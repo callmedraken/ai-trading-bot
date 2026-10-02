@@ -390,15 +390,15 @@ R8_HALT_REGISTRATION_PIN: Final = (
 
 ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "4dece99d8993934e9747f091415927353b70a2e3"
 ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
-ARCH131_APPROVAL_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-approval-paper-mode"
+ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
 
 
-def _arch131_approval_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
+def _arch131_review_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     names: set[str] = set()
     for relative in (
-        "src/trading_bot/approval_paper/models.py",
-        "src/trading_bot/approval_paper/store.py",
+        "src/trading_bot/review_paper/models.py",
+        "src/trading_bot/review_paper/store.py",
     ):
         path = repo_root / relative
         try:
@@ -2201,22 +2201,22 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
-        "arch131-robinhood-approval-paper": CheckpointSpec(
-            name="arch131-robinhood-approval-paper",
-            description="Architecture 131 Robinhood manual-approval paper ledger",
+        "arch131-robinhood-review-paper": CheckpointSpec(
+            name="arch131-robinhood-review-paper",
+            description="Architecture 131 Robinhood review-based paper ledger",
             tests=(
                 *COMMON_TESTS,
-                "tests/approval_paper/test_store.py",
+                "tests/review_paper/test_store.py",
             ),
             ruff_paths=(
                 *COMMON_RUFF_PATHS,
-                "src/trading_bot/approval_paper/__init__.py",
-                "src/trading_bot/approval_paper/models.py",
-                "src/trading_bot/approval_paper/store.py",
-                "tests/approval_paper/test_store.py",
+                "src/trading_bot/review_paper/__init__.py",
+                "src/trading_bot/review_paper/models.py",
+                "src/trading_bot/review_paper/store.py",
+                "tests/review_paper/test_store.py",
             ),
-            authority_check=_arch131_approval_paper_authority_check,
-            remote_branch=ARCH131_APPROVAL_PAPER_REMOTE_BRANCH,
+            authority_check=_arch131_review_paper_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
         ),
         "arch130-r8i-d1": CheckpointSpec(
             name="arch130-r8i-d1",

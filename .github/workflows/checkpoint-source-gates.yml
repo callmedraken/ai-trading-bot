@@ -7,7 +7,7 @@ on:
       - feature/d10c-durable-wake-evidence
       - feature/d10c-r8-terminal-halt
       - feature/d10c-r8-incident-reconciliation
-      - feature/robinhood-approval-paper-mode
+      - feature/robinhood-review-paper-mode
   pull_request:
 
 permissions:
@@ -98,9 +98,9 @@ jobs:
           }
 
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-approval-paper
+            verify arch131-robinhood-review-paper
           if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-approval-paper'
+            $Failures += 'arch131-robinhood-review-paper'
           }
 
           if ($Failures.Count -ne 0) {

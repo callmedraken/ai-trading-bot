@@ -157,15 +157,15 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch128-r8",
         "arch128-r8-terminal-halt",
         "arch130-r8i-d1",
-        "arch131-robinhood-approval-paper",
+        "arch131-robinhood-review-paper",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
         assert "scripts/checkpoint_runner.py" in spec.ruff_paths
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
-            "feature/robinhood-approval-paper-mode"
-            if spec.name == "arch131-robinhood-approval-paper"
+            "feature/robinhood-review-paper-mode"
+            if spec.name == "arch131-robinhood-review-paper"
             else (
                 "feature/d10c-r8-incident-reconciliation"
                 if spec.name == "arch130-r8i-d1"
@@ -188,8 +188,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r7"].execute is runner._r7_execute
     assert specs["arch130-r8i-d1"].preflight is runner._arch130_r8i_d1_preflight
     assert specs["arch130-r8i-d1"].execute is None
-    assert specs["arch131-robinhood-approval-paper"].preflight is None
-    assert specs["arch131-robinhood-approval-paper"].execute is None
+    assert specs["arch131-robinhood-review-paper"].preflight is None
+    assert specs["arch131-robinhood-review-paper"].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -208,7 +208,7 @@ def test_current_arch128_authority_profiles_pass() -> None:
     assert specs["arch128-r7"].authority_check(repo_root) == ()
     assert specs["arch128-r8"].authority_check(repo_root) == ()
     assert specs["arch130-r8i-d1"].authority_check(repo_root) == ()
-    assert specs["arch131-robinhood-approval-paper"].authority_check(repo_root) == ()
+    assert specs["arch131-robinhood-review-paper"].authority_check(repo_root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:

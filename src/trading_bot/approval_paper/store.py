@@ -81,9 +81,7 @@ class ApprovalPaperStore:
             raise ValueError("quote symbol must match intent")
         if quote.observed_at < intent.proposed_at:
             raise ValueError("quote cannot precede Robinhood approval proposal")
-        slippage = require_decimal(
-            slippage_basis_points, "slippage_basis_points"
-        )
+        slippage = require_decimal(slippage_basis_points, "slippage_basis_points")
         commission_value = require_decimal(commission, "commission")
         if commission_value < Decimal("0"):
             raise ValueError("commission must be zero or greater")
@@ -320,7 +318,10 @@ class ApprovalPaperStore:
                             "approval-paper schema version mismatch"
                         )
                     stored_cash = metadata.get("starting_cash")
-                    if stored_cash is None or Decimal(stored_cash) != self._starting_cash:
+                    if (
+                        stored_cash is None
+                        or Decimal(stored_cash) != self._starting_cash
+                    ):
                         raise ApprovalPaperStoreError(
                             "approval-paper starting_cash mismatch"
                         )
@@ -444,9 +445,7 @@ def _record_from_row(row: tuple[object, ...]) -> ApprovalPaperRecord:
         risk_reason_codes=tuple(reason_codes),
         proposal_reason=str(proposal_reason),
         proposal_confidence=(
-            None
-            if proposal_confidence is None
-            else Decimal(str(proposal_confidence))
+            None if proposal_confidence is None else Decimal(str(proposal_confidence))
         ),
         order_type=OrderType(str(order_type)),
         time_in_force=TimeInForce(str(time_in_force)),

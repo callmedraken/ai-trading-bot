@@ -166,7 +166,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
             "feature/robinhood-review-paper-mode"
-            if spec.name in {
+            if spec.name
+            in {
                 "arch131-robinhood-review-paper",
                 "arch131-robinhood-mcp-schema",
             }

@@ -74,6 +74,49 @@ COMMON_RUFF_PATHS: Final = (
 )
 
 
+CI_CHECKPOINTS: Final = (
+    "arch128-parent-acl-repair",
+    "arch128-r4",
+    "arch128-r5-substrate",
+    "arch128-r5-trading",
+    "arch128-r6",
+    "arch128-r7",
+    "arch128-r8-terminal-halt",
+    "arch130-r8i-d1",
+    "arch131-robinhood-review-paper",
+    "arch131-robinhood-mcp-schema",
+    "arch131-robinhood-paper-cycle",
+    "arch131-robinhood-performance",
+    "arch131-robinhood-direct-mcp",
+    "arch131-robinhood-oauth-windows",
+    "arch131-robinhood-agentic-account",
+    "arch131-robinhood-paper-operator",
+    "arch131-robinhood-paper-intent-bridge",
+    "arch131-robinhood-deterministic-paper-pipeline",
+)
+
+
+def _batch_workflow_is_reviewed(workflow: str) -> bool:
+    # Freeze the executable batch command, all 18 participants and their order,
+    # and exit propagation. Comments, duplicates and missing phases must drift.
+    invocation = (
+        "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
+        "-File .\\ops.ps1 `\n"
+        "            verify-batch `\n"
+        + "".join(
+            f"              {name}"
+            + (" `\n" if index < len(CI_CHECKPOINTS) - 1 else "\n")
+            for index, name in enumerate(CI_CHECKPOINTS)
+        )
+        + "          exit $LASTEXITCODE\n"
+    )
+    return (
+        workflow.count("verify-batch") == 1
+        and workflow.count(invocation) == 1
+        and "verify arch" not in workflow
+    )
+
+
 def _qualified_names(node: ast.AST) -> set[str]:
     result: set[str] = set()
     for item in ast.walk(node):
@@ -668,23 +711,7 @@ def _arch131_deterministic_paper_pipeline_authority_check(
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
         ).read_text(encoding="utf-8")
-        invocation = (
-            "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
-            "-File .\\ops.ps1 `\n"
-            "            verify arch131-robinhood-deterministic-paper-pipeline\n"
-            "          if ($LASTEXITCODE -ne 0) {\n"
-            "            $Failures += "
-            "'arch131-robinhood-deterministic-paper-pipeline'\n"
-            "          }"
-        )
-        bridge_invocation = invocation.replace(
-            name, "arch131-robinhood-paper-intent-bridge"
-        )
-        if (
-            workflow.count(invocation) != 1
-            or workflow.count(bridge_invocation) != 1
-            or workflow.index(invocation) <= workflow.index(bridge_invocation)
-        ):
+        if not _batch_workflow_is_reviewed(workflow):
             failures.append("131-J workflow invocation/131-I ordering drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-J source or structural boundary unavailable")
@@ -776,22 +803,7 @@ def _arch131_paper_intent_bridge_authority_check(repo_root: Path) -> tuple[str, 
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
         ).read_text(encoding="utf-8")
-        invocation = (
-            "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
-            "-File .\\ops.ps1 `\n"
-            "            verify arch131-robinhood-paper-intent-bridge\n"
-            "          if ($LASTEXITCODE -ne 0) {\n"
-            "            $Failures += 'arch131-robinhood-paper-intent-bridge'\n"
-            "          }"
-        )
-        operator_invocation = invocation.replace(
-            "arch131-robinhood-paper-intent-bridge", "arch131-robinhood-paper-operator"
-        )
-        if (
-            workflow.count(invocation) != 1
-            or workflow.count(operator_invocation) != 1
-            or workflow.index(invocation) <= workflow.index(operator_invocation)
-        ):
+        if not _batch_workflow_is_reviewed(workflow):
             failures.append("131-I workflow invocation/131-H ordering drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-I source or structural boundary unavailable")
@@ -889,9 +901,7 @@ def _arch131_paper_operator_authority_check(repo_root: Path) -> tuple[str, ...]:
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
         ).read_text(encoding="utf-8")
-        if workflow.index("verify arch131-robinhood-paper-operator") <= workflow.index(
-            "verify arch131-robinhood-agentic-account"
-        ):
+        if not _batch_workflow_is_reviewed(workflow):
             failures.append("131-H workflow ordering drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-H source or structural boundary unavailable")
@@ -3705,6 +3715,257 @@ def verify_checkpoint(
     return passed, report_path
 
 
+def batch_requirements(
+    specs: Sequence[CheckpointSpec],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Collect source requirements in deterministic caller/first-seen order."""
+    if not specs or len({spec.name for spec in specs}) != len(specs):
+        raise ValueError("batch requires distinct registered checkpoints")
+    return (
+        tuple(dict.fromkeys(path for spec in specs for path in spec.tests)),
+        tuple(dict.fromkeys(path for spec in specs for path in spec.ruff_paths)),
+    )
+
+
+def verify_batch(
+    specs: Sequence[CheckpointSpec],
+    *,
+    repo_root: Path,
+    evidence_root: Path,
+) -> tuple[bool, Path]:
+    """Share source commands while independently checking every authority."""
+    tests, ruff_paths = batch_requirements(specs)
+    state_before = _git_state(repo_root)
+    if state_before["porcelain"]:
+        raise RuntimeError("source gate requires a clean worktree")
+    evidence_dir = evidence_root / f"source-gate-batch-{_stamp()}"
+    command_dir = evidence_dir / "commands"
+    command_dir.mkdir(parents=True, exist_ok=False)
+    shared = CheckpointSpec(
+        name="source_gate_batch",
+        description="shared source requirements",
+        tests=tests,
+        ruff_paths=ruff_paths,
+        authority_check=lambda repo: (),
+    )
+    steps = build_verification_steps(
+        shared, python_executable=sys.executable, basetemp=evidence_dir / "pytest"
+    )
+    counter = 0
+
+    def execute(step: Step, diagnostic: bool) -> CommandOutcome:
+        nonlocal counter
+        counter += 1
+        return _execute_step(
+            step,
+            repo_root=repo_root,
+            command_dir=command_dir,
+            index=counter,
+            diagnostic=diagnostic,
+        )
+
+    outcomes = run_verification_steps(steps, execute)
+    authority_failures: dict[str, tuple[str, ...]] = {}
+    for spec in specs:
+        try:
+            authority_failures[spec.name] = spec.authority_check(repo_root)
+        except Exception as exc:
+            # One unavailable authority must fail closed without hiding others.
+            authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
+    state_after = _git_state(repo_root)
+    commands_pass = all(
+        outcome.exit_code == 0
+        for outcome in outcomes
+        if not outcome.name.endswith("_diagnostic")
+    )
+    identity_stable = (
+        state_before["head"] == state_after["head"]
+        and state_before["tree"] == state_after["tree"]
+        and not state_after["porcelain"]
+    )
+    passed = commands_pass and identity_stable and not any(authority_failures.values())
+    report_path = evidence_dir / "report.json"
+    participants = {}
+    for spec in specs:
+        participants[spec.name] = {
+            "checkpoint": spec.name,
+            "batch_report": str(report_path),
+            "tests": list(spec.tests),
+            "ruff_paths": list(spec.ruff_paths),
+            "tests_covered": all(path in tests for path in spec.tests),
+            "ruff_paths_covered": all(path in ruff_paths for path in spec.ruff_paths),
+            "authority_failures": list(authority_failures[spec.name]),
+            "authority_status": "FAIL" if authority_failures[spec.name] else "PASS",
+            "source_before": state_before,
+            "source_after": state_after,
+            "status": "PASS"
+            if commands_pass and identity_stable and not authority_failures[spec.name]
+            else "FAIL",
+        }
+    report = {
+        "schema": SCHEMA,
+        "kind": "source_gate_batch",
+        "checkpoints": [spec.name for spec in specs],
+        "source_before": state_before,
+        "source_after": state_after,
+        "identity_stable": identity_stable,
+        "tests": list(tests),
+        "ruff_paths": list(ruff_paths),
+        "commands": [asdict(outcome) for outcome in outcomes],
+        "authority_failures": authority_failures,
+        "participants": participants,
+        "production_effects": "NOT_RUN",
+        "scheduler_mutation": "NOT_RUN",
+        "provider_effects": "NOT_RUN",
+        "broker_live_effects": "NOT_RUN",
+        "status": "PASS" if passed else "FAIL",
+    }
+    _write_json(report_path, report)
+    print(
+        f"CHECKPOINTS={len(specs)} TEST_PATHS={len(tests)} RUFF_PATHS={len(ruff_paths)}"
+    )
+    for outcome in outcomes:
+        print(f"{outcome.name.upper()}={outcome.exit_code}")
+    for name, failures in authority_failures.items():
+        print(f"AUTHORITY[{name}]={'FAIL' if failures else 'PASS'}")
+        for failure in failures:
+            print(f"AUTHORITY_FAILURE[{name}]={failure}")
+    print(f"IDENTITY_STABLE={identity_stable}")
+    print(f"EVIDENCE={report_path}")
+    print(f"OVERALL={'PASS' if passed else 'FAIL'}")
+    return passed, report_path
+
+
+def classify_changed_paths(paths: Sequence[str]) -> str:
+    """Only a nonempty, known set of strictly docs/ paths takes the fast path."""
+    if paths and all(
+        path.startswith("docs/")
+        and all(part not in {"", ".", ".."} for part in path.split("/"))
+        and "\\" not in path
+        and "\x00" not in path
+        for path in paths
+    ):
+        return "DOCS_ONLY"
+    return "FULL"
+
+
+def _ci_changes(repo_root: Path, head: str) -> dict[str, object]:
+    """Read a closed event base; unavailable/unknown ranges always run FULL."""
+    fallback = {
+        "mode": "FULL",
+        "base": None,
+        "changed_paths": [],
+        "reason": "event base unavailable",
+    }
+    try:
+        event = json.loads(
+            Path(os.environ["GITHUB_EVENT_PATH"]).read_text(encoding="utf-8")
+        )
+        if not isinstance(event, dict):
+            return fallback
+        event_name = os.environ.get("GITHUB_EVENT_NAME")
+        if event_name == "push":
+            base = event.get("before")
+        elif event_name == "pull_request":
+            base = event["pull_request"]["base"]["sha"]
+        else:
+            return fallback
+        if (
+            not isinstance(base, str)
+            or len(base) != 40
+            or set(base) == {"0"}
+            or any(char not in "0123456789abcdef" for char in base)
+        ):
+            return fallback
+        if _git_output(repo_root, "cat-file", "-t", base) != "commit":
+            return fallback
+        _git_output(repo_root, "merge-base", "--is-ancestor", base, head)
+        # Disable rename detection: moving source into docs must include deletion
+        # of the old source path. NUL delimiters preserve unusual filenames.
+        changed = subprocess.run(
+            ("git", "diff", "--name-only", "-z", "--no-renames", base, head, "--"),
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+        )
+        raw = changed.stdout.decode("utf-8")
+        if changed.returncode != 0 or (raw and not raw.endswith("\x00")):
+            return fallback
+        paths = raw.removesuffix("\x00").split("\x00") if raw else []
+        mode = classify_changed_paths(paths)
+        return {
+            "mode": mode,
+            "base": base,
+            "changed_paths": paths,
+            "reason": "all changed paths under docs/"
+            if mode == "DOCS_ONLY"
+            else "non-docs or empty diff",
+        }
+    except (OSError, UnicodeError, KeyError, TypeError, ValueError, RuntimeError):
+        return fallback
+
+
+def verify_ci_changes(
+    *,
+    repo_root: Path,
+    evidence_root: Path,
+    docs_only: bool = False,
+) -> tuple[bool, Path]:
+    """Classify CI changes or validate the docs-only range without dependencies."""
+    before = _git_state(repo_root)
+    if before["porcelain"]:
+        raise RuntimeError("CI change gate requires a clean worktree")
+    changes = _ci_changes(repo_root, str(before["head"]))
+    evidence_dir = (
+        evidence_root / f"{'docs-only' if docs_only else 'ci-changes'}-{_stamp()}"
+    )
+    evidence_dir.mkdir(parents=True, exist_ok=False)
+    outcomes = ()
+    if docs_only and changes["mode"] == "DOCS_ONLY":
+        command_dir = evidence_dir / "commands"
+        command_dir.mkdir()
+        step = Step(
+            "git_range_diff_check",
+            ("git", "diff", "--check", str(changes["base"]), str(before["head"]), "--"),
+        )
+        outcomes = (
+            _execute_step(step, repo_root=repo_root, command_dir=command_dir, index=1),
+        )
+    after = _git_state(repo_root)
+    stable = (
+        before["head"] == after["head"]
+        and before["tree"] == after["tree"]
+        and not after["porcelain"]
+    )
+    passed = stable and (
+        not docs_only or (changes["mode"] == "DOCS_ONLY" and outcomes[0].exit_code == 0)
+    )
+    report_path = evidence_dir / "report.json"
+    _write_json(
+        report_path,
+        {
+            "schema": SCHEMA,
+            "kind": "docs_only_gate" if docs_only else "ci_change_classification",
+            **changes,
+            "source_before": before,
+            "source_after": after,
+            "identity_stable": stable,
+            "status": "PASS" if passed else "FAIL",
+            "commands": [asdict(outcome) for outcome in outcomes],
+            "production_effects": "NOT_RUN",
+            "scheduler_mutation": "NOT_RUN",
+            "provider_effects": "NOT_RUN",
+            "broker_live_effects": "NOT_RUN",
+        },
+    )
+    if not docs_only and os.environ.get("GITHUB_OUTPUT"):
+        with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as output:
+            output.write(f"mode={changes['mode'] if passed else 'FULL'}\n")
+    print(f"MODE={changes['mode']} EVIDENCE={report_path}")
+    print(f"OVERALL={'PASS' if passed else 'FAIL'}")
+    return passed, report_path
+
+
 def preflight_checkpoint(
     spec: CheckpointSpec,
     *,
@@ -3983,6 +4244,13 @@ def _parser(specs: Mapping[str, CheckpointSpec]) -> argparse.ArgumentParser:
         help="override the external checkpoint evidence root",
     )
 
+    batch = subparsers.add_parser("verify-batch", help="share registered source gates")
+    batch.add_argument("checkpoints", nargs="+", choices=sorted(specs))
+    batch.add_argument("--evidence-root", type=Path)
+    for command in ("classify-ci", "verify-docs"):
+        changes = subparsers.add_parser(command, help="source-only CI change gate")
+        changes.add_argument("--evidence-root", type=Path)
+
     preflight_specs = sorted(
         name for name, spec in specs.items() if spec.preflight is not None
     )
@@ -4016,12 +4284,16 @@ def _parser(specs: Mapping[str, CheckpointSpec]) -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     repo_root = Path(__file__).resolve().parent.parent
     specs = _checkpoint_specs()
-    args = _parser(specs).parse_args(argv)
+    parser = _parser(specs)
+    args = parser.parse_args(argv)
+    if args.command == "verify-batch" and len(set(args.checkpoints)) != len(
+        args.checkpoints
+    ):
+        parser.error("duplicate checkpoint names are not allowed")
 
     if args.command == "status":
         return _status(repo_root, specs)
 
-    spec = specs[args.checkpoint]
     evidence_root = (
         args.evidence_root
         if args.evidence_root is not None
@@ -4029,6 +4301,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     try:
+        if args.command == "verify-batch":
+            passed, _ = verify_batch(
+                [specs[name] for name in args.checkpoints],
+                repo_root=repo_root,
+                evidence_root=evidence_root,
+            )
+            return 0 if passed else 1
+        if args.command in {"classify-ci", "verify-docs"}:
+            passed, _ = verify_ci_changes(
+                repo_root=repo_root,
+                evidence_root=evidence_root,
+                docs_only=args.command == "verify-docs",
+            )
+            return 0 if passed else 1
+        spec = specs[args.checkpoint]
         if args.command == "verify":
             passed, _ = verify_checkpoint(
                 spec,

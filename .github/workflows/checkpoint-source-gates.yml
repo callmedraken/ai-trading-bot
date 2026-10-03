@@ -18,6 +18,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 20
 
+    env:
+      AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -29,7 +32,22 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Classify changed paths
+        id: changes
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 classify-ci
+          exit $LASTEXITCODE
+
+      - name: Validate docs-only range
+        if: steps.changes.outputs.mode == 'DOCS_ONLY'
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-docs
+          exit $LASTEXITCODE
+
       - name: Install source-gate dependencies
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
         shell: powershell
         run: |
           python -m pip install --disable-pip-version-check `
@@ -38,133 +56,45 @@ jobs:
             "tzdata>=2024.1,<2027.0"
 
       - name: Show checkpoint status
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
         shell: powershell
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
 
-      - name: Verify source checkpoints
+      - name: Verify batch source checkpoints
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
         shell: powershell
         run: |
-          $env:AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT = Join-Path `
-            $env:RUNNER_TEMP 'ai-trading-bot-checkpoints'
-          $Failures = @()
-
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-parent-acl-repair
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-parent-acl-repair'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r4
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r4'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r5-substrate
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r5-substrate'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r5-trading
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r5-trading'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r6
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r6'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r7
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r7'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch128-r8-terminal-halt
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch128-r8-terminal-halt'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch130-r8i-d1
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch130-r8i-d1'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-review-paper
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-review-paper'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-mcp-schema
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-mcp-schema'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-paper-cycle
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-paper-cycle'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-performance
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-performance'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-direct-mcp
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-direct-mcp'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-oauth-windows
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-oauth-windows'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-agentic-account
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-agentic-account'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-paper-operator
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-paper-operator'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-paper-intent-bridge
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-paper-intent-bridge'
-          }
-
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify arch131-robinhood-deterministic-paper-pipeline
-          if ($LASTEXITCODE -ne 0) {
-            $Failures += 'arch131-robinhood-deterministic-paper-pipeline'
-          }
-
-          if ($Failures.Count -ne 0) {
-            throw "Checkpoint source gates failed: $($Failures -join ', ')"
-          }
+            verify-batch `
+              arch128-parent-acl-repair `
+              arch128-r4 `
+              arch128-r5-substrate `
+              arch128-r5-trading `
+              arch128-r6 `
+              arch128-r7 `
+              arch128-r8-terminal-halt `
+              arch130-r8i-d1 `
+              arch131-robinhood-review-paper `
+              arch131-robinhood-mcp-schema `
+              arch131-robinhood-paper-cycle `
+              arch131-robinhood-performance `
+              arch131-robinhood-direct-mcp `
+              arch131-robinhood-oauth-windows `
+              arch131-robinhood-agentic-account `
+              arch131-robinhood-paper-operator `
+              arch131-robinhood-paper-intent-bridge `
+              arch131-robinhood-deterministic-paper-pipeline
+          exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: checkpoint-source-gate-evidence
-          path: ${{ runner.temp }}/ai-trading-bot-checkpoints
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+            !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
           if-no-files-found: ignore

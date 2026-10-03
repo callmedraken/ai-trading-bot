@@ -1677,8 +1677,8 @@ def test_131f_source_registration_and_workflow():
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert workflow.index("verify arch131-robinhood-oauth-windows") > workflow.index(
-        "verify arch131-robinhood-direct-mcp"
+    assert workflow.index("arch131-robinhood-oauth-windows") > workflow.index(
+        "arch131-robinhood-direct-mcp"
     )
 
 
@@ -1695,9 +1695,9 @@ def test_131g_source_registration():
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert "verify arch131-robinhood-agentic-account" in workflow
-    assert workflow.index("verify arch131-robinhood-agentic-account") > workflow.index(
-        "verify arch131-robinhood-oauth-windows"
+    assert "arch131-robinhood-agentic-account" in workflow
+    assert workflow.index("arch131-robinhood-agentic-account") > workflow.index(
+        "arch131-robinhood-oauth-windows"
     )
 
 
@@ -1803,8 +1803,8 @@ def test_131h_source_registration_and_workflow():
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert workflow.index("verify arch131-robinhood-paper-operator") > workflow.index(
-        "verify arch131-robinhood-agentic-account"
+    assert workflow.index("arch131-robinhood-paper-operator") > workflow.index(
+        "arch131-robinhood-agentic-account"
     )
 
 
@@ -1908,8 +1908,8 @@ def test_131h_source_registration_and_workflow():
         ("scripts/checkpoint_runner.py", "execute=None,", "execute=host_effect,"),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "verify arch131-robinhood-paper-operator",
-            "verify missing-checkpoint",
+            "arch131-robinhood-paper-operator",
+            "missing-checkpoint",
         ),
     ],
 )
@@ -1960,8 +1960,8 @@ def test_131i_source_registration_and_workflow() -> None:
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert workflow.index("verify arch131-robinhood-paper-intent-bridge") > (
-        workflow.index("verify arch131-robinhood-paper-operator")
+    assert workflow.index("arch131-robinhood-paper-intent-bridge") > (
+        workflow.index("arch131-robinhood-paper-operator")
     )
 
 
@@ -2102,28 +2102,29 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "verify arch131-robinhood-paper-intent-bridge",
-            "verify missing-checkpoint",
+            "arch131-robinhood-paper-intent-bridge",
+            "missing-checkpoint",
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "$Failures += 'arch131-robinhood-paper-intent-bridge'",
+            "verify-batch",
             "$Failures += 'wrong'",
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "            verify arch131-robinhood-paper-intent-bridge",
-            "          # verify arch131-robinhood-paper-intent-bridge",
+            "              arch131-robinhood-paper-intent-bridge",
+            "              # arch131-robinhood-paper-intent-bridge",
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "            verify arch131-robinhood-paper-operator",
-            "          # verify arch131-robinhood-paper-operator",
+            "              arch131-robinhood-paper-operator",
+            "              # arch131-robinhood-paper-operator",
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "$Failures += 'arch131-robinhood-paper-operator'",
-            "$Failures += 'wrong'",
+            "arch131-robinhood-deterministic-paper-pipeline\n"
+            "          exit $LASTEXITCODE",
+            "arch131-robinhood-deterministic-paper-pipeline\n          exit 0",
         ),
     ],
 )
@@ -2174,8 +2175,8 @@ def test_131j_source_registration_and_workflow() -> None:
     repo = Path(runner.__file__).resolve().parent.parent
     assert spec.authority_check(repo) == ()
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert workflow.index("verify arch131-robinhood-deterministic-paper-pipeline") > (
-        workflow.index("verify arch131-robinhood-paper-intent-bridge")
+    assert workflow.index("arch131-robinhood-deterministic-paper-pipeline") > (
+        workflow.index("arch131-robinhood-paper-intent-bridge")
     )
 
 
@@ -2353,16 +2354,16 @@ def test_131j_authority_freezes_source_only_registration(tmp_path, before, after
     "before,after",
     [
         (
-            "            verify arch131-robinhood-deterministic-paper-pipeline",
-            "          # verify arch131-robinhood-deterministic-paper-pipeline",
+            "              arch131-robinhood-deterministic-paper-pipeline",
+            "              # arch131-robinhood-deterministic-paper-pipeline",
         ),
         (
-            "$Failures += 'arch131-robinhood-deterministic-paper-pipeline'",
+            "exit $LASTEXITCODE",
             "$Failures += 'other'",
         ),
         (
-            "            verify arch131-robinhood-paper-intent-bridge",
-            "          # verify arch131-robinhood-paper-intent-bridge",
+            "              arch131-robinhood-paper-intent-bridge",
+            "              # arch131-robinhood-paper-intent-bridge",
         ),
     ],
 )
@@ -2387,3 +2388,589 @@ def test_131j_authority_rejects_reversed_workflow_order(tmp_path):
     )
     path.write_text(source, encoding="utf-8")
     assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+# CI source-gate optimization regressions. Frozen independently of the runner
+# registry to detect omissions/order changes in the workflow and its pins.
+_EXPECTED_CI_CHECKPOINTS = (
+    "arch128-parent-acl-repair",
+    "arch128-r4",
+    "arch128-r5-substrate",
+    "arch128-r5-trading",
+    "arch128-r6",
+    "arch128-r7",
+    "arch128-r8-terminal-halt",
+    "arch130-r8i-d1",
+    "arch131-robinhood-review-paper",
+    "arch131-robinhood-mcp-schema",
+    "arch131-robinhood-paper-cycle",
+    "arch131-robinhood-performance",
+    "arch131-robinhood-direct-mcp",
+    "arch131-robinhood-oauth-windows",
+    "arch131-robinhood-agentic-account",
+    "arch131-robinhood-paper-operator",
+    "arch131-robinhood-paper-intent-bridge",
+    "arch131-robinhood-deterministic-paper-pipeline",
+)
+
+
+def _clean_source():
+    return {"head": "a" * 40, "tree": "b" * 40, "branch": "example", "porcelain": ""}
+
+
+def _batch_specs(calls, *, authority_failure=False, authority_exception=False):
+    def forbidden():
+        raise AssertionError("host/effect capability called")
+
+    def authority(name):
+        def check(repo):
+            calls.append(name)
+            if name == "second" and authority_exception:
+                raise RuntimeError("authority unavailable")
+            return ("boundary drift",) if name == "second" and authority_failure else ()
+
+        return check
+
+    return tuple(
+        runner.CheckpointSpec(
+            name=name,
+            description=name,
+            tests=tests,
+            ruff_paths=ruff,
+            authority_check=authority(name),
+            preflight=forbidden,
+            execute=forbidden,
+        )
+        for name, tests, ruff in (
+            ("first", ("tests/shared.py", "tests/first.py"), ("shared.py", "first.py")),
+            (
+                "second",
+                ("tests/second.py", "tests/shared.py"),
+                ("second.py", "shared.py"),
+            ),
+            ("third", ("tests/first.py",), ("third.py", "first.py")),
+        )
+    )
+
+
+def test_batch_first_seen_requirements_and_all_current_coverage():
+    tests, ruff = runner.batch_requirements(_batch_specs([]))
+    assert tests == ("tests/shared.py", "tests/first.py", "tests/second.py")
+    assert ruff == ("shared.py", "first.py", "second.py", "third.py")
+    specs = runner._checkpoint_specs()
+    selected = [specs[name] for name in _EXPECTED_CI_CHECKPOINTS]
+    tests, ruff = runner.batch_requirements(selected)
+    assert len(tests) == len(set(tests))
+    assert len(ruff) == len(set(ruff))
+    assert tests[0] == runner.COMMON_TESTS[0]
+    assert ruff[:2] == runner.COMMON_RUFF_PATHS
+    for spec in selected:
+        assert set(spec.tests) <= set(tests)
+        assert set(spec.ruff_paths) <= set(ruff)
+    assert runner.CI_CHECKPOINTS == _EXPECTED_CI_CHECKPOINTS
+
+
+@pytest.mark.parametrize(
+    "failure", [None, "pytest", "ruff_check", "ruff_format", "git_diff_check"]
+)
+def test_batch_shares_commands_preserves_order_and_collects_authorities(
+    tmp_path,
+    monkeypatch,
+    failure,
+):
+    authorities = []
+    specs = _batch_specs(authorities)
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    calls = []
+
+    def execute(step, **kwargs):
+        diagnostic = kwargs["diagnostic"]
+        calls.append((step, diagnostic))
+        return _outcome(
+            step.name + ("_diagnostic" if diagnostic else ""),
+            1 if step.name == failure and not diagnostic else 0,
+        )
+
+    monkeypatch.setattr(runner, "_execute_step", execute)
+    passed, report_path = runner.verify_batch(
+        specs, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+    assert passed == (failure is None)
+    assert [step.name for step, diagnostic in calls if not diagnostic] == [
+        "pytest",
+        "ruff_check",
+        "ruff_format",
+        "git_diff_check",
+    ]
+    assert [step.name for step, diagnostic in calls if diagnostic] == (
+        [failure] if failure in {"ruff_check", "ruff_format"} else []
+    )
+    assert calls[0][0].argv[3:6] == (
+        "tests/shared.py",
+        "tests/first.py",
+        "tests/second.py",
+    )
+    assert calls[1][0].argv[5:] == ("shared.py", "first.py", "second.py", "third.py")
+    assert authorities == ["first", "second", "third"]
+    report = json.loads(report_path.read_text())
+    assert report["kind"] == "source_gate_batch"
+    assert report["checkpoints"] == authorities
+    assert report["source_before"] == report["source_after"] == _clean_source()
+    assert report["identity_stable"] is True
+    assert report["authority_failures"] == dict.fromkeys(authorities, [])
+    for spec in specs:
+        participant = report["participants"][spec.name]
+        assert participant["checkpoint"] == spec.name
+        assert participant["batch_report"] == str(report_path)
+        assert participant["tests"] == list(spec.tests)
+        assert participant["ruff_paths"] == list(spec.ruff_paths)
+        assert participant["tests_covered"] and participant["ruff_paths_covered"]
+        assert participant["authority_status"] == "PASS"
+        assert participant["status"] == ("PASS" if passed else "FAIL")
+    for field in (
+        "production_effects",
+        "scheduler_mutation",
+        "provider_effects",
+        "broker_live_effects",
+    ):
+        assert report[field] == "NOT_RUN"
+    assert not list(report_path.parent.glob("*/pytest"))
+
+
+@pytest.mark.parametrize("exception", [False, True])
+def test_batch_authority_failure_attribution_and_continuation(
+    tmp_path, monkeypatch, exception
+):
+    calls = []
+    specs = _batch_specs(calls, authority_failure=True, authority_exception=exception)
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    monkeypatch.setattr(
+        runner, "_execute_step", lambda step, **kw: _outcome(step.name, 0)
+    )
+    passed, path = runner.verify_batch(
+        specs, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+    assert not passed
+    assert calls == ["first", "second", "third"]
+    report = json.loads(path.read_text())
+    assert report["authority_failures"]["first"] == []
+    assert report["authority_failures"]["second"]
+    assert report["authority_failures"]["third"] == []
+    assert report["participants"]["first"]["status"] == "PASS"
+    assert report["participants"]["second"]["status"] == "FAIL"
+    assert report["status"] == "FAIL"
+
+
+@pytest.mark.parametrize(
+    "drift", [{"head": "c" * 40}, {"tree": "d" * 40}, {"porcelain": " M changed.py"}]
+)
+def test_batch_source_drift_fails(tmp_path, monkeypatch, drift):
+    states = iter([_clean_source(), {**_clean_source(), **drift}])
+    monkeypatch.setattr(runner, "_git_state", lambda repo: next(states))
+    monkeypatch.setattr(
+        runner, "_execute_step", lambda step, **kw: _outcome(step.name, 0)
+    )
+    passed, path = runner.verify_batch(
+        _batch_specs([]), repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+    assert not passed
+    report = json.loads(path.read_text())
+    assert not report["identity_stable"]
+    assert all(p["status"] == "FAIL" for p in report["participants"].values())
+
+
+def test_batch_dirty_source_rejected_before_commands_or_authority(
+    tmp_path, monkeypatch
+):
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "_git_state",
+        lambda repo: {**_clean_source(), "porcelain": "?? unknown"},
+    )
+    monkeypatch.setattr(
+        runner, "_execute_step", lambda *a, **kw: pytest.fail("command ran")
+    )
+    with pytest.raises(RuntimeError, match="clean worktree"):
+        runner.verify_batch(
+            _batch_specs(calls), repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+        )
+    assert calls == []
+    assert not (tmp_path / "evidence").exists()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [[], ["unknown"], ["arch128-r4", "arch128-r4"], ["arch128-r4", "--execute"]],
+)
+def test_batch_cli_rejects_invalid_selection(monkeypatch, arguments):
+    monkeypatch.setattr(
+        runner, "verify_batch", lambda *a, **kw: pytest.fail("batch ran")
+    )
+    with pytest.raises(SystemExit) as error:
+        runner.main(["verify-batch", *arguments])
+    assert error.value.code == 2
+
+
+def test_batch_cli_preserves_order_and_single_verify_dispatch(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(
+        runner,
+        "verify_batch",
+        lambda specs, **kw: (seen.extend(s.name for s in specs) or True, tmp_path),
+    )
+    assert runner.main(["verify-batch", "arch128-r6", "arch128-r4"]) == 0
+    assert seen == ["arch128-r6", "arch128-r4"]
+    monkeypatch.setattr(
+        runner,
+        "verify_checkpoint",
+        lambda spec, **kw: (seen.append(spec.name) or True, tmp_path),
+    )
+    assert runner.main(["verify", "arch128-r4"]) == 0
+    assert seen[-1] == "arch128-r4"
+
+
+def test_single_verify_report_and_command_selection_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    calls = []
+
+    def execute(step, **kw):
+        calls.append(step)
+        return _outcome(step.name, 0)
+
+    monkeypatch.setattr(runner, "_execute_step", execute)
+    passed, path = runner.verify_checkpoint(
+        _spec(), repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+    assert passed
+    report = json.loads(path.read_text())
+    assert report["kind"] == "source_gate" and report["checkpoint"] == "example"
+    assert report["started_from"] == report["finished_at"] == _clean_source()
+    assert "participants" not in report
+    assert calls[0].argv[3] == _spec().tests[0]
+    assert [step.name for step in calls] == [
+        "pytest",
+        "ruff_check",
+        "ruff_format",
+        "git_diff_check",
+    ]
+
+
+@pytest.mark.parametrize(
+    "paths,expected",
+    [
+        (["docs/foo.md"], "DOCS_ONLY"),
+        (["docs/foo.md", "docs/nested/bar.md"], "DOCS_ONLY"),
+        (["docs/foo.md", "src/foo.py"], "FULL"),
+        (["docs/foo.md", "tests/foo.py"], "FULL"),
+        ([".github/workflows/checkpoint-source-gates.yml"], "FULL"),
+        (["scripts/checkpoint_runner.py"], "FULL"),
+        (["pyproject.toml"], "FULL"),
+        (["unknown"], "FULL"),
+        ([], "FULL"),
+        ([""], "FULL"),
+        (["docs/../src/foo.py"], "FULL"),
+        (["docs/"], "FULL"),
+        ([" docs/foo.md"], "FULL"),
+        (["docs\\foo.md"], "FULL"),
+    ],
+)
+def test_docs_changed_path_classification(paths, expected):
+    assert runner.classify_changed_paths(paths) == expected
+
+
+def _event(monkeypatch, tmp_path, base, name="push"):
+    event = tmp_path / "event.json"
+    event.write_text(
+        json.dumps(
+            {"before": base}
+            if name == "push"
+            else {"pull_request": {"base": {"sha": base}}}
+        )
+    )
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(event))
+    monkeypatch.setenv("GITHUB_EVENT_NAME", name)
+    return event
+
+
+@pytest.mark.parametrize("name", ["push", "pull_request"])
+def test_ci_classification_uses_exact_event_base_and_nul_paths(
+    tmp_path, monkeypatch, name
+):
+    base, head = "a" * 40, "b" * 40
+    _event(monkeypatch, tmp_path, base, name)
+    calls = []
+
+    def git(repo, *args):
+        calls.append(args)
+        return "commit" if args[0] == "cat-file" else ""
+
+    monkeypatch.setattr(runner, "_git_output", git)
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(
+            argv, 0, b"docs/a file.md\x00docs/nested.md\x00", b""
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    result = runner._ci_changes(tmp_path, head)
+    assert result["mode"] == "DOCS_ONLY"
+    assert result["changed_paths"] == ["docs/a file.md", "docs/nested.md"]
+    assert calls == [
+        ("cat-file", "-t", base),
+        ("merge-base", "--is-ancestor", base, head),
+        ("git", "diff", "--name-only", "-z", "--no-renames", base, head, "--"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "base", [None, "", "0" * 40, "invalid", "g" * 40, "--malicious", 123]
+)
+def test_ci_invalid_base_falls_back_without_git(tmp_path, monkeypatch, base):
+    _event(monkeypatch, tmp_path, base)
+    monkeypatch.setattr(
+        runner, "_git_output", lambda *a: pytest.fail("invalid base used")
+    )
+    assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+
+
+@pytest.mark.parametrize(
+    "bad_event", ["[]", "null", "{}", "{", '{"pull_request": null}']
+)
+def test_ci_missing_or_malformed_event_falls_back(tmp_path, monkeypatch, bad_event):
+    event = _event(monkeypatch, tmp_path, "a" * 40, "pull_request")
+    event.write_text(bad_event)
+    assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+    monkeypatch.delenv("GITHUB_EVENT_PATH")
+    assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+
+
+@pytest.mark.parametrize("stage", ["cat-file", "merge-base"])
+def test_ci_unavailable_base_or_nonancestor_falls_back(tmp_path, monkeypatch, stage):
+    _event(monkeypatch, tmp_path, "a" * 40)
+
+    def git(repo, *args):
+        if args[0] == stage:
+            raise RuntimeError("unavailable")
+        return "commit"
+
+    monkeypatch.setattr(runner, "_git_output", git)
+    assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+
+
+@pytest.mark.parametrize(
+    "raw,code",
+    [
+        (b"", 0),
+        (b" docs/hidden.md\x00", 0),
+        (b"docs/a.md", 0),
+        (b"docs/a.md\x00", 1),
+        (b"docs/a.md\x00src/old.py\x00", 0),
+    ],
+)
+def test_ci_unknown_diff_and_moved_source_fall_back(tmp_path, monkeypatch, raw, code):
+    _event(monkeypatch, tmp_path, "a" * 40)
+    monkeypatch.setattr(runner, "_git_output", lambda *a: "commit")
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda argv, **kw: subprocess.CompletedProcess(argv, code, raw, b""),
+    )
+    assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+
+
+@pytest.mark.parametrize(
+    "docs_only,mode,exit_code,drift,expected",
+    [
+        (False, "DOCS_ONLY", 0, False, True),
+        (False, "FULL", 0, False, True),
+        (True, "DOCS_ONLY", 0, False, True),
+        (True, "DOCS_ONLY", 1, False, False),
+        (True, "FULL", 0, False, False),
+        (True, "DOCS_ONLY", 0, True, False),
+        (False, "DOCS_ONLY", 0, True, False),
+    ],
+)
+def test_ci_docs_gate_evidence_range_check_and_output(
+    tmp_path, monkeypatch, docs_only, mode, exit_code, drift, expected
+):
+    states = iter(
+        [_clean_source(), {**_clean_source(), "porcelain": "?? drift" if drift else ""}]
+    )
+    monkeypatch.setattr(runner, "_git_state", lambda repo: next(states))
+    monkeypatch.setattr(
+        runner,
+        "_ci_changes",
+        lambda *a: {
+            "mode": mode,
+            "base": "c" * 40,
+            "changed_paths": ["docs/a.md"],
+            "reason": "test",
+        },
+    )
+    output = tmp_path / "output"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output))
+    calls = []
+
+    def execute(step, **kwargs):
+        calls.append(step.argv)
+        return _outcome(step.name, exit_code)
+
+    monkeypatch.setattr(runner, "_execute_step", execute)
+    passed, path = runner.verify_ci_changes(
+        repo_root=tmp_path, evidence_root=tmp_path / "evidence", docs_only=docs_only
+    )
+    assert passed == expected
+    assert calls == (
+        [("git", "diff", "--check", "c" * 40, "a" * 40, "--")]
+        if docs_only and mode == "DOCS_ONLY"
+        else []
+    )
+    report = json.loads(path.read_text())
+    assert report["status"] == ("PASS" if expected else "FAIL")
+    assert report["identity_stable"] == (not drift)
+    assert report["production_effects"] == "NOT_RUN"
+    if docs_only:
+        assert not output.exists()
+    else:
+        assert output.read_text() == f"mode={mode if expected else 'FULL'}\n"
+
+
+def test_docs_gate_rejects_dirty_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        runner,
+        "_git_state",
+        lambda repo: {**_clean_source(), "porcelain": " M docs/a.md"},
+    )
+    monkeypatch.setattr(
+        runner, "_ci_changes", lambda *a: pytest.fail("classified dirty source")
+    )
+    with pytest.raises(RuntimeError, match="clean worktree"):
+        runner.verify_ci_changes(
+            repo_root=tmp_path, evidence_root=tmp_path / "evidence", docs_only=True
+        )
+
+
+def test_ci_workflow_batch_order_conditions_and_slim_artifacts():
+    repo = Path(runner.__file__).resolve().parent.parent
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert workflow.count("verify-batch") == 1
+    assert "verify arch" not in workflow and "$Failures" not in workflow
+    command = workflow.split("            verify-batch `\n", 1)[1].split(
+        "          exit $LASTEXITCODE", 1
+    )[0]
+    assert (
+        tuple(line.strip().removesuffix(" `") for line in command.splitlines())
+        == _EXPECTED_CI_CHECKPOINTS
+    )
+    assert workflow.index("classify-ci") < workflow.index(
+        "Install source-gate dependencies"
+    )
+    for name in (
+        "Install source-gate dependencies",
+        "Show checkpoint status",
+        "Verify batch source checkpoints",
+    ):
+        assert (
+            f"- name: {name}\n        if: steps.changes.outputs.mode != 'DOCS_ONLY'"
+            in workflow
+        )
+    assert (
+        "- name: Validate docs-only range\n"
+        "        if: steps.changes.outputs.mode == 'DOCS_ONLY'" in workflow
+    )
+    assert "-File .\\ops.ps1 verify-docs" in workflow
+    upload = workflow.split("- name: Upload checkpoint evidence", 1)[1]
+    assert (
+        "/**/report.json" in upload
+        and "/**/commands/*.stdout.txt" in upload
+        and "/**/commands/*.stderr.txt" in upload
+    )
+    assert "!${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**" in upload
+    assert "path: ${{ runner.temp }}/ai-trading-bot-checkpoints\n" not in upload
+
+
+@pytest.mark.parametrize(
+    "mutation", ["duplicate", "comment", "exit", "rename", "reverse"]
+)
+def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mutation):
+    repo = Path(runner.__file__).resolve().parent.parent
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    if mutation == "duplicate":
+        workflow += "\nverify-batch arch128-r4\n"
+    elif mutation == "comment":
+        workflow = workflow.replace(
+            "              arch128-r4", "              # arch128-r4"
+        )
+    elif mutation == "exit":
+        workflow = workflow.replace("exit $LASTEXITCODE", "exit 0")
+    elif mutation == "rename":
+        workflow = workflow.replace("arch128-r4", "missing-checkpoint")
+    else:
+        workflow = (
+            workflow.replace("arch128-r4", "TEMP")
+            .replace("arch128-r6", "arch128-r4")
+            .replace("TEMP", "arch128-r6")
+        )
+    assert not runner._batch_workflow_is_reviewed(workflow)
+
+
+@pytest.mark.parametrize("event_name", ["push", "pull_request"])
+@pytest.mark.parametrize(
+    "scenario", ["docs", "whitespace", "moved_source", "unavailable"]
+)
+def test_ci_change_gate_against_real_git_range(
+    tmp_path, monkeypatch, event_name, scenario
+):
+    repo = tmp_path / "repository"
+    repo.mkdir()
+
+    def git(*args):
+        result = subprocess.run(
+            ("git", *args), cwd=repo, capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+
+    git("init", "--quiet")
+    git("config", "user.name", "CI test")
+    git("config", "user.email", "ci-test@example.invalid")
+    git("config", "core.autocrlf", "false")
+    (repo / "docs").mkdir()
+    (repo / "src").mkdir()
+    (repo / "docs/a.md").write_text("before\n", encoding="utf-8", newline="\n")
+    (repo / "src/source.py").write_text("source\n", encoding="utf-8", newline="\n")
+    git("add", "docs/a.md", "src/source.py")
+    git("commit", "--quiet", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    if scenario == "moved_source":
+        git("mv", "src/source.py", "docs/source.py")
+    else:
+        (repo / "docs/a.md").write_text(
+            "after  \n" if scenario == "whitespace" else "after\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    git("add", "docs/a.md")
+    git("commit", "--quiet", "-m", "change")
+    _event(
+        monkeypatch,
+        tmp_path,
+        "f" * 40 if scenario == "unavailable" else base,
+        event_name,
+    )
+    monkeypatch.delenv("GITHUB_OUTPUT", raising=False)
+    mode = runner._ci_changes(repo, git("rev-parse", "HEAD"))["mode"]
+    assert mode == (
+        "FULL" if scenario in {"moved_source", "unavailable"} else "DOCS_ONLY"
+    )
+    passed, path = runner.verify_ci_changes(
+        repo_root=repo, evidence_root=tmp_path / "evidence", docs_only=True
+    )
+    assert passed == (scenario == "docs")
+    report = json.loads(path.read_text())
+    assert report["source_before"] == report["source_after"]
+    assert report["identity_stable"] is True
+    assert report["status"] == ("PASS" if passed else "FAIL")
+    assert git("status", "--porcelain=v1", "--untracked-files=all") == ""

@@ -258,8 +258,26 @@ is introduced.
 The registered source-only checkpoint is
 `arch131-robinhood-deterministic-paper-pipeline`.
 
-The next protected boundary is one live qualification of this source-owned
-pipeline before considering repeated human-started forward-paper operation.
+The source-owned 131-J pipeline has now passed one bounded live qualification.
+
+### 131-K — durable virtual-paper risk context
+
+Before repeated human-started forward-paper operation, derive the exact
+`RiskContext` for 131-J from the durable virtual paper account rather than from
+caller-invented cash/equity/position values.
+
+The source-owned builder will reconstruct the existing `ReviewPaperStore`
+ledger, require an explicit exact price snapshot covering every open virtual
+position plus the proposal symbol, value the virtual account at an explicit
+`as_of`, and map that state exactly into `RiskContext`.
+
+Real Robinhood balances, positions, portfolio values, and buying power remain
+non-authoritative for paper risk. The builder remains network-free and does not
+evaluate risk, call the operator/pipeline, write a performance valuation, create
+identities, retry, loop, or schedule.
+
+The planned source-only checkpoint is
+`arch131-robinhood-virtual-risk-context`.
 
 ## D10 disposition
 

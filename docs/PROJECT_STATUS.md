@@ -10248,3 +10248,89 @@ and therefore requires separate explicit authorization.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Live Architecture 131-J source-owned pipeline qualification ACCEPTED
+
+The first authorized live run of the accepted source-owned 131-J deterministic
+paper pipeline completed successfully.
+
+Exact qualification source identity:
+
+```text
+HEAD cc65dbad6e8678d1c81b2518233dd55f7bcf952d
+TREE 0b76798ec14de7d21413d8824f07ae66a9355f3c
+```
+
+The qualified path called
+`run_robinhood_deterministic_paper_pipeline()` directly:
+
+```text
+explicit SPY TradeProposal
+-> source-owned RiskManager evaluation
+-> APPROVED RiskDecision
+-> source-owned 131-I intent bridge
+-> source-owned 131-H operator
+-> canonical Agentic-account resolution
+-> baseline get_equity_orders
+-> review_equity_order
+-> post-review get_equity_orders
+-> local durable synthetic paper fill
+-> RobinhoodDeterministicPaperPipelineResult
+```
+
+Sanitized pipeline evidence:
+
+```text
+risk_outcome=APPROVED
+approved_quantity=1
+risk_reason_codes=[]
+intent_created=true
+operator_invoked=true
+
+status=PASS
+phase=complete
+symbol=SPY
+side=BUY
+quantity=1
+order_type=MARKET
+
+get_accounts_calls=1
+get_equity_orders_calls=2
+get_equity_quotes_calls=0
+review_equity_order_calls=1
+
+baseline_order_pages=1
+post_review_order_pages=1
+paper_record_count=1
+replay=false
+
+review_echo_validated=true
+quote_fill_validated=true
+disclosure_present=true
+interactive_reauth_count=0
+
+placement_calls=0
+cancellation_calls=0
+options_mutation_calls=0
+crypto_mutation_calls=0
+
+QUALIFICATION_EXIT=0
+ARCH131_J_SOURCE_PIPELINE_LIVE=PASS
+```
+
+Evidence directory:
+
+```text
+F:\AI\temp\robinhood-131j-source-live-91b4bf7f665947f79a6a94fd44ecae39
+```
+
+The repository remained clean after qualification.
+
+This accepts the source-owned one-cycle deterministic paper pipeline as a live
+review-paper boundary. Production/live order placement remains NO-GO.
+
+Next milestone: Architecture 131-K — durable virtual-paper risk context. Before
+introducing repeated human-started forward-paper cycles, derive the exact
+`RiskContext` consumed by 131-J from the durable local paper ledger plus an
+explicit bounded market-price snapshot. Real Robinhood balances/positions must
+never become paper-risk authority.
+

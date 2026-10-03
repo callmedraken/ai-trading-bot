@@ -10350,3 +10350,102 @@ temporary driver. It may issue exactly one non-placement
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — 131-J source-owned pipeline live-qualified
+
+The accepted 131-J application pipeline has now passed one live non-placement
+qualification on:
+
+```text
+HEAD cc65dbad6e8678d1c81b2518233dd55f7bcf952d
+TREE 0b76798ec14de7d21413d8824f07ae66a9355f3c
+```
+
+Observed live result:
+
+```text
+SPY MARKET BUY desired quantity 1
+risk outcome                    APPROVED
+approved quantity               1
+intent created                  true
+operator invoked                true
+get_accounts                    1
+get_equity_orders               2
+review_equity_order             1
+baseline pages                  1
+post-review pages               1
+paper records                   1
+review echo valid               true
+quote/fill valid                true
+disclosure present              true
+interactive reauth              0
+placement/cancel/options/crypto 0
+status                          PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\robinhood-131j-source-live-91b4bf7f665947f79a6a94fd44ecae39
+```
+
+Repository state remained unchanged.
+
+### Architecture 131-K — durable virtual-paper risk context
+
+Repeated paper operation must not rely on manually invented account balances.
+The Architecture 131 contract already requires paper risk to use the virtual
+paper account. 131-K closes that gap before any repeated-cycle/session runner.
+
+Target boundary:
+
+```text
+ReviewPaperStore durable history
++ explicit TradeProposal
++ explicit bounded symbol-price snapshot
++ explicit as_of / new_trading_enabled
+-> reconstructed PaperLedger
+-> AccountSnapshot
+-> exact RiskContext
+-> accepted 131-J pipeline
+```
+
+Frozen direction:
+
+1. source-owned, deterministic, network-free;
+2. no Robinhood/MCP/OAuth calls;
+3. no real brokerage account/portfolio/buying-power reads;
+4. use the existing `ReviewPaperStore` / reconstructed `PaperLedger` as the
+   only account-state authority;
+5. caller supplies the proposal and current price snapshot explicitly;
+6. require exact price coverage for every open virtual position plus the
+   proposal symbol;
+7. reject missing prices and reject unrelated extra symbol prices;
+8. require every price to be a finite positive `Decimal`;
+9. require a timezone-aware `as_of` that is not before the proposal timestamp;
+10. reconstruct the durable ledger once;
+11. value open positions with the supplied prices at `as_of`;
+12. map exactly:
+    - `cash = account_snapshot.cash`
+    - `equity = account_snapshot.equity`
+    - `positions = ledger.positions`
+    - `current_price = prices[proposal.symbol]`
+    - `total_market_exposure = account_snapshot.positions_market_value`
+    - `new_trading_enabled = caller-supplied bool`
+    - `as_of = supplied as_of`;
+13. no mutation of durable history;
+14. do not write a valuation/performance row as a side effect;
+15. no risk evaluation inside the context builder;
+16. no `RiskManager` call inside the context builder;
+17. no operator/pipeline call inside the context builder;
+18. no UUID generation;
+19. no scheduler/retry/loop;
+20. return an exact immutable `RiskContext`;
+21. register source-only checkpoint
+    `arch131-robinhood-virtual-risk-context`.
+
+After 131-K source acceptance/certification, the next milestone can bind this
+durable context builder into a human-started forward-paper cycle so each trade
+evaluates against the actual accumulated virtual paper state.
+
+Production/live order placement remains NO-GO.
+

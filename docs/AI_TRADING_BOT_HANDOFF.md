@@ -10524,3 +10524,91 @@ and certification. Any later live `review_equity_order` qualification remains a
 separately authorized protected effect. Production/live order placement remains
 NO-GO.
 
+## 2026-10-03 — Architecture 131-L human-started durable-context forward-paper cycle FULLY ACCEPTED
+
+Architecture 131-L has passed exact GitHub source review, source-gate CI, and
+full broad local certification.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   97ab6b89931c105726944dc9609a9e0de062bac6
+TREE   8942f72bebed58cb7536f227b866b7818b5ac513
+PARENT e54f4c40228382030eea7d504a7d60d94f913c3e
+CI     #152 / 37105712512 SUCCESS
+```
+
+Accepted behavior:
+
+- `run_robinhood_forward_paper_cycle` calls the accepted 131-K
+  `build_review_paper_risk_context` exactly once;
+- the exact returned `RiskContext` is passed to accepted 131-J exactly once;
+- one exact `ReviewPaperStore` is the sole paper-account identity;
+- `paper_store_path` is derived only from `store.path`;
+- `starting_cash` is derived only from `store.starting_cash`;
+- callers cannot supply independent `paper_store_path`, `starting_cash`, or
+  `risk_context` inputs;
+- all remaining explicit 131-J/operator inputs are forwarded unchanged;
+- the exact existing `RobinhoodDeterministicPaperPipelineResult` is returned;
+- 131-K failure stops before 131-J;
+- 131-J failure propagates after one call with no retry;
+- rejected risk behavior remains owned by 131-J;
+- no independent ledger reconstruction, second `RiskManager`, intent bridge,
+  direct paper operator, raw MCP/OAuth/account-resolution access, brokerage
+  balance/position/buying-power risk authority, UUID generation, OrderEngine
+  submission, performance valuation write, network/config discovery, retry,
+  polling, loop, scheduler, unattended operation, placement/cancel/options/crypto
+  mutation surface was introduced;
+- `arch131-robinhood-forward-paper-cycle` remains source-only with
+  `preflight=None` and `execute=None`, immediately after 131-K in the
+  optimized batch.
+
+Full certification:
+
+```text
+broad-1: 152 modules
+  5,217 passed, 1 skipped, 0 failed, 0 errors
+
+broad-2: 151 modules
+  4,666 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  10,820 cases
+  10,809 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 412.828 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-8e1fd78a7a0645f8a24827d384aacd32
+```
+
+Repository identity remained unchanged and the worktree/index was clean after
+certification. No live Robinhood/MCP/OAuth request was made.
+
+### Next protected boundary — first live 131-L qualification
+
+Qualify the accepted source-owned 131-L binder end to end using one
+human-started forward-paper cycle against the durable virtual account. The
+qualification must prove that the risk context comes from the durable
+`ReviewPaperStore`, that accepted risk flows through existing 131-J/131-H
+exactly once, and that the resulting synthetic paper record lands in that same
+virtual account.
+
+The live qualification may perform exactly one non-placement
+`review_equity_order` plus the existing bounded read-only account/order
+observations. It must not place or cancel a real order, use options/crypto
+mutation, retry a consumed review, loop, or schedule unattended execution.
+
+Because this crosses the live Robinhood/MCP review boundary, execution requires
+fresh explicit user authorization. Production/live order placement remains
+NO-GO.
+

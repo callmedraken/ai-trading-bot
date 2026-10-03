@@ -294,11 +294,12 @@ wall 454.629 s
 
 ### 131-L — human-started durable-context forward-paper cycle
 
-Next source milestone. Bind 131-K to the already accepted 131-J source-owned
-deterministic pipeline without creating a second risk, brokerage, or paper-state
-implementation.
+Accepted. The source-owned `run_robinhood_forward_paper_cycle` binder composes
+the accepted 131-K durable virtual-paper risk context with the accepted 131-J
+deterministic paper pipeline without creating a second risk, brokerage, or
+paper-state implementation.
 
-Frozen direction:
+Accepted composition:
 
 ```text
 ReviewPaperStore durable history (sole paper-account identity)
@@ -310,29 +311,51 @@ ReviewPaperStore durable history (sole paper-account identity)
 + caller-supplied local order_id
 + explicit non-store 131-H operator configuration
 -> build_review_paper_risk_context(store, ...) exactly once
+-> exact returned RiskContext
 -> run_robinhood_deterministic_paper_pipeline exactly once
    with paper_store_path = store.path
    and starting_cash = store.starting_cash
--> existing 131-J result/evidence
+-> exact existing RobinhoodDeterministicPaperPipelineResult
 ```
 
-The binder is one human-started cycle per call. The caller supplies exactly one
-`ReviewPaperStore`, which is the sole paper-account identity for both risk and
-the later synthetic paper write. The caller must not independently supply a
-second `paper_store_path` or `starting_cash`; 131-L derives those exact values
-from `store.path` and `store.starting_cash` when delegating to 131-J.
+The caller supplies exactly one `ReviewPaperStore`, which is the sole
+paper-account identity for both risk and the later synthetic paper write. The
+public binder accepts no independent `paper_store_path`, `starting_cash`, or
+`risk_context` input.
 
-The binder must not reconstruct the ledger independently, evaluate risk
-independently, bypass 131-J, call raw Robinhood/MCP/OAuth/account-resolution
-capability, infer paper risk from the real brokerage account, generate order
-identity, retry, poll, loop, schedule, or introduce unattended operation.
-Placement/cancel/options/crypto mutation remains absent.
+The binder does not reconstruct the ledger independently, evaluate risk
+independently, bypass 131-J, call the intent bridge/operator/raw
+Robinhood/MCP/OAuth/account-resolution boundary directly, infer paper risk from
+the real brokerage account, generate order identity, retry, poll, loop, schedule,
+or introduce unattended operation. Placement/cancel/options/crypto mutation
+remains absent.
 
-The planned source-only checkpoint is
-`arch131-robinhood-forward-paper-cycle`. Source implementation and
-certification must perform no live Robinhood/MCP review request. After source
-acceptance, any bounded live qualification remains a separately authorized
-protected effect.
+The accepted source-only checkpoint is
+`arch131-robinhood-forward-paper-cycle`, immediately after 131-K in the
+optimized batch. It has `preflight=None` and `execute=None`.
+
+Accepted source and certification:
+
+```text
+HEAD 97ab6b89931c105726944dc9609a9e0de062bac6
+TREE 8942f72bebed58cb7536f227b866b7818b5ac513
+CI   #152 / 37105712512 SUCCESS
+
+10,820 cases
+10,809 passed
+11 skipped
+0 failed
+0 errors
+wall 412.828 s
+```
+
+No live Robinhood/MCP activity occurred during source implementation or
+certification.
+
+The next boundary is one bounded live qualification of the accepted 131-L
+human-started forward-paper cycle. That qualification may perform exactly one
+non-placement `review_equity_order` and therefore requires fresh explicit
+authorization. Production/live order placement remains NO-GO.
 
 ## D10 disposition
 

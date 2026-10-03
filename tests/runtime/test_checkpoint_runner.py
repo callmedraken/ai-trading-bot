@@ -2855,6 +2855,17 @@ def test_docs_gate_rejects_dirty_source(tmp_path, monkeypatch):
 def test_ci_workflow_batch_order_conditions_and_slim_artifacts():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    # runner context is allowed in step env, but unavailable in job env.
+    job_settings = workflow.split("    steps:", 1)[0]
+    assert "runner.temp" not in job_settings
+    assert (
+        workflow.count(
+            "        env:\n"
+            "          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: "
+            "${{ runner.temp }}/ai-trading-bot-checkpoints"
+        )
+        == 3
+    )
     assert runner._batch_workflow_is_reviewed(workflow)
     assert workflow.count("verify-batch") == 1
     assert "verify arch" not in workflow and "$Failures" not in workflow

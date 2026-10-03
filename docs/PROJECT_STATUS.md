@@ -10058,3 +10058,91 @@ Move the successful qualification composition into reviewed source so normal
 forward-paper cycles accept explicit deterministic inputs and produce a closed
 pipeline result/evidence without relying on a temporary external launcher.
 
+## 2026-10-02 — Architecture 131-J source-owned deterministic paper pipeline ACCEPTED
+
+Architecture 131-J is accepted on exact executable/source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+SOURCE HEAD fabf1bfa0799aa6ad332000905a394d491fd0cfd
+SOURCE TREE 6255e0b46874843998bc14866bccd9626a4bdb40
+CI #143 / 37097095369 SUCCESS
+```
+
+Implementation commit:
+
+```text
+fabf1bfa0799aa6ad332000905a394d491fd0cfd
+  feat: add deterministic Robinhood paper pipeline
+```
+
+Accepted behavior:
+
+- one source-owned deterministic paper cycle evaluates exactly one supplied
+  `TradeProposal` against exactly one supplied `RiskContext` and
+  `RiskLimits`;
+- the supplied paper `RiskContext` remains the sole risk authority;
+- rejected decisions return locally before the intent bridge/operator and
+  create no operator paper/evidence outputs;
+- APPROVED and RESIZED decisions flow through the accepted 131-I
+  `build_review_paper_intent` boundary exactly once;
+- the caller supplies the local order UUID; 131-J performs no UUID generation;
+- the accepted 131-H operator is called exactly once for accepted decisions;
+- every operator configuration argument is forwarded unchanged;
+- operator PASS/FAIL evidence is preserved exactly rather than reconstructed;
+- operator exceptions propagate after one call with no retry;
+- the result is frozen/slotted and enforces rejected versus accepted invariants;
+- no `OrderEngine` order lifecycle is invoked;
+- no raw MCP/OAuth/account-resolution capability is called directly by 131-J;
+- no direct networking, subprocess, environment/config discovery, scheduler,
+  polling loop, retry loop, or unattended execution was introduced;
+- the MCP application surface remains unchanged and no
+  placement/cancel/options/crypto mutation capability was introduced.
+
+Registered source-only checkpoint:
+
+```text
+arch131-robinhood-deterministic-paper-pipeline
+preflight=None
+execute=None
+```
+
+Focused verification:
+
+```text
+558 distinct focused tests passed
+Ruff check: PASS
+Ruff format: PASS
+diff/staged-diff checks: PASS
+131-H/I/J authority: PASS
+```
+
+Full certification:
+
+```text
+broad-1: 4,828 passed, 1 skipped
+broad-2: 4,782 passed, 1 skipped
+serial: 926 passed, 9 skipped
+total: 10,536 passed, 11 skipped, 0 failed, 0 errors
+cases: 10,547
+wall: 425.880 seconds
+repository unchanged: PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c4458555ad634bc89cff6502ee099eae
+```
+
+No live Robinhood/MCP activity occurred during implementation or certification.
+
+Production/live trading remains NO-GO.
+
+Next protected boundary: one live qualification of the accepted source-owned
+131-J deterministic pipeline. It should exercise the same bounded SPY
+proposal/risk/instruction inputs already qualified through the temporary driver,
+but invoke `run_robinhood_deterministic_paper_pipeline` directly. Exactly one
+live non-placement `review_equity_order` may occur, so that run requires
+separate explicit authorization.
+

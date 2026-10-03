@@ -240,22 +240,26 @@ qualification.
 
 ### 131-J — source-owned deterministic paper pipeline
 
-Move that qualified composition into reviewed source. The one-cycle pipeline
-accepts explicit `TradeProposal`, `RiskContext`, `RiskLimits`,
-`ExecutionInstruction`, caller-supplied local order UUID, and the existing
-131-H operator configuration.
+Accepted. The source-owned one-cycle pipeline accepts explicit `TradeProposal`,
+`RiskContext`, `RiskLimits`, `ExecutionInstruction`, caller-supplied local
+order UUID, and the existing 131-H operator configuration.
 
-It evaluates risk exactly once, stops rejected decisions before Robinhood/OAuth
-effects, sends APPROVED/RESIZED decisions through the accepted 131-I bridge, and
-then delegates the paper review cycle to the accepted 131-H operator.
+It evaluates risk exactly once, returns rejected decisions locally before
+brokerage/operator effects, sends APPROVED/RESIZED decisions through the
+accepted 131-I bridge exactly once, and delegates accepted paper review to the
+accepted 131-H operator exactly once.
 
-131-J must remain one-cycle and human-invoked for now. It must not introduce
-scheduling, unattended loops, real brokerage balance as risk state, OrderEngine
-submission, placement/cancel/options/crypto mutation capability, or a wider MCP
-application surface.
+The result is immutable and preserves the exact `RiskDecision`,
+`ReviewPaperIntent`, and sanitized `RobinhoodPaperOperatorEvidence` boundaries.
+No scheduler, retry loop, OrderEngine submission, direct MCP/OAuth capability,
+real brokerage balance as risk state, mutation-tool surface, or unattended mode
+is introduced.
 
-The planned source-only checkpoint is
+The registered source-only checkpoint is
 `arch131-robinhood-deterministic-paper-pipeline`.
+
+The next protected boundary is one live qualification of this source-owned
+pipeline before considering repeated human-started forward-paper operation.
 
 ## D10 disposition
 

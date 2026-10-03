@@ -10191,3 +10191,90 @@ forward-paper cycles.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Architecture 131-J accepted; source-owned deterministic pipeline ready for live qualification
+
+Accepted source:
+
+```text
+HEAD fabf1bfa0799aa6ad332000905a394d491fd0cfd
+TREE 6255e0b46874843998bc14866bccd9626a4bdb40
+CI   #143 / 37097095369 SUCCESS
+```
+
+131-J now owns the reviewed application composition:
+
+```text
+TradeProposal
++ RiskContext
++ RiskLimits
++ ExecutionInstruction
++ explicit local order_id
++ explicit operator configuration
+-> RiskManager
+-> RiskDecision
+-> build_review_paper_intent
+-> run_robinhood_paper_operator
+-> RobinhoodDeterministicPaperPipelineResult
+```
+
+Important accepted semantics:
+
+1. exactly one deterministic risk evaluation per call;
+2. rejected risk stops before bridge/operator effects;
+3. APPROVED/RESIZED decisions use the accepted 131-I bridge exactly once;
+4. explicit local order identity is caller-owned;
+5. the accepted 131-H operator is the only brokerage-effect boundary;
+6. operator configuration is forwarded exactly;
+7. operator evidence is preserved unchanged;
+8. there is no retry, loop, scheduler, unattended mode, direct MCP/OAuth call,
+   OrderEngine submission, or mutation-tool surface in 131-J.
+
+Full certification:
+
+```text
+10,547 cases
+10,536 passed
+11 skipped
+0 failed
+0 errors
+
+broad-1 4,828 passed, 1 skipped
+broad-2 4,782 passed, 1 skipped
+serial    926 passed, 9 skipped
+
+wall 425.880 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c4458555ad634bc89cff6502ee099eae
+```
+
+No live Robinhood/MCP activity occurred.
+
+### Next protected boundary — live source-owned 131-J qualification
+
+Perform exactly one live qualification that calls
+`run_robinhood_deterministic_paper_pipeline` directly.
+
+Use the same deliberately bounded shape as the previously accepted temporary
+full-pipeline qualification:
+
+- explicit SPY MARKET BUY proposal;
+- explicit virtual paper RiskContext;
+- explicit RiskLimits;
+- explicit MARKET/DAY ExecutionInstruction;
+- explicit local order UUID;
+- fresh external paper SQLite/evidence paths;
+- persisted OAuth only;
+- no interactive reauthorization;
+- exactly one `review_equity_order` on a new accepted cycle;
+- exhaustive pre/post agentic order history;
+- no placement/cancel/options/crypto mutation;
+- repository unchanged after qualification.
+
+A fresh explicit authorization is required before this live review request.
+
+Production/live order placement remains NO-GO.
+

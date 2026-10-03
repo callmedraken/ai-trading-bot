@@ -10146,3 +10146,105 @@ but invoke `run_robinhood_deterministic_paper_pipeline` directly. Exactly one
 live non-placement `review_equity_order` may occur, so that run requires
 separate explicit authorization.
 
+## 2026-10-02 — Source-gate CI optimization ACCEPTED
+
+The source-gate CI optimization is accepted on exact source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+SOURCE HEAD 819e53e9efeb2fe4d673d1528eb34b0b956ef6fd
+SOURCE TREE 76d4c5b13d8edc79556f89a6bf7cecc8400b1a49
+CI #146 / 37100958672 SUCCESS
+```
+
+Implementation commits:
+
+```text
+ef15890408d65d1510c08009f16cac583445ee86
+  perf: batch checkpoint source gates
+
+819e53e9efeb2fe4d673d1528eb34b0b956ef6fd
+  fix: scope CI evidence environment to steps
+```
+
+Accepted behavior:
+
+- CI preserves all 18 registered source checkpoints and their reviewed order;
+- checkpoint test requirements are deduplicated in deterministic first-seen
+  order and executed by one shared pytest process;
+- Ruff check and Ruff format requirements are deduplicated and each executed
+  once;
+- `git diff --check` runs once;
+- all 18 checkpoint authority checks still run independently;
+- authority checks still run when a shared command fails and failures remain
+  attributed to their checkpoint;
+- individual `verify CHECKPOINT` behavior remains available unchanged;
+- the batch command cannot invoke preflight or protected execution;
+- source HEAD/tree/cleanliness are admitted before and checked after the batch;
+- docs-only classification fails closed for missing/invalid bases, empty or
+  unknown diffs, source/test/script/workflow changes, and source-to-docs moves;
+- true docs-only commits skip source dependencies/tests but still run an exact
+  range `git diff --check` and source-stability check;
+- normal successful artifacts exclude pytest temporary trees.
+
+Measured GitHub Actions improvement:
+
+```text
+baseline #143
+  total wall: ~14m16s
+  source gates: ~12m20s
+  artifact: 161,340,773 bytes
+  artifact files: ~15,041
+
+optimized #146
+  total wall: 2m07s
+  source gates: ~1m22s
+  artifact: 6,934 bytes
+  artifact files: 10
+
+wall-time reduction: ~85.2%
+source-gate reduction: ~88.9%
+artifact-byte reduction: ~99.9957%
+```
+
+CI #146 batch evidence:
+
+```text
+18 checkpoints
+41 unique pytest paths
+57 unique Ruff paths
+2,455 passed, 3 skipped
+all 18 authority checks PASS
+Ruff check PASS
+Ruff format PASS
+git diff check PASS
+identity stable PASS
+```
+
+Full repository certification:
+
+```text
+broad-1: 4,704 passed, 0 skipped
+broad-2: 4,981 passed, 2 skipped
+serial: 926 passed, 9 skipped
+total: 10,611 passed, 11 skipped, 0 failed, 0 errors
+cases: 10,622
+wall: 430.102 seconds
+repository unchanged: PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c640d05b28f74f078e80f48a9bcaa650
+```
+
+No live Robinhood/MCP activity occurred.
+
+The next protected product boundary remains the first live qualification of the
+accepted source-owned Architecture 131-J deterministic paper pipeline. That
+qualification may perform exactly one live non-placement `review_equity_order`
+and therefore requires separate explicit authorization.
+
+Production/live order placement remains NO-GO.
+

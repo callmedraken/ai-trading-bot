@@ -10278,3 +10278,75 @@ A fresh explicit authorization is required before this live review request.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Source-gate CI optimization accepted
+
+Exact accepted source:
+
+```text
+HEAD 819e53e9efeb2fe4d673d1528eb34b0b956ef6fd
+TREE 76d4c5b13d8edc79556f89a6bf7cecc8400b1a49
+CI   #146 / 37100958672 SUCCESS
+```
+
+Source-gate verification is now batched without reducing coverage:
+
+```text
+18 checkpoints
+-> union/deduplicate tests
+-> pytest once
+-> union/deduplicate Ruff paths
+-> Ruff check once
+-> Ruff format once
+-> git diff --check once
+-> every authority check independently
+-> exact source-stability check
+```
+
+Measured CI change:
+
+```text
+#143 baseline: ~14m16s total / ~12m20s gates / ~161 MB artifact
+#146 optimized: 2m07s total / ~1m22s gates / 6,934-byte artifact
+
+successful artifact: 10 files, no pytest temp contents
+```
+
+Full certification:
+
+```text
+10,622 cases
+10,611 passed
+11 skipped
+0 failed
+0 errors
+wall 430.102 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c640d05b28f74f078e80f48a9bcaa650
+```
+
+The docs-only fast path is also part of the accepted design. A commit whose
+entire exact diff is under `docs/` skips pytest/Ruff dependency installation
+and source checkpoint execution, but still validates the exact commit range with
+`git diff --check` and requires source identity stability. Unknown or unsafe
+classification falls back to FULL verification.
+
+No Robinhood/risk/operator implementation changed and no live brokerage call
+occurred.
+
+### Next protected boundary
+
+Return to the accepted Architecture 131-J plan and perform one live
+source-owned deterministic paper-pipeline qualification only after fresh
+explicit authorization.
+
+That run must call `run_robinhood_deterministic_paper_pipeline` directly using
+the same bounded SPY MARKET BUY virtual-paper shape already qualified through the
+temporary driver. It may issue exactly one non-placement
+`review_equity_order`; placement/cancel/options/crypto remain unavailable.
+
+Production/live order placement remains NO-GO.
+

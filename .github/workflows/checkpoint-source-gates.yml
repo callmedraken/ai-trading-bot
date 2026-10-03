@@ -88,7 +88,8 @@ jobs:
               arch131-robinhood-paper-operator `
               arch131-robinhood-paper-intent-bridge `
               arch131-robinhood-deterministic-paper-pipeline `
-              arch131-robinhood-virtual-risk-context
+              arch131-robinhood-virtual-risk-context `
+              arch131-robinhood-forward-paper-cycle
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

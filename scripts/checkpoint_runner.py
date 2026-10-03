@@ -94,11 +94,12 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-paper-intent-bridge",
     "arch131-robinhood-deterministic-paper-pipeline",
     "arch131-robinhood-virtual-risk-context",
+    "arch131-robinhood-forward-paper-cycle",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 19 participants and their order,
+    # Freeze the executable batch command, all 20 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -653,6 +654,66 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
         StopIteration,
     ):
         failures.append("131-F source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch131_forward_paper_cycle_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        tree = ast.parse(
+            (repo_root / "src/trading_bot/robinhood_forward_paper_cycle.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        # Pin the entire narrow binder: closed imports and signature, one exact
+        # 131-K call followed by one exact 131-J call, sole store identity,
+        # unchanged explicit arguments/context/result, and no alternate effects.
+        # Helpers, decorators, extra calls, loops, retries, UUID generation,
+        # risk/operator/MCP/OAuth/config/host/performance access all drift.
+        if (
+            hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "2528528ce13770c5aefe3481f3527d856c9d3ea19ffb3ab994de9b2b5fcb736a"
+        ):
+            failures.append("131-L sole-account/context/pipeline/effect boundary drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-forward-paper-cycle"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        # Pin source-only flags, authority, remote, and test/lint coverage.
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "8cf69056ebee325d28c2487709f121ca09796a1c6b301bec0e099b581a9ff67d"
+        ):
+            failures.append("131-L source-only checkpoint registration drift")
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-L checkpoint has host/effect capability")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("131-L workflow invocation/131-K ordering drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-L source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -3214,6 +3275,25 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/review_paper/test_risk_context.py",
             ),
             authority_check=_arch131_virtual_risk_context_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-forward-paper-cycle": CheckpointSpec(
+            name="arch131-robinhood-forward-paper-cycle",
+            description="Architecture 131-L human-started durable-context paper cycle",
+            tests=(
+                *COMMON_TESTS,
+                "tests/test_robinhood_forward_paper_cycle.py",
+                "tests/review_paper/test_risk_context.py",
+                "tests/test_robinhood_paper_pipeline.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_forward_paper_cycle.py",
+                "tests/test_robinhood_forward_paper_cycle.py",
+            ),
+            authority_check=_arch131_forward_paper_cycle_authority_check,
             remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
             preflight=None,
             execute=None,

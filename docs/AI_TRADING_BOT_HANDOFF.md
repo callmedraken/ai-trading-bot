@@ -10681,3 +10681,76 @@ read a clock, or perform any trading/provider effect. The planned checkpoint is
 `arch131-robinhood-session-admission`, source-only with no preflight/execute
 surface.
 
+## 2026-10-03 — Architecture 131-M explicit-schedule regular-session admission FULLY ACCEPTED
+
+Architecture 131-M has passed exact GitHub source review, source-gate CI, and
+full broad local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   be4203bfdd37265fd4491712e4fb8292a5070bd1
+TREE   25c9a9ca22478d3e626b8aef6d000f23496282bf
+PARENT 7776b4564ea715cdcac16836ca25c66ef2e7cf49
+CI     #162 / 37139337294 SUCCESS
+```
+
+Accepted behavior:
+
+- one explicit instant is classified against one explicit authoritative regular
+  session schedule;
+- all temporal inputs are timezone-aware and UTC-normalized;
+- schedule open/close must map to the supplied America/New_York session date;
+- exact nonnegative opening/closing buffers must leave a nonempty interval;
+- zero buffers are valid;
+- exact status boundaries are deterministic and half-open;
+- the existing date-only NYSE calendar remains unchanged;
+- no holiday/early-close discovery or system-clock authority was introduced;
+- no brokerage/MCP/OAuth/market-data/store/risk/intent/execution/filesystem/
+  network/subprocess/environment/config/UUID/retry/poll/loop/scheduler/sleep/
+  durable-mutation capability exists;
+- `arch131-robinhood-session-admission` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-LQ.
+
+Full certification:
+
+```text
+broad-1: 153 modules
+  5,143 passed, 7 skipped, 0 failed, 0 errors
+
+broad-2: 152 modules
+  4,922 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  11,008 cases
+  10,991 passed
+  17 skipped
+  0 failed
+  0 errors
+  wall 522.892 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-bc214d8d6b724fb89f0e3541319cc091
+```
+
+The side worktree/index remained clean and source identity did not move during
+certification. No protected brokerage/provider effect was used.
+
+### Next side milestone — Architecture 131-N
+
+Implement the frozen canonical Robinhood quote-to-risk-price snapshot boundary
+from Architecture 131. Reuse `RobinhoodQuoteData.current_trade_candidate()`
+and the accepted review-paper quote validity/freshness rules. 131-N is pure and
+transport-free: it consumes a typed quote response already in memory and emits
+an immutable exact price snapshot. It performs no quote acquisition, durable
+valuation, risk evaluation, or paper cycle. Planned checkpoint:
+`arch131-robinhood-risk-price-snapshot`, source-only with no
+preflight/execute surface.
+

@@ -423,60 +423,46 @@ No live Robinhood/MCP/OAuth request or durable paper mutation occurred.
 
 ### 131-M — explicit-schedule regular-session admission
 
-Next side-foundation source milestone. Add a pure, clock-free admission boundary
-for supervised review-paper cycles without changing the existing date-only
-`NYSEMarketCalendar` semantics or inventing exchange schedules inside the
-admission function.
+Accepted. The source-owned session-admission primitive classifies one explicit
+instant against one already-authoritative immutable regular-session schedule.
+It preserves the existing date-only `NYSEMarketCalendar` contract and does not
+claim authority for holiday, early-close, or intraday schedule discovery.
 
-Frozen composition:
+Accepted composition:
 
 ```text
 explicit timezone-aware as_of
-+ exact immutable session schedule
-  - exchange-local session date
++ exact immutable ReviewPaperSessionSchedule
+  - exchange-local session_date
   - regular-session opens_at
   - regular-session closes_at
-+ explicit nonnegative opening buffer
-+ explicit nonnegative closing buffer
++ exact nonnegative opening_buffer
++ exact nonnegative closing_buffer
 -> immutable ReviewPaperSessionAdmission
 ```
 
-The schedule is already-authoritative input. 131-M does not fetch, scrape,
-infer, or synthesize holiday/early-close schedules. A later source milestone may
-provide a versioned NYSE intraday schedule authority; until then, missing or
-unsupported schedule material fails closed before 131-M.
-
-Frozen statuses:
+Accepted statuses and half-open boundaries:
 
 ```text
-ADMITTED
-NON_SESSION_DATE
-BEFORE_REGULAR_WINDOW
-OPENING_BUFFER
-CLOSING_BUFFER
-AFTER_REGULAR_WINDOW
+different America/New_York date              -> NON_SESSION_DATE
+before opens_at                              -> BEFORE_REGULAR_WINDOW
+[opens_at, admission_opens_at)               -> OPENING_BUFFER
+[admission_opens_at, admission_closes_at)    -> ADMITTED
+[admission_closes_at, closes_at)             -> CLOSING_BUFFER
+at/after closes_at                           -> AFTER_REGULAR_WINDOW
 ```
 
-Frozen boundary semantics:
+All datetimes are timezone-aware and UTC-normalized. Open must precede close;
+both endpoints must map to the supplied exchange-local date; exact
+`timedelta` buffers must be nonnegative and leave a nonempty admissible
+interval. Zero buffers are permitted.
 
-- all datetimes must be timezone-aware and normalize to UTC;
-- the schedule's open/close must map to the schedule's exchange-local date;
-- `opens_at < closes_at`;
-- buffers are exact `timedelta` values and must be nonnegative;
-- buffers must leave a nonempty admissible interval;
-- `as_of` is explicit; no system clock is read;
-- before open is `BEFORE_REGULAR_WINDOW`;
-- `[open, open + opening_buffer)` is `OPENING_BUFFER`;
-- `[open + opening_buffer, close - closing_buffer)` is `ADMITTED`;
-- `[close - closing_buffer, close)` is `CLOSING_BUFFER`;
-- at/after close is `AFTER_REGULAR_WINDOW`;
-- an `as_of` whose exchange-local date differs from the supplied schedule is
-  `NON_SESSION_DATE`;
-- no brokerage, MCP, OAuth, market-data, paper-store, risk, intent, execution,
-  filesystem, networking, subprocess, environment/config, UUID, retry, loop,
-  scheduler, sleep, or durable-mutation capability.
+The implementation reads no clock and has no schedule discovery, brokerage,
+MCP, OAuth, market-data acquisition, paper-store, risk, intent, execution,
+filesystem, network, subprocess, environment/config, UUID, retry, polling,
+loop, scheduler, sleep, or durable-mutation capability.
 
-Planned source-only checkpoint:
+Accepted source-only checkpoint:
 
 ```text
 arch131-robinhood-session-admission
@@ -484,8 +470,97 @@ preflight=None
 execute=None
 ```
 
-The checkpoint should follow 131-LQ on the side-foundation batch. 131-M is a
-pure admission primitive only; it does not authorize or invoke a 131-L cycle.
+Accepted source and certification:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   be4203bfdd37265fd4491712e4fb8292a5070bd1
+TREE   25c9a9ca22478d3e626b8aef6d000f23496282bf
+CI     #162 / 37139337294 SUCCESS
+
+11,008 cases
+10,991 passed
+17 skipped
+0 failed
+0 errors
+wall 522.892 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-bc214d8d6b724fb89f0e3541319cc091
+```
+
+No live Robinhood/MCP/OAuth request or durable paper mutation occurred.
+
+### 131-N — canonical Robinhood quote-to-risk-price snapshot
+
+Next side-foundation source milestone. Extract the already accepted quote-mark
+selection and freshness semantics into one pure, transport-free boundary that
+produces the exact immutable price snapshot later consumed by 131-K.
+
+Frozen composition:
+
+```text
+typed RobinhoodEquityQuotesResponse
++ exact canonical required_symbols tuple
++ explicit observed_at
++ explicit positive max_quote_age
+-> immutable ReviewPaperRiskPriceSnapshot
+   - observed_at
+   - canonical tuple of ReviewPaperRiskPriceMark
+       symbol
+       price
+       source_at
+   - read-only exact Symbol -> Decimal price mapping
+```
+
+Frozen quote semantics reuse existing accepted behavior:
+
+- `response` must be exactly the typed Robinhood equity-quotes response;
+- `required_symbols` must be an exact nonempty tuple of unique `Symbol`
+  values in canonical `str(symbol)` order;
+- quote-bearing results are indexed by symbol; duplicate quotes fail closed;
+- after ignoring result entries with no quote, the quote symbol set must equal
+  `required_symbols` exactly: no missing or extra quote symbol;
+- each required quote must have `has_traded == True`;
+- each required quote must have `state == "active"`;
+- mark selection is exactly `RobinhoodQuoteData.current_trade_candidate()`:
+  use the newer of the regular last trade and non-regular last trade, with the
+  regular last trade winning ties;
+- selected price must be finite and strictly positive;
+- selected `source_at` must not be later than explicit `observed_at`;
+- `observed_at - source_at <= max_quote_age`; older quotes fail closed;
+- `max_quote_age` must be an exact positive `timedelta`;
+- all timestamps are timezone-aware and UTC-normalized;
+- output marks follow exact canonical required-symbol order;
+- the exposed price mapping is read-only and contains exactly those marks.
+
+The typed response's official-close material and `closes_error` are not risk
+mark authority for 131-N. 131-N deliberately reuses the current-trade candidate
+policy already used by review-paper performance valuation rather than creating a
+second price-selection rule.
+
+131-N performs no quote acquisition and no valuation write. It may import the
+typed Robinhood quote models, `Symbol`, and deterministic validation helpers,
+but it must not import or invoke the Robinhood adapter/SDK transport, OAuth,
+account resolution, MCP calls, `ReviewPaperStore`, performance store,
+`RiskManager`, 131-J/131-L, order execution, filesystem, network, subprocess,
+environment/config, UUID generation, retry, polling, scheduler, sleep, or
+durable mutation.
+
+Planned source-only checkpoint:
+
+```text
+arch131-robinhood-risk-price-snapshot
+preflight=None
+execute=None
+```
+
+The checkpoint follows 131-M on the side-foundation optimized batch. A later
+131-O milestone consumes this snapshot for an effect-free trade preview; a
+later 131-P milestone owns read-only quote acquisition.
 
 ## D10 disposition
 

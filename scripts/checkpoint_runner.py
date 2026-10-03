@@ -96,11 +96,12 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-virtual-risk-context",
     "arch131-robinhood-forward-paper-cycle",
     "arch131-robinhood-live-qualification-verifier",
+    "arch131-robinhood-session-admission",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 21 participants and their order,
+    # Freeze the executable batch command, all 22 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -719,6 +720,102 @@ def _arch131_forward_paper_cycle_authority_check(
             failures.append("131-L workflow invocation/131-K ordering drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-L source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch131_session_admission_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        path = repo_root / "src/trading_bot/review_paper/session_admission.py"
+        text_value = path.read_text(encoding="utf-8")
+        # Pin the complete module, including every import, helper and call.
+        if (
+            hashlib.sha256(
+                ast.dump(ast.parse(text_value), include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "12afcc9014383695b0b10ca7a8d71bd61f40ebc60e07588eabe6dd98fba49d92"
+        ):
+            failures.append("131-M deterministic temporal boundary drift")
+
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-session-admission"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "d2c29698ef6cff2d52c65f4f6a880c758384900c23b91eb48e247983aa5ae593"
+        ):
+            failures.append("131-M source-only checkpoint registration drift")
+
+        side_branch_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH"
+        ]
+        if (
+            len(side_branch_assignments) != 1
+            or ast.literal_eval(side_branch_assignments[0].value)
+            != "feature/robinhood-review-paper-side-foundation"
+        ):
+            failures.append("131-M remote branch authority drift")
+
+        ci_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(ci_assignments) != 1
+            or hashlib.sha256(
+                ast.dump(ci_assignments[0].value, include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "9607f1022eae6a77f58d4061f9e822f5f01899d0476e9ea9e063920e8b1514bb"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("131-M checkpoint batch registration drift")
+
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-M checkpoint has host/effect capability")
+        if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
+            failures.append("131-M checkpoint remote branch drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier") + 1
+        ):
+            failures.append("131-M checkpoint ordering drift")
+
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("131-M workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-M source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -3401,6 +3498,25 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/test_robinhood_live_qualification_verifier.py",
             ),
             authority_check=_arch131_live_qualification_verifier_authority_check,
+            remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-session-admission": CheckpointSpec(
+            name="arch131-robinhood-session-admission",
+            description=(
+                "Architecture 131-M explicit-schedule regular-session admission"
+            ),
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_session_admission.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/session_admission.py",
+                "tests/review_paper/test_session_admission.py",
+            ),
+            authority_check=_arch131_session_admission_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
             preflight=None,
             execute=None,

@@ -222,13 +222,21 @@ The registered source-only checkpoint is
 
 ### 131-I — deterministic risk-to-paper-intent bridge
 
-Convert the existing deterministic `TradeProposal` / `RiskDecision` /
-`ExecutionInstruction` pipeline into an exact `ReviewPaperIntent` without
-performing any Robinhood, MCP, OAuth, file, or credential operation.
+Accepted. The pure `build_review_paper_intent` boundary converts an existing
+`RiskDecision`, `ExecutionInstruction`, and explicit caller-supplied local
+order UUID into the exact `ReviewPaperIntent` consumed by 131-H.
 
-This bridge is the next source milestone after the successful live qualification
-of the source-owned 131-H operator. It removes manually constructed paper intents
-from the normal path while keeping risk authority outside the Robinhood operator.
+The bridge preserves proposal, risk-decision, reason-code, execution-instruction,
+and order identity material exactly. It performs no risk reevaluation, order
+submission, Robinhood/MCP/OAuth/credential access, environment/config access,
+filesystem/network/subprocess activity, or logging.
+
+The registered source-only checkpoint is
+`arch131-robinhood-paper-intent-bridge`.
+
+The next protected boundary is a single live qualification of the full
+deterministic proposal -> risk -> execution instruction -> intent bridge ->
+source-owned paper operator path.
 
 ## D10 disposition
 

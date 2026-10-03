@@ -10014,3 +10014,88 @@ with a bounded live review before considering repeated forward paper sessions.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Architecture 131-I accepted; deterministic pipeline ready for bounded live qualification
+
+Accepted source:
+
+```text
+HEAD 92f229227eb1e513a0d17d7b918bc664cf937034
+TREE 20e5806509b120cb129669bc3386a7c2a97e31be
+CI   #140 / 37089235644 SUCCESS
+```
+
+131-I adds a pure deterministic bridge:
+
+```text
+TradeProposal
+-> RiskDecision
+-> ExecutionInstruction + explicit order_id
+-> ReviewPaperIntent
+```
+
+The bridge does not own strategy generation, risk authority, order identity
+generation, brokerage identity, MCP, OAuth, credentials, networking, logging, or
+host effects.
+
+The exact mappings are frozen by authority coverage and the whole bridge module
+has a closed import/call surface.
+
+Full certification:
+
+```text
+10,472 cases
+10,455 passed
+17 skipped
+0 failed
+0 errors
+
+broad-1 4,490 passed, 4 skipped
+broad-2 5,039 passed, 4 skipped
+serial    926 passed, 9 skipped
+
+overall wall 468.776 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-993a81301db94ff6b01fc3a6b8995cd3
+```
+
+No live Robinhood/MCP activity occurred.
+
+### Next protected boundary — full deterministic pipeline live qualification
+
+The next qualification should exercise the complete accepted path rather than a
+manually constructed `ReviewPaperIntent`:
+
+```text
+explicit TradeProposal
+-> deterministic RiskManager
+-> RiskDecision
+-> ExecutionInstruction
+-> explicit local order_id
+-> build_review_paper_intent
+-> run_robinhood_paper_operator
+```
+
+Keep it deliberately narrow:
+
+1. one explicit SPY MARKET BUY paper proposal;
+2. one deterministic risk evaluation using an explicit virtual paper context;
+3. one explicit local order UUID;
+4. no OrderEngine submission lifecycle;
+5. fresh external paper SQLite/evidence paths;
+6. persisted OAuth only;
+7. no interactive reauthorization;
+8. exhaustive baseline/post-review agentic order reads;
+9. exactly one `review_equity_order` on a new cycle;
+10. no placement/cancel/options/crypto mutation capability;
+11. sanitized evidence only;
+12. repository unchanged after qualification.
+
+This boundary requires separate explicit authorization because it performs a live
+non-placement Robinhood review request.
+
+Production/live order placement remains NO-GO.
+

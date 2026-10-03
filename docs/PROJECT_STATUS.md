@@ -9861,3 +9861,108 @@ from the existing `TradeProposal` + accepted `RiskDecision` +
 The bridge must remain network-free and must not invoke the Robinhood operator
 during source certification.
 
+## 2026-10-02 — Architecture 131-I deterministic risk-to-paper-intent bridge ACCEPTED
+
+Architecture 131-I is accepted on exact executable/source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+SOURCE HEAD 92f229227eb1e513a0d17d7b918bc664cf937034
+SOURCE TREE 20e5806509b120cb129669bc3386a7c2a97e31be
+CI #140 / 37089235644 SUCCESS
+```
+
+Implementation commit:
+
+```text
+92f229227eb1e513a0d17d7b918bc664cf937034
+  feat: add deterministic review-paper intent bridge
+```
+
+Accepted behavior:
+
+- the bridge is pure and network-free;
+- it accepts an existing `RiskDecision`, `ExecutionInstruction`, and explicit
+  caller-supplied `order_id`;
+- rejected risk decisions cannot create paper intent;
+- proposal -> risk -> execution timestamp ordering is enforced;
+- proposal id, symbol, side, desired quantity, proposal reason/confidence, and
+  proposal timestamp are preserved exactly;
+- approved quantity, APPROVED/RESIZED outcome, and ordered risk reason codes are
+  preserved exactly;
+- order type, time in force, and limit price are preserved exactly;
+- MARKET remains `limit_price=None`;
+- LIMIT remains LIMIT with the exact validated limit price;
+- the bridge does not reevaluate risk, invoke OrderEngine, generate order IDs,
+  call the Robinhood operator, touch MCP/OAuth/credentials, access environment
+  configuration, log proposal material, or perform filesystem/network/subprocess
+  effects;
+- duplicate risk reason codes are not rewritten or deduplicated by the bridge;
+  existing `ReviewPaperIntent` validation remains authoritative;
+- identical inputs deterministically produce equal `ReviewPaperIntent` values.
+
+Registered source-only checkpoint:
+
+```text
+arch131-robinhood-paper-intent-bridge
+preflight=None
+execute=None
+```
+
+Focused verification:
+
+```text
+452 focused tests passed
+65 affected authority tests passed
+Ruff check: PASS
+Ruff format: PASS
+diff checks: PASS
+131-I authority: PASS
+```
+
+Full certification:
+
+```text
+broad-1: 4,490 passed, 4 skipped
+  pytest duration: 462.88 s
+  runner elapsed: 465.029 s
+
+broad-2: 5,039 passed, 4 skipped
+  pytest duration: 219.37 s
+  runner elapsed: 465.049 s
+
+serial: 926 passed, 9 skipped
+  pytest duration: 249.24 s
+  runner elapsed: 465.075 s
+
+total: 10,455 passed, 17 skipped, 0 failed, 0 errors
+overall certification wall: 468.776 s
+repository unchanged: PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-993a81301db94ff6b01fc3a6b8995cd3
+```
+
+No live Robinhood/MCP activity occurred during implementation or certification.
+
+Production/live trading remains NO-GO.
+
+Next protected boundary: one full deterministic pipeline qualification:
+
+```text
+TradeProposal
+-> deterministic RiskDecision
+-> ExecutionInstruction + explicit local order_id
+-> build_review_paper_intent
+-> accepted source-owned Robinhood paper operator
+-> read/review/read
+-> local synthetic paper fill
+```
+
+That qualification may issue exactly one live non-placement
+`review_equity_order` request and therefore requires separate explicit
+authorization before execution.
+

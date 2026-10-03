@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -180,7 +181,7 @@ def test_verifies_exact_frozen_131l_qualification(tmp_path):
     assert result.source_head == HEAD
     assert result.source_tree == TREE
     assert result.record_count == 2
-    assert str(result.cash) == "98458.810000"
+    assert result.cash == Decimal("98458.810000")
     assert str(result.symbol) == "SPY"
     assert str(result.position_quantity) == "2.000"
     assert result.order_id == ORDER

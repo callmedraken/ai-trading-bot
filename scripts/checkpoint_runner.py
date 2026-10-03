@@ -440,6 +440,7 @@ ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode
 ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH: Final = (
     "feature/robinhood-review-paper-side-foundation"
 )
+ARCH131_LQ_SOURCE_BLOB_SHA1: Final = "6cf2f9e7358dfa8d0d9af2706b83e36c3db778bc"
 
 
 def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -726,18 +727,15 @@ def _arch131_live_qualification_verifier_authority_check(
 ) -> tuple[str, ...]:
     failures: list[str] = []
     try:
-        tree = ast.parse(
-            (
-                repo_root / "src/trading_bot/robinhood_live_qualification_verifier.py"
-            ).read_text(encoding="utf-8")
-        )
-        if (
-            hashlib.sha256(
-                ast.dump(tree, include_attributes=False).encode("utf-8")
-            ).hexdigest()
-            != "a4d3d9a21b6799ba28efa6fe94d37254087c95ad84c60a79eb42803e967a4280"
-        ):
+        path = repo_root / "src/trading_bot/robinhood_live_qualification_verifier.py"
+        text_value = path.read_text(encoding="utf-8")
+        data = text_value.encode("utf-8")
+        actual = hashlib.sha1(
+            b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
+        ).hexdigest()
+        if actual != ARCH131_LQ_SOURCE_BLOB_SHA1:
             failures.append("131-LQ read-only reconciliation boundary drift")
+        tree = ast.parse(text_value)
 
         runner_tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")

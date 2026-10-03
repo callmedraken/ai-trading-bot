@@ -2131,8 +2131,8 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "arch131-robinhood-forward-paper-cycle\n          exit $LASTEXITCODE",
-            "arch131-robinhood-forward-paper-cycle\n          exit 0",
+            "arch131-robinhood-live-qualification-verifier\n          exit $LASTEXITCODE",
+            "arch131-robinhood-live-qualification-verifier\n          exit 0",
         ),
     ],
 )
@@ -2421,6 +2421,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-deterministic-paper-pipeline",
     "arch131-robinhood-virtual-risk-context",
     "arch131-robinhood-forward-paper-cycle",
+    "arch131-robinhood-live-qualification-verifier",
 )
 
 

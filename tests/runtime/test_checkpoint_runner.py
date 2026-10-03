@@ -165,6 +165,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-oauth-windows",
         "arch131-robinhood-agentic-account",
         "arch131-robinhood-paper-operator",
+        "arch131-robinhood-paper-intent-bridge",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -182,6 +183,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-oauth-windows",
                 "arch131-robinhood-agentic-account",
                 "arch131-robinhood-paper-operator",
+                "arch131-robinhood-paper-intent-bridge",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -1933,3 +1935,217 @@ def test_131h_authority_rejects_boundary_drift(tmp_path, relative, before, after
     destination.write_text(source.replace(before, after), encoding="utf-8")
     failures = runner._arch131_paper_operator_authority_check(tmp_path)
     assert failures
+
+
+def test_131i_source_registration_and_workflow() -> None:
+    spec = runner._checkpoint_specs()["arch131-robinhood-paper-intent-bridge"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    assert spec.authority_check is runner._arch131_paper_intent_bridge_authority_check
+    assert {
+        "tests/review_paper/test_intent_bridge.py",
+        "tests/review_paper/test_store.py",
+        "tests/risk/test_risk_models.py",
+        "tests/risk/test_manager.py",
+        "tests/execution/test_execution_models.py",
+        "tests/execution/test_order_engine.py",
+    } <= set(spec.tests)
+    assert {
+        "src/trading_bot/review_paper/intent_bridge.py",
+        "src/trading_bot/review_paper/__init__.py",
+        "tests/review_paper/test_intent_bridge.py",
+    } <= set(spec.ruff_paths)
+    repo = Path(runner.__file__).resolve().parent.parent
+    assert spec.authority_check(repo) == ()
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.index("verify arch131-robinhood-paper-intent-bridge") > (
+        workflow.index("verify arch131-robinhood-paper-operator")
+    )
+
+
+def _131i_authority_copy(tmp_path: Path) -> Path:
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/review_paper/intent_bridge.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_paper_intent_bridge_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        "proposal_id=decision.proposal.proposal_id",
+        "order_id=order_id",
+        "symbol=decision.proposal.symbol",
+        "side=decision.proposal.side",
+        "desired_quantity=decision.proposal.desired_quantity",
+        "approved_quantity=decision.approved_quantity",
+        "risk_outcome=decision.outcome",
+        "risk_reason_codes=tuple(reason.code.value for reason in decision.reasons)",
+        "proposal_reason=decision.proposal.reason",
+        "proposal_confidence=decision.proposal.confidence",
+        "order_type=instruction.order_type",
+        "time_in_force=instruction.time_in_force",
+        "proposed_at=decision.proposal.created_at",
+        "limit_price=instruction.limit_price",
+    ],
+)
+def test_131i_authority_freezes_each_mapping(tmp_path, mapping) -> None:
+    root = _131i_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/intent_bridge.py"
+    source = path.read_text(encoding="utf-8")
+    field = mapping.split("=", 1)[0]
+    assert mapping in source
+    path.write_text(source.replace(mapping, field + "=None"), encoding="utf-8")
+    assert runner._arch131_paper_intent_bridge_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("before", "after"),
+    [
+        ("type(decision) is not RiskDecision", "False"),
+        ("type(instruction) is not ExecutionInstruction", "False"),
+        ("type(order_id) is not UUID", "False"),
+        ("decision.outcome is RiskOutcome.REJECTED", "False"),
+        ("decision.evaluated_at < decision.proposal.created_at", "False"),
+        ("instruction.created_at < decision.evaluated_at", "False"),
+        ("order_id: UUID,", "order_id: UUID = UUID(int=0),"),
+        ("order_id=order_id", "order_id=uuid4()"),
+        ("order_id=order_id", "order_id=UUID(int=0)"),
+        (
+            "reason.code.value for reason in decision.reasons",
+            "reason.code.value for reason in reversed(decision.reasons)",
+        ),
+        (
+            "tuple(reason.code.value for reason in decision.reasons)",
+            "tuple(sorted({reason.code.value for reason in decision.reasons}))",
+        ),
+        ("limit_price=instruction.limit_price", "limit_price=None"),
+        ("risk_outcome=decision.outcome", "risk_outcome=RiskOutcome.APPROVED"),
+    ],
+)
+def test_131i_authority_freezes_validation_and_identity(tmp_path, before, after):
+    root = _131i_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/intent_bridge.py"
+    source = path.read_text(encoding="utf-8")
+    assert before in source
+    path.write_text(source.replace(before, after), encoding="utf-8")
+    assert runner._arch131_paper_intent_bridge_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "from trading_bot.robinhood_paper_cycle import RobinhoodReviewPaperCycle",
+        "from trading_bot.robinhood_mcp.sdk_transport import "
+        "RobinhoodMcpStreamableHttpTransport",
+        "from trading_bot.robinhood_mcp.windows_oauth import WindowsOAuthStorage",
+        "from trading_bot.risk import RiskManager",
+        "from trading_bot.execution import OrderEngine",
+        "from uuid import uuid4",
+        "import socket",
+        "import subprocess",
+        "import http.client",
+        "import pathlib",
+        "import os",
+        "import logging",
+        "run_robinhood_paper_operator()",
+        "RobinhoodReviewPaperCycle()",
+        "RiskManager().evaluate()",
+        "OrderEngine().create_order()",
+        "open('file')",
+        "socket.socket()",
+        "subprocess.run([])",
+        "os.environ['SECRET']",
+        "os.getenv('SECRET')",
+        "print('proposal material')",
+        "logging.info('proposal material')",
+        "eval('effect()')",
+        "__import__('socket')",
+        "(",
+    ],
+)
+def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addition):
+    root = _131i_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/intent_bridge.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + addition + "\n", encoding="utf-8"
+    )
+    assert runner._arch131_paper_intent_bridge_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("relative", "before", "after"),
+    [
+        ("scripts/checkpoint_runner.py", "preflight=None,", "preflight=host_effect,"),
+        ("scripts/checkpoint_runner.py", "execute=None,", "execute=host_effect,"),
+        (
+            "scripts/checkpoint_runner.py",
+            "authority_check=_arch131_paper_intent_bridge_authority_check,",
+            "authority_check=_arch131_paper_operator_authority_check,",
+        ),
+        (
+            "scripts/checkpoint_runner.py",
+            'name="arch131-robinhood-paper-intent-bridge",',
+            'name="missing-checkpoint",',
+        ),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "verify arch131-robinhood-paper-intent-bridge",
+            "verify missing-checkpoint",
+        ),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "$Failures += 'arch131-robinhood-paper-intent-bridge'",
+            "$Failures += 'wrong'",
+        ),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "            verify arch131-robinhood-paper-intent-bridge",
+            "          # verify arch131-robinhood-paper-intent-bridge",
+        ),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "            verify arch131-robinhood-paper-operator",
+            "          # verify arch131-robinhood-paper-operator",
+        ),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "$Failures += 'arch131-robinhood-paper-operator'",
+            "$Failures += 'wrong'",
+        ),
+    ],
+)
+def test_131i_authority_freezes_source_only_registration_and_ci(
+    tmp_path,
+    relative,
+    before,
+    after,
+) -> None:
+    root = _131i_authority_copy(tmp_path)
+    path = root / relative
+    source = path.read_text(encoding="utf-8")
+    assert before in source
+    path.write_text(source.replace(before, after, 1), encoding="utf-8")
+    assert runner._arch131_paper_intent_bridge_authority_check(root)
+
+
+def test_131i_authority_rejects_reversed_workflow_order(tmp_path) -> None:
+    root = _131i_authority_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text(encoding="utf-8")
+    operator = "arch131-robinhood-paper-operator"
+    bridge = "arch131-robinhood-paper-intent-bridge"
+    source = source.replace(operator, "TEMP_CHECKPOINT")
+    source = source.replace(bridge, operator).replace("TEMP_CHECKPOINT", bridge)
+    path.write_text(source, encoding="utf-8")
+    assert runner._arch131_paper_intent_bridge_authority_check(root)

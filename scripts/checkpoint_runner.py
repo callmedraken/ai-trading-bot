@@ -612,6 +612,113 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch131_paper_intent_bridge_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        tree = ast.parse(
+            (repo_root / "src/trading_bot/review_paper/intent_bridge.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        # Freeze every mapping, exact type guard, timestamp guard, and explicit
+        # identity parameter. Whole-module coverage also forbids extra helpers,
+        # dynamic calls, imports, logging, or module-level effects.
+        if (
+            hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "48579d59a3940db668d2381b87a2ff63b02327f7f1bfca8d823926b78519054a"
+        ):
+            failures.append("131-I exact mapping/type/time/identity boundary drift")
+        allowed_imports = {
+            "__future__": {"annotations"},
+            "uuid": {"UUID"},
+            "trading_bot.execution.models": {"ExecutionInstruction"},
+            "trading_bot.review_paper.models": {"ReviewPaperIntent"},
+            "trading_bot.risk.models": {"RiskDecision", "RiskOutcome"},
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                failures.append("131-I unreviewed import/effect surface")
+            elif isinstance(node, ast.ImportFrom):
+                if (
+                    node.level != 0
+                    or node.module not in allowed_imports
+                    or any(
+                        name.asname is not None
+                        or name.name not in allowed_imports[node.module]
+                        for name in node.names
+                    )
+                ):
+                    failures.append("131-I unreviewed import/effect surface")
+            elif isinstance(node, ast.Call):
+                if not isinstance(node.func, ast.Name) or node.func.id not in {
+                    "type",
+                    "TypeError",
+                    "ValueError",
+                    "tuple",
+                    "ReviewPaperIntent",
+                }:
+                    failures.append("131-I unreviewed call/effect surface")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-paper-intent-bridge"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1:
+            failures.append("131-I source-only registration missing")
+        else:
+            fields = {item.arg: item.value for item in registrations[0].keywords}
+            for field in ("preflight", "execute"):
+                value = fields.get(field)
+                if not isinstance(value, ast.Constant) or value.value is not None:
+                    failures.append("131-I checkpoint has host/effect capability")
+            check = fields.get("authority_check")
+            if (
+                not isinstance(check, ast.Name)
+                or check.id != "_arch131_paper_intent_bridge_authority_check"
+            ):
+                failures.append("131-I authority registration drift")
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-I checkpoint has host/effect capability")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        invocation = (
+            "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
+            "-File .\\ops.ps1 `\n"
+            "            verify arch131-robinhood-paper-intent-bridge\n"
+            "          if ($LASTEXITCODE -ne 0) {\n"
+            "            $Failures += 'arch131-robinhood-paper-intent-bridge'\n"
+            "          }"
+        )
+        operator_invocation = invocation.replace(
+            "arch131-robinhood-paper-intent-bridge", "arch131-robinhood-paper-operator"
+        )
+        if (
+            workflow.count(invocation) != 1
+            or workflow.count(operator_invocation) != 1
+            or workflow.index(invocation) <= workflow.index(operator_invocation)
+        ):
+            failures.append("131-I workflow invocation/131-H ordering drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-I source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_paper_operator_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = list(_arch131_agentic_account_authority_check(repo_root))
     failures.extend(_arch131_windows_oauth_authority_check(repo_root))
@@ -2896,6 +3003,29 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-paper-intent-bridge": CheckpointSpec(
+            name="arch131-robinhood-paper-intent-bridge",
+            description="Architecture 131-I deterministic risk-to-paper-intent bridge",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_intent_bridge.py",
+                "tests/review_paper/test_store.py",
+                "tests/risk/test_risk_models.py",
+                "tests/risk/test_manager.py",
+                "tests/execution/test_execution_models.py",
+                "tests/execution/test_order_engine.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/intent_bridge.py",
+                "src/trading_bot/review_paper/__init__.py",
+                "tests/review_paper/test_intent_bridge.py",
+            ),
+            authority_check=_arch131_paper_intent_bridge_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         "arch131-robinhood-paper-operator": CheckpointSpec(
             name="arch131-robinhood-paper-operator",
             description="Architecture 131-H one-cycle Robinhood paper operator",

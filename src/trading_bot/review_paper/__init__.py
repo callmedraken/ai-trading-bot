@@ -1,5 +1,6 @@
 """Robinhood review-based paper-trading domain and persistence."""
 
+from trading_bot.review_paper.intent_bridge import build_review_paper_intent
 from trading_bot.review_paper.models import (
     ReviewPaperIntent,
     ReviewPaperRecord,
@@ -43,5 +44,6 @@ __all__ = [
     "RobinhoodEquityOrderReview",
     "RobinhoodReviewQuote",
     "UnsupportedReviewPaperOrderError",
+    "build_review_paper_intent",
     "canonical_order_checks",
 ]

@@ -437,7 +437,7 @@ R8_HALT_REGISTRATION_PIN: Final = (
 ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "4dece99d8993934e9747f091415927353b70a2e3"
 ARCH130_R8I_D1_REMOTE_BRANCH: Final = "feature/d10c-r8-incident-reconciliation"
 ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode"
-ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-side-foundation"
+ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH: Final = (\n    "feature/robinhood-review-paper-side-foundation"\n)
 
 
 def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -726,8 +726,7 @@ def _arch131_live_qualification_verifier_authority_check(
     try:
         tree = ast.parse(
             (
-                repo_root
-                / "src/trading_bot/robinhood_live_qualification_verifier.py"
+                repo_root / "src/trading_bot/robinhood_live_qualification_verifier.py"
             ).read_text(encoding="utf-8")
         )
         if (

@@ -151,7 +151,9 @@ def verify_robinhood_131l_live_qualification(
         Path(str(summary.get("store"))).resolve() == store_path.resolve(),
         "summary store mismatch",
     )
-    _require(summary.get("order_id") == str(expected_order_id), "summary order mismatch")
+    _require(
+        summary.get("order_id") == str(expected_order_id), "summary order mismatch"
+    )
     _require(summary.get("operator") == operator, "summary operator mismatch")
 
     before = summary.get("before")

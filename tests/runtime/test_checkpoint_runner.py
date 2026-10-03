@@ -169,13 +169,17 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-deterministic-paper-pipeline",
         "arch131-robinhood-virtual-risk-context",
         "arch131-robinhood-forward-paper-cycle",
+        "arch131-robinhood-live-qualification-verifier",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
         assert "scripts/checkpoint_runner.py" in spec.ruff_paths
         assert "tests/runtime/test_checkpoint_runner.py" in spec.ruff_paths
         expected_branch = (
-            "feature/robinhood-review-paper-mode"
+            "feature/robinhood-review-paper-side-foundation"
+            if spec.name == "arch131-robinhood-live-qualification-verifier"
+            else (
+                "feature/robinhood-review-paper-mode"
             if spec.name
             in {
                 "arch131-robinhood-review-paper",
@@ -199,6 +203,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                     if spec.name == "arch128-r8-terminal-halt"
                     else "feature/d10c-durable-wake-evidence"
                 )
+            )
             )
         )
         assert spec.remote_branch == expected_branch
@@ -3427,3 +3432,87 @@ def test_131l_authority_fails_closed_when_source_is_unavailable(tmp_path, relati
     root = _131l_authority_copy(tmp_path)
     (root / relative).unlink()
     assert runner._arch131_forward_paper_cycle_authority_check(root)
+
+
+# 131-LQ freezes read-only evidence reconciliation on the isolated side branch.
+def test_131lq_source_only_registration_and_batch():
+    name = "arch131-robinhood-live-qualification-verifier"
+    spec = runner._checkpoint_specs()[name]
+    assert spec.preflight is None and spec.execute is None
+    assert (
+        spec.authority_check
+        is runner._arch131_live_qualification_verifier_authority_check
+    )
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/test_robinhood_live_qualification_verifier.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "src/trading_bot/robinhood_live_qualification_verifier.py",
+        "tests/test_robinhood_live_qualification_verifier.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CHECKPOINTS.index(name) == (
+        runner.CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
+
+
+def _131lq_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/robinhood_live_qualification_verifier.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_live_qualification_verifier_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import socket",
+        "import subprocess",
+        "import os",
+        "from trading_bot.review_paper import ReviewPaperStore",
+        "from trading_bot.robinhood_mcp import RobinhoodMcpStreamableHttpTransport",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "while True:\n    pass",
+        "open('paper.sqlite', 'w')",
+    ],
+)
+def test_131lq_authority_rejects_effect_surface_drift(tmp_path, addition):
+    root = _131lq_authority_copy(tmp_path)
+    path = root / "src/trading_bot/robinhood_live_qualification_verifier.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n" + addition + "\n",
+        encoding="utf-8",
+    )
+    assert runner._arch131_live_qualification_verifier_authority_check(root)
+
+
+@pytest.mark.parametrize("capability", ["preflight", "execute"])
+def test_131lq_authority_rejects_runtime_effect_registration(
+    tmp_path, monkeypatch, capability
+):
+    root = _131lq_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-robinhood-live-qualification-verifier"
+    from dataclasses import replace
+
+    def forbidden():
+        raise AssertionError("effect capability invoked during source certification")
+
+    specs[name] = replace(specs[name], **{capability: forbidden})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-LQ checkpoint has host/effect capability" in (
+        runner._arch131_live_qualification_verifier_authority_check(root)
+    )

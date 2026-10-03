@@ -357,6 +357,58 @@ human-started forward-paper cycle. That qualification may perform exactly one
 non-placement `review_equity_order` and therefore requires fresh explicit
 authorization. Production/live order placement remains NO-GO.
 
+
+### 131-LQ — read-only live-qualification evidence verifier
+
+Side-foundation source milestone. This work is isolated from the frozen
+`feature/robinhood-review-paper-mode` qualification branch and must not alter
+the accepted 131-L source, its Monday qualification command, or the durable
+paper store.
+
+The verifier consumes only:
+
+```text
+durable review-paper SQLite path
++ sanitized 131-H operator evidence JSON
++ sanitized 131-L qualification summary JSON
++ expected source HEAD/tree
++ expected predecessor order UUID
++ expected qualification order UUID
+-> deterministic read-only reconciliation result
+```
+
+Frozen qualification-specific acceptance:
+
+- SQLite is opened in URI `mode=ro`; the verifier must not construct a
+  `ReviewPaperStore` or initialize/migrate/write the database;
+- no Robinhood/MCP/OAuth/network/subprocess/environment/config capability;
+- no retry, polling, scheduler, trading, risk evaluation, intent construction,
+  review request, paper fill, or performance valuation;
+- exact source HEAD/tree must match the sanitized operator evidence and summary;
+- exact durable baseline is the accepted 131-J SPY BUY 1 record;
+- exact qualified record is the separately authorized 131-L SPY BUY proposal
+  with desired quantity 2, RESIZED approved quantity 1.000, and frozen risk
+  reasons `MAX_POSITION_PERCENT` then `QUANTITY_INCREMENT`;
+- durable paper history must contain exactly the predecessor and qualification
+  records, reconstructing to exactly 2.000 SPY after the qualification;
+- operator evidence must prove PASS/complete, one internal account resolution,
+  two equity-order reads, exactly one `review_equity_order`, zero quote calls,
+  one baseline page, one post-review page, two paper records, no replay, valid
+  review/quote/disclosure checks, and zero interactive reauthorization;
+- the qualification summary must agree exactly with the operator evidence and
+  durable SQLite material;
+- result output contains only sanitized reconciliation facts.
+
+Register a source-only checkpoint named
+`arch131-robinhood-live-qualification-verifier` on the isolated
+`feature/robinhood-review-paper-side-foundation` branch, with
+`preflight=None` and `execute=None`.
+
+131-LQ source implementation and certification perform no live
+Robinhood/MCP/OAuth request and no durable paper mutation. The already
+authorized 131-L live qualification remains a separate protected effect on the
+frozen qualification branch.
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

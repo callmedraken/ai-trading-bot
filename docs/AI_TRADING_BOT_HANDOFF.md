@@ -9691,3 +9691,96 @@ should the first live `review_equity_order` paper-cycle qualification occur.
 
 Production/live trading remains NO-GO.
 
+## 2026-10-02 — Architecture 131-G accepted; canonical MCP account identity closed
+
+Accepted source:
+
+```text
+HEAD 73ecd604c6d7f95af93dce5336ef0ca3700f3877
+TREE cebd9a3fdaff1168fefb60b82dac09b494a0acd6
+```
+
+131-G converts the live account-identity finding into the production paper-cycle
+boundary:
+
+1. internal Robinhood MCP account metadata is read once for a new cycle;
+2. exactly one equities account with `agentic_allowed=true` is required;
+3. only that MCP-returned `account_number` is used;
+4. the same value is reused for pre-review order history, review, and post-review
+   order history;
+5. `get_accounts` is not exposed through the public AI/application facade;
+6. no RHS-account fallback exists;
+7. the resolved identifier is not printed/logged/persisted by this path;
+8. durable replay/conflict checks still occur before account resolution.
+
+Public Robinhood application surface remains exactly:
+
+```text
+review_equity_order
+get_equity_quotes
+get_equity_orders
+```
+
+The registered source-only checkpoint is
+`arch131-robinhood-agentic-account` with no preflight or execute capability.
+
+One source-review correction was required: the first implementation registered
+131-G in `checkpoint_runner.py` but did not invoke it from the GitHub source-gate
+workflow. Commit `73ecd604c6d7f95af93dce5336ef0ca3700f3877` fixed that
+wiring and added a regression requiring the 131-G invocation after 131-F.
+
+CI:
+
+```text
+run #133 / 37071520277
+SUCCESS
+```
+
+Certification:
+
+```text
+10,288 cases
+10,277 passed
+11 skipped
+0 failed
+0 errors
+
+broad-1 4,532 passed
+broad-2 4,819 passed, 2 skipped
+serial    926 passed, 9 skipped
+
+wall 387.936 s
+```
+
+Evidence directory:
+
+```text
+F:\AI\temp\pytest\certification-evidence-ae536ed386ac43e59e3a7386fb3af118
+```
+
+### Next boundary
+
+The next step is a bounded live paper-cycle qualification that may call
+`review_equity_order` but must never place an order:
+
+```text
+resolve canonical agentic account
+-> exhaustive bounded get_equity_orders before review
+-> require empty attributable order window
+-> review_equity_order
+-> validate exact review echo / quote / checks / disclosure
+-> exhaustive bounded get_equity_orders after review
+-> require empty attributable order window
+-> only then allow the local synthetic paper fill
+```
+
+For the first live qualification, prefer a deliberately bounded test intent and
+a local test store/evidence path outside the repository. Do not expose account
+numbers or OAuth material in console/evidence. The qualification must stop on
+any real order observation, review mismatch, malformed quote/check data, MCP
+tool error, account ambiguity, interactive reauthorization, or unexpected tool
+inventory.
+
+Production/live trading remains NO-GO. Placement, cancellation, options, and
+crypto mutation tools remain forbidden.
+

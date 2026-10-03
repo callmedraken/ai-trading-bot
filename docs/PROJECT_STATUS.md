@@ -9529,3 +9529,97 @@ Production/live trading remains NO-GO.
 Next milestone: design and implement the source-only canonical MCP Agentic-account resolver
 before authorizing the first `review_equity_order` paper-cycle qualification.
 
+## 2026-10-02 — Architecture 131-G canonical Agentic-account resolution ACCEPTED
+
+Architecture 131-G is accepted on executable/source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+SOURCE HEAD 73ecd604c6d7f95af93dce5336ef0ca3700f3877
+SOURCE TREE cebd9a3fdaff1168fefb60b82dac09b494a0acd6
+```
+
+Implementation commits:
+
+```text
+65c8797fd759e429d458f7d2b2c52e845d80b040
+  feat: add canonical Robinhood agentic account resolution
+
+73ecd604c6d7f95af93dce5336ef0ca3700f3877
+  fix: run Architecture 131-G source gate in CI
+```
+
+Accepted behavior:
+
+- `get_accounts` remains an internal brokerage-transport capability and is not
+  added to the public AI/application MCP facade;
+- the public MCP surface remains exactly `review_equity_order`,
+  `get_equity_quotes`, and `get_equity_orders`;
+- a new paper cycle resolves Robinhood account metadata once and requires exactly
+  one equities account with `agentic_allowed=true`;
+- the canonical MCP `account_number` is reused for the baseline order read,
+  review request, and post-review order read;
+- zero/multiple eligible accounts, malformed metadata, invalid account numbers,
+  MCP errors, missing structured content, and missing account-tool inventory fail
+  closed;
+- `rhs_account_number` is never used as a fallback;
+- the canonical account number is not printed, logged, or persisted by the
+  resolver/paper-cycle path;
+- durable replay of an identical local `order_id` still performs zero
+  Robinhood/account-resolution calls;
+- conflicting reuse of an `order_id` still fails before Robinhood calls;
+- placement/cancellation/options/crypto mutation tools remain outside the
+  application surface.
+
+The new source-only checkpoint is:
+
+```text
+arch131-robinhood-agentic-account
+preflight=None
+execute=None
+```
+
+The initial 131-G implementation was source-correct but the GitHub source-gate
+workflow omitted the new checkpoint. The follow-up commit
+`73ecd604c6d7f95af93dce5336ef0ca3700f3877` added the workflow invocation and
+a regression that requires 131-G to run after 131-F.
+
+CI source-gate evidence:
+
+```text
+run #133 / 37071520277
+Checkpoint Source Gates: SUCCESS
+Verify source checkpoints: SUCCESS
+arch131-robinhood-agentic-account: executed through reviewed workflow
+```
+
+Full certification:
+
+```text
+broad-1: 4,532 passed, 0 skipped
+broad-2: 4,819 passed, 2 skipped
+serial: 926 passed, 9 skipped
+total: 10,277 passed, 11 skipped, 0 failed, 0 errors
+cases: 10,288
+wall: 387.936 seconds
+Ruff check: PASS
+Ruff format: PASS
+git diff --check: PASS
+repository unchanged: PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-ae536ed386ac43e59e3a7386fb3af118
+```
+
+Architecture 131-G therefore closes the account-identity gap discovered during
+live read-only qualification. Operator-entered app-visible account numbers are
+no longer authoritative for the paper-cycle MCP path.
+
+Production/live trading remains NO-GO. The next protected milestone is the first
+live non-placement `review_equity_order` paper-cycle qualification using the
+accepted canonical account resolver, with read-only real-order checks before and
+after review. No placement/cancel/options/crypto call is permitted.
+

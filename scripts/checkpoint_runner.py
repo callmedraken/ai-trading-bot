@@ -440,7 +440,7 @@ ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode
 ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH: Final = (
     "feature/robinhood-review-paper-side-foundation"
 )
-ARCH131_LQ_SOURCE_BLOB_SHA1: Final = "6cf2f9e7358dfa8d0d9af2706b83e36c3db778bc"
+ARCH131_LQ_SOURCE_BLOB_SHA1: Final = "731232c79be39ba629236ecf29ee9f5d3d1e8bf2"
 
 
 def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -735,7 +735,7 @@ def _arch131_live_qualification_verifier_authority_check(
         ).hexdigest()
         if actual != ARCH131_LQ_SOURCE_BLOB_SHA1:
             failures.append("131-LQ read-only reconciliation boundary drift")
-        tree = ast.parse(text_value)
+        ast.parse(text_value)
 
         runner_tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")

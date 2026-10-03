@@ -2131,8 +2131,14 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "arch131-robinhood-live-qualification-verifier\n          exit $LASTEXITCODE",
-            "arch131-robinhood-live-qualification-verifier\n          exit 0",
+            (
+                "arch131-robinhood-live-qualification-verifier\n"
+                "          exit $LASTEXITCODE"
+            ),
+            (
+                "arch131-robinhood-live-qualification-verifier\n"
+                "          exit 0"
+            ),
         ),
     ],
 )

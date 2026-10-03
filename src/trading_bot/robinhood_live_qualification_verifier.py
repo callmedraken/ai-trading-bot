@@ -20,6 +20,11 @@ _STARTING_CASH = Decimal("100000")
 _BEFORE_CASH = Decimal("99230.130000")
 _SYMBOL = Symbol("SPY")
 _PRIOR_QUANTITY = Decimal("1")
+_PRIOR_FILL_PRICE = Decimal("769.870000")
+_PRIOR_FILL_TIME = "2026-10-03T00:00:00.232470+00:00"
+_QUALIFICATION_BRANCH = "feature/robinhood-review-paper-mode"
+_QUALIFICATION_PROPOSAL_ID = UUID("11111111-131b-4000-8000-000000000001")
+_QUALIFICATION_MARK = Decimal("769.650000")
 _DESIRED_QUANTITY = Decimal("2")
 _APPROVED_QUANTITY = Decimal("1.000")
 _FINAL_QUANTITY = Decimal("2.000")
@@ -93,9 +98,24 @@ def verify_robinhood_131l_live_qualification(
     _require(prior["side"] == OrderSide.BUY.value, "prior side mismatch")
     _require(qualified["side"] == OrderSide.BUY.value, "new side mismatch")
     _require(
+        Decimal(prior["desired_quantity"]) == _PRIOR_QUANTITY,
+        "prior desired quantity mismatch",
+    )
+    _require(
         Decimal(prior["approved_quantity"]) == _PRIOR_QUANTITY,
         "prior quantity mismatch",
     )
+    _require(
+        prior["risk_outcome"] == RiskOutcome.APPROVED.value,
+        "prior risk outcome mismatch",
+    )
+    _require(prior["risk_reason_codes"] == "", "prior risk reasons mismatch")
+    _require(
+        Decimal(prior["fill_price"]) == _PRIOR_FILL_PRICE,
+        "prior fill price mismatch",
+    )
+    _require(Decimal(prior["commission"]) == Decimal("0"), "prior commission mismatch")
+    _require(prior["filled_at"] == _PRIOR_FILL_TIME, "prior fill time mismatch")
     _require(
         Decimal(qualified["desired_quantity"]) == _DESIRED_QUANTITY,
         "new desired quantity mismatch",
@@ -107,6 +127,10 @@ def verify_robinhood_131l_live_qualification(
     _require(
         qualified["risk_outcome"] == RiskOutcome.RESIZED.value,
         "new risk outcome mismatch",
+    )
+    _require(
+        Decimal(qualified["commission"]) == Decimal("0"),
+        "new commission mismatch",
     )
     _require(
         tuple(item for item in qualified["risk_reason_codes"].split("|") if item)
@@ -145,6 +169,18 @@ def verify_robinhood_131l_live_qualification(
     _require(operator == expected_operator, "operator evidence mismatch")
 
     _require(summary.get("schema") == _SCHEMA, "summary schema mismatch")
+    _require(
+        summary.get("branch") == _QUALIFICATION_BRANCH,
+        "summary branch mismatch",
+    )
+    _require(
+        summary.get("proposal_id") == str(_QUALIFICATION_PROPOSAL_ID),
+        "summary proposal mismatch",
+    )
+    _require(
+        Decimal(str(summary.get("qualification_mark"))) == _QUALIFICATION_MARK,
+        "summary qualification mark mismatch",
+    )
     _require(summary.get("head") == expected_source_head, "summary head mismatch")
     _require(summary.get("tree") == expected_source_tree, "summary tree mismatch")
     _require(

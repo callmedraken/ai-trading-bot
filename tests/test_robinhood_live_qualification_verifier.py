@@ -264,6 +264,30 @@ def test_rejects_new_durable_record_drift(tmp_path, column, value):
         _verify(store, evidence, summary)
 
 
+@pytest.mark.parametrize(
+    "column,value",
+    [
+        ("desired_quantity", "2"),
+        ("approved_quantity", "2"),
+        ("risk_outcome", "RESIZED"),
+        ("risk_reason_codes", "MAX_POSITION_PERCENT"),
+        ("fill_price", "769.86"),
+        ("commission", "0.01"),
+        ("filled_at", "2026-10-03T00:00:01+00:00"),
+    ],
+)
+def test_rejects_prior_durable_record_drift(tmp_path, column, value):
+    store, evidence, summary = _fixture(tmp_path)
+    with sqlite3.connect(store) as connection:
+        connection.execute(
+            f"UPDATE review_fills SET {column} = ? WHERE order_id = ?",
+            (value, str(PRIOR_ORDER)),
+        )
+
+    with pytest.raises(RobinhoodLiveQualificationVerificationError):
+        _verify(store, evidence, summary)
+
+
 def test_rejects_extra_durable_record(tmp_path):
     store, evidence, summary = _fixture(tmp_path)
     with sqlite3.connect(store) as connection:
@@ -307,6 +331,24 @@ def test_rejects_summary_disagreement(tmp_path):
         RobinhoodLiveQualificationVerificationError,
         match="summary approved quantity mismatch",
     ):
+        _verify(store, evidence, summary)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("branch", "feature/other"),
+        ("proposal_id", "11111111-131b-4000-8000-000000000002"),
+        ("qualification_mark", "769.640000"),
+    ],
+)
+def test_rejects_frozen_summary_identity_drift(tmp_path, field, value):
+    store, evidence, summary = _fixture(tmp_path)
+    document = _summary(store, evidence)
+    document[field] = value
+    summary.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(RobinhoodLiveQualificationVerificationError):
         _verify(store, evidence, summary)
 
 

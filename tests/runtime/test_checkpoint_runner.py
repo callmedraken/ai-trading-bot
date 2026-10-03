@@ -166,6 +166,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-agentic-account",
         "arch131-robinhood-paper-operator",
         "arch131-robinhood-paper-intent-bridge",
+        "arch131-robinhood-deterministic-paper-pipeline",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -184,6 +185,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-agentic-account",
                 "arch131-robinhood-paper-operator",
                 "arch131-robinhood-paper-intent-bridge",
+                "arch131-robinhood-deterministic-paper-pipeline",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -2149,3 +2151,239 @@ def test_131i_authority_rejects_reversed_workflow_order(tmp_path) -> None:
     source = source.replace(bridge, operator).replace("TEMP_CHECKPOINT", bridge)
     path.write_text(source, encoding="utf-8")
     assert runner._arch131_paper_intent_bridge_authority_check(root)
+
+
+def test_131j_source_registration_and_workflow() -> None:
+    spec = runner._checkpoint_specs()["arch131-robinhood-deterministic-paper-pipeline"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    assert (
+        spec.authority_check
+        is runner._arch131_deterministic_paper_pipeline_authority_check
+    )
+    assert set(spec.tests) == {
+        "tests/runtime/test_checkpoint_runner.py",
+        "tests/test_robinhood_paper_pipeline.py",
+        "tests/review_paper/test_intent_bridge.py",
+        "tests/test_robinhood_paper_operator.py",
+        "tests/test_robinhood_paper_cycle.py",
+        "tests/risk/test_risk_models.py",
+        "tests/risk/test_manager.py",
+    }
+    assert "src/trading_bot/robinhood_paper_pipeline.py" in spec.ruff_paths
+    repo = Path(runner.__file__).resolve().parent.parent
+    assert spec.authority_check(repo) == ()
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.index("verify arch131-robinhood-deterministic-paper-pipeline") > (
+        workflow.index("verify arch131-robinhood-paper-intent-bridge")
+    )
+
+
+def _131j_authority_copy(tmp_path: Path) -> Path:
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/robinhood_paper_pipeline.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "argument",
+    [
+        "intent",
+        "review_received_at",
+        "expected_branch",
+        "expected_head",
+        "expected_tree",
+        "paper_store_path",
+        "evidence_path",
+        "redirect_uri",
+        "starting_cash",
+        "slippage_basis_points",
+        "commission",
+    ],
+)
+def test_131j_authority_freezes_each_forwarded_argument(tmp_path, argument):
+    root = _131j_authority_copy(tmp_path)
+    path = root / "src/trading_bot/robinhood_paper_pipeline.py"
+    source = path.read_text()
+    before = f"{argument}={argument},"
+    assert source.count(before) == 1
+    path.write_text(source.replace(before, f"{argument}=None,"), encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("RiskManager(risk_limits)", "RiskManager(RiskLimits())"),
+        (".evaluate(proposal, risk_context)", ".evaluate(proposal, other_context)"),
+        (
+            "decision = RiskManager",
+            "decision = RiskManager(risk_limits).evaluate(proposal, risk_context)\n"
+            "    decision = RiskManager",
+        ),
+        (
+            "return RobinhoodDeterministicPaperPipelineResult(decision, None, None)",
+            "pass",
+        ),
+        (
+            "decision.outcome is RiskOutcome.REJECTED",
+            "decision.outcome is RiskOutcome.APPROVED",
+        ),
+        (
+            "build_review_paper_intent(decision, instruction, order_id=order_id)",
+            "ReviewPaperIntent()",
+        ),
+        ("order_id=order_id)", "order_id=UUID(int=0))"),
+        (
+            "intent = build_review_paper_intent",
+            "build_review_paper_intent(decision, instruction, order_id=order_id)\n"
+            "    intent = build_review_paper_intent",
+        ),
+        (
+            "evidence = run_robinhood_paper_operator(",
+            "run_robinhood_paper_operator(intent=intent)\n"
+            "    evidence = run_robinhood_paper_operator(",
+        ),
+        ("decision, intent, evidence)", "decision, intent, None)"),
+        ("frozen=True, slots=True", "frozen=False, slots=True"),
+        ("if type(order_id) is not UUID:", "if False:"),
+        ("if type(self.intent) is not ReviewPaperIntent:", "if False:"),
+        (
+            "if type(self.operator_evidence) is not RobinhoodPaperOperatorEvidence:",
+            "if False:",
+        ),
+        (
+            "if self.intent is not None or self.operator_evidence is not None:",
+            "if False:",
+        ),
+    ],
+)
+def test_131j_authority_freezes_composition_and_result(tmp_path, before, after):
+    root = _131j_authority_copy(tmp_path)
+    path = root / "src/trading_bot/robinhood_paper_pipeline.py"
+    source = path.read_text()
+    assert before in source
+    path.write_text(source.replace(before, after), encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import os",
+        "import random",
+        "from uuid import uuid4",
+        "from trading_bot.robinhood_mcp import RobinhoodReviewReadAdapter",
+        "from trading_bot.robinhood_mcp.windows_oauth import "
+        "create_windows_robinhood_oauth_factory",
+        "from trading_bot.execution.engine import OrderEngine",
+        "open('paper.sqlite', 'w')",
+        "print('raw proposal/account')",
+        "os.getenv('CONFIG')",
+        "subprocess.run(['command'])",
+        "transport.call_tool('place_equity_order')",
+        "transport.call_tool('cancel_equity_order')",
+        "transport.call_tool('place_option_order')",
+        "transport.call_tool('place_crypto_order')",
+        "create_windows_robinhood_oauth_factory()",
+        "resolver.resolve()",
+        "OrderEngine.create_order()",
+        "OrderEngine.submit_order()",
+        "uuid4()",
+        "while True:\n    pass",
+        "for cycle in range(2):\n    pass",
+        "try:\n    run_robinhood_paper_operator()\n"
+        "except Exception:\n    run_robinhood_paper_operator()",
+    ],
+)
+def test_131j_authority_rejects_unreviewed_effects(tmp_path, addition):
+    root = _131j_authority_copy(tmp_path)
+    path = root / "src/trading_bot/robinhood_paper_pipeline.py"
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("preflight=None", "preflight=_r7_preflight"),
+        ("execute=None", "execute=_r7_execute"),
+        (
+            "authority_check=_arch131_deterministic_paper_pipeline_authority_check",
+            "authority_check=_arch131_paper_operator_authority_check",
+        ),
+        ('name="arch131-robinhood-deterministic-paper-pipeline"', 'name="other"'),
+        ('"tests/test_robinhood_paper_pipeline.py",', '"tests/other.py",'),
+        ("remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH", 'remote_branch="other"'),
+    ],
+)
+def test_131j_authority_freezes_source_only_registration(tmp_path, before, after):
+    root = _131j_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text()
+    prefix, rest = source.split(
+        '        "arch131-robinhood-deterministic-paper-pipeline": CheckpointSpec(', 1
+    )
+    registration, suffix = rest.split(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', 1
+    )
+    assert before in registration
+    source = (
+        prefix
+        + '        "arch131-robinhood-deterministic-paper-pipeline": CheckpointSpec('
+        + registration.replace(before, after, 1)
+        + '        "arch131-robinhood-paper-operator": CheckpointSpec('
+        + suffix
+    )
+    path.write_text(source, encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        (
+            "            verify arch131-robinhood-deterministic-paper-pipeline",
+            "          # verify arch131-robinhood-deterministic-paper-pipeline",
+        ),
+        (
+            "$Failures += 'arch131-robinhood-deterministic-paper-pipeline'",
+            "$Failures += 'other'",
+        ),
+        (
+            "            verify arch131-robinhood-paper-intent-bridge",
+            "          # verify arch131-robinhood-paper-intent-bridge",
+        ),
+    ],
+)
+def test_131j_authority_freezes_workflow_invocations(tmp_path, before, after):
+    root = _131j_authority_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text()
+    assert before in source
+    path.write_text(source.replace(before, after), encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)
+
+
+def test_131j_authority_rejects_reversed_workflow_order(tmp_path):
+    root = _131j_authority_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text()
+    pipeline_name = "arch131-robinhood-deterministic-paper-pipeline"
+    bridge_name = "arch131-robinhood-paper-intent-bridge"
+    source = source.replace(pipeline_name, "TEMP_CHECKPOINT")
+    source = source.replace(bridge_name, pipeline_name).replace(
+        "TEMP_CHECKPOINT", bridge_name
+    )
+    path.write_text(source, encoding="utf-8")
+    assert runner._arch131_deterministic_paper_pipeline_authority_check(root)

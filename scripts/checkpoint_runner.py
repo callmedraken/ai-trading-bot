@@ -612,6 +612,85 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch131_deterministic_paper_pipeline_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        tree = ast.parse(
+            (repo_root / "src/trading_bot/robinhood_paper_pipeline.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        # Freeze the whole module: immutable result invariants, caller-owned
+        # identities/context/limits, exactly one evaluation, rejected early
+        # return, authoritative bridge, and one exact operator forwarding call.
+        # Extra helpers/imports/calls, UUID creation, OrderEngine/MCP/OAuth,
+        # config/logging/host effects, loops, retries and schedulers all drift.
+        if (
+            hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "ee8b2a62bc434d4f611a27e786e3c30fcf1e7b0243f4b9fd70cb4686aae276b2"
+        ):
+            failures.append(
+                "131-J deterministic composition/result/effect boundary drift"
+            )
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-deterministic-paper-pipeline"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        # Also freeze test/lint surfaces, remote branch, authority binding and
+        # explicit preflight=None/execute=None; no host capability is registered.
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "11a7b1d02f2809026c941643a380b5af23cf781f14c1a5b008e3c72373eba2f0"
+        ):
+            failures.append("131-J source-only checkpoint registration drift")
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-J checkpoint has host/effect capability")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        invocation = (
+            "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
+            "-File .\\ops.ps1 `\n"
+            "            verify arch131-robinhood-deterministic-paper-pipeline\n"
+            "          if ($LASTEXITCODE -ne 0) {\n"
+            "            $Failures += "
+            "'arch131-robinhood-deterministic-paper-pipeline'\n"
+            "          }"
+        )
+        bridge_invocation = invocation.replace(
+            name, "arch131-robinhood-paper-intent-bridge"
+        )
+        if (
+            workflow.count(invocation) != 1
+            or workflow.count(bridge_invocation) != 1
+            or workflow.index(invocation) <= workflow.index(bridge_invocation)
+        ):
+            failures.append("131-J workflow invocation/131-I ordering drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-J source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_paper_intent_bridge_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     try:
@@ -3022,6 +3101,28 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/review_paper/test_intent_bridge.py",
             ),
             authority_check=_arch131_paper_intent_bridge_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-deterministic-paper-pipeline": CheckpointSpec(
+            name="arch131-robinhood-deterministic-paper-pipeline",
+            description="Architecture 131-J one-cycle deterministic paper pipeline",
+            tests=(
+                *COMMON_TESTS,
+                "tests/test_robinhood_paper_pipeline.py",
+                "tests/review_paper/test_intent_bridge.py",
+                "tests/test_robinhood_paper_operator.py",
+                "tests/test_robinhood_paper_cycle.py",
+                "tests/risk/test_risk_models.py",
+                "tests/risk/test_manager.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_paper_pipeline.py",
+                "tests/test_robinhood_paper_pipeline.py",
+            ),
+            authority_check=_arch131_deterministic_paper_pipeline_authority_check,
             remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
             preflight=None,
             execute=None,

@@ -9939,3 +9939,78 @@ source admission
 A separate explicit authorization is required before this live review request.
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — 131-H live operator qualified; next gap is deterministic intent bridging
+
+The accepted source-owned Robinhood paper operator has now passed its first live
+qualification.
+
+Live evidence:
+
+```text
+source HEAD 3d3d9d5f2100b61735b917263844324c48135027
+source TREE 4c300db5c3f82219026ff6396282fe5c8d524384
+
+SPY MARKET BUY quantity 1
+get_accounts               1
+get_equity_orders          2
+review_equity_order        1
+get_equity_quotes          0
+baseline pages             1
+post-review pages          1
+paper records              1
+interactive reauth         0
+placement/cancel/options/crypto mutation 0
+status                     PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\robinhood-131h-live-ea9992615ad14a28a0e7384c33d6bb79
+```
+
+The qualification used the source-owned operator rather than an ad-hoc embedded
+live driver. Repository state remained unchanged.
+
+### Architecture 131-I — deterministic risk-to-paper-intent bridge
+
+The next source milestone closes the remaining application pipeline gap before
+repeated forward paper operation.
+
+Goal:
+
+```text
+TradeProposal
+-> deterministic RiskDecision
+-> ExecutionInstruction / local order identity
+-> exact ReviewPaperIntent
+-> accepted 131-H operator
+```
+
+Frozen direction:
+
+1. add a pure/network-free source-owned conversion boundary;
+2. accept an existing `RiskDecision`, `ExecutionInstruction`, and explicit
+   local `order_id`;
+3. reject `RiskOutcome.REJECTED`;
+4. preserve exact proposal id, symbol, side, desired quantity, proposal reason,
+   confidence, and proposal timestamp;
+5. preserve exact approved quantity, risk outcome, and deterministic risk reason
+   codes from the decision;
+6. preserve exact order type, time in force, and limit price from the execution
+   instruction;
+7. require execution-instruction timestamp ordering to remain consistent with
+   proposal/risk evaluation;
+8. produce no brokerage/account/OAuth data;
+9. perform no MCP/network/file/credential operation;
+10. do not call `run_robinhood_paper_operator` inside the bridge;
+11. add source-only checkpoint
+    `arch131-robinhood-paper-intent-bridge`;
+12. no live Robinhood call during implementation or certification.
+
+After 131-I source acceptance and certification, the next stage can exercise the
+full deterministic proposal/risk/instruction -> source-owned paper operator path
+with a bounded live review before considering repeated forward paper sessions.
+
+Production/live order placement remains NO-GO.
+

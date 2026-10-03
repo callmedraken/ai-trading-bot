@@ -220,6 +220,16 @@ local synthetic paper fill.
 The registered source-only checkpoint is
 `arch131-robinhood-paper-operator`.
 
+### 131-I — deterministic risk-to-paper-intent bridge
+
+Convert the existing deterministic `TradeProposal` / `RiskDecision` /
+`ExecutionInstruction` pipeline into an exact `ReviewPaperIntent` without
+performing any Robinhood, MCP, OAuth, file, or credential operation.
+
+This bridge is the next source milestone after the successful live qualification
+of the source-owned 131-H operator. It removes manually constructed paper intents
+from the normal path while keeping risk authority outside the Robinhood operator.
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

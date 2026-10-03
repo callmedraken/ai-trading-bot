@@ -41,8 +41,11 @@ No real Robinhood order is intentionally created.
 ## Robinhood review contract
 
 Phase A supports share-quantity MARKET equity/ETF orders during regular hours.
-The future MCP adapter must pass the exact agentic account selected by the
-operator and the exact risk-approved quantity.
+The MCP paper-cycle boundary must resolve the canonical equities account
+internally from Robinhood MCP account metadata, require exactly one account with
+`agentic_allowed=true`, and pass that account's exact MCP `account_number`
+together with the exact risk-approved quantity. Operator-entered app-visible
+account numbers are not authoritative MCP identity.
 
 The review response must echo the expected symbol, side, order type, and
 quantity. The response's quote_data is the fill quote; no second immediate quote
@@ -183,6 +186,30 @@ real-order guard evidence.
 
 Add forward-test valuation/reporting: realized/unrealized P&L, total return,
 drawdown, win/loss rate, and model/strategy attribution.
+
+### 131-E — direct Robinhood MCP transport
+
+Use the official MCP Python SDK over Streamable HTTP with the public application
+surface frozen to `review_equity_order`, `get_equity_quotes`, and
+`get_equity_orders`.
+
+### 131-F — Windows OAuth persistence and callback
+
+Persist OAuth token/client-registration state only in reviewed Windows
+Credential Manager records and use the bounded loopback callback flow.
+
+### 131-G — canonical Agentic-account resolution
+
+Resolve Robinhood account metadata internally, require exactly one equities
+account with `agentic_allowed=true`, and use its MCP `account_number` for
+the complete paper cycle. `get_accounts` remains internal and is not exposed
+to the AI/application facade.
+
+### 131-H — source-owned paper operator
+
+Move one-cycle Robinhood review-paper operation into a deterministic,
+source-owned operator with sanitized evidence and no interactive reauth or
+real-order mutation capability.
 
 ## D10 disposition
 

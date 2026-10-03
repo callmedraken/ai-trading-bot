@@ -234,9 +234,28 @@ filesystem/network/subprocess activity, or logging.
 The registered source-only checkpoint is
 `arch131-robinhood-paper-intent-bridge`.
 
-The next protected boundary is a single live qualification of the full
-deterministic proposal -> risk -> execution instruction -> intent bridge ->
-source-owned paper operator path.
+The full deterministic proposal -> risk -> execution instruction -> intent
+bridge -> source-owned paper operator path has now passed one bounded live
+qualification.
+
+### 131-J — source-owned deterministic paper pipeline
+
+Move that qualified composition into reviewed source. The one-cycle pipeline
+accepts explicit `TradeProposal`, `RiskContext`, `RiskLimits`,
+`ExecutionInstruction`, caller-supplied local order UUID, and the existing
+131-H operator configuration.
+
+It evaluates risk exactly once, stops rejected decisions before Robinhood/OAuth
+effects, sends APPROVED/RESIZED decisions through the accepted 131-I bridge, and
+then delegates the paper review cycle to the accepted 131-H operator.
+
+131-J must remain one-cycle and human-invoked for now. It must not introduce
+scheduling, unattended loops, real brokerage balance as risk state, OrderEngine
+submission, placement/cancel/options/crypto mutation capability, or a wider MCP
+application surface.
+
+The planned source-only checkpoint is
+`arch131-robinhood-deterministic-paper-pipeline`.
 
 ## D10 disposition
 

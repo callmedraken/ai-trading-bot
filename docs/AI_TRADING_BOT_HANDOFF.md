@@ -10099,3 +10099,95 @@ non-placement Robinhood review request.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Full deterministic paper pipeline live-qualified
+
+The complete accepted path has now passed one live non-placement qualification:
+
+```text
+TradeProposal
+-> RiskManager
+-> RiskDecision
+-> ExecutionInstruction
+-> explicit local order_id
+-> build_review_paper_intent
+-> run_robinhood_paper_operator
+```
+
+Accepted live source:
+
+```text
+HEAD 5d0a9658700f569dd4133c976e01201852050288
+TREE 098b4a2eb2ac382ed32561394fd524845e93ce0f
+```
+
+Observed boundary:
+
+```text
+SPY BUY desired quantity       1
+risk outcome                   APPROVED
+risk approved quantity         1
+bridge exact mapping           true
+get_accounts                   1
+get_equity_orders              2
+review_equity_order            1
+baseline order pages           1
+post-review order pages        1
+paper records                  1
+interactive reauth             0
+placement/cancel/options/crypto mutation 0
+status                         PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\robinhood-131i-pipeline-live-e0644590b17745a5a5a543d6eb9b2f40
+```
+
+Repository state remained unchanged.
+
+### Architecture 131-J — source-owned deterministic paper pipeline
+
+The next source milestone moves the now-live-qualified composition into reviewed
+application source.
+
+Target source path:
+
+```text
+TradeProposal
++ RiskContext
++ RiskLimits
++ ExecutionInstruction
++ explicit local order_id
++ explicit operator configuration
+-> deterministic RiskManager
+-> build_review_paper_intent
+-> accepted 131-H source-owned operator
+-> closed pipeline result/evidence
+```
+
+Frozen direction:
+
+1. one-cycle only; do not introduce scheduling/unattended loops yet;
+2. explicit deterministic inputs only;
+3. evaluate risk exactly once with the existing `RiskManager`;
+4. rejected decisions must stop before any Robinhood/OAuth/account-resolution
+   call and return/raise a bounded local result;
+5. APPROVED/RESIZED decisions flow through the accepted 131-I bridge unchanged;
+6. caller supplies the local order UUID; no random order identity generation;
+7. preserve existing 131-H source/output admission and sanitized evidence;
+8. no `OrderEngine.submit_order` or real broker placement lifecycle;
+9. no live brokerage balance may become paper risk state;
+10. virtual risk context remains caller-owned and explicit;
+11. source-owned pipeline must not widen the MCP application surface;
+12. placement/cancel/options/crypto remain absent;
+13. no live Robinhood call during 131-J implementation/certification;
+14. register source-only checkpoint
+    `arch131-robinhood-deterministic-paper-pipeline`.
+
+After 131-J source acceptance/certification, qualify the source-owned pipeline
+with one separately authorized live review before enabling repeated human-started
+forward-paper cycles.
+
+Production/live order placement remains NO-GO.
+

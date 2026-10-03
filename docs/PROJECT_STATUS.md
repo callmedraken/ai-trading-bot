@@ -10497,3 +10497,72 @@ Because this crosses the live Robinhood/MCP review boundary, execution requires
 fresh explicit user authorization. Production/live order placement remains
 NO-GO.
 
+## 2026-10-03 — Architecture 131-LQ read-only live-qualification verifier FULLY ACCEPTED
+
+Architecture 131-LQ has passed exact source review, source-gate CI, and full
+local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   49721d2607c01d2298447f494302cb5221afdf2a
+TREE   6263431a90bc0e859ee4ef82d81c23351b17cae3
+CI     #160 / 37110312724 SUCCESS
+```
+
+Accepted behavior:
+
+- SQLite qualification state is opened only with URI `mode=ro`;
+- exact accepted 131-J predecessor material is frozen and reconciled;
+- exact planned 131-L qualification branch/proposal/mark/decision is frozen;
+- sanitized operator evidence must prove PASS/complete, one account resolution,
+  two equity-order reads, exactly one review call, zero quote calls, no replay,
+  complete validation, and zero interactive reauthorization;
+- summary JSON, operator evidence, and durable SQLite must agree;
+- durable history must be exactly two records ending at exactly 2.000 SPY;
+- no Robinhood/MCP/OAuth/network/subprocess/environment/config/risk/review/fill/
+  valuation/retry/poll/scheduler capability exists;
+- `arch131-robinhood-live-qualification-verifier` is source-only with
+  `preflight=None` and `execute=None`.
+
+Full certification:
+
+```text
+broad-1: 152 modules
+  5,236 passed, 1 skipped, 0 failed, 0 errors
+
+broad-2: 152 modules
+  4,694 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  10,867 cases
+  10,856 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 526.681 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-8c29c7f1ed4b44ddbdc8c9663b5771d2
+```
+
+The side worktree/index remained clean. No protected brokerage/provider effect
+was used.
+
+### Next side milestone — Architecture 131-M
+
+Implement the frozen explicit-schedule regular-session admission primitive from
+Architecture 131. Preserve the existing date-only NYSE calendar contract.
+131-M accepts an already-authoritative immutable intraday schedule and an
+explicit `as_of`; it does not invent or acquire holiday/early-close schedules,
+read a clock, or perform any trading/provider effect. The planned checkpoint is
+`arch131-robinhood-session-admission`, source-only with no preflight/execute
+surface.
+

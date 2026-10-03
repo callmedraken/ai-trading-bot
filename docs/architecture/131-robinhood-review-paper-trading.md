@@ -360,54 +360,132 @@ authorization. Production/live order placement remains NO-GO.
 
 ### 131-LQ — read-only live-qualification evidence verifier
 
-Side-foundation source milestone. This work is isolated from the frozen
-`feature/robinhood-review-paper-mode` qualification branch and must not alter
-the accepted 131-L source, its Monday qualification command, or the durable
-paper store.
+Accepted. The side-foundation verifier deterministically reconciles the frozen
+131-L live-qualification artifacts without gaining trading or provider
+capability.
 
-The verifier consumes only:
+Accepted inputs and result:
 
 ```text
-durable review-paper SQLite path
+durable review-paper SQLite path opened with URI mode=ro
 + sanitized 131-H operator evidence JSON
 + sanitized 131-L qualification summary JSON
 + expected source HEAD/tree
-+ expected predecessor order UUID
-+ expected qualification order UUID
--> deterministic read-only reconciliation result
++ exact predecessor order UUID
++ exact qualification order UUID
+-> sanitized immutable verification result
 ```
 
-Frozen qualification-specific acceptance:
+The verifier freezes the exact accepted predecessor, including SPY BUY 1,
+desired/approved quantity 1, APPROVED outcome, empty risk reasons, fill price
+769.870000, zero commission, and fill timestamp
+2026-10-03T00:00:00.232470+00:00. It also freezes the qualification branch,
+proposal UUID, deterministic qualification mark, RESIZED 2 -> 1.000 decision,
+risk-reason order, operator call counts, no replay, zero interactive
+reauthorization, and the final two-record / 2.000-SPY durable state.
 
-- SQLite is opened in URI `mode=ro`; the verifier must not construct a
-  `ReviewPaperStore` or initialize/migrate/write the database;
-- no Robinhood/MCP/OAuth/network/subprocess/environment/config capability;
-- no retry, polling, scheduler, trading, risk evaluation, intent construction,
-  review request, paper fill, or performance valuation;
-- exact source HEAD/tree must match the sanitized operator evidence and summary;
-- exact durable baseline is the accepted 131-J SPY BUY 1 record;
-- exact qualified record is the separately authorized 131-L SPY BUY proposal
-  with desired quantity 2, RESIZED approved quantity 1.000, and frozen risk
-  reasons `MAX_POSITION_PERCENT` then `QUANTITY_INCREMENT`;
-- durable paper history must contain exactly the predecessor and qualification
-  records, reconstructing to exactly 2.000 SPY after the qualification;
-- operator evidence must prove PASS/complete, one internal account resolution,
-  two equity-order reads, exactly one `review_equity_order`, zero quote calls,
-  one baseline page, one post-review page, two paper records, no replay, valid
-  review/quote/disclosure checks, and zero interactive reauthorization;
-- the qualification summary must agree exactly with the operator evidence and
-  durable SQLite material;
-- result output contains only sanitized reconciliation facts.
+It imports no Robinhood MCP/OAuth transport and has no network, subprocess,
+environment/config, retry, polling, scheduler, risk evaluation, review request,
+paper fill, or performance-valuation capability. SQLite is opened read-only and
+the verifier does not construct `ReviewPaperStore`.
 
-Register a source-only checkpoint named
-`arch131-robinhood-live-qualification-verifier` on the isolated
-`feature/robinhood-review-paper-side-foundation` branch, with
-`preflight=None` and `execute=None`.
+Accepted source-only checkpoint:
 
-131-LQ source implementation and certification perform no live
-Robinhood/MCP/OAuth request and no durable paper mutation. The already
-authorized 131-L live qualification remains a separate protected effect on the
-frozen qualification branch.
+```text
+arch131-robinhood-live-qualification-verifier
+preflight=None
+execute=None
+```
+
+Accepted source and certification:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   49721d2607c01d2298447f494302cb5221afdf2a
+TREE   6263431a90bc0e859ee4ef82d81c23351b17cae3
+CI     #160 / 37110312724 SUCCESS
+
+10,867 cases
+10,856 passed
+11 skipped
+0 failed
+0 errors
+wall 526.681 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-8c29c7f1ed4b44ddbdc8c9663b5771d2
+```
+
+No live Robinhood/MCP/OAuth request or durable paper mutation occurred.
+
+### 131-M — explicit-schedule regular-session admission
+
+Next side-foundation source milestone. Add a pure, clock-free admission boundary
+for supervised review-paper cycles without changing the existing date-only
+`NYSEMarketCalendar` semantics or inventing exchange schedules inside the
+admission function.
+
+Frozen composition:
+
+```text
+explicit timezone-aware as_of
++ exact immutable session schedule
+  - exchange-local session date
+  - regular-session opens_at
+  - regular-session closes_at
++ explicit nonnegative opening buffer
++ explicit nonnegative closing buffer
+-> immutable ReviewPaperSessionAdmission
+```
+
+The schedule is already-authoritative input. 131-M does not fetch, scrape,
+infer, or synthesize holiday/early-close schedules. A later source milestone may
+provide a versioned NYSE intraday schedule authority; until then, missing or
+unsupported schedule material fails closed before 131-M.
+
+Frozen statuses:
+
+```text
+ADMITTED
+NON_SESSION_DATE
+BEFORE_REGULAR_WINDOW
+OPENING_BUFFER
+CLOSING_BUFFER
+AFTER_REGULAR_WINDOW
+```
+
+Frozen boundary semantics:
+
+- all datetimes must be timezone-aware and normalize to UTC;
+- the schedule's open/close must map to the schedule's exchange-local date;
+- `opens_at < closes_at`;
+- buffers are exact `timedelta` values and must be nonnegative;
+- buffers must leave a nonempty admissible interval;
+- `as_of` is explicit; no system clock is read;
+- before open is `BEFORE_REGULAR_WINDOW`;
+- `[open, open + opening_buffer)` is `OPENING_BUFFER`;
+- `[open + opening_buffer, close - closing_buffer)` is `ADMITTED`;
+- `[close - closing_buffer, close)` is `CLOSING_BUFFER`;
+- at/after close is `AFTER_REGULAR_WINDOW`;
+- an `as_of` whose exchange-local date differs from the supplied schedule is
+  `NON_SESSION_DATE`;
+- no brokerage, MCP, OAuth, market-data, paper-store, risk, intent, execution,
+  filesystem, networking, subprocess, environment/config, UUID, retry, loop,
+  scheduler, sleep, or durable-mutation capability.
+
+Planned source-only checkpoint:
+
+```text
+arch131-robinhood-session-admission
+preflight=None
+execute=None
+```
+
+The checkpoint should follow 131-LQ on the side-foundation batch. 131-M is a
+pure admission primitive only; it does not authorize or invoke a 131-L cycle.
 
 ## D10 disposition
 

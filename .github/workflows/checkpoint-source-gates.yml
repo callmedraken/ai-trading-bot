@@ -92,7 +92,8 @@ jobs:
               arch131-robinhood-virtual-risk-context `
               arch131-robinhood-forward-paper-cycle `
               arch131-robinhood-live-qualification-verifier `
-              arch131-robinhood-session-admission
+              arch131-robinhood-session-admission `
+              arch131-robinhood-risk-price-snapshot
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

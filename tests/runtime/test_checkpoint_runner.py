@@ -171,6 +171,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
+        "arch131-robinhood-risk-price-snapshot",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -182,6 +183,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             in {
                 "arch131-robinhood-live-qualification-verifier",
                 "arch131-robinhood-session-admission",
+                "arch131-robinhood-risk-price-snapshot",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2136,8 +2138,8 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            ("arch131-robinhood-session-admission\n          exit $LASTEXITCODE"),
-            ("arch131-robinhood-session-admission\n          exit 0"),
+            ("arch131-robinhood-risk-price-snapshot\n          exit $LASTEXITCODE"),
+            ("arch131-robinhood-risk-price-snapshot\n          exit 0"),
         ),
     ],
 )
@@ -2428,6 +2430,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-forward-paper-cycle",
     "arch131-robinhood-live-qualification-verifier",
     "arch131-robinhood-session-admission",
+    "arch131-robinhood-risk-price-snapshot",
 )
 
 
@@ -3680,4 +3683,162 @@ def test_131m_authority_rejects_runtime_remote_drift(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
     assert "131-M checkpoint remote branch drift" in (
         runner._arch131_session_admission_authority_check(root)
+    )
+
+
+# 131-N pins the entire pure module and its source-only side-branch registration.
+def test_131n_source_only_registration_and_batch():
+    name = "arch131-robinhood-risk-price-snapshot"
+    spec = runner._checkpoint_specs()[name]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.authority_check is runner._arch131_risk_price_snapshot_authority_check
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/review_paper/test_risk_prices.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "src/trading_bot/review_paper/risk_prices.py",
+        "tests/review_paper/test_risk_prices.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CHECKPOINTS.index(name) == (
+        runner.CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
+
+
+def _131n_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/review_paper/risk_prices.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_risk_price_snapshot_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import socket",
+        "import subprocess",
+        "import os",
+        "from trading_bot.review_paper import ReviewPaperStore",
+        "from trading_bot.robinhood_mcp import RobinhoodMcpStreamableHttpTransport",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "while True:\n    pass",
+        "open('paper.sqlite', 'w')",
+    ],
+)
+def test_131n_authority_rejects_effect_surface_drift(tmp_path, addition):
+    root = _131n_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/risk_prices.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n" + addition + "\n",
+        encoding="utf-8",
+    )
+    assert runner._arch131_risk_price_snapshot_authority_check(root)
+
+
+@pytest.mark.parametrize("capability", ["preflight", "execute"])
+def test_131n_authority_rejects_runtime_effect_registration(
+    tmp_path, monkeypatch, capability
+):
+    root = _131n_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-robinhood-risk-price-snapshot"
+    from dataclasses import replace
+
+    def forbidden():
+        raise AssertionError("effect capability invoked during source certification")
+
+    specs[name] = replace(specs[name], **{capability: forbidden})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-N checkpoint has host/effect capability" in (
+        runner._arch131_risk_price_snapshot_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("preflight=None", "preflight=_arch130_r8i_d1_preflight"),
+        ("execute=None", "execute=_r7_execute"),
+        ("ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH", "ARCH131_REVIEW_PAPER_REMOTE_BRANCH"),
+        ("*COMMON_TESTS,", ""),
+        ("*COMMON_RUFF_PATHS,", ""),
+        (
+            "tests/review_paper/test_risk_prices.py",
+            "tests/review_paper/test_models.py",
+        ),
+        (
+            "_arch131_risk_price_snapshot_authority_check",
+            "_arch131_review_paper_authority_check",
+        ),
+    ],
+)
+def test_131n_authority_rejects_registration_drift(tmp_path, old, new):
+    root = _131n_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index(
+        '        "arch131-robinhood-risk-price-snapshot": CheckpointSpec('
+    )
+    end = source.index(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+    )
+    registration = source[start:end]
+    assert old in registration
+    source = source[:start] + registration.replace(old, new) + source[end:]
+    path.write_text(source, encoding="utf-8")
+    assert "131-N source-only checkpoint registration drift" in (
+        runner._arch131_risk_price_snapshot_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize("target", ["branch", "batch", "workflow", "source_missing"])
+def test_131n_authority_rejects_source_authority_drift(tmp_path, target):
+    root = _131n_authority_copy(tmp_path)
+    if target == "source_missing":
+        (root / "src/trading_bot/review_paper/risk_prices.py").unlink()
+    elif target == "workflow":
+        path = root / ".github/workflows/checkpoint-source-gates.yml"
+        path.write_text(path.read_text().replace("exit $LASTEXITCODE", "exit 0"))
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        source = path.read_text()
+        if target == "branch":
+            source = source.replace(
+                '"feature/robinhood-review-paper-side-foundation"',
+                '"feature/wrong-branch"',
+            )
+        else:
+            source = source.replace(
+                '    "arch131-robinhood-session-admission",\n'
+                '    "arch131-robinhood-risk-price-snapshot",',
+                '    "arch131-robinhood-risk-price-snapshot",\n'
+                '    "arch131-robinhood-session-admission",',
+            )
+        path.write_text(source, encoding="utf-8")
+    assert runner._arch131_risk_price_snapshot_authority_check(root)
+
+
+def test_131n_authority_rejects_runtime_remote_drift(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    root = _131n_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-robinhood-risk-price-snapshot"
+    specs[name] = replace(specs[name], remote_branch="feature/wrong-branch")
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-N checkpoint remote branch drift" in (
+        runner._arch131_risk_price_snapshot_authority_check(root)
     )

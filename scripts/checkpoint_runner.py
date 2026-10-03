@@ -612,6 +612,73 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch131_paper_operator_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_arch131_agentic_account_authority_check(repo_root))
+    failures.extend(_arch131_windows_oauth_authority_check(repo_root))
+    try:
+        source = (repo_root / "src/trading_bot/robinhood_paper_operator.py").read_text(
+            encoding="utf-8"
+        )
+        tree = ast.parse(source)
+        # Freeze the complete composition, browser denial, path/source admission,
+        # closed evidence schema and serialization boundary independent of format.
+        if (
+            hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "680d4965eaa4eafe6c2b0c7f864a70e5d31159bf85e188fcfbd2516962147bac"
+        ):
+            failures.append("131-H operator composition/redaction boundary drift")
+        for token in (
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "cancel_option_order",
+            "exercise_option",
+            "place_crypto_order",
+            "cancel_crypto_order",
+        ):
+            if token in source:
+                failures.append("131-H forbidden mutation surface")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == "arch131-robinhood-paper-operator"
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1:
+            failures.append("131-H source-only registration missing")
+        else:
+            fields = {item.arg: item.value for item in registrations[0].keywords}
+            for field in ("preflight", "execute"):
+                value = fields.get(field)
+                if not isinstance(value, ast.Constant) or value.value is not None:
+                    failures.append("131-H checkpoint has host/effect capability")
+        spec = _checkpoint_specs()["arch131-robinhood-paper-operator"]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-H checkpoint has host/effect capability")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if workflow.index("verify arch131-robinhood-paper-operator") <= workflow.index(
+            "verify arch131-robinhood-agentic-account"
+        ):
+            failures.append("131-H workflow ordering drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-H source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_agentic_account_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = list(_arch131_direct_mcp_authority_check(repo_root))
     failures.extend(_arch131_mcp_schema_authority_check(repo_root))
@@ -2796,6 +2863,27 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        "arch131-robinhood-paper-operator": CheckpointSpec(
+            name="arch131-robinhood-paper-operator",
+            description="Architecture 131-H one-cycle Robinhood paper operator",
+            tests=(
+                *COMMON_TESTS,
+                "tests/test_robinhood_paper_operator.py",
+                "tests/test_robinhood_paper_cycle.py",
+                "tests/robinhood_mcp/test_account_resolution.py",
+                "tests/robinhood_mcp/test_sdk_transport.py",
+                "tests/robinhood_mcp/test_windows_oauth.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/robinhood_paper_operator.py",
+                "tests/test_robinhood_paper_operator.py",
+            ),
+            authority_check=_arch131_paper_operator_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         "arch131-robinhood-agentic-account": CheckpointSpec(
             name="arch131-robinhood-agentic-account",
             description="Architecture 131-G internal Agentic-account resolution",

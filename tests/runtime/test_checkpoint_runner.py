@@ -164,6 +164,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-direct-mcp",
         "arch131-robinhood-oauth-windows",
         "arch131-robinhood-agentic-account",
+        "arch131-robinhood-paper-operator",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -180,6 +181,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-direct-mcp",
                 "arch131-robinhood-oauth-windows",
                 "arch131-robinhood-agentic-account",
+                "arch131-robinhood-paper-operator",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -1780,3 +1782,117 @@ def test_131g_authority_rejects_boundary_drift(tmp_path, relative, before, after
             source = source.replace(before, after)
         destination.write_text(source, encoding="utf-8")
     assert runner._arch131_agentic_account_authority_check(tmp_path)
+
+
+def test_131h_source_registration_and_workflow():
+    spec = runner._checkpoint_specs()["arch131-robinhood-paper-operator"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    assert spec.authority_check is runner._arch131_paper_operator_authority_check
+    assert {
+        "tests/test_robinhood_paper_operator.py",
+        "tests/test_robinhood_paper_cycle.py",
+        "tests/robinhood_mcp/test_account_resolution.py",
+        "tests/robinhood_mcp/test_sdk_transport.py",
+        "tests/robinhood_mcp/test_windows_oauth.py",
+    } <= set(spec.tests)
+    repo = Path(runner.__file__).resolve().parent.parent
+    assert spec.authority_check(repo) == ()
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.index("verify arch131-robinhood-paper-operator") > workflow.index(
+        "verify arch131-robinhood-agentic-account"
+    )
+
+
+@pytest.mark.parametrize(
+    "relative,before,after",
+    [
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "browser_opener=observation.forbid_browser",
+            "browser_opener=lambda url: True",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            'raise RobinhoodPaperOperatorError("interactive OAuth is forbidden")',
+            "return True",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "json.dumps(asdict(evidence), sort_keys=True)",
+            'json.dumps({"raw": store.history()}, default=str)',
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "    source_head: str",
+            "    account_number: str\n    source_head: str",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "    placement_calls: int = 0",
+            "    placement_calls: int = 1",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "if any(resolved == root or resolved.is_relative_to(root) "
+            "for root in roots):",
+            "if False:",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "    roots = _admit_source(expected_branch, expected_head, expected_tree)",
+            "    roots = ()",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "    observation = _Observation()",
+            "    place_equity_order()\n    observation = _Observation()",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            '    "get_equity_orders",',
+            '    "get_accounts",\n    "get_equity_orders",',
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "    def _get_accounts(",
+            "    def get_accounts(",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/sdk_transport.py",
+            "    def get_equity_orders(",
+            "    def call_tool(",
+        ),
+        ("scripts/checkpoint_runner.py", "preflight=None,", "preflight=host_effect,"),
+        ("scripts/checkpoint_runner.py", "execute=None,", "execute=host_effect,"),
+        (
+            ".github/workflows/checkpoint-source-gates.yml",
+            "verify arch131-robinhood-paper-operator",
+            "verify missing-checkpoint",
+        ),
+    ],
+)
+def test_131h_authority_rejects_boundary_drift(tmp_path, relative, before, after):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for path in (
+        "src/trading_bot/robinhood_paper_operator.py",
+        "src/trading_bot/robinhood_mcp/sdk_transport.py",
+        "src/trading_bot/robinhood_mcp/windows_oauth.py",
+        "src/trading_bot/robinhood_mcp/adapter.py",
+        "src/trading_bot/robinhood_mcp/account_resolution.py",
+        "src/trading_bot/robinhood_mcp/__init__.py",
+        "src/trading_bot/robinhood_paper_cycle.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        source = (repo / path).read_text(encoding="utf-8")
+        destination = tmp_path / path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(source, encoding="utf-8")
+    assert runner._arch131_paper_operator_authority_check(tmp_path) == ()
+    destination = tmp_path / relative
+    source = destination.read_text(encoding="utf-8")
+    assert before in source
+    destination.write_text(source.replace(before, after), encoding="utf-8")
+    failures = runner._arch131_paper_operator_authority_check(tmp_path)
+    assert failures

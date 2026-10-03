@@ -10449,3 +10449,75 @@ evaluates against the actual accumulated virtual paper state.
 
 Production/live order placement remains NO-GO.
 
+## 2026-10-02 — Architecture 131-K durable virtual-paper risk context FULLY ACCEPTED
+
+Architecture 131-K has passed full broad certification on the exact accepted
+source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+HEAD   30c30a4141bc45f20a4fd1bf87ec6c40d7091dca
+TREE   f6e11a8593482c3e29eda5187589dfa85a3e3a39
+CI     #149 / 37103825469 SUCCESS
+```
+
+Accepted behavior:
+
+- `ReviewPaperStore` and `TradeProposal` require exact types;
+- prices are an explicit mapping of `Symbol` to positive finite `Decimal`;
+- the price-symbol set must equal exactly the open virtual positions union the
+  proposal symbol;
+- missing prices and unrelated extra prices fail closed;
+- `as_of` is normalized to UTC and cannot precede the proposal;
+- durable paper history is reconstructed exactly once;
+- the marked account snapshot is created exactly once;
+- `RiskContext` maps cash, equity, positions, proposal current price, market
+  exposure, explicit new-trading enablement, and explicit `as_of` exactly;
+- no performance valuation row or other durable mutation is written;
+- no `RiskManager`, intent bridge, 131-J pipeline, operator, MCP, OAuth,
+  brokerage-account risk state, UUID generation, networking, subprocess,
+  logging, environment/config lookup, retry, loop, or scheduler was added;
+- `arch131-robinhood-virtual-risk-context` remains source-only with
+  `preflight=None` and `execute=None`.
+
+Full certification:
+
+```text
+broad-1: 151 modules
+  5,417 passed, 0 skipped, 0 failed, 0 errors
+
+broad-2: 151 modules
+  4,363 passed, 2 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  10,717 cases
+  10,706 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 454.629 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-e90be278296b41f1a23e7c926c1d4317
+```
+
+Repository identity remained unchanged and the worktree/index was clean after
+certification. No live Robinhood/MCP activity was required or authorized.
+
+### Next milestone — Architecture 131-L
+
+Bind the accepted 131-K durable virtual-paper context builder into one
+human-started forward-paper cycle that delegates the actual risk/intent/operator
+flow to accepted 131-J exactly once.
+
+The source milestone remains source-only and effect-free during implementation
+and certification. Any later live `review_equity_order` qualification remains a
+separately authorized protected effect. Production/live order placement remains
+NO-GO.
+

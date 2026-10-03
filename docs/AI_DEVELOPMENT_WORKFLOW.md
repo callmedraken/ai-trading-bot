@@ -19,6 +19,21 @@ ChatGPT owns:
 - production-authority and external-effect review;
 - concrete next-step and next-milestone instructions.
 
+ChatGPT also directly handles small, clearly scoped, low-risk project updates
+and fixes when the desired behavior, affected files, and focused verification
+surface are already known. This is the default for routine docs/status/handoff
+closeout, tiny workflow/test/source corrections, and mechanical consistency
+fixes where delegating to Codex would add overhead without useful isolation.
+Do not hand such work to Codex merely by habit.
+
+Direct ChatGPT changes follow the same repository discipline as delegated work:
+prove exact startup identity, edit only the intended files, run the focused
+checks appropriate to the change, exact-file stage/commit/push only when
+authorized, and leave broad/final certification to the established gate.
+Delegate to Luna/Astra/Sol High only when implementation size, discovery,
+isolation, or architecture/security sensitivity makes delegation materially
+useful.
+
 When the next action is known, ChatGPT must provide it automatically rather
 than waiting for the user to ask what to do next. The response should include
 the actionable execution material when known: exact operator commands,

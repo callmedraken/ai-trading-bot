@@ -262,22 +262,70 @@ The source-owned 131-J pipeline has now passed one bounded live qualification.
 
 ### 131-K — durable virtual-paper risk context
 
-Before repeated human-started forward-paper operation, derive the exact
-`RiskContext` for 131-J from the durable virtual paper account rather than from
-caller-invented cash/equity/position values.
+Accepted. The source-owned `build_review_paper_risk_context` boundary derives
+the exact 131-J `RiskContext` from durable virtual paper history rather than
+caller-invented account balances.
 
-The source-owned builder will reconstruct the existing `ReviewPaperStore`
-ledger, require an explicit exact price snapshot covering every open virtual
-position plus the proposal symbol, value the virtual account at an explicit
-`as_of`, and map that state exactly into `RiskContext`.
-
+It reconstructs `ReviewPaperStore` exactly once, requires an exact explicit
+price snapshot for every open virtual position plus the proposal symbol, creates
+one marked `AccountSnapshot`, and maps that state exactly into `RiskContext`.
 Real Robinhood balances, positions, portfolio values, and buying power remain
-non-authoritative for paper risk. The builder remains network-free and does not
-evaluate risk, call the operator/pipeline, write a performance valuation, create
-identities, retry, loop, or schedule.
+non-authoritative for paper risk.
+
+The accepted source-only checkpoint is
+`arch131-robinhood-virtual-risk-context`. It has no preflight or execute
+capability and remains network-free, mutation-free, identity-free, and free of
+risk-manager, pipeline, operator, retry, loop, or scheduler behavior.
+
+Accepted source and certification:
+
+```text
+HEAD 30c30a4141bc45f20a4fd1bf87ec6c40d7091dca
+TREE f6e11a8593482c3e29eda5187589dfa85a3e3a39
+CI   #149 / 37103825469 SUCCESS
+
+10,717 cases
+10,706 passed
+11 skipped
+0 failed
+0 errors
+wall 454.629 s
+```
+
+### 131-L — human-started durable-context forward-paper cycle
+
+Next source milestone. Bind 131-K to the already accepted 131-J source-owned
+deterministic pipeline without creating a second risk, brokerage, or paper-state
+implementation.
+
+Frozen direction:
+
+```text
+ReviewPaperStore durable history
++ TradeProposal
++ explicit exact price snapshot
++ explicit as_of / new_trading_enabled
++ RiskLimits
++ ExecutionInstruction
++ caller-supplied local order_id
++ explicit 131-H operator configuration
+-> build_review_paper_risk_context exactly once
+-> run_robinhood_deterministic_paper_pipeline exactly once
+-> existing 131-J result/evidence
+```
+
+The binder is one human-started cycle per call. It must not reconstruct the
+ledger independently, evaluate risk independently, bypass 131-J, call raw
+Robinhood/MCP/OAuth/account-resolution capability, infer paper risk from the
+real brokerage account, generate order identity, retry, poll, loop, schedule, or
+introduce unattended operation. Placement/cancel/options/crypto mutation remains
+absent.
 
 The planned source-only checkpoint is
-`arch131-robinhood-virtual-risk-context`.
+`arch131-robinhood-forward-paper-cycle`. Source implementation and
+certification must perform no live Robinhood/MCP review request. After source
+acceptance, any bounded live qualification remains a separately authorized
+protected effect.
 
 ## D10 disposition
 

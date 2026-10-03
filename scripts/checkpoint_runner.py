@@ -98,11 +98,12 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-live-qualification-verifier",
     "arch131-robinhood-session-admission",
     "arch131-robinhood-risk-price-snapshot",
+    "arch131-robinhood-forward-paper-preview",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 23 participants and their order,
+    # Freeze the executable batch command, all 24 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -795,7 +796,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "de5738e850b126625140857c3053dc682f6495cb9015960c965ca6478c5970af"
+            != "50d59503c3a6067b199c75a9a73fdc57fb80a439b192f2a07ebb47da86d8aa62"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -891,7 +892,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "de5738e850b126625140857c3053dc682f6495cb9015960c965ca6478c5970af"
+            != "50d59503c3a6067b199c75a9a73fdc57fb80a439b192f2a07ebb47da86d8aa62"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -913,6 +914,102 @@ def _arch131_risk_price_snapshot_authority_check(
             failures.append("131-N workflow invocation/order drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-N source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch131_forward_paper_preview_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        path = repo_root / "src/trading_bot/review_paper/forward_preview.py"
+        text_value = path.read_text(encoding="utf-8")
+        # Pin the complete module, including every import, helper and call.
+        if (
+            hashlib.sha256(
+                ast.dump(ast.parse(text_value), include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "d5f9746abeb119336773a82e3a5d5de4e66c72147ee0a7eac45fd7e0a9b384b0"
+        ):
+            failures.append("131-O forward-preview boundary drift")
+
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-forward-paper-preview"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "14158ca87e328e2bd990251c4adf729b3f83fba647adcf02163b128888ae8226"
+        ):
+            failures.append("131-O source-only checkpoint registration drift")
+
+        side_branch_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH"
+        ]
+        if (
+            len(side_branch_assignments) != 1
+            or ast.literal_eval(side_branch_assignments[0].value)
+            != "feature/robinhood-review-paper-side-foundation"
+        ):
+            failures.append("131-O remote branch authority drift")
+
+        ci_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(ci_assignments) != 1
+            or hashlib.sha256(
+                ast.dump(ci_assignments[0].value, include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "50d59503c3a6067b199c75a9a73fdc57fb80a439b192f2a07ebb47da86d8aa62"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("131-O checkpoint batch registration drift")
+
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-O checkpoint has host/effect capability")
+        if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
+            failures.append("131-O checkpoint remote branch drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1
+        ):
+            failures.append("131-O checkpoint ordering drift")
+
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("131-O workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-O source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -3633,6 +3730,25 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/review_paper/test_risk_prices.py",
             ),
             authority_check=_arch131_risk_price_snapshot_authority_check,
+            remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-forward-paper-preview": CheckpointSpec(
+            name="arch131-robinhood-forward-paper-preview",
+            description=(
+                "Architecture 131-O effect-free durable forward-paper risk preview"
+            ),
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_forward_preview.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/forward_preview.py",
+                "tests/review_paper/test_forward_preview.py",
+            ),
+            authority_check=_arch131_forward_paper_preview_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
             preflight=None,
             execute=None,

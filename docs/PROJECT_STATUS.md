@@ -10639,3 +10639,79 @@ valuation, risk evaluation, or paper cycle. Planned checkpoint:
 `arch131-robinhood-risk-price-snapshot`, source-only with no
 preflight/execute surface.
 
+## 2026-10-03 — Architecture 131-N canonical quote-to-risk-price snapshot FULLY ACCEPTED
+
+Architecture 131-N has passed exact GitHub source review, source-gate CI, and
+full broad local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   a0c65ad559dacf6ce6121fcc0a1148b5c92adf78
+TREE   78b3d663752ea18b7fae98fe12ef639fe8fdb3a8
+PARENT 4dd1bea835b529cd9892bf21c5044a9d1b1c423d
+CI     #164 / 37148921694 SUCCESS
+```
+
+Accepted behavior:
+
+- exact typed Robinhood quote response is converted to exact canonical risk
+  marks without provider acquisition;
+- quote coverage must exactly equal the canonical required-symbol tuple;
+- duplicate, missing, or extra quote symbols fail closed;
+- each mark requires traded/active state and exactly one
+  `current_trade_candidate()` selection;
+- regular/non-regular candidate selection and tie behavior reuse the accepted
+  typed quote model;
+- price must be finite/positive and source timestamp must be nonfuture/fresh;
+- exact max-age boundary is accepted;
+- official-close material is not risk-price authority;
+- marks and observed timestamps normalize to UTC;
+- the exposed price mapping is derived and read-only;
+- no adapter/transport/OAuth/store/risk/execution/filesystem/network/clock/
+  retry/poll/scheduler/durable-mutation authority exists;
+- `arch131-robinhood-risk-price-snapshot` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-M.
+
+Full certification:
+
+```text
+broad-1: 153 modules
+  4,893 passed, 0 skipped, 0 failed, 0 errors
+
+broad-2: 153 modules
+  5,306 passed, 2 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  11,136 cases
+  11,125 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 405.197 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-51708679d6c74d6ab74dc69365e46b1b
+```
+
+The side worktree/index remained clean and source identity did not move during
+certification. No protected brokerage/provider effect was used.
+
+### Next side milestone — Architecture 131-O
+
+Implement the frozen effect-free durable forward-paper risk preview from
+Architecture 131. 131-O accepts the durable virtual store, proposal, the exact
+131-N snapshot, risk limits, and explicit trading-enabled flag; delegates once
+to 131-K and once to `RiskManager`; and returns immutable preview state plus
+derived marked-position/exposure properties. It creates no execution instruction,
+paper intent, provider review, fill, or durable mutation. Planned checkpoint:
+`arch131-robinhood-forward-paper-preview`, source-only with no
+preflight/execute surface.
+

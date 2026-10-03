@@ -1809,6 +1809,43 @@ def test_131h_source_registration_and_workflow():
     [
         (
             "src/trading_bot/robinhood_paper_operator.py",
+            '"--porcelain=v1", "--untracked-files=all"',
+            '"--porcelain"',
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "with localcontext(_decimal_context()), _suppress_downstream_output():",
+            "with localcontext(_decimal_context()):",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "logging.Logger.handle = _discard_log",
+            "logging.Logger.handle = previous_handle",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            'open(os.devnull, "w", encoding="utf-8") as sink',
+            'open("captured-output.txt", "w", encoding="utf-8") as sink',
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
+            "isinstance(value, str) and bool(value.strip())",
+            "bool(value)",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_cycle.py",
+            "        post_review, post_review_pages = _collect_agentic_orders(",
+            "        if review_failure is not None:\n"
+            "            raise review_failure\n"
+            "        post_review, post_review_pages = _collect_agentic_orders(",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_cycle.py",
+            "except Exception as error:",
+            "except BaseException as error:",
+        ),
+        (
+            "src/trading_bot/robinhood_paper_operator.py",
             "browser_opener=observation.forbid_browser",
             "browser_opener=lambda url: True",
         ),

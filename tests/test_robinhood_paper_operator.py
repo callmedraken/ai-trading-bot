@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
+import sys
+import warnings
 from dataclasses import asdict, replace
 from datetime import UTC, datetime
 from decimal import Decimal, localcontext
@@ -117,9 +121,12 @@ class _Caller:
         self.failure: str | None = None
         self.browser_opener = None
         self.reauth = False
+        self.noisy = False
 
     async def __call__(self, name, arguments):
         self.calls.append((name, dict(arguments)))
+        if self.noisy:
+            _emit_downstream_material()
         if self.reauth:
             self.browser_opener("https://authorization.invalid/?code=" + RAW)
         if self.failure == name:
@@ -406,7 +413,7 @@ def test_source_admission_rejects_drift_before_output(
         ("branch", "--show-current"): inputs["expected_branch"],
         ("rev-parse", "HEAD"): HEAD,
         ("rev-parse", "HEAD^{tree}"): TREE,
-        ("status", "--porcelain"): "",
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
         ("worktree", "list", "--porcelain"): f"worktree {root}",
     }
     key = {
@@ -414,7 +421,7 @@ def test_source_admission_rejects_drift_before_output(
         "branch": ("branch", "--show-current"),
         "head": ("rev-parse", "HEAD"),
         "tree": ("rev-parse", "HEAD^{tree}"),
-        "dirty": ("status", "--porcelain"),
+        "dirty": ("status", "--porcelain=v1", "--untracked-files=all"),
     }[mismatch]
     replies[key] = str(root.parent) if mismatch == "root" else "wrong"
     monkeypatch.setattr(operator, "_git", lambda root, *args: replies[args])
@@ -431,14 +438,22 @@ def test_source_admission_registers_all_worktree_roots(monkeypatch, tmp_path):
         ("branch", "--show-current"): "expected-branch",
         ("rev-parse", "HEAD"): HEAD,
         ("rev-parse", "HEAD^{tree}"): TREE,
-        ("status", "--porcelain"): "",
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
         ("worktree", "list", "--porcelain"): f"worktree {root}\n\nworktree {tmp_path}",
     }
-    monkeypatch.setattr(operator, "_git", lambda root, *args: replies[args])
+    calls = []
+
+    def source_git(root, *args):
+        calls.append(args)
+        return replies[args]
+
+    monkeypatch.setattr(operator, "_git", source_git)
     assert operator._admit_source("expected-branch", HEAD, TREE) == (
         root,
         tmp_path.resolve(),
     )
+
+    assert ("status", "--porcelain=v1", "--untracked-files=all") in calls
 
 
 def test_git_failure_suppresses_raw_stderr(monkeypatch, tmp_path):
@@ -530,3 +545,110 @@ def test_real_windows_factory_redirect_denial_without_browser_or_listener(
     assert result.review_equity_order_calls == result.get_equity_orders_calls == 0
     assert closed
     _assert_redacted(result, inputs["evidence_path"])
+
+
+def _emit_downstream_material() -> None:
+    material = ACCOUNT + RAW
+    print(material)
+    sys.stderr.write(material + "\n")
+    os.write(1, material.encode())
+    os.write(2, material.encode())
+    logging.getLogger("downstream").warning(material)
+    # Even warnings configured to emit, and direct standard logger dispatch,
+    # remain discarded inside the bounded operation.
+    warnings.simplefilter("always")
+    warnings.warn(material, RuntimeWarning, stacklevel=1)
+    logging.getLogger("downstream").handle(
+        logging.LogRecord("downstream", logging.ERROR, "", 0, material, (), None)
+    )
+
+
+@pytest.mark.parametrize("failure", [None, "review_equity_order"])
+def test_downstream_output_logs_and_warnings_never_escape(
+    composition, monkeypatch, capfd, caplog, failure
+):
+    caller, inputs, _ = composition
+    caller.noisy = True
+    caller.failure = failure
+    factory = operator.create_windows_robinhood_oauth_factory
+
+    def noisy_composition(**kwargs):
+        _emit_downstream_material()
+        return factory(**kwargs)
+
+    monkeypatch.setattr(
+        operator, "create_windows_robinhood_oauth_factory", noisy_composition
+    )
+    result = operator.run_robinhood_paper_operator(**inputs)
+    assert result.status == ("PASS" if failure is None else "FAIL")
+    assert result.paper_record_count == (1 if failure is None else 0)
+    assert result.post_review_order_pages == 1
+    captured = capfd.readouterr()
+    assert captured.out == captured.err == ""
+    assert ACCOUNT not in caplog.text and RAW not in caplog.text
+    _assert_redacted(result, inputs["evidence_path"])
+
+
+@pytest.mark.parametrize("failure", [None, RuntimeError, KeyboardInterrupt, SystemExit])
+def test_suppression_restores_process_state_on_every_exit(failure, capfd, caplog):
+    previous_disable = logging.root.manager.disable
+    logging.disable(logging.ERROR)
+    streams = (sys.stdout, sys.stderr)
+    handle = logging.Logger.handle
+    showwarning = warnings.showwarning
+    filters = warnings.filters
+    filter_contents = list(filters)
+    descriptors = (os.fstat(1), os.fstat(2))
+    try:
+
+        def suppressed():
+            with operator._suppress_downstream_output():
+                _emit_downstream_material()
+                if failure:
+                    raise failure("terminal control")
+
+        if failure:
+            with pytest.raises(failure):
+                suppressed()
+        else:
+            suppressed()
+        assert (sys.stdout, sys.stderr) == streams
+        assert logging.root.manager.disable == logging.ERROR
+        assert logging.Logger.handle is handle
+        assert warnings.showwarning is showwarning
+        assert warnings.filters is filters and warnings.filters == filter_contents
+        assert (os.fstat(1), os.fstat(2)) == descriptors
+        captured = capfd.readouterr()
+        assert captured.out == captured.err == ""
+        assert ACCOUNT not in caplog.text and RAW not in caplog.text
+        print("caller stdout restored")
+        sys.stderr.write("caller stderr restored\n")
+        os.write(1, b"caller fd1 restored\n")
+        os.write(2, b"caller fd2 restored\n")
+        logging.getLogger("caller").critical("caller logging restored")
+        captured = capfd.readouterr()
+        assert "caller stdout restored" in captured.out
+        assert "caller fd1 restored" in captured.out
+        assert "caller stderr restored" in captured.err
+        assert "caller fd2 restored" in captured.err
+        assert "caller logging restored" in caplog.text
+    finally:
+        logging.disable(previous_disable)
+
+
+@pytest.mark.parametrize("disclosure", ["", " ", "\t\n", None, " disclosure "])
+def test_disclosure_present_requires_nonblank_string_on_new_cycle_and_replay(
+    composition, disclosure
+):
+    caller, inputs, _ = composition
+    caller.review["data"]["market_data_disclosure"] = disclosure
+    expected = isinstance(disclosure, str) and bool(disclosure.strip())
+    first = operator.run_robinhood_paper_operator(**inputs)
+    assert first.status == "PASS"
+    assert first.disclosure_present is expected
+    inputs["evidence_path"] = inputs["evidence_path"].with_name("replay.json")
+    caller.calls.clear()
+    replay = operator.run_robinhood_paper_operator(**inputs)
+    assert replay.status == "PASS" and replay.replay
+    assert replay.disclosure_present is expected
+    assert caller.calls == []

@@ -626,9 +626,42 @@ def _arch131_paper_operator_authority_check(repo_root: Path) -> tuple[str, ...]:
             hashlib.sha256(
                 ast.dump(tree, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "680d4965eaa4eafe6c2b0c7f864a70e5d31159bf85e188fcfbd2516962147bac"
+            != "d17ea88426f21d540a6634ed90de622dba054375437f67be2d3571cbcc85268b"
         ):
             failures.append("131-H operator composition/redaction boundary drift")
+        status_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_git"
+            and len(node.args) > 1
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "status"
+        ]
+        if len(status_calls) != 1 or tuple(
+            argument.value if isinstance(argument, ast.Constant) else None
+            for argument in status_calls[0].args[1:]
+        ) != ("status", "--porcelain=v1", "--untracked-files=all"):
+            failures.append("131-H source cleanliness arguments drift")
+        cycle_tree = ast.parse(
+            (repo_root / "src/trading_bot/robinhood_paper_cycle.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        cycle_runs = [
+            node
+            for node in ast.walk(cycle_tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "run"
+        ]
+        if (
+            len(cycle_runs) != 1
+            or hashlib.sha256(
+                ast.dump(cycle_runs[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "a86c598165ddb9334c771f6490571f46f102575202ff477208e92f1d65e04bed"
+        ):
+            failures.append("131-H post-review failure guard drift")
         for token in (
             "place_equity_order",
             "cancel_equity_order",

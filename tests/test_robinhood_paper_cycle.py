@@ -496,3 +496,94 @@ def test_concrete_transport_composition_resolves_once_and_replays_without_calls(
         == result.record
     )
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    "post_case", ["empty", "paginated_empty", "order", "read_failure"]
+)
+def test_review_failure_always_checks_post_window_and_never_persists(
+    tmp_path, monkeypatch, post_case
+) -> None:
+    review_error = ValueError("review response failed")
+    read_error = RuntimeError("post history unavailable")
+    pages = [_empty_page()]
+    if post_case == "empty":
+        pages += [_empty_page()]
+    else:
+        pages += [_empty_page("post-2"), _empty_page()]
+    if post_case == "order":
+        pages[-1] = RobinhoodEquityOrdersPage(orders=(_real_order(),), next_cursor=None)
+
+    class FailingReviewAdapter(FakeAdapter):
+        def review_market_order(self, **kwargs):
+            self.calls.append(("review", dict(kwargs)))
+            raise review_error
+
+        def agentic_equity_orders(self, **kwargs):
+            if post_case == "read_failure" and any(
+                name == "review" for name, _ in self.calls
+            ):
+                self.calls.append(("orders", dict(kwargs)))
+                raise read_error
+            return super().agentic_equity_orders(**kwargs)
+
+    adapter = FailingReviewAdapter(order_pages=pages)
+    store = ReviewPaperStore(tmp_path / "paper.sqlite", starting_cash=Decimal("10000"))
+    persistence_calls = []
+
+    def forbidden_persistence(*args, **kwargs):
+        persistence_calls.append(True)
+        raise AssertionError("review failure must not reach persistence")
+
+    monkeypatch.setattr(store, "record_market_review", forbidden_persistence)
+    expected = (
+        RobinhoodPaperCycleSafetyError
+        if post_case == "order"
+        else RuntimeError
+        if post_case == "read_failure"
+        else ValueError
+    )
+    with pytest.raises(expected) as caught:
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
+            intent=_intent(), review_received_at=_review().reviewed_at
+        )
+    if post_case in {"empty", "paginated_empty"}:
+        assert caught.value is review_error
+    elif post_case == "read_failure":
+        assert caught.value is read_error
+    else:
+        assert "after_review" in str(caught.value)
+    assert [name for name, _ in adapter.calls] == [
+        "orders",
+        "review",
+        "orders",
+        *([] if post_case in {"empty", "read_failure"} else ["orders"]),
+    ]
+    assert all(
+        arguments["account_number"] == "agentic-account"
+        for _, arguments in adapter.calls
+    )
+    assert not persistence_calls
+    assert store.history() == ()
+
+
+@pytest.mark.parametrize("exception", [KeyboardInterrupt, SystemExit])
+def test_review_process_control_exceptions_propagate_without_being_caught(
+    tmp_path, exception
+) -> None:
+    failure = exception()
+
+    class InterruptedAdapter(FakeAdapter):
+        def review_market_order(self, **kwargs):
+            self.calls.append(("review", dict(kwargs)))
+            raise failure
+
+    adapter = InterruptedAdapter(order_pages=[_empty_page()])
+    store = ReviewPaperStore(tmp_path / "paper.sqlite", starting_cash=Decimal("10000"))
+    with pytest.raises(exception) as caught:
+        RobinhoodReviewPaperCycle(adapter, store, account_resolver=_resolver()).run(
+            intent=_intent(), review_received_at=_review().reviewed_at
+        )
+    assert caught.value is failure
+    assert [name for name, _ in adapter.calls] == ["orders", "review"]
+    assert store.history() == ()

@@ -10,8 +10,14 @@ JSON evidence deliberately exclude the durable record and all upstream errors.
 from __future__ import annotations
 
 import json
+import logging
+import os
 import re
 import subprocess
+import sys
+import warnings
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import (
@@ -124,7 +130,9 @@ class _ObservedAdapter(RobinhoodReviewReadAdapter):
             account_number=account_number, intent=intent, received_at=received_at
         )
         self._observation.review_echo_validated = True
-        self._observation.disclosure_present = bool(review.market_data_disclosure)
+        self._observation.disclosure_present = _disclosure_present(
+            review.market_data_disclosure
+        )
         return review
 
     def agentic_equity_orders(
@@ -151,6 +159,60 @@ class _ObservedAdapter(RobinhoodReviewReadAdapter):
         else:
             self._observation.baseline_order_pages += 1
         return page
+
+
+def _discard_log(_logger: logging.Logger, _record: logging.LogRecord) -> None:
+    pass
+
+
+def _discard_warning(*_args: object, **_kwargs: object) -> None:
+    pass
+
+
+@contextmanager
+def _suppress_downstream_output() -> Iterator[None]:
+    """Discard output for one synchronous cycle, restoring process state on exit.
+
+    The null device retains no content. Redirect both Python streams and standard
+    descriptors, and block logger dispatch including preconfigured handlers that
+    hold their own streams. No in-memory or on-disk capture buffer is created.
+    """
+    original_streams = (sys.stdout, sys.stderr)
+    for stream in original_streams:
+        stream.flush()
+    previous_disable = logging.root.manager.disable
+    previous_handle = logging.Logger.handle
+    with (
+        open(os.devnull, "w", encoding="utf-8") as sink,
+        redirect_stdout(sink),
+        redirect_stderr(sink),
+        warnings.catch_warnings(),
+        ExitStack() as descriptors,
+    ):
+        for descriptor in (1, 2):
+            saved = os.dup(descriptor)
+            descriptors.callback(os.close, saved)
+            descriptors.callback(os.dup2, saved, descriptor)
+            os.dup2(sink.fileno(), descriptor)
+        try:
+            logging.disable(sys.maxsize)
+            logging.Logger.handle = _discard_log
+            warnings.simplefilter("ignore")
+            warnings.showwarning = _discard_warning
+            yield
+        finally:
+            try:
+                # Drain any downstream writes through retained original streams
+                # while their descriptors still point to the null device.
+                for stream in original_streams:
+                    stream.flush()
+            finally:
+                logging.Logger.handle = previous_handle
+                logging.disable(previous_disable)
+
+
+def _disclosure_present(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _git(root: Path, *arguments: str) -> str:
@@ -182,7 +244,7 @@ def _admit_source(
         or _git(root, "branch", "--show-current") != expected_branch
         or _git(root, "rev-parse", "HEAD") != expected_head
         or _git(root, "rev-parse", "HEAD^{tree}") != expected_tree
-        or _git(root, "status", "--porcelain")
+        or _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     ):
         raise RobinhoodPaperOperatorError("source identity mismatch")
     roots = tuple(
@@ -279,7 +341,7 @@ def run_robinhood_paper_operator(
         output_path.parent.mkdir(parents=True, exist_ok=True)
         # Reserve the evidence destination before any brokerage request.
         with output_path.open("x", encoding="utf-8", newline="\n") as output:
-            with localcontext(_decimal_context()):
+            with localcontext(_decimal_context()), _suppress_downstream_output():
                 store = None
                 try:
                     observation.phase = "paper_store"
@@ -307,7 +369,7 @@ def run_robinhood_paper_operator(
                     )
                     replay = result.reused_durable_record
                     observation.review_echo_validated = True
-                    observation.disclosure_present = bool(
+                    observation.disclosure_present = _disclosure_present(
                         result.record.review.market_data_disclosure
                     )
                     quote_fill_validated = True

@@ -94,11 +94,17 @@ class RobinhoodReviewPaperCycle:
         )
         _require_empty_order_window(baseline, stage="before_review")
 
-        review = self._adapter.review_market_order(
-            account_number=account_number,
-            intent=intent,
-            received_at=review_received_at,
-        )
+        review_failure: Exception | None = None
+        try:
+            review = self._adapter.review_market_order(
+                account_number=account_number,
+                intent=intent,
+                received_at=review_received_at,
+            )
+        except Exception as error:
+            # A failed review may still have reached Robinhood. Establish the
+            # post-window before surfacing that failure; no fill is yet durable.
+            review_failure = error
 
         post_review, post_review_pages = _collect_agentic_orders(
             self._adapter,
@@ -106,6 +112,9 @@ class RobinhoodReviewPaperCycle:
             intent=intent,
         )
         _require_empty_order_window(post_review, stage="after_review")
+
+        if review_failure is not None:
+            raise review_failure
 
         record = self._store.record_market_review(
             intent,

@@ -167,6 +167,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-paper-operator",
         "arch131-robinhood-paper-intent-bridge",
         "arch131-robinhood-deterministic-paper-pipeline",
+        "arch131-robinhood-virtual-risk-context",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -186,6 +187,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-paper-operator",
                 "arch131-robinhood-paper-intent-bridge",
                 "arch131-robinhood-deterministic-paper-pipeline",
+                "arch131-robinhood-virtual-risk-context",
             }
             else (
                 "feature/d10c-r8-incident-reconciliation"
@@ -2122,9 +2124,8 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            "arch131-robinhood-deterministic-paper-pipeline\n"
-            "          exit $LASTEXITCODE",
-            "arch131-robinhood-deterministic-paper-pipeline\n          exit 0",
+            "arch131-robinhood-virtual-risk-context\n          exit $LASTEXITCODE",
+            "arch131-robinhood-virtual-risk-context\n          exit 0",
         ),
     ],
 )
@@ -2411,6 +2412,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-paper-operator",
     "arch131-robinhood-paper-intent-bridge",
     "arch131-robinhood-deterministic-paper-pipeline",
+    "arch131-robinhood-virtual-risk-context",
 )
 
 
@@ -2985,3 +2987,189 @@ def test_ci_change_gate_against_real_git_range(
     assert report["identity_stable"] is True
     assert report["status"] == ("PASS" if passed else "FAIL")
     assert git("status", "--porcelain=v1", "--untracked-files=all") == ""
+
+
+# 131-K pins every builder boundary and the source-only batch participant.
+def test_131k_source_only_registration_and_batch():
+    name = "arch131-robinhood-virtual-risk-context"
+    specs = runner._checkpoint_specs()
+    spec = specs[name]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.authority_check is runner._arch131_virtual_risk_context_authority_check
+    assert spec.remote_branch == "feature/robinhood-review-paper-mode"
+    assert set(spec.tests) == {
+        *runner.COMMON_TESTS,
+        "tests/review_paper/test_risk_context.py",
+        "tests/review_paper/test_store.py",
+        "tests/ledger/test_ledger.py",
+        "tests/risk/test_risk_models.py",
+    }
+    assert set(spec.ruff_paths) == {
+        *runner.COMMON_RUFF_PATHS,
+        "src/trading_bot/review_paper/risk_context.py",
+        "src/trading_bot/review_paper/__init__.py",
+        "tests/review_paper/test_risk_context.py",
+    }
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert (
+        runner.CI_CHECKPOINTS.index(name)
+        == runner.CI_CHECKPOINTS.index("arch131-robinhood-deterministic-paper-pipeline")
+        + 1
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
+
+
+def _131k_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/review_paper/risk_context.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_virtual_risk_context_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        (
+            "type(store) is not ReviewPaperStore",
+            "not isinstance(store, ReviewPaperStore)",
+        ),
+        ("type(proposal) is not TradeProposal", "False"),
+        ("isinstance(prices, Mapping)", "True"),
+        ("type(new_trading_enabled) is not bool", "False"),
+        ('normalize_utc(as_of, "as_of")', "as_of"),
+        ("as_of < proposal.created_at", "False"),
+        ("isinstance(symbol, Symbol)", "True"),
+        ("isinstance(price, Decimal)", "True"),
+        ("not price.is_finite()", "False"),
+        ('price <= Decimal("0")', "False"),
+        ("set(prices) != set(ledger.positions) | {proposal.symbol}", "False"),
+        (
+            "ledger = store.reconstruct_ledger()",
+            "ledger = store.reconstruct_ledger()\n"
+            "    ledger = store.reconstruct_ledger()",
+        ),
+        (
+            "account = ledger.create_account_snapshot(prices, as_of)",
+            "account = ledger.create_account_snapshot(prices, as_of)\n"
+            "    account = ledger.create_account_snapshot(prices, as_of)",
+        ),
+        ("cash=account.cash", "cash=account.buying_power"),
+        ("equity=account.equity", "equity=account.cash"),
+        ("positions=ledger.positions", "positions={}"),
+        ("current_price=prices[proposal.symbol]", "current_price=None"),
+        (
+            "total_market_exposure=account.positions_market_value",
+            "total_market_exposure=account.equity",
+        ),
+        ("new_trading_enabled=new_trading_enabled", "new_trading_enabled=True"),
+        ("as_of=as_of", "as_of=proposal.created_at"),
+    ],
+)
+def test_131k_authority_freezes_builder(tmp_path, before, after):
+    root = _131k_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/risk_context.py"
+    source = path.read_text()
+    assert before in source
+    path.write_text(source.replace(before, after, 1), encoding="utf-8")
+    assert runner._arch131_virtual_risk_context_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "from trading_bot.risk import RiskManager",
+        "RiskManager().evaluate()",
+        "from trading_bot.review_paper.intent_bridge import build_review_paper_intent",
+        "from trading_bot.robinhood_paper_pipeline "
+        "import run_robinhood_deterministic_paper_pipeline",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "from trading_bot.robinhood_mcp import RobinhoodMCPAdapter",
+        "from trading_bot.robinhood_oauth import RobinhoodOAuthClient",
+        "store.record_market_review(intent, review)",
+        "performance.record_valuation(quotes)",
+        "from uuid import uuid4",
+        "import random",
+        "import socket",
+        "import subprocess",
+        "import os",
+        "import logging",
+        "open('paper', 'w')",
+        "print('context')",
+        "ReviewPaperStore('other', starting_cash=1)",
+        "def hidden_effect():\n    pass",
+    ],
+)
+def test_131k_authority_rejects_expanded_effect_surface(tmp_path, addition):
+    root = _131k_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/risk_context.py"
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert runner._arch131_virtual_risk_context_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("preflight=None", "preflight=_r7_preflight"),
+        ("execute=None", "execute=_r7_execute"),
+        (
+            "authority_check=_arch131_virtual_risk_context_authority_check",
+            "authority_check=_arch131_paper_operator_authority_check",
+        ),
+        ('name="arch131-robinhood-virtual-risk-context"', 'name="other"'),
+        ('"tests/review_paper/test_risk_context.py"', '"tests/other.py"'),
+        ('"src/trading_bot/review_paper/risk_context.py"', '"src/other.py"'),
+        ("remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH", 'remote_branch="other"'),
+    ],
+)
+def test_131k_authority_freezes_registration(tmp_path, before, after):
+    root = _131k_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text()
+    prefix, rest = source.split(
+        '        "arch131-robinhood-virtual-risk-context": CheckpointSpec(', 1
+    )
+    registration, suffix = rest.split(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', 1
+    )
+    assert before in registration
+    path.write_text(
+        prefix
+        + '        "arch131-robinhood-virtual-risk-context": CheckpointSpec('
+        + registration.replace(before, after, 1)
+        + '        "arch131-robinhood-paper-operator": CheckpointSpec('
+        + suffix,
+        encoding="utf-8",
+    )
+    assert runner._arch131_virtual_risk_context_authority_check(root)
+
+
+@pytest.mark.parametrize("change", ["missing", "duplicate", "reverse", "sequential"])
+def test_131k_authority_freezes_batch_workflow(tmp_path, change):
+    root = _131k_authority_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text()
+    name = "arch131-robinhood-virtual-risk-context"
+    if change == "missing":
+        source = source.replace(name, "# " + name)
+    elif change == "duplicate":
+        source = source.replace(name, name + " " + name)
+    elif change == "reverse":
+        previous = "arch131-robinhood-deterministic-paper-pipeline"
+        source = (
+            source.replace(previous, "TEMP_CHECKPOINT")
+            .replace(name, previous)
+            .replace("TEMP_CHECKPOINT", name)
+        )
+    else:
+        source = source.replace("verify-batch", "verify arch")
+    path.write_text(source, encoding="utf-8")
+    assert runner._arch131_virtual_risk_context_authority_check(root)

@@ -19,6 +19,7 @@ from trading_bot.review_paper.performance import (
     ReviewPaperValuation,
     ReviewPaperValuationConflictError,
 )
+from trading_bot.review_paper.risk_context import build_review_paper_risk_context
 from trading_bot.review_paper.store import (
     ReviewPaperConflictError,
     ReviewPaperStore,
@@ -45,5 +46,6 @@ __all__ = [
     "RobinhoodReviewQuote",
     "UnsupportedReviewPaperOrderError",
     "build_review_paper_intent",
+    "build_review_paper_risk_context",
     "canonical_order_checks",
 ]

@@ -93,11 +93,12 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-paper-operator",
     "arch131-robinhood-paper-intent-bridge",
     "arch131-robinhood-deterministic-paper-pipeline",
+    "arch131-robinhood-virtual-risk-context",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 18 participants and their order,
+    # Freeze the executable batch command, all 19 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -652,6 +653,65 @@ def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:
         StopIteration,
     ):
         failures.append("131-F source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch131_virtual_risk_context_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        tree = ast.parse(
+            (repo_root / "src/trading_bot/review_paper/risk_context.py").read_text(
+                encoding="utf-8"
+            )
+        )
+        # Pin the whole module: closed imports/calls, strict inputs, UTC ordering,
+        # exact prices, one reconstruction, one snapshot, and all context fields.
+        # Any added helper, risk/bridge/operator/performance use, identity creation
+        # or network/host/config mutation changes this structural boundary.
+        if (
+            hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "92f04d726f30bca61cb245456b782185fc183c10c71752664b0ba171e6a2d241"
+        ):
+            failures.append("131-K durable ledger/snapshot/context boundary drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-virtual-risk-context"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        # Pin test/lint coverage, authority binding, remote, and source-only flags.
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "58e753d8d40f6323289a609960ec36e9abf68cb56207b5d205b1ac5ec8473b67"
+        ):
+            failures.append("131-K source-only checkpoint registration drift")
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-K checkpoint has host/effect capability")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("131-K workflow invocation/131-J ordering drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-K source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -3133,6 +3193,27 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/test_robinhood_paper_pipeline.py",
             ),
             authority_check=_arch131_deterministic_paper_pipeline_authority_check,
+            remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-virtual-risk-context": CheckpointSpec(
+            name="arch131-robinhood-virtual-risk-context",
+            description="Architecture 131-K durable virtual-paper risk context",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_risk_context.py",
+                "tests/review_paper/test_store.py",
+                "tests/ledger/test_ledger.py",
+                "tests/risk/test_risk_models.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/risk_context.py",
+                "src/trading_bot/review_paper/__init__.py",
+                "tests/review_paper/test_risk_context.py",
+            ),
+            authority_check=_arch131_virtual_risk_context_authority_check,
             remote_branch=ARCH131_REVIEW_PAPER_REMOTE_BRANCH,
             preflight=None,
             execute=None,

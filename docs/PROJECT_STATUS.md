@@ -9693,3 +9693,103 @@ source identity checks, no interactive OAuth fallback, and the same immutable
 three-method application surface. 131-H remains paper/review only and must not
 introduce any real-order mutation capability.
 
+## 2026-10-02 — Architecture 131-H source-owned Robinhood paper operator ACCEPTED
+
+Architecture 131-H is accepted on exact executable/source:
+
+```text
+BRANCH feature/robinhood-review-paper-mode
+SOURCE HEAD f263656bddd3505bb4f4a2ebdd1f6828f7a05fa4
+SOURCE TREE 3f73d6d51a7d9d2f81b96d6e3f1a467a45d8621b
+CI #137 / 37084247389 SUCCESS
+```
+
+Implementation commits:
+
+```text
+d35af17bbbdc90710b0cbf6ee253622d7b79363c
+  feat: add source-owned Robinhood paper operator
+
+f263656bddd3505bb4f4a2ebdd1f6828f7a05fa4
+  fix: harden Architecture 131-H paper safety
+```
+
+Accepted 131-H behavior:
+
+- source-owned one-cycle paper operation composes the accepted Windows OAuth
+  factory, direct MCP transport, canonical Agentic-account resolver, typed
+  review/read adapter, paper-cycle orchestrator, and durable ReviewPaperStore;
+- callers provide an already deterministic/risk-approved ReviewPaperIntent;
+  the operator does not generate proposals, make risk decisions, resize
+  quantities, or infer brokerage buying power;
+- the public application MCP surface remains exactly
+  `review_equity_order`, `get_equity_quotes`, and `get_equity_orders`;
+- `get_accounts` remains internal only;
+- interactive OAuth/browser fallback is blocked during normal operator runs;
+- canonical account resolution occurs once for a new cycle and the same
+  account number is reused for baseline orders, review, and post-review orders;
+- durable replay remains zero Robinhood calls and conflicting order-id reuse
+  fails before Robinhood calls;
+- pre/post agentic order history is exhausted through bounded pagination;
+- once review is attempted, the post-review order window is always established,
+  even when the review call/parse/echo path fails;
+- post-review safety/read failure takes precedence over the original review
+  failure and no synthetic fill is persisted;
+- a clean post-review window plus failed review re-raises the original review
+  failure;
+- only a valid review plus a proven-empty post-review window may persist the
+  synthetic paper fill;
+- source admission requires exact branch/HEAD/tree plus
+  `git status --porcelain=v1 --untracked-files=all`;
+- paper/evidence paths must be absolute and outside every registered worktree;
+- downstream stdout, stderr, file-descriptor output, logging, and warnings are
+  discarded for the bounded live operation and process state is restored;
+- evidence is machine-readable and intentionally excludes account identifiers,
+  OAuth material, raw MCP payloads/errors, and credential-store contents;
+- disclosure presence means a nonblank disclosure string;
+- no placement/cancel/options/crypto mutation capability was introduced.
+
+Registered source-only checkpoint:
+
+```text
+arch131-robinhood-paper-operator
+preflight=None
+execute=None
+```
+
+Focused correction verification:
+
+```text
+535 focused tests passed
+Ruff check: PASS
+Ruff format: PASS
+git diff checks: PASS
+131-H authority: PASS
+```
+
+Full certification:
+
+```text
+broad-1: 4,477 passed, 0 skipped
+broad-2: 4,953 passed, 2 skipped
+serial: 926 passed, 9 skipped
+total: 10,356 passed, 11 skipped, 0 failed, 0 errors
+cases: 10,367
+wall: 371.027 seconds
+repository unchanged: PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-914762f3ec3a49b7b298fa92b240efd6
+```
+
+Production/live trading remains NO-GO.
+
+Next protected boundary: a single live qualification of the accepted source-owned
+operator using persisted OAuth, an explicit deterministic SPY paper intent,
+external paper/evidence paths, no interactive reauthorization, and no real-order
+mutation capability. That live review request requires separate explicit
+authorization before execution.
+

@@ -9851,3 +9851,91 @@ operation.
 
 Production/live trading remains NO-GO.
 
+## 2026-10-02 — Architecture 131-H accepted; source-owned operator ready for live qualification
+
+Accepted source:
+
+```text
+HEAD f263656bddd3505bb4f4a2ebdd1f6828f7a05fa4
+TREE 3f73d6d51a7d9d2f81b96d6e3f1a467a45d8621b
+CI   #137 / 37084247389 SUCCESS
+```
+
+Full certification:
+
+```text
+10,367 cases
+10,356 passed
+11 skipped
+0 failed
+0 errors
+
+broad-1 4,477 passed
+broad-2 4,953 passed, 2 skipped
+serial    926 passed, 9 skipped
+
+wall 371.027 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-914762f3ec3a49b7b298fa92b240efd6
+```
+
+The source-owned one-cycle Robinhood paper operator now provides the reviewed
+normal-operation boundary that replaces the earlier ad-hoc live qualification
+driver.
+
+Important accepted safety semantics:
+
+1. exact source identity and full untracked-file cleanliness are established
+   before operation;
+2. output paths are outside all registered repository worktrees;
+3. existing evidence files are never overwritten;
+4. persisted Windows OAuth may be reused, but interactive browser
+   reauthorization is blocked;
+5. canonical Agentic account metadata is resolved internally exactly once for a
+   new cycle;
+6. exhaustive agentic order history must be empty before review;
+7. once review is attempted, exhaustive post-review order history is always
+   checked, including when review parsing/echo validation fails;
+8. post-review order/safety failure wins over a review failure;
+9. only valid review + empty post-window permits a synthetic paper fill;
+10. durable exact replay performs zero Robinhood calls;
+11. downstream stdout/stderr/fd writes/logging/warnings are suppressed during
+    the bounded live operation;
+12. returned/persisted evidence contains only the closed sanitized schema;
+13. no placement/cancel/options/crypto mutation capability exists.
+
+### Next protected boundary
+
+Perform exactly one live qualification of the source-owned operator.
+
+Use:
+- persisted accepted OAuth only;
+- one explicit deterministic SPY MARKET BUY paper intent;
+- a fresh external paper SQLite file;
+- a fresh external evidence JSON file;
+- source identity pinned to the accepted 131-H checkout;
+- no browser reauthorization;
+- no live mutation tool;
+- stop on any FAIL evidence.
+
+The live qualification should establish:
+
+```text
+source admission
+-> external output admission
+-> canonical account resolution
+-> exhaustive baseline agentic-order read
+-> review_equity_order exactly once
+-> exact review/quote/disclosure validation
+-> exhaustive post-review agentic-order read
+-> local synthetic fill
+-> sanitized evidence
+```
+
+A separate explicit authorization is required before this live review request.
+Production/live order placement remains NO-GO.
+

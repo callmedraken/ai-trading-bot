@@ -207,9 +207,18 @@ to the AI/application facade.
 
 ### 131-H — source-owned paper operator
 
-Move one-cycle Robinhood review-paper operation into a deterministic,
-source-owned operator with sanitized evidence and no interactive reauth or
-real-order mutation capability.
+Accepted. One-cycle Robinhood review-paper operation now lives in a deterministic
+source-owned operator with explicit source/output admission, sanitized evidence,
+no interactive reauthorization, and no real-order mutation capability.
+
+After any attempted review, post-review agentic order history is always exhausted
+before the cycle may finish. A post-review safety/read failure takes precedence
+over a review failure; a clean post-window re-surfaces the original review
+failure. Only a valid review and proven-empty post-review window may create the
+local synthetic paper fill.
+
+The registered source-only checkpoint is
+`arch131-robinhood-paper-operator`.
 
 ## D10 disposition
 

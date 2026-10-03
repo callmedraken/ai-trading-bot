@@ -10399,7 +10399,10 @@ certification. No live Robinhood/MCP activity was required or authorized.
 
 Bind the accepted 131-K durable virtual-paper context builder into one
 human-started forward-paper cycle that delegates the actual risk/intent/operator
-flow to accepted 131-J exactly once.
+flow to accepted 131-J exactly once. One exact `ReviewPaperStore` is the sole
+paper-account identity: 131-L derives the 131-J `paper_store_path` and
+`starting_cash` from `store.path` and `store.starting_cash`; callers may not
+supply independent values for those fields.
 
 The source milestone remains source-only and effect-free during implementation
 and certification. Any later live `review_equity_order` qualification remains a

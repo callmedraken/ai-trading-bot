@@ -301,25 +301,32 @@ implementation.
 Frozen direction:
 
 ```text
-ReviewPaperStore durable history
+ReviewPaperStore durable history (sole paper-account identity)
 + TradeProposal
 + explicit exact price snapshot
 + explicit as_of / new_trading_enabled
 + RiskLimits
 + ExecutionInstruction
 + caller-supplied local order_id
-+ explicit 131-H operator configuration
--> build_review_paper_risk_context exactly once
++ explicit non-store 131-H operator configuration
+-> build_review_paper_risk_context(store, ...) exactly once
 -> run_robinhood_deterministic_paper_pipeline exactly once
+   with paper_store_path = store.path
+   and starting_cash = store.starting_cash
 -> existing 131-J result/evidence
 ```
 
-The binder is one human-started cycle per call. It must not reconstruct the
-ledger independently, evaluate risk independently, bypass 131-J, call raw
-Robinhood/MCP/OAuth/account-resolution capability, infer paper risk from the
-real brokerage account, generate order identity, retry, poll, loop, schedule, or
-introduce unattended operation. Placement/cancel/options/crypto mutation remains
-absent.
+The binder is one human-started cycle per call. The caller supplies exactly one
+`ReviewPaperStore`, which is the sole paper-account identity for both risk and
+the later synthetic paper write. The caller must not independently supply a
+second `paper_store_path` or `starting_cash`; 131-L derives those exact values
+from `store.path` and `store.starting_cash` when delegating to 131-J.
+
+The binder must not reconstruct the ledger independently, evaluate risk
+independently, bypass 131-J, call raw Robinhood/MCP/OAuth/account-resolution
+capability, infer paper risk from the real brokerage account, generate order
+identity, retry, poll, loop, schedule, or introduce unattended operation.
+Placement/cancel/options/crypto mutation remains absent.
 
 The planned source-only checkpoint is
 `arch131-robinhood-forward-paper-cycle`. Source implementation and

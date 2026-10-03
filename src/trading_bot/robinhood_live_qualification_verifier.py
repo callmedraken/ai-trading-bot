@@ -62,7 +62,7 @@ def verify_robinhood_131l_live_qualification(
         ("operator_evidence_path", operator_evidence_path),
         ("summary_path", summary_path),
     ):
-        if type(value) is not Path or not value.is_absolute():
+        if not isinstance(value, Path) or not value.is_absolute():
             raise TypeError(f"{name} must be an absolute Path")
     for name, value in (
         ("expected_source_head", expected_source_head),

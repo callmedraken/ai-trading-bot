@@ -734,7 +734,7 @@ def _arch131_live_qualification_verifier_authority_check(
             hashlib.sha256(
                 ast.dump(tree, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "89cd367d05112a62a242a0135577b67d50703a4b5b6295bef542af20228af999"
+            != "a4d3d9a21b6799ba28efa6fe94d37254087c95ad84c60a79eb42803e967a4280"
         ):
             failures.append("131-LQ read-only reconciliation boundary drift")
 

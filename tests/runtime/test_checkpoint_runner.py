@@ -180,30 +180,30 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             if spec.name == "arch131-robinhood-live-qualification-verifier"
             else (
                 "feature/robinhood-review-paper-mode"
-            if spec.name
-            in {
-                "arch131-robinhood-review-paper",
-                "arch131-robinhood-mcp-schema",
-                "arch131-robinhood-paper-cycle",
-                "arch131-robinhood-performance",
-                "arch131-robinhood-direct-mcp",
-                "arch131-robinhood-oauth-windows",
-                "arch131-robinhood-agentic-account",
-                "arch131-robinhood-paper-operator",
-                "arch131-robinhood-paper-intent-bridge",
-                "arch131-robinhood-deterministic-paper-pipeline",
-                "arch131-robinhood-virtual-risk-context",
-                "arch131-robinhood-forward-paper-cycle",
-            }
-            else (
-                "feature/d10c-r8-incident-reconciliation"
-                if spec.name == "arch130-r8i-d1"
+                if spec.name
+                in {
+                    "arch131-robinhood-review-paper",
+                    "arch131-robinhood-mcp-schema",
+                    "arch131-robinhood-paper-cycle",
+                    "arch131-robinhood-performance",
+                    "arch131-robinhood-direct-mcp",
+                    "arch131-robinhood-oauth-windows",
+                    "arch131-robinhood-agentic-account",
+                    "arch131-robinhood-paper-operator",
+                    "arch131-robinhood-paper-intent-bridge",
+                    "arch131-robinhood-deterministic-paper-pipeline",
+                    "arch131-robinhood-virtual-risk-context",
+                    "arch131-robinhood-forward-paper-cycle",
+                }
                 else (
-                    "feature/d10c-r8-terminal-halt"
-                    if spec.name == "arch128-r8-terminal-halt"
-                    else "feature/d10c-durable-wake-evidence"
+                    "feature/d10c-r8-incident-reconciliation"
+                    if spec.name == "arch130-r8i-d1"
+                    else (
+                        "feature/d10c-r8-terminal-halt"
+                        if spec.name == "arch128-r8-terminal-halt"
+                        else "feature/d10c-durable-wake-evidence"
+                    )
                 )
-            )
             )
         )
         assert spec.remote_branch == expected_branch

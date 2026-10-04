@@ -179,6 +179,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-supervised-prepare-verifier",
         "arch131-nyse-published-regular-session-authority",
         "arch131-robinhood-published-session-prepare",
+        "arch131-robinhood-published-prepare-operator",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -198,6 +199,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-supervised-prepare-verifier",
                 "arch131-nyse-published-regular-session-authority",
                 "arch131-robinhood-published-session-prepare",
+                "arch131-robinhood-published-prepare-operator",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2153,10 +2155,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch131-robinhood-published-session-prepare\n"
+                "arch131-robinhood-published-prepare-operator\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch131-robinhood-published-session-prepare\n          exit 0"),
+            ("arch131-robinhood-published-prepare-operator\n          exit 0"),
         ),
     ],
 )
@@ -2455,6 +2457,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-supervised-prepare-verifier",
     "arch131-nyse-published-regular-session-authority",
     "arch131-robinhood-published-session-prepare",
+    "arch131-robinhood-published-prepare-operator",
 )
 
 
@@ -4517,8 +4520,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 30
-    assert runner.CI_CHECKPOINTS[-11:] == (
+    assert len(runner.CI_CHECKPOINTS) == 31
+    assert runner.CI_CHECKPOINTS[-12:] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4530,6 +4533,7 @@ def test_131r_source_only_registration_and_batch(boundary):
         "arch131-robinhood-supervised-prepare-verifier",
         "arch131-nyse-published-regular-session-authority",
         "arch131-robinhood-published-session-prepare",
+        "arch131-robinhood-published-prepare-operator",
     )
 
 
@@ -4934,7 +4938,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 30
+    assert len(runner.CI_CHECKPOINTS) == 31
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5048,7 +5052,7 @@ def test_131t_registration_drift(tmp_path, old, new):
     source = path.read_text()
     start = source.index(f'        "{_T_NAME}": CheckpointSpec(')
     end = source.index(
-        '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+        '        "arch131-robinhood-published-prepare-operator": CheckpointSpec(', start
     )
     registration = source[start:end]
     assert old in registration
@@ -5104,7 +5108,7 @@ def test_131t_ci_invocation_drift(tmp_path, mutation):
     root = _131t_copy(tmp_path)
     path = root / ".github/workflows/checkpoint-source-gates.yml"
     source = path.read_text()
-    line = f"              {_T_NAME}\n"
+    line = f"              {_T_NAME} `\n"
     previous = "arch131-nyse-published-regular-session-authority"
     assert source.count(line) == 1
     if mutation == "missing":
@@ -5116,7 +5120,251 @@ def test_131t_ci_invocation_drift(tmp_path, mutation):
     else:
         source = source.replace(
             f"              {previous} `\n" + line,
-            f"              {_T_NAME} `\n              {previous}\n",
+            f"              {_T_NAME} `\n              {previous} `\n",
         )
     path.write_text(source, encoding="utf-8")
     assert "131-T workflow invocation/order drift" in _T_AUTHORITY(root)
+
+
+_U_NAME = "arch131-robinhood-published-prepare-operator"
+_U_SOURCE = "src/trading_bot/robinhood_prepare_operator.py"
+_U_AUTHORITY = runner._arch131_published_prepare_operator_authority_check
+
+
+def test_131u_source_only_registration_and_batch():
+    spec = runner._checkpoint_specs()[_U_NAME]
+    assert (
+        spec.description
+        == "Architecture 131-U source-owned PREPARE transport composition"
+    )
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.authority_check is _U_AUTHORITY
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/test_robinhood_prepare_operator.py",
+        "tests/review_paper/test_published_session_prepare.py",
+        "tests/review_paper/test_prepare_qualification.py",
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        _U_SOURCE,
+        "tests/test_robinhood_prepare_operator.py",
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert len(runner.CI_CHECKPOINTS) == 31
+    assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
+    assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
+        runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
+    )
+    assert _U_AUTHORITY(Path(runner.__file__).resolve().parents[1]) == ()
+
+
+def _131u_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in (
+        _U_SOURCE,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert _U_AUTHORITY(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize("relative", [_U_SOURCE])
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "from datetime import datetime",
+        "datetime.now()",
+        "date.today()",
+        "import socket",
+        "import httpx",
+        "import os",
+        "import subprocess",
+        "import time",
+        "sleep(1)",
+        "while True:\n    pass",
+        "config.read()",
+        "scheduler.run()",
+        "adapter.acquire_quotes()",
+        "from trading_bot.execution.models import ExecutionInstruction",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "run_robinhood_deterministic_paper_pipeline()",
+        "run_robinhood_forward_paper_cycle()",
+        "build_review_paper_intent()",
+        "transport.get_accounts()",
+        "transport.get_equity_orders()",
+        "transport.review_equity_order()",
+        "place_order()",
+        "cancel_order()",
+        "options_mutation()",
+        "crypto_mutation()",
+        "storage.get_tokens()",
+        "storage.get_client_info()",
+        "api.read_generic()",
+        "webbrowser.open('private')",
+        "uuid4()",
+        "store.read_records()",
+        "execute_review_paper_supervised_cycle()",
+        "retry()",
+        "poll()",
+        "open('evidence.json', 'w')",
+    ],
+)
+def test_131u_complete_boundaries_pinned(tmp_path, relative, addition):
+    root = _131u_copy(tmp_path)
+    path = root / relative
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("browser_opener=_block_interactive_authorization", "browser_opener=None"),
+        (
+            'raise LoopbackOAuthError("Interactive OAuth authorization is forbidden")',
+            "return True",
+        ),
+        ("redirect_uri=redirect_uri", "redirect_uri='http://127.0.0.1:9999/callback'"),
+        (
+            "RobinhoodMcpStreamableHttpTransport(oauth_factory)",
+            "RobinhoodMcpStreamableHttpTransport(None)",
+        ),
+        ("RobinhoodReviewReadAdapter(transport)", "RobinhoodReviewReadAdapter(None)"),
+        ("adapter=adapter", "adapter=None"),
+        ("session_date=session_date", "session_date=None"),
+        ("store=store", "store=None"),
+        ("evidence_path=evidence_path", "evidence_path=None"),
+        (
+            "return run_review_paper_published_session_prepare_qualification(",
+            "return execute_review_paper_supervised_cycle(",
+        ),
+    ],
+)
+def test_131u_composition_and_blocker_pinned(tmp_path, old, new):
+    root = _131u_copy(tmp_path)
+    path = root / _U_SOURCE
+    source = path.read_text()
+    assert old in source
+    path.write_text(source.replace(old, new), encoding="utf-8")
+    assert _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("preflight=None", "preflight=_r7_execute"),
+        ("execute=None", "execute=_r7_execute"),
+        ("ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH", "ARCH131_REVIEW_PAPER_REMOTE_BRANCH"),
+        ("*COMMON_TESTS,", ""),
+        ("*COMMON_RUFF_PATHS,", ""),
+        ("tests/scripts/test_run_test_certification.py", "tests/missing.py"),
+        (
+            "_arch131_published_prepare_operator_authority_check",
+            "_arch131_review_paper_authority_check",
+        ),
+    ],
+)
+def test_131u_registration_drift(tmp_path, old, new):
+    root = _131u_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text()
+    start = source.index(f'        "{_U_NAME}": CheckpointSpec(')
+    end = source.index(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+    )
+    registration = source[start:end]
+    assert old in registration
+    path.write_text(
+        source[:start] + registration.replace(old, new) + source[end:], encoding="utf-8"
+    )
+    assert "131-U source-only checkpoint registration drift" in _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize("field", ["preflight", "execute", "remote_branch"])
+def test_131u_runtime_capability_drift(tmp_path, monkeypatch, field):
+    from dataclasses import replace
+
+    root = _131u_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+
+    def forbidden():
+        pytest.fail("source gate must never invoke host/effect capabilities")
+
+    specs[_U_NAME] = replace(
+        specs[_U_NAME], **{field: "wrong" if field == "remote_branch" else forbidden}
+    )
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize(
+    "target", ["branch", "batch", "source_missing", "source_duplicate"]
+)
+def test_131u_authority_drift(tmp_path, target):
+    root = _131u_copy(tmp_path)
+    if target == "source_missing":
+        (root / _U_SOURCE).unlink()
+    elif target == "source_duplicate":
+        path = root / _U_SOURCE
+        path.write_text(
+            path.read_text() + "\ndef helper(): return None\n", encoding="utf-8"
+        )
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        source = path.read_text()
+        if target == "branch":
+            source = source.replace(
+                '"feature/robinhood-review-paper-side-foundation"', '"feature/wrong"'
+            )
+        else:
+            previous = "arch131-robinhood-published-session-prepare"
+            source = source.replace(
+                f'    "{previous}",\n    "{_U_NAME}",',
+                f'    "{_U_NAME}",\n    "{previous}",',
+            )
+        path.write_text(source, encoding="utf-8")
+    assert _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "comment", "reordered"])
+def test_131u_ci_invocation_drift(tmp_path, mutation):
+    root = _131u_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text()
+    line = f"              {_U_NAME}\n"
+    previous = "arch131-robinhood-published-session-prepare"
+    assert source.count(line) == 1
+    if mutation == "missing":
+        source = source.replace(line, "")
+    elif mutation == "duplicate":
+        source = source.replace(line, f"              {_U_NAME} `\n" + line)
+    elif mutation == "comment":
+        source = source.replace(line, f"              # {_U_NAME}\n")
+    else:
+        source = source.replace(
+            f"              {previous} `\n" + line,
+            f"              {_U_NAME} `\n              {previous}\n",
+        )
+    path.write_text(source, encoding="utf-8")
+    assert "131-U workflow invocation/order drift" in _U_AUTHORITY(root)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate"])
+def test_131u_source_gate_participant_drift(tmp_path, mutation):
+    root = _131u_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text()
+    line = f'    "{_U_NAME}",\n'
+    assert source.count(line) == 1
+    source = source.replace(line, "" if mutation == "missing" else line * 2)
+    path.write_text(source, encoding="utf-8")
+    assert "131-U checkpoint batch registration drift" in _U_AUTHORITY(root)

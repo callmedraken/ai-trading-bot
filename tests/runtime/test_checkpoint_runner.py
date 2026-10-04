@@ -177,6 +177,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-supervised-forward-paper",
         "arch131-robinhood-supervised-prepare-qualification",
         "arch131-robinhood-supervised-prepare-verifier",
+        "arch131-nyse-published-regular-session-authority",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -194,6 +195,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-supervised-forward-paper",
                 "arch131-robinhood-supervised-prepare-qualification",
                 "arch131-robinhood-supervised-prepare-verifier",
+                "arch131-nyse-published-regular-session-authority",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2149,10 +2151,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch131-robinhood-supervised-prepare-verifier\n"
+                "arch131-nyse-published-regular-session-authority\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch131-robinhood-supervised-prepare-verifier\n          exit 0"),
+            ("arch131-nyse-published-regular-session-authority\n          exit 0"),
         ),
     ],
 )
@@ -2449,6 +2451,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-supervised-forward-paper",
     "arch131-robinhood-supervised-prepare-qualification",
     "arch131-robinhood-supervised-prepare-verifier",
+    "arch131-nyse-published-regular-session-authority",
 )
 
 
@@ -4511,8 +4514,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 28
-    assert runner.CI_CHECKPOINTS[-9:] == (
+    assert len(runner.CI_CHECKPOINTS) == 29
+    assert runner.CI_CHECKPOINTS[-10:] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4522,6 +4525,7 @@ def test_131r_source_only_registration_and_batch(boundary):
         "arch131-robinhood-supervised-forward-paper",
         "arch131-robinhood-supervised-prepare-qualification",
         "arch131-robinhood-supervised-prepare-verifier",
+        "arch131-nyse-published-regular-session-authority",
     )
 
 
@@ -4668,3 +4672,230 @@ def test_131r_critical_guards_pinned(tmp_path, index, old, new):
     assert old in source
     path.write_text(source.replace(old, new), encoding="utf-8")
     assert boundary[4](root)
+
+
+# 131-S pins the entire pure module and its source-only side-branch registration.
+def test_131s_source_only_registration_and_batch():
+    name = "arch131-nyse-published-regular-session-authority"
+    spec = runner._checkpoint_specs()[name]
+    assert spec.preflight is None and spec.execute is None
+    assert (
+        spec.authority_check
+        is runner._arch131_nyse_published_regular_session_authority_check
+    )
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/review_paper/test_nyse_published_regular_sessions.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "src/trading_bot/review_paper/nyse_published_regular_sessions.py",
+        "tests/review_paper/test_nyse_published_regular_sessions.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CHECKPOINTS.index(name) == (
+        runner.CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier") + 1
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
+
+
+def _131s_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/review_paper/nyse_published_regular_sessions.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert (
+        runner._arch131_nyse_published_regular_session_authority_check(tmp_path) == ()
+    )
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import socket",
+        "import subprocess",
+        "import os",
+        "from trading_bot.review_paper import ReviewPaperStore",
+        "from trading_bot.robinhood_mcp import RobinhoodMcpStreamableHttpTransport",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "while True:\n    pass",
+        "open('paper.sqlite', 'w')",
+    ],
+)
+def test_131s_authority_rejects_effect_surface_drift(tmp_path, addition):
+    root = _131s_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/nyse_published_regular_sessions.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n" + addition + "\n",
+        encoding="utf-8",
+    )
+    assert runner._arch131_nyse_published_regular_session_authority_check(root)
+
+
+@pytest.mark.parametrize("capability", ["preflight", "execute"])
+def test_131s_authority_rejects_runtime_effect_registration(
+    tmp_path, monkeypatch, capability
+):
+    root = _131s_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-nyse-published-regular-session-authority"
+    from dataclasses import replace
+
+    def forbidden():
+        raise AssertionError("effect capability invoked during source certification")
+
+    specs[name] = replace(specs[name], **{capability: forbidden})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-S checkpoint has host/effect capability" in (
+        runner._arch131_nyse_published_regular_session_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("preflight=None", "preflight=_arch130_r8i_d1_preflight"),
+        ("execute=None", "execute=_r7_execute"),
+        ("ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH", "ARCH131_REVIEW_PAPER_REMOTE_BRANCH"),
+        ("*COMMON_TESTS,", ""),
+        ("*COMMON_RUFF_PATHS,", ""),
+        (
+            "tests/review_paper/test_nyse_published_regular_sessions.py",
+            "tests/review_paper/test_models.py",
+        ),
+        (
+            "_arch131_nyse_published_regular_session_authority_check",
+            "_arch131_review_paper_authority_check",
+        ),
+    ],
+)
+def test_131s_authority_rejects_registration_drift(tmp_path, old, new):
+    root = _131s_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index(
+        '        "arch131-nyse-published-regular-session-authority": CheckpointSpec('
+    )
+    end = source.index(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+    )
+    registration = source[start:end]
+    assert old in registration
+    source = source[:start] + registration.replace(old, new) + source[end:]
+    path.write_text(source, encoding="utf-8")
+    assert "131-S source-only checkpoint registration drift" in (
+        runner._arch131_nyse_published_regular_session_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize("target", ["branch", "batch", "workflow", "source_missing"])
+def test_131s_authority_rejects_source_authority_drift(tmp_path, target):
+    root = _131s_authority_copy(tmp_path)
+    if target == "source_missing":
+        (
+            root / "src/trading_bot/review_paper/nyse_published_regular_sessions.py"
+        ).unlink()
+    elif target == "workflow":
+        path = root / ".github/workflows/checkpoint-source-gates.yml"
+        path.write_text(path.read_text().replace("exit $LASTEXITCODE", "exit 0"))
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        source = path.read_text()
+        if target == "branch":
+            source = source.replace(
+                '"feature/robinhood-review-paper-side-foundation"',
+                '"feature/wrong-branch"',
+            )
+        else:
+            source = source.replace(
+                '    "arch131-robinhood-supervised-prepare-verifier",\n'
+                '    "arch131-nyse-published-regular-session-authority",',
+                '    "arch131-nyse-published-regular-session-authority",\n'
+                '    "arch131-robinhood-supervised-prepare-verifier",',
+            )
+        path.write_text(source, encoding="utf-8")
+    assert runner._arch131_nyse_published_regular_session_authority_check(root)
+
+
+def test_131s_authority_rejects_runtime_remote_drift(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    root = _131s_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-nyse-published-regular-session-authority"
+    specs[name] = replace(specs[name], remote_branch="feature/wrong-branch")
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-S checkpoint remote branch drift" in (
+        runner._arch131_nyse_published_regular_session_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("date(2028, 1, 17)", "date(2028, 1, 1)"),
+        ("date(2028, 7, 3)", "date(2028, 7, 5)"),
+        ("type(session_date) is not date", "not isinstance(session_date, date)"),
+        ("if session_date.year not in self.supported_years:", "if False:"),
+        ("session_date.weekday() >= 5", "session_date.weekday() > 5"),
+        ("time(9, 30)", "time(9, 31)"),
+        ("close_hour = 13 if session_date in _EARLY_CLOSES else 16", "close_hour = 16"),
+        ('ZoneInfo("America/New_York")', 'ZoneInfo("UTC")'),
+        ('default="NYSE"', 'default="other"'),
+        ('default="NYSE core equity regular session"', 'default="other scope"'),
+        (
+            'default="nyse-published-regular-sessions-2026-2028/v1"',
+            'default="unreviewed/v2"',
+        ),
+        ("default=(2026, 2027, 2028)", "default=(2026, 2027, 2028, 2029)"),
+        ("default=date(2026, 10, 4)", "default=date(2026, 10, 5)"),
+        ("frozen=True", "frozen=False"),
+        ("init=False", "init=True"),
+        ("frozenset(", "set("),
+        ("return ReviewPaperSessionSchedule(", "return other_schedule("),
+    ],
+)
+def test_131s_authority_pins_manifest_and_schedule(tmp_path, old, new):
+    root = _131s_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/nyse_published_regular_sessions.py"
+    source = path.read_text(encoding="utf-8")
+    assert old in source
+    path.write_text(source.replace(old, new), encoding="utf-8")
+    assert "131-S published regular-session boundary drift" in (
+        runner._arch131_nyse_published_regular_session_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "comment", "reordered"])
+def test_131s_authority_rejects_ci_invocation_drift(tmp_path, mutation):
+    root = _131s_authority_copy(tmp_path)
+    path = root / ".github/workflows/checkpoint-source-gates.yml"
+    source = path.read_text(encoding="utf-8")
+    name = "arch131-nyse-published-regular-session-authority"
+    previous = "arch131-robinhood-supervised-prepare-verifier"
+    line = f"              {name}\n"
+    assert source.count(line) == 1
+    if mutation == "missing":
+        source = source.replace(line, "")
+    elif mutation == "duplicate":
+        source = source.replace(line, f"              {name} `\n" + line)
+    elif mutation == "comment":
+        source = source.replace(line, f"              # {name}\n")
+    else:
+        source = source.replace(
+            f"              {previous} `\n" + line,
+            f"              {name} `\n              {previous}\n",
+        )
+    path.write_text(source, encoding="utf-8")
+    assert "131-S workflow invocation/order drift" in (
+        runner._arch131_nyse_published_regular_session_authority_check(root)
+    )

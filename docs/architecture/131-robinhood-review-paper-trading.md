@@ -1446,8 +1446,8 @@ certification: ROBINHOOD profile
 ```
 
 FULL is not required merely for 131-T because this is a bounded current
-Robinhood integration change and the 40-module ROBINHOOD profile is a strict
-subset of the already-certified supported FULL topology.
+Robinhood integration change and the ROBINHOOD profile remains a strict subset
+of the already-certified supported FULL topology.
 
 131-T grants no live provider qualification or execution authority. A real
 131-Q PREPARE qualification remains a separately protected read-only provider

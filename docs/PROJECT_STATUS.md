@@ -11202,7 +11202,9 @@ execute=None
 ```
 
 After focused implementation and exact GitHub review, 131-T should use the
-40-module ROBINHOOD certification profile, not FULL/LEGACY/EXHAUSTIVE. Any real
+ROBINHOOD certification profile, not FULL/LEGACY/EXHAUSTIVE. The profile has
+40 modules on the pre-131-T tree; newly added owned Robinhood tests are admitted
+automatically and may increase that count. Any real
 131-Q PREPARE qualification remains a separately protected read-only provider
 effect requiring fresh explicit authorization; EXECUTE remains separately
 protected and production/live real-money placement remains NO-GO.

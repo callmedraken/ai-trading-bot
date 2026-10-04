@@ -11152,16 +11152,57 @@ accepted PREPARE. `READY_TO_PROCEED` is never execution authorization.
 test/workflow infrastructure only. The protected operational sequence remains
 separate and unchanged; this closeout grants no new authority.
 
-### Next safe source/design work — schedule composition
+## 2026-10-04 — Architecture 131-T explicit-date published-session PREPARE binding FROZEN
 
-Next safe source/design work is to integrate the accepted 131-S published
-schedule authority into the supervised PREPARE/qualification composition so an
-operator does not have to manually construct `ReviewPaperSessionSchedule` for a
-supported NYSE session.
+The next safe source milestone is **131-T**, a bounded composition layer that
+removes manual `ReviewPaperSessionSchedule` construction from the supervised
+PREPARE/qualification path without adding a new source of temporal authority.
 
-This is a new bounded Architecture 131 follow-on whose exact contract is **not
-yet frozen** by this docs-only closeout. Do not implement it under this closeout
-or grant it provider/execution authority. Do not add runtime web/calendar
-discovery or introduce system-clock authority. Preserve explicit/fail-closed
-temporal authority until the next contract is reviewed. The protected
-operational sequence remains separate and unchanged.
+131-T keeps the target session date explicit. The caller supplies one exact
+`datetime.date`; 131-T must not derive "today" from the system clock,
+environment, provider, filesystem, or network. It resolves that date only
+through accepted `NYSEPublishedRegularSessionAuthority`. Unsupported years
+continue to fail closed; weekends/published holidays fail before provider,
+durable-store, or evidence activity.
+
+The frozen source surface is:
+
+```text
+resolve_review_paper_published_session_schedule(session_date: date)
+    -> ReviewPaperSessionSchedule
+
+prepare_review_paper_supervised_published_session(...)
+    -> ReviewPaperSupervisedPreparation
+
+run_review_paper_published_session_prepare_qualification(...)
+    -> ReviewPaperSupervisedPreparation
+```
+
+The two wrappers take `session_date` instead of a caller-built schedule,
+resolve the accepted 131-S schedule exactly once, then delegate exactly once to
+the existing accepted 131-Q PREPARE or 131-R qualification primitive. Existing
+low-level schedule-taking APIs remain unchanged.
+
+The provider-free 131-R verifier must also recompute the canonical 131-S
+schedule from the evidence session date and require exact open/close equality,
+so a manually fabricated or stale schedule cannot qualify. The existing
+`arch131-q-prepare-qualification/v1` evidence schema remains unchanged.
+
+131-T adds no EXECUTE path, order placement/cancel authority, new provider
+operation, retry/polling/scheduler behavior, runtime calendar discovery, or new
+clock read. The already-accepted 131-Q PREPARE clock remains unchanged and is
+used only for admission against the resolved explicit-date schedule.
+
+Planned source-only checkpoint:
+
+```text
+arch131-robinhood-published-session-prepare
+preflight=None
+execute=None
+```
+
+After focused implementation and exact GitHub review, 131-T should use the
+40-module ROBINHOOD certification profile, not FULL/LEGACY/EXHAUSTIVE. Any real
+131-Q PREPARE qualification remains a separately protected read-only provider
+effect requiring fresh explicit authorization; EXECUTE remains separately
+protected and production/live real-money placement remains NO-GO.

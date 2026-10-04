@@ -265,21 +265,35 @@ During iteration:
 - if a broad local run fails, diagnose the affected area and rerun only focused
   tests after the bounded fix.
 
-Architecture 132 freezes four source-verification levels plus a separate
-protected authorization boundary:
+Architecture 132-R1 separates current-supported certification from legacy
+compatibility. The normal tier sequence is:
+
+```text
+FOCUSED
+-> SOURCE-GATE CI
+-> ROBINHOOD when appropriate
+-> FULL at coherent current-product boundaries
+-> LEGACY/EXHAUSTIVE only when explicitly relevant
+-> PROTECTED separately authorized
+```
 
 | Level | Trigger and responsibility |
 | --- | --- |
 | FOCUSED | Every implementation/correction; Codex runs affected tests and focused checks. |
 | SOURCE-GATE CI | Every pushed registered checkpoint; existing registered GitHub source-gate batching remains accepted. |
 | ROBINHOOD | ChatGPT-declared coherent Architecture 131 integration boundary; before protected Robinhood qualification; after material changes to shared domain/execution/ledger/risk foundations used by Architecture 131. |
-| FULL | After certification-topology changes; before major develop/release integration; before consequential production/live-readiness transitions; after sufficiently broad shared-core changes; or when ChatGPT explicitly determines accumulated checkpoints warrant repository-wide regression. |
+| FULL | Comprehensive CURRENTLY SUPPORTED product certification: after certification-topology changes; at coherent current-product boundaries; before major develop/release integration or consequential production/live-readiness transitions; after sufficiently broad supported shared-core changes; or when ChatGPT determines accumulated checkpoints warrant current-product regression. |
+| LEGACY / EXHAUSTIVE | Only when explicitly relevant: legacy architecture changes, interpreter/dependency migrations spanning both eras, broad repository restructuring, deliberate legacy removal, or explicit backward compatibility investigation. |
 | PROTECTED | Always separate fresh authorization at the exact effect boundary. |
 
-Full repository certification is intentionally retained, but is not required
-after every accepted source checkpoint. FULL is not mechanically tied to every
-Architecture 131 letter/checkpoint. ChatGPT chooses the appropriate tier after
-exact GitHub code review and source acceptance. The normal handoff remains:
+FULL remains the default and is not mechanically tied to every accepted source
+checkpoint or Architecture 131 letter. FULL now means all CURRENTLY SUPPORTED
+functionality, replacing the original Architecture 132 meaning. EXHAUSTIVE
+preserves that earlier all-repository behavior. Normal current-product
+certification does not require LEGACY or EXHAUSTIVE.
+
+ChatGPT chooses the appropriate tier after exact GitHub code review and source
+acceptance. The normal handoff remains:
 
 ```text
 implementation + focused checks
@@ -287,7 +301,7 @@ implementation + focused checks
 -> ChatGPT exact GitHub code review
 -> source acceptance
 -> appropriate certification tier
--> docs closeout (PROJECT_STATUS + HANDOFF)
+-> docs closeout (PROJECT_STATUS + HANDOFF after certification acceptance)
 ```
 
 At a declared certification boundary:
@@ -299,13 +313,35 @@ At a declared certification boundary:
   as source defects;
 - after clean certification, do not repeat it without a new source change or
   explicit gate decision;
-- a merge needs no second complete run when its resulting tree exactly equals
-  the already-certified tree.
+- a merge needs no second run when its resulting tree exactly equals the
+  already-certified tree.
 
-`scripts/run_test_certification.py --profile full` remains the default, including
-when `--profile` is omitted. It discovers every `tests/**/test_*.py` module and
-uses two deterministic balanced broad lanes plus the exact five-module serial
-safety lane:
+The runner accepts these profiles (counts at the accepted 132-R1 startup tree):
+
+| Profile | Modules | Exact lanes |
+| --- | ---: | --- |
+| full (default) | 113 supported | broad-1, broad-2 |
+| robinhood | 40 supported subset | robinhood-1, robinhood-2 |
+| legacy | 204 retired architecture | legacy-1, legacy-2, serial |
+| exhaustive | 317 complete repository | broad-1, broad-2, serial |
+
+[Architecture 132](architecture/132-tiered-certification-profiles.md) freezes
+ownership and required baselines. Whole supported directories admit new tests
+automatically; mixed CLI/market-data/scripts ownership is exact and new files
+require review. Root `tests/test_robinhood_*.py` tests enter automatically.
+Missing/renamed FULL or Robinhood baseline modules fail closed. Every repository
+module must have reviewed support status, including for EXHAUSTIVE; unfamiliar
+namespaces must never silently enter LEGACY. Robinhood is contained in FULL;
+FULL and LEGACY are disjoint and their union equals EXHAUSTIVE, which equals
+the complete discovered repository inventory.
+
+D10/Windows/Paper-v2/Alpaca operational paths are retained historical
+compatibility, not current product requirements. The existing pre-Robinhood GUI
+is legacy because it uses the retired operational artifact/runtime model. GUI
+remains a future product goal; a Robinhood-integrated GUI milestone must
+explicitly reclassify or replace it.
+
+Only LEGACY and EXHAUSTIVE retain the historical serial safety lane:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py
@@ -316,31 +352,23 @@ tests/acceptance/test_windows_authority_provisioning_acceptance.py
 ```
 
 Architecture-77 remains serial; unrestricted parallel safety has not been
-established. `--profile robinhood` instead owns the domain, execution, ledger,
-risk, review_paper, and robinhood_mcp test directories; root
-`tests/test_robinhood_*.py`; and exactly the checkpoint-runner and
-certification-runner infrastructure modules. Its frozen current baseline is 40
-modules, listed in [Architecture 132](architecture/132-tiered-certification-profiles.md).
-New owned files are automatically selected; missing/renamed baseline modules
-fail closed. Robinhood uses exactly `robinhood-1` and `robinhood-2`, two nonempty
-balanced file lanes, with no historical Windows/D10 serial lane. Unrelated GUI,
-CLI, backtesting/research, market-data/Alpaca, personal-desktop/D10, and Windows
-production-authority families are excluded.
+established. FULL and Robinhood have exactly two nonempty balanced file lanes
+and no serial lane. Never launch pytest with an empty module list.
 
-Both profiles admit the same exact clean source identity, reject protected
-opt-ins, use the same external temp-root and JUnit/evidence validation, and run
-whole-repository `ruff check --no-cache .`, `ruff format --check --no-cache .`,
-and `git diff --check` after successful tests. Evidence identifies the profile,
-full repository inventory, selected modules, exclusions, and exact lane set;
-`inventory.json` retains `all` as the full repository inventory. `--plan` saves
-topology/evidence without launching pytest for either profile. Never launch
-pytest with an empty module list.
+All profiles retain exact clean source/local-tracking/live-origin admission,
+post-test/final verification, protected-opt-in rejection, external temp-root and
+JUnit/evidence validation, and whole-repository `ruff check --no-cache .`,
+`ruff format --check --no-cache .`, and `git diff --check`. Evidence records the
+profile, repository/selected/excluded inventories, support classification and
+exact lanes. `inventory.json` retains `all` as the complete repository inventory;
+only EXHAUSTIVE selects all of it. `--plan` saves topology/evidence without
+launching pytest or static checks for any profile.
 
-Neither source profile authorizes native Windows acceptance opt-ins, provider
-access, Robinhood calls, OAuth interaction, broker effects, or production
-effects. PROTECTED gates remain separate and always need fresh authorization.
-The current topology change itself triggers FULL certification after source
-review; implementation runs only the requested focused checks.
+No profile grants native Windows acceptance opt-ins, provider access, Robinhood
+calls, OAuth interaction, broker effects, or production effects. PROTECTED
+remains separate and always needs fresh authorization. Architecture 132-R1
+implementation runs only focused checks; actual certification requires the
+subsequent exact GitHub review and ChatGPT's gate decision.
 
 ### Local Git compatibility rule
 

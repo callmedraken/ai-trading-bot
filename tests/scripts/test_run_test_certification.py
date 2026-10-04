@@ -129,12 +129,14 @@ def test_plan_never_launches_pytest_and_saves_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
     modules = _profile_inventory(tmp_path, profile)
-    monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
     monkeypatch.setattr(
         runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
     )
     monkeypatch.setattr(
         runner, "run_children", lambda *a: pytest.fail("pytest launched")
+    )
+    monkeypatch.setattr(
+        runner, "run_static_checks", lambda *a: pytest.fail("static checks launched")
     )
     args = argparse.Namespace(
         root=tmp_path,
@@ -159,13 +161,28 @@ def test_plan_never_launches_pytest_and_saves_summary(
     assert evidence["excluded"] == result["excluded_inventory"]
     assert set(evidence["selected"]) | set(evidence["excluded"]) == set(evidence["all"])
     assert set(evidence["selected"]).isdisjoint(evidence["excluded"])
-    if profile == "full":
-        assert evidence["all"] == evidence["selected"]
+    assert set(result["lanes"]) == set(_lane_names(profile))
+    expected = _fixture_profiles()
+    assert evidence["excluded"] == sorted(set(expected["exhaustive"]) - set(modules))
+    assert evidence["classification"] == result["classification"]
+    classification = evidence["classification"]
+    assert classification["policy"] == "architecture-132-r1"
+    assert classification["supported_inventory"] == list(_EXPECTED_FULL)
+    assert classification["legacy_inventory"] == list(_FIXTURE_LEGACY)
+    assert classification["profile_counts"] == {
+        name: len(value) for name, value in expected.items()
+    }
+    assert (
+        classification["ownership"]["supported_root_pattern"]
+        == "tests/test_robinhood_*.py"
+    )
+    if profile == "exhaustive":
+        assert evidence["selected"] == evidence["all"]
         assert evidence["excluded"] == []
-        assert result["lanes"]["serial"]["module_count"] == 1
+    if profile in {"legacy", "exhaustive"}:
+        assert evidence["serial"] == list(_EXPECTED_SERIAL)
+        assert result["lanes"]["serial"]["module_count"] == 5
     else:
-        assert evidence["excluded"] == ["tests/gui/test_unrelated.py"]
-        assert set(result["lanes"]) == {"robinhood-1", "robinhood-2"}
         assert evidence["serial"] == []
     assert (args.evidence_dir / "results.json").is_file()
     assert (args.evidence_dir / "inventory.json").is_file()
@@ -400,7 +417,6 @@ def test_final_source_verification_repeats_live_origin_proof(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
     _profile_inventory(tmp_path, profile)
-    monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
     monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path / "temp")
     args = _source_args(
         tmp_path,
@@ -454,8 +470,7 @@ def test_final_source_verification_repeats_live_origin_proof(
 def test_failed_child_sets_failed_summary(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _inventory(tmp_path)
-    monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
+    _profile_inventory(tmp_path, "full")
     monkeypatch.setattr(
         runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
     )
@@ -466,7 +481,6 @@ def test_failed_child_sets_failed_summary(
         lambda *args: {
             "broad-1": {"error": "Child exited with 1", "exit_code": 1},
             "broad-2": {"exit_code": 0},
-            "serial": {"exit_code": 0},
         },
     )
     monkeypatch.setattr(
@@ -530,25 +544,117 @@ _EXPECTED_ROBINHOOD = tuple(
 )
 
 
-def _lane_names(profile: str) -> tuple[str, ...]:
-    return (
-        ("broad-1", "broad-2", "serial")
-        if profile == "full"
-        else ("robinhood-1", "robinhood-2")
+_SUPPORTED_ADDITIONAL_FAMILIES = {
+    "analytics": ("analyzer"),
+    "backtesting": ("backtest_engine backtest_models"),
+    "cli": (
+        "create_research_session_bundle historical_experiment "
+        "historical_experiment_pairwise_config "
+        "historical_experiment_pairwise_serialization "
+        "historical_experiment_pareto_config "
+        "historical_experiment_pareto_serialization "
+        "historical_experiment_report_serialization optimized_simulation "
+        "research_session_archive research_session_archive_cli "
+        "research_session_bundle research_session_manifest "
+        "research_session_restore restore_research_session_archive "
+        "rolling_historical verify_research_session_manifest "
+        "walk_forward_aggregate_config "
+        "walk_forward_aggregate_serialization walk_forward_experiment "
+        "walk_forward_experiment_config "
+        "walk_forward_experiment_serialization "
+        "walk_forward_stability_config "
+        "walk_forward_stability_serialization"
+    ),
+    "experiments": (
+        "comparison grid historical pairwise pareto report walk_forward "
+        "walk_forward_analytics walk_forward_stability"
+    ),
+    "integration": (
+        "walk_forward_e2e walk_forward_research_archive_e2e "
+        "walk_forward_research_bundle_e2e "
+        "walk_forward_research_restore_e2e "
+        "walk_forward_research_transport_e2e"
+    ),
+    "market_calendar": ("calendar_models nyse_calendar"),
+    "market_data": (
+        "csv_historical_provider historical_models multi_symbol_models "
+        "multi_symbol_provider"
+    ),
+    "multi_backtesting": ("engine models strategy_contract"),
+    "optimization": ("cpu_mean_cvar"),
+    "portfolio": (
+        "historical_scenarios mean_cvar models optimized_targets "
+        "optimizer_protocol scenarios"
+    ),
+    "portfolio_analytics": ("analyzer models optimized_simulation"),
+    "rebalancing": ("models planner proposals"),
+    "scripts": (
+        "create_walk_forward_research_bundle "
+        "research_session_archive_scripts run_backtest "
+        "run_historical_experiment run_rolling_historical_simulation "
+        "run_walk_forward_experiment"
+    ),
+    "simulation": ("optimized_paper_portfolio paper_portfolio rolling_historical"),
+    "strategies": ("moving_average"),
+}
+_EXPECTED_FULL = tuple(
+    sorted(
+        (
+            *_EXPECTED_ROBINHOOD,
+            *(
+                f"tests/{family}/test_{name}.py"
+                for family, names in _SUPPORTED_ADDITIONAL_FAMILIES.items()
+                for name in names.split()
+            ),
+            "tests/test_config.py",
+        )
     )
+)
+_EXPECTED_SERIAL = (
+    "tests/runtime/test_windows_transactional_capture_authority.py",
+    "tests/runtime/test_windows_authority_schema.py",
+    "tests/runtime/test_windows_authority.py",
+    "tests/runtime/test_windows_effectful_capture_native_acceptance.py",
+    "tests/acceptance/test_windows_authority_provisioning_acceptance.py",
+)
+_FIXTURE_LEGACY = tuple(
+    sorted(
+        (
+            *_EXPECTED_SERIAL,
+            "tests/gui/test_unrelated.py",
+            "tests/runtime/test_d10_future.py",
+            "tests/cli/test_daily_snapshot_capture.py",
+            "tests/market_data/test_alpaca_http.py",
+            "tests/scripts/test_capture_daily_market_snapshot.py",
+        )
+    )
+)
+
+
+def _fixture_profiles() -> dict[str, tuple[str, ...]]:
+    return {
+        "full": _EXPECTED_FULL,
+        "robinhood": _EXPECTED_ROBINHOOD,
+        "legacy": _FIXTURE_LEGACY,
+        "exhaustive": tuple(sorted((*_EXPECTED_FULL, *_FIXTURE_LEGACY))),
+    }
+
+
+def _lane_names(profile: str) -> tuple[str, ...]:
+    return {
+        "full": ("broad-1", "broad-2"),
+        "robinhood": ("robinhood-1", "robinhood-2"),
+        "legacy": ("legacy-1", "legacy-2", "serial"),
+        "exhaustive": ("broad-1", "broad-2", "serial"),
+    }[profile]
 
 
 def _profile_inventory(root: Path, profile: str) -> tuple[str, ...]:
-    if profile == "full":
-        return _inventory(root)
-    for index, module in enumerate(_EXPECTED_ROBINHOOD):
+    for index, module in enumerate(_fixture_profiles()["exhaustive"]):
         path = root / module
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(b"x" * (index + 1))
-    excluded = root / "tests/gui/test_unrelated.py"
-    excluded.parent.mkdir(parents=True)
-    excluded.write_text("", encoding="utf-8")
-    return _EXPECTED_ROBINHOOD
+    return _fixture_profiles()[profile]
 
 
 def _parser_arguments() -> list[str]:
@@ -600,23 +706,38 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     assert not set(runner.SERIAL_MODULES) & set(selected)
 
 
-def test_full_retains_repository_inventory_and_exact_serial_allowlist() -> None:
+def test_current_profile_counts_support_partition_and_serial_allowlist() -> None:
     root = Path(__file__).resolve().parents[2]
     inventory = runner.discover_inventory(root)
-    assert runner.select_inventory(inventory, "full") == inventory
-    assert runner.SERIAL_MODULES == (
-        "tests/runtime/test_windows_transactional_capture_authority.py",
-        "tests/runtime/test_windows_authority_schema.py",
-        "tests/runtime/test_windows_authority.py",
-        "tests/runtime/test_windows_effectful_capture_native_acceptance.py",
-        "tests/acceptance/test_windows_authority_provisioning_acceptance.py",
-    )
-    broad, serial = runner.separate_serial(inventory)
-    lanes = runner.build_lanes(root, inventory, "full")
-    assert tuple(lanes) == _lane_names("full")
-    assert lanes["serial"] == serial == runner.SERIAL_MODULES
-    assert (lanes["broad-1"], lanes["broad-2"]) == runner.balance_broad(root, broad)
-    runner.validate_partitions(inventory, tuple(lanes.values()))
+    profiles = {
+        name: runner.select_inventory(inventory, name)
+        for name in ("full", "robinhood", "legacy", "exhaustive")
+    }
+    assert runner.PROFILES == ("full", "robinhood", "legacy", "exhaustive")
+    assert profiles["full"] == _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
+    assert {name: len(value) for name, value in profiles.items()} == {
+        "full": 113,
+        "robinhood": 40,
+        "legacy": 204,
+        "exhaustive": 317,
+    }
+    assert profiles["exhaustive"] == inventory
+    assert set(profiles["robinhood"]) <= set(profiles["full"])
+    assert set(profiles["full"]).isdisjoint(profiles["legacy"])
+    assert set(profiles["full"]) | set(profiles["legacy"]) == set(inventory)
+    assert runner.SERIAL_MODULES == _EXPECTED_SERIAL
+    for name, selected in profiles.items():
+        lanes = runner.build_lanes(root, selected, name)
+        assert tuple(lanes) == _lane_names(name)
+        assert all(lanes.values())
+        runner.validate_partitions(selected, tuple(lanes.values()))
+        if name in {"legacy", "exhaustive"}:
+            broad, serial = runner.separate_serial(selected)
+            assert lanes["serial"] == serial == _EXPECTED_SERIAL
+            assert tuple(lanes.values())[:2] == runner.balance_broad(root, broad)
+        else:
+            assert not set(selected) & set(_EXPECTED_SERIAL)
+            assert tuple(lanes.values()) == runner.balance_broad(root, selected)
 
 
 @pytest.mark.parametrize(
@@ -627,8 +748,11 @@ def test_full_retains_repository_inventory_and_exact_serial_allowlist() -> None:
     ],
 )
 def test_new_owned_modules_are_automatically_admitted(module: str) -> None:
-    inventory = tuple(sorted((*_EXPECTED_ROBINHOOD, module)))
-    assert runner.select_inventory(inventory, "robinhood") == inventory
+    inventory = tuple(sorted((*_EXPECTED_FULL, module)))
+    assert runner.select_inventory(inventory, "robinhood") == tuple(
+        sorted((*_EXPECTED_ROBINHOOD, module))
+    )
+    assert module in runner.select_inventory(inventory, "full")
 
 
 @pytest.mark.parametrize("missing", _EXPECTED_ROBINHOOD)
@@ -636,31 +760,50 @@ def test_new_owned_modules_are_automatically_admitted(module: str) -> None:
 def test_missing_or_renamed_required_module_fails_closed(
     missing: str, rename: bool
 ) -> None:
-    inventory = tuple(module for module in _EXPECTED_ROBINHOOD if module != missing)
+    inventory = tuple(module for module in _EXPECTED_FULL if module != missing)
     if rename:
         inventory += (missing.replace(".py", "_renamed.py"),)
     with pytest.raises(runner.CertificationError, match="Missing required Robinhood"):
         runner.select_inventory(inventory, "robinhood")
 
 
-def test_unrelated_families_are_excluded() -> None:
-    excluded = (
-        "tests/gui/test_window.py",
-        "tests/cli/test_cli.py",
+def test_retired_families_are_legacy_and_research_is_supported() -> None:
+    root = Path(__file__).resolve().parents[2]
+    profiles = runner.classify_inventory(runner.discover_inventory(root))
+    expected_counts = {
+        "tests/acceptance": 1,
+        "tests/cli": 34,
+        "tests/gui": 34,
+        "tests/market_data": 8,
+        "tests/runtime": 126,
+        "tests/scripts": 1,
+    }
+    assert {
+        directory: sum(
+            Path(module).parent.as_posix() == directory for module in profiles["legacy"]
+        )
+        for directory in expected_counts
+    } == expected_counts
+    for module in (
         "tests/runtime/test_d10_arch128_r4_windows.py",
         "tests/runtime/test_personal_desktop_paper_account_authority.py",
-        "tests/backtesting/test_backtest.py",
-        "tests/market_data/test_alpaca.py",
+        "tests/market_data/test_alpaca_daily_snapshot.py",
+        "tests/cli/test_daily_snapshot_capture.py",
+        "tests/scripts/test_capture_daily_market_snapshot.py",
+        *_EXPECTED_SERIAL,
+    ):
+        assert module in profiles["legacy"]
+    for module in (
+        "tests/analytics/test_analyzer.py",
+        "tests/backtesting/test_backtest_engine.py",
+        "tests/strategies/test_moving_average.py",
+        "tests/portfolio/test_mean_cvar.py",
+        "tests/cli/test_walk_forward_experiment.py",
         "tests/scripts/test_run_backtest.py",
-        "tests/test_unrelated.py",
-        *runner.SERIAL_MODULES,
-    )
-    assert (
-        runner.select_inventory(
-            tuple(sorted((*_EXPECTED_ROBINHOOD, *excluded))), "robinhood"
-        )
-        == _EXPECTED_ROBINHOOD
-    )
+        "tests/test_config.py",
+    ):
+        assert module in profiles["full"]
+        assert module not in profiles["robinhood"]
 
 
 def test_robinhood_has_two_deterministic_balanced_nonempty_lanes(
@@ -703,7 +846,6 @@ def test_exact_profile_lane_success_accounting(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, outcome: str
 ) -> None:
     _profile_inventory(tmp_path, profile)
-    monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
     monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path)
     monkeypatch.setattr(
         runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
@@ -749,7 +891,7 @@ def test_exact_profile_lane_success_accounting(
 
 @pytest.mark.parametrize("profile", runner.PROFILES)
 @pytest.mark.parametrize("name", runner.PROTECTED_OPT_INS)
-def test_both_profiles_reject_protected_opt_ins_before_source(
+def test_all_profiles_reject_protected_opt_ins_before_source(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, name: str
 ) -> None:
     monkeypatch.setenv(name, "0")
@@ -788,7 +930,7 @@ def test_static_checks_remain_whole_repository(
 
 
 @pytest.mark.parametrize("profile", runner.PROFILES)
-def test_both_profiles_retain_temp_root_requirement(
+def test_all_profiles_retain_temp_root_requirement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
     monkeypatch.setattr(
@@ -805,3 +947,103 @@ def test_both_profiles_retain_temp_root_requirement(
     )
     with pytest.raises(runner.CertificationError, match="basetemp root"):
         runner.run(args)
+
+
+@pytest.mark.parametrize("missing", _EXPECTED_FULL)
+@pytest.mark.parametrize("rename", [False, True])
+def test_full_missing_or_renamed_frozen_baseline_fails_closed(
+    missing: str, rename: bool
+) -> None:
+    inventory = tuple(module for module in _EXPECTED_FULL if module != missing)
+    if rename:
+        inventory += (missing.replace(".py", "_renamed.py"),)
+    with pytest.raises(runner.CertificationError, match="Missing required"):
+        runner.select_inventory(inventory, "full")
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "tests/analytics/test_new.py",
+        "tests/backtesting/nested/test_new.py",
+        "tests/domain/nested/test_new.py",
+        "tests/execution/test_new.py",
+        "tests/experiments/test_new.py",
+        "tests/integration/test_new.py",
+        "tests/ledger/test_new.py",
+        "tests/market_calendar/test_new.py",
+        "tests/multi_backtesting/test_new.py",
+        "tests/optimization/test_new.py",
+        "tests/portfolio/test_new.py",
+        "tests/portfolio_analytics/test_new.py",
+        "tests/rebalancing/test_new.py",
+        "tests/review_paper/test_new.py",
+        "tests/risk/test_new.py",
+        "tests/robinhood_mcp/test_new.py",
+        "tests/simulation/test_new.py",
+        "tests/strategies/test_new.py",
+        "tests/test_robinhood_new.py",
+    ],
+)
+def test_new_supported_files_are_discovered_and_admitted(
+    tmp_path: Path, module: str
+) -> None:
+    _profile_inventory(tmp_path, "full")
+    path = tmp_path / module
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("", encoding="utf-8")
+    inventory = runner.discover_inventory(tmp_path)
+    assert runner.select_inventory(inventory, "full") == tuple(
+        sorted((*_EXPECTED_FULL, module))
+    )
+    assert module not in runner.select_inventory(inventory, "legacy")
+
+
+@pytest.mark.parametrize("profile", ("full", "robinhood", "legacy", "exhaustive"))
+@pytest.mark.parametrize(
+    "module",
+    [
+        "tests/new_product/test_new.py",
+        "tests/test_unknown.py",
+        "tests/cli/test_unknown.py",
+        "tests/market_data/test_unknown.py",
+        "tests/scripts/test_unknown.py",
+    ],
+)
+def test_unclassified_namespace_fails_every_profile(profile: str, module: str) -> None:
+    inventory = tuple(sorted((*_EXPECTED_FULL, module)))
+    with pytest.raises(runner.CertificationError, match="Unclassified"):
+        runner.select_inventory(inventory, profile)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["exhaustive", "overlap", "missing", "robinhood", "duplicate", "profile_set"],
+)
+def test_classification_invariants_fail_closed(mutation: str) -> None:
+    profiles = _fixture_profiles()
+    repository = profiles["exhaustive"]
+    if mutation == "exhaustive":
+        profiles["exhaustive"] = repository[:-1]
+    elif mutation == "overlap":
+        profiles["legacy"] += (profiles["full"][0],)
+    elif mutation == "missing":
+        profiles["legacy"] = profiles["legacy"][:-1]
+    elif mutation == "robinhood":
+        profiles["robinhood"] += (profiles["legacy"][0],)
+    elif mutation == "duplicate":
+        profiles["robinhood"] += (profiles["robinhood"][0],)
+    else:
+        profiles.pop("legacy")
+    with pytest.raises(runner.CertificationError):
+        runner.validate_classification(repository, profiles)
+
+
+def test_ownership_overlap_fails_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        runner,
+        "LEGACY_EXACT_MODULES",
+        (*runner.LEGACY_EXACT_MODULES, "tests/test_config.py"),
+    )
+    with pytest.raises(runner.CertificationError, match="Overlapping"):
+        runner.classify_inventory(_EXPECTED_FULL)

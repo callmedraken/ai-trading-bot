@@ -14,8 +14,10 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 _SCHEMA = "arch131-q-prepare-qualification/v1"
+_EXCHANGE_TZ = ZoneInfo("America/New_York")
 _ADMISSION_FIELDS = {
     "status",
     "as_of",
@@ -141,6 +143,28 @@ def _read_current(path: Path) -> dict[str, object]:
     }
 
 
+def _expected_admission_status(
+    as_of: datetime,
+    *,
+    session_date: date,
+    opens_at: datetime,
+    closes_at: datetime,
+    opening: timedelta,
+    closing: timedelta,
+) -> str:
+    if as_of.astimezone(_EXCHANGE_TZ).date() != session_date:
+        return "NON_SESSION_DATE"
+    if as_of < opens_at:
+        return "BEFORE_REGULAR_WINDOW"
+    if as_of < opens_at + opening:
+        return "OPENING_BUFFER"
+    if as_of < closes_at - closing:
+        return "ADMITTED"
+    if as_of < closes_at:
+        return "CLOSING_BUFFER"
+    return "AFTER_REGULAR_WINDOW"
+
+
 def _admission(
     value: object, schedule: dict, opening: timedelta, closing: timedelta
 ) -> dict:
@@ -157,7 +181,10 @@ def _admission(
         },
         "unknown admission status",
     )
-    _datetime(admission["as_of"])
+    as_of = _datetime(admission["as_of"])
+    session_date = date.fromisoformat(schedule["session_date"])
+    opens_at = _datetime(schedule["opens_at"])
+    closes_at = _datetime(schedule["closes_at"])
     _require(
         admission["session_date"] == schedule["session_date"],
         "admission session date mismatch",
@@ -167,6 +194,18 @@ def _admission(
             _datetime(admission[field]) == _datetime(schedule[field]),
             "admission schedule mismatch",
         )
+    _require(
+        admission["status"]
+        == _expected_admission_status(
+            as_of,
+            session_date=session_date,
+            opens_at=opens_at,
+            closes_at=closes_at,
+            opening=opening,
+            closing=closing,
+        ),
+        "admission status does not match as_of",
+    )
     _require(
         _datetime(admission["admission_opens_at"])
         == _datetime(schedule["opens_at"]) + opening,
@@ -251,11 +290,19 @@ def _verify(
         evidence["schedule"], {"session_date", "opens_at", "closes_at"}, "schedule"
     )
     _require(type(schedule["session_date"]) is str, "session_date must be a string")
-    date.fromisoformat(schedule["session_date"])
+    session_date = date.fromisoformat(schedule["session_date"])
+    opens_at = _datetime(schedule["opens_at"])
+    closes_at = _datetime(schedule["closes_at"])
+    _require(
+        opens_at < closes_at
+        and opens_at.astimezone(_EXCHANGE_TZ).date() == session_date
+        and closes_at.astimezone(_EXCHANGE_TZ).date() == session_date,
+        "schedule must map to its exchange-local session date",
+    )
     opening = _duration(evidence["opening_buffer_seconds"])
     closing_buffer = _duration(evidence["closing_buffer_seconds"])
     age = _duration(evidence["max_quote_age_seconds"])
-    duration = _datetime(schedule["closes_at"]) - _datetime(schedule["opens_at"])
+    duration = closes_at - opens_at
     _require(
         opening >= timedelta(0)
         and closing_buffer >= timedelta(0)
@@ -270,7 +317,12 @@ def _verify(
         _require(durable == current, f"{key} differs from current durable state")
     metadata = dict(current["metadata"])
     _require(
-        metadata.get("starting_cash") == evidence["starting_cash"],
+        set(metadata) == {"schema_version", "starting_cash"}
+        and metadata.get("schema_version") == "2",
+        "paper metadata mismatch",
+    )
+    _require(
+        metadata["starting_cash"] == evidence["starting_cash"],
         "starting cash mismatch",
     )
     _require(_decimal(evidence["starting_cash"]) > 0, "starting cash must be positive")
@@ -393,6 +445,10 @@ def _verify(
                 )
             deadline = _datetime(deadline_value)
             expected_deadline = min(source + age for source in source_times)
+            _require(
+                expected_deadline >= observed,
+                "quote snapshot was already stale at observation",
+            )
             _require(deadline == expected_deadline, "quote deadline mismatch")
     return RobinhoodPrepareQualificationVerification(
         head,

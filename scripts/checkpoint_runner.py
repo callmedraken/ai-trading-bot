@@ -1325,14 +1325,11 @@ def _arch131_prepare_verifier_authority_check(
         path = repo_root / "src/trading_bot/robinhood_prepare_qualification_verifier.py"
         text_value = path.read_text(encoding="utf-8")
         # Pin the complete module, including every import, helper and call.
-        if (
-            hashlib.sha256(
-                ast.dump(ast.parse(text_value), include_attributes=False).encode(
-                    "utf-8"
-                )
-            ).hexdigest()
-            != "20b57ea378b433e1ea933d01b50013085de4d5e3c756ce31781e67034f7dcdd2"
-        ):
+        data = text_value.encode("utf-8")
+        actual_blob = hashlib.sha1(
+            b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
+        ).hexdigest()
+        if actual_blob != "320038c79686dde247e6ce14c388290ce0bf0937":
             failures.append("131-R PREPARE verifier boundary drift")
 
         runner_tree = ast.parse(

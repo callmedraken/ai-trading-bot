@@ -479,6 +479,51 @@ def test_resized_passes(h):
     assert _verify(h).approved_quantity == Decimal("0.500")
 
 
+@pytest.mark.parametrize("metadata_change", ["schema_version", "extra_key"])
+def test_self_consistent_wrong_metadata_rejected(h, metadata_change):
+    with sqlite3.connect(h.store) as connection:
+        if metadata_change == "schema_version":
+            connection.execute(
+                "UPDATE metadata SET value='999' WHERE key='schema_version'"
+            )
+        else:
+            connection.execute(
+                "INSERT INTO metadata(key, value) VALUES ('unexpected', 'value')"
+            )
+    durable = _fingerprint(h.store)
+    h.evidence["durable_before"] = copy.deepcopy(durable)
+    h.evidence["durable_after"] = copy.deepcopy(durable)
+    with pytest.raises(ERROR, match="metadata"):
+        _verify(h)
+
+
+@pytest.mark.parametrize(
+    "field,at",
+    [
+        ("initial_admission", AT.replace(hour=13, minute=30)),
+        ("quote_admission", AT.replace(hour=20)),
+    ],
+)
+def test_forged_admitted_status_inconsistent_with_timestamp_rejected(h, field, at):
+    h.evidence["preparation"][field] = _admission("ADMITTED", at)
+    if field == "quote_admission":
+        h.evidence["preparation"]["price_snapshot"]["observed_at"] = at.isoformat()
+    with pytest.raises(ERROR, match="status"):
+        _verify(h)
+
+
+def test_completed_preview_rejects_quote_already_stale_at_observation(h):
+    stale_source = AT - timedelta(seconds=61)
+    h.evidence["preparation"]["price_snapshot"]["marks"][0]["source_at"] = (
+        stale_source.isoformat()
+    )
+    h.evidence["preparation"]["quote_valid_until"] = (
+        stale_source + timedelta(seconds=60, microseconds=1)
+    ).isoformat()
+    with pytest.raises(ERROR, match="already stale"):
+        _verify(h)
+
+
 def test_cli_pass_deterministic_json(h, capsys):
     _verify(h)
     args = [
@@ -555,6 +600,7 @@ def test_structural_no_provider_store_risk_execution_capability():
         "decimal",
         "pathlib",
         "uuid",
+        "zoneinfo",
     }
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):

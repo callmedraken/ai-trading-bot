@@ -10935,3 +10935,35 @@ Proceed in this order:
 A successful READY_TO_PROCEED preparation is not execution authorization.
 Production/live real order placement remains NO-GO.
 
+## 2026-10-04 — Architecture 131-R qualification-support contract FROZEN
+
+Safe side work continues with an optional source-only qualification-support
+checkpoint, not a new trading authority.
+
+131-R freezes:
+
+- a PREPARE-only harness that invokes accepted 131-Q PREPARE exactly once;
+- exact read-only SQLite before/after fingerprints covering metadata and every
+  `review_fills` column;
+- one sanitized evidence artifact written only after the durable before/after
+  snapshots match exactly;
+- a separate provider-free verifier that reopens SQLite with `mode=ro` and
+  independently reconciles evidence against current durable state;
+- explicit evidence that supervised EXECUTE/pipeline authority was not invoked.
+
+131-R source work does not authorize a live quote read. The already-authorized
+131-L qualification remains independent and unchanged. A later real 131-Q
+PREPARE qualification still requires fresh explicit authorization, and any
+131-Q EXECUTE qualification requires another separate authorization.
+
+Planned source-only checkpoints:
+
+```text
+arch131-robinhood-supervised-prepare-qualification
+arch131-robinhood-supervised-prepare-verifier
+preflight=None
+execute=None
+```
+
+Production/live real brokerage placement remains NO-GO.
+

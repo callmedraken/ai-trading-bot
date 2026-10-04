@@ -933,6 +933,184 @@ post-authorization failure does not create retry authority.
 
 Production/live real brokerage placement remains NO-GO.
 
+### 131-R — PREPARE qualification harness and read-only evidence verifier
+
+Optional qualification-support milestone. 131-R does not extend the trading
+pipeline and is not a prerequisite for the already-authorized 131-L
+qualification. It exists to make the later protected 131-Q PREPARE
+qualification source-owned, reproducible, and independently reconcilable.
+
+131-R has two source surfaces:
+
+```text
+A. PREPARE qualification harness
+B. read-only PREPARE evidence verifier
+```
+
+#### A. PREPARE qualification harness
+
+Frozen inputs:
+
+```text
+exact ReviewPaperStore
++ exact TradeProposal
++ exact ReviewPaperSessionSchedule
++ exact opening/closing buffers
++ exact RobinhoodReviewReadAdapter
++ exact positive max_quote_age
++ exact RiskLimits
++ exact new_trading_enabled bool
++ expected source HEAD/tree
++ fresh absolute evidence path
+```
+
+Frozen sequence:
+
+```text
+validate all non-provider inputs
+-> read exact SQLite metadata + full review_fills rows using URI mode=ro
+-> canonicalize and hash PREPARE-BEFORE durable snapshot
+-> prepare_review_paper_supervised_cycle(...) exactly once
+-> read exact SQLite metadata + full review_fills rows again using mode=ro
+-> canonicalize and hash PREPARE-AFTER durable snapshot
+-> require BEFORE == AFTER exactly
+-> serialize one sanitized evidence document
+-> write evidence once to a fresh path
+-> return the exact ReviewPaperSupervisedPreparation
+```
+
+The harness may call only the accepted 131-Q PREPARE function. It must not import
+or call `execute_review_paper_supervised_cycle`,
+`run_robinhood_forward_paper_cycle`, 131-J/I/H, RiskManager, direct adapter
+methods, transport, OAuth/account resolution, store mutation, performance
+valuation, placement/cancel/options/crypto, retry, polling, scheduler, or sleep.
+
+The harness must never infer that `READY_TO_PROCEED` authorizes execution.
+Evidence must state explicitly that no supervised EXECUTE/pipeline result was
+produced by this harness.
+
+The durable snapshot fingerprint covers:
+
+- complete ordered metadata rows;
+- complete ordered `review_fills` rows and all columns;
+- canonical JSON encoding;
+- SHA-256 digest;
+- row count.
+
+The harness reads SQLite only through a read-only URI. It must not construct a
+second `ReviewPaperStore`, initialize schema, migrate, insert, update, or
+delete.
+
+Frozen sanitized evidence schema:
+
+```text
+schema = arch131-q-prepare-qualification/v1
+source_head
+source_tree
+store_path
+starting_cash
+proposal:
+  proposal_id
+  symbol
+  side
+  desired_quantity
+  created_at
+schedule:
+  session_date
+  opens_at
+  closes_at
+opening_buffer_seconds
+closing_buffer_seconds
+max_quote_age_seconds
+new_trading_enabled
+
+durable_before:
+  metadata
+  record_count
+  sha256
+
+preparation:
+  status
+  initial_admission
+  price_snapshot | null
+  quote_admission | null
+  risk_preview | null
+  quote_valid_until | null
+
+durable_after:
+  metadata
+  record_count
+  sha256
+
+execute_invoked = false
+pipeline_result_present = false
+```
+
+Where present, `price_snapshot` records only accepted 131-N marks
+(symbol/price/source_at/observed_at), and `risk_preview` records sanitized
+requested quantity, risk outcome, approved quantity, reason codes, marked
+cash/equity/current price/exposure, current/projected position quantity/value,
+and projected total exposure. No OAuth credential, account identifier, raw
+transport payload, order-check disclosure, or secret-bearing data belongs in
+131-R evidence.
+
+Evidence path must be an absolute `Path`, must not already exist, and must not
+be the durable SQLite path. Failure after the provider read does not create
+retry authority; a later real qualification requires a new explicit
+authorization and a fresh evidence path.
+
+#### B. PREPARE evidence verifier
+
+The verifier is provider-free and opens the durable SQLite only with URI
+`mode=ro`. Inputs:
+
+```text
+evidence JSON
++ durable store path
++ expected source HEAD/tree
++ expected proposal UUID
+-> immutable sanitized verification result
+```
+
+It independently verifies:
+
+- exact schema/source/proposal/store identity;
+- exact durable metadata;
+- PREPARE before/after digests are equal;
+- current read-only SQLite digest equals the recorded before and after digest;
+- evidence record counts equal the current durable record count;
+- `execute_invoked == false`;
+- `pipeline_result_present == false`;
+- status/optional-field combinations match accepted 131-Q preparation semantics;
+- quote marks are canonical/nonempty when a snapshot is present;
+- `quote_valid_until` equals the earliest mark source time plus exact max age
+  for completed preview states;
+- RISK_REJECTED carries a rejected risk result;
+- READY_TO_PROCEED carries APPROVED or RESIZED risk result;
+- session-blocked states carry no execution-capable preview material.
+
+The verifier must not import adapter/transport/OAuth, call a provider, construct
+`ReviewPaperStore`, evaluate risk, invoke 131-Q, or mutate the filesystem/store.
+
+Planned source-only checkpoints:
+
+```text
+arch131-robinhood-supervised-prepare-qualification
+arch131-robinhood-supervised-prepare-verifier
+preflight=None
+execute=None
+```
+
+Both follow 131-Q on the side-foundation batch. Source certification uses a real
+review adapter around fake transport for the harness and fixture SQLite for the
+verifier. It performs zero live Robinhood/MCP/OAuth requests and no durable
+paper mutation.
+
+A later real 131-Q PREPARE qualification remains a protected read-only provider
+effect requiring fresh explicit user authorization. 131-R source acceptance
+does not grant that authorization and does not grant 131-Q EXECUTE authority.
+
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

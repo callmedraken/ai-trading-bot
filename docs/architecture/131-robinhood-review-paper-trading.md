@@ -573,95 +573,52 @@ No live Robinhood/MCP/OAuth request or durable paper mutation occurred.
 
 ### 131-O — effect-free durable forward-paper risk preview
 
-Next side-foundation source milestone. Compose the accepted 131-N snapshot,
-131-K durable virtual-account context builder, and deterministic `RiskManager`
-into one immutable pre-review preview. 131-O is risk-preview authority only; it
-does not claim execution readiness or create a paper intent.
+Accepted. The source-owned preview composes the exact accepted 131-N snapshot,
+131-K durable virtual-account context, and one deterministic `RiskManager`
+evaluation into immutable pre-review operator state.
 
-Frozen composition:
+Accepted composition:
 
 ```text
 exact ReviewPaperStore
 + exact TradeProposal
 + exact ReviewPaperRiskPriceSnapshot
 + exact RiskLimits
-+ explicit exact new_trading_enabled bool
++ exact new_trading_enabled bool
 -> build_review_paper_risk_context exactly once
    using snapshot.prices
-   and as_of = snapshot.observed_at
+   and snapshot.observed_at
 -> RiskManager(risk_limits).evaluate exactly once
 -> immutable ReviewPaperForwardPreview
 ```
 
-Frozen public preview state:
+The preview preserves the exact proposal, price snapshot, risk limits, 131-K
+`RiskContext`, and `RiskDecision`. Derived read-only properties are limited
+to current/projected marked position quantity/value and projected total marked
+market exposure.
 
-```text
-proposal                exact original proposal
-price_snapshot           exact original 131-N snapshot
-risk_limits              exact supplied immutable limits
-risk_context             exact 131-K result
-risk_decision            exact RiskManager result
+Accepted projection rules:
 
-derived read-only properties:
-  current_position_quantity
-  current_position_market_value
-  projected_position_quantity
-  projected_position_market_value
-  projected_total_market_exposure
-```
+- rejected risk leaves position/exposure unchanged;
+- approved/resized BUY adds the approved quantity/notional;
+- approved/resized SELL subtracts the approved quantity/notional;
+- projections use only the accepted current mark and exact approved quantity;
+- negative projected position or market exposure fails closed;
+- explicit Decimal arithmetic is independent of ambient Decimal precision/traps.
 
-Projection semantics use only the accepted risk decision and current 131-K mark:
+The preview does not reconstruct the durable ledger independently and does not
+reimplement cash/equity/position-coverage or risk constraints. It deliberately
+does not produce projected post-fill cash/equity, realized P&L, fill price,
+execution state, Robinhood review/checks/disclosures, an
+`ExecutionInstruction`, or a `ReviewPaperIntent`.
 
-- rejected decision -> zero approved delta and unchanged projected position/
-  market exposure;
-- approved/resized BUY -> add approved quantity;
-- approved/resized SELL -> subtract approved quantity;
-- current/projected position market value is quantity times
-  `risk_context.current_price`;
-- projected total exposure is current total market exposure plus/minus the
-  approved marked notional;
-- projection must never become negative; any contradictory manually constructed
-  preview fails closed.
+The implementation has no provider adapter/transport, OAuth/account resolution,
+quote acquisition, review call, intent bridge, 131-J/131-L invocation, order
+execution/cancel, paper write, performance valuation, filesystem, network,
+subprocess, environment/config, UUID generation, clock read, retry, polling,
+scheduler, or sleep capability.
 
-The preview deliberately does not produce projected cash, fill price, post-fill
-equity, realized P&L, execution status, Robinhood disclosures/checks, or a
-`ReviewPaperIntent`. Those values are not authoritative before the later
-review/fill boundary.
-
-131-O must delegate account/risk authority instead of reimplementing it:
-
-- call `build_review_paper_risk_context` exactly once;
-- pass exactly `price_snapshot.prices`;
-- use exactly `price_snapshot.observed_at` as `as_of`;
-- call `RiskManager(risk_limits).evaluate(proposal, risk_context)` exactly once;
-- do not call `store.reconstruct_ledger()` directly;
-- do not independently calculate cash/equity/open-position coverage or risk
-  constraints.
-
-Frozen validation:
-
-- `store` exactly `ReviewPaperStore`;
-- `proposal` exactly `TradeProposal`;
-- `price_snapshot` exactly `ReviewPaperRiskPriceSnapshot`;
-- `risk_limits` exactly `RiskLimits`;
-- `new_trading_enabled` exactly `bool`;
-- 131-K remains responsible for proposal timestamp, exact symbol coverage,
-  durable ledger reconstruction, and account marking;
-- the result preserves exact supplied input/result objects and validates
-  cross-object consistency.
-
-No `ExecutionInstruction` is accepted at this milestone. 131-O is intentionally
-a risk preview, not a promise that a later 131-I bridge/operator invocation is
-admissible. The later supervised runner composes execution instruction and
-identity only after the preview.
-
-131-O has no Robinhood adapter/SDK transport, OAuth, account resolution, quote
-acquisition, review call, paper intent, 131-J/131-L invocation, order execution,
-paper write, performance valuation, filesystem, network, subprocess,
-environment/config, UUID generation, system clock, retry, polling, scheduler,
-or sleep capability.
-
-Planned source-only checkpoint:
+Accepted source-only checkpoint:
 
 ```text
 arch131-robinhood-forward-paper-preview
@@ -669,9 +626,121 @@ preflight=None
 execute=None
 ```
 
-The checkpoint follows 131-N in the side-foundation optimized batch. 131-P later
-owns read-only quote acquisition; 131-Q later composes 131-M/131-P/131-N/131-O
-with explicit execution inputs into the supervised runner.
+Accepted source and certification:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   47e3d6341848265752501d8376caad38bd5acb0f
+TREE   04e5f54da0fbf03fdb1d5970777ca319c83be092
+PARENT 7c1c088123beedb4e1303245190fcc2ea7228983
+CI     #166 / 37155938112 SUCCESS
+
+11,226 cases
+11,209 passed
+17 skipped
+0 failed
+0 errors
+wall 497.582 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-81403e975caf4243ba9a7e6448b6ca51
+```
+
+No live Robinhood/MCP/OAuth request or durable paper mutation occurred.
+
+### 131-P — bounded read-only Robinhood risk-price acquisition
+
+Next side-foundation source milestone. This is the first side milestone allowed
+to invoke the already accepted read-only quote adapter. It derives the exact
+required symbol set from durable virtual positions plus the proposal, performs
+one bounded quote read, timestamps the observation after that response, and
+delegates all quote/mark/freshness policy to accepted 131-N.
+
+Frozen composition:
+
+```text
+exact ReviewPaperStore
++ exact TradeProposal
++ exact RobinhoodReviewReadAdapter
++ exact positive max_quote_age
+-> store.reconstruct_ledger exactly once
+-> required_symbols =
+     canonical tuple(sorted(open position symbols U {proposal.symbol}, key=str))
+-> require 1..20 symbols before provider access
+-> adapter.equity_quotes(required_symbols) exactly once
+-> observed_at = datetime.now(UTC) exactly once after the response
+-> build_review_paper_risk_price_snapshot exactly once
+     response=response
+     required_symbols=required_symbols
+     observed_at=observed_at
+     max_quote_age=max_quote_age
+-> exact ReviewPaperRiskPriceSnapshot
+```
+
+Frozen pre-effect admission:
+
+- `store` must be exactly `ReviewPaperStore`;
+- `proposal` must be exactly `TradeProposal`;
+- `adapter` must be exactly `RobinhoodReviewReadAdapter`;
+- `max_quote_age` must be exactly `timedelta` and strictly positive;
+- durable history reconstruction and required-symbol derivation happen before
+  the provider call;
+- required symbols are canonical, unique, nonempty, and capped at 20;
+- more than 20 required symbols fails closed with zero provider calls.
+
+Frozen provider authority:
+
+- call only `RobinhoodReviewReadAdapter.equity_quotes`;
+- call it exactly once with the exact derived canonical tuple;
+- do not invoke transport directly;
+- do not call review/order/account methods;
+- do not construct OAuth/account resolution;
+- provider/parsing exceptions propagate unchanged;
+- if 131-N rejects the response, do not reacquire/retry.
+
+Observation/freshness authority:
+
+- 131-P reads the system clock exactly once, after the typed quote response has
+  returned, using UTC;
+- caller cannot inject or backdate `observed_at`;
+- 131-P does not inspect/select quote prices itself;
+- pass the typed response, exact required-symbol tuple, exact observed timestamp,
+  and exact max age to 131-N once;
+- 131-N remains sole mark-selection/quote-validity/freshness authority.
+
+Durable-account scope is read-only:
+
+- `store.reconstruct_ledger()` is permitted exactly once only to discover open
+  position symbols required for market-data coverage;
+- do not calculate account cash/equity/exposure;
+- do not invoke 131-K or `RiskManager`;
+- do not write the store or performance valuation.
+
+131-P has no `review_equity_order`, `get_equity_orders`, account resolution,
+paper intent, 131-J/131-L, order placement/cancel, performance write, filesystem,
+subprocess, environment/config, UUID generation, retry, polling, scheduler, or
+sleep authority.
+
+Source certification must use an in-memory/fake reviewed transport behind the
+real adapter object and make zero live Robinhood/MCP/OAuth requests. Any later
+real quote-read qualification is a separate protected effect requiring explicit
+authorization.
+
+Planned source-only checkpoint:
+
+```text
+arch131-robinhood-risk-price-acquisition
+preflight=None
+execute=None
+```
+
+The checkpoint follows 131-O in the side-foundation optimized batch. 131-Q later
+composes 131-M admission, 131-P acquisition, 131-O preview, explicit execution
+inputs, and the already accepted 131-L cycle into one supervised human-started
+operator flow.
 
 ## D10 disposition
 

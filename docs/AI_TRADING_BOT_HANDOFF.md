@@ -10830,3 +10830,68 @@ paper intent, provider review, fill, or durable mutation. Planned checkpoint:
 `arch131-robinhood-forward-paper-preview`, source-only with no
 preflight/execute surface.
 
+## 2026-10-03 — Architecture 131-O effect-free durable forward-paper risk preview FULLY ACCEPTED
+
+Architecture 131-O has passed exact GitHub source review, source-gate CI, and
+full broad local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   47e3d6341848265752501d8376caad38bd5acb0f
+TREE   04e5f54da0fbf03fdb1d5970777ca319c83be092
+PARENT 7c1c088123beedb4e1303245190fcc2ea7228983
+CI     #166 / 37155938112 SUCCESS
+```
+
+Accepted behavior:
+
+- delegates durable risk-context construction exactly once to 131-K;
+- forwards exactly the 131-N read-only price mapping and observation time;
+- constructs/evaluates `RiskManager` exactly once;
+- preserves exact proposal/snapshot/limits/context/decision objects;
+- exposes only deterministic marked current/projected position and exposure;
+- projections fail closed if manually constructed state would become negative;
+- projection arithmetic is independent of ambient Decimal precision/traps;
+- no independent ledger reconstruction or risk-rule implementation occurs;
+- no execution instruction, paper intent, provider review, fill, or durable write
+  is created;
+- `arch131-robinhood-forward-paper-preview` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-N.
+
+Full certification:
+
+```text
+11,226 cases
+11,209 passed
+17 skipped
+0 failed
+0 errors
+wall 497.582 s
+```
+
+Repository-wide Ruff check, format check, and Git diff check passed. Source
+HEAD/tree, feature remote, and develop identity remained unchanged; the side
+worktree/index remained clean.
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-81403e975caf4243ba9a7e6448b6ca51
+```
+
+No protected provider/brokerage effect occurred.
+
+### Next side milestone — Architecture 131-P
+
+Implement the frozen bounded read-only Robinhood risk-price acquisition boundary
+from Architecture 131. 131-P derives canonical required symbols from the durable
+paper positions plus proposal, performs exactly one accepted adapter
+`equity_quotes` read, records one UTC observation timestamp after the response,
+and delegates exactly once to 131-N. It has no review/order/account-resolution,
+risk, execution, write, retry, polling, or scheduler authority. Source
+certification uses a fake transport and performs zero live provider requests.
+Planned checkpoint: `arch131-robinhood-risk-price-acquisition`, source-only
+with no checkpoint preflight/execute surface.
+

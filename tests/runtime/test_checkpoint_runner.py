@@ -173,6 +173,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-session-admission",
         "arch131-robinhood-risk-price-snapshot",
         "arch131-robinhood-forward-paper-preview",
+        "arch131-robinhood-risk-price-acquisition",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -186,6 +187,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-session-admission",
                 "arch131-robinhood-risk-price-snapshot",
                 "arch131-robinhood-forward-paper-preview",
+                "arch131-robinhood-risk-price-acquisition",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2140,8 +2142,8 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            ("arch131-robinhood-forward-paper-preview\n          exit $LASTEXITCODE"),
-            ("arch131-robinhood-forward-paper-preview\n          exit 0"),
+            ("arch131-robinhood-risk-price-acquisition\n          exit $LASTEXITCODE"),
+            ("arch131-robinhood-risk-price-acquisition\n          exit 0"),
         ),
     ],
 )
@@ -2434,6 +2436,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-session-admission",
     "arch131-robinhood-risk-price-snapshot",
     "arch131-robinhood-forward-paper-preview",
+    "arch131-robinhood-risk-price-acquisition",
 )
 
 
@@ -4037,4 +4040,196 @@ def test_131o_authority_pins_composition_validation_and_projection(
     assert (
         "131-O forward-preview boundary drift"
         in runner._arch131_forward_paper_preview_authority_check(root)
+    )
+
+
+# 131-P pins the entire bounded module and its source-only side-branch registration.
+def test_131p_source_only_registration_and_batch():
+    name = "arch131-robinhood-risk-price-acquisition"
+    spec = runner._checkpoint_specs()[name]
+    assert spec.preflight is None and spec.execute is None
+    assert (
+        spec.authority_check is runner._arch131_risk_price_acquisition_authority_check
+    )
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        "tests/review_paper/test_risk_price_acquisition.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        "src/trading_bot/review_paper/risk_price_acquisition.py",
+        "tests/review_paper/test_risk_price_acquisition.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.CI_CHECKPOINTS.index(name) == (
+        runner.CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
+
+
+def _131p_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        "src/trading_bot/review_paper/risk_price_acquisition.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch131_risk_price_acquisition_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import socket",
+        "import subprocess",
+        "import os",
+        "from trading_bot.review_paper import ReviewPaperStore",
+        "from trading_bot.robinhood_mcp import RobinhoodMcpStreamableHttpTransport",
+        "from trading_bot.robinhood_paper_operator import run_robinhood_paper_operator",
+        "while True:\n    pass",
+        "open('paper.sqlite', 'w')",
+    ],
+)
+def test_131p_authority_rejects_effect_surface_drift(tmp_path, addition):
+    root = _131p_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/risk_price_acquisition.py"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "\n" + addition + "\n",
+        encoding="utf-8",
+    )
+    assert runner._arch131_risk_price_acquisition_authority_check(root)
+
+
+@pytest.mark.parametrize("capability", ["preflight", "execute"])
+def test_131p_authority_rejects_runtime_effect_registration(
+    tmp_path, monkeypatch, capability
+):
+    root = _131p_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-robinhood-risk-price-acquisition"
+    from dataclasses import replace
+
+    def forbidden():
+        raise AssertionError("effect capability invoked during source certification")
+
+    specs[name] = replace(specs[name], **{capability: forbidden})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-P checkpoint has host/effect capability" in (
+        runner._arch131_risk_price_acquisition_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("preflight=None", "preflight=_arch130_r8i_d1_preflight"),
+        ("execute=None", "execute=_r7_execute"),
+        ("ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH", "ARCH131_REVIEW_PAPER_REMOTE_BRANCH"),
+        ("*COMMON_TESTS,", ""),
+        ("*COMMON_RUFF_PATHS,", ""),
+        (
+            "tests/review_paper/test_risk_price_acquisition.py",
+            "tests/review_paper/test_models.py",
+        ),
+        (
+            "_arch131_risk_price_acquisition_authority_check",
+            "_arch131_review_paper_authority_check",
+        ),
+    ],
+)
+def test_131p_authority_rejects_registration_drift(tmp_path, old, new):
+    root = _131p_authority_copy(tmp_path)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    start = source.index(
+        '        "arch131-robinhood-risk-price-acquisition": CheckpointSpec('
+    )
+    end = source.index(
+        '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+    )
+    registration = source[start:end]
+    assert old in registration
+    source = source[:start] + registration.replace(old, new) + source[end:]
+    path.write_text(source, encoding="utf-8")
+    assert "131-P source-only checkpoint registration drift" in (
+        runner._arch131_risk_price_acquisition_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize("target", ["branch", "batch", "workflow", "source_missing"])
+def test_131p_authority_rejects_source_authority_drift(tmp_path, target):
+    root = _131p_authority_copy(tmp_path)
+    if target == "source_missing":
+        (root / "src/trading_bot/review_paper/risk_price_acquisition.py").unlink()
+    elif target == "workflow":
+        path = root / ".github/workflows/checkpoint-source-gates.yml"
+        path.write_text(path.read_text().replace("exit $LASTEXITCODE", "exit 0"))
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        source = path.read_text()
+        if target == "branch":
+            source = source.replace(
+                '"feature/robinhood-review-paper-side-foundation"',
+                '"feature/wrong-branch"',
+            )
+        else:
+            source = source.replace(
+                '    "arch131-robinhood-forward-paper-preview",\n'
+                '    "arch131-robinhood-risk-price-acquisition",',
+                '    "arch131-robinhood-risk-price-acquisition",\n'
+                '    "arch131-robinhood-forward-paper-preview",',
+            )
+        path.write_text(source, encoding="utf-8")
+    assert runner._arch131_risk_price_acquisition_authority_check(root)
+
+
+def test_131p_authority_rejects_runtime_remote_drift(tmp_path, monkeypatch):
+    from dataclasses import replace
+
+    root = _131p_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    name = "arch131-robinhood-risk-price-acquisition"
+    specs[name] = replace(specs[name], remote_branch="feature/wrong-branch")
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "131-P checkpoint remote branch drift" in (
+        runner._arch131_risk_price_acquisition_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("store.reconstruct_ledger()", "store.create_account_snapshot({})"),
+        (
+            "response = adapter.equity_quotes(required_symbols)",
+            "adapter.equity_quotes(required_symbols)\n"
+            "    response = adapter.equity_quotes(required_symbols)",
+        ),
+        ("datetime.now(UTC)", "datetime.now()"),
+        ("observed_at = datetime.now(UTC)", "observed_at = proposal.created_at"),
+        ("max_quote_age=max_quote_age,", "max_quote_age=timedelta(days=1),"),
+        ("return build_review_paper_risk_price_snapshot(", "return other_builder("),
+        ("key=str", "key=repr"),
+        ("len(required_symbols) > 20", "len(required_symbols) > 21"),
+        (
+            "type(store) is not ReviewPaperStore",
+            "not isinstance(store, ReviewPaperStore)",
+        ),
+    ],
+)
+def test_131p_authority_pins_complete_acquisition(tmp_path, before, after):
+    root = _131p_authority_copy(tmp_path)
+    path = root / "src/trading_bot/review_paper/risk_price_acquisition.py"
+    source = path.read_text(encoding="utf-8")
+    assert before in source
+    path.write_text(source.replace(before, after), encoding="utf-8")
+    assert "131-P risk-price acquisition boundary drift" in (
+        runner._arch131_risk_price_acquisition_authority_check(root)
     )

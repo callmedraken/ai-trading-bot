@@ -1394,6 +1394,114 @@ first live 131-L request remains protected and requires fresh explicit
 authorization. PREPARE and EXECUTE remain separate protected boundaries.
 Production/live real-money placement remains **NO-GO**.
 
+#### 131-U — source-owned PREPARE transport composition
+
+**Contract frozen.** 131-U removes the remaining ad-hoc transport/OAuth
+composition from the later protected 131-Q PREPARE qualification without
+granting PREPARE or EXECUTE authority.
+
+Frozen public surface:
+
+```text
+run_robinhood_published_session_prepare_qualification(
+    *,
+    session_date: date,
+    store: ReviewPaperStore,
+    proposal: TradeProposal,
+    opening_buffer: timedelta,
+    closing_buffer: timedelta,
+    max_quote_age: timedelta,
+    risk_limits: RiskLimits,
+    new_trading_enabled: bool,
+    expected_source_head: str,
+    expected_source_tree: str,
+    evidence_path: Path,
+    redirect_uri: str,
+) -> ReviewPaperSupervisedPreparation
+```
+
+Frozen composition:
+
+```text
+exact caller inputs
+-> create_windows_robinhood_oauth_factory(
+       redirect_uri=redirect_uri,
+       browser_opener=<source-owned fail-closed blocker>,
+   ) exactly once
+-> RobinhoodMcpStreamableHttpTransport(oauth_factory) exactly once
+-> RobinhoodReviewReadAdapter(transport) exactly once
+-> run_review_paper_published_session_prepare_qualification(
+       ... exact caller values ...,
+       adapter=exact constructed adapter,
+   ) exactly once
+-> return exact delegated ReviewPaperSupervisedPreparation
+```
+
+Construction of the OAuth factory, transport, and adapter must remain inert and
+must not read credentials, authenticate, open a browser/listener, or call a
+provider. The browser opener supplied by 131-U must fail closed. If the MCP SDK
+attempts interactive OAuth reauthorization during a later protected PREPARE,
+the attempt fails; 131-U never opens a browser or turns that failure into retry
+authority.
+
+Accepted existing boundaries retain authority:
+
+- 131-F owns Windows credential storage and loopback OAuth implementation;
+- direct MCP transport owns the fixed Robinhood endpoint and tool allowlist;
+- the adapter owns typed quote parsing;
+- 131-P owns the single bounded quote acquisition;
+- 131-T owns published-session resolution;
+- 131-R owns PREPARE evidence and durable before/after read-only fingerprints;
+- 131-Q PREPARE owns the supervised preparation state machine.
+
+131-U must not import, construct, or call:
+
+- account resolution or `get_accounts`;
+- `get_equity_orders`;
+- `review_equity_order`;
+- order placement/cancel/options/crypto mutation;
+- `execute_review_paper_supervised_cycle`;
+- `run_robinhood_forward_paper_cycle`;
+- 131-J/I/H operator/pipeline boundaries;
+- direct store mutation or performance valuation;
+- retry, polling, scheduler, sleep, unattended loops;
+- environment/config discovery for semantic inputs.
+
+All semantic inputs remain explicit. 131-U generates no proposal/order identity,
+does not derive a session date from the clock, and does not infer paths or
+redirect URIs.
+
+Source tests must prove:
+
+- exact constructor/delegate call count and object identity;
+- exact forwarding of every caller value;
+- exact delegated result identity;
+- construction is inert;
+- a fake PREPARE reaches only one `get_equity_quotes` call;
+- interactive browser-opening attempts fail closed;
+- no account/order-review/mutation/EXECUTE path is reachable;
+- delegate failure is propagated without retry;
+- no evidence retry or second provider call occurs;
+- source AST/import guards reject the forbidden capabilities above.
+
+Source-only checkpoint:
+
+```text
+arch131-robinhood-published-prepare-operator
+preflight=None
+execute=None
+```
+
+It follows `arch131-robinhood-published-session-prepare` in the optimized
+source-gate batch.
+
+Implementation and certification are effect-free: fake transport/OAuth only,
+focused tests, source-gate CI, exact GitHub review, then ROBINHOOD profile.
+A real invocation is still the separately protected 131-Q PREPARE boundary and
+requires fresh explicit user authorization after the first live 131-L
+qualification is independently accepted. PREPARE success never authorizes
+EXECUTE. Production/live real-money placement remains **NO-GO**.
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

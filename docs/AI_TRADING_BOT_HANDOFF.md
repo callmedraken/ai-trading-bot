@@ -11368,3 +11368,69 @@ paper mutation. A live 131-L qualification still requires fresh explicit
 authorization and must retain its one-shot/no-retry rules. 131-Q PREPARE then
 requires separate fresh authorization. `READY_TO_PROCEED` never authorizes
 EXECUTE, and production/live real-money placement remains **NO-GO**.
+
+## 2026-10-04 — Architecture 131-U source-owned PREPARE transport composition FROZEN
+
+131-U is an **optional safety/operability hardening** that may be implemented
+while the first live 131-L qualification waits for its protected market-session
+window. It is not a new prerequisite for 131-L and does not alter the protected
+131-L -> 131-Q PREPARE -> 131-Q EXECUTE sequence.
+
+Purpose:
+
+```text
+explicit 131-T / 131-R PREPARE inputs
++ explicit loopback redirect URI
+        ↓
+source-owned Windows OAuth factory with interactive browser opening forbidden
+        ↓
+RobinhoodMcpStreamableHttpTransport
+        ↓
+RobinhoodReviewReadAdapter
+        ↓
+accepted run_review_paper_published_session_prepare_qualification(...) exactly once
+        ↓
+exact ReviewPaperSupervisedPreparation
+```
+
+The frozen public boundary is
+`run_robinhood_published_session_prepare_qualification(...)`. It constructs the
+accepted Windows OAuth factory, direct allowlisted transport, and read adapter
+exactly once, then delegates exactly once to accepted 131-T. Composition itself
+must remain inert: constructing these objects performs no credential read,
+authentication, network request, or provider call.
+
+Interactive OAuth reauthorization is forbidden. The source-owned browser opener
+must fail closed if the SDK attempts an interactive redirect. Existing stored
+OAuth state and any SDK-supported non-interactive refresh remain owned by the
+accepted 131-F transport/storage boundary; 131-U must not inspect, serialize, or
+log credentials.
+
+131-U may reach a live provider only through the delegated PREPARE path, whose
+accepted 131-P behavior performs one bounded `get_equity_quotes` request for the
+required paper-risk symbols. 131-U must expose no account lookup,
+`get_equity_orders`, `review_equity_order`, place/cancel/options/crypto,
+131-Q EXECUTE, 131-L pipeline, retry, polling, scheduler, unattended operation,
+or automatic second attempt.
+
+Source implementation/certification uses fakes and performs **zero**
+Robinhood/MCP/OAuth/credential/provider effects and zero durable paper mutation.
+A later real invocation remains the separately protected 131-Q PREPARE
+authorization. `READY_TO_PROCEED` remains non-authorizing.
+
+Planned source-only checkpoint:
+
+```text
+arch131-robinhood-published-prepare-operator
+preflight=None
+execute=None
+```
+
+Register it immediately after
+`arch131-robinhood-published-session-prepare`. After exact GitHub source review,
+use the ROBINHOOD certification profile. FULL/LEGACY/EXHAUSTIVE are not required
+for this bounded current-product integration change.
+
+The current first live 131-L authorization is unaffected by 131-U and remains
+restricted to the already-frozen one-shot 2026-10-05 qualification window.
+Production/live real-money placement remains **NO-GO**.

@@ -687,6 +687,9 @@ def test_parser_defaults_to_full_and_rejects_unknown_profile() -> None:
         runner.select_inventory((), "unknown")
 
 
+_PUBLISHED_PREPARE_TEST = "tests/review_paper/test_published_session_prepare.py"
+
+
 def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     from scripts import checkpoint_runner
 
@@ -694,8 +697,9 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     repository = runner.discover_inventory(root)
     selected = runner.select_inventory(repository, "robinhood")
     assert runner.ROBINHOOD_REQUIRED_MODULES == _EXPECTED_ROBINHOOD
-    assert selected == _EXPECTED_ROBINHOOD
-    assert len(selected) == 40
+    assert len(runner.ROBINHOOD_REQUIRED_MODULES) == 40
+    assert selected == tuple(sorted((*_EXPECTED_ROBINHOOD, _PUBLISHED_PREPARE_TEST)))
+    assert len(selected) == 41
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -714,12 +718,15 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert runner.PROFILES == ("full", "robinhood", "legacy", "exhaustive")
-    assert profiles["full"] == _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
+    assert _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
+    assert len(runner.FULL_REQUIRED_MODULES) == 113
+    assert profiles["full"] == tuple(sorted((*_EXPECTED_FULL, _PUBLISHED_PREPARE_TEST)))
+    assert _PUBLISHED_PREPARE_TEST in profiles["robinhood"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 113,
-        "robinhood": 40,
+        "full": 114,
+        "robinhood": 41,
         "legacy": 204,
-        "exhaustive": 317,
+        "exhaustive": 318,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

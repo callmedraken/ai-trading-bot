@@ -104,11 +104,12 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-supervised-prepare-qualification",
     "arch131-robinhood-supervised-prepare-verifier",
     "arch131-nyse-published-regular-session-authority",
+    "arch131-robinhood-published-session-prepare",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 29 participants and their order,
+    # Freeze the executable batch command, all 30 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -804,7 +805,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -826,6 +827,113 @@ def _arch131_nyse_published_regular_session_authority_check(
             failures.append("131-S workflow invocation/order drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("131-S source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch131_published_session_prepare_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        path = repo_root / "src/trading_bot/review_paper/published_session_prepare.py"
+        text_value = path.read_text(encoding="utf-8")
+        # Pin the complete module, including every import, helper and call.
+        if (
+            hashlib.sha256(
+                ast.dump(ast.parse(text_value), include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "831c75256addd7a779a8f776c30c7ce9bbe2b16381f71231dbc71dfc9efde42a"
+        ):
+            failures.append("131-T published regular-session boundary drift")
+
+        verifier = (
+            repo_root / "src/trading_bot/robinhood_prepare_qualification_verifier.py"
+        ).read_text(encoding="utf-8")
+        if (
+            hashlib.sha256(
+                ast.dump(ast.parse(verifier), include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "c618e667286ff06fdda772ca78af29affb1b0cd9b9158c3267e42920b89d677a"
+        ):
+            failures.append("131-T canonical schedule verifier boundary drift")
+
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch131-robinhood-published-session-prepare"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "96c920b26ef94304732b07eaf4df2f7ff18dcac2a2ddd1cab7b4de6dd6d540b0"
+        ):
+            failures.append("131-T source-only checkpoint registration drift")
+
+        side_branch_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH"
+        ]
+        if (
+            len(side_branch_assignments) != 1
+            or ast.literal_eval(side_branch_assignments[0].value)
+            != "feature/robinhood-review-paper-side-foundation"
+        ):
+            failures.append("131-T remote branch authority drift")
+
+        ci_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(ci_assignments) != 1
+            or hashlib.sha256(
+                ast.dump(ci_assignments[0].value, include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("131-T checkpoint batch registration drift")
+
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("131-T checkpoint has host/effect capability")
+        if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
+            failures.append("131-T checkpoint remote branch drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority") + 1
+        ):
+            failures.append("131-T checkpoint ordering drift")
+
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("131-T workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("131-T source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -900,7 +1008,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -996,7 +1104,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -1092,7 +1200,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -1188,7 +1296,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -1284,7 +1392,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -1382,7 +1490,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append(
@@ -1429,7 +1537,7 @@ def _arch131_prepare_verifier_authority_check(
         actual_blob = hashlib.sha1(
             b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
         ).hexdigest()
-        if actual_blob != "320038c79686dde247e6ce14c388290ce0bf0937":
+        if actual_blob != "8636e91df74ce8153930817c471043fdb21737f9":
             failures.append("131-R PREPARE verifier boundary drift")
 
         runner_tree = ast.parse(
@@ -1487,7 +1595,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "49317f355f7ed10a4cbc194823e1e8f9677c159ce3ed0925f5f5240dda3e3ebb"
+            != "1528b78dd89d9d3303bd01c6dfbc987c6a65ebb005d0b9f758f1a51135494410"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append(
@@ -4345,6 +4453,30 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/review_paper/test_nyse_published_regular_sessions.py",
             ),
             authority_check=_arch131_nyse_published_regular_session_authority_check,
+            remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch131-robinhood-published-session-prepare": CheckpointSpec(
+            name="arch131-robinhood-published-session-prepare",
+            description=(
+                "Architecture 131-T explicit-date published-session PREPARE binding"
+            ),
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_published_session_prepare.py",
+                "tests/test_robinhood_prepare_qualification_verifier.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/published_session_prepare.py",
+                "tests/review_paper/test_published_session_prepare.py",
+                "src/trading_bot/robinhood_prepare_qualification_verifier.py",
+                "tests/test_robinhood_prepare_qualification_verifier.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            authority_check=_arch131_published_session_prepare_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
             preflight=None,
             execute=None,

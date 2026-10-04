@@ -99,7 +99,8 @@ jobs:
               arch131-robinhood-supervised-forward-paper `
               arch131-robinhood-supervised-prepare-qualification `
               arch131-robinhood-supervised-prepare-verifier `
-              arch131-nyse-published-regular-session-authority
+              arch131-nyse-published-regular-session-authority `
+              arch131-robinhood-published-session-prepare
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

@@ -16,6 +16,10 @@ from pathlib import Path
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
+from trading_bot.review_paper.nyse_published_regular_sessions import (
+    NYSEPublishedRegularSessionAuthority,
+)
+
 _SCHEMA = "arch131-q-prepare-qualification/v1"
 _EXCHANGE_TZ = ZoneInfo("America/New_York")
 _ADMISSION_FIELDS = {
@@ -293,6 +297,12 @@ def _verify(
     session_date = date.fromisoformat(schedule["session_date"])
     opens_at = _datetime(schedule["opens_at"])
     closes_at = _datetime(schedule["closes_at"])
+    canonical = NYSEPublishedRegularSessionAuthority().schedule_for(session_date)
+    _require(canonical is not None, "schedule must be a published NYSE session")
+    _require(
+        opens_at == canonical.opens_at and closes_at == canonical.closes_at,
+        "schedule differs from canonical published NYSE session",
+    )
     _require(
         opens_at < closes_at
         and opens_at.astimezone(_EXCHANGE_TZ).date() == session_date

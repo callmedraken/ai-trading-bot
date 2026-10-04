@@ -601,6 +601,7 @@ def test_structural_no_provider_store_risk_execution_capability():
         "pathlib",
         "uuid",
         "zoneinfo",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
     }
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):
@@ -653,3 +654,86 @@ def test_overlength_symbol_rejected(h):
     h.evidence["preparation"]["price_snapshot"]["marks"][0]["symbol"] = "ABCDEFGHIJK"
     with pytest.raises(ERROR, match="symbol"):
         _verify(h)
+
+
+# Self-consistent blocked evidence isolates schedule provenance from later checks.
+def _published_schedule_evidence(h, session_date, open_hour, close_hour):
+    opens = datetime.fromisoformat(session_date + "T00:00:00+00:00").replace(
+        hour=open_hour, minute=30
+    )
+    closes = opens.replace(hour=close_hour, minute=0)
+    schedule = dict(
+        session_date=session_date,
+        opens_at=opens.isoformat(),
+        closes_at=closes.isoformat(),
+    )
+    h.evidence["schedule"] = schedule
+    preparation = h.evidence["preparation"]
+    preparation.update(
+        status="SESSION_NOT_ADMITTED",
+        initial_admission={
+            **schedule,
+            "status": "BEFORE_REGULAR_WINDOW",
+            "as_of": (opens - timedelta(minutes=1)).isoformat(),
+            "admission_opens_at": (opens + timedelta(minutes=5)).isoformat(),
+            "admission_closes_at": (closes - timedelta(minutes=5)).isoformat(),
+        },
+        price_snapshot=None,
+        quote_admission=None,
+        risk_preview=None,
+        quote_valid_until=None,
+    )
+
+
+@pytest.mark.parametrize(
+    "session_date,open_hour,close_hour",
+    [
+        ("2026-01-05", 14, 21),
+        ("2026-07-06", 13, 20),
+        ("2026-11-27", 14, 18),
+    ],
+)
+def test_canonical_published_schedule_passes_readonly(
+    h, session_date, open_hour, close_hour, monkeypatch
+):
+    _published_schedule_evidence(h, session_date, open_hour, close_hour)
+    before = h.store.read_bytes()
+    authority = module.NYSEPublishedRegularSessionAuthority
+    original = authority.schedule_for
+    calls = []
+
+    def resolve(self, value):
+        calls.append(value)
+        return original(self, value)
+
+    monkeypatch.setattr(authority, "schedule_for", resolve)
+    assert _verify(h).preparation_status == "SESSION_NOT_ADMITTED"
+    assert [value.isoformat() for value in calls] == [session_date]
+    assert h.store.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "session_date,open_hour,close_hour",
+    [
+        ("2026-10-02", 14, 20),  # fabricated ordinary open
+        ("2026-10-02", 13, 21),  # fabricated ordinary close
+        ("2026-11-27", 14, 21),  # missing published early close
+        ("2026-10-02", 13, 17),  # invented early close
+        ("2026-10-03", 13, 20),  # weekend
+        ("2026-12-25", 14, 21),  # published holiday
+        ("2029-01-02", 14, 21),  # unsupported manifest year
+    ],
+)
+def test_schedule_provenance_rejects_before_store_read(
+    h, session_date, open_hour, close_hour, monkeypatch
+):
+    _published_schedule_evidence(h, session_date, open_hour, close_hour)
+
+    def forbidden_read(*args):
+        pytest.fail("invalid schedule must fail before durable read")
+
+    monkeypatch.setattr(module, "_read_current", forbidden_read)
+    before = h.store.read_bytes()
+    with pytest.raises(ERROR):
+        _verify(h)
+    assert h.store.read_bytes() == before

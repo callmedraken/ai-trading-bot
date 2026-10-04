@@ -725,8 +725,7 @@ paper mutation.
 
 ### 131-Q — two-phase supervised forward-paper operator composition
 
-Next side-foundation source milestone. 131-Q is the first coherent
-operator-facing composition: prepare one current-session risk preview using
+Accepted. 131-Q is the first coherent operator-facing composition: prepare one current-session risk preview using
 131-M/P/O, preserve the exact durable state that was reviewed, then require a
 separate explicit proceed call before invoking accepted 131-L exactly once.
 
@@ -872,7 +871,7 @@ Source certification uses doubles at 131-P and 131-L boundaries and performs zer
 live Robinhood/MCP/OAuth requests and zero durable paper writes. The source-only
 checkpoint does not itself expose preflight/execute callbacks.
 
-Planned checkpoint:
+Accepted source-only checkpoint:
 
 ```text
 arch131-robinhood-supervised-forward-paper
@@ -880,11 +879,59 @@ preflight=None
 execute=None
 ```
 
-The checkpoint follows 131-P in the side-foundation optimized batch. After
-source/broad certification, the next protected work is a bounded supervised
-qualification of the prepare path/read-only quote boundary and, separately,
-explicit authorization for a real 131-Q paper execution. Production/live real
-order placement remains NO-GO.
+The checkpoint follows 131-P in the side-foundation optimized batch.
+
+Accepted source and certification:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   577393185fa244f81a37d5b898454c883bcec6cf
+TREE   7ea902274d7f56abaf3ccc1d38a605193ea21a2d
+PARENT 63529780a14800fa0e909dd65bce22c9def5a12b
+CI     #170 / 37187325071 SUCCESS
+
+11,444 cases
+11,433 passed
+11 skipped
+0 failed
+0 errors
+wall 425.341 s
+```
+
+Evidence:
+
+```text
+F:\\AI\\temp\\pytest\\certification-evidence-e75178913a21469bbea2267da2dc35ad
+```
+
+Source/broad certification used doubles/fakes and performed zero live
+Robinhood/MCP/OAuth requests and zero durable paper writes.
+
+### Protected operational sequence after 131-Q source acceptance
+
+No further source milestone is required before bounded qualification of the
+accepted supervised flow. The protected sequence is intentionally split:
+
+1. complete the already-authorized first live 131-L qualification on the frozen
+   `feature/robinhood-review-paper-mode` branch and reconcile it with 131-LQ;
+2. separately authorize one bounded 131-Q PREPARE qualification on the accepted
+   side-foundation source, permitting only the existing read-only quote path and
+   no 131-L execution;
+3. after the prepare qualification is accepted, separately authorize one 131-Q
+   EXECUTE qualification, which may invoke accepted 131-L exactly once and may
+   create one synthetic paper fill if all current session/freshness/drift/risk
+   checks remain satisfied.
+
+A PREPARE qualification must stop after producing operator-visible preparation
+state. It must not use the fact that preparation returned READY_TO_PROCEED as
+implicit permission to execute. PREPARE and EXECUTE are distinct protected
+authorizations.
+
+Any real 131-Q qualification must preserve the accepted no-retry rule. Provider
+failure, stale quote, session expiry, drift, ambiguous review outcome, or any
+post-authorization failure does not create retry authority.
+
+Production/live real brokerage placement remains NO-GO.
 
 ## D10 disposition
 

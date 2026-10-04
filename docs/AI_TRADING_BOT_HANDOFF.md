@@ -10968,3 +10968,85 @@ authorized. Planned checkpoint:
 `arch131-robinhood-supervised-forward-paper`, source-only with no checkpoint
 preflight/execute surface.
 
+## 2026-10-04 — Architecture 131-Q two-phase supervised forward-paper composition FULLY ACCEPTED
+
+Architecture 131-Q has passed exact GitHub source review, source-gate CI, and
+full broad local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   577393185fa244f81a37d5b898454c883bcec6cf
+TREE   7ea902274d7f56abaf3ccc1d38a605193ea21a2d
+PARENT 63529780a14800fa0e909dd65bce22c9def5a12b
+CI     #170 / 37187325071 SUCCESS
+```
+
+Accepted behavior:
+
+- PREPARE and EXECUTE are distinct functions; PREPARE never invokes 131-L;
+- PREPARE performs one initial session admission, one 131-P acquisition, one
+  quote-time admission, one 131-O preview, and exact durable-history drift
+  guarding;
+- prepared quote validity is the earliest accepted mark deadline and expiry
+  requires a fresh human-reviewed preparation;
+- EXECUTE rechecks session admission, quote validity, exact 131-O risk/account
+  state, durable history, and instruction time before 131-L;
+- EXECUTE invokes accepted 131-L at most once and never reacquires/retries;
+- returned 131-L risk decision must match the pre-effect revalidation;
+- no direct MCP/SDK transport, OAuth/account resolution, direct adapter calls,
+  131-K/J/I/H calls, direct RiskManager, store mutation, retry, polling,
+  scheduler, sleep, or real brokerage placement authority was introduced;
+- `arch131-robinhood-supervised-forward-paper` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-P.
+
+Full certification:
+
+```text
+broad-1: 154 modules
+  5,540 passed, 1 skipped, 0 failed, 0 errors
+
+broad-2: 155 modules
+  4,967 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  11,444 cases
+  11,433 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 425.341 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-e75178913a21469bbea2267da2dc35ad
+```
+
+Source HEAD/tree, feature remote, and develop identity remained unchanged; the
+side worktree/index remained clean. Source certification performed zero live
+Robinhood/MCP/OAuth requests and zero protected paper effects.
+
+### Next protected operational sequence
+
+The side source progression 131-LQ through 131-Q is complete. Do not add another
+source milestone merely by habit.
+
+Proceed in this order:
+
+1. first live 131-L qualification on the frozen qualification branch — already
+   explicitly authorized once, but only within its reviewed one-shot command and
+   no-retry rules;
+2. bounded 131-Q PREPARE qualification — fresh explicit authorization required;
+   read-only quote acquisition only, no 131-L execution;
+3. bounded 131-Q EXECUTE qualification — separate fresh explicit authorization
+   required after PREPARE qualification acceptance.
+
+A successful READY_TO_PROCEED preparation is not execution authorization.
+Production/live real order placement remains NO-GO.
+

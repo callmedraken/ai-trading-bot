@@ -1304,127 +1304,51 @@ separate and unchanged; this closeout grants no new authority.
 
 #### 131-T — explicit-date published-session PREPARE binding
 
-**Contract frozen.** 131-T removes manual `ReviewPaperSessionSchedule`
-construction from the operator-facing supervised PREPARE/qualification path
-while preserving explicit, fail-closed temporal authority.
+**CERTIFIED.** 131-T removes manual `ReviewPaperSessionSchedule` construction
+from the supervised PREPARE/qualification path while preserving explicit,
+fail-closed temporal authority.
 
-Purpose:
+Accepted source identity:
+
+```text
+BRANCH  feature/robinhood-review-paper-side-foundation
+PARENT  460a2be87905f024022a8630a4575f1080a6ec7f
+HEAD    32c3bd41c6a48c24f7df5942eb082233a3624626
+TREE    a8a35bb503ba3eea71cc175c01e6edc21393639a
+CI      #182 / 37241669446 SUCCESS
+```
+
+Accepted composition:
 
 ```text
 explicit caller session_date
         ↓
-accepted 131-S NYSEPublishedRegularSessionAuthority
+accepted 131-S NYSEPublishedRegularSessionAuthority exactly once
         ↓
-canonical ReviewPaperSessionSchedule
+exact canonical ReviewPaperSessionSchedule
         ↓
-accepted 131-Q PREPARE / 131-R PREPARE qualification
+accepted 131-Q PREPARE / 131-R PREPARE qualification exactly once
 ```
 
-131-T does **not** decide what day it is. The caller must supply one exact
-`datetime.date`. A `datetime.datetime`, date subclass, string, integer, or
-other coercible value is rejected rather than normalized. 131-T must not read
-the system clock to derive `session_date`, inspect environment/config, use
-runtime web/calendar discovery, read a provider calendar, or infer an
-unsupported year.
+The caller still supplies one exact `datetime.date`; 131-T never derives today
+from the system clock, environment, provider, filesystem, or network. Unsupported
+years propagate the accepted 131-S unsupported-year error; weekends and
+published holidays fail as `ReviewPaperPublishedNonSessionDateError`. Invalid
+resolution occurs before provider, store, evidence, PREPARE, or qualification
+activity.
 
-Frozen public surface:
+The accepted wrappers preserve every non-schedule caller object/value exactly,
+preserve the exact 131-S schedule object, and return the exact delegate result.
+They add no EXECUTE/pipeline/order path, retry, polling, scheduler, provider
+calendar, direct transport, or added clock authority.
 
-```text
-ReviewPaperPublishedNonSessionDateError(ValueError)
+The provider-free PREPARE verifier now independently resolves the evidence
+`session_date` through accepted 131-S and requires exact canonical
+`opens_at`/`closes_at`. Unsupported years, weekends/holidays, ordinary-session
+time drift, and early-close drift fail before durable-store reconciliation. The
+existing `arch131-q-prepare-qualification/v1` evidence schema is unchanged.
 
-resolve_review_paper_published_session_schedule(
-    session_date: date,
-) -> ReviewPaperSessionSchedule
-
-prepare_review_paper_supervised_published_session(
-    *,
-    session_date: date,
-    store: ReviewPaperStore,
-    proposal: TradeProposal,
-    opening_buffer: timedelta,
-    closing_buffer: timedelta,
-    adapter: RobinhoodReviewReadAdapter,
-    max_quote_age: timedelta,
-    risk_limits: RiskLimits,
-    new_trading_enabled: bool,
-) -> ReviewPaperSupervisedPreparation
-
-run_review_paper_published_session_prepare_qualification(
-    *,
-    session_date: date,
-    store: ReviewPaperStore,
-    proposal: TradeProposal,
-    opening_buffer: timedelta,
-    closing_buffer: timedelta,
-    adapter: RobinhoodReviewReadAdapter,
-    max_quote_age: timedelta,
-    risk_limits: RiskLimits,
-    new_trading_enabled: bool,
-    expected_source_head: str,
-    expected_source_tree: str,
-    evidence_path: Path,
-) -> ReviewPaperSupervisedPreparation
-```
-
-Resolution contract:
-
-- use the accepted `NYSEPublishedRegularSessionAuthority`; do not duplicate its
-  holiday/early-close manifest;
-- invoke its `schedule_for(session_date)` boundary exactly once per wrapper
-  invocation;
-- propagate `UnsupportedNYSEPublishedSessionYearError` unchanged for a year
-  outside the frozen 2026-2028 authority;
-- if 131-S returns `None` for a weekend or published holiday, raise
-  `ReviewPaperPublishedNonSessionDateError`;
-- a failed resolution must occur before any provider call, durable-store read or
-  mutation, evidence-file creation, PREPARE call, or qualification call;
-- a successful resolution preserves the exact 131-S
-  `ReviewPaperSessionSchedule` object into the delegated accepted primitive.
-
-Composition contract:
-
-- `prepare_review_paper_supervised_published_session` resolves once and calls
-  accepted `prepare_review_paper_supervised_cycle` exactly once with the
-  resolved schedule and the exact caller objects/values;
-- `run_review_paper_published_session_prepare_qualification` resolves once and
-  calls accepted `run_review_paper_prepare_qualification` exactly once with
-  the resolved schedule and exact caller objects/values;
-- neither wrapper directly calls MCP/SDK transport, quote APIs, durable store
-  methods, risk evaluation, or EXECUTE;
-- existing schedule-taking 131-Q/131-R APIs remain unchanged for low-level
-  composition/tests; 131-T adds the safer published-session entry points rather
-  than silently changing their signatures;
-- the existing 131-Q `datetime.now(UTC)` admission read remains unchanged.
-  131-T introduces no additional clock read and never derives `session_date`
-  from that clock.
-
-Verifier hardening:
-
-- the provider-free `robinhood_prepare_qualification_verifier` must parse the
-  evidence `schedule.session_date`, resolve it through accepted 131-S, and
-  require a non-`None` schedule whose exact UTC `opens_at` and `closes_at`
-  equal the evidence schedule;
-- unsupported years, weekends/holidays, wrong normal-session times, wrong
-  early-close times, or any mismatch fail verification;
-- verifier resolution performs no provider/OAuth/network/system-clock access;
-- the existing `arch131-q-prepare-qualification/v1` evidence schema remains
-  unchanged. Source identity plus canonical verifier recomputation supplies the
-  schedule provenance; no duplicate manifest is serialized into evidence.
-
-Source/test boundary:
-
-- source-only tests use fakes/mocks around accepted 131-Q/131-R delegates;
-- prove normal session, DST season, and an explicit early-close session preserve
-  the exact accepted 131-S schedule;
-- prove weekend, published holiday, unsupported year, datetime/date-subclass,
-  and wrong verifier schedule fail before provider/effect boundaries;
-- prove each delegate is called exactly once on success and not called on
-  resolution failure;
-- prove no new EXECUTE/pipeline/order effect is reachable from 131-T;
-- preserve source AST guards against runtime web/network/environment/config,
-  subprocess, retry, polling, scheduler, sleep, and added clock authority.
-
-Planned source-only checkpoint:
+Accepted checkpoint:
 
 ```text
 arch131-robinhood-published-session-prepare
@@ -1432,30 +1356,43 @@ preflight=None
 execute=None
 ```
 
-Register it immediately after
-`arch131-nyse-published-regular-session-authority` in the optimized
-side-foundation source-gate batch.
+It is registered exactly once immediately after 131-S in the 30-participant
+source-gate batch.
 
-Certification policy for this milestone:
+Focused implementation verification passed 1,839 requested cases plus 2
+delegate-failure regressions. Final ROBINHOOD certification on the exact source
+tree passed 2,941/2,941 cases across 41 selected modules with zero skips,
+failures, or errors in 173.193 seconds.
+
+Evidence:
 
 ```text
-implementation: focused tests + scoped Ruff/diff checks
-push:          registered SOURCE-GATE CI
-acceptance:    exact GitHub commit/tree review
-certification: ROBINHOOD profile
+F:\AI\temp\pytest\certification-evidence-ec2be1768b7646eba09923bfba8bb98d
 ```
 
-FULL is not required merely for 131-T because this is a bounded current
-Robinhood integration change and the ROBINHOOD profile remains a strict subset
-of the already-certified supported FULL topology.
+Current profile discovery is FULL 114 / ROBINHOOD 41 / LEGACY 204 / EXHAUSTIVE
+318; the frozen 132-R1 minimum baselines remain 113/40.
 
-131-T grants no live provider qualification or execution authority. A real
-131-Q PREPARE qualification remains a separately protected read-only provider
-effect requiring fresh explicit authorization. 131-Q EXECUTE remains a separate
-fresh authorization boundary, and production/live real-money placement remains
-**NO-GO**.
+##### Next protected operational sequence
 
+No additional source milestone is required before qualification. Continue the
+already-frozen sequence:
 
+1. first live 131-L qualification on
+   `feature/robinhood-review-paper-mode`;
+2. separately authorize a bounded 131-Q PREPARE qualification using the accepted
+   131-T explicit-date schedule composition;
+3. after PREPARE evidence is independently accepted, separately authorize one
+   131-Q EXECUTE qualification.
+
+The current 131-L remote branch head
+`909d51ce0c8418295d52e050557e49cfe8d8ee41` is a one-commit docs-only
+descendant of accepted executable source
+`97ab6b89931c105726944dc9609a9e0de062bac6`; no executable file differs across
+that compare. Provider-free source/worktree readiness checks are safe, but the
+first live 131-L request remains protected and requires fresh explicit
+authorization. PREPARE and EXECUTE remain separate protected boundaries.
+Production/live real-money placement remains **NO-GO**.
 
 ## D10 disposition
 

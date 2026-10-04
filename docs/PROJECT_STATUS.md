@@ -11152,59 +11152,104 @@ accepted PREPARE. `READY_TO_PROCEED` is never execution authorization.
 test/workflow infrastructure only. The protected operational sequence remains
 separate and unchanged; this closeout grants no new authority.
 
-## 2026-10-04 — Architecture 131-T explicit-date published-session PREPARE binding FROZEN
+## 2026-10-04 — Architecture 131-T explicit-date published-session PREPARE binding CERTIFIED
 
-The next safe source milestone is **131-T**, a bounded composition layer that
-removes manual `ReviewPaperSessionSchedule` construction from the supervised
-PREPARE/qualification path without adding a new source of temporal authority.
+Architecture 131-T is **CERTIFIED** after exact GitHub source review, source-gate
+CI, focused implementation verification, and ROBINHOOD-profile certification.
 
-131-T keeps the target session date explicit. The caller supplies one exact
-`datetime.date`; 131-T must not derive "today" from the system clock,
-environment, provider, filesystem, or network. It resolves that date only
-through accepted `NYSEPublishedRegularSessionAuthority`. Unsupported years
-continue to fail closed; weekends/published holidays fail before provider,
-durable-store, or evidence activity.
-
-The frozen source surface is:
+Certified source identity:
 
 ```text
-resolve_review_paper_published_session_schedule(session_date: date)
-    -> ReviewPaperSessionSchedule
-
-prepare_review_paper_supervised_published_session(...)
-    -> ReviewPaperSupervisedPreparation
-
-run_review_paper_published_session_prepare_qualification(...)
-    -> ReviewPaperSupervisedPreparation
+BRANCH  feature/robinhood-review-paper-side-foundation
+PARENT  460a2be87905f024022a8630a4575f1080a6ec7f
+HEAD    32c3bd41c6a48c24f7df5942eb082233a3624626
+TREE    a8a35bb503ba3eea71cc175c01e6edc21393639a
+SUBJECT feat: bind published sessions into supervised prepare
+CI      #182 / 37241669446 SUCCESS
 ```
 
-The two wrappers take `session_date` instead of a caller-built schedule,
-resolve the accepted 131-S schedule exactly once, then delegate exactly once to
-the existing accepted 131-Q PREPARE or 131-R qualification primitive. Existing
-low-level schedule-taking APIs remain unchanged.
+Accepted behavior:
 
-The provider-free 131-R verifier must also recompute the canonical 131-S
-schedule from the evidence session date and require exact open/close equality,
-so a manually fabricated or stale schedule cannot qualify. The existing
-`arch131-q-prepare-qualification/v1` evidence schema remains unchanged.
+- explicit exact `datetime.date` remains the sole target-session input;
+- accepted 131-S schedule authority is resolved exactly once and its exact
+  `ReviewPaperSessionSchedule` is preserved into the existing 131-Q/131-R
+  delegate;
+- weekends, published holidays, unsupported years, datetime/date subclasses,
+  and other invalid inputs fail before PREPARE/provider/store/evidence effects;
+- the PREPARE wrapper and qualification wrapper each delegate exactly once and
+  add no retry, polling, scheduling, clock, provider-calendar, EXECUTE, or order
+  effect;
+- the provider-free 131-R verifier independently recomputes the canonical 131-S
+  schedule from evidence and rejects wrong opens/closes, including early-close
+  drift, before durable-store reconciliation;
+- the existing `arch131-q-prepare-qualification/v1` evidence schema remains
+  unchanged;
+- `arch131-robinhood-published-session-prepare` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-S in the
+  optimized source-gate batch.
 
-131-T adds no EXECUTE path, order placement/cancel authority, new provider
-operation, retry/polling/scheduler behavior, runtime calendar discovery, or new
-clock read. The already-accepted 131-Q PREPARE clock remains unchanged and is
-used only for admission against the resolved explicit-date schedule.
-
-Planned source-only checkpoint:
+Implementation verification:
 
 ```text
-arch131-robinhood-published-session-prepare
-preflight=None
-execute=None
+requested focused pytest modules: 1,839 passed
+additional delegate-failure regressions: 2 passed
+Ruff check: PASS
+Ruff format --check: PASS
+git diff --check: PASS
+git diff --cached --check: PASS
 ```
 
-After focused implementation and exact GitHub review, 131-T should use the
-ROBINHOOD certification profile, not FULL/LEGACY/EXHAUSTIVE. The profile has
-40 modules on the pre-131-T tree; newly added owned Robinhood tests are admitted
-automatically and may increase that count. Any real
-131-Q PREPARE qualification remains a separately protected read-only provider
-effect requiring fresh explicit authorization; EXECUTE remains separately
-protected and production/live real-money placement remains NO-GO.
+Final ROBINHOOD certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| robinhood-1 | 18 | 1,558 | 1,558 | 0 | 0 | 0 |
+| robinhood-2 | 23 | 1,383 | 1,383 | 0 | 0 | 0 |
+| Total | 41 | 2,941 | 2,941 | 0 | 0 | 0 |
+
+```text
+profile: robinhood
+wall: 173.193 s
+ARCH131_T_ROBINHOOD_CERTIFICATION_EXIT=0
+ARCH131_T_ROBINHOOD_CERTIFICATION=PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-ec2be1768b7646eba09923bfba8bb98d
+```
+
+The worktree/index remained clean after certification. The current discovered
+profile topology is now FULL 114 / ROBINHOOD 41 / LEGACY 204 / EXHAUSTIVE 318,
+while the Architecture 132-R1 frozen minimum baselines remain FULL 113 and
+ROBINHOOD 40. The new 131-T test module was admitted automatically through the
+reviewed ownership rules.
+
+### Next protected operational boundary
+
+Do **not** add another source milestone merely by habit. The accepted source is
+sufficient for the protected sequence already frozen by Architecture 131:
+
+1. first live 131-L qualification on
+   `feature/robinhood-review-paper-mode`;
+2. after that evidence is independently accepted, one bounded 131-Q PREPARE
+   qualification on the side-foundation source;
+3. only after PREPARE acceptance, one separately authorized 131-Q EXECUTE
+   qualification.
+
+The current remote 131-L branch head
+`909d51ce0c8418295d52e050557e49cfe8d8ee41` is exactly one docs-only descendant
+of accepted executable 131-L source
+`97ab6b89931c105726944dc9609a9e0de062bac6`; the compare contains only
+`PROJECT_STATUS.md`, `AI_TRADING_BOT_HANDOFF.md`, and Architecture 131 docs.
+This fact permits a provider-free readiness preflight but does **not** authorize
+a live Robinhood request.
+
+Because today is Sunday 2026-10-04, the next safe task is effect-free readiness
+only: prove the frozen 131-L worktree/branch/source ancestry and clean state,
+without OAuth credential access, MCP/provider calls, review requests, or durable
+paper mutation. A live 131-L qualification still requires fresh explicit
+authorization and must retain its one-shot/no-retry rules. 131-Q PREPARE then
+requires separate fresh authorization. `READY_TO_PROCEED` never authorizes
+EXECUTE, and production/live real-money placement remains **NO-GO**.

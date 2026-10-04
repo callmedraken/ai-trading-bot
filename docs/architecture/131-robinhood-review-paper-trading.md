@@ -1111,6 +1111,148 @@ effect requiring fresh explicit user authorization. 131-R source acceptance
 does not grant that authorization and does not grant 131-Q EXECUTE authority.
 
 
+#### 131-R accepted source/certification
+
+131-R is fully accepted after exact source review, one direct verifier hardening
+commit, source-gate CI, and broad local certification.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   15d69c5bc12803ce71f6f2bd5151f53bc2432f6d
+TREE   58de4e2e5c943c81cfa8179dd52b51620c86f490
+PARENT 32b15e714a5925bf1bd5844025d8c2ef50605c33
+CI     #174 / 37230454534 SUCCESS
+
+11,657 cases
+11,646 passed
+11 skipped
+0 failed
+0 errors
+wall 462.356 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c893b92f948b4495927699e109d3fc9a
+```
+
+Accepted verifier hardening additionally requires exact paper metadata
+(`schema_version=2`, matching starting cash, no unexpected metadata keys),
+independently recomputes session-admission status from each evidence timestamp,
+validates the schedule's America/New_York session date, and rejects a completed
+preview whose earliest accepted quote deadline predates its observation time.
+
+No live Robinhood/MCP/OAuth request, supervised EXECUTE, synthetic fill, or
+protected durable mutation occurred during source/broad certification.
+
+### 131-S — versioned NYSE regular-session schedule authority
+
+Next safe side milestone. 131-S removes the manually supplied intraday-schedule
+gap without adding provider or execution authority.
+
+The authority is deliberately bounded to the NYSE-published 2026-2028 equity
+calendar currently used for qualification/product development. It must not
+pretend to know unpublished future years or unscheduled emergency closures.
+
+Authoritative public sources frozen for this manifest:
+
+- NYSE Holidays & Trading Hours:
+  https://www.nyse.com/trade/hours-calendars
+- NYSE 2026 Yearly Trading Calendar:
+  https://www.nyse.com/publicdocs/nyse/ICE_NYSE_2026_Yearly_Trading_Calendar.pdf
+
+Source facts used by 131-S:
+
+- NYSE core equity trading session is 09:30-16:00 America/New_York;
+- published full-market holidays for 2026, 2027, and 2028 are explicit;
+- published early 13:00 closes are explicit and must not be inferred beyond the
+  manifest:
+  - 2026-11-27
+  - 2026-12-24
+  - 2027-11-26
+  - 2028-07-03
+  - 2028-11-24
+
+Frozen public surface:
+
+```text
+NYSEPublishedRegularSessionAuthority
+  .schedule_for(session_date: date)
+      -> ReviewPaperSessionSchedule | None
+```
+
+Input and range authority:
+
+- input must be exactly `datetime.date`, not `datetime.datetime`;
+- supported years are exactly 2026, 2027, 2028;
+- unsupported years fail closed with a dedicated error rather than extrapolating;
+- Saturday/Sunday returns `None`;
+- an explicit published full-market holiday returns `None`;
+- an ordinary supported weekday returns one exact regular-session schedule;
+- an explicit published early-close weekday returns one schedule closing 13:00
+  America/New_York;
+- all other supported sessions close 16:00 America/New_York;
+- all sessions open 09:30 America/New_York;
+- returned `ReviewPaperSessionSchedule` uses timezone-aware instants and relies
+  on `ZoneInfo("America/New_York")` for DST rather than fixed offsets.
+
+Frozen manifest identity:
+
+```text
+source_name = NYSE
+source_scope = NYSE core equity regular session
+manifest_version = nyse-published-regular-sessions-2026-2028/v1
+supported_years = (2026, 2027, 2028)
+source_as_of = 2026-10-04
+```
+
+The explicit full-market closure manifest is:
+
+```text
+2026:
+  01-01, 01-19, 02-16, 04-03, 05-25,
+  06-19, 07-03, 09-07, 11-26, 12-25
+
+2027:
+  01-01, 01-18, 02-15, 03-26, 05-31,
+  06-18, 07-05, 09-06, 11-25, 12-24
+
+2028:
+  01-17, 02-21, 04-14, 05-29, 06-19,
+  07-04, 09-04, 11-23, 12-25
+```
+
+Note that 2028-01-01 falls on Saturday and NYSE publishes no observed New Year's
+closure for that holiday; the authority must not manufacture one.
+
+131-S is static/versioned source authority only. It must perform no system-clock
+read, web/network access, filesystem access, Robinhood/MCP/OAuth call, store
+access, quote acquisition, risk evaluation, execution, environment/config read,
+subprocess, retry, polling, scheduler, or sleep.
+
+It must not modify `NYSEMarketCalendar`. That existing date-only calendar
+retains its historical 1998-2100 contract; 131-S is a separate bounded,
+published intraday authority intended to feed 131-M.
+
+A future manifest refresh is an explicit source change requiring review and
+certification. If NYSE changes a published holiday/early-close schedule, the
+checked-in manifest must be updated; runtime network discovery is intentionally
+out of scope.
+
+Planned source-only checkpoint:
+
+```text
+arch131-nyse-published-regular-session-authority
+preflight=None
+execute=None
+```
+
+Place it after the two 131-R checkpoints in the side-foundation optimized batch.
+
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

@@ -10967,3 +10967,67 @@ execute=None
 
 Production/live real brokerage placement remains NO-GO.
 
+## 2026-10-04 — Architecture 131-R PREPARE qualification tooling FULLY ACCEPTED
+
+Architecture 131-R has passed exact source review, source-gate CI, direct
+verifier hardening, and full broad local certification.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   15d69c5bc12803ce71f6f2bd5151f53bc2432f6d
+TREE   58de4e2e5c943c81cfa8179dd52b51620c86f490
+PARENT 32b15e714a5925bf1bd5844025d8c2ef50605c33
+CI     #174 / 37230454534 SUCCESS
+```
+
+Full certification:
+
+```text
+broad-1: 155 modules
+  5,771 passed, 1 skipped, 0 failed, 0 errors
+
+broad-2: 156 modules
+  4,949 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  11,657 cases
+  11,646 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 462.356 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-c893b92f948b4495927699e109d3fc9a
+```
+
+The accepted PREPARE harness remains EXECUTE-free and brackets one 131-Q
+PREPARE with exact read-only SQLite fingerprints. The accepted provider-free
+verifier independently reopens SQLite `mode=ro`, requires exact schema metadata,
+recomputes session status and quote deadlines, and proves
+`execute_invoked=false` / `pipeline_result_present=false`.
+
+No live Robinhood/MCP/OAuth request, supervised EXECUTE, synthetic paper fill,
+or protected durable mutation occurred.
+
+### Next safe side milestone — Architecture 131-S
+
+Implement the frozen versioned NYSE published regular-session authority from
+Architecture 131. 131-S supports only published 2026-2028 NYSE core-equity
+sessions, including explicit holidays and explicit 13:00 early closes, and
+returns the exact `ReviewPaperSessionSchedule` consumed by 131-M. It performs
+no runtime web/provider/clock/filesystem/risk/execution effect and does not
+change the existing historical date-only `NYSEMarketCalendar`.
+
+Planned checkpoint:
+`arch131-nyse-published-regular-session-authority`, source-only with
+`preflight=None` and `execute=None`.
+

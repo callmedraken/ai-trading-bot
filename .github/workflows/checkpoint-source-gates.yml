@@ -95,7 +95,8 @@ jobs:
               arch131-robinhood-session-admission `
               arch131-robinhood-risk-price-snapshot `
               arch131-robinhood-forward-paper-preview `
-              arch131-robinhood-risk-price-acquisition
+              arch131-robinhood-risk-price-acquisition `
+              arch131-robinhood-supervised-forward-paper
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

@@ -175,6 +175,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-forward-paper-preview",
         "arch131-robinhood-risk-price-acquisition",
         "arch131-robinhood-supervised-forward-paper",
+        "arch131-robinhood-supervised-prepare-qualification",
+        "arch131-robinhood-supervised-prepare-verifier",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -190,6 +192,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-robinhood-forward-paper-preview",
                 "arch131-robinhood-risk-price-acquisition",
                 "arch131-robinhood-supervised-forward-paper",
+                "arch131-robinhood-supervised-prepare-qualification",
+                "arch131-robinhood-supervised-prepare-verifier",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2145,10 +2149,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch131-robinhood-supervised-forward-paper\n"
+                "arch131-robinhood-supervised-prepare-verifier\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch131-robinhood-supervised-forward-paper\n          exit 0"),
+            ("arch131-robinhood-supervised-prepare-verifier\n          exit 0"),
         ),
     ],
 )
@@ -2443,6 +2447,8 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-forward-paper-preview",
     "arch131-robinhood-risk-price-acquisition",
     "arch131-robinhood-supervised-forward-paper",
+    "arch131-robinhood-supervised-prepare-qualification",
+    "arch131-robinhood-supervised-prepare-verifier",
 )
 
 
@@ -4467,3 +4473,198 @@ def test_131q_authority_pins_complete_composition(tmp_path, before, after):
     assert "131-Q supervised forward-paper boundary drift" in (
         runner._arch131_supervised_forward_paper_authority_check(root)
     )
+
+
+_R_PREPARE_BOUNDARIES = (
+    (
+        "arch131-robinhood-supervised-prepare-qualification",
+        "Architecture 131-R supervised PREPARE qualification harness",
+        "src/trading_bot/review_paper/prepare_qualification.py",
+        "tests/review_paper/test_prepare_qualification.py",
+        runner._arch131_prepare_qualification_authority_check,
+        "arch131-robinhood-supervised-forward-paper",
+    ),
+    (
+        "arch131-robinhood-supervised-prepare-verifier",
+        "Architecture 131-R read-only PREPARE qualification verifier",
+        "src/trading_bot/robinhood_prepare_qualification_verifier.py",
+        "tests/test_robinhood_prepare_qualification_verifier.py",
+        runner._arch131_prepare_verifier_authority_check,
+        "arch131-robinhood-supervised-prepare-qualification",
+    ),
+)
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+def test_131r_source_only_registration_and_batch(boundary):
+    name, description, source, test, authority, predecessor = boundary
+    spec = runner._checkpoint_specs()[name]
+    assert spec.description == description
+    assert spec.preflight is None and spec.execute is None
+    assert spec.authority_check is authority
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert spec.tests == (*runner.COMMON_TESTS, test)
+    assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, source, test)
+    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert (
+        runner.CI_CHECKPOINTS.index(name)
+        == runner.CI_CHECKPOINTS.index(predecessor) + 1
+    )
+    assert authority(Path(runner.__file__).resolve().parent.parent) == ()
+    assert len(runner.CI_CHECKPOINTS) == 28
+    assert runner.CI_CHECKPOINTS[-9:] == (
+        "arch131-robinhood-forward-paper-cycle",
+        "arch131-robinhood-live-qualification-verifier",
+        "arch131-robinhood-session-admission",
+        "arch131-robinhood-risk-price-snapshot",
+        "arch131-robinhood-forward-paper-preview",
+        "arch131-robinhood-risk-price-acquisition",
+        "arch131-robinhood-supervised-forward-paper",
+        "arch131-robinhood-supervised-prepare-qualification",
+        "arch131-robinhood-supervised-prepare-verifier",
+    )
+
+
+def _131r_copy(tmp_path, boundary):
+    repo = Path(runner.__file__).resolve().parent.parent
+    for relative in (
+        boundary[2],
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert boundary[4](tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import socket",
+        "import subprocess",
+        "import os",
+        "from trading_bot.review_paper.store import ReviewPaperStore",
+        "from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter",
+        "from trading_bot.risk.manager import RiskManager",
+        "from trading_bot.execution.models import ExecutionInstruction",
+        "from trading_bot.review_paper.supervised_forward_paper import "
+        "execute_review_paper_supervised_cycle",
+        "while True:\n    pass",
+        "open('paper.sqlite', 'w')",
+    ],
+)
+def test_131r_complete_module_pinned(tmp_path, boundary, addition):
+    root = _131r_copy(tmp_path, boundary)
+    path = root / boundary[2]
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert boundary[4](root)
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("preflight=None", "preflight=_r7_execute"),
+        ("execute=None", "execute=_r7_execute"),
+        ("ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH", "ARCH131_REVIEW_PAPER_REMOTE_BRANCH"),
+        ("*COMMON_TESTS,", ""),
+        ("*COMMON_RUFF_PATHS,", ""),
+        ("Architecture 131-R", "unreviewed"),
+    ],
+)
+def test_131r_exact_registration_pinned(tmp_path, boundary, old, new):
+    root = _131r_copy(tmp_path, boundary)
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text()
+    start = source.index(f'        "{boundary[0]}": CheckpointSpec(')
+    end = source.index("            execute=None,\n        ),", start) + len(
+        "            execute=None,\n        ),"
+    )
+    registration = source[start:end]
+    assert old in registration
+    path.write_text(
+        source[:start] + registration.replace(old, new) + source[end:], encoding="utf-8"
+    )
+    assert boundary[4](root)
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+@pytest.mark.parametrize("target", ["source_missing", "branch", "batch", "workflow"])
+def test_131r_source_authority_drift(tmp_path, boundary, target):
+    root = _131r_copy(tmp_path, boundary)
+    if target == "source_missing":
+        (root / boundary[2]).unlink()
+    elif target == "workflow":
+        path = root / ".github/workflows/checkpoint-source-gates.yml"
+        path.write_text(
+            path.read_text().replace("exit $LASTEXITCODE", "exit 0"), encoding="utf-8"
+        )
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        source = path.read_text()
+        if target == "branch":
+            source = source.replace(
+                '"feature/robinhood-review-paper-side-foundation"', '"feature/wrong"'
+            )
+        else:
+            source = source.replace(
+                f'    "{boundary[0]}",',
+                f'    "{boundary[0]}",\n    "{boundary[0]}",',
+                1,
+            )
+        path.write_text(source, encoding="utf-8")
+    assert boundary[4](root)
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("preflight", lambda: None),
+        ("execute", lambda: None),
+        ("remote_branch", "feature/wrong"),
+    ],
+)
+def test_131r_runtime_registration_drift(tmp_path, monkeypatch, boundary, field, value):
+    from dataclasses import replace
+
+    root = _131r_copy(tmp_path, boundary)
+    specs = runner._checkpoint_specs()
+    specs[boundary[0]] = replace(specs[boundary[0]], **{field: value})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert boundary[4](root)
+
+
+@pytest.mark.parametrize(
+    "index,old,new",
+    [
+        (0, "prepare_review_paper_supervised_cycle(", "other_prepare("),
+        (0, "after = _read_durable_snapshot(store.path)", "after = before"),
+        (0, "if before != after:", "if False:"),
+        (0, 'evidence_path.open("x"', 'evidence_path.open("w"'),
+        (0, "return preparation", "return None"),
+        (0, "SELECT * FROM review_fills", "SELECT paper_trade_id FROM review_fills"),
+        (0, "?mode=ro", "?mode=rw"),
+        (1, "?mode=ro", "?mode=rw"),
+        (1, "SELECT * FROM review_fills", "SELECT paper_trade_id FROM review_fills"),
+        (1, '"execute_invoked"] is False', '"execute_invoked"] == False'),
+        (
+            1,
+            "expected_deadline = min(source + age for source in source_times)",
+            "expected_deadline = observed + age",
+        ),
+    ],
+)
+def test_131r_critical_guards_pinned(tmp_path, index, old, new):
+    boundary = _R_PREPARE_BOUNDARIES[index]
+    root = _131r_copy(tmp_path, boundary)
+    path = root / boundary[2]
+    source = path.read_text()
+    assert old in source
+    path.write_text(source.replace(old, new), encoding="utf-8")
+    assert boundary[4](root)

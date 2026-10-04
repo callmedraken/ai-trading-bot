@@ -45,7 +45,7 @@ starting a new milestone or preparing a broad implementation plan.
 - Work on one focused feature or correction group at a time.
 - Create or update tests with every behavioral change.
 - Run focused tests while iterating.
-- Run the complete repository test suite when the task explicitly calls for final milestone/release certification, or when the change is the final tree for the current milestone.
+- Use the Architecture 132 certification tiers below. Full repository certification is intentionally retained, but is not mechanically required after every accepted source checkpoint or Architecture 131 letter.
 - Do not repeatedly rerun an expensive full suite after every intermediate correction when a narrower certification gate is defined.
 - Do not silently modify unrelated files.
 - Prefer small, reviewable changes.
@@ -56,6 +56,42 @@ starting a new milestone or preparing a broad implementation plan.
 - Avoid look-ahead bias in backtests.
 - Do not treat missing market data as zero.
 - Prefer clear and testable code over complicated abstractions.
+
+## Tiered certification policy
+
+Architecture 132 defines four source-verification levels and a separate protected
+authorization boundary. See `docs/architecture/132-tiered-certification-profiles.md`
+for the frozen ownership and 40-module Robinhood baseline.
+
+- **FOCUSED:** every implementation or correction; Codex runs affected tests and
+  focused checks.
+- **SOURCE-GATE CI:** every pushed registered checkpoint; retain the existing
+  registered GitHub source-gate batching.
+- **ROBINHOOD:** when ChatGPT declares a coherent Architecture 131 integration
+  boundary, before protected Robinhood qualification, and after material changes
+  to shared domain/execution/ledger/risk foundations used by Architecture 131.
+  `scripts/run_test_certification.py --profile robinhood` selects owned product
+  and direct shared-core modules in two nonempty balanced lanes. Missing frozen
+  required modules fail closed; new owned modules are admitted automatically.
+- **FULL:** after certification-topology changes; before major develop/release
+  integration or consequential production/live-readiness transitions; after
+  sufficiently broad shared-core changes; or when ChatGPT explicitly determines
+  accumulated checkpoints warrant repository-wide regression. `--profile full`
+  remains the default and retains all discovered modules, two broad lanes, and
+  the exact five-module serial safety lane. FULL is not mechanically tied to
+  every Architecture 131 letter/checkpoint.
+- **PROTECTED:** always separate fresh authorization; neither source profile
+  grants native Windows acceptance, provider/Robinhood/OAuth access, broker
+  effects, or production effects. Protected opt-ins remain rejected by both.
+
+Both certification profiles retain whole-repository Ruff check/format and
+`git diff --check`, exact source admission, JUnit/evidence validation, and the
+external temporary-root requirement. ChatGPT chooses the appropriate tier after
+exact GitHub code review and source acceptance; users normally run local
+certification. The normal handoff remains implementation + focused checks ->
+exact-file commit/push -> ChatGPT exact GitHub code review -> source acceptance
+-> appropriate certification tier -> docs closeout. Full certification remains
+available and required at its triggers, not after every source checkpoint.
 
 ## AI development workflow
 

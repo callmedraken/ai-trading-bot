@@ -1,4 +1,4 @@
-"""Run the reviewed two-broad-lane and serial-safety certification topology."""
+"""Run full or Robinhood source certification with reviewed explicit lanes."""
 
 import argparse
 import json
@@ -18,6 +18,63 @@ SERIAL_MODULES = (
     "tests/runtime/test_windows_authority.py",
     "tests/runtime/test_windows_effectful_capture_native_acceptance.py",
     "tests/acceptance/test_windows_authority_provisioning_acceptance.py",
+)
+PROFILES = ("full", "robinhood")
+ROBINHOOD_DIRECTORIES = (
+    "tests/domain",
+    "tests/execution",
+    "tests/ledger",
+    "tests/risk",
+    "tests/review_paper",
+    "tests/robinhood_mcp",
+)
+ROBINHOOD_INFRASTRUCTURE_MODULES = (
+    "tests/runtime/test_checkpoint_runner.py",
+    "tests/scripts/test_run_test_certification.py",
+)
+# Frozen Architecture 132 baseline at accepted HEAD:
+# 69327a7d5fbea7499329902ff96fd98e77a62591.
+ROBINHOOD_REQUIRED_MODULES = (
+    "tests/domain/test_market.py",
+    "tests/domain/test_orders.py",
+    "tests/domain/test_positions.py",
+    "tests/domain/test_proposals.py",
+    "tests/execution/test_execution_models.py",
+    "tests/execution/test_order_engine.py",
+    "tests/execution/test_paper_fill_application.py",
+    "tests/execution/test_paper_fills.py",
+    "tests/execution/test_paper_submission.py",
+    "tests/execution/test_portfolio_orders.py",
+    "tests/ledger/test_checkpoint_state.py",
+    "tests/ledger/test_initialization.py",
+    "tests/ledger/test_ledger.py",
+    "tests/ledger/test_models.py",
+    "tests/review_paper/test_forward_preview.py",
+    "tests/review_paper/test_intent_bridge.py",
+    "tests/review_paper/test_nyse_published_regular_sessions.py",
+    "tests/review_paper/test_performance.py",
+    "tests/review_paper/test_prepare_qualification.py",
+    "tests/review_paper/test_risk_context.py",
+    "tests/review_paper/test_risk_price_acquisition.py",
+    "tests/review_paper/test_risk_prices.py",
+    "tests/review_paper/test_session_admission.py",
+    "tests/review_paper/test_store.py",
+    "tests/review_paper/test_supervised_forward_paper.py",
+    "tests/risk/test_manager.py",
+    "tests/risk/test_orchestration.py",
+    "tests/risk/test_risk_models.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_windows_oauth.py",
+    "tests/runtime/test_checkpoint_runner.py",
+    "tests/scripts/test_run_test_certification.py",
+    "tests/test_robinhood_forward_paper_cycle.py",
+    "tests/test_robinhood_live_qualification_verifier.py",
+    "tests/test_robinhood_paper_cycle.py",
+    "tests/test_robinhood_paper_operator.py",
+    "tests/test_robinhood_paper_pipeline.py",
+    "tests/test_robinhood_prepare_qualification_verifier.py",
 )
 PROTECTED_OPT_INS = (
     "AI_TRADING_BOT_RUN_WINDOWS_AUTHORITY_ACCEPTANCE",
@@ -92,6 +149,50 @@ def validate_partitions(
         raise CertificationError(
             f"Incomplete partition: missing={missing}, extra={extra}"
         )
+
+
+def select_inventory(inventory: tuple[str, ...], profile: str) -> tuple[str, ...]:
+    """Select owned modules while failing closed on missing frozen coverage."""
+    if profile == "full":
+        return inventory
+    if profile != "robinhood":
+        raise CertificationError(f"Unknown certification profile: {profile}")
+    missing = set(ROBINHOOD_REQUIRED_MODULES) - set(inventory)
+    if missing:
+        raise CertificationError(
+            f"Missing required Robinhood modules: {sorted(missing)}"
+        )
+    return tuple(
+        module
+        for module in inventory
+        if (
+            Path(module).parent.as_posix() in ROBINHOOD_DIRECTORIES
+            or (
+                Path(module).parent.as_posix() == "tests"
+                and Path(module).match("test_robinhood_*.py")
+            )
+            or module in ROBINHOOD_INFRASTRUCTURE_MODULES
+        )
+    )
+
+
+def build_lanes(
+    root: Path, inventory: tuple[str, ...], profile: str
+) -> dict[str, tuple[str, ...]]:
+    """Partition the selected inventory into the profile's exact nonempty lanes."""
+    if profile == "full":
+        broad, serial = separate_serial(inventory, SERIAL_MODULES)
+        first, second = balance_broad(root, broad)
+        lanes = {"broad-1": first, "broad-2": second, "serial": serial}
+    elif profile == "robinhood":
+        first, second = balance_broad(root, inventory)
+        lanes = {"robinhood-1": first, "robinhood-2": second}
+    else:
+        raise CertificationError(f"Unknown certification profile: {profile}")
+    validate_partitions(inventory, tuple(lanes.values()))
+    if any(not modules for modules in lanes.values()):
+        raise CertificationError("Every certification lane must contain test modules")
+    return lanes
 
 
 def _git(root: Path, *arguments: str) -> str:
@@ -290,7 +391,9 @@ def _save(path: Path, value: dict[str, Any]) -> None:
 def run_children(
     args: argparse.Namespace, lanes: dict[str, tuple[str, ...]], evidence_dir: Path
 ) -> dict[str, dict[str, Any]]:
-    """Start all three pytest processes before waiting for any of them."""
+    """Start all selected pytest lanes before waiting for any of them."""
+    if not lanes or any(not modules for modules in lanes.values()):
+        raise CertificationError("Every certification lane must contain test modules")
     started: dict[str, tuple[subprocess.Popen[bytes], float]] = {}
     streams: list[Any] = []
     results: dict[str, dict[str, Any]] = {}
@@ -404,6 +507,7 @@ def run_static_checks(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", choices=PROFILES, default="full")
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--expected-head", required=True)
@@ -437,13 +541,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     identity = verify_source(args)
     if not args.plan and args.temp_root.resolve() != DEFAULT_TEMP_ROOT.resolve():
         raise CertificationError(f"Pytest basetemp root must be {DEFAULT_TEMP_ROOT}")
-    inventory = discover_inventory(args.root)
-    broad, serial = separate_serial(inventory, SERIAL_MODULES)
-    broad1, broad2 = balance_broad(args.root, broad)
-    lanes = {"broad-1": broad1, "broad-2": broad2, "serial": serial}
-    validate_partitions(inventory, tuple(lanes.values()))
-    if not broad1 or not broad2:
-        raise CertificationError("Both broad lanes must contain test modules")
+    profile = getattr(args, "profile", "full")
+    repository_inventory = discover_inventory(args.root)
+    inventory = select_inventory(repository_inventory, profile)
+    lanes = build_lanes(args.root, inventory, profile)
+    serial = lanes.get("serial", ())
+    broad = tuple(module for module in inventory if module not in set(serial))
+    excluded = tuple(
+        module for module in repository_inventory if module not in set(inventory)
+    )
     evidence_dir = (
         args.evidence_dir
         or args.temp_root / f"certification-evidence-{uuid.uuid4().hex}"
@@ -457,10 +563,20 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     summary = make_summary(
         identity, lanes, dry_run=args.plan, evidence_dir=evidence_dir
     )
+    summary.update(
+        profile=profile,
+        repository_inventory=list(repository_inventory),
+        selected_inventory=list(inventory),
+        excluded_inventory=list(excluded),
+    )
     _save(
         evidence_dir / "inventory.json",
         {
-            "all": list(inventory),
+            "profile": profile,
+            "all": list(repository_inventory),
+            "repository": list(repository_inventory),
+            "selected": list(inventory),
+            "excluded": list(excluded),
             "broad": list(broad),
             "serial": list(serial),
             "lanes": {name: list(modules) for name, modules in lanes.items()},
@@ -476,11 +592,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             summary["post_test_source"] = verify_source(args)
         except CertificationError as error:
             summary["source_error"] = str(error)
-        if (
-            not summary.get("source_error")
-            and all("error" not in child for child in summary["children"].values())
-            and len(summary["children"]) == 3
-        ):
+        children_passed = set(summary["children"]) == set(lanes) and all(
+            "error" not in child and child.get("exit_code") == 0
+            for child in summary["children"].values()
+        )
+        if not summary.get("source_error") and children_passed:
             summary["static_checks"] = run_static_checks(args, evidence_dir)
         else:
             summary["static_checks"] = {}
@@ -497,8 +613,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "passed"
             if (
                 not summary.get("source_error")
-                and len(summary["children"]) == 3
-                and all("error" not in child for child in summary["children"].values())
+                and children_passed
                 and len(summary["static_checks"]) == 3
                 and all(
                     check.get("exit_code") == 0
@@ -519,7 +634,7 @@ def main() -> int:
     except (CertificationError, OSError) as error:
         print(f"Certification STOP: {error}", file=sys.stderr)
         return 1
-    print(f"Status: {summary['status']}")
+    print(f"Status: {summary['status']}; profile: {summary['profile']}")
     print(f"HEAD: {summary['source']['head']}; tree: {summary['source']['tree']}")
     for name, lane in summary["lanes"].items():
         child = summary.get("children", {}).get(name, {})

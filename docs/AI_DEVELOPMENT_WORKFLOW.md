@@ -173,8 +173,8 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> isolated feature branch is ordinary-pushed when authorized
 -> exact remote branch HEAD/tree are verified
 -> ChatGPT reviews the exact GitHub commit/diff
--> user runs broader/full local certification only when ChatGPT says the
-   reviewed source has reached the final certification gate
+-> ChatGPT accepts the reviewed source checkpoint
+-> user runs the appropriate certification tier when ChatGPT declares its gate
 -> ChatGPT accepts/rejects certification
 -> ChatGPT reviews/updates PROJECT_STATUS + HANDOFF
 -> ChatGPT automatically provides and, when safe, advances into the next
@@ -265,20 +265,47 @@ During iteration:
 - if a broad local run fails, diagnose the affected area and rerun only focused
   tests after the bounded fix.
 
-At the final source-certification boundary:
+Architecture 132 freezes four source-verification levels plus a separate
+protected authorization boundary:
 
-- ChatGPT supplies the exact local commands;
-- the user runs the broad/full suite once, plus required lint/format/diff and
-  frozen-artifact identity checks;
-- do not request broad/full certification until exact remote/PR review has established that the current executable/source tree is intended to be final; review-driven source corrections return to focused verification first;
-- if the environment invalidates the run, repair the environment first and do
-  not treat the resulting cascade as a source defect;
-- after a clean certification, do not rerun the full suite unless source code
-  changes.
+| Level | Trigger and responsibility |
+| --- | --- |
+| FOCUSED | Every implementation/correction; Codex runs affected tests and focused checks. |
+| SOURCE-GATE CI | Every pushed registered checkpoint; existing registered GitHub source-gate batching remains accepted. |
+| ROBINHOOD | ChatGPT-declared coherent Architecture 131 integration boundary; before protected Robinhood qualification; after material changes to shared domain/execution/ledger/risk foundations used by Architecture 131. |
+| FULL | After certification-topology changes; before major develop/release integration; before consequential production/live-readiness transitions; after sufficiently broad shared-core changes; or when ChatGPT explicitly determines accumulated checkpoints warrant repository-wide regression. |
+| PROTECTED | Always separate fresh authorization at the exact effect boundary. |
 
-The accepted complete-certification topology uses three concurrent, explicit
-pytest processes: two file-level broad lanes and one serial safety lane. The
-five current serial modules are a conservative safety boundary:
+Full repository certification is intentionally retained, but is not required
+after every accepted source checkpoint. FULL is not mechanically tied to every
+Architecture 131 letter/checkpoint. ChatGPT chooses the appropriate tier after
+exact GitHub code review and source acceptance. The normal handoff remains:
+
+```text
+implementation + focused checks
+-> exact-file commit/push
+-> ChatGPT exact GitHub code review
+-> source acceptance
+-> appropriate certification tier
+-> docs closeout (PROJECT_STATUS + HANDOFF)
+```
+
+At a declared certification boundary:
+
+- ChatGPT supplies exact local commands and frozen source identities;
+- the user runs the selected profile and required source/artifact checks;
+- review-driven source corrections return to focused verification first;
+- if the environment invalidates the run, repair it before interpreting failures
+  as source defects;
+- after clean certification, do not repeat it without a new source change or
+  explicit gate decision;
+- a merge needs no second complete run when its resulting tree exactly equals
+  the already-certified tree.
+
+`scripts/run_test_certification.py --profile full` remains the default, including
+when `--profile` is omitted. It discovers every `tests/**/test_*.py` module and
+uses two deterministic balanced broad lanes plus the exact five-module serial
+safety lane:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py
@@ -289,13 +316,31 @@ tests/acceptance/test_windows_authority_provisioning_acceptance.py
 ```
 
 Architecture-77 remains serial; unrestricted parallel safety has not been
-established. `scripts/run_test_certification.py` admits an exact clean source
-identity, proves full module coverage and disjoint partitions, saves the plan,
-and runs the lanes with separate temporary directories and evidence. Use its
-`--plan` mode to inspect a clean checkout without launching pytest. During
-iteration, run only focused verification; complete certification follows exact
-GitHub/PR review when the source tree is intended final. A merge needs no
-second complete run when its resulting tree exactly equals the certified tree.
+established. `--profile robinhood` instead owns the domain, execution, ledger,
+risk, review_paper, and robinhood_mcp test directories; root
+`tests/test_robinhood_*.py`; and exactly the checkpoint-runner and
+certification-runner infrastructure modules. Its frozen current baseline is 40
+modules, listed in [Architecture 132](architecture/132-tiered-certification-profiles.md).
+New owned files are automatically selected; missing/renamed baseline modules
+fail closed. Robinhood uses exactly `robinhood-1` and `robinhood-2`, two nonempty
+balanced file lanes, with no historical Windows/D10 serial lane. Unrelated GUI,
+CLI, backtesting/research, market-data/Alpaca, personal-desktop/D10, and Windows
+production-authority families are excluded.
+
+Both profiles admit the same exact clean source identity, reject protected
+opt-ins, use the same external temp-root and JUnit/evidence validation, and run
+whole-repository `ruff check --no-cache .`, `ruff format --check --no-cache .`,
+and `git diff --check` after successful tests. Evidence identifies the profile,
+full repository inventory, selected modules, exclusions, and exact lane set;
+`inventory.json` retains `all` as the full repository inventory. `--plan` saves
+topology/evidence without launching pytest for either profile. Never launch
+pytest with an empty module list.
+
+Neither source profile authorizes native Windows acceptance opt-ins, provider
+access, Robinhood calls, OAuth interaction, broker effects, or production
+effects. PROTECTED gates remain separate and always need fresh authorization.
+The current topology change itself triggers FULL certification after source
+review; implementation runs only the requested focused checks.
 
 ### Local Git compatibility rule
 

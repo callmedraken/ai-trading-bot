@@ -1,6 +1,7 @@
 """Focused contract tests for the persistent certification runner."""
 
 import argparse
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -123,10 +124,11 @@ def test_subprocess_failure_propagates(
     assert "error" in result["broad-1"]
 
 
+@pytest.mark.parametrize("profile", runner.PROFILES)
 def test_plan_never_launches_pytest_and_saves_summary(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
-    modules = _inventory(tmp_path)
+    modules = _profile_inventory(tmp_path, profile)
     monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
     monkeypatch.setattr(
         runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
@@ -140,14 +142,31 @@ def test_plan_never_launches_pytest_and_saves_summary(
         expected_feature_ref=None,
         expected_feature_head=None,
         timeout_seconds=1,
-        evidence_dir=tmp_path.parent / "plan-evidence",
+        evidence_dir=tmp_path.parent / f"{tmp_path.name}-plan-evidence",
         temp_root=tmp_path,
+        profile=profile,
         plan=True,
     )
     result = runner.run(args)
     assert result["status"] == "planned"
-    assert len(result["inventory"]) == len(modules)
-    assert result["lanes"]["serial"]["module_count"] == 1
+    assert result["profile"] == profile
+    assert result["repository_inventory"] == list(runner.discover_inventory(tmp_path))
+    assert result["selected_inventory"] == result["inventory"] == sorted(modules)
+    evidence = json.loads((args.evidence_dir / "inventory.json").read_text())
+    assert evidence["profile"] == profile
+    assert evidence["all"] == evidence["repository"] == result["repository_inventory"]
+    assert evidence["selected"] == result["selected_inventory"]
+    assert evidence["excluded"] == result["excluded_inventory"]
+    assert set(evidence["selected"]) | set(evidence["excluded"]) == set(evidence["all"])
+    assert set(evidence["selected"]).isdisjoint(evidence["excluded"])
+    if profile == "full":
+        assert evidence["all"] == evidence["selected"]
+        assert evidence["excluded"] == []
+        assert result["lanes"]["serial"]["module_count"] == 1
+    else:
+        assert evidence["excluded"] == ["tests/gui/test_unrelated.py"]
+        assert set(result["lanes"]) == {"robinhood-1", "robinhood-2"}
+        assert evidence["serial"] == []
     assert (args.evidence_dir / "results.json").is_file()
     assert (args.evidence_dir / "inventory.json").is_file()
 
@@ -376,10 +395,11 @@ def test_live_origin_query_failure_is_rejected(
         runner._resolve_live_origin_branch_sha(tmp_path, "origin/develop")
 
 
+@pytest.mark.parametrize("profile", runner.PROFILES)
 def test_final_source_verification_repeats_live_origin_proof(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
-    _inventory(tmp_path)
+    _profile_inventory(tmp_path, profile)
     monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
     monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path / "temp")
     args = _source_args(
@@ -398,9 +418,7 @@ def test_final_source_verification_repeats_live_origin_proof(
     monkeypatch.setattr(
         runner,
         "run_children",
-        lambda *args: {
-            name: {"exit_code": 0} for name in ("broad-1", "broad-2", "serial")
-        },
+        lambda *args: {name: {"exit_code": 0} for name in _lane_names(profile)},
     )
     monkeypatch.setattr(
         runner,
@@ -416,6 +434,7 @@ def test_final_source_verification_repeats_live_origin_proof(
     args.timeout_seconds = 1
     args.evidence_dir = tmp_path.parent / f"{tmp_path.name}-final-proof"
     args.plan = False
+    args.profile = profile
 
     summary = runner.run(args)
 
@@ -473,4 +492,316 @@ def test_feature_ref_must_name_origin(tmp_path: Path) -> None:
         timeout_seconds=1,
     )
     with pytest.raises(runner.CertificationError, match="origin tracking ref"):
+        runner.run(args)
+
+
+# Independent frozen baseline, so editing the production allowlist cannot silently
+# reduce accepted Architecture 131 coverage.
+_BASELINE_FAMILIES = {
+    "domain": "market orders positions proposals",
+    "execution": (
+        "execution_models order_engine paper_fill_application paper_fills "
+        "paper_submission portfolio_orders"
+    ),
+    "ledger": "checkpoint_state initialization ledger models",
+    "risk": "manager orchestration risk_models",
+    "review_paper": (
+        "forward_preview intent_bridge nyse_published_regular_sessions performance "
+        "prepare_qualification risk_context risk_price_acquisition risk_prices "
+        "session_admission store supervised_forward_paper"
+    ),
+    "robinhood_mcp": "account_resolution adapter sdk_transport windows_oauth",
+    "runtime": "checkpoint_runner",
+    "scripts": "run_test_certification",
+}
+_BASELINE_ROOT = (
+    "forward_paper_cycle live_qualification_verifier paper_cycle paper_operator "
+    "paper_pipeline prepare_qualification_verifier"
+)
+_EXPECTED_ROBINHOOD = tuple(
+    sorted(
+        [
+            f"tests/{family}/test_{name}.py"
+            for family, names in _BASELINE_FAMILIES.items()
+            for name in names.split()
+        ]
+        + [f"tests/test_robinhood_{name}.py" for name in _BASELINE_ROOT.split()]
+    )
+)
+
+
+def _lane_names(profile: str) -> tuple[str, ...]:
+    return (
+        ("broad-1", "broad-2", "serial")
+        if profile == "full"
+        else ("robinhood-1", "robinhood-2")
+    )
+
+
+def _profile_inventory(root: Path, profile: str) -> tuple[str, ...]:
+    if profile == "full":
+        return _inventory(root)
+    for index, module in enumerate(_EXPECTED_ROBINHOOD):
+        path = root / module
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x" * (index + 1))
+    excluded = root / "tests/gui/test_unrelated.py"
+    excluded.parent.mkdir(parents=True)
+    excluded.write_text("", encoding="utf-8")
+    return _EXPECTED_ROBINHOOD
+
+
+def _parser_arguments() -> list[str]:
+    return [
+        "--root",
+        ".",
+        "--python",
+        "python",
+        "--expected-head",
+        "h",
+        "--expected-tree",
+        "t",
+        "--expected-base-head",
+        "b",
+    ]
+
+
+def test_parser_defaults_to_full_and_rejects_unknown_profile() -> None:
+    parser = runner.build_parser()
+    assert parser.parse_args(_parser_arguments()).profile == "full"
+    for profile in runner.PROFILES:
+        assert (
+            parser.parse_args(_parser_arguments() + ["--profile", profile]).profile
+            == profile
+        )
+    with pytest.raises(SystemExit) as error:
+        parser.parse_args(_parser_arguments() + ["--profile", "unknown"])
+    assert error.value.code == 2
+    with pytest.raises(runner.CertificationError, match="Unknown"):
+        runner.select_inventory((), "unknown")
+
+
+def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
+    from scripts import checkpoint_runner
+
+    root = Path(__file__).resolve().parents[2]
+    repository = runner.discover_inventory(root)
+    selected = runner.select_inventory(repository, "robinhood")
+    assert runner.ROBINHOOD_REQUIRED_MODULES == _EXPECTED_ROBINHOOD
+    assert selected == _EXPECTED_ROBINHOOD
+    assert len(selected) == 40
+    registered = {
+        module
+        for name, spec in checkpoint_runner._checkpoint_specs().items()
+        if name.startswith("arch131-")
+        for module in spec.tests
+    }
+    assert registered <= set(selected)
+    assert not set(runner.SERIAL_MODULES) & set(selected)
+
+
+def test_full_retains_repository_inventory_and_exact_serial_allowlist() -> None:
+    root = Path(__file__).resolve().parents[2]
+    inventory = runner.discover_inventory(root)
+    assert runner.select_inventory(inventory, "full") == inventory
+    assert runner.SERIAL_MODULES == (
+        "tests/runtime/test_windows_transactional_capture_authority.py",
+        "tests/runtime/test_windows_authority_schema.py",
+        "tests/runtime/test_windows_authority.py",
+        "tests/runtime/test_windows_effectful_capture_native_acceptance.py",
+        "tests/acceptance/test_windows_authority_provisioning_acceptance.py",
+    )
+    broad, serial = runner.separate_serial(inventory)
+    lanes = runner.build_lanes(root, inventory, "full")
+    assert tuple(lanes) == _lane_names("full")
+    assert lanes["serial"] == serial == runner.SERIAL_MODULES
+    assert (lanes["broad-1"], lanes["broad-2"]) == runner.balance_broad(root, broad)
+    runner.validate_partitions(inventory, tuple(lanes.values()))
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        *(f"{directory}/test_new.py" for directory in runner.ROBINHOOD_DIRECTORIES),
+        "tests/test_robinhood_new.py",
+    ],
+)
+def test_new_owned_modules_are_automatically_admitted(module: str) -> None:
+    inventory = tuple(sorted((*_EXPECTED_ROBINHOOD, module)))
+    assert runner.select_inventory(inventory, "robinhood") == inventory
+
+
+@pytest.mark.parametrize("missing", _EXPECTED_ROBINHOOD)
+@pytest.mark.parametrize("rename", [False, True])
+def test_missing_or_renamed_required_module_fails_closed(
+    missing: str, rename: bool
+) -> None:
+    inventory = tuple(module for module in _EXPECTED_ROBINHOOD if module != missing)
+    if rename:
+        inventory += (missing.replace(".py", "_renamed.py"),)
+    with pytest.raises(runner.CertificationError, match="Missing required Robinhood"):
+        runner.select_inventory(inventory, "robinhood")
+
+
+def test_unrelated_families_are_excluded() -> None:
+    excluded = (
+        "tests/gui/test_window.py",
+        "tests/cli/test_cli.py",
+        "tests/runtime/test_d10_arch128_r4_windows.py",
+        "tests/runtime/test_personal_desktop_paper_account_authority.py",
+        "tests/backtesting/test_backtest.py",
+        "tests/market_data/test_alpaca.py",
+        "tests/scripts/test_run_backtest.py",
+        "tests/test_unrelated.py",
+        *runner.SERIAL_MODULES,
+    )
+    assert (
+        runner.select_inventory(
+            tuple(sorted((*_EXPECTED_ROBINHOOD, *excluded))), "robinhood"
+        )
+        == _EXPECTED_ROBINHOOD
+    )
+
+
+def test_robinhood_has_two_deterministic_balanced_nonempty_lanes(
+    tmp_path: Path,
+) -> None:
+    inventory = _profile_inventory(tmp_path, "robinhood")
+    lanes = runner.build_lanes(tmp_path, inventory, "robinhood")
+    assert tuple(lanes) == _lane_names("robinhood")
+    assert all(lanes.values())
+    assert lanes == runner.build_lanes(tmp_path, inventory, "robinhood")
+    assert tuple(lanes.values()) == runner.balance_broad(tmp_path, inventory)
+    runner.validate_partitions(inventory, tuple(lanes.values()))
+    weights = [
+        sum((tmp_path / module).stat().st_size for module in lane)
+        for lane in lanes.values()
+    ]
+    assert abs(weights[0] - weights[1]) <= max(
+        (tmp_path / module).stat().st_size for module in inventory
+    )
+
+
+@pytest.mark.parametrize(
+    "lanes", [{}, {"empty": ()}, {"valid": ("test.py",), "empty": ()}]
+)
+def test_empty_lane_never_launches_pytest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lanes: dict[str, tuple[str, ...]]
+) -> None:
+    monkeypatch.setattr(
+        runner.subprocess, "Popen", lambda *a, **k: pytest.fail("pytest launched")
+    )
+    with pytest.raises(runner.CertificationError, match="contain test modules"):
+        runner.run_children(SimpleNamespace(), lanes, tmp_path)
+
+
+@pytest.mark.parametrize("profile", runner.PROFILES)
+@pytest.mark.parametrize(
+    "outcome", ["pass", "missing", "extra", "wrong", "error", "nonzero", "no_exit_code"]
+)
+def test_exact_profile_lane_success_accounting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, outcome: str
+) -> None:
+    _profile_inventory(tmp_path, profile)
+    monkeypatch.setattr(runner, "SERIAL_MODULES", ("tests/safety/test_serial.py",))
+    monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path)
+    monkeypatch.setattr(
+        runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
+    )
+    children = {name: {"exit_code": 0} for name in _lane_names(profile)}
+    first = _lane_names(profile)[0]
+    if outcome in {"missing", "wrong"}:
+        children.pop(first)
+    if outcome in {"extra", "wrong"}:
+        children["unexpected"] = {"exit_code": 0}
+    if outcome == "error":
+        children[first]["error"] = "bad evidence"
+    if outcome == "nonzero":
+        children[first]["exit_code"] = 1
+    if outcome == "no_exit_code":
+        children[first] = {}
+    monkeypatch.setattr(runner, "run_children", lambda *args: children)
+    static_calls = []
+
+    def static(*args):
+        static_calls.append(True)
+        return {
+            name: {"exit_code": 0}
+            for name in ("ruff_check", "ruff_format", "git_diff_check")
+        }
+
+    monkeypatch.setattr(runner, "run_static_checks", static)
+    args = argparse.Namespace(
+        root=tmp_path,
+        python=Path("python"),
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        evidence_dir=tmp_path.parent / f"{tmp_path.name}-accounting",
+        temp_root=tmp_path,
+        profile=profile,
+        plan=False,
+    )
+    result = runner.run(args)
+    assert result["status"] == ("passed" if outcome == "pass" else "failed")
+    assert bool(static_calls) == (outcome == "pass")
+
+
+@pytest.mark.parametrize("profile", runner.PROFILES)
+@pytest.mark.parametrize("name", runner.PROTECTED_OPT_INS)
+def test_both_profiles_reject_protected_opt_ins_before_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str, name: str
+) -> None:
+    monkeypatch.setenv(name, "0")
+    monkeypatch.setattr(
+        runner, "verify_source", lambda *a: pytest.fail("source verification ran")
+    )
+    args = argparse.Namespace(
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        profile=profile,
+    )
+    with pytest.raises(runner.CertificationError, match=name):
+        runner.run(args)
+
+
+@pytest.mark.parametrize("profile", runner.PROFILES)
+def test_static_checks_remain_whole_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
+) -> None:
+    commands = []
+
+    def fake_run(command, **kwargs):
+        assert kwargs["cwd"] == tmp_path
+        commands.append(command)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    args = argparse.Namespace(root=tmp_path, python=Path("python"), profile=profile)
+    runner.run_static_checks(args, tmp_path)
+    assert commands == [
+        ["python", "-m", "ruff", "check", "--no-cache", "."],
+        ["python", "-m", "ruff", "format", "--check", "--no-cache", "."],
+        ["git", "diff", "--check"],
+    ]
+
+
+@pytest.mark.parametrize("profile", runner.PROFILES)
+def test_both_profiles_retain_temp_root_requirement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
+) -> None:
+    monkeypatch.setattr(
+        runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
+    )
+    args = argparse.Namespace(
+        root=tmp_path,
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        profile=profile,
+        plan=False,
+        temp_root=tmp_path,
+    )
+    with pytest.raises(runner.CertificationError, match="basetemp root"):
         runner.run(args)

@@ -1150,8 +1150,10 @@ protected durable mutation occurred during source/broad certification.
 
 ### 131-S — versioned NYSE regular-session schedule authority
 
-Next safe side milestone. 131-S removes the manually supplied intraday-schedule
-gap without adding provider or execution authority.
+131-S is **ACCEPTED/CERTIFIED**. It supplies the published intraday-schedule
+authority without adding provider or execution authority. Integrating that
+authority into supervised PREPARE/qualification composition is separate
+follow-on source/design work; its exact contract is not yet frozen.
 
 The authority is deliberately bounded to the NYSE-published 2026-2028 equity
 calendar currently used for qualification/product development. It must not
@@ -1242,7 +1244,7 @@ certification. If NYSE changes a published holiday/early-close schedule, the
 checked-in manifest must be updated; runtime network discovery is intentionally
 out of scope.
 
-Planned source-only checkpoint:
+Accepted source-only checkpoint:
 
 ```text
 arch131-nyse-published-regular-session-authority
@@ -1250,7 +1252,70 @@ preflight=None
 execute=None
 ```
 
-Place it after the two 131-R checkpoints in the side-foundation optimized batch.
+It is registered after the two 131-R checkpoints in the side-foundation
+optimized batch.
+
+#### 131-S accepted source/certification — 2026-10-04
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+PARENT 6638676c6ee4abb804903cb13396d9f807d78d34
+HEAD   69327a7d5fbea7499329902ff96fd98e77a62591
+TREE   8e39547005c320387ef231c8dfd5e914d2f02322
+CI     #176 / 37235257282 SUCCESS
+
+arch131-nyse-published-regular-session-authority
+preflight=None
+execute=None
+```
+
+131-S source was accepted at its own HEAD above. Final broad supported-product
+certification subsequently ran on descendant Architecture 132-R1 HEAD
+`91cafa03f9244523fc45df0716427402028257a7`, tree
+`cb044a9014132b4e73310e19da5dfeba0fd89c3b`. That descendant contains unchanged
+accepted 131-S executable source, so this one accepted FULL-supported
+certification also closes 131-S. No standalone second certification was
+required.
+
+The descendant FULL-supported certification passed 3,694 cases across 113
+supported modules (broad-1: 55 modules / 1,985 passed; broad-2: 58 modules /
+1,709 passed), with zero skipped, failed, or error cases, wall 201.655 s,
+`ARCH132_R1_FULL_CERTIFICATION_EXIT=0`, and
+`ARCH132_R1_FULL_CERTIFICATION=PASS`. Source-gate CI for the descendant was
+#178 / 37238601866 SUCCESS; its worktree/index remained clean.
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-a1860dc18fac474ba2fd9e163eaba684
+```
+
+The certified tier topology and complete 132-R1 record are maintained in
+[Architecture 132](132-tiered-certification-profiles.md).
+
+Production/live real-money placement remains **NO-GO**. Certification does not
+authorize provider/broker effects. 131-Q PREPARE remains a protected read-only
+provider boundary requiring fresh explicit authorization. 131-Q EXECUTE remains
+a separate protected boundary requiring fresh explicit authorization after
+accepted PREPARE. `READY_TO_PROCEED` is never execution authorization.
+131-S adds schedule authority only, not provider/execution authority; 132-R1 is
+test/workflow infrastructure only. The protected operational sequence remains
+separate and unchanged; this closeout grants no new authority.
+
+#### Next safe source/design work — schedule composition
+
+Next safe source/design work is to integrate the accepted 131-S published
+schedule authority into the supervised PREPARE/qualification composition so an
+operator does not have to manually construct `ReviewPaperSessionSchedule` for a
+supported NYSE session.
+
+This is a new bounded Architecture 131 follow-on whose exact contract is **not
+yet frozen** by this docs-only closeout. Do not implement it under this closeout
+or grant it provider/execution authority. Do not add runtime web/calendar
+discovery or introduce system-clock authority. Preserve explicit/fail-closed
+temporal authority until the next contract is reviewed. The protected
+operational sequence remains separate and unchanged.
+
 
 
 ## D10 disposition

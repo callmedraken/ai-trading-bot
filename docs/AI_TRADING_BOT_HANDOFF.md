@@ -11133,16 +11133,150 @@ recomputes session status and quote deadlines, and proves
 No live Robinhood/MCP/OAuth request, supervised EXECUTE, synthetic paper fill,
 or protected durable mutation occurred.
 
-### Next safe side milestone — Architecture 131-S
+## 2026-10-04 — Architecture 131-S ACCEPTED/CERTIFIED
 
-Implement the frozen versioned NYSE published regular-session authority from
-Architecture 131. 131-S supports only published 2026-2028 NYSE core-equity
-sessions, including explicit holidays and explicit 13:00 early closes, and
-returns the exact `ReviewPaperSessionSchedule` consumed by 131-M. It performs
-no runtime web/provider/clock/filesystem/risk/execution effect and does not
-change the existing historical date-only `NYSEMarketCalendar`.
+Accepted 131-S source identity and source-only checkpoint:
 
-Planned checkpoint:
-`arch131-nyse-published-regular-session-authority`, source-only with
-`preflight=None` and `execute=None`.
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+PARENT 6638676c6ee4abb804903cb13396d9f807d78d34
+HEAD   69327a7d5fbea7499329902ff96fd98e77a62591
+TREE   8e39547005c320387ef231c8dfd5e914d2f02322
+CI     #176 / 37235257282 SUCCESS
 
+arch131-nyse-published-regular-session-authority
+preflight=None
+execute=None
+```
+
+131-S provides frozen NYSE-published 2026-2028 core-equity regular-session
+authority. It accepts exact `datetime.date` input, rejects `datetime.datetime`,
+and fails closed for unsupported years. Explicit holidays and weekends return
+`None`. Sessions open at 09:30 America/New_York, normally close at 16:00, and
+use explicit published 13:00 early closes. `ZoneInfo("America/New_York")`
+provides DST-aware instants.
+
+This is static/versioned source only: no clock, runtime web/network, filesystem,
+Robinhood/MCP/OAuth, store, quote, risk, execution, environment/config,
+subprocess, retry, polling, scheduler, or sleep. The existing historical
+`NYSEMarketCalendar` is unchanged.
+
+131-S source was accepted at its own HEAD above. Final broad supported-product
+certification subsequently ran on descendant Architecture 132-R1 HEAD
+`91cafa03f9244523fc45df0716427402028257a7`, tree
+`cb044a9014132b4e73310e19da5dfeba0fd89c3b`. That descendant contains unchanged
+accepted 131-S executable source, so this one accepted FULL-supported
+certification also closes 131-S. No standalone second certification was
+required.
+
+## 2026-10-04 — Architecture 132-R1 CERTIFIED
+
+Architecture 132-R1 is **CERTIFIED** after exact source review, source-gate CI,
+focused implementation verification, and final FULL-supported certification.
+
+Certified source identity:
+
+```text
+BRANCH  feature/robinhood-review-paper-side-foundation
+PARENT  2577225dafcff2d616fcbf018d7045aebaab1ff5
+HEAD    91cafa03f9244523fc45df0716427402028257a7
+TREE    cb044a9014132b4e73310e19da5dfeba0fd89c3b
+SUBJECT fix: separate supported and legacy certification
+CI      #178 / 37238601866 SUCCESS
+```
+
+Focused implementation verification: 450 passed; Ruff check, Ruff format
+`--check`, `git diff --check`, and `git diff --cached --check` all PASS.
+
+Final FULL-supported certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 55 | 1,985 | 1,985 | 0 | 0 | 0 |
+| broad-2 | 58 | 1,709 | 1,709 | 0 | 0 | 0 |
+| Total | 113 | 3,694 | 3,694 | 0 | 0 | 0 |
+
+```text
+profile: full
+wall 201.655 s
+ARCH132_R1_FULL_CERTIFICATION_EXIT=0
+ARCH132_R1_FULL_CERTIFICATION=PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-a1860dc18fac474ba2fd9e163eaba684
+```
+
+Worktree/index remained clean after certification. This docs-only closeout
+changes no executable source; no second broad certification is required after
+accepted docs-only review.
+
+Final profile topology at the certified tree:
+
+| Profile | Modules | Scope | Lanes |
+| --- | ---: | --- | --- |
+| full | 113 | Currently supported functionality; default | broad-1, broad-2 |
+| robinhood | 40 | Current Architecture 131 integration subset | robinhood-1, robinhood-2 |
+| legacy | 204 | Retained retired architecture | legacy-1, legacy-2, serial |
+| exhaustive | 317 | Every current repository test module | broad-1, broad-2, serial |
+
+Final invariants:
+
+```text
+robinhood subset full
+full intersection legacy = empty
+full union legacy = exhaustive
+exhaustive = complete discovered test inventory
+```
+
+Unknown ownership fails closed before profile selection. The historical
+five-module Windows/Architecture-77 serial lane exists only in
+LEGACY/EXHAUSTIVE. Current pre-Robinhood GUI, D10, Windows authority,
+Paper-v2/personal-desktop, and Alpaca operational capture remain legacy
+compatibility, not normal current-product certification requirements.
+Research/backtesting/strategy/portfolio/analytics/shared deterministic core
+and Architecture 131 remain supported.
+
+FULL is not mechanically required after every Architecture 131 checkpoint.
+The normal gate policy remains:
+
+```text
+FOCUSED
+-> SOURCE-GATE CI
+-> ROBINHOOD when appropriate
+-> FULL at coherent supported-product boundaries
+-> LEGACY/EXHAUSTIVE only when explicitly relevant
+-> PROTECTED separately authorized
+```
+
+The source-review workflow remains implementation + focused checks -> exact-file
+commit/push -> ChatGPT exact GitHub commit/tree review -> source acceptance ->
+appropriate certification tier -> docs closeout. Local patch review remains
+fallback-only.
+
+### Authority and safety status
+
+Production/live real-money placement remains **NO-GO**. Certification does not
+authorize provider/broker effects. 131-Q PREPARE remains a protected read-only
+provider boundary requiring fresh explicit authorization. 131-Q EXECUTE remains
+a separate protected boundary requiring fresh explicit authorization after
+accepted PREPARE. `READY_TO_PROCEED` is never execution authorization.
+131-S adds schedule authority only, not provider/execution authority; 132-R1 is
+test/workflow infrastructure only. The protected operational sequence remains
+separate and unchanged; this closeout grants no new authority.
+
+### Next safe source/design work — schedule composition
+
+Next safe source/design work is to integrate the accepted 131-S published
+schedule authority into the supervised PREPARE/qualification composition so an
+operator does not have to manually construct `ReviewPaperSessionSchedule` for a
+supported NYSE session.
+
+This is a new bounded Architecture 131 follow-on whose exact contract is **not
+yet frozen** by this docs-only closeout. Do not implement it under this closeout
+or grant it provider/execution authority. Do not add runtime web/calendar
+discovery or introduce system-clock authority. Preserve explicit/fail-closed
+temporal authority until the next contract is reviewed. The protected
+operational sequence remains separate and unchanged.

@@ -33,6 +33,73 @@ Counts describe this tree, not hard limits on future admitted additions.
 The FULL 113-module and Robinhood 40-module required baselines below remain
 frozen so deletion/renaming cannot silently reduce certification.
 
+## 132-R1 accepted certification — 2026-10-04
+
+Architecture 132-R1 is **CERTIFIED** after exact source review, source-gate CI,
+focused implementation verification, and final FULL-supported certification.
+
+Certified source identity:
+
+```text
+BRANCH  feature/robinhood-review-paper-side-foundation
+PARENT  2577225dafcff2d616fcbf018d7045aebaab1ff5
+HEAD    91cafa03f9244523fc45df0716427402028257a7
+TREE    cb044a9014132b4e73310e19da5dfeba0fd89c3b
+SUBJECT fix: separate supported and legacy certification
+CI      #178 / 37238601866 SUCCESS
+```
+
+Focused implementation verification: 450 passed; Ruff check, Ruff format
+`--check`, `git diff --check`, and `git diff --cached --check` all PASS.
+
+Final FULL-supported certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 55 | 1,985 | 1,985 | 0 | 0 | 0 |
+| broad-2 | 58 | 1,709 | 1,709 | 0 | 0 | 0 |
+| Total | 113 | 3,694 | 3,694 | 0 | 0 | 0 |
+
+```text
+profile: full
+wall 201.655 s
+ARCH132_R1_FULL_CERTIFICATION_EXIT=0
+ARCH132_R1_FULL_CERTIFICATION=PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-a1860dc18fac474ba2fd9e163eaba684
+```
+
+Worktree/index remained clean after certification. This docs-only closeout
+changes no executable source; no second broad certification is required after
+accepted docs-only review.
+
+The accepted certification also closes 131-S: source HEAD
+`69327a7d5fbea7499329902ff96fd98e77a62591`, tree
+`8e39547005c320387ef231c8dfd5e914d2f02322`, was accepted with CI
+#176 / 37235257282 SUCCESS. Its executable source is unchanged in the certified
+132-R1 descendant; no standalone second 131-S certification was required.
+
+At the certified tree, final profile counts remain FULL 113 (default),
+Robinhood 40, LEGACY 204, and EXHAUSTIVE 317. The required subset/disjoint/union
+invariants hold, and unknown ownership fails closed before profile selection.
+The historical five-module serial lane remains exclusive to LEGACY/EXHAUSTIVE.
+Research/backtesting/strategy/portfolio/analytics/shared deterministic core and
+Architecture 131 remain supported; pre-Robinhood GUI, D10, Windows authority,
+Paper-v2/personal-desktop, and Alpaca operational capture remain legacy.
+
+Production/live real-money placement remains **NO-GO**. Certification does not
+authorize provider/broker effects. 131-Q PREPARE remains a protected read-only
+provider boundary requiring fresh explicit authorization. 131-Q EXECUTE remains
+a separate protected boundary requiring fresh explicit authorization after
+accepted PREPARE. `READY_TO_PROCEED` is never execution authorization.
+131-S adds schedule authority only, not provider/execution authority; 132-R1 is
+test/workflow infrastructure only. The protected operational sequence remains
+separate and unchanged; this closeout grants no new authority.
+
 ## Tier policy and handoff
 
 ```text
@@ -61,7 +128,7 @@ certification-tier decision. The normal handoff remains:
 ```text
 implementation + focused checks
 -> exact-file commit/push
--> ChatGPT exact GitHub code review
+-> ChatGPT exact GitHub commit/tree review
 -> source acceptance
 -> appropriate certification tier
 -> docs closeout (PROJECT_STATUS + HANDOFF after certification acceptance)
@@ -499,6 +566,7 @@ Ruff check/format on changed Python files, and Git diff checks. Tests construct
 independent baseline expectations and prove counts, support invariants, new
 owned-file admission, missing/renamed baselines, unknown ownership rejection,
 all lane sets, protected rejection, static commands, source identity, plan-only
-behavior, and evidence semantics. Actual certification awaits exact GitHub
-review and ChatGPT's authorization. Status/handoff closeout waits for accepted
-certification.
+behavior, and evidence semantics. The final FULL-supported certification above
+is accepted; canonical status/handoff documentation records this docs-only
+closeout. Executable source is unchanged, so accepted docs-only review requires
+no second broad certification.

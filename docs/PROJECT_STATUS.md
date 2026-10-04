@@ -10780,3 +10780,76 @@ certification uses a fake transport and performs zero live provider requests.
 Planned checkpoint: `arch131-robinhood-risk-price-acquisition`, source-only
 with no checkpoint preflight/execute surface.
 
+## 2026-10-03 — Architecture 131-P bounded read-only Robinhood risk-price acquisition FULLY ACCEPTED
+
+Architecture 131-P has passed exact GitHub source review, source-gate CI, and
+full broad local certification on the isolated side-foundation branch.
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   adcf26ecdaa34fcdd85101fa0f82883cbbd7c752
+TREE   7cddd4bfeb0c0d529e26182108a56acbd24fc174
+PARENT a88ff4e5b25846e7c6d66bb7ff90c98b9f77e6b2
+CI     #168 / 37167947385 SUCCESS
+```
+
+Accepted behavior:
+
+- exact public input admission precedes durable/provider access;
+- durable ledger reconstruction occurs exactly once for symbol discovery only;
+- canonical required symbols are capped at 20 before provider access;
+- exactly one accepted adapter `equity_quotes` call occurs;
+- exactly one UTC clock read occurs after a successful typed quote response;
+- exactly one 131-N snapshot build follows;
+- provider/parser/131-N failures propagate with no retry/reacquisition;
+- no direct transport, account/review/order, risk, intent, execution, paper
+  mutation, performance write, retry, polling, scheduler, or sleep authority was
+  introduced;
+- `arch131-robinhood-risk-price-acquisition` is source-only with
+  `preflight=None` and `execute=None`, immediately after 131-O.
+
+Full certification:
+
+```text
+broad-1: 154 modules
+  5,396 passed, 1 skipped, 0 failed, 0 errors
+
+broad-2: 154 modules
+  4,958 passed, 1 skipped, 0 failed, 0 errors
+
+serial: 5 modules
+  926 passed, 9 skipped, 0 failed, 0 errors
+
+total:
+  11,291 cases
+  11,280 passed
+  11 skipped
+  0 failed
+  0 errors
+  wall 495.919 s
+```
+
+Evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-ed5706f4c2d747c8a128d903d64a0518
+```
+
+Source HEAD/tree, feature remote, and develop identity remained unchanged; the
+side worktree/index remained clean. No live Robinhood/MCP/OAuth request or
+durable paper mutation occurred.
+
+### Next side milestone — Architecture 131-Q
+
+Implement the frozen two-phase supervised forward-paper operator composition
+from Architecture 131. Preparation performs current-session admission, one 131-P
+quote acquisition, quote-time session re-admission, one 131-O preview, and
+durable-history drift guarding. A separate explicit proceed call rechecks
+session/freshness/account/risk state before invoking accepted 131-L exactly once.
+No automatic execution, retry, polling, scheduler, or real-order placement is
+authorized. Planned checkpoint:
+`arch131-robinhood-supervised-forward-paper`, source-only with no checkpoint
+preflight/execute surface.
+

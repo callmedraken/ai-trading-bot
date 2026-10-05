@@ -181,6 +181,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-robinhood-published-session-prepare",
         "arch131-robinhood-published-prepare-operator",
         "arch131-robinhood-supervised-qualification",
+        "arch133-robinhood-unattended-activation-core",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -231,6 +232,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 )
             )
         )
+        if spec.name == "arch133-robinhood-unattended-activation-core":
+            expected_branch = "feature/robinhood-unattended-review-paper-133a"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -2157,10 +2160,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch131-robinhood-supervised-qualification\n"
+                "arch133-robinhood-unattended-activation-core\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch131-robinhood-supervised-qualification\n          exit 0"),
+            ("arch133-robinhood-unattended-activation-core\n          exit 0"),
         ),
     ],
 )
@@ -2461,6 +2464,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-robinhood-published-session-prepare",
     "arch131-robinhood-published-prepare-operator",
     "arch131-robinhood-supervised-qualification",
+    "arch133-robinhood-unattended-activation-core",
 )
 
 
@@ -4523,8 +4527,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 32
-    assert runner.CI_CHECKPOINTS[-13:] == (
+    assert len(runner.CI_CHECKPOINTS) == 33
+    assert runner.CI_CHECKPOINTS[-14:] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4538,6 +4542,7 @@ def test_131r_source_only_registration_and_batch(boundary):
         "arch131-robinhood-published-session-prepare",
         "arch131-robinhood-published-prepare-operator",
         "arch131-robinhood-supervised-qualification",
+        "arch133-robinhood-unattended-activation-core",
     )
 
 
@@ -4942,7 +4947,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 32
+    assert len(runner.CI_CHECKPOINTS) == 33
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5157,7 +5162,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 32
+    assert len(runner.CI_CHECKPOINTS) == 33
     assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
@@ -5405,3 +5410,141 @@ def test_131v_source_only_registration_and_boundaries(tmp_path):
     ):
         source.write_text(text_value + "\n" + addition + "\n", encoding="utf-8")
         assert authority(tmp_path)
+
+
+_A133_NAME = "arch133-robinhood-unattended-activation-core"
+_A133_SOURCE = "src/trading_bot/review_paper/unattended_activation.py"
+_A133_TEST = "tests/review_paper/test_unattended_activation.py"
+
+
+def test_133a_source_only_registration_and_single_ordered_batch():
+    repo = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[_A133_NAME]
+    assert spec.name == _A133_NAME
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133a"
+    assert spec.authority_check is runner._arch133_unattended_activation_authority_check
+    assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST)
+    assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, _A133_SOURCE, _A133_TEST)
+    assert runner.CI_CHECKPOINTS.count(_A133_NAME) == 1
+    assert runner.CI_CHECKPOINTS[-2:] == (
+        "arch131-robinhood-supervised-qualification",
+        _A133_NAME,
+    )
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.count(_A133_NAME) == 1
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert spec.authority_check(repo) == ()
+
+
+def _133a_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in (
+        _A133_SOURCE,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch133_unattended_activation_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import os",
+        "import sqlite3",
+        "import socket",
+        "import subprocess",
+        "from pathlib import Path",
+        "from uuid import uuid4",
+        "from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter",
+        "from trading_bot.review_paper.store import ReviewPaperStore",
+        "from trading_bot.risk.manager import RiskManager",
+        "datetime.now(UTC)",
+        "open('paper.sqlite', 'w')",
+        "sleep(1)",
+        "while True:\n    pass",
+        "callback()",
+    ],
+)
+def test_133a_authority_pins_every_import_and_call(tmp_path, addition):
+    root = _133a_authority_copy(tmp_path)
+    path = root / _A133_SOURCE
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert "133-A pure activation/wake boundary drift" in (
+        runner._arch133_unattended_activation_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "target,mutation",
+    [
+        ("source", "missing"),
+        ("source", "syntax"),
+        ("runner", "missing"),
+        ("runner", "registration"),
+        ("runner", "batch_missing"),
+        ("runner", "batch_duplicate"),
+        ("workflow", "missing"),
+        ("workflow", "batch_missing"),
+        ("workflow", "batch_duplicate"),
+    ],
+)
+def test_133a_authority_fails_closed_on_missing_or_drifting_material(
+    tmp_path, target, mutation
+):
+    root = _133a_authority_copy(tmp_path)
+    relative = {
+        "source": _A133_SOURCE,
+        "runner": "scripts/checkpoint_runner.py",
+        "workflow": ".github/workflows/checkpoint-source-gates.yml",
+    }[target]
+    path = root / relative
+    if mutation == "missing":
+        path.unlink()
+    elif mutation == "syntax":
+        path.write_text("def broken(:", encoding="utf-8")
+    else:
+        text = path.read_text(encoding="utf-8")
+        if mutation == "registration":
+            start = text.index('        "' + _A133_NAME + '": CheckpointSpec(')
+            end = text.index(
+                '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+            )
+            block = text[start:end].replace("preflight=None", "preflight=_r8_preflight")
+            text = text[:start] + block + text[end:]
+        else:
+            line = (
+                f'    "{_A133_NAME}",\n'
+                if target == "runner"
+                else f"              {_A133_NAME}\n"
+            )
+            assert text.count(line) == 1
+            text = text.replace(line, "" if mutation == "batch_missing" else line * 2)
+        path.write_text(text, encoding="utf-8")
+    assert runner._arch133_unattended_activation_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflight": lambda: {}},
+        {"execute": lambda: {}},
+        {"remote_branch": "feature/wrong"},
+        {"tests": ()},
+        {"ruff_paths": ()},
+    ],
+)
+def test_133a_runtime_registration_drift_is_rejected(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    root = _133a_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    specs[_A133_NAME] = replace(specs[_A133_NAME], **change)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert runner._arch133_unattended_activation_authority_check(root)

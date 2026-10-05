@@ -964,7 +964,12 @@ def _arch131_supervised_qualification_authority_check(
                 ast.dump(ast.parse(source), include_attributes=False).encode()
             ).hexdigest()
             if actual != expected:
-                failures.append("131-V qualification boundary drift: " + relative)
+                failures.append(
+                    "131-V qualification boundary drift: "
+                    + relative
+                    + " actual="
+                    + actual
+                )
         tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
         )

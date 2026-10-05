@@ -1841,8 +1841,17 @@ After fresh explicit approval, type the exact token, Enter, then Ctrl+Z and
 Enter. A STOP is terminal. Do not rerun without a new reviewed checkpoint and
 new PREPARE authorization. Real-money trading remains NO-GO.
 
-PROJECT_STATUS and AI_TRADING_BOT_HANDOFF final closeout is deliberately deferred
-until ChatGPT exact source acceptance and the chosen certification gate pass.
+Architecture 131-V source and certification are accepted at:
+
+```text
+HEAD 9048146c57fedfddf212e0473d48eeef2e0153d6
+TREE 12e5c0dc7e188a024fb369371aeb0a8a436cdf3f
+CI   #192 / 37356466423 SUCCESS
+ROBINHOOD 3172 passed / 0 skipped / 0 failed / 0 errors
+```
+
+PROJECT_STATUS and AI_TRADING_BOT_HANDOFF closeout is therefore required before
+the protected qualification runbook is used.
 
 ## D10 disposition
 

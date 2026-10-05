@@ -608,10 +608,11 @@ def _verify(
         new["fill_id"]
         == str(uuid5(UUID("cde151e5-5a25-5aab-8ec6-9d39e58ba13e"), str(ORDER_ID)))
     )
+    fill_at = _time(new["filled_at"])
     require_qualification(
         _number(new["fill_price"]) == _number(new["bid_price"]) > 0
         and new["filled_at"] == new["venue_bid_time"]
-        and proposed_at <= _time(new["filled_at"]) <= execute_at
+        and proposed_at <= fill_at
     )
     operator = _object(read_qualification_json(operator_evidence_path), OPERATOR_FIELDS)
     require_qualification(

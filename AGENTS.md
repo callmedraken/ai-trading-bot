@@ -117,6 +117,45 @@ with PROTECTED separately authorized.
 
 ## AI development workflow
 
+### Project-state reconstruction and transition quality
+
+At the start of a new Trading Bot chat, after a substantial context reset, or
+whenever the user asks to re-establish the workflow, reconstruct the current
+state before recommending or authorizing work. Read the current Git-tracked
+`docs/AI_TRADING_BOT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `AGENTS.md`, the
+relevant architecture/validation documents, and the available Trading Bot
+project conversation history. Verify the active remote branch/HEAD, recent
+commits/diff and CI through GitHub when material. Git-tracked canonical docs
+outrank uploaded mirrors or older chat summaries unless the conversation clearly
+records a newer intentional change that has not yet been committed.
+
+Do not ask the user to paste GitHub diffs/comments, prior Trading Bot chats,
+repository files, or other project material when the available project/GitHub
+retrieval tools can obtain it directly.
+
+After reconstruction, and after every milestone/review/certification transition,
+leave the project immediately actionable. A substantive transition response
+should state, when applicable:
+
+- current verified checkpoint;
+- active branch and verified remote HEAD/tree;
+- latest relevant implementation/certification identity;
+- current unresolved blocker or protected boundary;
+- immediate next step;
+- recommended owner/model for that step;
+- the exact ready-to-run command, ready-to-paste Codex prompt, or ChatGPT-led
+  review action;
+- expected success evidence and stop condition; and
+- exactly what output the user should return when another review turn is
+  genuinely required.
+
+The user should not need a follow-up merely to ask what to do next, which model
+to use, what command to run, what output to send back, or whether the checkpoint
+is ready to advance. If the next action crosses a protected effect boundary,
+provide the safe preflight/readiness material and stop at the authorization
+boundary rather than presenting the effectful command as ordinary verification.
+
+
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.

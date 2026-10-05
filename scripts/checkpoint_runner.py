@@ -450,7 +450,7 @@ ARCH131_REVIEW_PAPER_REMOTE_BRANCH: Final = "feature/robinhood-review-paper-mode
 ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH: Final = (
     "feature/robinhood-review-paper-side-foundation"
 )
-ARCH131_LQ_SOURCE_BLOB_SHA1: Final = "731232c79be39ba629236ecf29ee9f5d3d1e8bf2"
+ARCH131_LQ_SOURCE_BLOB_SHA1: Final = "3283793abed5320d778d28d72e49eeabed98ccf1"
 
 
 def _arch131_windows_oauth_authority_check(repo_root: Path) -> tuple[str, ...]:

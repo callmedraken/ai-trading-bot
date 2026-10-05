@@ -165,6 +165,10 @@ def verify_robinhood_131l_live_qualification(
         "quote_fill_validated": True,
         "disclosure_present": True,
         "interactive_reauth_count": 0,
+        "placement_calls": 0,
+        "cancellation_calls": 0,
+        "options_mutation_calls": 0,
+        "crypto_mutation_calls": 0,
     }
     _require(operator == expected_operator, "operator evidence mismatch")
 

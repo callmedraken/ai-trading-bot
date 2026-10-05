@@ -46,6 +46,10 @@ def _operator() -> dict[str, object]:
         "quote_fill_validated": True,
         "disclosure_present": True,
         "interactive_reauth_count": 0,
+        "placement_calls": 0,
+        "cancellation_calls": 0,
+        "options_mutation_calls": 0,
+        "crypto_mutation_calls": 0,
     }
 
 
@@ -223,6 +227,10 @@ def test_sqlite_is_opened_read_only(tmp_path, monkeypatch):
         ("paper_record_count", 1),
         ("replay", True),
         ("interactive_reauth_count", 1),
+        ("placement_calls", 1),
+        ("cancellation_calls", 1),
+        ("options_mutation_calls", 1),
+        ("crypto_mutation_calls", 1),
         ("review_echo_validated", False),
         ("quote_fill_validated", False),
         ("disclosure_present", False),

@@ -1868,3 +1868,53 @@ the protected qualification runbook is used.
 
 D10 remains frozen historical infrastructure with its scheduler disabled.
 Architecture 131 does not restart or reuse the failed D10 unattended soak.
+
+
+### Live 131-V / 131-Q EXECUTE qualification — ACCEPTED
+
+The first same-process qualification is accepted. One fresh PREPARE retained the
+exact in-memory preparation across the independent human boundary; the exact
+challenge was separately authorized; accepted 131-Q EXECUTE invoked accepted
+131-L exactly once; one synthetic SPY SELL record was added to the durable
+virtual paper account; provider/broker mutation counters remained zero; and no
+retry occurred.
+
+Qualified source/effect identity:
+
+```text
+HEAD 6ca0fdc4e6b139a1ef887954e14596eab09925d9
+TREE 2014def0b470cc1cc62a439e723448be3363c6c3
+challenge bc270a432ac3bd3e942302c20e7cfc85d30e284a2dd4189eaf9cba9dc3be6061
+records 2 -> 3
+BEFORE e10a8c2b1aaaaef1f7ccf3380c086501f0e4406ac246ec683d0cc4e7a40ee202
+AFTER  ecc8d0d9e7e4153014e2f5a3ee543118790da7b24b642bb93dff1241a34876b5
+placement/cancel/options/crypto 0 / 0 / 0 / 0
+interactive reauth 0
+retry 0
+```
+
+The first final verifier pass exposed one provider-free overconstraint only:
+venue bid/fill time was incorrectly required to be no later than the earlier
+131-Q execute-admission instant. That relationship is not part of the accepted
+fill contract. SELL still requires exact bid-price fill and exact venue-bid-time
+fill; the venue timestamp may follow execute admission because it belongs to the
+subsequent provider review response.
+
+Corrected verifier source and certification:
+
+```text
+HEAD ba7b6194b942d494e3f3c747e4a3bc612da257e5
+TREE 6f5c90f49ac42eb34f616ea93be1b85dc3b24963
+CI   #213 / 37362596426 SUCCESS
+ROBINHOOD 3173 / 3173 passed, 0 skipped, 0 failed, 0 errors
+Evidence F:\AI\temp\pytest\certification-evidence-1d0e283bd61542218d10df1b0dd0937d
+```
+
+The corrected provider-free verifier reconciled the original live evidence to
+PASS with record_count=3. No provider retry occurred.
+
+Architecture 131 now proceeds to one final FULL-profile certification of the
+complete side-foundation tree as the coherent integration boundary. After that
+passes, ChatGPT performs merge-readiness review against `origin/develop` and
+stops at the separately protected merge/PR boundary. No further 131 source
+checkpoint is implied by this qualification.

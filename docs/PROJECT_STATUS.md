@@ -11954,3 +11954,48 @@ A missing workflow run is a STOP/classification event, never an implicit PASS.
 This is a distinct workflow-registration checkpoint following the Architecture
 133 design freeze. It changes CI routing only and does not alter Architecture
 133 authority or product source.
+
+
+## 2026-10-05 — Architecture 133-A activation/wake core ACCEPTED
+
+Architecture 133-A is source-accepted after exact GitHub commit review and the
+optimized source gate.
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133a
+PARENT 10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+HEAD   b0751e1ff2109b7f99725910ee901685e293e175
+TREE   2230e11bcb3a2b27171aaa506f12110c31ae77a0
+CI     #227 / 37388706716 SUCCESS
+```
+
+Exact changed files were the pure activation/wake module and tests plus the
+checkpoint runner, runner tests, certification-inventory assertions, and the
+optimized source-gate workflow. No status/handoff/Architecture-133 docs were
+modified by the implementation commit.
+
+The accepted core provides closed immutable activation/wake material,
+deterministic UUID5 identities, canonical serialization, strict UTC/Decimal
+normalization, and the exact seven-state transition model. `store_path` is
+retained exactly in activation storage material but excluded from UUID5 identity
+as required by the repository-wide deterministic-identity rule; the semantic
+`store_identity` remains identity-bearing. Failure after the durable future
+review-start fence can resolve only to INDETERMINATE, while all terminal states
+have no outgoing transition authority.
+
+The implementation imports no filesystem/SQLite/provider/OAuth/risk-manager/
+scheduler authority and has no clock read, UUID4, retry, polling, sleep, or
+paper mutation capability. Source-gate #227 passed the 33-participant optimized
+batch, Ruff check/format, git diff check, source identity stability, and the
+133-A authority pin. Focused implementation verification reported 233 core
+cases, 1,018 runner cases, and two profile-inventory cases across the focused
+and corrected-failure runs.
+
+No ROBINHOOD/FULL rerun is required at this pure source-only boundary under
+Architecture 132. The next checkpoint is **133-B durable wake store +
+provider-free reconciliation**, with its exact local-durability/read-only
+verifier contract frozen in the Architecture-133 architecture and validation
+documents. 133-B adds no provider, review, paper-fill, scheduler, or broker/live
+authority.
+
+Production/live real-money placement remains **NO-GO**.

@@ -22,34 +22,68 @@ evidence, and zero-real-order guarantees.
 The first qualification targets exactly one NYSE session. Multi-session
 recurrence is deferred.
 
-## 133-A focused validation
+## 133-A focused validation — ACCEPTED
 
-Activation and wake identity/state tests must cover:
+Accepted exact source:
+
+```text
+HEAD b0751e1ff2109b7f99725910ee901685e293e175
+TREE 2230e11bcb3a2b27171aaa506f12110c31ae77a0
+CI   #227 / 37388706716 SUCCESS
+```
+
+The exact six-file GitHub review found no correction requirement. The complete
+133-A module is AST-pinned by the source gate, the checkpoint is source-only
+with no preflight/execute callback, and #227 passed the optimized batch,
+Ruff check/format, diff check, identity-stability check, and 133-A authority
+check.
+
+Accepted validation covers:
 
 - strict closed schemas and canonical serialization;
 - deterministic activation/wake identities;
 - exact proposal/order/session binding;
-- single-use activation;
+- filesystem path retained as exact storage material but excluded from
+  deterministic identity under the repository-wide identity rule;
 - legal and illegal state transitions;
-- completed replay is read-only/idempotent;
-- stopped replay has no automatic retry;
-- review-started ambiguity becomes INDETERMINATE;
-- restart does not create fresh authority;
-- no filesystem/network/provider/scheduler dependency in pure models.
+- completed/stopped/indeterminate terminal replay with no transition authority;
+- review-started failure -> INDETERMINATE only;
+- timezone normalization and malformed timestamp rejection;
+- ambient-Decimal-context independence;
+- no UUID4, filesystem, SQLite, network/provider/OAuth, risk, scheduler,
+  retry/polling, or paper-write capability in the pure module.
 
-## 133-B focused validation
+Focused implementation verification reported 233 core cases, 1,018 runner
+cases, and two certification-inventory cases across the focused and
+corrected-failure runs. No broad suite was required at this pure source boundary.
+
+## 133-B focused validation — FROZEN
 
 Durable state/reconciliation tests must cover:
 
-- create-only activation identity or exact-identical reopen;
-- conflicting reuse fails closed;
-- atomic/durable transition behavior;
-- independent read-only verifier;
-- no second writer hidden in verifier;
-- exact BEFORE/AFTER fingerprints;
-- malformed/partial state fails closed;
-- completed/indeterminate distinction survives restart;
-- deterministic local order/fill identity cannot duplicate.
+- closed SQLite schema/version and exact canonical row material;
+- create-only activation + READY wake admission in one transaction;
+- exact-identical reopen is read-only/idempotent;
+- same activation ID with different canonical activation bytes is a hard
+  conflict, including a changed stored filesystem path;
+- exact expected wake/revision compare-and-swap transitions;
+- stale writer rejection and transaction rollback without internal retry;
+- legal 133-A transition delegation rather than a second transition matrix;
+- completed/stopped/indeterminate durability across close/reopen;
+- no transition authority from terminal states;
+- independent verifier using SQLite URI `mode=ro` without constructing the
+  writer;
+- verifier rejection of malformed metadata/schema, partial rows, noncanonical
+  activation/wake JSON, mismatched activation/wake binding, duplicate/conflict
+  rows, and stale expected identity;
+- deterministic complete-store fingerprint independent of SQLite row-return
+  order;
+- the Architecture-131 paper-store path remains inert serialized material and is
+  never opened by 133-B;
+- zero provider/OAuth/risk/review/paper-fill/scheduler/subprocess/environment
+  capability;
+- source-only checkpoint registration immediately after 133-A with no
+  preflight/execute callback.
 
 ## 133-C focused validation
 

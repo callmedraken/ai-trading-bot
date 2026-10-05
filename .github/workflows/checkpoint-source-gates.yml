@@ -9,6 +9,7 @@ on:
       - feature/d10c-r8-incident-reconciliation
       - feature/robinhood-review-paper-mode
       - feature/robinhood-review-paper-side-foundation
+      - feature/robinhood-unattended-review-paper-authority
   pull_request:
 
 permissions:

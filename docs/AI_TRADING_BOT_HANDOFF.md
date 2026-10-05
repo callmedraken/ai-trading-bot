@@ -12016,3 +12016,38 @@ commit spanning `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`,
 branch update. It changes no executable/test source and does not invalidate the
 accepted Architecture 131 FULL certification. The Architecture 131 PR is now
 explicitly authorized; actual merge remains separately protected.
+
+
+## 2026-10-05 — Architecture 131 merged / Architecture 133 design opened
+
+Architecture 131 is fully integrated into `develop`.
+
+```text
+PR #24 MERGED
+merge commit 1419b551230b00102291cd3bab2f23e4e1a3588b
+merge tree   5d98221b3a2933726b56692c5092d715455807f4
+post-merge source gate #222 SUCCESS
+```
+
+The merge tree is byte-for-byte identical to the reviewed PR-head tree, so the
+accepted Architecture-131 FULL certification carries through the merge without a
+second full run. The main local checkout was reconciled cleanly to the same
+`develop` HEAD/TREE.
+
+The next current-supported milestone is Architecture 133, opened on
+`feature/robinhood-unattended-review-paper-authority` from that exact merged
+`develop` commit.
+
+Architecture 133 freezes a deliberately narrow first unattended scope: exactly
+one pre-authorized proposal, one explicit NYSE session, one bounded quote/risk
+PREPARE path, at most one Robinhood review request, at most one synthetic local
+paper fill, zero retry, zero catch-up, and zero placement/cancel/options/crypto
+authority. It does not reuse the historical D10 scheduler/runtime and does not
+yet authorize a multi-day soak or autonomous proposal generation.
+
+First safe source checkpoint after this design acceptance is **133-A activation
++ wake identity/state core**: network-free immutable models, deterministic
+identities, closed state transitions, and canonical serialization only. No
+provider/OAuth/scheduler/paper-write effect is part of 133-A.
+
+Production/live real-money placement remains **NO-GO**.

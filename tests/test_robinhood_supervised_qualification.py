@@ -162,6 +162,7 @@ def h(tmp_path, monkeypatch, capsys):
         preparation=None,
         forward_failure=False,
         operator_status="PASS",
+        review_quote_offset=timedelta(0),
     )
     monkeypatch.setattr(gate, "_admit_source", Mock(return_value=tmp_path / "repo"))
     monkeypatch.setattr(gate, "_quiet_provider", nullcontext)
@@ -216,7 +217,9 @@ def h(tmp_path, monkeypatch, capsys):
             kwargs["store"].record_market_review(
                 intent,
                 _review(
-                    OrderSide.SELL, Decimal("774.00"), kwargs["review_received_at"]
+                    OrderSide.SELL,
+                    Decimal("774.00"),
+                    kwargs["review_received_at"] + value.review_quote_offset,
                 ),
             )
         operator = RobinhoodPaperOperatorEvidence(
@@ -300,6 +303,14 @@ def test_same_preparation_one_prepare_one_verifier_one_stdin_one_execute_one_for
     assert _verify(h)["status"] == "PASS"
     assert set(_evidence(h)) == verifier.EVIDENCE_FIELDS
     h.forbidden.assert_not_called()
+
+
+def test_verifier_allows_venue_fill_after_execute_admission(h):
+    h.review_quote_offset = timedelta(seconds=1)
+    assert _run(h)["status"] == "PASS"
+    record = h.store.history()[-1]
+    assert record.filled_at > h.execute_at
+    assert _verify(h)["status"] == "PASS"
 
 
 @pytest.mark.parametrize(

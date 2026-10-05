@@ -11901,3 +11901,56 @@ commit spanning `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`,
 branch update. It changes no executable/test source and does not invalidate the
 accepted Architecture 131 FULL certification. The Architecture 131 PR is now
 explicitly authorized; actual merge remains separately protected.
+
+
+## 2026-10-05 — Architecture 131 merged / Architecture 133 design opened
+
+Architecture 131 is fully integrated into `develop`.
+
+```text
+PR #24 MERGED
+merge commit 1419b551230b00102291cd3bab2f23e4e1a3588b
+merge tree   5d98221b3a2933726b56692c5092d715455807f4
+post-merge source gate #222 SUCCESS
+```
+
+The merge tree is byte-for-byte identical to the reviewed PR-head tree, so the
+accepted Architecture-131 FULL certification carries through the merge without a
+second full run. The main local checkout was reconciled cleanly to the same
+`develop` HEAD/TREE.
+
+The next current-supported milestone is Architecture 133, opened on
+`feature/robinhood-unattended-review-paper-authority` from that exact merged
+`develop` commit.
+
+Architecture 133 freezes a deliberately narrow first unattended scope: exactly
+one pre-authorized proposal, one explicit NYSE session, one bounded quote/risk
+PREPARE path, at most one Robinhood review request, at most one synthetic local
+paper fill, zero retry, zero catch-up, and zero placement/cancel/options/crypto
+authority. It does not reuse the historical D10 scheduler/runtime and does not
+yet authorize a multi-day soak or autonomous proposal generation.
+
+First safe source checkpoint after this design acceptance is **133-A activation
++ wake identity/state core**: network-free immutable models, deterministic
+identities, closed state transitions, and canonical serialization only. No
+provider/OAuth/scheduler/paper-write effect is part of 133-A.
+
+Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Source-gate new-branch bootstrap rule restored
+
+The first Architecture-133 design commit correctly updated the source-gate
+workflow to name its new branch, but no push CI run was created for that same
+first push. The branch state was preserved and the missing run was not treated
+as acceptance.
+
+Canonical workflow now forbids relying on a branch's own first commit to admit
+itself to an explicit `push.branches` allowlist. The Robinhood workflow trigger
+uses the reviewed narrow family pattern `feature/robinhood-*`, so future
+Robinhood milestone branches are admitted before their first checkpoint push.
+A missing workflow run is a STOP/classification event, never an implicit PASS.
+
+This is a distinct workflow-registration checkpoint following the Architecture
+133 design freeze. It changes CI routing only and does not alter Architecture
+133 authority or product source.

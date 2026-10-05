@@ -363,6 +363,30 @@ likely to be reused, crosses a protected boundary, carries structured data, or
 requires more than a short admission/invocation wrapper, promote it to a tested
 reviewed script/checkpoint before use.
 
+### Source-gate branch bootstrap
+
+A new feature branch must not rely on its own first commit to add itself to an
+explicit GitHub Actions `push.branches` allowlist. GitHub may evaluate the push
+against the workflow trigger state that existed before that branch was admitted,
+leaving the first checkpoint with no push-triggered source gate.
+
+Before the first checkpoint push on a new branch, prove one of these is already
+true on the integration/default workflow:
+
+- the new branch matches an existing stable reviewed branch-family pattern; or
+- a separate intentional workflow-registration checkpoint has already admitted
+  the branch/pattern.
+
+Prefer stable narrowly scoped family patterns (for example
+`feature/robinhood-*`) over repeatedly self-registering each new milestone
+branch. Do not broaden to all feature branches unless that CI-cost decision is
+explicitly reviewed.
+
+If a first push produces no workflow run, never treat silence as PASS. Classify
+the bootstrap gap, preserve the branch state, make any required workflow
+registration as a distinct reviewed checkpoint, and require a real source-gate
+run on the resulting exact tree before source/design acceptance.
+
 ### Atomic ChatGPT-direct multi-file repository writes
 
 A logical ChatGPT-direct checkpoint that changes two or more repository files

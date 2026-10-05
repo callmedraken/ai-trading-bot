@@ -11657,3 +11657,89 @@ preparation remains valid.
 
 Neither this accepted PREPARE nor any future `READY_TO_PROCEED` result
 authorizes EXECUTE. Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Architecture 131-V in-process supervised qualification CERTIFIED
+
+Architecture 131-V is **CERTIFIED** after exact GitHub source review, source-gate
+CI, final focused verification, and ROBINHOOD-profile certification.
+
+Accepted source identity:
+
+```text
+BRANCH         feature/robinhood-review-paper-side-foundation
+IMPLEMENTATION 434798c0915c5ebbf374b47bcf4b1c1ef529e3a3
+HEAD           9048146c57fedfddf212e0473d48eeef2e0153d6
+TREE           12e5c0dc7e188a024fb369371aeb0a8a436cdf3f
+SUBJECT        test: admit 131-V certification inventory
+CI             #192 / 37356466423 SUCCESS
+```
+
+The implementation commit retained one exact in-memory
+`ReviewPaperSupervisedPreparation` across the human authorization pause,
+bound EXECUTE authority to a SHA-256 challenge over exact sanitized PREPARE and
+execution material, consumed exactly one whole-terminal stdin frame, and passed
+the same preparation object by identity into accepted 131-Q EXECUTE exactly
+once. It adds sanitized EXECUTE evidence and an independent provider-free,
+SQLite-read-only verifier. STOP/FAIL/INDETERMINATE states never authorize retry;
+an EXECUTE exception records downstream invocation as unknown rather than
+inventing proof of non-effect. Quote reacquisition, serialization/reconstruction,
+a second PREPARE, polling, retry, scheduler authority, interactive OAuth, and
+real brokerage placement remain absent.
+
+Final implementation verification on the unchanged 131-V source recorded:
+
+```text
+131-V integration regression:       539 passed
+checkpoint-runner module:            989 passed
+Architecture 131 authority/source:    24 passed
+Ruff check:                          PASS
+Ruff format --check:                 PASS
+git diff --check:                    PASS
+```
+
+GitHub source-gate run #191 exposed only stale current-tree certification
+expectations after the new root `tests/test_robinhood_supervised_qualification.py`
+module was correctly auto-admitted by Architecture 132. ChatGPT repaired that
+one-file mechanical expectation directly without changing executable source.
+The frozen minimum baselines remain FULL 113 / ROBINHOOD 40; current discovery
+is FULL 116 / ROBINHOOD 43 / LEGACY 204 / EXHAUSTIVE 320. Source-gate run #192
+then passed on the final accepted tree.
+
+Final ROBINHOOD certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| robinhood-1 | 19 | 1,641 | 1,641 | 0 | 0 | 0 |
+| robinhood-2 | 24 | 1,531 | 1,531 | 0 | 0 | 0 |
+| Total | 43 | 3,172 | 3,172 | 0 | 0 | 0 |
+
+```text
+profile: robinhood
+wall: 226.888 s
+ARCH131_V_ROBINHOOD_CERTIFICATION=PASS
+```
+
+Certification evidence:
+
+```text
+F:\AI\temp\pytest\certification-evidence-0ccd2b9e293a440689ded75493ec8351
+```
+
+### Next protected qualification boundary
+
+The first 131-L/131-LQ qualification and the first live 131-Q PREPARE are
+accepted. The old PREPARE is expired and cannot be reused. The next goal is one
+131-V same-process PREPARE -> human challenge -> 131-Q EXECUTE qualification.
+
+Before any provider call, perform only provider-free admission/readiness work:
+fast-forward the local worktree to this accepted docs closeout, prove exact
+source/worktree/remote identity, read the fixed two-record paper store in
+SQLite read-only mode, and freeze its full-column BEFORE SHA-256. A fresh launch
+then requires a new explicit PREPARE authorization. That authorization permits
+only one fresh 131-U quote/PREPARE path. The process must remain alive at
+`AUTHORIZATION_REQUIRED`; EXECUTE requires a later, separate challenge-bound
+human authorization while the quote remains fresh. No retry is implied by
+expiry, STOP, provider error, or ambiguous downstream effect.
+
+Production/live real-money placement remains **NO-GO**.

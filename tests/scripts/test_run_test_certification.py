@@ -689,6 +689,7 @@ def test_parser_defaults_to_full_and_rejects_unknown_profile() -> None:
 
 _PUBLISHED_PREPARE_TEST = "tests/review_paper/test_published_session_prepare.py"
 _PREPARE_OPERATOR_TEST = "tests/test_robinhood_prepare_operator.py"
+_SUPERVISED_QUALIFICATION_TEST = "tests/test_robinhood_supervised_qualification.py"
 
 
 def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
@@ -700,9 +701,16 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     assert runner.ROBINHOOD_REQUIRED_MODULES == _EXPECTED_ROBINHOOD
     assert len(runner.ROBINHOOD_REQUIRED_MODULES) == 40
     assert selected == tuple(
-        sorted((*_EXPECTED_ROBINHOOD, _PUBLISHED_PREPARE_TEST, _PREPARE_OPERATOR_TEST))
+        sorted(
+            (
+                *_EXPECTED_ROBINHOOD,
+                _PUBLISHED_PREPARE_TEST,
+                _PREPARE_OPERATOR_TEST,
+                _SUPERVISED_QUALIFICATION_TEST,
+            )
+        )
     )
-    assert len(selected) == 42
+    assert len(selected) == 43
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -724,16 +732,25 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
     assert len(runner.FULL_REQUIRED_MODULES) == 113
     assert profiles["full"] == tuple(
-        sorted((*_EXPECTED_FULL, _PUBLISHED_PREPARE_TEST, _PREPARE_OPERATOR_TEST))
+        sorted(
+            (
+                *_EXPECTED_FULL,
+                _PUBLISHED_PREPARE_TEST,
+                _PREPARE_OPERATOR_TEST,
+                _SUPERVISED_QUALIFICATION_TEST,
+            )
+        )
     )
     assert _PUBLISHED_PREPARE_TEST in profiles["robinhood"]
     assert _PREPARE_OPERATOR_TEST in profiles["robinhood"]
     assert _PREPARE_OPERATOR_TEST in profiles["full"]
+    assert _SUPERVISED_QUALIFICATION_TEST in profiles["robinhood"]
+    assert _SUPERVISED_QUALIFICATION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 115,
-        "robinhood": 42,
+        "full": 116,
+        "robinhood": 43,
         "legacy": 204,
-        "exhaustive": 319,
+        "exhaustive": 320,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

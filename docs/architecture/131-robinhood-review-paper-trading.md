@@ -1798,6 +1798,17 @@ protected store write or real brokerage effect is authorized during development.
 
 #### Qualification runbook (after source acceptance and ROBINHOOD certification)
 
+Operator transport rule: use the reviewed source-owned launcher directly. Do not
+wrap this qualification in generated inline Python or a large ad-hoc PowerShell
+here-string. Any small provider-free diagnostic needed around the launcher must
+prefer an existing reviewed entry point; otherwise carry structured material by
+file path or stdin, never raw JSON/native argv. If Python source itself must be
+fed through stdin for a short read-only diagnostic, pipe a single-quoted
+PowerShell here-string to `python -B -`; never pass the here-string to
+`python -c`. Multi-step PowerShell admission must run inside one guarded
+scriptblock and print PASS only after all checks succeed.
+
+
 Replace the former one-shot PREPARE here-doc with this source-owned launcher.
 ChatGPT must freeze the exact accepted source identities and BEFORE digest from
 provider-free review first. The variables below are explicit reviewed operator

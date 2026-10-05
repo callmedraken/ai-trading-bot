@@ -1590,6 +1590,62 @@ or EXECUTE. `READY_TO_PROCEED` is never execution authorization. Production/live
 real-money placement remains **NO-GO**.
 
 
+### First live 131-Q PREPARE qualification — ACCEPTED
+
+The first separately authorized live 131-Q PREPARE qualification through
+certified 131-U is accepted.
+
+```text
+source HEAD/TREE:
+114fca8e110c4e82d181aebafc30b0f689061265
+4b307dc6df11cc6487b9c4518adeeb27970ba695
+
+proposal:
+11111111-131c-4000-8000-000000000001
+SPY SELL 1.000
+
+result:
+READY_TO_PROCEED
+APPROVED 1.000
+quote_observed_at 2026-10-05T17:21:39.028389+00:00
+quote_valid_until 2026-10-05T17:26:30.262285+00:00
+execute_invoked false
+pipeline_result_present false
+durable bytes unchanged
+provider-free verifier PASS
+```
+
+Evidence:
+
+```text
+F:\AI\temp\robinhood-131q-prepare-defbc565dc8d472fbfe0bc97522e9883\prepare-evidence.json
+```
+
+The MCP runtime printed `Session termination failed: 400` during transport
+context teardown after the successful quote result. PREPARE returned normally,
+the process exited 0, durable bytes remained unchanged, and independent
+provider-free reconciliation passed. Record the warning as non-blocking
+transport-close noise; it does not authorize retry.
+
+The accepted preparation's quote deadline is authoritative. 131-Q requires
+`execute_at <= quote_valid_until`; after
+`2026-10-05T17:26:30.262285+00:00`, this preparation cannot enter 131-L. A
+fresh provider-read PREPARE and fresh review are required before an EXECUTE
+qualification can proceed.
+
+Current protected progression:
+
+1. first live 131-L + 131-LQ — **ACCEPTED**;
+2. first live 131-Q PREPARE — **ACCEPTED**;
+3. next goal: one 131-Q EXECUTE qualification;
+4. because the accepted PREPARE has expired, first obtain a new separately
+   authorized PREPARE with fresh evidence, then separately authorize EXECUTE
+   while the new quote remains valid.
+
+`READY_TO_PROCEED` remains evidence, never execution authorization.
+Production/live real-money placement remains **NO-GO**.
+
+
 ## D10 disposition
 
 D10 remains frozen historical infrastructure with its scheduler disabled.

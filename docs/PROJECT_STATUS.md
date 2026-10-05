@@ -11448,3 +11448,97 @@ ARCH131_L_LIVE_AND_RECONCILIATION=PASS
 The first live 131-L/131-LQ qualification is complete. The next main-flow step is one separately authorized 131-Q PREPARE qualification through certified 131-U. That authorization permits only the accepted quote-read/PREPARE path and does not authorize 131-Q EXECUTE, 131-L invocation, `review_equity_order`, account/order-history reads, placement/cancel/options/crypto mutation, automatic retry, unattended polling/scheduling, or real-money trading.
 
 A PREPARE result of `READY_TO_PROCEED` is evidence only and never execution authorization. The PREPARE run requires a fresh evidence path and fresh explicit user authorization. Production/live real-money placement remains **NO-GO**.
+
+## 2026-10-05 — First live Architecture 131-Q PREPARE qualification ACCEPTED
+
+The first separately authorized live Architecture 131-Q PREPARE qualification
+through certified 131-U completed successfully and is independently reconciled.
+
+Qualified source identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   114fca8e110c4e82d181aebafc30b0f689061265
+TREE   4b307dc6df11cc6487b9c4518adeeb27970ba695
+```
+
+Frozen qualification inputs/result:
+
+```text
+session_date         2026-10-05
+proposal_id          11111111-131c-4000-8000-000000000001
+symbol               SPY
+side                 SELL
+desired_quantity     1.000
+opening_buffer       5 minutes
+closing_buffer       5 minutes
+max_quote_age        5 minutes
+new_trading_enabled  true
+
+durable admission:
+  records             2
+  cash                98457.100000000
+  SPY quantity        2.000
+
+PREPARE:
+  status              READY_TO_PROCEED
+  risk_outcome        APPROVED
+  approved_quantity   1.000
+  quote_observed_at   2026-10-05T17:21:39.028389+00:00
+  quote_valid_until   2026-10-05T17:26:30.262285+00:00
+  execute_invoked     false
+  pipeline_result     absent
+```
+
+Evidence:
+
+```text
+F:\AI\temp\robinhood-131q-prepare-defbc565dc8d472fbfe0bc97522e9883\prepare-evidence.json
+```
+
+Observed operator output:
+
+```text
+131-Q_PREPARE_SOURCE_ADMISSION=PASS
+131-Q_PREPARE_LOCAL_ADMISSION=PASS
+131-Q_PREPARE_DURABLE_ADMISSION=PASS
+ARCH131_Q_PREPARE_AUTHORIZATION_CONSUMED=YES
+ARCH131_Q_EXECUTE_AUTHORIZED=NO
+ARCH131_Q_PREPARE_DURABLE_BYTES_UNCHANGED=PASS
+ARCH131_Q_PREPARE_RECONCILIATION=PASS
+ARCH131_Q_PREPARE_QUALIFICATION=PASS
+ARCH131_Q_PREPARE_EXIT=0
+ARCH131_Q_PREPARE_FINAL=PASS
+```
+
+The MCP runtime emitted `Session termination failed: 400` while closing the
+already-successful transport session. The quote tool result had already returned,
+the source-owned PREPARE completed, durable bytes remained unchanged, the
+sanitized evidence was written, and the provider-free verifier reconciled it
+successfully. The teardown warning is therefore recorded as non-blocking
+transport-close noise for this qualification; it does not grant retry authority
+and does not change the accepted provider/effect result.
+
+### EXECUTE freshness boundary
+
+This accepted PREPARE does **not** remain executable indefinitely. Accepted
+131-Q requires `execute_at <= preparation.quote_valid_until`. The qualification
+quote deadline was:
+
+```text
+2026-10-05T17:26:30.262285+00:00
+```
+
+After that instant, an EXECUTE call must fail closed before 131-L and the caller
+must obtain and review a fresh PREPARE result. Therefore this qualification
+proves the live PREPARE path, but it must not be reused as an execution token
+after expiration.
+
+The next main-flow goal remains one separately authorized 131-Q EXECUTE
+qualification. Because the qualified preparation has expired, reaching that goal
+first requires a **new separately authorized PREPARE provider read with a fresh
+evidence path**, followed by a distinct EXECUTE authorization while that new
+preparation remains valid.
+
+Neither this accepted PREPARE nor any future `READY_TO_PROCEED` result
+authorizes EXECUTE. Production/live real-money placement remains **NO-GO**.

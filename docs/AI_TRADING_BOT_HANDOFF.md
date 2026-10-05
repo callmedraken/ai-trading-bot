@@ -11770,3 +11770,20 @@ not invalidate the accepted 131-V ROBINHOOD certification. The next protected
 boundary remains one fresh 131-V PREPARE-only authorization followed, only if a
 fresh preparation is accepted and still live, by a separate exact
 challenge-bound EXECUTE authorization.
+
+
+## 2026-10-05 — Workflow reconstruction/transition contract restored
+
+The historical workflow review also recovered the older explicit transition
+quality contract. New chats/context resets must reconstruct state from the
+current Git-tracked handoff/status, relevant architecture, available project
+conversation history, and GitHub rather than asking the user to shuttle material
+that tools can retrieve. Every checkpoint transition must leave the next action
+immediately executable: current checkpoint/branch/HEAD, blocker or protected
+boundary, owner/model, exact command or prompt, expected success evidence, stop
+condition, and the specific output to return when another review is required.
+
+This complements the restored operator-transport rules and the existing
+automatic docs closeout, GitHub-first review, direct-small-fix routing,
+certification-tier, and automatic-next-step rules. It changes no Architecture
+131 executable source and does not invalidate the accepted 131-V certification.

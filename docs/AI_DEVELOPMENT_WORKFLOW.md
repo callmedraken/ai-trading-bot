@@ -433,6 +433,12 @@ through stdin, use a single-quoted PowerShell here-string and pipe it to
 `python -B -`; do not pass that here-string as the `-c` argument. Substantial
 logic belongs in reviewed repository files.
 
+This serialization rule does not override a protected operator contract that
+explicitly requires real interactive terminal stdin. In that case, do not pipe
+or redirect the human authorization input and do not automate the terminal gate;
+use stdin/file transport only for the surrounding diagnostic data that the
+reviewed contract permits.
+
 PowerShell/operator blocks must also preserve these established Windows rules:
 
 - normalize filesystem identities with `Resolve-Path` (and case-insensitive

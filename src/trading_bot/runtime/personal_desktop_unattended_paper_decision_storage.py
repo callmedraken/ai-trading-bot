@@ -528,6 +528,141 @@ def _find_finalized_unattended_decision_for_execution_session_for_test(
         return _blocked_session_result(execution_session)
 
 
+class CompleteDecisionNamespaceClassification(StrEnum):
+    VALID = "VALID"
+    BLOCKED = "BLOCKED"
+
+
+@dataclass(frozen=True, slots=True)
+class FinalizedDecisionIdentity:
+    execution_session: TradingSession
+    decision_id: UUID
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.execution_session) is not TradingSession
+            or type(self.decision_id) is not UUID
+        ):
+            raise ValueError("finalized decision identity is invalid")
+
+
+@dataclass(frozen=True, slots=True, eq=False, weakref_slot=True)
+class CompleteDecisionNamespaceResult:
+    """Sanitized complete-namespace inventory; never a trading capability."""
+
+    classification: CompleteDecisionNamespaceClassification
+    decisions: tuple[FinalizedDecisionIdentity, ...] = ()
+
+    def __post_init__(self) -> None:
+        if (
+            type(self.classification) is not CompleteDecisionNamespaceClassification
+            or type(self.decisions) is not tuple
+            or any(
+                type(item) is not FinalizedDecisionIdentity for item in self.decisions
+            )
+            or (
+                self.classification is CompleteDecisionNamespaceClassification.BLOCKED
+                and self.decisions
+            )
+            or len({item.decision_id for item in self.decisions}) != len(self.decisions)
+            or len({item.execution_session for item in self.decisions})
+            != len(self.decisions)
+        ):
+            raise ValueError("complete decision namespace result is invalid")
+
+
+_COMPLETE_REGISTRY: weakref.WeakKeyDictionary[
+    CompleteDecisionNamespaceResult,
+    tuple[
+        ValidatedProductionAuthority,
+        tuple[PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding, ...],
+    ],
+] = weakref.WeakKeyDictionary()
+
+
+def read_complete_personal_desktop_unattended_decision_namespace(
+    authority: ValidatedProductionAuthority,
+) -> CompleteDecisionNamespaceResult:
+    """Read every fixed decision entry through the pinned native-safe reader."""
+
+    try:
+        c1 = require_validated_production_authority(authority)
+        observer = WindowsTradingTokenObserver()
+        first = observer.observe()
+        require_trading_token(c1.approved_account_sid, first)
+        finalized = _read_complete_fixed_namespace(
+            c1.approved_account_sid,
+            api=WindowsPaperReadNativeApi(),
+            calendar=personal_desktop_unattended_decision_calendar(),
+        )
+        finalized = tuple(
+            sorted(
+                finalized,
+                key=lambda binding: (
+                    binding.decision.intended_execution_session.session_date,
+                    binding.decision.decision_id,
+                ),
+            )
+        )
+        for binding in finalized:
+            _require_decision_c3_matches_current_authority(binding, c1)
+        last = observer.observe()
+        require_trading_token(c1.approved_account_sid, last)
+        if last != first:
+            raise PersonalDesktopUnattendedDecisionStorageError("Trading token changed")
+        require_validated_production_authority(c1)
+        decisions = tuple(
+            FinalizedDecisionIdentity(
+                binding.decision.intended_execution_session,
+                binding.decision.decision_id,
+            )
+            for binding in finalized
+        )
+        result = CompleteDecisionNamespaceResult(
+            CompleteDecisionNamespaceClassification.VALID, decisions
+        )
+        with _REGISTRY_LOCK:
+            _COMPLETE_REGISTRY[result] = (c1, finalized)
+        return result
+    except Exception:
+        return CompleteDecisionNamespaceResult(
+            CompleteDecisionNamespaceClassification.BLOCKED
+        )
+
+
+def require_complete_personal_desktop_unattended_decision_namespace(
+    result: CompleteDecisionNamespaceResult,
+    authority: ValidatedProductionAuthority,
+) -> tuple[PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding, ...]:
+    """Require same-process current-C1 provenance for the complete inventory."""
+
+    try:
+        c1 = require_validated_production_authority(authority)
+        if type(result) is not CompleteDecisionNamespaceResult:
+            raise ValueError("wrong inventory type")
+        result.__post_init__()
+        with _REGISTRY_LOCK:
+            proof = _COMPLETE_REGISTRY.get(result)
+        if (
+            result.classification is not CompleteDecisionNamespaceClassification.VALID
+            or proof is None
+            or proof[0] != c1
+            or result.decisions
+            != tuple(
+                FinalizedDecisionIdentity(
+                    item.decision.intended_execution_session, item.decision.decision_id
+                )
+                for item in proof[1]
+            )
+        ):
+            raise ValueError("inventory lacks current-C1 provenance")
+        return proof[1]
+    except Exception as error:
+        raise PersonalDesktopUnattendedDecisionStorageError(
+            "complete decision namespace lacks current-C1 provenance"
+        ) from error
+
+
 def _read_personal_desktop_unattended_decision_storage_for_test(
     expected: PersonalDesktopUnattendedPaperDecisionIntentArtifactBinding,
     trading_sid: str,

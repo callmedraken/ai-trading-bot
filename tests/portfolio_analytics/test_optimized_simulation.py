@@ -1,6 +1,10 @@
+import os
+import subprocess
+import sys
 from dataclasses import fields
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -42,6 +46,41 @@ from trading_bot.simulation import (
     OptimizedPaperSimulationFrame,
     OptimizedPaperSimulationRequest,
 )
+
+
+@pytest.mark.parametrize(
+    "module_order",
+    [
+        ("trading_bot.portfolio_analytics",),
+        ("trading_bot.portfolio_analytics", "trading_bot.simulation"),
+        ("trading_bot.simulation", "trading_bot.portfolio_analytics"),
+    ],
+)
+def test_package_import_order_in_clean_interpreter(
+    module_order: tuple[str, ...], tmp_path: Path
+) -> None:
+    source = Path(__file__).resolve().parents[2] / "src"
+    code = "\n".join(
+        [
+            "from pathlib import Path",
+            "import sys",
+            "import trading_bot",
+            "source = Path(sys.argv[1]).resolve()",
+            "package_path = Path(trading_bot.__file__).resolve()",
+            "assert package_path == source / 'trading_bot' / '__init__.py'",
+            *(f"import {name}" for name in module_order),
+        ]
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", code, str(source), *module_order],
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": str(source)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
 
 NOW = datetime(2026, 7, 22, 20, tzinfo=UTC)
 SPY = Symbol("SPY")
@@ -384,6 +423,8 @@ def test_request_validation_and_defensive_metadata_copy() -> None:
     )
     metadata.clear()
     assert request.metadata == (MetadataEntry("source", "test"),)
+    with pytest.raises(InvalidOptimizedSimulationPerformanceRequestError):
+        OptimizedSimulationPerformanceRequest(UUID(int=2), object())  # type: ignore[arg-type]
     with pytest.raises(InvalidOptimizedSimulationPerformanceRequestError):
         OptimizedSimulationPerformanceRequest("bad", result)  # type: ignore[arg-type]
     with pytest.raises(InvalidOptimizedSimulationPerformanceRequestError):

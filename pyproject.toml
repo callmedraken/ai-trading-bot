@@ -25,6 +25,10 @@ gui = [
 optimization-cpu = [
     "scipy>=1.17,<1.19",
 ]
+robinhood-mcp = [
+    "httpx2>=2.13,<3",
+    "mcp>=2.2,<3",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

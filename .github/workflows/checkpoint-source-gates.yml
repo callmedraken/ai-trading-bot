@@ -1,0 +1,118 @@
+name: Checkpoint Source Gates
+
+on:
+  push:
+    branches:
+      - develop
+      - feature/d10c-durable-wake-evidence
+      - feature/d10c-r8-terminal-halt
+      - feature/d10c-r8-incident-reconciliation
+      - feature/robinhood-review-paper-mode
+      - feature/robinhood-review-paper-side-foundation
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-gates:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Classify changed paths
+        id: changes
+        env:
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 classify-ci
+          exit $LASTEXITCODE
+
+      - name: Validate docs-only range
+        if: steps.changes.outputs.mode == 'DOCS_ONLY'
+        env:
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-docs
+          exit $LASTEXITCODE
+
+      - name: Install source-gate dependencies
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Show checkpoint status
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
+
+      - name: Verify batch source checkpoints
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+        env:
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
+            verify-batch `
+              arch128-parent-acl-repair `
+              arch128-r4 `
+              arch128-r5-substrate `
+              arch128-r5-trading `
+              arch128-r6 `
+              arch128-r7 `
+              arch128-r8-terminal-halt `
+              arch130-r8i-d1 `
+              arch131-robinhood-review-paper `
+              arch131-robinhood-mcp-schema `
+              arch131-robinhood-paper-cycle `
+              arch131-robinhood-performance `
+              arch131-robinhood-direct-mcp `
+              arch131-robinhood-oauth-windows `
+              arch131-robinhood-agentic-account `
+              arch131-robinhood-paper-operator `
+              arch131-robinhood-paper-intent-bridge `
+              arch131-robinhood-deterministic-paper-pipeline `
+              arch131-robinhood-virtual-risk-context `
+              arch131-robinhood-forward-paper-cycle `
+              arch131-robinhood-live-qualification-verifier `
+              arch131-robinhood-session-admission `
+              arch131-robinhood-risk-price-snapshot `
+              arch131-robinhood-forward-paper-preview `
+              arch131-robinhood-risk-price-acquisition `
+              arch131-robinhood-supervised-forward-paper `
+              arch131-robinhood-supervised-prepare-qualification `
+              arch131-robinhood-supervised-prepare-verifier `
+              arch131-nyse-published-regular-session-authority `
+              arch131-robinhood-published-session-prepare `
+              arch131-robinhood-published-prepare-operator `
+              arch131-robinhood-supervised-qualification
+          exit $LASTEXITCODE
+
+      - name: Upload checkpoint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-evidence
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+            !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
+          if-no-files-found: ignore

@@ -1,0 +1,249 @@
+# Architecture 125 - D10 Signing-Key Bootstrap and CNG External Signer
+
+Status: amended after P125-1 attempt #2 for read-only recovery of the existing
+persisted v3 key. This document authorizes no further key creation, signing,
+trust publication, deployment, scheduler mutation, or trading effect.
+
+## 1. Purpose and key transition
+
+The private signer corresponding to the currently pinned legacy P-256 public
+key is operationally unavailable. It must not be reconstructed, derived,
+substituted, exported, or invented. D10 therefore requires a new dedicated
+signing key.
+
+The future logical key ID is exactly:
+
+AITradingBot/D10/DeploymentAttestation/v3
+
+The fixed persisted key name is exactly:
+
+AITradingBot-D10-DeploymentAttestation-v3
+
+The current v2 signing-key ID and public key remain unchanged during A125-1.
+They are historical only after the later public-key migration. No existing
+governed D10 verifier or signing-key constant changes in A125-1.
+
+## 2. Frozen provider, algorithm, scope, and policy
+
+The key identity is fixed in source and cannot be selected by a caller:
+
+- Provider: Microsoft Software Key Storage Provider.
+- Persisted key, machine scope, using NCRYPT_MACHINE_KEY_FLAG.
+- ECDSA P-256 only (ECDSA_P256, 256 bits).
+- Signing use only (NCRYPT_ALLOW_SIGNING_FLAG exactly).
+- Private-key export policy exactly zero: no export or archive policy.
+- Create-only; no overwrite, replacement, delete, or caller-chosen identity.
+
+The source-owned security descriptor is exactly:
+
+O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA)
+
+It requests BUILTIN Administrators as owner, SYSTEM as primary group, a
+protected DACL, and only SYSTEM and BUILTIN Administrators full-control ACEs.
+The D10 Trading SID is absent. Microsoft Software KSP persisted a different
+primary-group representation and expanded the requested FA mask. Persisted
+authority is verified from the binary security descriptor using native Windows
+APIs and the exact frozen structural contract in section 6. SDDL text is
+never parsed as authority.
+
+The key remains Administrator/SYSTEM controlled. Trading has no key access.
+The signing API does not accept caller-selected provider, key name, algorithm,
+scope, logical key ID, export policy, ACL, key bytes, or message bytes.
+
+## 3. Protected P125-1 enrollment contract
+
+scripts.d10_signing_key_windows.prepare_d10_signing_key() is the zero-argument
+operator entry point prepared for a later, separately authorized P125-1 run.
+Importing the module has no native side effects. The function:
+
+1. Requires an elevated Administrator token.
+2. Opens only the fixed Microsoft Software Key Storage Provider.
+3. Requires the fixed key name absent in the operator user namespace and the
+   machine namespace. Only a positive not-found result proves absence; unknown
+   or inaccessible state blocks.
+4. Creates the fixed algorithm/name with NCRYPT_MACHINE_KEY_FLAG and without
+   NCRYPT_OVERWRITE_KEY_FLAG.
+5. Sets the exact protected Administrator/SYSTEM descriptor before key
+   finalization, followed by signing-only usage and export-policy zero. There
+   is no descriptor readback on the unfinalized creation handle.
+6. Calls NCryptFinalizeKey exactly once.
+7. Closes the creation handle and reopens the fixed persisted key with
+   NCRYPT_MACHINE_KEY_FLAG.
+8. On the finalized, reopened key, authoritatively reads back the exact
+   provider, name, ECDSA_P256/ECDSA algorithm, 256-bit P-256 size, machine-key
+   type, signing-only usage, zero export policy, and full OWNER|GROUP|DACL
+   descriptor using the exact native structural contract in section 6.
+9. Exports only the public ECCPUBLICBLOB, validates its P-256 point, and
+   normalizes it to the verifier's 65-byte uncompressed SEC1 point
+   04 || X || Y.
+10. Returns a bounded deterministic canonical transcript and public material
+    only. The transcript records provider/key identity, public point and
+    SHA-256, exact security/property facts, and PASS or BLOCKED. It contains
+    no timestamp, path, handle, credential, or private-key material.
+
+The transcript is capped at 8 KiB. It contains no data from exception text.
+Enrollment does not create or publish a D10 attestation, signature, manifest,
+lease, or other trust file. It does not touch the D10 root, Task Scheduler, a
+market-data provider, settlement, broker-paper, or live trading.
+
+A failed or ambiguous step returns BLOCKED. Every CNG handle and native
+allocation is released once; any cleanup ambiguity also blocks. A failure after
+create-only key creation is not rolled back by deleting or replacing the
+persisted name. The operator must retain the blocked transcript and resolve
+state through a separately reviewed procedure. Successful descriptor setting
+alone cannot produce PASS or permit public-key export; complete reopened-state
+verification is required first.
+
+The first protected P125-1 attempt returned BLOCKED with
+`cng_security_descriptor_unavailable` during the pre-finalization readback.
+Read-only post-attempt diagnosis opened the Microsoft Software Key Storage
+Provider and observed `Security Descr Support = DWORD 1`; the fixed key name
+returned `NTE_BAD_KEYSET (0x80090016)` in both user and machine scopes. No v3
+key persisted, no public key was produced, and no P124 operation occurred.
+This evidence is not a P125-1 PASS or authorization for another attempt.
+
+## 4. Concrete P124-3 ExternalSigner implementation
+
+WindowsCngExternalSigner implements the accepted
+d10_protected_deployment.ExternalSigner protocol using only the fixed
+persisted machine key. Its SigningIdentity exposes v3,
+ECDSA-P256/SHA-256/IEEE-P1363, and private_key_exportable=False.
+
+For every sign_digest call it requires Administrator, opens only the fixed
+Microsoft Software KSP and fixed machine key, then rereads and verifies all
+provider, name, algorithm/group, curve/size, machine-scope, signing-usage,
+zero-export-policy, and the section 6 native structural security facts
+before signing. It accepts only the exact SigningRequest carrying a 32-byte SHA-256 digest
+and the frozen v3 protocol. It passes that exact digest once to
+NCryptSignHash, requires exactly 64 bytes of IEEE-P1363 r || s, and applies
+the existing scalar-canonicality check before returning a detached signature.
+
+No message input, key material, private-key import/export path, or generic key
+name/provider/algorithm API is exposed. Provider/key handles close once per
+operation. Native/property/signing/cleanup ambiguity raises a fail-closed
+DeploymentBlocked result. The signer does not create D10 trust files or
+perform a publication or trading effect.
+
+## 5. Migration and deployment gates
+
+The current S5 source certification remains historically accepted, but it
+cannot be deployed until A125 completes. P125-1 is a separately authorized
+protected key-creation checkpoint; source work does not create a production
+key.
+
+After P125-1, ChatGPT must review the protected transcript and public point.
+Only then may the separate A125-2 source checkpoint replace the governed D10
+signing-key ID and pinned public point, the P124-1/P124-3 operator verifier
+public-key constants, and directly related tests. A125-2 must not invent or
+substitute public material.
+
+The public-key change alters the certified executable D10 tree. A new exact
+tree S5-R1 certification is mandatory after A125-2. P124-2 and P124-3 remain
+blocked until the new public key is pinned and S5-R1 has passed. The current v2
+key ID/public key are historical after migration; they are not a fallback.
+
+A125-1 does not run P125-1, P124-2, P124-3, or P124-1, and does not change the
+currently pinned D10 public key.
+
+
+## 6. Attempt-#2 persisted-object security amendment and recovery
+
+P125-1 attempt #1 blocked on a pre-finalization descriptor read and left no
+persisted key. Attempt #2 finalized and persisted the fixed machine key, then
+blocked only because exact SDDL serialization equality rejected the Microsoft
+Software KSP representation. It returned no public key. A read-only inspection
+found the user-scope fixed name absent; the machine key had exact name
+AITradingBot-D10-DeploymentAttestation-v3, ECDSA_P256/ECDSA, 256 bits,
+machine key type 0x20, signing-only usage 0x02, export policy zero, and the
+Microsoft Software Key Storage Provider.
+
+The write-time request remains
+O:BAG:SYD:P(A;;FA;;;SY)(A;;FA;;;BA), where FA is 0x001F01FF. The frozen
+persisted object has owner S-1-5-32-544 (BUILTIN\Administrators), primary
+group S-1-5-21-1397534616-3988210162-180023805-1005, a present non-NULL
+protected DACL, and exactly two ordered ACCESS_ALLOWED ACEs with flags zero:
+SYSTEM S-1-5-18 then BUILTIN\Administrators S-1-5-32-544. Each mask is
+exactly 0xD01F01FF. The observed serialized descriptor SHA-256 is
+37add57ba665ea9c87b586574ad54b831f3aa6534720d4cc4215d0300d84ad91.
+This is host-observed frozen provider representation, not a general
+normalization or permission to accept arbitrary mask supersets. The primary
+group is pinned for drift detection only; it does not grant key access.
+Trading is not an ACE trustee. No extra, inherited, deny, object, callback,
+unknown, malformed, or differently ordered ACE is accepted. A further
+read-only native diagnostic of the exact persisted attempt-#2 object found
+security-descriptor revision 1; control exactly 0x9004 (DACL present,
+DACL protected, self-relative, and no other flags); owner, group, and DACL
+defaulted flags all false; ACL revision 2; and two ACEs. ACE 0 was type 0,
+flags 0, size 20, mask 0xD01F01FF, SID S-1-5-18. ACE 1 was type 0, flags 0,
+size 24, mask 0xD01F01FF, SID S-1-5-32-544. The control word is now an
+exact drift requirement, not a required-bit subset. Any additional or
+missing bit blocks. Owner/group native defaulted outputs must be false
+independently of the control-word check. Missing control, SID, ACL, or ACE
+data blocks.
+
+The same diagnostic observed acl_bytes_in_use=52, acl_bytes_free=0, and
+binary descriptor SHA-256
+ba4b328efe2fd3df0160302a957c641eed40dd40f4b3a31c955f300d51290d04.
+Those byte counts and the binary hash are diagnostic evidence only, not
+authority requirements; raw binary serialization is not pinned. The earlier
+37add57b... value is an SDDL serialization hash, also diagnostic only.
+
+The implementation reads the binary NCRYPT_SECURITY_DESCR_PROPERTY and uses
+GetSecurityDescriptorControl/Owner/Group/Dacl, GetAclInformation, GetAce,
+ConvertSidToStringSidW, validity checks, and LocalFree. An immutable
+SecurityFacts model carries descriptor revision, owner/group SIDs and native
+defaulted outputs, exact control, DACL state, ACL revision, ACE count, and
+ordered ACE type/flags/mask/SID records. The same verifier is
+used after enrollment reopen, by the read-only recovery qualification, and
+before every future ExternalSigner signature. Exact SDDL string equality is
+not a fallback.
+
+The new zero-argument
+qualify_existing_d10_signing_key_after_attempt2() is a distinct read-only
+recovery boundary. It requires elevated Administrator, opens only the fixed
+provider, proves the user-scope name absent and machine-scope name present,
+verifies every frozen provider/crypto/security fact, and only then exports
+ECCPUBLICBLOB and validates the P-256 public point. Its bounded public-only
+transcript has a distinct recovery schema. It never creates, sets, finalizes,
+deletes, signs, publishes, or touches scheduler/trading/provider state.
+prepare_d10_signing_key() remains create-only and blocks on any existing fixed
+name. No third enrollment attempt is planned. The recovery function has not
+been executed against the production key. Only after its PASS evidence and
+ChatGPT review may A125-2 pin the returned public point.
+
+This source correction has not run the production read-only qualification or
+mutated the persisted key. That qualification remains the next separately
+authorized protected checkpoint.
+
+## 7. Accepted read-only qualification and A125-2 migration
+
+The separately authorized qualification of the existing persisted v3
+machine key is accepted as read-only PASS evidence (reason: None). Its exact
+qualified SEC1 P-256 public point is:
+
+```text
+04f2e83034f58cc1e27b1ff6511df503c31d4103782b2992ee64ebb7a9e734a3548c5daaa5e5c69e83c2f2c2c825c26b61efd356680eed3d60822585c04493ba61
+```
+
+Public-key SHA-256: `fb22627f6d01d63ecfcc02dbe6e34a5529bdde30ceb0fcb8037eead6f0c56b1e`.
+Evidence directory: `F:\AI\temp\a125-existing-key-qualification-20260924-215835`.
+The repository remained at HEAD
+`9c6475c9e5736697878e9f7a225ed090a04f5c35` and tree
+`d7cc1df327f37bc531a3b32917d815e993cd889d` during qualification.
+The qualification did not mutate the key, sign, or execute any P124 operation.
+
+A125-2 pins only this qualified point and logical key ID
+`AITradingBot/D10/DeploymentAttestation/v3` in the governed deployment
+identity, pre-source launch guard, P124-3 verifier, and P124-1 signed-attestation
+verifier. This is source-only. The deployment-attestation schema and deployment
+UUID namespace remain v2; the separate Architecture-77 bootstrap trust anchor
+remains unchanged. The old D10 v2 key is historical and cannot authorize a new
+deployment.
+
+Historical S5 HEAD `acee8f80e947bcaefd79fa2c44531e8bbdf4cd0c` and tree
+`e2850c86adc83b70ab11f6db9e421e8584832c98` remain accepted historical
+evidence but are no longer deployable after the governed source change. Fresh
+S5-R1 exact-tree certification and acceptance are mandatory next. All P124
+protected execution remains blocked until S5-R1 acceptance. A125-2 itself
+performs no signing, production key access, protected deployment, scheduler
+mutation, or trading/provider effect.

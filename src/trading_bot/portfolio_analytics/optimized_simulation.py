@@ -1,10 +1,13 @@
 """Deterministic performance analytics for optimized paper simulations."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid5
 
 from trading_bot.analytics import DrawdownAnalysis, DrawdownRecord
@@ -20,7 +23,11 @@ from trading_bot.portfolio_analytics.exceptions import (
 )
 from trading_bot.risk import RiskOutcome
 from trading_bot.runtime import PaperPortfolioCycleStatus
-from trading_bot.simulation import OptimizedPaperSimulationResult
+
+if TYPE_CHECKING:
+    from trading_bot.simulation.optimized_paper_portfolio import (
+        OptimizedPaperSimulationResult,
+    )
 
 _ZERO = Decimal("0")
 _ONE = Decimal("1")
@@ -76,6 +83,10 @@ class OptimizedSimulationPerformanceRequest:
     metadata: tuple[MetadataEntry, ...] = ()
 
     def __post_init__(self) -> None:
+        from trading_bot.simulation.optimized_paper_portfolio import (
+            OptimizedPaperSimulationResult,
+        )
+
         error = InvalidOptimizedSimulationPerformanceRequestError
         if not isinstance(self.request_id, UUID):
             raise error("request_id must be a UUID")

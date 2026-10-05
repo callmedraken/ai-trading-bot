@@ -7,9 +7,7 @@ on:
       - feature/d10c-durable-wake-evidence
       - feature/d10c-r8-terminal-halt
       - feature/d10c-r8-incident-reconciliation
-      - feature/robinhood-review-paper-mode
-      - feature/robinhood-review-paper-side-foundation
-      - feature/robinhood-unattended-review-paper-authority
+      - "feature/robinhood-*"
   pull_request:
 
 permissions:

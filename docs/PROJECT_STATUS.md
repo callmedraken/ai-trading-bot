@@ -11936,3 +11936,21 @@ identities, closed state transitions, and canonical serialization only. No
 provider/OAuth/scheduler/paper-write effect is part of 133-A.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Source-gate new-branch bootstrap rule restored
+
+The first Architecture-133 design commit correctly updated the source-gate
+workflow to name its new branch, but no push CI run was created for that same
+first push. The branch state was preserved and the missing run was not treated
+as acceptance.
+
+Canonical workflow now forbids relying on a branch's own first commit to admit
+itself to an explicit `push.branches` allowlist. The Robinhood workflow trigger
+uses the reviewed narrow family pattern `feature/robinhood-*`, so future
+Robinhood milestone branches are admitted before their first checkpoint push.
+A missing workflow run is a STOP/classification event, never an implicit PASS.
+
+This is a distinct workflow-registration checkpoint following the Architecture
+133 design freeze. It changes CI routing only and does not alter Architecture
+133 authority or product source.

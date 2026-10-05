@@ -11628,3 +11628,30 @@ human authorization while the quote remains fresh. No retry is implied by
 expiry, STOP, provider error, or ambiguous downstream effect.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Workflow transport/serialization rules restored
+
+A deep handoff/history review confirmed that two previously accepted Windows
+operator rules had not been promoted into the current canonical workflow:
+structured payloads must not be passed as raw PowerShell/native command-line
+strings, and substantial inline Python/PowerShell must not be generated for
+operator checkpoints. The September 25 handoff recorded both the JSON-argv
+quote-mangling failure and earlier `python -c` / here-string quote-loss failures.
+Architecture 129 later added the complementary rule that reviewed `ops.ps1` /
+source-owned entry points are preferred and generated PowerShell diagnostics are
+fallback-only.
+
+The canonical workflow now freezes the combined hierarchy: use the reviewed
+runner/source-owned script first; otherwise use a short file/stdin-serialized
+read-only diagnostic; never use raw structured JSON argv or substantial
+`python -c` payloads. PowerShell path admission must normalize paths, and a
+multi-step operator block must emit PASS only inside the same guarded scriptblock
+that performed the checks so a prior failure cannot be followed by a misleading
+manual PASS line.
+
+This documentation repair changes no Architecture 131 executable source and does
+not invalidate the accepted 131-V ROBINHOOD certification. The next protected
+boundary remains one fresh 131-V PREPARE-only authorization followed, only if a
+fresh preparation is accepted and still live, by a separate exact
+challenge-bound EXECUTE authorization.

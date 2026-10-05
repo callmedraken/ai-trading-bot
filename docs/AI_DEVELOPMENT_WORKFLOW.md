@@ -222,12 +222,14 @@ when the exact resulting source tree was already certified. If the resulting
 tree differs from the certified source tree, use the appropriate final
 certification gate before accepting the milestone.
 
-## Docs-only closeout local catch-up
+## ChatGPT-direct bounded-commit local catch-up
 
-When ChatGPT directly creates accepted docs/status/handoff closeout commits on
-the active remote feature branch, the local worktree may intentionally be one
-or more reviewed docs-only commits behind. That expected state is not treated
-as a generic mismatch to repair.
+When ChatGPT directly creates an accepted, tightly scoped commit on the active
+remote feature branch, the local worktree may intentionally be one or more
+reviewed commits behind. This includes routine docs/status/handoff closeout and
+tiny mechanical source/test/workflow corrections whose exact diff ChatGPT has
+reviewed directly. That expected state is not treated as a generic mismatch to
+repair.
 
 Before any next local or Codex work:
 
@@ -235,9 +237,9 @@ Before any next local or Codex work:
    clean;
 2. prove the current local branch is the expected branch;
 3. fetch the exact remote branch;
-4. prove the remote HEAD is the exact reviewed docs-closeout HEAD;
+4. prove the remote HEAD is the exact reviewed ChatGPT-direct commit HEAD;
 5. prove the local HEAD is either already that HEAD or the exact known
-   pre-closeout accepted HEAD and an ancestor of the reviewed remote HEAD;
+   pre-direct-change accepted HEAD and an ancestor of the reviewed remote HEAD;
 6. only in that known-behind case, fast-forward with `git merge --ff-only`
    (or equivalently `git pull --ff-only` when the same exact remote/branch has
    already been proven);
@@ -250,9 +252,10 @@ Any other branch, HEAD, ancestry, remote, tracked/index, or fast-forward result
 is a STOP condition. Do not reset, rebase, normal-merge, force-update, switch,
 clean, delete artifacts, or otherwise manufacture the expected state.
 
-This is the narrow exception that reconciles the startup STOP rule with direct
-remote docs closeouts: fast-forward synchronization is mandatory only after the
-exact known docs-only-behind state has itself been proven.
+This is the narrow exception that reconciles the startup STOP rule with reviewed
+ChatGPT-direct remote commits: fast-forward synchronization is allowed only
+after the exact known-behind state has itself been proven. It is not a generic
+pull/repair mechanism.
 
 ## Testing and certification
 

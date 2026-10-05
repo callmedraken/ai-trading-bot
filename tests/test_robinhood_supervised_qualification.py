@@ -48,7 +48,7 @@ AT = datetime(2026, 10, 5, 17, 30, tzinfo=UTC)
 HEAD, TREE = "a" * 40, "b" * 40
 
 
-def _review(side, price, at):
+def _review(side, price, at, *, reviewed_at=None):
     quote = RobinhoodReviewQuote(
         Symbol("SPY"),
         price,
@@ -72,7 +72,7 @@ def _review(side, price, at):
         Decimal("1.000"),
         quote,
         "{}",
-        at,
+        at if reviewed_at is None else reviewed_at,
         "fixture disclosure",
     )
 
@@ -220,6 +220,7 @@ def h(tmp_path, monkeypatch, capsys):
                     OrderSide.SELL,
                     Decimal("774.00"),
                     kwargs["review_received_at"] + value.review_quote_offset,
+                    reviewed_at=kwargs["review_received_at"],
                 ),
             )
         operator = RobinhoodPaperOperatorEvidence(

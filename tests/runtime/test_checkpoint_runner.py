@@ -180,6 +180,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch131-nyse-published-regular-session-authority",
         "arch131-robinhood-published-session-prepare",
         "arch131-robinhood-published-prepare-operator",
+        "arch131-robinhood-supervised-qualification",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -200,6 +201,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "arch131-nyse-published-regular-session-authority",
                 "arch131-robinhood-published-session-prepare",
                 "arch131-robinhood-published-prepare-operator",
+                "arch131-robinhood-supervised-qualification",
             }
             else (
                 "feature/robinhood-review-paper-mode"
@@ -2155,10 +2157,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch131-robinhood-published-prepare-operator\n"
+                "arch131-robinhood-supervised-qualification\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch131-robinhood-published-prepare-operator\n          exit 0"),
+            ("arch131-robinhood-supervised-qualification\n          exit 0"),
         ),
     ],
 )
@@ -2458,6 +2460,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch131-nyse-published-regular-session-authority",
     "arch131-robinhood-published-session-prepare",
     "arch131-robinhood-published-prepare-operator",
+    "arch131-robinhood-supervised-qualification",
 )
 
 
@@ -4520,8 +4523,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 31
-    assert runner.CI_CHECKPOINTS[-12:] == (
+    assert len(runner.CI_CHECKPOINTS) == 32
+    assert runner.CI_CHECKPOINTS[-13:] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4534,6 +4537,7 @@ def test_131r_source_only_registration_and_batch(boundary):
         "arch131-nyse-published-regular-session-authority",
         "arch131-robinhood-published-session-prepare",
         "arch131-robinhood-published-prepare-operator",
+        "arch131-robinhood-supervised-qualification",
     )
 
 
@@ -4938,7 +4942,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 31
+    assert len(runner.CI_CHECKPOINTS) == 32
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5153,7 +5157,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 31
+    assert len(runner.CI_CHECKPOINTS) == 32
     assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
@@ -5340,7 +5344,7 @@ def test_131u_ci_invocation_drift(tmp_path, mutation):
     root = _131u_copy(tmp_path)
     path = root / ".github/workflows/checkpoint-source-gates.yml"
     source = path.read_text()
-    line = f"              {_U_NAME}\n"
+    line = f"              {_U_NAME} `\n"
     previous = "arch131-robinhood-published-session-prepare"
     assert source.count(line) == 1
     if mutation == "missing":
@@ -5368,3 +5372,36 @@ def test_131u_source_gate_participant_drift(tmp_path, mutation):
     source = source.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(source, encoding="utf-8")
     assert "131-U checkpoint batch registration drift" in _U_AUTHORITY(root)
+
+
+def test_131v_source_only_registration_and_boundaries(tmp_path):
+    repo = Path(runner.__file__).resolve().parents[1]
+    authority = runner._arch131_supervised_qualification_authority_check
+    spec = runner._checkpoint_specs()["arch131-robinhood-supervised-qualification"]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
+    assert authority(repo) == ()
+    for relative in (
+        "src/trading_bot/robinhood_supervised_qualification.py",
+        "src/trading_bot/robinhood_execute_qualification_verifier.py",
+        "scripts/robinhood_supervised_qualification.py",
+        "src/trading_bot/review_paper/__init__.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert authority(tmp_path) == ()
+    source = tmp_path / "src/trading_bot/robinhood_supervised_qualification.py"
+    text_value = source.read_text(encoding="utf-8")
+    for addition in (
+        "callback()",
+        "execute_review_paper_supervised_cycle()",
+        "place_order()",
+        "sleep(1)",
+    ):
+        source.write_text(text_value + "\n" + addition + "\n", encoding="utf-8")
+        assert authority(tmp_path)

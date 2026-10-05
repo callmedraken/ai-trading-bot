@@ -1481,9 +1481,9 @@ Current profile discovery is FULL 115 / ROBINHOOD 42 / LEGACY 204 / EXHAUSTIVE
 
 ##### Safe-side progression status after 131-U
 
-No Architecture 131-V is frozen. Do not add another source milestone merely by
-habit. The currently identified safe-side prerequisites for protected PREPARE
-qualification are complete.
+At 131-U closeout no further source milestone was needed. The first live
+PREPARE later exposed the process-lifetime gap addressed by the 131-V contract
+below; 131-U itself remains PREPARE-only.
 
 Continue only the already-frozen protected sequence:
 
@@ -1645,6 +1645,204 @@ Current protected progression:
 `READY_TO_PROCEED` remains evidence, never execution authorization.
 Production/live real-money placement remains **NO-GO**.
 
+
+### 131-V — in-process human-authorized EXECUTE qualification (source contract)
+
+Frozen source-only checkpoint. The first accepted live PREPARE used an ad-hoc
+one-shot Python process. Its exact `ReviewPaperSupervisedPreparation` disappeared
+when that process exited, so it could not cross the separate human authorization
+boundary required by accepted 131-Q EXECUTE. An expired PREPARE cannot be reused.
+131-V keeps one fresh preparation alive in one qualification process; it never
+serializes or reconstructs that object and never silently prepares again.
+
+The qualification-only launcher is
+`scripts/robinhood_supervised_qualification.py`. It bootstraps its own sibling
+`src`, and admission proves the loaded project modules originate there. It
+requires the caller's exact reviewed source branch/HEAD/tree, clean tracked/index
+state, exact origin URL and live remote HEAD, local remote tree, published
+explicit-date NYSE session, default reviewed risk limits, and caller-pinned
+BEFORE fingerprint. The launcher pins this operator store identity:
+
+```text
+F:\AI\temp\robinhood-131j-source-live-91b4bf7f665947f79a6a94fd44ecae39\paper.sqlite
+```
+
+An appended `2`, a missing store, different path, altered historical fingerprint,
+wrong balance, existing output, output overlap, or SQLite sidecar overlap stops
+before PREPARE/provider access. Reusable source/domain code has no `F:` path.
+The accepted two-record BEFORE state is starting cash 100000, current cash
+98457.100000000, and SPY quantity 2.000. No third record/replay is admitted.
+
+Frozen qualification identities and policy:
+
+```text
+caller proposal: 11111111-131c-4000-8000-000000000002 / SPY SELL 1.000
+caller order:    22222222-131c-4000-8000-000000000001
+execution:      MARKET / DAY
+slippage:       0 basis points (preserve reviewed qualification policy)
+commission:     0 (preserve reviewed qualification policy)
+opening buffer / closing buffer / max quote age: 5 minutes each
+redirect URI:   http://127.0.0.1:8765/callback
+risk limits:    accepted default RiskLimits, trading enabled
+```
+
+131-V receives the caller's proposal/order identities and proposal timestamp;
+it does not generate domain identities. Source/store/session/input admission
+precedes inert store construction; full-column fingerprints must remain equal
+through that construction. All three evidence outputs must be absolute, distinct,
+fresh, outside the worktree, and have existing parent directories. The EXECUTE
+output is reserved with exclusive creation before PREPARE. Existing output bytes
+are preserved. PREPARE and underlying operator retain their accepted exclusive
+publication. Failed evidence never grants a retry or an automatic cleanup.
+
+Frozen sequence:
+
+```text
+provider-free admission
+-> accepted source-owned 131-U PREPARE exactly once
+-> accepted independent provider-free 131-R PREPARE verifier exactly once
+-> require exact READY_TO_PROCEED / APPROVED SELL 1.000 / two-record BEFORE
+-> hash canonical sanitized challenge material
+-> emit one compact authorization-request JSON record, flush
+-> exactly one blocking human terminal stdin.read()
+-> require exact challenge-bound token frame, no retry
+-> record authorization acceptance instant
+-> construct explicit MARKET/DAY instruction after acceptance
+-> accepted 131-Q EXECUTE once, passing the exact preparation object by identity
+-> sanitized EXECUTE evidence
+-> independent provider-free reconciliation
+-> exit
+```
+
+The SHA-256 challenge covers canonical UTF-8 JSON (sorted keys, compact
+separators, Unicode preserved): schema, source HEAD/tree, proposal/order UUIDs,
+exact PREPARE evidence digest and resolved path, quote observation/deadline,
+risk outcome/approved quantity, and exact execution configuration. Configuration
+binds source branch/HEAD/tree, resolved store/operator evidence paths,
+MARKET/DAY, slippage/commission, redirect-URI digest, every risk-limit field,
+session buffers, quote age and trading-enabled flag. The request includes that
+material, sanitized risk preview and durable BEFORE fingerprint for review.
+`READY_TO_PROCEED` is never authorization.
+
+The operator explicitly approved whole-frame stdin framing: type exactly
+`AUTHORIZE 131-Q EXECUTE <challenge>`, press Enter, then press Ctrl+Z and Enter
+on Windows to terminate that one read. Only that token followed by one newline
+is accepted. Empty EOF, blank input, wrong challenge, whitespace, malformed
+input, a second line, interrupted read, or read error stops without EXECUTE.
+Redirected/nonterminal stdin is rejected before PREPARE. The process stays alive
+while ChatGPT/operator reviews the request. There is no callback/reader/executor
+injection API, file watch, polling, sleep, scheduler or retry loop. Token input
+is never persisted; sanitized evidence stores the challenge and acceptance flag.
+The PREPARE digest is stable around verification and reread after the pause;
+the full durable fingerprint must still equal BEFORE before EXECUTE is invoked.
+
+Accepted 131-Q alone remains authoritative for its execute clock, canonical
+session admission, `execute_at <= quote_valid_until`, prepared/revalidated risk
+context and decision equality, history drift, instruction ordering and exactly
+one accepted 131-L invocation. 131-V calls no 131-L/J/I/H directly and reacquires
+no quote. Source acceptance grants neither PREPARE provider access nor EXECUTE
+authority. Each launch requires fresh separate PREPARE authorization; EXECUTE
+requires the later challenge response while the same preparation remains fresh.
+
+The closed `arch131-q-execute-qualification/v1` evidence records source and
+proposal/order identities, PREPARE digest/path, challenge and authorization time,
+instruction time, quote observation/deadline, exact configuration, execute
+admission, prepared/revalidated sanitized risk material, full-column durable
+BEFORE/AFTER fingerprint/count, exact underlying returned operator evidence
+and its file digest/path, four mutation counters, interactive reauthorization
+count, PREPARE/verifier/stdin/EXECUTE counts, EXECUTE/131-L invocation state,
+zero retry count, and final status. Provider output/logs/warnings are discarded,
+and no arbitrary exception, traceback, OAuth material, account identifier,
+header, redirect secret or raw provider payload is serialized.
+
+A failure before EXECUTE records `STOP` and no 131-L invocation. An exception
+from EXECUTE records `INDETERMINATE` and `forward_cycle_invoked=null`, because
+accepted 131-Q may raise either before or after 131-L. No downstream invocation
+is inferred from the exception. Unavailable reauthorization/evidence remains
+null. A returned operator FAIL remains FAIL. Only independently reconciled PASS
+certifies qualification; STOP/FAIL/INDETERMINATE never authorize retry or replay.
+
+`robinhood_execute_qualification_verifier` imports no transport/OAuth/executor
+boundary, opens SQLite only with URI `mode=ro`, and writes nothing. It separately
+reconstructs challenge material, strictly validates every evidence/nested schema,
+source/proposal/order/configuration identity, PREPARE digest/path, published
+session and timestamps (observation <= acceptance <= instruction <= execute <=
+deadline), prepared/revalidated risk, counters and operator linkage. It removes
+only the exact qualification row from its in-memory snapshot and independently
+fingerprints the remaining two records against caller-pinned BEFORE and both
+PREPARE fingerprints. AFTER must match the current full database. Exactly one
+new SELL record must match the frozen proposal/order/risk/MARKET/DAY material,
+deterministic trade/fill identities, zero commission/slippage and bid-price/time
+fill. Operator evidence must prove one review, no quote reacquisition, zero
+placement/cancel/options/crypto, zero interactive reauthorization and no replay.
+The review-paper package's performance exports are lazy solely to prevent
+session/verifier imports from indirectly loading MCP transport; public exported
+objects retain their original identities.
+
+One new source-only checkpoint covers composition, launcher, verifier and
+provider-free package admission:
+
+```text
+arch131-robinhood-supervised-qualification
+preflight=None
+execute=None
+```
+
+It follows 131-U once in the 32-participant source-gate batch, pinning complete
+ASTs and source-only registration. New tests remain under
+`tests/test_robinhood_*.py`, automatically current-supported/Robinhood owned.
+Old checkpoint registrations and authority-source pins are unchanged; their
+shared batch digest advances only for the appended participant. Source tests
+use doubles/fake quotes and fixture SQLite only. No real provider/OAuth call,
+protected store write or real brokerage effect is authorized during development.
+
+#### Qualification runbook (after source acceptance and ROBINHOOD certification)
+
+Replace the former one-shot PREPARE here-doc with this source-owned launcher.
+ChatGPT must freeze the exact accepted source identities and BEFORE digest from
+provider-free review first. The variables below are explicit reviewed operator
+inputs, not authority inferred from the current checkout. The source launcher
+must be invoked only after separate PREPARE authorization. Existing/expired
+PREPARE evidence cannot be loaded as a new preparation.
+
+```powershell
+$qualificationRoot = 'F:\AI\worktrees\ai-trading-bot-robinhood-side-foundation'
+$qualificationPython = 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe'
+$qualificationStore = 'F:\AI\temp\robinhood-131j-source-live-91b4bf7f665947f79a6a94fd44ecae39\paper.sqlite'
+# Fill these only from independently reviewed admission/source material:
+$qualificationHead = '<accepted HEAD>'
+$qualificationTree = '<accepted TREE>'
+$qualificationBeforeSha256 = '<accepted two-record BEFORE SHA-256>'
+$qualificationSessionDate = '<explicit published session YYYY-MM-DD>'
+$qualificationProposalCreatedAt = '<explicit UTC proposal timestamp>'
+$qualificationPrepareEvidence = '<fresh absolute PREPARE evidence path>'
+$qualificationExecuteEvidence = '<fresh distinct absolute EXECUTE evidence path>'
+$qualificationOperatorEvidence = '<fresh distinct absolute operator evidence path>'
+
+& $qualificationPython "$qualificationRoot\scripts\robinhood_supervised_qualification.py" `
+  --session-date $qualificationSessionDate `
+  --store $qualificationStore `
+  --expected-before-sha256 $qualificationBeforeSha256 `
+  --proposal-id '11111111-131c-4000-8000-000000000002' `
+  --order-id '22222222-131c-4000-8000-000000000001' `
+  --proposal-created-at $qualificationProposalCreatedAt `
+  --expected-branch 'feature/robinhood-review-paper-side-foundation' `
+  --expected-head $qualificationHead --expected-tree $qualificationTree `
+  --prepare-evidence $qualificationPrepareEvidence `
+  --execute-evidence $qualificationExecuteEvidence `
+  --operator-evidence $qualificationOperatorEvidence `
+  --redirect-uri 'http://127.0.0.1:8765/callback' `
+  --slippage-basis-points 0 --commission 0
+```
+
+Leave the process alive at AUTHORIZATION_REQUIRED. Review the exact printed
+challenge/source/risk/deadline/configuration before any EXECUTE authorization.
+After fresh explicit approval, type the exact token, Enter, then Ctrl+Z and
+Enter. A STOP is terminal. Do not rerun without a new reviewed checkpoint and
+new PREPARE authorization. Real-money trading remains NO-GO.
+
+PROJECT_STATUS and AI_TRADING_BOT_HANDOFF final closeout is deliberately deferred
+until ChatGPT exact source acceptance and the chosen certification gate pass.
 
 ## D10 disposition
 

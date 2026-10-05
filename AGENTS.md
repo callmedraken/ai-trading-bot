@@ -363,6 +363,44 @@ likely to be reused, crosses a protected boundary, carries structured data, or
 requires more than a short admission/invocation wrapper, promote it to a tested
 reviewed script/checkpoint before use.
 
+### Atomic ChatGPT-direct multi-file repository writes
+
+A logical ChatGPT-direct checkpoint that changes two or more repository files
+MUST be published as one atomic Git commit and one branch-ref update/push. This
+includes the ordinary case where one accepted milestone updates
+`docs/PROJECT_STATUS.md`, `docs/AI_TRADING_BOT_HANDOFF.md`, a relevant
+architecture/validation document, and/or workflow documentation together.
+
+Sequential GitHub Contents-API writes that each create a commit and advance the
+same branch are prohibited for one logical checkpoint. They create unnecessary
+intermediate remote states and redundant push-triggered CI runs. If the active
+tool path cannot create the required multi-file commit atomically, STOP and use
+another supported path (for example Git blobs/tree/commit plus one leased ref
+update, or one local exact-file commit/push). Do not fall back to sequential
+single-file branch-advancing writes merely because they are convenient.
+
+The required publication sequence is:
+
+1. prove the exact expected remote parent HEAD/tree;
+2. compose all intended file contents against that same parent;
+3. create any blobs/tree/commit without advancing the branch;
+4. verify the commit contains exactly the intended file set;
+5. advance the branch exactly once with the expected-parent lease;
+6. verify the exact final remote HEAD/tree and changed-file set; and
+7. treat that one branch advance as the one push-triggered source-gate event for
+   the logical checkpoint.
+
+A separately triggered `pull_request` workflow run caused by opening/updating a
+PR is expected and is not a violation; the invariant is one **push-triggered**
+CI run per logical ChatGPT-direct checkpoint.
+
+Multiple branch-advancing commits/pushes are allowed only when the work is
+deliberately split into distinct review checkpoints with independently useful
+accepted states. ChatGPT must state that reason before the first push. A tool
+limitation is not such a reason. If an unexpected partial remote state already
+exists, stop and classify/review it before any further branch update rather than
+continuing a sequential-write chain.
+
 ## Unified checkpoint runner
 
 For checkpoints registered by Architecture 129, use the repository-root

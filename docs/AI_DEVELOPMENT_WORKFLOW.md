@@ -261,6 +261,42 @@ when the exact resulting source tree was already certified. If the resulting
 tree differs from the certified source tree, use the appropriate final
 certification gate before accepting the milestone.
 
+## Atomic ChatGPT-direct multi-file commits
+
+For one logical ChatGPT-direct checkpoint, all known repository changes must be
+published atomically. When two or more files belong to the same checkpoint,
+closeout, workflow repair, or acceptance transition, compose them from one exact
+remote parent and publish them as **one Git commit, one branch-ref update/push,
+and therefore one push-triggered source-gate CI run**.
+
+This is a strict workflow invariant:
+
+- do not use sequential GitHub Contents-API `update_file`/`create_file`
+  operations that each advance the branch for files that belong to the same
+  logical checkpoint;
+- status + handoff + architecture/validation + workflow documentation for one
+  accepted milestone are one logical docs closeout by default;
+- if a connector/API cannot atomically create the multi-file commit, STOP and
+  switch to a supported Git-object tree/commit/ref path or one local exact-file
+  commit/push; tool convenience does not authorize intermediate remote states;
+- create blobs/tree/commit first while the branch remains unchanged, then move
+  the branch ref exactly once with an expected-parent/lease check;
+- verify the resulting commit's exact changed-file set, final HEAD/tree, and
+  clean ancestry before treating the write as accepted;
+- a separate `pull_request` workflow run caused by opening or updating a PR is
+  legitimate and does not violate the rule; the invariant is one
+  **push-triggered** CI run for the logical ChatGPT-direct checkpoint;
+- multiple branch-advancing commits/pushes require a deliberately declared
+  sequence of distinct review checkpoints, each with independently meaningful
+  acceptance value. A connector limitation or per-file API shape is never a
+  sufficient reason.
+
+If an atomic operation fails before the branch ref moves, discard/reuse the
+unreferenced Git objects as needed and retry by a supported atomic path. If the
+branch has already moved unexpectedly or a partial remote state exists, STOP,
+review that state explicitly, and reconcile it before any further update. Never
+continue by serially appending the remaining files.
+
 ## ChatGPT-direct bounded-commit local catch-up
 
 When ChatGPT directly creates an accepted, tightly scoped commit on the active

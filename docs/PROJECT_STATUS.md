@@ -11872,3 +11872,32 @@ exact accepted feature head. ChatGPT then reviews the PR/checks/mergeability.
 The actual merge requires a later separate explicit authorization.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — ChatGPT-direct atomic closeout rule restored
+
+During the final Architecture 131 merge-readiness closeout, ChatGPT regressed
+from the established atomic-closeout workflow and used three sequential
+single-file GitHub branch updates for one logical documentation checkpoint.
+Those pushes triggered redundant source-gate runs (#217, #218, and #219) even
+though only the final combined state was meaningful.
+
+This is classified as a **workflow regression**, not an Architecture 131 product
+or certification defect. The canonical workflow now strictly requires one
+logical multi-file ChatGPT-direct checkpoint to be composed against one exact
+parent and published as one atomic commit plus one branch-ref update/push. The
+same rule applies to status/handoff/architecture/workflow closeouts. A connector
+that only offers single-file branch-advancing writes must not be used
+sequentially as a fallback; ChatGPT must switch to an atomic Git-object or local
+commit path instead.
+
+One push-triggered source-gate run is expected for that logical checkpoint. A
+separate `pull_request` event may legitimately trigger its own PR CI after the
+PR is opened; that is distinct from the prohibited redundant push sequence.
+
+This workflow repair itself is intentionally published as one atomic multi-file
+commit spanning `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`,
+`docs/PROJECT_STATUS.md`, and `docs/AI_TRADING_BOT_HANDOFF.md` with one leased
+branch update. It changes no executable/test source and does not invalidate the
+accepted Architecture 131 FULL certification. The Architecture 131 PR is now
+explicitly authorized; actual merge remains separately protected.

@@ -11808,3 +11808,67 @@ by ChatGPT merge-readiness review against `origin/develop`. Merge/PR metadata
 remain separately protected and are not authorized by this closeout.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Architecture 131 final FULL certification + merge-readiness ACCEPTED
+
+Architecture 131 is **FULLY CERTIFIED and MERGE-READY** at the current supported
+product boundary.
+
+Final reviewed branch identity:
+
+```text
+BRANCH feature/robinhood-review-paper-side-foundation
+HEAD   b1d8da28101ce934e91ee5a1357eb2ac02ebdb6c
+TREE   28af629e2c18f882b9f1782cdc6efeb46cc52d3a
+CI     #216 / 37364784308 SUCCESS
+```
+
+Final FULL-profile certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 56 | 2,014 | 2,012 | 2 | 0 | 0 |
+| broad-2 | 60 | 2,084 | 2,083 | 1 | 0 | 0 |
+| Total | 116 | 4,098 | 4,095 | 3 | 0 | 0 |
+
+```text
+profile: full
+wall: 239.309 s
+ARCH131_FINAL_FULL_CERTIFICATION=PASS
+Evidence: F:\AI\temp\pytest\certification-evidence-1ad86c51f64344f3968b43eb6097dabc
+```
+
+GitHub merge-readiness review against `origin/develop`:
+
+```text
+origin/develop HEAD 0024ad86767c76116094688d13ecff6ebf0aa438
+merge base          0024ad86767c76116094688d13ecff6ebf0aa438
+feature ahead       517 commits
+feature behind      0 commits
+open PR             none
+```
+
+The feature branch is therefore a strict descendant of the current integration
+branch with no ancestry divergence to repair. Architecture 132-R1 makes FULL the
+major develop/release integration gate for CURRENTLY SUPPORTED functionality;
+LEGACY/EXHAUSTIVE remains opt-in when legacy compatibility itself is relevant.
+No additional legacy/exhaustive rerun is required for this merge-readiness
+decision because the final Architecture-131 corrections did not modify retained
+legacy executable behavior and prior accepted legacy checkpoints remain
+historical evidence.
+
+A merge needs no second certification if the resulting integration tree is
+exactly the already-certified feature tree. PR creation, PR metadata/review
+mutation, and merge remain separately protected repository-control actions and
+are **not authorized** by this acceptance.
+
+### Next boundary
+
+The next action is repository integration, not another Architecture 131 source
+milestone. With fresh explicit authorization, open a PR from
+`feature/robinhood-review-paper-side-foundation` to `develop` pinned to the
+exact accepted feature head. ChatGPT then reviews the PR/checks/mergeability.
+The actual merge requires a later separate explicit authorization.
+
+Production/live real-money placement remains **NO-GO**.

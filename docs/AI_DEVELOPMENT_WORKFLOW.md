@@ -373,6 +373,51 @@ remains separate and always needs fresh authorization. Architecture 132-R1
 implementation runs only focused checks; actual certification requires the
 subsequent exact GitHub review and ChatGPT's gate decision.
 
+
+### Windows operator command transport and serialization
+
+Repeated project incidents have shown that Windows PowerShell/native-process
+argument transport is an authority and evidence risk, not merely a shell-style
+preference. Operator commands must use this order of preference:
+
+1. an existing reviewed source-owned CLI or the Architecture-129 `ops.ps1`
+   runner;
+2. a reviewed version-controlled `.py` / `.ps1` helper with focused tests;
+3. only when no reviewed entry point exists, a short read-only diagnostic whose
+   payload is transported through a file path or stdin rather than complex
+   command-line quoting.
+
+Never pass structured JSON or other structured payloads as a raw native command
+argument when a file path or stdin can carry the bytes. Never embed substantial
+Python in `python -c` from PowerShell. If a tiny Python diagnostic must be sent
+through stdin, use a single-quoted PowerShell here-string and pipe it to
+`python -B -`; do not pass that here-string as the `-c` argument. Substantial
+logic belongs in reviewed repository files.
+
+PowerShell/operator blocks must also preserve these established Windows rules:
+
+- normalize filesystem identities with `Resolve-Path` (and case-insensitive
+  comparison where appropriate) instead of comparing Git's slash-normalized
+  path text directly to a backslash literal;
+- under StrictMode, force potentially singleton pipelines to arrays with
+  `@(...)` before using `.Count`;
+- treat empty `Get-Content -Raw` results as possibly `$null` and use null-safe
+  string checks;
+- when native stderr can be expected, use a reviewed wrapper or
+  `Start-Process -Wait -PassThru` with redirected stdout/stderr instead of
+  allowing `$ErrorActionPreference = 'Stop'` to reinterpret diagnostic stderr
+  before the native exit code is handled;
+- serialize multi-step copy/paste operator commands inside one invoked
+  scriptblock (`& { ... }`) or reviewed script, and emit the terminal PASS
+  marker only inside that same guarded scope after every prerequisite succeeds.
+  Never provide a detached PASS line that can still be pasted/executed after an
+  earlier `throw` or native failure.
+
+Generated giant PowerShell blocks are not a normal workflow. If a diagnostic is
+likely to be reused, crosses a protected boundary, carries structured data, or
+requires more than a short admission/invocation wrapper, promote it to a tested
+reviewed script/checkpoint before use.
+
 ### Local Git compatibility rule
 
 The Windows development machine currently uses an older Git version where

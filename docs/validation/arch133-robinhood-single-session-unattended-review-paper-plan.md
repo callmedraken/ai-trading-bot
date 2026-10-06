@@ -314,19 +314,64 @@ No further source certification is due before Q133-1 unless source changes.
 Q133-1 remains provider-free/read-only and separately authorized. Q133-2
 through Q133-6 remain separately authorized effect boundaries.
 
+## 133-G pre-publication host bootstrap correction — ACCEPTED
+
+Accepted exact source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133g
+HEAD   4677ba442eafdcec56933b992f230a702012d573
+TREE   6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc
+CI     #256 / 37527021604 SUCCESS
+```
+
+The correction reuses the protected shared production Python
+`F:\AITradingBot\runtime\python.exe` at Python 3.14.3 and SHA-256
+`cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b`.
+It does not reuse D10 scheduler/deployment/lease authority.
+
+The source-owned zero-argument bootstrap proves exact Trading principal,
+source/runtime identity, isolated/no-bytecode execution, clean HEAD/TREE, and
+the complete absence of `F:\AITradingBot\Arch133` both before and after the
+observation. It has no OAuth/provider/scheduler/publication/store/broker effect.
+
+Fresh FULL certification passed on that exact source:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 58 | 2,275 | 2,272 | 3 | 0 | 0 |
+| broad-2 | 63 | 2,606 | 2,606 | 0 | 0 | 0 |
+| Total | 121 | 4,881 | 4,878 | 3 | 0 | 0 |
+
+```text
+evidence F:\AI\temp\certification\arch133g-full-4677ba4
+```
+
+The earlier 133-E provider-free preflight is reclassified as Q133-2V because it
+requires publication material and cannot establish a pre-publication state.
+
 ## Protected qualification gates
 
-### Q133-1 — provider-free host preflight
+### Q133-1 — pre-publication provider-free host bootstrap
 
-Read-only. Verify exact accepted source/runtime identity, persisted OAuth
-availability without browser interaction, paper-store predecessor state,
-single-session activation material, proposed scheduler spec, and zero consumed
-wake state.
+Read-only and zero-argument. Verify exact accepted 133-G source/runtime
+identity, the exact non-admin Trading principal, isolated/no-bytecode runtime,
+clean source HEAD/TREE, and `F:\AITradingBot\Arch133` absent before and after
+the observation. No OAuth read, provider request, scheduler access, activation
+publication, paper/state writer, or broker effect.
 
-### Q133-2 — activation publication
+### Q133-2 — activation/host publication
 
-Fresh explicit approval. Publish exactly one reviewed single-session activation.
-No provider request and no scheduler mutation.
+Fresh explicit approval. Provision/publish exactly one reviewed Architecture-133
+host namespace and single-session activation/binding material. No provider
+request and no scheduler mutation.
+
+### Q133-2V — post-publication provider-free verifier
+
+Read-only. Verify exact source/runtime/binding/activation/wake material, paper
+predecessor fingerprint, persisted-OAuth availability metadata, proposed
+scheduler specification, and zero consumed wake authority. Q133-2V cannot be
+used as Q133-1 evidence.
 
 ### Q133-3 — scheduler installation/update
 

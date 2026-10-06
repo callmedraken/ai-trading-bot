@@ -12404,3 +12404,104 @@ activation, mutate Task Scheduler, perform a Robinhood provider wake, write a
 qualified paper effect, place broker orders, or authorize live trading.
 
 Production/live real-money placement remains **NO-GO**.
+
+## 2026-10-06 — Architecture 133-G pre-publication host bootstrap correction ACCEPTED
+
+Q133-1 substrate review exposed two production-composition mismatches in the
+merged 133-E host contract before any Architecture-133 production namespace was
+created:
+
+1. the host pointed at a nonexistent private interpreter under
+   `F:\AITradingBot\Arch133\runtime\python.exe` even though the already
+   protected shared production interpreter is
+   `F:\AITradingBot\runtime\python.exe`;
+2. the old provider-free "Q133-1 preflight" depended on published host binding,
+   activation, wake-state, paper-store, and OAuth metadata, so it could not be a
+   genuine pre-publication qualification.
+
+Architecture 133-G corrects both without granting a production effect. It reuses
+only the existing protected Python substrate; it does **not** reuse D10 task,
+deployment, lease, scheduler, or trading authority. The corrected fixed runtime
+facts are:
+
+```text
+runtime executable F:\AITradingBot\runtime\python.exe
+runtime version    3.14.3
+runtime SHA-256    cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+Trading SID        S-1-5-21-1397534616-3988210162-180023805-1009
+```
+
+The accepted pre-source substrate probe also proved that the shared runtime is
+read/execute-only for Trading through the inherited production ACL and that the
+entire Architecture-133 production namespace remained absent:
+
+```text
+F:\AITradingBot\Arch133                         ABSENT
+host-binding.json                                ABSENT
+activation.json                                  ABSENT
+wake.sqlite                                      ABSENT
+paper.sqlite                                     ABSENT
+operator-evidence.json                           ABSENT
+no-pycache                                       ABSENT
+provider calls                                   0
+OAuth reads                                      0
+files created / modified                         0 / 0
+state writes                                     0
+scheduler reads / writes                         0 / 0
+activation publications                          0
+broker effects                                   0
+```
+
+133-G adds a separate zero-argument pre-publication bootstrap launcher and
+read-only bootstrap module. Q133-1 now requires, in one fail-closed observation:
+
+- exact non-admin Trading principal;
+- exact 133-G branch/source worktree;
+- exact shared Python executable/version/SHA-256;
+- isolated `-I -B` execution and no bytecode materialization;
+- clean source worktree and exact HEAD/TREE observation;
+- `F:\AITradingBot\Arch133` absent both before and after the observation;
+- zero OAuth, provider, Task Scheduler, publication, paper/state, or broker
+  effect.
+
+The former 133-E provider-free preflight is retained only as the
+**post-publication Q133-2V verifier**. It is not valid pre-publication evidence.
+
+Accepted 133-G source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133g
+HEAD   4677ba442eafdcec56933b992f230a702012d573
+TREE   6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc
+BASE   1ab7405163c2cbacb173ff475180cbca27e7e4ed
+CI     #256 / 37527021604 SUCCESS
+```
+
+Source gate #256 passed 38 checkpoints, 62 test paths, 105 Ruff paths,
+pytest/Ruff/diff checks, stable identity, and all Architecture-133 A/B/C/D/E/G
+authority checks.
+
+Fresh FULL certification on the exact 133-G source also passed:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 58 | 2,275 | 2,272 | 3 | 0 | 0 |
+| broad-2 | 63 | 2,606 | 2,606 | 0 | 0 | 0 |
+| Total | 121 | 4,881 | 4,878 | 3 | 0 | 0 |
+
+```text
+profile full PASS
+evidence F:\AI\temp\certification\arch133g-full-4677ba4
+```
+
+This fresh FULL supersedes the earlier Architecture-133 executable/test
+certification for qualification work. The historical 133-D ROBINHOOD and prior
+133-F/timing-correction FULL results remain provenance only.
+
+Q133-1 is now the next authorized read-only boundary. Q133-2 activation/host
+publication, Q133-2V post-publication verification, Q133-3 scheduler mutation,
+Q133-4 unattended provider wake, Q133-5 reconciliation, and Q133-6 closeout do
+not inherit authority from this PASS.
+
+Production/live real-money placement remains **NO-GO**.
+

@@ -619,22 +619,58 @@ checks, stable identity, and all Architecture-133 authority checks.
 Architecture 133 is integrated and source-complete. No integration result grants
 any protected qualification authority.
 
+### 133-G — pre-publication host bootstrap correction — ACCEPTED
+
+The original 133-E "Q133-1 preflight" required already-published host binding,
+activation, wake-state, paper-store, and persisted-OAuth metadata and therefore
+could not prove the host before publication. 133-G separates that concern.
+
+Accepted source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133g
+HEAD   4677ba442eafdcec56933b992f230a702012d573
+TREE   6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc
+CI     #256 / 37527021604 SUCCESS
+FULL   4,878 passed / 3 skipped / 0 failed / 0 errors
+evidence F:\AI\temp\certification\arch133g-full-4677ba4
+```
+
+133-G reuses the already protected shared Python substrate only:
+
+```text
+F:\AITradingBot\runtime\python.exe
+Python 3.14.3
+SHA-256 cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+D10 task/deployment/lease/scheduler authority remains distinct and is not
+reused. The new zero-argument Q133-1 bootstrap requires the Architecture-133
+host root to be absent before and after exact Trading-principal/source/runtime
+qualification and has no OAuth/provider/scheduler/publication/store/broker
+effect surface. The former 133-E preflight remains available only as
+post-publication **Q133-2V** verification.
+
 ## Protected qualification sequence
 
-No protected step is authorized by this document.
+No protected step is authorized merely by this document or by certification.
 
-After 133-F source acceptance, the intended protected sequence is:
+After 133-G source acceptance, the intended protected sequence is:
 
-1. provider-free/read-only host preflight;
-2. separately authorize publication of one exact single-session activation;
-3. separately authorize one Architecture-133 scheduler installation/update;
-4. separately authorize observation of the first unattended provider wake;
-5. independent provider-free reconciliation;
-6. disable/expire the one-session task/activation before review;
-7. only after acceptance decide whether to design a multi-session soak.
+1. **Q133-1** provider-free/read-only pre-publication host bootstrap;
+2. separately authorize **Q133-2** publication/provisioning of one exact
+   single-session activation and host material;
+3. **Q133-2V** provider-free/read-only post-publication verifier;
+4. separately authorize **Q133-3** Architecture-133 scheduler
+   installation/update;
+5. separately authorize **Q133-4** observation of the first unattended provider
+   wake;
+6. **Q133-5** independent provider-free reconciliation;
+7. **Q133-6** disable/expire the one-session task/activation before review;
+8. only after acceptance decide whether to design a multi-session soak.
 
-Each protected step has fresh authority. A source/CI/certification PASS never
-grants the next effect.
+Each protected effect step has fresh authority. A source/CI/certification PASS
+never grants the next effect.
 
 ## Explicit non-goals
 
@@ -648,7 +684,9 @@ Architecture 133 v1 does not authorize or implement:
 - automatic catch-up/backfill;
 - provider retry after ambiguity;
 - browser-based unattended OAuth;
-- D10 scheduler/runtime reuse;
+- D10 task/deployment/lease/scheduler authority reuse; the already protected
+  shared Python interpreter may be reused only under the exact 133-G runtime
+  identity;
 - production deployment as part of source implementation.
 
 Production/live real-money placement remains **NO-GO**.

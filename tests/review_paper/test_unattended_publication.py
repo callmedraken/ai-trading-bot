@@ -1,6 +1,7 @@
 """133-H fake-edge tests; production namespace/native effects are unreachable."""
 
 import ast
+import ctypes
 import hashlib
 import io
 import json
@@ -912,3 +913,255 @@ def test_public_planner_rechecks_absence_and_stable_facts_without_mutation(
         assert publication.plan_publication(case.raw) == case.plan
     assert not identity.HOST_ROOT.exists()
     assert not set(backend.events) & {"arm", "root", "paper", "state", "trading"}
+
+
+@pytest.mark.parametrize("cash", ["1", "10000", "23456.78", "99999.123400"])
+def test_pure_empty_predecessor_matches_frozen_store_contract(tmp_path, cash):
+    starting_cash = Decimal(cash)
+    expected = publication.expected_empty_paper_sha256(starting_cash)
+    assert list(tmp_path.iterdir()) == []
+    path = tmp_path / "test-only.sqlite"
+    ReviewPaperStore(path, starting_cash=starting_cash)
+    assert (
+        expected == qualification_fingerprint(*read_qualification_store(path))["sha256"]
+    )
+
+
+@pytest.mark.parametrize("entry", ["parse", "plan", "execute"])
+def test_wrong_predecessor_rejected_before_native_backend(case, monkeypatch, entry):
+    raw = envelope(
+        case.activation, replace(case.binding, paper_predecessor_sha256="f" * 64)
+    )
+    monkeypatch.setattr(
+        native,
+        "WindowsPublication",
+        lambda: pytest.fail(
+            "material rejection must precede native observation/arming"
+        ),
+    )
+    with pytest.raises(publication.PublicationError):
+        if entry == "parse":
+            publication.parse_publication_material(raw)
+        elif entry == "plan":
+            publication.plan_publication(raw)
+        else:
+            publication.execute_publication(
+                raw, "a" * 64, "AUTHORIZE Q133-2 " + "a" * 64
+            )
+    assert case.backend.events == []
+    assert not identity.HOST_ROOT.exists()
+
+
+def test_cash_change_requires_new_empty_predecessor(case):
+    assert publication.parse_publication_material(case.raw) == case.material
+    activation = replace(case.activation, starting_cash=Decimal("34567.89"))
+    binding = replace(
+        case.binding,
+        activation_sha256=hashlib.sha256(activation.to_json().encode()).hexdigest(),
+    )
+    with pytest.raises(publication.PublicationError):
+        publication.parse_publication_material(envelope(activation, binding))
+    predecessor = publication.expected_empty_paper_sha256(activation.starting_cash)
+    assert predecessor != case.binding.paper_predecessor_sha256
+    binding = replace(binding, paper_predecessor_sha256=predecessor)
+    assert (
+        publication.parse_publication_material(envelope(activation, binding)).binding
+        == binding
+    )
+
+
+@pytest.fixture
+def root_win32(monkeypatch):
+    """Fake only Win32 entry points; exercise the real local policy encoder."""
+    calls, failure = [], []
+
+    def output(argument, value, kind=ctypes.c_void_p):
+        ctypes.cast(argument, ctypes.POINTER(kind))[0] = value
+
+    def convert(sddl, revision, descriptor, size):
+        calls.append(("convert", sddl, revision, size))
+        output(descriptor, 101)
+        return "convert" not in failure
+
+    def owner(descriptor, result, defaulted):
+        assert descriptor.value == 101
+        output(result, 0 if "null_owner" in failure else 102)
+        return "owner" not in failure
+
+    def dacl(descriptor, present, result, defaulted):
+        assert descriptor.value == 101
+        output(present, "absent_dacl" not in failure, ctypes.c_int32)
+        output(result, 0 if "null_dacl" in failure else 103)
+        return "dacl" not in failure
+
+    def set_security(handle, kind, information, owner, group, dacl, sacl):
+        calls.append(
+            ("set", handle, kind, information, owner.value, group, dacl.value, sacl)
+        )
+        return 5 if "apply" in failure else 0
+
+    def free(descriptor):
+        calls.append(("free", descriptor.value))
+
+    advapi = SimpleNamespace(
+        ConvertStringSecurityDescriptorToSecurityDescriptorW=convert,
+        GetSecurityDescriptorOwner=owner,
+        GetSecurityDescriptorDacl=dacl,
+        SetSecurityInfo=set_security,
+    )
+    kernel = SimpleNamespace(LocalFree=free)
+    monkeypatch.setattr(
+        native.ctypes,
+        "WinDLL",
+        lambda name, **kwargs: {"advapi32": advapi, "kernel32": kernel}[name],
+    )
+    return SimpleNamespace(calls=calls, failure=failure)
+
+
+def test_exact_inheritable_root_policy_uses_local_win32_boundary(
+    root_win32, monkeypatch
+):
+    monkeypatch.setattr(
+        native,
+        "build_security_attributes",
+        lambda *args: pytest.fail("shared builder reached"),
+    )
+    native.apply_publication_root_policy(77, native.publication_policy("root"))
+    assert root_win32.calls == [
+        (
+            "convert",
+            "O:S-1-5-32-544D:P"
+            "(A;;0x1f01ff;;;S-1-5-32-544)(A;;0x1f01ff;;;S-1-5-18)"
+            f"(A;;0x1200ab;;;{identity.TRADING_SID})"
+            f"(A;OIIO;0x13019f;;;{identity.TRADING_SID})"
+            "(A;OIIO;0x1f01ff;;;S-1-5-32-544)(A;OIIO;0x1f01ff;;;S-1-5-18)",
+            1,
+            None,
+        ),
+        ("set", 77, 1, 0x80000005, 102, None, 103, None),
+        ("free", 101),
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "owner",
+        "unprotected",
+        "count",
+        "order",
+        "type",
+        "flags",
+        "mask",
+        "principal",
+        "semantic_file",
+        "database_file",
+    ],
+)
+def test_local_root_boundary_rejects_unsupported_policy_before_native(
+    root_win32, mutation
+):
+    policy = native.publication_policy("root")
+    if mutation == "owner":
+        policy = replace(policy, owner_sid=identity.TRADING_SID)
+    elif mutation == "unprotected":
+        policy = replace(policy, dacl_protected=False)
+    elif mutation == "count":
+        policy = replace(policy, aces=policy.aces[:-1])
+    elif mutation == "order":
+        policy = replace(policy, aces=tuple(reversed(policy.aces)))
+    elif mutation == "semantic_file":
+        policy = native.publication_policy("activation.json")
+    elif mutation == "database_file":
+        policy = native.publication_policy("paper.sqlite")
+    else:
+        field, value = {
+            "type": ("ace_type", 1),
+            "flags": ("ace_flags", 3),
+            "mask": ("access_mask", 0x1F01FF),
+            "principal": ("principal_sid", native.security.SYSTEM_SID),
+        }[mutation]
+        aces = list(policy.aces)
+        aces[3] = replace(aces[3], **{field: value})
+        policy = replace(policy, aces=tuple(aces))
+    with pytest.raises(publication.PublicationError, match="root policy rejected"):
+        native.apply_publication_root_policy(77, policy)
+    assert root_win32.calls == []
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,
+        "convert",
+        "owner",
+        "null_owner",
+        "dacl",
+        "absent_dacl",
+        "null_dacl",
+        "apply",
+        "readback",
+        "readback_drift",
+    ],
+)
+def test_root_admission_requires_successful_local_application_and_readback(
+    root_win32, monkeypatch, failure
+):
+    backend = native.WindowsPublication.__new__(native.WindowsPublication)
+    backend._root_handle = SimpleNamespace(value=77)
+    backend._trading_root = False
+    if failure:
+        root_win32.failure.append(failure)
+    policy = native.publication_policy("root")
+
+    def inspect(handle, path, kind):
+        assert backend._trading_root is False
+        assert handle is backend._root_handle
+        assert (path, kind) == (
+            str(identity.HOST_ROOT),
+            native.AuthorityObjectKind.DIRECTORY,
+        )
+        root_win32.calls.append(("readback",))
+        if failure == "readback":
+            raise publication.PublicationError("inspection failed")
+        return SimpleNamespace(
+            security=SimpleNamespace(
+                owner_sid=policy.owner_sid,
+                dacl_protected=True,
+                is_reparse_point=False,
+                aces=policy.aces[:-1] if failure == "readback_drift" else policy.aces,
+            )
+        )
+
+    backend.api = SimpleNamespace(inspect=inspect)
+    monkeypatch.setattr(
+        native,
+        "apply_security_policy",
+        lambda *args: pytest.fail("shared application reached"),
+    )
+    if failure:
+        with pytest.raises(
+            (publication.PublicationError, native.security.AuthoritySecurityError)
+        ):
+            backend.admit_trading_root()
+        assert backend._trading_root is False
+    else:
+        backend.admit_trading_root()
+        assert backend._trading_root is True
+        assert root_win32.calls[-1] == ("readback",)
+    assert ("free", 101) in root_win32.calls
+    if failure not in {None, "readback", "readback_drift"}:
+        assert ("readback",) not in root_win32.calls
+
+
+def test_final_file_policies_remain_explicit_and_unchanged():
+    for name in sorted(publication.FINAL_NAMES):
+        policy = native.publication_policy(name)
+        assert policy.owner_sid == "S-1-5-32-544" and policy.dacl_protected is True
+        assert policy.aces == (
+            native.SecurityAce("S-1-5-32-544", 0x1F01FF),
+            native.SecurityAce("S-1-5-18", 0x1F01FF),
+            native.SecurityAce(
+                identity.TRADING_SID, 0x120089 if name.endswith(".json") else 0x12019F
+            ),
+        )

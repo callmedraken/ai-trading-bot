@@ -85,6 +85,96 @@ def _bind(library: object, name: str, arguments: list, result: object):
     return function
 
 
+def apply_publication_root_policy(handle: int, policy: SecurityPolicy) -> None:
+    """Install only the exact 133-H root owner/protected inheritable DACL.
+
+    The shared creation-attributes builder intentionally admits no inheritance.
+    This local boundary uses SDDL revision 1 and SetSecurityInfo on the already
+    held root handle. OIIO is exactly OBJECT_INHERIT | INHERIT_ONLY (9).
+    """
+    if (
+        type(policy) is not SecurityPolicy
+        or type(policy.owner_sid) is not str
+        or policy.dacl_protected is not True
+        or type(policy.aces) is not tuple
+        or any(
+            type(ace) is not SecurityAce
+            or type(ace.principal_sid) is not str
+            or any(
+                type(value) is not int
+                for value in (ace.access_mask, ace.ace_type, ace.ace_flags)
+            )
+            for ace in policy.aces
+        )
+        or policy != publication_policy("root")
+    ):
+        raise PublicationError("publication root policy rejected")
+    sddl = f"O:{policy.owner_sid}D:P" + "".join(
+        f"(A;{'OIIO' if ace.ace_flags == 9 else ''};"
+        f"0x{ace.access_mask:x};;;{ace.principal_sid})"
+        for ace in policy.aces
+    )
+    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    pointer = ctypes.c_void_p
+    boolean = ctypes.c_int32
+    dword = ctypes.c_uint32
+    free = _bind(kernel, "LocalFree", [pointer], pointer)
+    convert = _bind(
+        advapi,
+        "ConvertStringSecurityDescriptorToSecurityDescriptorW",
+        [ctypes.c_wchar_p, dword, ctypes.POINTER(pointer), ctypes.POINTER(dword)],
+        boolean,
+    )
+    get_owner = _bind(
+        advapi,
+        "GetSecurityDescriptorOwner",
+        [pointer, ctypes.POINTER(pointer), ctypes.POINTER(boolean)],
+        boolean,
+    )
+    get_dacl = _bind(
+        advapi,
+        "GetSecurityDescriptorDacl",
+        [
+            pointer,
+            ctypes.POINTER(boolean),
+            ctypes.POINTER(pointer),
+            ctypes.POINTER(boolean),
+        ],
+        boolean,
+    )
+    set_security = _bind(
+        advapi,
+        "SetSecurityInfo",
+        [pointer, dword, dword, pointer, pointer, pointer, pointer],
+        dword,
+    )
+    descriptor, owner, dacl = pointer(), pointer(), pointer()
+    present, defaulted = boolean(), boolean()
+    try:
+        if not convert(sddl, 1, ctypes.byref(descriptor), None) or not descriptor.value:
+            raise PublicationError("publication root descriptor rejected")
+        if (
+            not get_owner(descriptor, ctypes.byref(owner), ctypes.byref(defaulted))
+            or not owner.value
+            or not get_dacl(
+                descriptor,
+                ctypes.byref(present),
+                ctypes.byref(dacl),
+                ctypes.byref(defaulted),
+            )
+            or not present.value
+            or not dacl.value
+        ):
+            raise PublicationError("publication root descriptor rejected")
+        # SE_FILE_OBJECT; OWNER | DACL | PROTECTED_DACL_SECURITY_INFORMATION.
+        if set_security(handle, 1, 0x80000005, owner, None, dacl, None) != 0:
+            raise PublicationError("publication root ACL application failed")
+    finally:
+        if descriptor.value:
+            free(descriptor)
+
+
 class PublicationReadApi(security.WindowsPaperReadNativeApi):
     """A103 reader admitted only to the exact Q133-2 names and shared runtime."""
 
@@ -443,8 +533,17 @@ class WindowsPublication:
     def admit_trading_root(self) -> None:
         if self._root_handle is None or self._trading_root:
             raise PublicationError("publication root admission rejected")
+        policy = publication_policy("root")
+        apply_publication_root_policy(self._root_handle.value, policy)
+        require_security_policy(
+            self.api.inspect(
+                self._root_handle,
+                str(identity.HOST_ROOT),
+                AuthorityObjectKind.DIRECTORY,
+            ).security,
+            policy,
+        )
         self._trading_root = True
-        apply_security_policy(self._root_handle.value, publication_policy("root"))
 
     @contextmanager
     def pin_complete(self) -> Iterator[CompletePublication]:

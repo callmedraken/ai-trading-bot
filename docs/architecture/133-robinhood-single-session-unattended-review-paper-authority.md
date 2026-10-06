@@ -27,8 +27,11 @@ No BOM, trailing newline, duplicate/unknown field or noncanonical inner/outer
 bytes is admitted. The publisher selects/generates no proposal, session, UUID,
 risk limit, cash, slippage, commission, OAuth bound, or predecessor. The reviewed
 binding supplies the expected empty-paper fingerprint for the activation's
-canonical starting cash; planning constructs no store to infer missing inputs.
-Execute independently verifies that expected predecessor after initialization.
+canonical starting cash. Pure material admission derives the required empty
+schema-v2 fingerprint from frozen columns, exact starting cash and zero rows;
+a well-formed but wrong predecessor fails before native observation or mutation.
+Planning constructs no scratch store. Execute independently verifies the actual
+predecessor again after initialization.
 
 Planning requires an elevated Administrators-authorized token, excluding Trading
 and SYSTEM user tokens, and the exact standard Trading SID. It proves the pinned
@@ -63,8 +66,11 @@ Publication order is fixed:
 5. Independently reopen/verify all four objects, canonical JSON, exact empty
    paper metadata/fingerprint and one READY revision-0 wake at activation
    creation time while the root remains Administrators/SYSTEM-only.
-6. Admit Trading to the root last, then independently repeat verification and
-   require identical content/state evidence. Root grants file creation and
+6. Apply the exact root owner/protected DACL through the local 133-H Win32
+   boundary, which accepts only the reviewed ACE count/order/type/flags/masks.
+   Independently inspect that ACL before marking Trading admitted; application
+   or readback failure leaves internal admission false. Then repeat verification
+   and require identical content/state evidence. Root grants file creation and
    read/list/traverse, with inherit-only child-data rights for future SQLite
    journals/operator evidence. It grants no delete-child, delete-root, ACL or
    owner authority. The four protected file DACLs exclude that inheritance.

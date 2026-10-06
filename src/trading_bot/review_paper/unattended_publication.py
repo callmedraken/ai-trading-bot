@@ -14,6 +14,7 @@ import json
 import re
 import sys
 from dataclasses import asdict, dataclass
+from decimal import Decimal
 from pathlib import Path
 
 from trading_bot.review_paper import unattended_host_identity as identity
@@ -38,6 +39,46 @@ MAX_MATERIAL_BYTES = 32768
 FINAL_NAMES = frozenset(
     {"paper.sqlite", "wake.sqlite", "activation.json", "host-binding.json"}
 )
+# Frozen schema-v2 SELECT * order. The authority gate pins store.py; changing
+# that schema requires an intentional publication-contract revision too.
+EMPTY_PAPER_COLUMNS = (
+    "paper_trade_id",
+    "proposal_id",
+    "order_id",
+    "symbol",
+    "side",
+    "desired_quantity",
+    "approved_quantity",
+    "risk_outcome",
+    "risk_reason_codes",
+    "proposal_reason",
+    "proposal_confidence",
+    "order_type",
+    "time_in_force",
+    "proposed_at",
+    "limit_price",
+    "reviewed_at",
+    "market_data_disclosure",
+    "order_checks_json",
+    "adjusted_previous_close",
+    "ask_price",
+    "bid_price",
+    "has_traded",
+    "last_non_reg_trade_price",
+    "last_trade_price",
+    "previous_close",
+    "previous_close_date",
+    "quote_state",
+    "venue_ask_time",
+    "venue_bid_time",
+    "venue_last_non_reg_trade_time",
+    "venue_last_trade_time",
+    "fill_id",
+    "fill_price",
+    "commission",
+    "slippage_basis_points",
+    "filled_at",
+)
 
 
 class PublicationError(RuntimeError):
@@ -55,6 +96,12 @@ class PublicationMaterial:
     activation: ReviewPaperActivation
     binding: identity.HostBinding
     raw: bytes
+
+
+def expected_empty_paper_sha256(starting_cash: Decimal) -> str:
+    """Pure schema-v2 predecessor; no SQLite connection or scratch artifact."""
+    metadata = [["schema_version", "2"], ["starting_cash", str(starting_cash)]]
+    return qualification_fingerprint(metadata, list(EMPTY_PAPER_COLUMNS), [])["sha256"]
 
 
 def parse_publication_material(raw: bytes) -> PublicationMaterial:
@@ -89,6 +136,8 @@ def parse_publication_material(raw: bytes) -> PublicationMaterial:
             or binding.activation_sha256
             != hashlib.sha256(activation.to_json().encode("utf-8")).hexdigest()
             or binding.oauth_valid_until <= activation.created_at
+            or binding.paper_predecessor_sha256
+            != expected_empty_paper_sha256(activation.starting_cash)
         ):
             raise ValueError
         build_unattended_scheduler_spec(activation)

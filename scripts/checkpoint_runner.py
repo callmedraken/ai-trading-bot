@@ -942,10 +942,10 @@ ARCH133_PUBLICATION_SOURCES: Final = (
 )
 ARCH133_PUBLICATION_PINS: Final = {
     "src/trading_bot/review_paper/unattended_publication.py": (
-        "3e267b5387a5becb36eab377d50e14fbdec865d20cc0f952966e271cd5f8c606"
+        "820b6d0f86f56c22a03bbd734b6a3a98d0042d8ac167f28b39230d99d89da128"
     ),
     "src/trading_bot/review_paper/unattended_publication_windows.py": (
-        "936f2b0876c694d30262dc056e83844a5c1356f663bfb1200f013d271922886d"
+        "c4b8000caa62acd1bf45d2c793dbfd08eac67da84c500cf89fd3d0739a3318e9"
     ),
     "scripts/run_arch133_host_publication.py": (
         "5b5bb84080d916d18383657d8d6c2f96e7fa3a47d4e74b137cbe42b5ff7df5d1"

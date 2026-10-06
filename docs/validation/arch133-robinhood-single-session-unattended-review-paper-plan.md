@@ -382,8 +382,15 @@ and material/plan fingerprints. The actual plan remains an external reviewed
 canonical file, not a hard-coded test proposal. Execute requires that file,
 the exact reviewed fingerprint and real interactive terminal authorization;
 redirected stdin and raw structured command-line JSON cannot supply authority.
-A wrong reviewed predecessor or failure after root creation retains partial
-material for read-only reconciliation, with no retry/repair.
+A well-formed but wrong predecessor fails pure material admission before native
+observation, arming or root creation. The expected empty schema-v2 fingerprint
+uses frozen columns, the activation's exact starting cash and zero rows, without
+a planning-time scratch store; disposable-store tests verify agreement. Actual
+post-publication predecessor verification remains independent. Failure after
+root creation retains partial material for read-only reconciliation, with no
+retry/repair. Local root-ACL tests cover exact inherit-only policy installation,
+unsupported owner/ACE/count/order/mask rejection and apply/readback failure
+leaving Trading unadmitted; final-file policies remain unchanged.
 
 After review and the real source-gate event, optional local source verification
 uses the existing runner:

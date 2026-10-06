@@ -137,7 +137,8 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
 
 
 def _git_blob_sha1(path: Path) -> str:
-    data = path.read_bytes()
+    # Text mode normalizes Git's LF source across Windows checkout CRLF.
+    data = path.read_text(encoding="utf-8").encode("utf-8")
     return hashlib.sha1(
         b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
     ).hexdigest()
@@ -946,7 +947,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         pins = {
             "src/trading_bot/review_paper/unattended_one_wake.py": (
-                "2dfe99bf2843b999fa51cf75bbf64bfc3fde66d3"
+                "9fbcb9d303bc8aa52362a92eef472fd6419a8e66"
             ),
         }
         for relative, expected in pins.items():

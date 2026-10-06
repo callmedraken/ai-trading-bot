@@ -116,6 +116,7 @@ def harness(tmp_path, monkeypatch):
     h.instants = OneWakeInstants(
         AT, AT + timedelta(seconds=10), AT + timedelta(seconds=11)
     )
+
     def quote_clock():
         h.quote_clock_calls += 1
         assert h.calls and h.calls[-1][0] == "get_equity_quotes"
@@ -294,8 +295,6 @@ def replay_is_inert(h):
     )
 
 
-@pytest.mark.parametrize("side", list(OrderSide))
-@pytest.mark.parametrize("outcome", list(RiskOutcome))
 def test_post_quote_clock_advances_pre_effect_time(harness):
     h = harness
     h.quote_observed_at = AT + timedelta(seconds=20)
@@ -334,6 +333,8 @@ def test_quote_return_after_freshness_deadline_stops_before_review(harness):
     assert h.operator_calls == 0
 
 
+@pytest.mark.parametrize("side", list(OrderSide))
+@pytest.mark.parametrize("outcome", list(RiskOutcome))
 def test_exact_risk_intent_and_synthetic_result(harness, side, outcome):
     h = harness
     if side is OrderSide.SELL:

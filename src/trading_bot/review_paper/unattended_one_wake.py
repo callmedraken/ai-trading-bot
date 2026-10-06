@@ -308,7 +308,10 @@ def compose_one_review_paper_wake(
         deadline = min(
             mark.source_at + activation.max_quote_age for mark in snapshot.marks
         )
-        if snapshot.observed_at < instants.started_at or deadline < snapshot.observed_at:
+        if (
+            snapshot.observed_at < instants.started_at
+            or deadline < snapshot.observed_at
+        ):
             classification = OneWakeClassification.QUOTE_NOT_VALID
         elif (
             admit(snapshot.observed_at).status is not ReviewPaperSessionStatus.ADMITTED
@@ -330,10 +333,7 @@ def compose_one_review_paper_wake(
 
     transition(ReviewPaperWakeState.PREPARED, snapshot.observed_at)
     try:
-        if (
-            admit(pre_effect_at).status
-            is not ReviewPaperSessionStatus.ADMITTED
-        ):
+        if admit(pre_effect_at).status is not ReviewPaperSessionStatus.ADMITTED:
             classification = OneWakeClassification.SESSION_NOT_ADMITTED
         elif pre_effect_at > deadline:
             classification = OneWakeClassification.QUOTE_NOT_VALID

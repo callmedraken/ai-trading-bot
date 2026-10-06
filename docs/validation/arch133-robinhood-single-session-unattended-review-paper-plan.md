@@ -293,6 +293,27 @@ FOCUSED
 -> PROTECTED always separately authorized
 ```
 
+## Integration verification — ACCEPTED
+
+PR #26 merged Architecture 133 into `develop`:
+
+```text
+BASE  10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+HEAD  4bbefe37f4ce52d085791982c7a86e6460460b3e
+MERGE b9ec5ea782ab14600a96de938cc16831557c1866
+TREE  1936813b864dee7ab1263800ce76b65cd4c78e4e
+CI    #250 / 37445845063 SUCCESS
+```
+
+The actual merge tree is exactly the reviewed PR-head tree and the compare from
+feature head to merge commit has zero file changes. Post-merge #250 passed the
+37-checkpoint / 62-test-path / 103-Ruff-path source gate with all 133 authority
+checks PASS.
+
+No further source certification is due before Q133-1 unless source changes.
+Q133-1 remains provider-free/read-only and separately authorized. Q133-2
+through Q133-6 remain separately authorized effect boundaries.
+
 ## Protected qualification gates
 
 ### Q133-1 — provider-free host preflight

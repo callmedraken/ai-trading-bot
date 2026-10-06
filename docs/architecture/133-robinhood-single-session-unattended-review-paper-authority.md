@@ -597,6 +597,28 @@ PR #26 remains the integration vehicle. Merge is allowed only after exact
 head/tree, clean mergeability, review-thread resolution, and computed merge-tree
 verification. The merge itself does not authorize Q133 protected effects.
 
+## Integration — ACCEPTED
+
+Architecture 133 was merged through PR #26 after the timing correction, exact
+review-thread resolution, corrected FULL certification, clean mergeability, and
+byte-exact merge-tree verification.
+
+```text
+PR       #26
+BASE     10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+PR HEAD  4bbefe37f4ce52d085791982c7a86e6460460b3e
+MERGE    b9ec5ea782ab14600a96de938cc16831557c1866
+TREE     1936813b864dee7ab1263800ce76b65cd4c78e4e
+POST-MERGE SOURCE-GATE #250 / 37445845063 SUCCESS
+```
+
+The merge tree exactly equals the reviewed PR-head tree. Post-merge source gate
+#250 passed 37 checkpoints, 62 test paths, 103 Ruff paths, pytest/Ruff/diff
+checks, stable identity, and all Architecture-133 authority checks.
+
+Architecture 133 is integrated and source-complete. No integration result grants
+any protected qualification authority.
+
 ## Protected qualification sequence
 
 No protected step is authorized by this document.

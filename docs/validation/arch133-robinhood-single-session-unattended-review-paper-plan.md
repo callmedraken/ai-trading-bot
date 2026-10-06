@@ -94,43 +94,87 @@ activation-core, 1,067 runner, and 450 inventory cases across focused and
 corrected-failure runs. No broad certification was required at this local state
 boundary.
 
-## 133-C focused validation — FROZEN
+## 133-C focused validation — ACCEPTED
 
-Composition tests use only bounded fake/double provider/effect seams and prove:
+Accepted exact source:
 
-- exact 131-S target-session schedule and accepted 131-M admission semantics;
-- READY -> PREPARE_STARTED is durable before the quote seam;
-- one quote/preparation seam invocation maximum;
+```text
+HEAD 3f5a5b673bc9d66409e415152d6252cd80a46e3a
+TREE 7b048cedea8a97501198311229b25ab32f112735
+CI   #231 / 37410294723 SUCCESS
+```
+
+The exact six-file GitHub review found no correction requirement. The complete
+133-C coordinator is AST-pinned by the source gate, the checkpoint is
+source-only with no preflight/execute callback, and #231 passed the 35-checkpoint
+optimized batch, 60 test paths, 96 Ruff paths, Ruff check/format, diff check,
+identity-stability check, and the 133-A/133-B/133-C authority checks.
+
+Accepted validation covers:
+
+- exact 131-S target-session resolution and 131-M admission;
+- READY -> PREPARE_STARTED durable before one quote seam call maximum;
 - exact 131-N snapshot and 131-O/K preview/risk material;
-- no quote reacquisition and no freshness extension;
-- PREPARED is durable before pre-effect revalidation;
-- risk rejection, stale quote, or expired/nonmatching session reaches STOPPED
-  with zero review-effect attempts;
-- exact predecessor history/risk drift rejection before REVIEW_STARTED;
-- REVIEW_STARTED is durable before the fake effect receives control;
+- earliest source-mark deadline with no freshness extension/reacquisition;
+- PREPARED durable before final predecessor/risk/session revalidation;
+- rejection/staleness/session mismatch/material drift -> STOPPED with zero
+  review-effect attempts;
+- REVIEW_STARTED durable before the fake effect sees control;
 - one fake review/paper-effect invocation maximum;
-- successful fake effect can produce exactly one COMPLETED transition;
-- any exception/ambiguity after effect invocation produces INDETERMINATE;
-- COMPLETED/STOPPED/INDETERMINATE replay performs zero quote/effect calls;
-- REVIEW_STARTED replay performs zero effect calls and is reconciliation-only;
+- exact successful acknowledgement -> COMPLETED once;
+- post-effect exception/ambiguity -> INDETERMINATE;
+- terminal replay zero quote/effect calls;
+- PREPARE_STARTED/PREPARED/REVIEW_STARTED reopen reconciliation-only with zero
+  new edge calls;
 - no historical catch-up, retry, polling, sleep, scheduler, real Robinhood MCP,
   Architecture-131 paper operator/pipeline, or mutation-tool reachability;
-- source-only checkpoint registration immediately after 133-B with no
-  preflight/execute callback.
+- sanitized durability failure behavior with no compensation authority.
 
-The production provider/review-paper binding remains 133-D and is not part of
-133-C source acceptance.
+Focused implementation verification reported 2,084 distinct cases: 87
+composition, 340 overlapping 133-A/133-B, 1,545 runner/inventory, and 112
+accepted 131-Q cases. Current inventory is FULL 119, ROBINHOOD 46, LEGACY 204,
+EXHAUSTIVE 323. Broad certification remains deferred because 133-C is fake-only.
 
-## 133-D focused validation
+## 133-D focused validation — FROZEN
 
-Execution tests must cover BUY/SELL, APPROVED/RESIZED/REJECTED, provider
-exception, process-boundary ambiguity, operator PASS/FAIL, exact deterministic
-paper idempotency, persisted-OAuth-only behavior, and all four forbidden mutation
-counters fixed at zero.
+133-D source tests must bind the accepted 133-C coordinator to the accepted real
+Robinhood quote/review-paper composition while replacing the actual provider
+transport/effect with deterministic fakes. They must prove:
 
-The existing accepted Architecture-131 verifier semantics remain regression
-coverage. Do not weaken 131-V human-supervised behavior to implement unattended
-mode.
+- exact accepted 133-C state/edge ordering is reused rather than reimplemented;
+- persisted-OAuth-only composition and interactive/browser OAuth rejection;
+- accepted 131-P/131-N quote material with one quote request maximum;
+- BUY and SELL proposal coverage;
+- APPROVED, RESIZED, and REJECTED risk outcomes;
+- exact revalidated risk decision/order identity preserved into the accepted
+  131-I/H/J/L review-paper path;
+- durable REVIEW_STARTED exists before any review-paper operator invocation;
+- one Robinhood review attempt maximum;
+- accepted operator PASS can acknowledge exactly one deterministic synthetic
+  paper result;
+- operator FAIL, malformed evidence, provider/transport exception after
+  invocation, and process-boundary ambiguity cannot report success and become
+  INDETERMINATE;
+- provider failure before review invocation becomes STOPPED with zero review
+  attempts;
+- exact deterministic paper idempotency/replay and no duplicate local fill;
+- terminal/review-start replay performs zero new quote/review calls;
+- no quote reacquisition, fallback session, historical catch-up, polling, sleep,
+  or retry;
+- placement, cancellation, options-mutation, and crypto-mutation counters remain
+  exactly zero;
+- source tests perform no real provider/OAuth/scheduler/broker effect;
+- existing accepted Architecture-131 qualification/verifier semantics remain
+  regression coverage and 131-V human-supervised behavior is unchanged.
+
+Register
+`arch133-robinhood-unattended-review-paper-execution` immediately after 133-C
+with
+`remote_branch=feature/robinhood-unattended-review-paper-133d`,
+`preflight=None`, and `execute=None`.
+
+After focused/source-gate acceptance, run ROBINHOOD certification for the exact
+accepted 133-D tree. FULL remains deferred to 133-F.
 
 ## 133-E focused validation
 

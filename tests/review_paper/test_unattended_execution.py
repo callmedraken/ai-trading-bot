@@ -315,9 +315,7 @@ def test_quote_return_after_closing_buffer_stops_before_review(harness):
     late = datetime(2026, 10, 5, 19, 55, 1, tzinfo=UTC)
     h.quote_observed_at = late
     h.quote_source_at = late
-    h.binding = replace(
-        h.binding, oauth_valid_until=late + timedelta(minutes=5)
-    )
+    h.binding = replace(h.binding, oauth_valid_until=late + timedelta(minutes=5))
     admit(h)
     result = run(h)
     assert result.wake.final_state is State.STOPPED

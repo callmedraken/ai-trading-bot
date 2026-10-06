@@ -247,6 +247,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-unattended-review-paper-133d"
         if spec.name == "arch133-robinhood-unattended-host-scheduler-surface":
             expected_branch = "feature/robinhood-unattended-review-paper-133e"
+        if spec.name == "arch133-robinhood-unattended-host-bootstrap":
+            expected_branch = "feature/robinhood-unattended-review-paper-133g"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -6368,4 +6370,3 @@ def test_133g_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_host_bootstrap_authority_check(root)
-

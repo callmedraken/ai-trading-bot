@@ -501,9 +501,9 @@ def test_q133_1_bootstrap_drift_fails_closed(bootstrap_h, monkeypatch, drift):
     if drift == "branch":
         bootstrap_h.values[("branch", "--show-current")] = "feature/wrong"
     elif drift == "dirty":
-        bootstrap_h.values[
-            ("status", "--porcelain=v1", "--untracked-files=all")
-        ] = " M x"
+        bootstrap_h.values[("status", "--porcelain=v1", "--untracked-files=all")] = (
+            " M x"
+        )
     elif drift == "version":
         bootstrap_h.sys.version_info = (3, 14, 4)
     elif drift == "python":
@@ -548,12 +548,15 @@ def test_q133_1_bootstrap_source_has_no_publication_provider_or_scheduler_effect
         "rename",
     ):
         assert forbidden not in names
-    assert sum(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "run"
-        for node in ast.walk(tree)
-    ) == 1
+    assert (
+        sum(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+            for node in ast.walk(tree)
+        )
+        == 1
+    )
 
 
 def test_q133_1_bootstrap_launcher_is_zero_argument_and_sets_cache_before_import():

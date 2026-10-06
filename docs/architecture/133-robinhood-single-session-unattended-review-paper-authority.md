@@ -242,42 +242,360 @@ material, or arbitrary exception text.
 
 ## Source checkpoint plan
 
-### 133-A — activation + wake identity/state core
+### 133-A — activation + wake identity/state core — ACCEPTED
 
 Network-free/source-only.
 
-Implement immutable activation/wake models, deterministic identities, closed
-state machine, canonical serialization, and pure admission transitions. No
-filesystem, provider, OAuth, scheduler mutation, or paper write.
+Accepted source:
 
-### 133-B — durable wake store + provider-free reconciliation
+```text
+BRANCH feature/robinhood-unattended-review-paper-133a
+PARENT 10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+HEAD   b0751e1ff2109b7f99725910ee901685e293e175
+TREE   2230e11bcb3a2b27171aaa506f12110c31ae77a0
+CI     #227 / 37388706716 SUCCESS
+```
 
-Add create/read/transition durability for activation/wake state plus an
-independent read-only verifier. Prove single-use/idempotent/indeterminate
-semantics without provider access.
+Accepted behavior:
 
-### 133-C — effect-free one-wake composition
+- immutable/slotted `ReviewPaperActivation` and `ReviewPaperWake`;
+- closed canonical JSON round-trip with unknown/missing/noncanonical material
+  rejected;
+- UUID5 activation identity over versioned canonical semantic facts;
+- repository-wide identity policy preserved: filesystem `store_path` is
+  retained exactly in activation storage material but excluded from UUID5
+  domain identity, while `store_identity` remains identity-bearing;
+- exact proposal, risk-limit, source/deployment, target-session, paper-account,
+  buffer, quote-age, slippage/commission, order, creation-time, wake-contract,
+  and expiry facts retained in the activation;
+- deterministic wake identity bound to activation ID + target session date +
+  proposal ID + local order ID;
+- exact states `READY`, `PREPARE_STARTED`, `PREPARED`,
+  `REVIEW_STARTED`, `COMPLETED`, `STOPPED`, `INDETERMINATE`;
+- no outgoing transitions from terminal states;
+- failure before the review-start fence terminates as `STOPPED`;
+- failure after `REVIEW_STARTED` can terminate only as `INDETERMINATE`;
+- caller-supplied timezone-aware timestamps only, UTC canonicalization, and no
+  system-clock read;
+- Decimal canonicalization independent of ambient Decimal context;
+- no UUID4/randomness, filesystem access, SQLite, environment/config, network,
+  subprocess, MCP/OAuth/provider adapter, risk evaluation, paper mutation,
+  scheduler, retry, polling, or sleep authority.
 
-Compose accepted 131-S/P/N/O/Q/K/J boundaries with doubles/fakes at provider and
-paper-effect edges. Prove exact ordering, one-attempt budgets, quote/session
-freshness, and no retry.
+The source-only checkpoint
+`arch133-robinhood-unattended-activation-core` is registered once immediately
+after the accepted Architecture-131 checkpoint sequence. Source-gate #227
+reported Ruff check/format PASS, git diff check PASS, stable source identity,
+and `AUTHORITY[arch133-robinhood-unattended-activation-core]=PASS`.
 
-### 133-D — bounded unattended review-paper execution
+Focused implementation verification reported 233 core cases, 1,018 runner
+cases, and the two profile-inventory cases across the focused/corrected-failure
+runs, with Ruff and staged/diff checks passing. No FULL/ROBINHOOD certification
+is required at this pure-model checkpoint; Architecture 132 reserves those for
+the later coherent Robinhood/current-product boundaries.
 
-Add the source-owned one-wake execution boundary that may reach accepted 131-H
-once only after durable review-start fencing. Provider effects remain disabled
-in source tests.
+### 133-B — durable wake store + provider-free reconciliation — ACCEPTED
 
-### 133-E — zero-argument host/scheduler surface
+Accepted source:
 
-Add a source-owned zero-semantic-argument launcher, persisted-OAuth-only policy,
-runtime identity admission, and scheduler specification. No scheduler mutation.
+```text
+BRANCH feature/robinhood-unattended-review-paper-133b
+PARENT 0609c08d2a3dd89b773c3416b629f377d04264ad
+HEAD   e27ce1c2cebf38654404a96c06275e892909b2f5
+TREE   37781465d0385aaa1251349ebb21fa5af59357c0
+CI     #229 / 37392099387 SUCCESS
+```
 
-### 133-F — final source certification
+Accepted behavior:
 
-Run focused/source-gate verification throughout, ROBINHOOD certification at the
-first complete Robinhood boundary, and FULL certification at the final coherent
-current-product tree.
+- dedicated closed Architecture-133 SQLite state schema separate from the
+  Architecture-131 review-paper ledger;
+- exact canonical 133-A activation/wake JSON persisted with deterministic
+  activation/wake identity binding;
+- state-database path remains transport metadata and never enters deterministic
+  identity material;
+- exact-identical activation reopen is read-only/idempotent;
+- same activation ID with different canonical activation bytes is a hard
+  conflict, including a changed serialized paper-store path;
+- first activation + READY wake admission is atomic;
+- monotonic integer revision and exact one-shot optimistic compare-and-swap;
+- transition legality is delegated to accepted 133-A rather than reimplemented;
+- stale/conflicting writers fail closed with zero internal retry;
+- terminal and INDETERMINATE state survives close/reopen with no restored
+  transition authority;
+- complete metadata/activation/wake snapshot is explicitly sorted and
+  deterministically fingerprinted;
+- independent verifier opens SQLite through URI `mode=ro`, never constructs
+  the writer, and returns frozen/slotted sanitized verification facts;
+- malformed schema/metadata, partial rows, noncanonical JSON, duplicate/binding
+  conflicts, invalid revisions, and expected-state disagreement fail closed;
+- embedded Architecture-131 paper-store material remains inert during normal
+  admission/transition/verification paths;
+- no provider/OAuth/risk-manager/review/paper-fill/scheduler/subprocess/
+  environment/config/clock/retry/polling authority is introduced.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-state-store` is registered exactly once after
+133-A with `preflight=None`, `execute=None`, and no trusted remote-head
+handoff. Source-gate #229 passed the 34-participant optimized batch, Ruff
+check/format, git diff check, source identity stability, and both 133-A/133-B
+authority pins.
+
+Focused implementation verification reported 107 store/verifier cases, 233
+activation-core cases, 1,067 runner cases, and 450 certification-inventory cases
+across focused and corrected-failure runs. No ROBINHOOD/FULL certification is
+required at this local-durability-only checkpoint.
+
+### 133-C — effect-free one-wake composition — ACCEPTED
+
+Accepted source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133c
+PARENT 4b86018fffce8e46ec348cc5aeddf0a8657d824b
+HEAD   3f5a5b673bc9d66409e415152d6252cd80a46e3a
+TREE   7b048cedea8a97501198311229b25ab32f112735
+CI     #231 / 37410294723 SUCCESS
+```
+
+Accepted behavior:
+
+- one source-owned coordinator/result boundary for exactly one activation/wake;
+- exact accepted 133-A activation, exact 133-B persisted wake/revision, explicit
+  caller-supplied instants, and no system-clock read;
+- exact target-session resolution through accepted 131-S and admission through
+  accepted 131-M with the activation's frozen buffers;
+- durable READY -> PREPARE_STARTED before the quote seam;
+- one quote/preparation seam invocation maximum;
+- exact accepted 131-N snapshot plus 131-O/K preview/risk material;
+- earliest exact source-mark freshness deadline, with no extension or
+  reacquisition;
+- durable PREPARE_STARTED -> PREPARED before final predecessor/risk/freshness
+  revalidation;
+- durable PREPARED -> REVIEW_STARTED before the fake effect receives control;
+- one fake review/paper-effect invocation maximum;
+- successful exact acknowledgement -> COMPLETED once;
+- post-effect exception/ambiguity -> INDETERMINATE with no retry;
+- pre-effect rejection, stale/expired session, material drift, or exception ->
+  STOPPED with zero effect attempts;
+- terminal replay is read-only with zero quote/effect calls;
+- PREPARE_STARTED/PREPARED/REVIEW_STARTED reopen is reconciliation-only and
+  performs zero new provider/effect calls;
+- bounded immutable sanitized result facts only;
+- no production Robinhood transport/OAuth/operator/pipeline/scheduler/mutation,
+  subprocess/config discovery, polling/sleep/retry/catch-up/fallback authority.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-one-wake-composition` is registered exactly once
+after 133-B with
+`remote_branch=feature/robinhood-unattended-review-paper-133c`,
+`preflight=None`, `execute=None`, and no trusted remote-head handoff.
+Source-gate #231 passed 35 optimized checkpoints, 60 test paths, 96 Ruff paths,
+Ruff check/format, git diff check, source identity stability, and the
+133-A/133-B/133-C authority pins.
+
+Focused implementation verification reported 2,084 distinct cases: 87
+composition, 340 overlapping 133-A/133-B, 1,545 runner/inventory, and 112
+accepted 131-Q cases. Current certification inventory is FULL 119, ROBINHOOD
+46, LEGACY 204, EXHAUSTIVE 323. No ROBINHOOD/FULL certification is required at
+this fake-only composition boundary.
+
+### 133-D — bounded unattended review-paper execution — ACCEPTED
+
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133d
+
+IMPLEMENTATION
+HEAD 14bc4902a231fc87f8449c5971f2f8a9b382cc6e
+TREE 084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+CI-RECOVERY SAME-TREE HEAD
+HEAD 6677676170fa9ffb70ca62809c03b2df40ca1253
+TREE 084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+SOURCE-GATE #234 / 37413871721 SUCCESS
+```
+
+The original implementation push received no GitHub workflow run despite the
+already-reviewed Robinhood branch-family trigger. No missing run was treated as
+acceptance. A single no-file-change fast-forward commit preserved the exact
+implementation tree and retriggered the gate. #234 passed the 36-checkpoint
+optimized batch, 61 test paths, 98 Ruff paths, Ruff check/format, diff check,
+stable source identity, and all 133-A/B/C/D authority pins.
+
+Accepted behavior:
+
+- one source-owned 133-D binding around the accepted 133-C coordinator; no
+  duplicate wake state machine or transition authority;
+- persisted OAuth read exactly for the bounded provider path, with no browser,
+  interactive challenge, token refresh, discovery/registration, or credential
+  write authority;
+- exact required-symbol validation and one Robinhood quote request maximum;
+- accepted 131-N snapshot construction with the activation's frozen freshness
+  policy;
+- independent durable REVIEW_STARTED verification before review-paper operator
+  control;
+- exact proposal/risk/order/store/source material preserved and revalidated;
+- deterministic market-order intent uses the activation's frozen local order ID;
+- accepted 131-H review-paper operator invoked at most once;
+- successful acknowledgement requires exact PASS evidence, expected call
+  budgets, exact synthetic paper record, deterministic idempotency, and zero
+  placement/cancel/options/crypto mutation counters;
+- quote/OAuth/provider failure before the 133-D effect boundary is STOPPED;
+- exception, malformed acknowledgement, process/transport ambiguity, or inability
+  to prove the exact result after effect entry is INDETERMINATE;
+- terminal/reconciliation replay performs zero new provider/review effects;
+- no quote reacquisition, fallback session, catch-up, polling, sleep, retry,
+  scheduler mutation, environment/config discovery, autonomous proposal
+  generation, or broker/live effect.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-review-paper-execution` is registered exactly once
+after 133-C with
+`remote_branch=feature/robinhood-unattended-review-paper-133d`,
+`preflight=None`, and `execute=None`.
+
+Required ROBINHOOD certification passed on the exact accepted tree:
+
+```text
+profile robinhood PASS
+robinhood-1: 1893 / 1893
+robinhood-2: 1899 / 1899
+total:       3792 / 3792
+skipped: 0
+failed:  0
+errors:  0
+evidence: F:\AI\temp\certification\arch133d-robinhood-667767
+```
+
+Current certification inventory is FULL 120, ROBINHOOD 47, LEGACY 204,
+EXHAUSTIVE 324. FULL remains deferred to 133-F.
+
+### 133-E — zero-argument host/scheduler source surface — ACCEPTED
+
+Accepted source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+PARENT c24039f229b66f1d5510cf8e5c317cc8d0cbafc5
+HEAD   ee542d5decf9b9fb1933a0a8681ee0c5cae29f27
+TREE   274e2097c86a7cf41efa9e7af41f7324686d1ff7
+CI     #236 / 37427681435 SUCCESS
+```
+
+Accepted behavior:
+
+- fixed Architecture-133 launcher with zero semantic command-line arguments and
+  sanitized rejection before trading-source import;
+- exact source HEAD/TREE, runtime executable/version/launcher digest, Trading
+  principal, and deployment identity admission before OAuth/provider access;
+- one fixed host binding, activation publication, wake store, paper store, and
+  evidence location; no CLI/environment path or trading-authority injection;
+- exact canonical activation bytes and dedicated wake-state binding before
+  execution composition;
+- one initial admission clock read plus exactly one post-quote response clock read for an admitted READY wake;
+- at most one delegation to accepted 133-D and no retry/polling/catch-up loop;
+- persisted-OAuth-only execution path and provider-free persisted-OAuth
+  availability metadata for preflight;
+- terminal and reconciliation-only wake states return read-only with zero
+  133-D/provider delegation;
+- immutable single-session scheduler spec with task identity distinct from D10,
+  zero semantic arguments, IgnoreNew overlap policy, zero restart/repetition
+  authority, and explicit session start/end boundaries;
+- scheduler/task state never creates activation/effect authority;
+- no Task Scheduler query/mutation surface in the scheduler module;
+- provider-free Q133-1 preflight verifies exact source/runtime/activation/wake,
+  paper predecessor, OAuth availability metadata, proposed scheduler spec, and
+  zero consumed wake authority without invoking 133-D;
+- bounded sanitized host/preflight evidence with no credentials, account IDs,
+  raw provider payloads, arbitrary exception text, or secret-bearing CLI/env
+  material.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-host-scheduler-surface` is registered exactly
+once after 133-D with
+`remote_branch=feature/robinhood-unattended-review-paper-133e`,
+`preflight=None`, and `execute=None`.
+
+Focused verification reported 1,051 distinct cases: 80 host, 356 runner, 2
+inventory, and 613 overlapping tests. Source-gate #236 passed 37 checkpoints,
+62 test paths, 103 Ruff paths, Ruff check/format, git diff check, stable source
+identity, and all 133-A/B/C/D/E authority pins.
+
+Current certification inventory is FULL 121, ROBINHOOD 48, LEGACY 204,
+EXHAUSTIVE 325. No separate ROBINHOOD rerun is required at 133-E because the
+accepted 133-D provider/review-paper effect boundary was not changed.
+
+Architecture-124's historical sealed pre-source D10 guard remains historical
+one-week-soak precedent, not an Architecture-133-v1 requirement. 133-E's frozen
+single-session contract requires exact source/runtime admission before
+OAuth/provider access; native deployment/ACL qualification remains a separate
+protected gate.
+
+### 133-F — final source certification — ACCEPTED (corrected PR source)
+
+The original 133-F certification was superseded during PR #26 review after an
+integration-level timing defect was found before merge. The production host had
+reused a pre-request timestamp for quote observation and final pre-effect
+validation. The corrected source now observes time once after the single quote
+response and advances the final session/freshness fence to that later
+observation, without adding retry, reacquisition, polling, or catch-up authority.
+
+Final corrected certified source:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+HEAD   2fa3ec574e0a0d0c3e0cf20211b12bf2c7921b62
+TREE   46f5514c8fbe57af592237772a5a8cf73bf8194e
+PR SOURCE-GATE #247 / 37438768450 SUCCESS
+```
+
+The corrected source gate passed 37 checkpoints, 62 test paths, 103 Ruff paths,
+pytest/Ruff/diff checks, stable source identity, and all Architecture-133
+authority pins.
+
+Fresh FULL certification passed on that exact corrected tree:
+
+```text
+profile full PASS
+
+broad-1
+modules 58
+cases 2721
+passed 2721
+skipped 0
+failed 0
+errors 0
+
+broad-2
+modules 63
+cases 2124
+passed 2121
+skipped 3
+failed 0
+errors 0
+
+TOTAL
+cases 4845
+passed 4842
+skipped 3
+failed 0
+errors 0
+wall 304.855 s
+evidence F:\AI\temp\certification\arch133-timing-full-2fa3ec5
+```
+
+Architecture-132's profile classifier enforces
+`ROBINHOOD ⊆ FULL`, so the fresh FULL run re-certifies the complete current
+Robinhood subset on the corrected source. The historical dedicated 133-D
+ROBINHOOD run remains provenance for the first coherent Robinhood boundary; no
+second redundant Robinhood-only run is required after this corrected FULL PASS.
+
+PR #26 remains the integration vehicle. Merge is allowed only after exact
+head/tree, clean mergeability, review-thread resolution, and computed merge-tree
+verification. The merge itself does not authorize Q133 protected effects.
 
 ## Protected qualification sequence
 

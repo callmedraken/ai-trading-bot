@@ -107,11 +107,16 @@ CI_CHECKPOINTS: Final = (
     "arch131-robinhood-published-session-prepare",
     "arch131-robinhood-published-prepare-operator",
     "arch131-robinhood-supervised-qualification",
+    "arch133-robinhood-unattended-activation-core",
+    "arch133-robinhood-unattended-state-store",
+    "arch133-robinhood-unattended-one-wake-composition",
+    "arch133-robinhood-unattended-review-paper-execution",
+    "arch133-robinhood-unattended-host-scheduler-surface",
 )
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 32 participants and their order,
+    # Freeze the executable batch command, all 37 participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -129,6 +134,14 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and workflow.count(invocation) == 1
         and "verify arch" not in workflow
     )
+
+
+def _git_blob_sha1(path: Path) -> str:
+    # Text mode normalizes Git's LF source across Windows checkout CRLF.
+    data = path.read_text(encoding="utf-8").encode("utf-8")
+    return hashlib.sha1(
+        b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
+    ).hexdigest()
 
 
 def _qualified_names(node: ast.AST) -> set[str]:
@@ -733,6 +746,486 @@ def _arch131_forward_paper_cycle_authority_check(
     return tuple(failures)
 
 
+def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        pins = {
+            "src/trading_bot/review_paper/unattended_host_identity.py": (
+                "d68c995e9812b9b797f62f60ccdba894aa702dae"
+            ),
+            "src/trading_bot/review_paper/unattended_scheduler.py": (
+                "1a622fd86c29f8e05d1b01d7f6b47979342e6ce9"
+            ),
+            "src/trading_bot/review_paper/unattended_host.py": (
+                "54a109931d27f6edf19d70bcb3947dbe3238898a"
+            ),
+            "scripts/run_arch133_unattended_review_paper.py": (
+                "661023c46a3e088d338b67282effb7f35b00a93d"
+            ),
+        }
+        for relative, expected in pins.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-E closed composition boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-host-scheduler-surface"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "a56111bf9d6e7bf6c8044082949b2b52fc4dc3f71199923803ee226d8069e02c"
+        ):
+            failures.append("133-E source-only registration drift")
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
+            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-E batch registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133e"
+            or spec.authority_check is not _arch133_host_scheduler_authority_check
+            or spec.tests
+            != (
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+            or spec.ruff_paths
+            != (
+                *COMMON_RUFF_PATHS,
+                *pins,
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+        ):
+            failures.append("133-E source-only coverage/authority drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch133-robinhood-unattended-review-paper-execution")
+            + 1
+        ):
+            failures.append("133-E checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-E workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-E source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        pins = {
+            "src/trading_bot/review_paper/unattended_execution.py": (
+                "2c74a68708b99f7813806c50f0519046b90982f3"
+            ),
+        }
+        for relative, expected in pins.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-D closed composition boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-review-paper-execution"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "ee37045e518b8996918d3a8009a48fa531f833f0ac79080a16937558290831f5"
+        ):
+            failures.append("133-D source-only registration drift")
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
+            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-D batch registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133d"
+            or spec.authority_check is not _arch133_execution_authority_check
+            or spec.tests
+            != (
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/test_robinhood_paper_operator.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+            or spec.ruff_paths
+            != (
+                *COMMON_RUFF_PATHS,
+                *pins,
+                "tests/review_paper/test_unattended_execution.py",
+                "src/trading_bot/robinhood_paper_operator.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+        ):
+            failures.append("133-D source-only coverage/authority drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch133-robinhood-unattended-one-wake-composition")
+            + 1
+        ):
+            failures.append("133-D checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-D workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-D source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        pins = {
+            "src/trading_bot/review_paper/unattended_one_wake.py": (
+                "9fbcb9d303bc8aa52362a92eef472fd6419a8e66"
+            ),
+        }
+        for relative, expected in pins.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-C closed composition boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-one-wake-composition"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "f27e9f8bae3b05bf9157138c3a394092cdd615af00a30e0faf6b09f4104382ba"
+        ):
+            failures.append("133-C source-only registration drift")
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
+            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-C batch registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133c"
+            or spec.authority_check is not _arch133_one_wake_authority_check
+            or spec.tests
+            != (
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+            or spec.ruff_paths
+            != (
+                *COMMON_RUFF_PATHS,
+                *pins,
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/scripts/test_run_test_certification.py",
+            )
+        ):
+            failures.append("133-C source-only coverage/authority drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch133-robinhood-unattended-state-store") + 1
+        ):
+            failures.append("133-C checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-C workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-C source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        pins = {
+            "src/trading_bot/review_paper/unattended_state_schema.py": (
+                "02859147d4d476c3b23b56f3c63f0ae5857caa372eaaf8cc9eeb230d88e34b77"
+            ),
+            "src/trading_bot/review_paper/unattended_state_store.py": (
+                "93ffd82253c22803ff318721779e892f5f20dd9f996c8a2cdf3ba8f154ced822"
+            ),
+            "src/trading_bot/review_paper/unattended_state_verifier.py": (
+                "95e20d01781879a8c0637973fdc0a6b5efaff17d8377ffa59dbe865cb9c14d1c"
+            ),
+        }
+        for relative, expected in pins.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode("utf-8")
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-B closed state boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-state-store"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "9c4545b38e5ac5a22d134c4675be76fbfcde36904a8b507ead63f2f3aa01a008"
+        ):
+            failures.append("133-B source-only registration drift")
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
+            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-B batch registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133b"
+            or spec.authority_check is not _arch133_unattended_state_authority_check
+            or spec.tests
+            != (
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+            )
+            or spec.ruff_paths
+            != (
+                *COMMON_RUFF_PATHS,
+                *pins,
+                "tests/review_paper/test_unattended_state_store.py",
+            )
+        ):
+            failures.append("133-B source-only coverage/authority drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch133-robinhood-unattended-activation-core") + 1
+        ):
+            failures.append("133-B checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-B workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-B source or structural boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_unattended_activation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        path = repo_root / "src/trading_bot/review_paper/unattended_activation.py"
+        text_value = path.read_text(encoding="utf-8")
+        # Pin the complete module, including every import, helper and call.
+        if (
+            hashlib.sha256(
+                ast.dump(ast.parse(text_value), include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "7fc65af97b2465d82b907a67365d898a028226c2145b4cc77f6cdc6634f60b27"
+        ):
+            failures.append("133-A pure activation/wake boundary drift")
+
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-activation-core"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        if len(registrations) != 1 or (
+            hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "e211daf645d1cfa4ef74d7556c7c870d54dc61b8729ec3de4ccd78f67c4546d7"
+        ):
+            failures.append("133-A source-only checkpoint registration drift")
+
+        ci_assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(ci_assignments) != 1
+            or hashlib.sha256(
+                ast.dump(ci_assignments[0].value, include_attributes=False).encode(
+                    "utf-8"
+                )
+            ).hexdigest()
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-A checkpoint batch registration drift")
+
+        spec = _checkpoint_specs()[name]
+        if spec.preflight is not None or spec.execute is not None:
+            failures.append("133-A checkpoint has host/effect capability")
+        if spec.remote_branch != "feature/robinhood-unattended-review-paper-133a":
+            failures.append("133-A checkpoint remote branch drift")
+        if (
+            spec.tests
+            != (*COMMON_TESTS, "tests/review_paper/test_unattended_activation.py")
+            or spec.ruff_paths
+            != (
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_activation.py",
+                "tests/review_paper/test_unattended_activation.py",
+            )
+            or spec.authority_check
+            is not _arch133_unattended_activation_authority_check
+        ):
+            failures.append("133-A checkpoint coverage/authority drift")
+        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
+            CI_CHECKPOINTS.index("arch131-robinhood-supervised-qualification") + 1
+        ):
+            failures.append("133-A checkpoint ordering drift")
+
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-A workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-A source or structural boundary unavailable")
+    return tuple(failures)
+
+
 def _arch131_nyse_published_regular_session_authority_check(
     repo_root: Path,
 ) -> tuple[str, ...]:
@@ -807,7 +1300,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -914,7 +1407,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -1007,7 +1500,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -1106,7 +1599,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -1202,7 +1695,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -1298,7 +1791,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -1394,7 +1887,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -1490,7 +1983,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -1586,7 +2079,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -1684,7 +2177,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append(
@@ -1789,7 +2282,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "82d6e1615ff1a9517ba0a18f76f221b1bb189276a26b61b7b33a9a6bd1f7f937"
+            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
         ):
             failures.append(
@@ -2134,7 +2627,7 @@ def _arch131_paper_operator_authority_check(repo_root: Path) -> tuple[str, ...]:
             hashlib.sha256(
                 ast.dump(tree, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d17ea88426f21d540a6634ed90de622dba054375437f67be2d3571cbcc85268b"
+            != "d8ba2b1efdda9ea075e1cdf5b400742500bc4793af337351f7d35c566ed48b87"
         ):
             failures.append("131-H operator composition/redaction boundary drift")
         status_calls = [
@@ -4717,6 +5210,118 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch131_supervised_qualification_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-activation-core": CheckpointSpec(
+            name="arch133-robinhood-unattended-activation-core",
+            description=(
+                "Architecture 133-A pure activation and wake identity/state core"
+            ),
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_activation.py",
+                "tests/review_paper/test_unattended_activation.py",
+            ),
+            authority_check=_arch133_unattended_activation_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133a",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-state-store": CheckpointSpec(
+            name="arch133-robinhood-unattended-state-store",
+            description="Architecture 133-B durable wake store and read-only verifier",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_state_schema.py",
+                "src/trading_bot/review_paper/unattended_state_store.py",
+                "src/trading_bot/review_paper/unattended_state_verifier.py",
+                "tests/review_paper/test_unattended_state_store.py",
+            ),
+            authority_check=_arch133_unattended_state_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133b",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-one-wake-composition": CheckpointSpec(
+            name="arch133-robinhood-unattended-one-wake-composition",
+            description="Architecture 133-C effect-free one-wake composition",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_one_wake.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            authority_check=_arch133_one_wake_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133c",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-review-paper-execution": CheckpointSpec(
+            name="arch133-robinhood-unattended-review-paper-execution",
+            description="Architecture 133-D bounded unattended review-paper execution",
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/test_robinhood_paper_operator.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_execution.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "src/trading_bot/robinhood_paper_operator.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            authority_check=_arch133_execution_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133d",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-host-scheduler-surface": CheckpointSpec(
+            name="arch133-robinhood-unattended-host-scheduler-surface",
+            description=(
+                "Architecture 133-E zero-argument host and pure scheduler surface"
+            ),
+            tests=(
+                *COMMON_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            ruff_paths=(
+                *COMMON_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_host_identity.py",
+                "src/trading_bot/review_paper/unattended_scheduler.py",
+                "src/trading_bot/review_paper/unattended_host.py",
+                "scripts/run_arch133_unattended_review_paper.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/test_run_test_certification.py",
+            ),
+            authority_check=_arch133_host_scheduler_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133e",
             preflight=None,
             execute=None,
         ),

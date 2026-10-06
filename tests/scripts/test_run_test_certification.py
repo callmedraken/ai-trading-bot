@@ -690,6 +690,11 @@ def test_parser_defaults_to_full_and_rejects_unknown_profile() -> None:
 _PUBLISHED_PREPARE_TEST = "tests/review_paper/test_published_session_prepare.py"
 _PREPARE_OPERATOR_TEST = "tests/test_robinhood_prepare_operator.py"
 _SUPERVISED_QUALIFICATION_TEST = "tests/test_robinhood_supervised_qualification.py"
+_UNATTENDED_ACTIVATION_TEST = "tests/review_paper/test_unattended_activation.py"
+_UNATTENDED_STATE_TEST = "tests/review_paper/test_unattended_state_store.py"
+_UNATTENDED_ONE_WAKE_TEST = "tests/review_paper/test_unattended_one_wake.py"
+_UNATTENDED_EXECUTION_TEST = "tests/review_paper/test_unattended_execution.py"
+_UNATTENDED_HOST_TEST = "tests/review_paper/test_unattended_host.py"
 
 
 def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
@@ -707,14 +712,19 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 _PUBLISHED_PREPARE_TEST,
                 _PREPARE_OPERATOR_TEST,
                 _SUPERVISED_QUALIFICATION_TEST,
+                _UNATTENDED_ACTIVATION_TEST,
+                _UNATTENDED_STATE_TEST,
+                _UNATTENDED_ONE_WAKE_TEST,
+                _UNATTENDED_EXECUTION_TEST,
+                _UNATTENDED_HOST_TEST,
             )
         )
     )
-    assert len(selected) == 43
+    assert len(selected) == 48
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
-        if name.startswith("arch131-")
+        if name.startswith(("arch131-", "arch133-"))
         for module in spec.tests
     }
     assert registered <= set(selected)
@@ -738,6 +748,11 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 _PUBLISHED_PREPARE_TEST,
                 _PREPARE_OPERATOR_TEST,
                 _SUPERVISED_QUALIFICATION_TEST,
+                _UNATTENDED_ACTIVATION_TEST,
+                _UNATTENDED_STATE_TEST,
+                _UNATTENDED_ONE_WAKE_TEST,
+                _UNATTENDED_EXECUTION_TEST,
+                _UNATTENDED_HOST_TEST,
             )
         )
     )
@@ -746,11 +761,15 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _PREPARE_OPERATOR_TEST in profiles["full"]
     assert _SUPERVISED_QUALIFICATION_TEST in profiles["robinhood"]
     assert _SUPERVISED_QUALIFICATION_TEST in profiles["full"]
+    assert _UNATTENDED_ACTIVATION_TEST in profiles["robinhood"]
+    assert _UNATTENDED_ACTIVATION_TEST in profiles["full"]
+    assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
+    assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 116,
-        "robinhood": 43,
+        "full": 121,
+        "robinhood": 48,
         "legacy": 204,
-        "exhaustive": 320,
+        "exhaustive": 325,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

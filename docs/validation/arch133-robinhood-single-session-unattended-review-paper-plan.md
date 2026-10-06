@@ -22,75 +22,263 @@ evidence, and zero-real-order guarantees.
 The first qualification targets exactly one NYSE session. Multi-session
 recurrence is deferred.
 
-## 133-A focused validation
+## 133-A focused validation — ACCEPTED
 
-Activation and wake identity/state tests must cover:
+Accepted exact source:
+
+```text
+HEAD b0751e1ff2109b7f99725910ee901685e293e175
+TREE 2230e11bcb3a2b27171aaa506f12110c31ae77a0
+CI   #227 / 37388706716 SUCCESS
+```
+
+The exact six-file GitHub review found no correction requirement. The complete
+133-A module is AST-pinned by the source gate, the checkpoint is source-only
+with no preflight/execute callback, and #227 passed the optimized batch,
+Ruff check/format, diff check, identity-stability check, and 133-A authority
+check.
+
+Accepted validation covers:
 
 - strict closed schemas and canonical serialization;
 - deterministic activation/wake identities;
 - exact proposal/order/session binding;
-- single-use activation;
+- filesystem path retained as exact storage material but excluded from
+  deterministic identity under the repository-wide identity rule;
 - legal and illegal state transitions;
-- completed replay is read-only/idempotent;
-- stopped replay has no automatic retry;
-- review-started ambiguity becomes INDETERMINATE;
-- restart does not create fresh authority;
-- no filesystem/network/provider/scheduler dependency in pure models.
+- completed/stopped/indeterminate terminal replay with no transition authority;
+- review-started failure -> INDETERMINATE only;
+- timezone normalization and malformed timestamp rejection;
+- ambient-Decimal-context independence;
+- no UUID4, filesystem, SQLite, network/provider/OAuth, risk, scheduler,
+  retry/polling, or paper-write capability in the pure module.
 
-## 133-B focused validation
+Focused implementation verification reported 233 core cases, 1,018 runner
+cases, and two certification-inventory cases across the focused and
+corrected-failure runs. No broad suite was required at this pure source boundary.
 
-Durable state/reconciliation tests must cover:
+## 133-B focused validation — ACCEPTED
 
-- create-only activation identity or exact-identical reopen;
-- conflicting reuse fails closed;
-- atomic/durable transition behavior;
-- independent read-only verifier;
-- no second writer hidden in verifier;
-- exact BEFORE/AFTER fingerprints;
-- malformed/partial state fails closed;
-- completed/indeterminate distinction survives restart;
-- deterministic local order/fill identity cannot duplicate.
+Accepted exact source:
 
-## 133-C focused validation
+```text
+HEAD e27ce1c2cebf38654404a96c06275e892909b2f5
+TREE 37781465d0385aaa1251349ebb21fa5af59357c0
+CI   #229 / 37392099387 SUCCESS
+```
 
-Composition tests use doubles at all provider/effect boundaries and prove:
+The exact eight-file GitHub review found no correction requirement. 133-B's
+three source modules are AST-pinned by the source gate, the checkpoint is
+source-only with no preflight/execute callback, and #229 passed the optimized
+batch, Ruff check/format, diff check, identity-stability check, and both 133-A
+and 133-B authority checks.
 
-- exact 131-S target-session schedule;
-- one quote acquisition maximum;
-- exact 131-N/O snapshot/risk material;
-- quote deadline remains valid at effect admission;
-- risk rejection never reaches review;
-- durable review-start fence precedes review invocation;
-- one review invocation maximum;
-- one synthetic fill maximum;
-- any ambiguity forbids same-activation retry;
-- zero historical catch-up;
-- forbidden mutation tools are unreachable.
+Accepted validation covers:
 
-## 133-D focused validation
+- exact closed SQLite schema/application/user versions;
+- atomic activation + READY-wake creation;
+- exact-identical read-only reopen and changed-material conflict;
+- one-shot optimistic compare-and-swap with monotonic revision;
+- transaction rollback and zero busy retry;
+- delegation to the accepted 133-A transition matrix;
+- terminal/INDETERMINATE persistence across restart;
+- deterministic complete-state fingerprinting with explicit sorting;
+- independent URI-`mode=ro` verifier that never constructs the writer;
+- malformed/partial/duplicate/noncanonical/binding-conflict rejection;
+- inert Architecture-131 paper-store material on admitted/verified paths;
+- no provider/OAuth/risk/review/paper-fill/scheduler/subprocess/environment/
+  clock/retry/polling authority.
 
-Execution tests must cover BUY/SELL, APPROVED/RESIZED/REJECTED, provider
-exception, process-boundary ambiguity, operator PASS/FAIL, exact deterministic
-paper idempotency, persisted-OAuth-only behavior, and all four forbidden mutation
-counters fixed at zero.
+Focused implementation verification reported 107 store/verifier, 233
+activation-core, 1,067 runner, and 450 inventory cases across focused and
+corrected-failure runs. No broad certification was required at this local state
+boundary.
 
-The existing accepted Architecture-131 verifier semantics remain regression
-coverage. Do not weaken 131-V human-supervised behavior to implement unattended
-mode.
+## 133-C focused validation — ACCEPTED
 
-## 133-E focused validation
+Accepted exact source:
 
-Launcher/scheduler-source tests must prove:
+```text
+HEAD 3f5a5b673bc9d66409e415152d6252cd80a46e3a
+TREE 7b048cedea8a97501198311229b25ab32f112735
+CI   #231 / 37410294723 SUCCESS
+```
 
-- zero semantic CLI arguments;
-- no browser/interactive OAuth path;
-- exact source/runtime/activation admission before provider access;
-- scheduler spec points only at the reviewed launcher;
-- no task retries;
-- no overlapping effect authority;
-- task identity is distinct from historical D10;
-- task state is not activation authority;
-- source tests never mutate Task Scheduler.
+The exact six-file GitHub review found no correction requirement. The complete
+133-C coordinator is AST-pinned by the source gate, the checkpoint is
+source-only with no preflight/execute callback, and #231 passed the 35-checkpoint
+optimized batch, 60 test paths, 96 Ruff paths, Ruff check/format, diff check,
+identity-stability check, and the 133-A/133-B/133-C authority checks.
+
+Accepted validation covers:
+
+- exact 131-S target-session resolution and 131-M admission;
+- READY -> PREPARE_STARTED durable before one quote seam call maximum;
+- exact 131-N snapshot and 131-O/K preview/risk material;
+- earliest source-mark deadline with no freshness extension/reacquisition;
+- PREPARED durable before final predecessor/risk/session revalidation;
+- rejection/staleness/session mismatch/material drift -> STOPPED with zero
+  review-effect attempts;
+- REVIEW_STARTED durable before the fake effect sees control;
+- one fake review/paper-effect invocation maximum;
+- exact successful acknowledgement -> COMPLETED once;
+- post-effect exception/ambiguity -> INDETERMINATE;
+- terminal replay zero quote/effect calls;
+- PREPARE_STARTED/PREPARED/REVIEW_STARTED reopen reconciliation-only with zero
+  new edge calls;
+- no historical catch-up, retry, polling, sleep, scheduler, real Robinhood MCP,
+  Architecture-131 paper operator/pipeline, or mutation-tool reachability;
+- sanitized durability failure behavior with no compensation authority.
+
+Focused implementation verification reported 2,084 distinct cases: 87
+composition, 340 overlapping 133-A/133-B, 1,545 runner/inventory, and 112
+accepted 131-Q cases. Current inventory is FULL 119, ROBINHOOD 46, LEGACY 204,
+EXHAUSTIVE 323. Broad certification remains deferred because 133-C is fake-only.
+
+## 133-D focused validation — ACCEPTED
+
+Accepted exact implementation tree:
+
+```text
+IMPLEMENTATION HEAD 14bc4902a231fc87f8449c5971f2f8a9b382cc6e
+ACCEPTED HEAD       6677676170fa9ffb70ca62809c03b2df40ca1253
+TREE                084c8b794e3aa6f2795ef70deb70f92b92842bcd
+SOURCE-GATE          #234 / 37413871721 SUCCESS
+```
+
+The accepted HEAD is a no-file-change fast-forward of the implementation commit,
+created only because GitHub delivered no source-gate run/checks for the original
+push. The tree is exactly identical.
+
+Focused implementation verification reported 2,101 distinct cases: 58
+execution, 87 overlapping 133-C, 383 accepted Architecture-131, and 1,573
+runner/inventory cases. Source-gate #234 independently passed the 36-checkpoint
+batch, 61 test paths, 98 Ruff paths, Ruff check/format, diff check, stable source
+identity, and all Architecture-133 authority checks.
+
+Accepted validation covers:
+
+- accepted 133-C transition/ordering reuse with no second wake authority;
+- persisted-OAuth-only provider composition and no interactive/browser renewal;
+- accepted quote material with one quote request maximum;
+- BUY/SELL and APPROVED/RESIZED/REJECTED coverage;
+- exact risk/order/store/source binding into the accepted review-paper path;
+- durable REVIEW_STARTED before operator control;
+- one review-paper operator attempt maximum;
+- exact PASS acknowledgement and deterministic local paper idempotency;
+- quote/OAuth/provider failure before the effect boundary -> STOPPED;
+- malformed/failed/post-entry ambiguity -> INDETERMINATE;
+- terminal/reconciliation replay with zero new effects;
+- no quote reacquisition, fallback session, historical catch-up, polling, sleep,
+  retry, scheduler mutation, or live-order effect;
+- placement/cancellation/options/crypto mutation counters exactly zero.
+
+Required ROBINHOOD certification passed:
+
+```text
+robinhood-1: 1893 passed
+robinhood-2: 1899 passed
+total:       3792 passed
+skipped:     0
+failed:      0
+errors:      0
+evidence: F:\AI\temp\certification\arch133d-robinhood-667767
+```
+
+Current inventory is FULL 120, ROBINHOOD 47, LEGACY 204, EXHAUSTIVE 324. FULL
+remains deferred to 133-F.
+
+## 133-E focused validation — ACCEPTED
+
+Accepted exact source:
+
+```text
+HEAD ee542d5decf9b9fb1933a0a8681ee0c5cae29f27
+TREE 274e2097c86a7cf41efa9e7af41f7324686d1ff7
+CI   #236 / 37427681435 SUCCESS
+```
+
+The exact nine-file GitHub review found no correction requirement. Accepted
+validation covers:
+
+- zero semantic launcher/CLI arguments with sanitized early rejection;
+- exact source/runtime/deployment/principal admission before OAuth/provider
+  access;
+- canonical activation publication and dedicated wake-state binding;
+- scheduler/task metadata cannot create activation authority;
+- one initial admission clock read plus exactly one post-quote response clock read, and one 133-D delegation maximum;
+- persisted-OAuth-only execution and provider-free OAuth availability metadata;
+- no retry, polling, recursion, fallback session, or catch-up loop;
+- terminal/reconciliation replay with zero execution;
+- harmless duplicate/manual launch under durable wake-state authority;
+- immutable Architecture-133 scheduler identity distinct from D10;
+- exact zero-semantic scheduler action, IgnoreNew overlap policy, zero restart
+  and repetition authority, and exact single-session start/end boundaries;
+- no scheduler mutation/query surface;
+- provider-free Q133-1 preflight with zero 133-D delegation;
+- sanitized evidence/errors and no real credential/provider access in source
+  tests.
+
+Focused verification reported 1,051 distinct cases: 80 host, 356 runner, 2
+inventory, and 613 overlapping tests. Source-gate #236 passed 37 checkpoints,
+62 test paths, 103 Ruff paths, Ruff check/format, diff check, stable source
+identity, and all 133-A/B/C/D/E authority checks.
+
+Current inventory is FULL 121, ROBINHOOD 48, LEGACY 204, EXHAUSTIVE 325. The
+dedicated ROBINHOOD gate remains accepted from 133-D.
+
+## 133-F final source certification — ACCEPTED (corrected PR source)
+
+The original pre-PR-review 133-F evidence is superseded by the timing-corrected
+source below.
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+HEAD   2fa3ec574e0a0d0c3e0cf20211b12bf2c7921b62
+TREE   46f5514c8fbe57af592237772a5a8cf73bf8194e
+PR SOURCE-GATE #247 / 37438768450 SUCCESS
+```
+
+PR review found that the host previously reused a timestamp captured before
+quote acquisition as quote observation/final pre-effect time. The corrected
+path performs exactly one later post-response observation, uses that time for
+the snapshot, and advances the final session/freshness fence to it. It still
+permits one quote request maximum, one review effect maximum, and no retry,
+reacquisition, polling, catch-up, or fallback authority.
+
+Regression validation proves:
+
+- a quote returning after the closing-buffer boundary STOPs with zero review
+  attempt;
+- a quote returning after the earliest source-mark freshness deadline STOPs
+  with zero review attempt;
+- the post-response observation reaches the final admission and review-received
+  boundary;
+- terminal/reconciliation and one-attempt semantics remain unchanged.
+
+Fresh FULL certification on the exact corrected tree passed:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 58 | 2,721 | 2,721 | 0 | 0 | 0 |
+| broad-2 | 63 | 2,124 | 2,121 | 3 | 0 | 0 |
+| Total | 121 | 4,845 | 4,842 | 3 | 0 | 0 |
+
+```text
+status passed
+profile full
+wall 304.855 s
+evidence F:\AI\temp\certification\arch133-timing-full-2fa3ec5
+```
+
+The certification classifier fails closed unless the Robinhood inventory is a
+subset of FULL, so this corrected FULL PASS also covers every current Robinhood
+module. A separate Robinhood-only rerun would duplicate coverage and is not
+required.
+
+PR #26 may merge only after exact final PR identity/review/merge-tree checks.
+Post-merge source-gate verification remains required. Q133 protected
+qualification remains separately authorized.
 
 ## Certification topology
 

@@ -15,6 +15,7 @@ import pytest
 
 from trading_bot.domain import OrderSide, Symbol, TradeProposal
 from trading_bot.review_paper import unattended_host as host
+from trading_bot.review_paper import unattended_host_bootstrap as bootstrap
 from trading_bot.review_paper import unattended_host_identity as identity
 from trading_bot.review_paper import unattended_scheduler as scheduler
 from trading_bot.review_paper.store import ReviewPaperStore
@@ -56,7 +57,11 @@ def h(tmp_path, monkeypatch):
     value.paper = ReviewPaperStore(identity.PAPER_PATH, starting_cash=Decimal("10000"))
     value.state = UnattendedStateStore(identity.STATE_PATH)
     value.runtime = identity.HostRuntimeIdentity(
-        "a" * 40, "b" * 40, "c" * 64, "3.14.0", "d" * 64
+        "a" * 40,
+        "b" * 40,
+        identity.PRODUCTION_PYTHON_SHA256,
+        identity.PRODUCTION_PYTHON_VERSION,
+        "d" * 64,
     )
     value.activation = ReviewPaperActivation(
         source_head=value.runtime.source_head,
@@ -397,11 +402,193 @@ def test_binding_rejects_noncanonical_and_unknown_material(h, mutation):
         identity.HostBinding.from_json(raw)
 
 
+@pytest.fixture
+def bootstrap_h(tmp_path, monkeypatch):
+    root = tmp_path / "source"
+    module_file = root / "src" / "trading_bot" / "review_paper" / "bootstrap.py"
+    module_file.parent.mkdir(parents=True)
+    module_file.write_text("# bootstrap", encoding="utf-8")
+    python = tmp_path / "python.exe"
+    python.write_bytes(b"reviewed-shared-runtime")
+    launcher = root / "scripts" / "run_arch133_unattended_host_preflight.py"
+    launcher.parent.mkdir()
+    launcher.write_text("# launcher", encoding="utf-8")
+    host_root = tmp_path / "Arch133"
+    pycache = host_root / "no-pycache"
+    digest = hashlib.sha256(python.read_bytes()).hexdigest()
+
+    monkeypatch.setattr(identity, "SOURCE_ROOT", root)
+    monkeypatch.setattr(identity, "SOURCE_BRANCH", "feature/test-133g")
+    monkeypatch.setattr(identity, "PRODUCTION_PYTHON", python)
+    monkeypatch.setattr(identity, "PRODUCTION_PYTHON_SHA256", digest)
+    monkeypatch.setattr(identity, "PRODUCTION_PYTHON_VERSION", "3.14.3")
+    monkeypatch.setattr(identity, "HOST_ROOT", host_root)
+    monkeypatch.setattr(identity, "NO_PYCACHE", pycache)
+    monkeypatch.setattr(bootstrap, "BOOTSTRAP_LAUNCHER", launcher)
+    monkeypatch.setattr(bootstrap, "__file__", str(module_file))
+
+    fake_sys = SimpleNamespace(
+        platform="win32",
+        flags=SimpleNamespace(isolated=1),
+        dont_write_bytecode=True,
+        executable=str(python),
+        pycache_prefix=str(pycache),
+        argv=[str(launcher)],
+        version_info=(3, 14, 3),
+    )
+    monkeypatch.setattr(bootstrap, "sys", fake_sys)
+
+    calls = []
+    values = {
+        ("branch", "--show-current"): identity.SOURCE_BRANCH,
+        ("rev-parse", "HEAD"): "a" * 40,
+        ("rev-parse", "HEAD^{tree}"): "b" * 40,
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
+    }
+
+    def git(*args):
+        calls.append(args)
+        return values[args]
+
+    absence = []
+
+    def absent():
+        absence.append("absence")
+        if host_root.exists():
+            raise bootstrap.UnattendedHostBootstrapError("present")
+
+    monkeypatch.setattr(bootstrap, "_git", git)
+    monkeypatch.setattr(bootstrap, "_require_host_root_absent", absent)
+    monkeypatch.setattr(
+        bootstrap,
+        "WindowsTradingTokenObserver",
+        lambda: SimpleNamespace(
+            observe=lambda: TradingTokenObservation(
+                identity.TRADING_SID, 1, False, False, ()
+            )
+        ),
+    )
+    return SimpleNamespace(
+        calls=calls,
+        absence=absence,
+        values=values,
+        root=host_root,
+        python=python,
+        sys=fake_sys,
+    )
+
+
+def test_q133_1_bootstrap_is_prepublication_read_only(bootstrap_h):
+    result = bootstrap.preflight_unattended_host_bootstrap()
+    assert result.source_branch == identity.SOURCE_BRANCH
+    assert result.source_head == "a" * 40
+    assert result.source_tree == "b" * 40
+    assert result.python_sha256 == identity.PRODUCTION_PYTHON_SHA256
+    assert result.python_version == identity.PRODUCTION_PYTHON_VERSION
+    assert result.trading_sid == identity.TRADING_SID
+    assert result.host_root_absent is True
+    assert result.publication_objects == 0
+    assert result.provider_calls == result.oauth_reads == 0
+    assert result.scheduler_reads == result.scheduler_writes == 0
+    assert bootstrap_h.absence == ["absence", "absence"]
+    assert not bootstrap_h.root.exists()
+
+
+@pytest.mark.parametrize("drift", ["branch", "dirty", "version", "python", "principal", "root"])
+def test_q133_1_bootstrap_drift_fails_closed(bootstrap_h, monkeypatch, drift):
+    if drift == "branch":
+        bootstrap_h.values[("branch", "--show-current")] = "feature/wrong"
+    elif drift == "dirty":
+        bootstrap_h.values[("status", "--porcelain=v1", "--untracked-files=all")] = " M x"
+    elif drift == "version":
+        bootstrap_h.sys.version_info = (3, 14, 4)
+    elif drift == "python":
+        bootstrap_h.python.write_bytes(b"drift")
+    elif drift == "principal":
+        monkeypatch.setattr(
+            bootstrap,
+            "WindowsTradingTokenObserver",
+            lambda: SimpleNamespace(
+                observe=lambda: TradingTokenObservation(
+                    "S-1-5-21-1-2-3-4", 1, False, False, ()
+                )
+            ),
+        )
+    else:
+        bootstrap_h.root.mkdir()
+    with pytest.raises(
+        bootstrap.UnattendedHostBootstrapError,
+        match="host bootstrap preflight failed closed",
+    ):
+        bootstrap.preflight_unattended_host_bootstrap()
+
+
+def test_q133_1_bootstrap_source_has_no_publication_provider_or_scheduler_effects():
+    tree = ast.parse(Path(bootstrap.__file__).read_text(encoding="utf-8"))
+    names = {
+        node.id if isinstance(node, ast.Name) else node.attr
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Name, ast.Attribute))
+    }
+    for forbidden in (
+        "WindowsOAuthStorage",
+        "ReviewPaperStore",
+        "UnattendedStateStore",
+        "execute_one_unattended_review_paper_wake",
+        "RegisterTask",
+        "RegisterTaskDefinition",
+        "mkdir",
+        "write_text",
+        "write_bytes",
+        "unlink",
+        "rename",
+    ):
+        assert forbidden not in names
+    assert sum(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+        for node in ast.walk(tree)
+    ) == 1
+
+
+def test_q133_1_bootstrap_launcher_is_zero_argument_and_sets_cache_before_import():
+    launcher = (
+        Path(bootstrap.__file__).resolve().parents[3]
+        / "scripts"
+        / "run_arch133_unattended_host_preflight.py"
+    )
+    source = launcher.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    imports = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "trading_bot.review_paper.unattended_host_bootstrap"
+    ]
+    assignments = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Attribute)
+            and target.attr == "pycache_prefix"
+            for target in node.targets
+        )
+    ]
+    assert len(imports) == len(assignments) == 1
+    assert assignments[0] < imports[0]
+    assert "HOST_BOOTSTRAP_FAILED_CLOSED" in source
+    assert "environ" not in {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
+
+
 def test_scheduler_exact_single_session_action_is_pure_and_distinct(h):
     spec = scheduler.build_unattended_scheduler_spec(h.activation)
     assert spec.task_path == r"\AITradingBot-Arch133-SingleSessionReviewPaper-v1"
     assert "D10" not in spec.task_path and "D10" not in spec.executable
-    assert spec.executable == r"F:\AITradingBot\Arch133\runtime\python.exe"
+    assert spec.executable == r"F:\AITradingBot\runtime\python.exe"
     assert spec.arguments == ("-I", "-B", scheduler.LAUNCHER)
     assert spec.semantic_arguments == spec.scheduler_owned_environment == ()
     assert spec.start_boundary == AT
@@ -478,10 +665,13 @@ def runtime_h(tmp_path, monkeypatch):
     launcher.parent.mkdir()
     python.write_bytes(b"reviewed-runtime")
     launcher.write_bytes(b"reviewed-launcher")
+    python_sha256 = hashlib.sha256(python.read_bytes()).hexdigest()
+    monkeypatch.setattr(identity, "PRODUCTION_PYTHON_SHA256", python_sha256)
+    monkeypatch.setattr(identity, "PRODUCTION_PYTHON_VERSION", "3.14.0")
     runtime = identity.HostRuntimeIdentity(
         "a" * 40,
         "b" * 40,
-        hashlib.sha256(python.read_bytes()).hexdigest(),
+        python_sha256,
         "3.14.0",
         hashlib.sha256(launcher.read_bytes()).hexdigest(),
     )

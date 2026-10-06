@@ -5443,7 +5443,8 @@ def test_133a_source_only_registration_and_single_ordered_batch():
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, _A133_SOURCE, _A133_TEST)
     assert runner.CI_CHECKPOINTS.count(_A133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-6:-4] == (
+    index = runner.CI_CHECKPOINTS.index(_A133_NAME)
+    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
         "arch131-robinhood-supervised-qualification",
         _A133_NAME,
     )
@@ -5585,7 +5586,11 @@ def test_133b_source_only_registration_exact_order_and_coverage():
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST, _B133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, *_B133_SOURCES, _B133_TEST)
     assert runner.CI_CHECKPOINTS.count(_B133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-5:-3] == (_A133_NAME, _B133_NAME)
+    index = runner.CI_CHECKPOINTS.index(_B133_NAME)
+    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+        _A133_NAME,
+        _B133_NAME,
+    )
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_B133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -5746,7 +5751,13 @@ def test_133c_source_only_registration_exact_order_and_coverage():
         "tests/scripts/test_run_test_certification.py",
     )
     assert runner.CI_CHECKPOINTS.count(_C133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-5:-2] == (_A133_NAME, _B133_NAME, _C133_NAME)
+    start = runner.CI_CHECKPOINTS.index(_A133_NAME)
+    end = runner.CI_CHECKPOINTS.index(_C133_NAME)
+    assert runner.CI_CHECKPOINTS[start : end + 1] == (
+        _A133_NAME,
+        _B133_NAME,
+        _C133_NAME,
+    )
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_C133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -5892,7 +5903,11 @@ def test_133d_source_only_registration_exact_order_and_coverage():
         "tests/scripts/test_run_test_certification.py",
     )
     assert runner.CI_CHECKPOINTS.count(_D133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-3:-1] == (_C133_NAME, _D133_NAME)
+    index = runner.CI_CHECKPOINTS.index(_D133_NAME)
+    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+        _C133_NAME,
+        _D133_NAME,
+    )
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_D133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -6085,7 +6100,11 @@ def test_133e_source_only_registration_exact_order_and_coverage():
         "tests/scripts/test_run_test_certification.py",
     )
     assert runner.CI_CHECKPOINTS.count(_E133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-2:] == (_D133_NAME, _E133_NAME)
+    index = runner.CI_CHECKPOINTS.index(_E133_NAME)
+    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+        _D133_NAME,
+        _E133_NAME,
+    )
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_E133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -6188,7 +6207,8 @@ def test_133e_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
     if mutation == "registration":
         start = text.index('        "' + _E133_NAME + '": CheckpointSpec(')
         end = text.index(
-            '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+            '        "arch133-robinhood-unattended-host-bootstrap": CheckpointSpec(',
+            start,
         )
         text = (
             text[:start]
@@ -6199,7 +6219,7 @@ def test_133e_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
         line = (
             f'    "{_E133_NAME}",\n'
             if target == "runner"
-            else f"              {_E133_NAME}\n"
+            else f"              {_E133_NAME} `\n"
         )
         assert text.count(line) == 1
         if mutation == "order":
@@ -6211,3 +6231,141 @@ def test_133e_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
             text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_host_scheduler_authority_check(root)
+
+_G133_NAME = "arch133-robinhood-unattended-host-bootstrap"
+_G133_SOURCES = (
+    "src/trading_bot/review_paper/unattended_host_identity.py",
+    "src/trading_bot/review_paper/unattended_scheduler.py",
+    "src/trading_bot/review_paper/unattended_host.py",
+    "src/trading_bot/review_paper/unattended_host_bootstrap.py",
+    "scripts/run_arch133_unattended_review_paper.py",
+    "scripts/run_arch133_unattended_host_preflight.py",
+)
+
+
+def test_133g_source_only_registration_exact_order_and_coverage():
+    repo = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[_G133_NAME]
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133g"
+    assert spec.authority_check is runner._arch133_host_bootstrap_authority_check
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        _A133_TEST,
+        _B133_TEST,
+        _C133_TEST,
+        _D133_TEST,
+        _E133_TEST,
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        *_G133_SOURCES,
+        _E133_TEST,
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(_G133_NAME) == 1
+    assert runner.CI_CHECKPOINTS[-2:] == (_E133_NAME, _G133_NAME)
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.count(_G133_NAME) == 1
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._arch133_host_bootstrap_authority_check(repo) == ()
+
+
+def _133g_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in (
+        *_G133_SOURCES,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text((repo / relative).read_text(), encoding="utf-8")
+    assert runner._arch133_host_bootstrap_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize("source", _G133_SOURCES)
+def test_133g_authority_pins_bootstrap_runtime_and_launcher_edges(tmp_path, source):
+    root = _133g_authority_copy(tmp_path)
+    path = root / source
+    path.write_text(path.read_text() + "\n# drift\n", encoding="utf-8")
+    assert (
+        f"133-G closed bootstrap boundary drift: {source}"
+        in runner._arch133_host_bootstrap_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        *_G133_SOURCES,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ),
+)
+def test_133g_authority_missing_files_fail_closed(tmp_path, relative):
+    root = _133g_authority_copy(tmp_path)
+    (root / relative).unlink()
+    assert runner._arch133_host_bootstrap_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflight": lambda: {}},
+        {"execute": lambda: {}},
+        {"remote_branch": "wrong"},
+        {"remote_head_env": "UNREVIEWED"},
+        {"tests": ()},
+        {"ruff_paths": ()},
+        {"authority_check": lambda _: ()},
+    ],
+)
+def test_133g_runtime_registration_drift_rejected(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    root = _133g_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    specs[_G133_NAME] = replace(specs[_G133_NAME], **change)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert runner._arch133_host_bootstrap_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    ("target", "mutation"),
+    [
+        ("runner", "missing"),
+        ("runner", "duplicate"),
+        ("workflow", "missing"),
+        ("workflow", "duplicate"),
+        ("workflow", "order"),
+    ],
+)
+def test_133g_registration_batch_and_workflow_fail_closed(
+    tmp_path, target, mutation
+):
+    root = _133g_authority_copy(tmp_path)
+    path = root / (
+        "scripts/checkpoint_runner.py"
+        if target == "runner"
+        else ".github/workflows/checkpoint-source-gates.yml"
+    )
+    text = path.read_text()
+    line = (
+        f'    "{_G133_NAME}",\n'
+        if target == "runner"
+        else f"              {_G133_NAME}\n"
+    )
+    assert text.count(line) == 1
+    if mutation == "order":
+        text = text.replace(
+            f"              {_E133_NAME} `\n" + line,
+            f"              {_G133_NAME} `\n              {_E133_NAME}\n",
+        )
+    else:
+        text = text.replace(line, "" if mutation == "missing" else line * 2)
+    path.write_text(text, encoding="utf-8")
+    assert runner._arch133_host_bootstrap_authority_check(root)
+

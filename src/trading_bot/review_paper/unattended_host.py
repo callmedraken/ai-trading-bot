@@ -1,4 +1,4 @@
-"""133-E fixed-location zero-argument host and provider-free Q133-1 preflight.
+"""133-E/G fixed-location host and provider-free post-publication verification.
 
 No authority comes from scheduler state, CLI, cwd, or environment. Publication
 is read-only here. The accepted 133-D/C/B path owns all state/effect ordering.
@@ -180,7 +180,7 @@ def _quiet_edges() -> Iterator[None]:
 
 
 def preflight_unattended_host() -> UnattendedHostPreflight:
-    """Q133-1 read-only; never construct stores/writers or invoke 133-D.
+    """Q133-2V post-publication read-only; never construct stores/writers or 133-D.
 
     This surface requires already-published exact material. Publication itself
     remains separately authorized; source tests use deterministic publications.

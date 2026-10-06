@@ -495,7 +495,7 @@ Accepted behavior:
   evidence location; no CLI/environment path or trading-authority injection;
 - exact canonical activation bytes and dedicated wake-state binding before
   execution composition;
-- one current UTC read maximum for an admitted READY wake;
+- one initial admission clock read plus exactly one post-quote response clock read for an admitted READY wake;
 - at most one delegation to accepted 133-D and no retry/polling/catch-up loop;
 - persisted-OAuth-only execution path and provider-free persisted-OAuth
   availability metadata for preflight;
@@ -534,73 +534,68 @@ single-session contract requires exact source/runtime admission before
 OAuth/provider access; native deployment/ACL qualification remains a separate
 protected gate.
 
-### 133-F — final source certification — ACCEPTED
+### 133-F — final source certification — ACCEPTED (corrected PR source)
 
-Architecture 133 is fully source-certified at the exact closed 133-E tree:
+The original 133-F certification was superseded during PR #26 review after an
+integration-level timing defect was found before merge. The production host had
+reused a pre-request timestamp for quote observation and final pre-effect
+validation. The corrected source now observes time once after the single quote
+response and advances the final session/freshness fence to that later
+observation, without adding retry, reacquisition, polling, or catch-up authority.
+
+Final corrected certified source:
 
 ```text
 BRANCH feature/robinhood-unattended-review-paper-133e
-HEAD   31ab26fa842594b9d915ff8bba65a705978b0b00
-TREE   49afbefd4767a63b88c02c24f2a2bbbc0a282f21
-SOURCE-GATE #236 / 37427681435 SUCCESS
-DOCS-GATE   #237 / 37429153807 SUCCESS
+HEAD   2fa3ec574e0a0d0c3e0cf20211b12bf2c7921b62
+TREE   46f5514c8fbe57af592237772a5a8cf73bf8194e
+PR SOURCE-GATE #247 / 37438768450 SUCCESS
 ```
 
-Final FULL certification passed:
+The corrected source gate passed 37 checkpoints, 62 test paths, 103 Ruff paths,
+pytest/Ruff/diff checks, stable source identity, and all Architecture-133
+authority pins.
+
+Fresh FULL certification passed on that exact corrected tree:
 
 ```text
 profile full PASS
 
 broad-1
 modules 58
-cases 2702
-passed 2702
+cases 2721
+passed 2721
 skipped 0
 failed 0
 errors 0
 
 broad-2
 modules 63
-cases 2139
-passed 2136
+cases 2124
+passed 2121
 skipped 3
 failed 0
 errors 0
 
 TOTAL
-cases 4841
-passed 4838
+cases 4845
+passed 4842
 skipped 3
 failed 0
 errors 0
-wall 300.214 s
-evidence F:\AI\temp\certification\arch133f-full-31ab26f
+wall 304.855 s
+evidence F:\AI\temp\certification\arch133-timing-full-2fa3ec5
 ```
 
-The FULL run covered all 121 current-supported modules, including the 48-module
-ROBINHOOD subset. The separately required first complete Robinhood-boundary
-certification already passed at 133-D with 3,792 / 3,792 cases, so no mechanical
-second ROBINHOOD run was required at 133-F.
+Architecture-132's profile classifier enforces
+`ROBINHOOD ⊆ FULL`, so the fresh FULL run re-certifies the complete current
+Robinhood subset on the corrected source. The historical dedicated 133-D
+ROBINHOOD run remains provenance for the first coherent Robinhood boundary; no
+second redundant Robinhood-only run is required after this corrected FULL PASS.
 
-The exact certified feature source was compared against live `develop` before
-this docs-only closeout:
-
-```text
-origin/develop HEAD 10e72fc5c609802e2704bb6a8b40bd99e8782d6a
-merge base          10e72fc5c609802e2704bb6a8b40bd99e8782d6a
-ahead                11
-behind               0
-open PR              none
-```
-
-Architecture 133 is therefore source-complete and merge-ready. The final
-canonical 133-F closeout changes documentation only and does not alter the
-certified executable/test source.
-
-No Architecture-133 source/certification acceptance authorizes production host
-provisioning, activation publication, Task Scheduler mutation, a Robinhood
-provider wake, paper-effect qualification, broker placement, or live trading.
-Those remain the separately approved protected sequence below.
+PR #26 remains the integration vehicle. Merge is allowed only after exact
+head/tree, clean mergeability, review-thread resolution, and computed merge-tree
+verification. The merge itself does not authorize Q133 protected effects.
 
 ## Protected qualification sequence
 

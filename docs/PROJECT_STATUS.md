@@ -12292,3 +12292,71 @@ Q133-5 provider-free reconciliation, and Q133-6 authority closeout each require
 their own fresh authorization. A source/certification PASS grants none of them.
 
 Production/live real-money placement remains **NO-GO**.
+
+## 2026-10-06 — Architecture 133 PR timing correction ACCEPTED / supersedes prior 133-F evidence
+
+PR #26 review found one integration-level timing defect before merge: the
+133-E production host captured one timestamp before Robinhood quote acquisition
+and reused it as quote observation and final pre-effect time. That could hide
+provider/local elapsed time crossing the closing buffer or quote-freshness
+deadline.
+
+The correction preserves one quote, one review, zero retry/reacquisition and
+zero catch-up. Final timing is now:
+
+```text
+initial admission clock
+-> durable PREPARE_STARTED
+-> exactly one Robinhood quote request
+-> one post-response clock observation
+-> quote observed_at = post-response observation
+-> final session + earliest-source-mark freshness revalidation
+-> durable REVIEW_STARTED
+-> at most one review-paper effect
+```
+
+Regression coverage proves a quote returning after the closing buffer or after
+the earliest source-mark freshness deadline STOPs with zero review attempt.
+
+Corrected source identity:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+HEAD   2fa3ec574e0a0d0c3e0cf20211b12bf2c7921b62
+TREE   46f5514c8fbe57af592237772a5a8cf73bf8194e
+PR source gate #247 / 37438768450 SUCCESS
+```
+
+The source gate passed 37 checkpoints, 62 test paths, 103 Ruff paths,
+pytest/Ruff/diff checks, stable identity, and all 133-A/B/C/D/E authority
+checks.
+
+Fresh FULL certification on that exact corrected source passed:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 58 | 2,721 | 2,721 | 0 | 0 | 0 |
+| broad-2 | 63 | 2,124 | 2,121 | 3 | 0 | 0 |
+| Total | 121 | 4,845 | 4,842 | 3 | 0 | 0 |
+
+```text
+profile full PASS
+wall 304.855 s
+evidence F:\AI\temp\certification\arch133-timing-full-2fa3ec5
+```
+
+Architecture-132 explicitly requires ROBINHOOD to be a subset of FULL, so this
+fresh FULL run also re-certifies every current Robinhood module on the corrected
+source. A separate redundant ROBINHOOD rerun is not required.
+
+This section supersedes the earlier 133-F certified HEAD/TREE and FULL evidence.
+Historical 133-D ROBINHOOD and pre-correction 133-F results remain provenance
+only.
+
+Architecture 133 is again source-certified and merge-ready subject to exact PR
+head/tree and merge-tree verification. Q133-1 through Q133-6 remain separately
+protected; no source or certification result authorizes a provider wake,
+activation publication, Task Scheduler mutation, broker placement, or live
+trading.
+
+Production/live real-money placement remains **NO-GO**.

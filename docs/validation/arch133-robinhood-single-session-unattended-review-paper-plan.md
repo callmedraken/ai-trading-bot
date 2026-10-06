@@ -206,7 +206,7 @@ validation covers:
   access;
 - canonical activation publication and dedicated wake-state binding;
 - scheduler/task metadata cannot create activation authority;
-- one current UTC read maximum and one 133-D delegation maximum;
+- one initial admission clock read plus exactly one post-quote response clock read, and one 133-D delegation maximum;
 - persisted-OAuth-only execution and provider-free OAuth availability metadata;
 - no retry, polling, recursion, fallback session, or catch-up loop;
 - terminal/reconciliation replay with zero execution;
@@ -227,46 +227,58 @@ identity, and all 133-A/B/C/D/E authority checks.
 Current inventory is FULL 121, ROBINHOOD 48, LEGACY 204, EXHAUSTIVE 325. The
 dedicated ROBINHOOD gate remains accepted from 133-D.
 
-## 133-F final source certification — ACCEPTED
+## 133-F final source certification — ACCEPTED (corrected PR source)
 
-Final exact certified source:
+The original pre-PR-review 133-F evidence is superseded by the timing-corrected
+source below.
 
 ```text
 BRANCH feature/robinhood-unattended-review-paper-133e
-HEAD   31ab26fa842594b9d915ff8bba65a705978b0b00
-TREE   49afbefd4767a63b88c02c24f2a2bbbc0a282f21
+HEAD   2fa3ec574e0a0d0c3e0cf20211b12bf2c7921b62
+TREE   46f5514c8fbe57af592237772a5a8cf73bf8194e
+PR SOURCE-GATE #247 / 37438768450 SUCCESS
 ```
 
-Architecture-132 FULL certification passed on that exact tree:
+PR review found that the host previously reused a timestamp captured before
+quote acquisition as quote observation/final pre-effect time. The corrected
+path performs exactly one later post-response observation, uses that time for
+the snapshot, and advances the final session/freshness fence to it. It still
+permits one quote request maximum, one review effect maximum, and no retry,
+reacquisition, polling, catch-up, or fallback authority.
+
+Regression validation proves:
+
+- a quote returning after the closing-buffer boundary STOPs with zero review
+  attempt;
+- a quote returning after the earliest source-mark freshness deadline STOPs
+  with zero review attempt;
+- the post-response observation reaches the final admission and review-received
+  boundary;
+- terminal/reconciliation and one-attempt semantics remain unchanged.
+
+Fresh FULL certification on the exact corrected tree passed:
 
 | Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| broad-1 | 58 | 2,702 | 2,702 | 0 | 0 | 0 |
-| broad-2 | 63 | 2,139 | 2,136 | 3 | 0 | 0 |
-| Total | 121 | 4,841 | 4,838 | 3 | 0 | 0 |
+| broad-1 | 58 | 2,721 | 2,721 | 0 | 0 | 0 |
+| broad-2 | 63 | 2,124 | 2,121 | 3 | 0 | 0 |
+| Total | 121 | 4,845 | 4,842 | 3 | 0 | 0 |
 
 ```text
 status passed
 profile full
-wall 300.214 s
-evidence F:\AI\temp\certification\arch133f-full-31ab26f
+wall 304.855 s
+evidence F:\AI\temp\certification\arch133-timing-full-2fa3ec5
 ```
 
-The runner re-proved exact local branch/HEAD/TREE, live
-`origin/develop=10e72fc5c609802e2704bb6a8b40bd99e8782d6a`, and live
-`origin/feature/robinhood-unattended-review-paper-133e` identity before,
-during, and after the certification, while keeping protected opt-ins absent.
+The certification classifier fails closed unless the Robinhood inventory is a
+subset of FULL, so this corrected FULL PASS also covers every current Robinhood
+module. A separate Robinhood-only rerun would duplicate coverage and is not
+required.
 
-No separate ROBINHOOD rerun was required because the dedicated 133-D ROBINHOOD
-gate already passed and FULL contains the complete 48-module Robinhood subset.
-
-Merge-readiness review before this docs-only closeout proved the live develop
-HEAD is exactly the feature merge base, feature is 11 commits ahead / 0 behind,
-and no open PR exists. No source rebase or divergence repair is required.
-
-133-F adds no implementation source/checkpoint. Architecture 133 source
-certification is complete. PR creation/merge and Q133 protected qualification
-remain separate approval boundaries.
+PR #26 may merge only after exact final PR identity/review/merge-tree checks.
+Post-merge source-gate verification remains required. Q133 protected
+qualification remains separately authorized.
 
 ## Certification topology
 

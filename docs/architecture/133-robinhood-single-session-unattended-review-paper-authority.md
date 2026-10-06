@@ -534,45 +534,73 @@ single-session contract requires exact source/runtime admission before
 OAuth/provider access; native deployment/ACL qualification remains a separate
 protected gate.
 
-### 133-F — final source certification — FROZEN NEXT
+### 133-F — final source certification — ACCEPTED
 
-133-F is a certification-only boundary over the exact accepted 133-E product
-tree. Do **not** create a new 133-F implementation branch merely to continue the
-letter sequence: the source-owned host/scheduler identity is intentionally
-pinned to the accepted 133-E branch and worktree.
+Architecture 133 is fully source-certified at the exact closed 133-E tree:
 
-Freeze this certification contract:
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+HEAD   31ab26fa842594b9d915ff8bba65a705978b0b00
+TREE   49afbefd4767a63b88c02c24f2a2bbbc0a282f21
+SOURCE-GATE #236 / 37427681435 SUCCESS
+DOCS-GATE   #237 / 37429153807 SUCCESS
+```
 
-1. First close 133-E canonically and require its docs-only source-gate to PASS.
-2. Fast-forward the clean local 133-E worktree only to that exact reviewed
-   closeout HEAD/TREE.
-3. Run Architecture-132 `full` certification exactly once on that exact
-   branch/HEAD/TREE, with live `origin/develop` and live
-   `origin/feature/robinhood-unattended-review-paper-133e` both pinned.
-4. FULL must cover the complete current-supported inventory, including all
-   Architecture-131 and Architecture-133 A-E current-product modules. Current
-   expected profile inventory is FULL 121, ROBINHOOD 48, LEGACY 204,
-   EXHAUSTIVE 325.
-5. Protected opt-ins remain absent. The certification performs no real OAuth,
-   Robinhood provider wake, Task Scheduler mutation, activation publication,
-   broker placement, or other protected effect.
-6. A separate ROBINHOOD rerun is not required mechanically because ROBINHOOD is
-   a subset of FULL and the dedicated first-complete-boundary ROBINHOOD gate
-   already passed at 133-D.
-7. If FULL fails, STOP. Diagnose the bounded failing area, make only the
-   necessary correction, run focused verification/source gate, and then ask for
-   one fresh FULL rerun on the corrected exact tree. Do not loop broad suites.
-8. FULL PASS establishes final Architecture-133 source certification only. It
-   does not authorize provider access, activation publication, scheduler
-   mutation, or any Q133 protected effect.
-9. After FULL PASS, ChatGPT performs final Architecture-133 canonical
-   certification and merge-readiness review against live `origin/develop`.
-   PR creation/metadata and merge remain separately protected repository-control
-   actions.
-10. A merge needs no second FULL run only if the resulting integration source
-    tree is exactly the already-certified feature source tree apart from
-    reviewed docs-only closeout/integration metadata. Post-merge source-gate
-    success remains required before entering protected qualification planning.
+Final FULL certification passed:
+
+```text
+profile full PASS
+
+broad-1
+modules 58
+cases 2702
+passed 2702
+skipped 0
+failed 0
+errors 0
+
+broad-2
+modules 63
+cases 2139
+passed 2136
+skipped 3
+failed 0
+errors 0
+
+TOTAL
+cases 4841
+passed 4838
+skipped 3
+failed 0
+errors 0
+wall 300.214 s
+evidence F:\AI\temp\certification\arch133f-full-31ab26f
+```
+
+The FULL run covered all 121 current-supported modules, including the 48-module
+ROBINHOOD subset. The separately required first complete Robinhood-boundary
+certification already passed at 133-D with 3,792 / 3,792 cases, so no mechanical
+second ROBINHOOD run was required at 133-F.
+
+The exact certified feature source was compared against live `develop` before
+this docs-only closeout:
+
+```text
+origin/develop HEAD 10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+merge base          10e72fc5c609802e2704bb6a8b40bd99e8782d6a
+ahead                11
+behind               0
+open PR              none
+```
+
+Architecture 133 is therefore source-complete and merge-ready. The final
+canonical 133-F closeout changes documentation only and does not alter the
+certified executable/test source.
+
+No Architecture-133 source/certification acceptance authorizes production host
+provisioning, activation publication, Task Scheduler mutation, a Robinhood
+provider wake, paper-effect qualification, broker placement, or live trading.
+Those remain the separately approved protected sequence below.
 
 ## Protected qualification sequence
 

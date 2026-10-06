@@ -227,33 +227,46 @@ identity, and all 133-A/B/C/D/E authority checks.
 Current inventory is FULL 121, ROBINHOOD 48, LEGACY 204, EXHAUSTIVE 325. The
 dedicated ROBINHOOD gate remains accepted from 133-D.
 
-## 133-F final source certification — FROZEN
+## 133-F final source certification — ACCEPTED
 
-133-F adds no new implementation source by default. Do not create a new source
-branch/checkpoint solely for the letter.
+Final exact certified source:
 
-After the atomic 133-E docs closeout and its docs-only CI success:
+```text
+BRANCH feature/robinhood-unattended-review-paper-133e
+HEAD   31ab26fa842594b9d915ff8bba65a705978b0b00
+TREE   49afbefd4767a63b88c02c24f2a2bbbc0a282f21
+```
 
-- reconcile the clean local 133-E worktree to the exact reviewed closeout
-  HEAD/TREE by fast-forward only;
-- run `scripts/run_test_certification.py --profile full` against that exact
-  branch/HEAD/TREE;
-- pin live `origin/develop` and the live 133-E feature ref;
-- require the complete FULL current-supported profile and the runner's source
-  identity/static checks to PASS;
-- keep all protected opt-ins absent;
-- perform no provider/OAuth/scheduler/activation/broker effect;
-- do not run LEGACY/EXHAUSTIVE unless an actual compatibility change makes it
-  relevant;
-- do not run a separate ROBINHOOD profile mechanically because FULL includes the
-  ROBINHOOD subset and the dedicated 133-D gate already passed;
-- on failure, STOP for bounded diagnosis/correction and focused verification
-  before one fresh FULL rerun.
+Architecture-132 FULL certification passed on that exact tree:
 
-After FULL PASS, ChatGPT records the exact lane/case evidence, performs final
-Architecture-133 merge-readiness review against live `origin/develop`, and
-closes 133-F. PR creation/merge and Q133-1 through Q133-6 remain separately
-authorized boundaries.
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 58 | 2,702 | 2,702 | 0 | 0 | 0 |
+| broad-2 | 63 | 2,139 | 2,136 | 3 | 0 | 0 |
+| Total | 121 | 4,841 | 4,838 | 3 | 0 | 0 |
+
+```text
+status passed
+profile full
+wall 300.214 s
+evidence F:\AI\temp\certification\arch133f-full-31ab26f
+```
+
+The runner re-proved exact local branch/HEAD/TREE, live
+`origin/develop=10e72fc5c609802e2704bb6a8b40bd99e8782d6a`, and live
+`origin/feature/robinhood-unattended-review-paper-133e` identity before,
+during, and after the certification, while keeping protected opt-ins absent.
+
+No separate ROBINHOOD rerun was required because the dedicated 133-D ROBINHOOD
+gate already passed and FULL contains the complete 48-module Robinhood subset.
+
+Merge-readiness review before this docs-only closeout proved the live develop
+HEAD is exactly the feature merge base, feature is 11 commits ahead / 0 behind,
+and no open PR exists. No source rebase or divergence repair is required.
+
+133-F adds no implementation source/checkpoint. Architecture 133 source
+certification is complete. PR creation/merge and Q133 protected qualification
+remain separate approval boundaries.
 
 ## Certification topology
 

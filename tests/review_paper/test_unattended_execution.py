@@ -78,7 +78,15 @@ def review(side, quantity, at=AT):
 @pytest.fixture
 def harness(tmp_path, monkeypatch):
     h = SimpleNamespace(
-        calls=[], oauth_reads=0, failure=None, operator_calls=0, fault=None, previews=[]
+        calls=[],
+        oauth_reads=0,
+        failure=None,
+        operator_calls=0,
+        fault=None,
+        previews=[],
+        quote_clock_calls=0,
+        quote_observed_at=AT,
+        quote_source_at=AT,
     )
     h.paper_store = ReviewPaperStore(
         tmp_path / "paper.sqlite", starting_cash=Decimal("10000")
@@ -108,6 +116,11 @@ def harness(tmp_path, monkeypatch):
     h.instants = OneWakeInstants(
         AT, AT + timedelta(seconds=10), AT + timedelta(seconds=11)
     )
+    def quote_clock():
+        h.quote_clock_calls += 1
+        assert h.calls and h.calls[-1][0] == "get_equity_quotes"
+        return h.quote_observed_at
+
     h.binding = module.UnattendedExecutionBinding(
         "feature/robinhood-unattended-review-paper-133d",
         "a" * 40,
@@ -116,7 +129,7 @@ def harness(tmp_path, monkeypatch):
         tmp_path / "evidence.json",
         "http://127.0.0.1:8765/oauth/callback",
         AT + timedelta(minutes=5),
-        AT,
+        quote_clock,
     )
     h.oauth_storage = object.__new__(WindowsOAuthStorage)
     original_preview = coordinator.build_review_paper_forward_preview
@@ -156,7 +169,11 @@ def harness(tmp_path, monkeypatch):
             raise RuntimeError(SECRET)
         if name == "get_equity_quotes":
             assert arguments == {"symbols": ["SPY"]}
-            return {"data": {"results": [{"quote": quote(), "close": None}]}}
+            return {
+                "data": {
+                    "results": [{"quote": quote(h.quote_source_at), "close": None}]
+                }
+            }
         if name == "get_accounts":
             return {
                 "data": {
@@ -202,7 +219,9 @@ def harness(tmp_path, monkeypatch):
         assert intent == build_review_paper_intent(
             h.previews[-1].risk_decision,
             ExecutionInstruction(
-                OrderType.MARKET, TimeInForce.DAY, h.instants.pre_effect_at
+                OrderType.MARKET,
+                TimeInForce.DAY,
+                max(h.instants.pre_effect_at, h.quote_observed_at),
             ),
             order_id=h.activation.local_order_id,
         )
@@ -277,6 +296,44 @@ def replay_is_inert(h):
 
 @pytest.mark.parametrize("side", list(OrderSide))
 @pytest.mark.parametrize("outcome", list(RiskOutcome))
+def test_post_quote_clock_advances_pre_effect_time(harness):
+    h = harness
+    h.quote_observed_at = AT + timedelta(seconds=20)
+    h.quote_source_at = h.quote_observed_at
+    admit(h)
+    result = run(h)
+    assert result.wake.final_state is State.COMPLETED
+    assert result.wake.admissions[-1].as_of == h.quote_observed_at
+    assert h.intent.proposed_at == h.quote_observed_at
+    assert h.quote_clock_calls == 1
+    assert h.operator_calls == 1
+
+
+def test_quote_return_after_closing_buffer_stops_before_review(harness):
+    h = harness
+    late = datetime(2026, 10, 5, 19, 55, 1, tzinfo=UTC)
+    h.quote_observed_at = late
+    h.quote_source_at = late
+    admit(h)
+    result = run(h)
+    assert result.wake.final_state is State.STOPPED
+    assert result.wake.classification.value == "SESSION_NOT_ADMITTED"
+    assert result.wake.admissions[-1].as_of == late
+    assert h.quote_clock_calls == 1
+    assert h.operator_calls == 0
+
+
+def test_quote_return_after_freshness_deadline_stops_before_review(harness):
+    h = harness
+    h.quote_observed_at = AT + timedelta(seconds=61)
+    h.quote_source_at = AT
+    admit(h)
+    result = run(h)
+    assert result.wake.final_state is State.STOPPED
+    assert h.quote_clock_calls == 1
+    assert h.operator_calls == 0
+
+
 def test_exact_risk_intent_and_synthetic_result(harness, side, outcome):
     h = harness
     if side is OrderSide.SELL:

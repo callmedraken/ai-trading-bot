@@ -129,7 +129,7 @@ def h(tmp_path, monkeypatch):
             == kwargs["instants"].finished_at
             == AT
         )
-        assert kwargs["binding"].quote_observed_at == AT
+        assert kwargs["binding"].quote_observed_clock is host._current_utc
         assert kwargs["binding"].oauth_valid_until == value.binding.oauth_valid_until
         assert type(kwargs["oauth_storage"]) is host.WindowsOAuthStorage
         if value.failure == "execute":
@@ -141,7 +141,8 @@ def h(tmp_path, monkeypatch):
             replay = host.run_unattended_host()
             assert replay.execution_delegations == 0
             assert replay.state is State.PREPARE_STARTED
-        current = value.state.transition(current, state=State.STOPPED, at=AT)
+        quote_at = kwargs["binding"].quote_observed_clock()
+        current = value.state.transition(current, state=State.STOPPED, at=quote_at)
         return UnattendedExecutionResult(
             OneWakeResult(
                 value.activation.activation_id,
@@ -213,7 +214,7 @@ def test_environment_cannot_supply_authority(h, monkeypatch, variable):
     monkeypatch.setenv(variable, SECRET)
     result = host.run_unattended_host()
     assert result.execution_delegations == 1
-    assert h.clocks == 1
+    assert h.clocks == 2
     assert h.oauth == 0
 
 
@@ -223,13 +224,13 @@ def test_once_delegation_and_duplicate_manual_launch(h):
     assert result.execution_delegations == 1
     assert replay.execution_delegations == 0
     assert replay.state is State.STOPPED
-    assert h.clocks == 1 and len(h.executions) == 1 and h.oauth == 0
+    assert h.clocks == 2 and len(h.executions) == 1 and h.oauth == 0
 
 
 def test_concurrent_launch_after_durable_consumption_is_read_only(h):
     h.failure = "overlap"
     host.run_unattended_host()
-    assert h.clocks == 1 and len(h.executions) == 1
+    assert h.clocks == 2 and len(h.executions) == 1
 
 
 @pytest.mark.parametrize(
@@ -317,7 +318,7 @@ def test_fixed_errors_no_retry_and_no_raw_exception(h, failure, capsys):
     h.failure = failure
     assert host.main([]) == 3
     assert SECRET not in capsys.readouterr().err
-    assert h.clocks <= 1 and len(h.executions) <= 1 and h.oauth == 0
+    assert h.clocks <= 2 and len(h.executions) <= 1 and h.oauth == 0
 
 
 def test_q133_1_is_read_only_and_never_constructs_writer(h, monkeypatch):

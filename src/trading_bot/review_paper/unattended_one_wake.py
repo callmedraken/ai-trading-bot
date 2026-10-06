@@ -185,6 +185,12 @@ def compose_one_review_paper_wake(
     outcome = None
     quote_attempts = 0
     effect_attempts = 0
+    # The caller supplies lower-bound/fakeable instants. A real quote seam may
+    # observe the response later; that later observation must advance every
+    # remaining freshness/session/effect fence rather than be compared to an
+    # already-stale pre-request timestamp.
+    pre_effect_at = instants.pre_effect_at
+    finished_at = instants.finished_at
 
     def result(classification: OneWakeClassification) -> OneWakeResult:
         return OneWakeResult(
@@ -297,13 +303,12 @@ def compose_one_review_paper_wake(
         )
         if type(snapshot) is not ReviewPaperRiskPriceSnapshot:
             raise TypeError("quote seam must return exact 131-N snapshot")
+        pre_effect_at = max(pre_effect_at, snapshot.observed_at)
+        finished_at = max(finished_at, pre_effect_at)
         deadline = min(
             mark.source_at + activation.max_quote_age for mark in snapshot.marks
         )
-        if (
-            not instants.started_at <= snapshot.observed_at <= instants.pre_effect_at
-            or deadline < snapshot.observed_at
-        ):
+        if snapshot.observed_at < instants.started_at or deadline < snapshot.observed_at:
             classification = OneWakeClassification.QUOTE_NOT_VALID
         elif (
             admit(snapshot.observed_at).status is not ReviewPaperSessionStatus.ADMITTED
@@ -321,16 +326,16 @@ def compose_one_review_paper_wake(
     except BaseException:
         classification = OneWakeClassification.PRE_EFFECT_FAILURE
     if classification is not None:
-        return stop(classification, instants.pre_effect_at)
+        return stop(classification, pre_effect_at)
 
     transition(ReviewPaperWakeState.PREPARED, snapshot.observed_at)
     try:
         if (
-            admit(instants.pre_effect_at).status
+            admit(pre_effect_at).status
             is not ReviewPaperSessionStatus.ADMITTED
         ):
             classification = OneWakeClassification.SESSION_NOT_ADMITTED
-        elif instants.pre_effect_at > deadline:
+        elif pre_effect_at > deadline:
             classification = OneWakeClassification.QUOTE_NOT_VALID
         else:
             revalidated = preview(snapshot)
@@ -347,16 +352,16 @@ def compose_one_review_paper_wake(
     except BaseException:
         classification = OneWakeClassification.PRE_EFFECT_FAILURE
     if classification is not None:
-        return stop(classification, instants.pre_effect_at)
+        return stop(classification, pre_effect_at)
 
-    transition(ReviewPaperWakeState.REVIEW_STARTED, instants.pre_effect_at)
+    transition(ReviewPaperWakeState.REVIEW_STARTED, pre_effect_at)
     effect_attempts = 1
     try:
         acknowledgement = effect_seam.simulate_review_paper(
             activation=activation,
             persisted=current,
             preview=revalidated,
-            as_of=instants.pre_effect_at,
+            as_of=pre_effect_at,
         )
         completed = (
             type(acknowledgement) is OneWakeSyntheticEffectResult
@@ -371,7 +376,7 @@ def compose_one_review_paper_wake(
         ReviewPaperWakeState.COMPLETED
         if completed
         else ReviewPaperWakeState.INDETERMINATE,
-        instants.finished_at,
+        finished_at,
     )
     return result(
         OneWakeClassification.COMPLETED

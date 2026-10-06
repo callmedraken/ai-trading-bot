@@ -11,7 +11,7 @@ import hashlib
 import json
 from collections.abc import Callable, Generator
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 from uuid import UUID
@@ -63,6 +63,8 @@ class UnattendedExecutionBinding:
     deployment_identity is the activation's admitted runtime identity. Host
     attestation/discovery is deliberately outside this source composition.
     oauth_valid_until is an explicit bound, never an inferred token renewal.
+    quote_observed_clock is source-owned and called once only after the single
+    quote response returns so provider latency cannot inherit a pre-request time.
     """
 
     source_branch: str
@@ -72,7 +74,7 @@ class UnattendedExecutionBinding:
     evidence_path: Path
     redirect_uri: str
     oauth_valid_until: datetime
-    quote_observed_at: datetime
+    quote_observed_clock: Callable[[], datetime]
 
     def __post_init__(self) -> None:
         if (
@@ -86,9 +88,11 @@ class UnattendedExecutionBinding:
             or not self.evidence_path.is_absolute()
         ):
             raise ValueError("explicit absolute evidence path required")
-        for at in (self.oauth_valid_until, self.quote_observed_at):
-            if type(at) is not datetime or at.tzinfo is None or at.utcoffset() is None:
-                raise ValueError("explicit aware OAuth/quote instants required")
+        if not callable(self.quote_observed_clock):
+            raise ValueError("explicit post-quote clock required")
+        at = self.oauth_valid_until
+        if type(at) is not datetime or at.tzinfo is None or at.utcoffset() is None:
+            raise ValueError("explicit aware OAuth expiry required")
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,7 +177,6 @@ class _ExecutionEdges:
                 activation.deployment_identity,
             )
             or as_of >= b.oauth_valid_until
-            or b.quote_observed_at >= b.oauth_valid_until
         ):
             raise UnattendedExecutionError("source/runtime/OAuth binding mismatch")
         paths = {self.paper_store.path.resolve(), self.state_store.path.resolve()}
@@ -212,10 +215,20 @@ class _ExecutionEdges:
             RobinhoodMcpStreamableHttpTransport(self.auth_factory)
         )
         response = adapter.equity_quotes(symbols)
+        observed_at = b.quote_observed_clock()
+        if (
+            type(observed_at) is not datetime
+            or observed_at.tzinfo is None
+            or observed_at.utcoffset() is None
+        ):
+            raise UnattendedExecutionError("post-quote observation invalid")
+        observed_at = observed_at.astimezone(UTC)
+        if observed_at < as_of or observed_at >= b.oauth_valid_until:
+            raise UnattendedExecutionError("post-quote observation outside authority")
         self.snapshot = build_review_paper_risk_price_snapshot(
             response=response,
             required_symbols=symbols,
-            observed_at=b.quote_observed_at,
+            observed_at=observed_at,
             max_quote_age=activation.max_quote_age,
         )
         return self.snapshot

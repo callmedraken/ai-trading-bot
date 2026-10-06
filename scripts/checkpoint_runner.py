@@ -136,6 +136,13 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     )
 
 
+def _git_blob_sha1(path: Path) -> str:
+    data = path.read_bytes()
+    return hashlib.sha1(
+        b"blob " + str(len(data)).encode("ascii") + bytes((0,)) + data
+    ).hexdigest()
+
+
 def _qualified_names(node: ast.AST) -> set[str]:
     result: set[str] = set()
     for item in ast.walk(node):
@@ -743,26 +750,20 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         pins = {
             "src/trading_bot/review_paper/unattended_host_identity.py": (
-                "3f30cf8416fe3982baa00bdca5051945036d39b5a471f14b89fd36f95f8ff511"
+                "d68c995e9812b9b797f62f60ccdba894aa702dae"
             ),
             "src/trading_bot/review_paper/unattended_scheduler.py": (
-                "f9e0ccfd6158d3f169b8103436bb90c5caa9ec1f44133829b5cfddea24c1cb22"
+                "1a622fd86c29f8e05d1b01d7f6b47979342e6ce9"
             ),
             "src/trading_bot/review_paper/unattended_host.py": (
-                "3aa531d68abbcf087c018ea5d4405bc61faf02725e9b370cc2053c7726d6cd3e"
+                "54a109931d27f6edf19d70bcb3947dbe3238898a"
             ),
             "scripts/run_arch133_unattended_review_paper.py": (
-                "0cef61a39958bd62eee2f947d8ca3bbd899cd4cf740fc71570d826f85b12385b"
+                "661023c46a3e088d338b67282effb7f35b00a93d"
             ),
         }
         for relative, expected in pins.items():
-            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
-            if (
-                hashlib.sha256(
-                    ast.dump(tree, include_attributes=False).encode("utf-8")
-                ).hexdigest()
-                != expected
-            ):
+            if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append(f"133-E closed composition boundary drift: {relative}")
         runner_tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
@@ -851,17 +852,11 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         pins = {
             "src/trading_bot/review_paper/unattended_execution.py": (
-                "9b1f1966422c9de24070a9fc74fe6450ad37e221eb24df19c4e5a4ca203028e7"
+                "2c74a68708b99f7813806c50f0519046b90982f3"
             ),
         }
         for relative, expected in pins.items():
-            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
-            if (
-                hashlib.sha256(
-                    ast.dump(tree, include_attributes=False).encode("utf-8")
-                ).hexdigest()
-                != expected
-            ):
+            if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append(f"133-D closed composition boundary drift: {relative}")
         runner_tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
@@ -951,17 +946,11 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         pins = {
             "src/trading_bot/review_paper/unattended_one_wake.py": (
-                "5a744b1767e60d1716360e8ad9a282f68e9fdc74627e71ec6326e198faf5bd8d"
+                "2dfe99bf2843b999fa51cf75bbf64bfc3fde66d3"
             ),
         }
         for relative, expected in pins.items():
-            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
-            if (
-                hashlib.sha256(
-                    ast.dump(tree, include_attributes=False).encode("utf-8")
-                ).hexdigest()
-                != expected
-            ):
+            if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append(f"133-C closed composition boundary drift: {relative}")
         runner_tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")

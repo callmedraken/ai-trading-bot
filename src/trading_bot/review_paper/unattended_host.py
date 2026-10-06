@@ -236,7 +236,7 @@ def run_unattended_host() -> UnattendedHostEvidence:
                 )
             build_unattended_scheduler_spec(activation)
             _paper_predecessor(binding, activation)
-            at = _current_utc()  # Sole current-time capture, after exact admission.
+            at = _current_utc()  # Initial admission time, after exact admission.
             if type(at) is not datetime or at.tzinfo is None or at.utcoffset() is None:
                 raise ValueError
             at = at.astimezone(UTC)
@@ -260,7 +260,7 @@ def run_unattended_host() -> UnattendedHostEvidence:
                     identity.EVIDENCE_PATH,
                     identity.REDIRECT_URI,
                     binding.oauth_valid_until,
-                    at,
+                    _current_utc,
                 ),
                 oauth_storage=WindowsOAuthStorage(),
             )

@@ -152,7 +152,9 @@ def harness(tmp_path, monkeypatch):
             assert current == kwargs["persisted"]
             assert kwargs["activation"] is h.activation
             assert kwargs["preview"] is h.previews[-1]
-            assert kwargs["as_of"] == h.instants.pre_effect_at
+            assert kwargs["as_of"] == max(
+                h.instants.pre_effect_at, h.snapshot.observed_at
+            )
             if h.effect_error:
                 raise h.effect_error
             return h.effect_result or OneWakeSyntheticEffectResult(
@@ -206,6 +208,23 @@ def assert_terminal(h, result, state, quotes, effects):
     assert replay.revisions == (current.revision,)
     assert h.state_store.path.read_bytes() == before
     assert h.quote_calls == quotes and h.effect_calls == effects
+
+
+def test_late_quote_observation_advances_final_session_gate(harness):
+    h = harness
+    late = datetime(2026, 10, 5, 19, 55, 1, tzinfo=UTC)
+    h.snapshot = ReviewPaperRiskPriceSnapshot(
+        late, (ReviewPaperRiskPriceMark(SPY, Decimal("100"), late),)
+    )
+    result = run(h)
+    assert result.classification is Classification.SESSION_NOT_ADMITTED
+    assert tuple(item.as_of for item in result.admissions) == (AT, late)
+    assert result.transitions == (
+        State.READY,
+        State.PREPARE_STARTED,
+        State.STOPPED,
+    )
+    assert_terminal(h, result, State.STOPPED, 1, 0)
 
 
 def test_success_exact_durable_order_and_revalidation(harness):

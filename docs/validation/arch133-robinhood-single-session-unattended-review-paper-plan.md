@@ -188,52 +188,72 @@ evidence: F:\AI\temp\certification\arch133d-robinhood-667767
 Current inventory is FULL 120, ROBINHOOD 47, LEGACY 204, EXHAUSTIVE 324. FULL
 remains deferred to 133-F.
 
-## 133-E focused validation — FROZEN
+## 133-E focused validation — ACCEPTED
 
-133-E source tests must prove the zero-semantic-argument host and pure scheduler
-specification without performing a real provider wake or Task Scheduler
-mutation. They must cover:
+Accepted exact source:
 
-- zero semantic launcher/CLI arguments and fail-closed rejection of unexpected
-  semantic arguments;
-- exact reviewed source HEAD/TREE and deployment identity admission before
-  OAuth/provider access;
-- exact canonical single-session activation and durable wake-state binding;
-- scheduler state/task metadata cannot create or replace activation authority;
-- one current UTC read maximum per admitted host wake;
-- exactly one delegation maximum to the accepted 133-D executor;
-- persisted-OAuth-only policy with no browser, interactive callback, refresh,
-  registration, environment credentials, or alternate token store;
-- no retry, polling, recursive launch, fallback session, or catch-up loop;
-- terminal and reconciliation-only states produce zero 133-D/provider
-  delegation;
-- duplicate/manual scheduler launches remain harmless under durable wake state;
-- immutable Architecture-133 scheduler spec uses a task identity distinct from
-  historical D10;
-- exact reviewed launcher/runtime action with zero semantic task arguments;
-- no overlapping-instance or task retry authority;
-- exact single-session trigger/expiry bound;
-- scheduler action carries no evidence path, activation ID, store path, proposal,
-  credential, account, or other trading authority;
-- scheduler construction is pure and source tests make zero Task Scheduler
-  mutations;
-- provider-free Q133-1 preflight verifies source/runtime/activation/wake,
-  persisted-OAuth availability metadata, paper predecessor state, scheduler
-  spec, and zero consumed authority without invoking provider/review execution;
-- all evidence/errors are sanitized and source tests access neither real
-  credentials nor Robinhood.
+```text
+HEAD ee542d5decf9b9fb1933a0a8681ee0c5cae29f27
+TREE 274e2097c86a7cf41efa9e7af41f7324686d1ff7
+CI   #236 / 37427681435 SUCCESS
+```
 
-Register
-`arch133-robinhood-unattended-host-scheduler-surface` immediately after 133-D
-with
-`remote_branch=feature/robinhood-unattended-review-paper-133e`,
-`preflight=None`, and `execute=None`.
+The exact nine-file GitHub review found no correction requirement. Accepted
+validation covers:
 
-Use focused/source-gate verification. The first coherent Robinhood boundary has
-already passed ROBINHOOD certification at 133-D. FULL remains deferred to
-133-F; any need for an additional ROBINHOOD rerun at 133-E must be justified by
-an actual change to the certified Robinhood boundary rather than run
-mechanically.
+- zero semantic launcher/CLI arguments with sanitized early rejection;
+- exact source/runtime/deployment/principal admission before OAuth/provider
+  access;
+- canonical activation publication and dedicated wake-state binding;
+- scheduler/task metadata cannot create activation authority;
+- one current UTC read maximum and one 133-D delegation maximum;
+- persisted-OAuth-only execution and provider-free OAuth availability metadata;
+- no retry, polling, recursion, fallback session, or catch-up loop;
+- terminal/reconciliation replay with zero execution;
+- harmless duplicate/manual launch under durable wake-state authority;
+- immutable Architecture-133 scheduler identity distinct from D10;
+- exact zero-semantic scheduler action, IgnoreNew overlap policy, zero restart
+  and repetition authority, and exact single-session start/end boundaries;
+- no scheduler mutation/query surface;
+- provider-free Q133-1 preflight with zero 133-D delegation;
+- sanitized evidence/errors and no real credential/provider access in source
+  tests.
+
+Focused verification reported 1,051 distinct cases: 80 host, 356 runner, 2
+inventory, and 613 overlapping tests. Source-gate #236 passed 37 checkpoints,
+62 test paths, 103 Ruff paths, Ruff check/format, diff check, stable source
+identity, and all 133-A/B/C/D/E authority checks.
+
+Current inventory is FULL 121, ROBINHOOD 48, LEGACY 204, EXHAUSTIVE 325. The
+dedicated ROBINHOOD gate remains accepted from 133-D.
+
+## 133-F final source certification — FROZEN
+
+133-F adds no new implementation source by default. Do not create a new source
+branch/checkpoint solely for the letter.
+
+After the atomic 133-E docs closeout and its docs-only CI success:
+
+- reconcile the clean local 133-E worktree to the exact reviewed closeout
+  HEAD/TREE by fast-forward only;
+- run `scripts/run_test_certification.py --profile full` against that exact
+  branch/HEAD/TREE;
+- pin live `origin/develop` and the live 133-E feature ref;
+- require the complete FULL current-supported profile and the runner's source
+  identity/static checks to PASS;
+- keep all protected opt-ins absent;
+- perform no provider/OAuth/scheduler/activation/broker effect;
+- do not run LEGACY/EXHAUSTIVE unless an actual compatibility change makes it
+  relevant;
+- do not run a separate ROBINHOOD profile mechanically because FULL includes the
+  ROBINHOOD subset and the dedicated 133-D gate already passed;
+- on failure, STOP for bounded diagnosis/correction and focused verification
+  before one fresh FULL rerun.
+
+After FULL PASS, ChatGPT records the exact lane/case evidence, performs final
+Architecture-133 merge-readiness review against live `origin/develop`, and
+closes 133-F. PR creation/merge and Q133-1 through Q133-6 remain separately
+authorized boundaries.
 
 ## Certification topology
 

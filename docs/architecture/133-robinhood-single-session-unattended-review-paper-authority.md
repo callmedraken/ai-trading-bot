@@ -473,109 +473,106 @@ evidence: F:\AI\temp\certification\arch133d-robinhood-667767
 Current certification inventory is FULL 120, ROBINHOOD 47, LEGACY 204,
 EXHAUSTIVE 324. FULL remains deferred to 133-F.
 
-### 133-E — zero-argument host/scheduler source surface — FROZEN NEXT
+### 133-E — zero-argument host/scheduler source surface — ACCEPTED
 
-133-E defines the source-owned unattended host and its exact scheduler
-specification without granting scheduler mutation or a protected provider wake.
-It must use accepted 133-A/B/C/D authority as-is and must not reuse the
-historical D10 runtime/task identity.
-
-Freeze this source contract:
-
-1. Add one Architecture-133 host/launcher boundary with **zero semantic command
-   line arguments**. The production launcher rejects unexpected semantic
-   arguments rather than treating CLI/environment input as activation, provider,
-   credential, path, session, or retry authority.
-2. The host must prove exact reviewed source/runtime identity before opening
-   provider/OAuth access. The admitted source HEAD/TREE and deployment identity
-   must equal the immutable activation material used by 133-D. Identity mismatch
-   fails closed before any provider request.
-3. The host reads exactly one source-owned published Architecture-133 activation
-   location and the dedicated Architecture-133 durable wake state needed for
-   that activation. It must validate canonical activation bytes/identity and
-   exact state-store binding before constructing 133-D execution.
-4. Scheduler/task state is **never activation authority**. A scheduled wake may
-   only ask the host to inspect the already-published activation and durable
-   wake. It cannot select a symbol, proposal, session, order ID, risk limits,
-   store, quote age, retry policy, or other trading semantics.
-5. Host time authority is one current UTC instant per process wake, captured
-   after source/runtime/activation admission and supplied explicitly into the
-   accepted 133-C/133-D instant model. No historical/next-session catch-up loop
-   or repeated clock-driven polling is permitted.
-6. Persisted OAuth remains the only OAuth path. The host must not open a
-   browser, launch an interactive callback, refresh/re-register OAuth, accept
-   credentials from CLI/environment, or create an alternate token store.
-7. The host delegates at most one admitted wake to the accepted
-   `execute_one_unattended_review_paper_wake` path. It must not wrap that call
-   in retry, polling, catch-up, recursive launch, or effect compensation.
-8. COMPLETED, STOPPED, INDETERMINATE, PREPARE_STARTED, PREPARED, and
-   REVIEW_STARTED replays remain governed by accepted 133-C/133-D semantics;
-   scheduler repetition cannot manufacture a fresh quote/review attempt.
-9. Add a frozen immutable **Architecture-133 scheduler specification** only. The
-   spec must use a task identity distinct from all historical D10 tasks, point
-   only at the reviewed 133-E launcher/runtime, use zero semantic task
-   arguments, disallow overlapping instances/retry authority, and bind the
-   exact single-session trigger/expiry boundary needed for the activation.
-10. Scheduler construction in 133-E is pure/source-only. No call may create,
-    update, enable, disable, start, stop, delete, or otherwise mutate Windows
-    Task Scheduler. Actual installation/update remains protected Q133-3.
-11. Scheduler success, enabled state, last-run result, or task existence can
-    never override activation/state/source admission. The host must be safe when
-    launched manually, duplicated, or after the target authority is already
-    terminal: the durable activation/wake state decides whether any effect may
-    occur.
-12. The scheduler action must not redirect output or pass evidence paths,
-    activation IDs, store paths, proposal material, OAuth material, account
-    identifiers, or any other trading authority through its command line.
-13. Define one provider-free/read-only host-preflight surface suitable for
-    Q133-1. It may verify exact source/runtime identity, canonical activation and
-    wake state, persisted OAuth **availability metadata without provider access**,
-    paper predecessor state, proposed scheduler spec, and zero consumed wake
-    state. It must not invoke 133-D provider/review execution.
-14. Source tests must replace clock/runtime/OAuth metadata and execution
-    boundaries with deterministic fakes. They must not read real credentials,
-    contact Robinhood, write the paper account through a provider wake, or mutate
-    Task Scheduler.
-15. Host/scheduler evidence and errors remain bounded and sanitized: no token,
-    account number, provider payload, credential record, raw exception text,
-    arbitrary environment value, or secret-bearing command line.
-
-133-E focused tests must prove zero semantic CLI args, exact admission before
-OAuth/provider access, immutable activation/state binding, one current-time read
-maximum, one 133-D delegation maximum, persisted-OAuth-only policy, zero
-retry/catch-up/polling, terminal/reconciliation replay with zero provider
-delegation, manual/duplicate launch safety, scheduler task identity distinct
-from D10, exact zero-semantic scheduler action, no overlap/retry authority,
-scheduler state not activation authority, pure scheduler construction with zero
-Task Scheduler mutation, and provider-free Q133-1 preflight behavior.
-
-Register exactly one source checkpoint:
+Accepted source:
 
 ```text
-arch133-robinhood-unattended-host-scheduler-surface
+BRANCH feature/robinhood-unattended-review-paper-133e
+PARENT c24039f229b66f1d5510cf8e5c317cc8d0cbafc5
+HEAD   ee542d5decf9b9fb1933a0a8681ee0c5cae29f27
+TREE   274e2097c86a7cf41efa9e7af41f7324686d1ff7
+CI     #236 / 37427681435 SUCCESS
 ```
 
-immediately after
-`arch133-robinhood-unattended-review-paper-execution`, with:
+Accepted behavior:
 
-```text
-remote_branch=feature/robinhood-unattended-review-paper-133e
-preflight=None
-execute=None
-```
+- fixed Architecture-133 launcher with zero semantic command-line arguments and
+  sanitized rejection before trading-source import;
+- exact source HEAD/TREE, runtime executable/version/launcher digest, Trading
+  principal, and deployment identity admission before OAuth/provider access;
+- one fixed host binding, activation publication, wake store, paper store, and
+  evidence location; no CLI/environment path or trading-authority injection;
+- exact canonical activation bytes and dedicated wake-state binding before
+  execution composition;
+- one current UTC read maximum for an admitted READY wake;
+- at most one delegation to accepted 133-D and no retry/polling/catch-up loop;
+- persisted-OAuth-only execution path and provider-free persisted-OAuth
+  availability metadata for preflight;
+- terminal and reconciliation-only wake states return read-only with zero
+  133-D/provider delegation;
+- immutable single-session scheduler spec with task identity distinct from D10,
+  zero semantic arguments, IgnoreNew overlap policy, zero restart/repetition
+  authority, and explicit session start/end boundaries;
+- scheduler/task state never creates activation/effect authority;
+- no Task Scheduler query/mutation surface in the scheduler module;
+- provider-free Q133-1 preflight verifies exact source/runtime/activation/wake,
+  paper predecessor, OAuth availability metadata, proposed scheduler spec, and
+  zero consumed wake authority without invoking 133-D;
+- bounded sanitized host/preflight evidence with no credentials, account IDs,
+  raw provider payloads, arbitrary exception text, or secret-bearing CLI/env
+  material.
 
-Extend the optimized source-gate batch exactly once and update only mechanically
-necessary runner/certification inventory pins. 133-E is source-only; no
-scheduler mutation or real unattended provider wake is authorized. The required
-Architecture-133 ROBINHOOD boundary was certified at 133-D; FULL remains
-deferred to 133-F unless 133-E changes a previously certified Robinhood product
-boundary in a way that requires reclassification.
+The source-only checkpoint
+`arch133-robinhood-unattended-host-scheduler-surface` is registered exactly
+once after 133-D with
+`remote_branch=feature/robinhood-unattended-review-paper-133e`,
+`preflight=None`, and `execute=None`.
 
-### 133-F — final source certification
+Focused verification reported 1,051 distinct cases: 80 host, 356 runner, 2
+inventory, and 613 overlapping tests. Source-gate #236 passed 37 checkpoints,
+62 test paths, 103 Ruff paths, Ruff check/format, git diff check, stable source
+identity, and all 133-A/B/C/D/E authority pins.
 
-Run focused/source-gate verification throughout, ROBINHOOD certification at the
-first complete Robinhood boundary, and FULL certification at the final coherent
-current-product tree.
+Current certification inventory is FULL 121, ROBINHOOD 48, LEGACY 204,
+EXHAUSTIVE 325. No separate ROBINHOOD rerun is required at 133-E because the
+accepted 133-D provider/review-paper effect boundary was not changed.
+
+Architecture-124's historical sealed pre-source D10 guard remains historical
+one-week-soak precedent, not an Architecture-133-v1 requirement. 133-E's frozen
+single-session contract requires exact source/runtime admission before
+OAuth/provider access; native deployment/ACL qualification remains a separate
+protected gate.
+
+### 133-F — final source certification — FROZEN NEXT
+
+133-F is a certification-only boundary over the exact accepted 133-E product
+tree. Do **not** create a new 133-F implementation branch merely to continue the
+letter sequence: the source-owned host/scheduler identity is intentionally
+pinned to the accepted 133-E branch and worktree.
+
+Freeze this certification contract:
+
+1. First close 133-E canonically and require its docs-only source-gate to PASS.
+2. Fast-forward the clean local 133-E worktree only to that exact reviewed
+   closeout HEAD/TREE.
+3. Run Architecture-132 `full` certification exactly once on that exact
+   branch/HEAD/TREE, with live `origin/develop` and live
+   `origin/feature/robinhood-unattended-review-paper-133e` both pinned.
+4. FULL must cover the complete current-supported inventory, including all
+   Architecture-131 and Architecture-133 A-E current-product modules. Current
+   expected profile inventory is FULL 121, ROBINHOOD 48, LEGACY 204,
+   EXHAUSTIVE 325.
+5. Protected opt-ins remain absent. The certification performs no real OAuth,
+   Robinhood provider wake, Task Scheduler mutation, activation publication,
+   broker placement, or other protected effect.
+6. A separate ROBINHOOD rerun is not required mechanically because ROBINHOOD is
+   a subset of FULL and the dedicated first-complete-boundary ROBINHOOD gate
+   already passed at 133-D.
+7. If FULL fails, STOP. Diagnose the bounded failing area, make only the
+   necessary correction, run focused verification/source gate, and then ask for
+   one fresh FULL rerun on the corrected exact tree. Do not loop broad suites.
+8. FULL PASS establishes final Architecture-133 source certification only. It
+   does not authorize provider access, activation publication, scheduler
+   mutation, or any Q133 protected effect.
+9. After FULL PASS, ChatGPT performs final Architecture-133 canonical
+   certification and merge-readiness review against live `origin/develop`.
+   PR creation/metadata and merge remain separately protected repository-control
+   actions.
+10. A merge needs no second FULL run only if the resulting integration source
+    tree is exactly the already-certified feature source tree apart from
+    reviewed docs-only closeout/integration metadata. Post-merge source-gate
+    success remains required before entering protected qualification planning.
 
 ## Protected qualification sequence
 

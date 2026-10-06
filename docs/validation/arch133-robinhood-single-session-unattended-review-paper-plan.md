@@ -135,60 +135,105 @@ composition, 340 overlapping 133-A/133-B, 1,545 runner/inventory, and 112
 accepted 131-Q cases. Current inventory is FULL 119, ROBINHOOD 46, LEGACY 204,
 EXHAUSTIVE 323. Broad certification remains deferred because 133-C is fake-only.
 
-## 133-D focused validation — FROZEN
+## 133-D focused validation — ACCEPTED
 
-133-D source tests must bind the accepted 133-C coordinator to the accepted real
-Robinhood quote/review-paper composition while replacing the actual provider
-transport/effect with deterministic fakes. They must prove:
+Accepted exact implementation tree:
 
-- exact accepted 133-C state/edge ordering is reused rather than reimplemented;
-- persisted-OAuth-only composition and interactive/browser OAuth rejection;
-- accepted 131-P/131-N quote material with one quote request maximum;
-- BUY and SELL proposal coverage;
-- APPROVED, RESIZED, and REJECTED risk outcomes;
-- exact revalidated risk decision/order identity preserved into the accepted
-  131-I/H/J/L review-paper path;
-- durable REVIEW_STARTED exists before any review-paper operator invocation;
-- one Robinhood review attempt maximum;
-- accepted operator PASS can acknowledge exactly one deterministic synthetic
-  paper result;
-- operator FAIL, malformed evidence, provider/transport exception after
-  invocation, and process-boundary ambiguity cannot report success and become
-  INDETERMINATE;
-- provider failure before review invocation becomes STOPPED with zero review
-  attempts;
-- exact deterministic paper idempotency/replay and no duplicate local fill;
-- terminal/review-start replay performs zero new quote/review calls;
+```text
+IMPLEMENTATION HEAD 14bc4902a231fc87f8449c5971f2f8a9b382cc6e
+ACCEPTED HEAD       6677676170fa9ffb70ca62809c03b2df40ca1253
+TREE                084c8b794e3aa6f2795ef70deb70f92b92842bcd
+SOURCE-GATE          #234 / 37413871721 SUCCESS
+```
+
+The accepted HEAD is a no-file-change fast-forward of the implementation commit,
+created only because GitHub delivered no source-gate run/checks for the original
+push. The tree is exactly identical.
+
+Focused implementation verification reported 2,101 distinct cases: 58
+execution, 87 overlapping 133-C, 383 accepted Architecture-131, and 1,573
+runner/inventory cases. Source-gate #234 independently passed the 36-checkpoint
+batch, 61 test paths, 98 Ruff paths, Ruff check/format, diff check, stable source
+identity, and all Architecture-133 authority checks.
+
+Accepted validation covers:
+
+- accepted 133-C transition/ordering reuse with no second wake authority;
+- persisted-OAuth-only provider composition and no interactive/browser renewal;
+- accepted quote material with one quote request maximum;
+- BUY/SELL and APPROVED/RESIZED/REJECTED coverage;
+- exact risk/order/store/source binding into the accepted review-paper path;
+- durable REVIEW_STARTED before operator control;
+- one review-paper operator attempt maximum;
+- exact PASS acknowledgement and deterministic local paper idempotency;
+- quote/OAuth/provider failure before the effect boundary -> STOPPED;
+- malformed/failed/post-entry ambiguity -> INDETERMINATE;
+- terminal/reconciliation replay with zero new effects;
 - no quote reacquisition, fallback session, historical catch-up, polling, sleep,
-  or retry;
-- placement, cancellation, options-mutation, and crypto-mutation counters remain
-  exactly zero;
-- source tests perform no real provider/OAuth/scheduler/broker effect;
-- existing accepted Architecture-131 qualification/verifier semantics remain
-  regression coverage and 131-V human-supervised behavior is unchanged.
+  retry, scheduler mutation, or live-order effect;
+- placement/cancellation/options/crypto mutation counters exactly zero.
+
+Required ROBINHOOD certification passed:
+
+```text
+robinhood-1: 1893 passed
+robinhood-2: 1899 passed
+total:       3792 passed
+skipped:     0
+failed:      0
+errors:      0
+evidence: F:\AI\temp\certification\arch133d-robinhood-667767
+```
+
+Current inventory is FULL 120, ROBINHOOD 47, LEGACY 204, EXHAUSTIVE 324. FULL
+remains deferred to 133-F.
+
+## 133-E focused validation — FROZEN
+
+133-E source tests must prove the zero-semantic-argument host and pure scheduler
+specification without performing a real provider wake or Task Scheduler
+mutation. They must cover:
+
+- zero semantic launcher/CLI arguments and fail-closed rejection of unexpected
+  semantic arguments;
+- exact reviewed source HEAD/TREE and deployment identity admission before
+  OAuth/provider access;
+- exact canonical single-session activation and durable wake-state binding;
+- scheduler state/task metadata cannot create or replace activation authority;
+- one current UTC read maximum per admitted host wake;
+- exactly one delegation maximum to the accepted 133-D executor;
+- persisted-OAuth-only policy with no browser, interactive callback, refresh,
+  registration, environment credentials, or alternate token store;
+- no retry, polling, recursive launch, fallback session, or catch-up loop;
+- terminal and reconciliation-only states produce zero 133-D/provider
+  delegation;
+- duplicate/manual scheduler launches remain harmless under durable wake state;
+- immutable Architecture-133 scheduler spec uses a task identity distinct from
+  historical D10;
+- exact reviewed launcher/runtime action with zero semantic task arguments;
+- no overlapping-instance or task retry authority;
+- exact single-session trigger/expiry bound;
+- scheduler action carries no evidence path, activation ID, store path, proposal,
+  credential, account, or other trading authority;
+- scheduler construction is pure and source tests make zero Task Scheduler
+  mutations;
+- provider-free Q133-1 preflight verifies source/runtime/activation/wake,
+  persisted-OAuth availability metadata, paper predecessor state, scheduler
+  spec, and zero consumed authority without invoking provider/review execution;
+- all evidence/errors are sanitized and source tests access neither real
+  credentials nor Robinhood.
 
 Register
-`arch133-robinhood-unattended-review-paper-execution` immediately after 133-C
+`arch133-robinhood-unattended-host-scheduler-surface` immediately after 133-D
 with
-`remote_branch=feature/robinhood-unattended-review-paper-133d`,
+`remote_branch=feature/robinhood-unattended-review-paper-133e`,
 `preflight=None`, and `execute=None`.
 
-After focused/source-gate acceptance, run ROBINHOOD certification for the exact
-accepted 133-D tree. FULL remains deferred to 133-F.
-
-## 133-E focused validation
-
-Launcher/scheduler-source tests must prove:
-
-- zero semantic CLI arguments;
-- no browser/interactive OAuth path;
-- exact source/runtime/activation admission before provider access;
-- scheduler spec points only at the reviewed launcher;
-- no task retries;
-- no overlapping effect authority;
-- task identity is distinct from historical D10;
-- task state is not activation authority;
-- source tests never mutate Task Scheduler.
+Use focused/source-gate verification. The first coherent Robinhood boundary has
+already passed ROBINHOOD certification at 133-D. FULL remains deferred to
+133-F; any need for an additional ROBINHOOD rerun at 133-E must be justified by
+an actual change to the certified Robinhood boundary rather than run
+mechanically.
 
 ## Certification topology
 

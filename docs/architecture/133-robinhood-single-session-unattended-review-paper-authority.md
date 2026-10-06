@@ -400,100 +400,176 @@ accepted 131-Q cases. Current certification inventory is FULL 119, ROBINHOOD
 46, LEGACY 204, EXHAUSTIVE 323. No ROBINHOOD/FULL certification is required at
 this fake-only composition boundary.
 
-### 133-D — bounded unattended review-paper execution — FROZEN NEXT
+### 133-D — bounded unattended review-paper execution — ACCEPTED
 
-133-D is the first Architecture-133 source checkpoint that binds the accepted
-Robinhood provider/review-paper production boundaries. It must reuse the
-accepted 133-C coordinator/state ordering rather than create a second wake state
-machine, and source tests must keep all real provider effects disabled.
+Accepted source identity:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133d
+
+IMPLEMENTATION
+HEAD 14bc4902a231fc87f8449c5971f2f8a9b382cc6e
+TREE 084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+CI-RECOVERY SAME-TREE HEAD
+HEAD 6677676170fa9ffb70ca62809c03b2df40ca1253
+TREE 084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+SOURCE-GATE #234 / 37413871721 SUCCESS
+```
+
+The original implementation push received no GitHub workflow run despite the
+already-reviewed Robinhood branch-family trigger. No missing run was treated as
+acceptance. A single no-file-change fast-forward commit preserved the exact
+implementation tree and retriggered the gate. #234 passed the 36-checkpoint
+optimized batch, 61 test paths, 98 Ruff paths, Ruff check/format, diff check,
+stable source identity, and all 133-A/B/C/D authority pins.
+
+Accepted behavior:
+
+- one source-owned 133-D binding around the accepted 133-C coordinator; no
+  duplicate wake state machine or transition authority;
+- persisted OAuth read exactly for the bounded provider path, with no browser,
+  interactive challenge, token refresh, discovery/registration, or credential
+  write authority;
+- exact required-symbol validation and one Robinhood quote request maximum;
+- accepted 131-N snapshot construction with the activation's frozen freshness
+  policy;
+- independent durable REVIEW_STARTED verification before review-paper operator
+  control;
+- exact proposal/risk/order/store/source material preserved and revalidated;
+- deterministic market-order intent uses the activation's frozen local order ID;
+- accepted 131-H review-paper operator invoked at most once;
+- successful acknowledgement requires exact PASS evidence, expected call
+  budgets, exact synthetic paper record, deterministic idempotency, and zero
+  placement/cancel/options/crypto mutation counters;
+- quote/OAuth/provider failure before the 133-D effect boundary is STOPPED;
+- exception, malformed acknowledgement, process/transport ambiguity, or inability
+  to prove the exact result after effect entry is INDETERMINATE;
+- terminal/reconciliation replay performs zero new provider/review effects;
+- no quote reacquisition, fallback session, catch-up, polling, sleep, retry,
+  scheduler mutation, environment/config discovery, autonomous proposal
+  generation, or broker/live effect.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-review-paper-execution` is registered exactly once
+after 133-C with
+`remote_branch=feature/robinhood-unattended-review-paper-133d`,
+`preflight=None`, and `execute=None`.
+
+Required ROBINHOOD certification passed on the exact accepted tree:
+
+```text
+profile robinhood PASS
+robinhood-1: 1893 / 1893
+robinhood-2: 1899 / 1899
+total:       3792 / 3792
+skipped: 0
+failed:  0
+errors:  0
+evidence: F:\AI\temp\certification\arch133d-robinhood-667767
+```
+
+Current certification inventory is FULL 120, ROBINHOOD 47, LEGACY 204,
+EXHAUSTIVE 324. FULL remains deferred to 133-F.
+
+### 133-E — zero-argument host/scheduler source surface — FROZEN NEXT
+
+133-E defines the source-owned unattended host and its exact scheduler
+specification without granting scheduler mutation or a protected provider wake.
+It must use accepted 133-A/B/C/D authority as-is and must not reuse the
+historical D10 runtime/task identity.
 
 Freeze this source contract:
 
-1. Add one narrow source-owned 133-D binding/composition layer around the
-   accepted 133-C quote and effect seams. It must delegate exactly one admitted
-   wake through `compose_one_review_paper_wake`; it may not duplicate, bypass,
-   or reorder READY/PREPARE_STARTED/PREPARED/REVIEW_STARTED/terminal semantics.
-2. The concrete quote seam binds the accepted persisted-OAuth Robinhood
-   review/read transport to accepted 131-P quote acquisition and returns the
-   exact accepted 131-N snapshot. It must validate the 133-C required-symbol
-   set, make at most one quote request, and provide no retry, refresh,
-   reacquisition, fallback session, or catch-up path.
-3. Interactive/browser OAuth is forbidden. A missing/expired persisted
-   authorization that would require user interaction is a bounded failure and
-   grants no second quote/review attempt.
-4. The concrete effect seam may receive control only after the accepted 133-C
-   coordinator has durably persisted REVIEW_STARTED. It must verify the exact
-   persisted activation/wake/order binding and exact revalidated 133-C
-   preview/risk material before reaching any accepted Architecture-131
-   review-paper effect.
-5. Build the deterministic market-order review-paper intent only from the exact
-   revalidated risk decision and the activation's frozen local order identity.
-   No second proposal, alternate order identity, autonomous strategy decision,
-   or independent risk authority may be introduced. If an accepted downstream
-   131-J/L path reevaluates risk, its decision must exactly equal the
-   revalidated 133-C decision before a successful acknowledgement is possible.
-6. Invoke the accepted 131-H review-paper operator/equivalent accepted
-   Architecture-131 composition at most once. Preserve the activation's exact
-   paper-store path, starting cash, slippage, commission, source identity, and
-   synthetic-paper-only semantics.
-7. A successful effect acknowledgement requires bounded accepted operator facts
-   proving PASS, exact activation/wake/local-order binding, one review attempt
-   maximum, deterministic local paper idempotency, and zero placement,
-   cancellation, options-mutation, and crypto-mutation calls. Operator FAIL,
-   malformed/mismatched evidence, or any ambiguous post-invocation outcome must
-   not be converted into success.
-8. Once the production effect seam has been invoked, every exception,
-   process/transport ambiguity, malformed acknowledgement, or inability to prove
-   the exact synthetic paper result resolves through accepted 133-C semantics to
-   INDETERMINATE. There is no same-activation retry.
-9. Provider failure proven before review invocation remains a pre-effect failure
-   and therefore STOPPED. No effect-side compensation, cleanup-as-authority, or
-   retry is allowed after a failed durable transition.
-10. 133-D receives explicit source/runtime/evidence/OAuth binding material; it
-    performs no environment/config discovery, no scheduler installation or task
-    mutation, and adds no zero-argument host/CLI. Those host/scheduler concerns
-    remain 133-E.
-11. Source tests must use fake transport/provider boundaries and must never
-    contact Robinhood, open interactive OAuth, mutate Task Scheduler, or perform
-    any real broker/order effect.
-12. Evidence/results remain closed and sanitized: no tokens, account numbers,
-    raw provider payloads, arbitrary exception text, headers, or credential
-    material.
+1. Add one Architecture-133 host/launcher boundary with **zero semantic command
+   line arguments**. The production launcher rejects unexpected semantic
+   arguments rather than treating CLI/environment input as activation, provider,
+   credential, path, session, or retry authority.
+2. The host must prove exact reviewed source/runtime identity before opening
+   provider/OAuth access. The admitted source HEAD/TREE and deployment identity
+   must equal the immutable activation material used by 133-D. Identity mismatch
+   fails closed before any provider request.
+3. The host reads exactly one source-owned published Architecture-133 activation
+   location and the dedicated Architecture-133 durable wake state needed for
+   that activation. It must validate canonical activation bytes/identity and
+   exact state-store binding before constructing 133-D execution.
+4. Scheduler/task state is **never activation authority**. A scheduled wake may
+   only ask the host to inspect the already-published activation and durable
+   wake. It cannot select a symbol, proposal, session, order ID, risk limits,
+   store, quote age, retry policy, or other trading semantics.
+5. Host time authority is one current UTC instant per process wake, captured
+   after source/runtime/activation admission and supplied explicitly into the
+   accepted 133-C/133-D instant model. No historical/next-session catch-up loop
+   or repeated clock-driven polling is permitted.
+6. Persisted OAuth remains the only OAuth path. The host must not open a
+   browser, launch an interactive callback, refresh/re-register OAuth, accept
+   credentials from CLI/environment, or create an alternate token store.
+7. The host delegates at most one admitted wake to the accepted
+   `execute_one_unattended_review_paper_wake` path. It must not wrap that call
+   in retry, polling, catch-up, recursive launch, or effect compensation.
+8. COMPLETED, STOPPED, INDETERMINATE, PREPARE_STARTED, PREPARED, and
+   REVIEW_STARTED replays remain governed by accepted 133-C/133-D semantics;
+   scheduler repetition cannot manufacture a fresh quote/review attempt.
+9. Add a frozen immutable **Architecture-133 scheduler specification** only. The
+   spec must use a task identity distinct from all historical D10 tasks, point
+   only at the reviewed 133-E launcher/runtime, use zero semantic task
+   arguments, disallow overlapping instances/retry authority, and bind the
+   exact single-session trigger/expiry boundary needed for the activation.
+10. Scheduler construction in 133-E is pure/source-only. No call may create,
+    update, enable, disable, start, stop, delete, or otherwise mutate Windows
+    Task Scheduler. Actual installation/update remains protected Q133-3.
+11. Scheduler success, enabled state, last-run result, or task existence can
+    never override activation/state/source admission. The host must be safe when
+    launched manually, duplicated, or after the target authority is already
+    terminal: the durable activation/wake state decides whether any effect may
+    occur.
+12. The scheduler action must not redirect output or pass evidence paths,
+    activation IDs, store paths, proposal material, OAuth material, account
+    identifiers, or any other trading authority through its command line.
+13. Define one provider-free/read-only host-preflight surface suitable for
+    Q133-1. It may verify exact source/runtime identity, canonical activation and
+    wake state, persisted OAuth **availability metadata without provider access**,
+    paper predecessor state, proposed scheduler spec, and zero consumed wake
+    state. It must not invoke 133-D provider/review execution.
+14. Source tests must replace clock/runtime/OAuth metadata and execution
+    boundaries with deterministic fakes. They must not read real credentials,
+    contact Robinhood, write the paper account through a provider wake, or mutate
+    Task Scheduler.
+15. Host/scheduler evidence and errors remain bounded and sanitized: no token,
+    account number, provider payload, credential record, raw exception text,
+    arbitrary environment value, or secret-bearing command line.
 
-133-D focused tests must prove BUY/SELL and APPROVED/RESIZED/REJECTED behavior,
-one quote request maximum, one review attempt maximum, exact durable
-REVIEW_STARTED-before-effect ordering, persisted-OAuth-only behavior, provider
-failure before review -> STOPPED, operator PASS -> exact COMPLETED synthetic
-paper result, operator FAIL/post-invocation exception/process ambiguity ->
-INDETERMINATE, exact deterministic paper replay/idempotency, terminal/review
-replay with zero new effects, no quote reacquisition/catch-up, and all four
-placement/cancel/options/crypto mutation counters fixed at zero.
+133-E focused tests must prove zero semantic CLI args, exact admission before
+OAuth/provider access, immutable activation/state binding, one current-time read
+maximum, one 133-D delegation maximum, persisted-OAuth-only policy, zero
+retry/catch-up/polling, terminal/reconciliation replay with zero provider
+delegation, manual/duplicate launch safety, scheduler task identity distinct
+from D10, exact zero-semantic scheduler action, no overlap/retry authority,
+scheduler state not activation authority, pure scheduler construction with zero
+Task Scheduler mutation, and provider-free Q133-1 preflight behavior.
 
-Register exactly one new source checkpoint:
+Register exactly one source checkpoint:
 
 ```text
-arch133-robinhood-unattended-review-paper-execution
+arch133-robinhood-unattended-host-scheduler-surface
 ```
 
 immediately after
-`arch133-robinhood-unattended-one-wake-composition`, with:
+`arch133-robinhood-unattended-review-paper-execution`, with:
 
 ```text
-remote_branch=feature/robinhood-unattended-review-paper-133d
+remote_branch=feature/robinhood-unattended-review-paper-133e
 preflight=None
 execute=None
 ```
 
-Extend the optimized source-gate batch once and update only mechanically
-necessary runner/certification inventory pins. After exact GitHub source review
-and source-gate success, 133-D is the first Architecture-133 checkpoint that
-requires ROBINHOOD certification under Architecture 132. FULL remains deferred
-to the final coherent Architecture-133 current-product tree.
-
-### 133-E — zero-argument host/scheduler surface
-
-Add a source-owned zero-semantic-argument launcher, persisted-OAuth-only policy,
-runtime identity admission, and scheduler specification. No scheduler mutation.
+Extend the optimized source-gate batch exactly once and update only mechanically
+necessary runner/certification inventory pins. 133-E is source-only; no
+scheduler mutation or real unattended provider wake is authorized. The required
+Architecture-133 ROBINHOOD boundary was certified at 133-D; FULL remains
+deferred to 133-F unless 133-E changes a previously certified Robinhood product
+boundary in a way that requires reclassification.
 
 ### 133-F — final source certification
 

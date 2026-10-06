@@ -12211,3 +12211,72 @@ that first coherent bound Robinhood boundary; FULL remains deferred to the final
 Architecture-133 current-product integration.
 
 Production/live real-money placement remains **NO-GO**.
+
+## 2026-10-05 — Architecture 133-D bounded unattended review-paper execution ACCEPTED
+
+Architecture 133-D is accepted after exact GitHub source review, recovered
+same-tree source-gate certification, and the required ROBINHOOD certification.
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133d
+
+IMPLEMENTATION
+PARENT 77ff833717cc66113633cbfba40d73b3f0973fe4
+HEAD   14bc4902a231fc87f8449c5971f2f8a9b382cc6e
+TREE   084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+CI-RECOVERY SAME-TREE HEAD
+HEAD   6677676170fa9ffb70ca62809c03b2df40ca1253
+TREE   084c8b794e3aa6f2795ef70deb70f92b92842bcd
+
+SOURCE-GATE
+#234 / 37413871721 SUCCESS
+
+ROBINHOOD
+profile robinhood PASS
+robinhood-1 1893 / 1893
+robinhood-2 1899 / 1899
+TOTAL       3792 / 3792
+skipped 0 / failed 0 / errors 0
+evidence F:\AI\temp\certification\arch133d-robinhood-667767
+```
+
+GitHub recorded no source-gate run or checks for the original 133-D push even
+though the already-reviewed `feature/robinhood-*` trigger was present and the
+workflow was valid on both parent and implementation commits. That missing run
+was treated as a STOP rather than acceptance. ChatGPT published one no-file-
+change fast-forward commit with the exact implementation tree solely to recover
+the source-gate event. Source-gate #234 then executed the real 36-checkpoint
+batch and passed 61 test paths, 98 Ruff paths, diff checks, identity stability,
+and all 133-A/B/C/D authority checks. The recovery commit introduced no source
+or test-byte change.
+
+The accepted 133-D source binds the accepted 133-C coordinator to the accepted
+Robinhood read/review-paper production boundaries without creating a second wake
+state machine. Persisted OAuth is read without browser/interactive renewal,
+quote acquisition is bounded to one accepted snapshot, REVIEW_STARTED is
+durable before operator control, and exact proposal/risk/order/store material is
+revalidated before the accepted review-paper operator can acknowledge success.
+Successful completion requires exact sanitized PASS evidence, deterministic
+local paper idempotency, and zero placement/cancel/options/crypto mutation
+counters. Pre-effect quote/OAuth failure stops without a review attempt; once the
+durable review-start/effect boundary is crossed, exception or ambiguity remains
+INDETERMINATE with no same-activation retry.
+
+No scheduler mutation, autonomous proposal generation, multi-session authority,
+broker placement, cancellation, options/crypto mutation, or live-money
+authority was added.
+
+Current certification inventory is FULL 120, ROBINHOOD 47, LEGACY 204,
+EXHAUSTIVE 324. The required first Architecture-133 ROBINHOOD certification has
+passed. FULL remains deferred to the final coherent Architecture-133 tree.
+
+The next checkpoint is **133-E zero-argument host/scheduler source surface**.
+133-E adds only the source-owned zero-semantic-argument launcher, exact
+source/runtime/activation admission, persisted-OAuth-only host composition, and
+a pure distinct Architecture-133 Task Scheduler specification. It must not
+install/update/enable/run a task and must not perform a real provider wake in
+source tests. Scheduler state remains plumbing only; activation + durable wake
+state remain the effect authority.
+
+Production/live real-money placement remains **NO-GO**.

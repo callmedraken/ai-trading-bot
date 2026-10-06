@@ -5,6 +5,94 @@ only. It does not authorize scheduler mutation, unattended provider access,
 Robinhood review requests, synthetic paper mutation, broker placement, or live
 trading.
 
+## 133-H — source prerequisite for protected Q133-2
+
+Q133-1 was accepted at the exact 133-G closeout HEAD
+`65f0d40217f8ce129224531a5151f4acea889d89`, TREE
+`16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2`. That branch/worktree remains the
+runtime TARGET. The separate publisher lives on
+`feature/robinhood-unattended-review-paper-133h` in
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133h`. Existing 133-G host
+and scheduler identities are preserved. 133-H awaits exact GitHub review/source
+acceptance. **Q133-2 has not been executed.**
+
+`scripts/run_arch133_host_publication.py` requires the shared production Python
+under `-I -B`. Its explicit modes are `plan` and `execute-once`. Input travels
+through `--material-file` or, for planning only, bounded binary stdin via
+`--material-file -`. The maximum-32-KiB canonical UTF-8 envelope has exactly
+`schema=arch133-host-publication-material/v1`, `activation_json`, and
+`host_binding_json`. The last two values are canonical strings parsed by the
+accepted `ReviewPaperActivation.from_json` and `HostBinding.from_json` contracts.
+No BOM, trailing newline, duplicate/unknown field or noncanonical inner/outer
+bytes is admitted. The publisher selects/generates no proposal, session, UUID,
+risk limit, cash, slippage, commission, OAuth bound, or predecessor. The reviewed
+binding supplies the expected empty-paper fingerprint for the activation's
+canonical starting cash; planning constructs no store to infer missing inputs.
+Execute independently verifies that expected predecessor after initialization.
+
+Planning requires an elevated Administrators-authorized token, excluding Trading
+and SYSTEM user tokens, and the exact standard Trading SID. It proves the pinned
+local NTFS parent chain, protected runtime ACLs, exact Python path/version/hash,
+target launcher hash, clean 133-G branch/HEAD/TREE/origin and clean 133-H publisher
+path/branch/HEAD/TREE/origin. It proves the entire Arch133 namespace absent twice.
+Bounded stdout evidence includes the full activation/binding semantic summary,
+pure scheduler spec, host/source/security identities, material SHA-256 and plan
+SHA-256. Changes to these facts require a new reviewed plan. Planning writes no
+publication, store or evidence, reads no OAuth and accesses no provider,
+Task Scheduler or broker surface.
+
+Execute requires a material **file**, `--reviewed-plan-sha256`, a real interactive
+terminal and the exact line `AUTHORIZE Q133-2 <reviewed-plan-sha256>`. Redirected
+or piped authorization is rejected. Readiness precedes the prompt and repeats
+under held parent guards before mutation; the native backend also requires
+one-time arming. Q133-1 PASS, scheduler metadata and environment variables
+provide no publication authority.
+
+Publication order is fixed:
+
+1. Exclusively create Arch133 with protected Administrators/SYSTEM-only
+   owner/DACL and retain a no-delete root handle.
+2. Construct `ReviewPaperStore` once with the exact activation starting cash;
+   admit exactly one activation/READY wake through `UnattendedStateStore`.
+3. Publish canonical `activation.json` and `host-binding.json` once each through
+   fixed `.activation.json.pending` / `.host-binding.json.pending` names inside
+   Arch133. Create-new, exact bounded write/readback, flush and same-parent
+   Win32 WRITE_THROUGH rename exclude every replacement/copy/delete flag.
+4. Apply exact protected final-file ACLs: Trading read-only semantic files and
+   accepted concrete SQLite data rights without DELETE/WRITE_DAC/WRITE_OWNER.
+5. Independently reopen/verify all four objects, canonical JSON, exact empty
+   paper metadata/fingerprint and one READY revision-0 wake at activation
+   creation time while the root remains Administrators/SYSTEM-only.
+6. Admit Trading to the root last, then independently repeat verification and
+   require identical content/state evidence. Root grants file creation and
+   read/list/traverse, with inherit-only child-data rights for future SQLite
+   journals/operator evidence. It grants no delete-child, delete-root, ACL or
+   owner authority. The four protected file DACLs exclude that inheritance.
+
+Only `paper.sqlite`, `wake.sqlite`, `activation.json` and `host-binding.json`
+remain. Operator evidence and no-pycache remain absent. Any occupied root,
+partial/pending/extra/conflicting state, interruption, uncertain acknowledgement
+or verifier disagreement stops without deletion, overwrite, migration, repair
+or retry. Even identical complete publication blocks execute re-entry.
+Sanitized result evidence is stdout only; Q133-2V's existing OAuth availability
+observation is outside this publisher.
+
+Reuse is limited to A103's public no-follow reader/pinned production-parent
+guard, exact Win32 inspection, binary security attributes/policies and native
+handle closure. D10/Paper-v2 provisioning/staging/deployment/task/lease/recovery
+authority is not reused. Native qualification of the new role ACLs remains at
+the separately protected Q133-2/Q133-2V gates; tests use fake Win32 boundaries
+and disposable stores only.
+
+The dedicated `arch133-robinhood-unattended-host-publication` source registration
+has `preflight=None` and `execute=None`. Its structural checks pin the complete
+operator/interlock/native composition, accepted store/verifier dependencies,
+reused security primitives, exact registration and batch workflow. CI and
+ordinary verify cannot invoke the protected publisher. After source acceptance,
+review one actual external activation plan before **fresh** Q133-2 authorization.
+No source PASS authorizes provisioning, scheduler access, provider wake or live
+money.
+
 ## Decision
 
 The next current-supported product step after Architecture 131 is one bounded

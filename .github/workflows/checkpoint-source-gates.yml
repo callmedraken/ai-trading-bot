@@ -107,7 +107,8 @@ jobs:
               arch133-robinhood-unattended-one-wake-composition `
               arch133-robinhood-unattended-review-paper-execution `
               arch133-robinhood-unattended-host-scheduler-surface `
-              arch133-robinhood-unattended-host-bootstrap
+              arch133-robinhood-unattended-host-bootstrap `
+              arch133-robinhood-unattended-host-publication
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

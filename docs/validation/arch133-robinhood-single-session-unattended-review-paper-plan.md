@@ -362,6 +362,44 @@ publication, paper/state writer, or broker effect.
 
 ### Q133-2 — activation/host publication
 
+Architecture 133-H is the source-only prerequisite, awaiting exact GitHub review
+and source acceptance. Q133-1 is accepted on the unchanged runtime target 133-G
+HEAD `65f0d40217f8ce129224531a5151f4acea889d89`, TREE
+`16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2`. **Q133-2 is NOT EXECUTED** here.
+
+133-H focused validation covers target/runtime/principal drift, existing and
+partial namespaces, malformed/noncanonical and changed activation/binding
+bytes, reviewed-plan fingerprint drift, full external semantic material, one
+empty-paper initialization, canonical JSON, one READY revision-0 wake, conflicting
+paper/state material, independent reopen verification, no-clobber, interruption
+at composition and native write/flush/readback/close/rename steps, retained
+ambiguous state with no second mutation, sanitized diagnostics, constrained
+role ACLs, zero OAuth/provider/scheduler/broker reachability and source-gate
+callback exclusion. Temporary stores use fresh external pytest roots.
+
+The read-only planner emits the full semantic/scheduler/security/source summary
+and material/plan fingerprints. The actual plan remains an external reviewed
+canonical file, not a hard-coded test proposal. Execute requires that file,
+the exact reviewed fingerprint and real interactive terminal authorization;
+redirected stdin and raw structured command-line JSON cannot supply authority.
+A wrong reviewed predecessor or failure after root creation retains partial
+material for read-only reconciliation, with no retry/repair.
+
+After review and the real source-gate event, optional local source verification
+uses the existing runner:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-unattended-host-publication
+```
+
+Do not run FULL/ROBINHOOD/LEGACY/EXHAUSTIVE during 133-H implementation. Native
+ACL acceptance/publication remains separately approved Q133-2 work. Successful
+publication must report exact source/runtime/JSON identities, empty-paper
+predecessor/store identity, activation/wake identity, READY revision 0, state
+fingerprint and zero OAuth/provider/scheduler/broker effects. The only final
+names are `paper.sqlite`, `wake.sqlite`, `activation.json`, `host-binding.json`;
+operator-evidence/no-pycache/pending names must be absent.
+
 Fresh explicit approval. Provision/publish exactly one reviewed Architecture-133
 host namespace and single-session activation/binding material. No provider
 request and no scheduler mutation.

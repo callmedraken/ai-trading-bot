@@ -57,49 +57,69 @@ Focused implementation verification reported 233 core cases, 1,018 runner
 cases, and two certification-inventory cases across the focused and
 corrected-failure runs. No broad suite was required at this pure source boundary.
 
-## 133-B focused validation — FROZEN
+## 133-B focused validation — ACCEPTED
 
-Durable state/reconciliation tests must cover:
+Accepted exact source:
 
-- closed SQLite schema/version and exact canonical row material;
-- create-only activation + READY wake admission in one transaction;
-- exact-identical reopen is read-only/idempotent;
-- same activation ID with different canonical activation bytes is a hard
-  conflict, including a changed stored filesystem path;
-- exact expected wake/revision compare-and-swap transitions;
-- stale writer rejection and transaction rollback without internal retry;
-- legal 133-A transition delegation rather than a second transition matrix;
-- completed/stopped/indeterminate durability across close/reopen;
-- no transition authority from terminal states;
-- independent verifier using SQLite URI `mode=ro` without constructing the
-  writer;
-- verifier rejection of malformed metadata/schema, partial rows, noncanonical
-  activation/wake JSON, mismatched activation/wake binding, duplicate/conflict
-  rows, and stale expected identity;
-- deterministic complete-store fingerprint independent of SQLite row-return
-  order;
-- the Architecture-131 paper-store path remains inert serialized material and is
-  never opened by 133-B;
-- zero provider/OAuth/risk/review/paper-fill/scheduler/subprocess/environment
-  capability;
-- source-only checkpoint registration immediately after 133-A with no
+```text
+HEAD e27ce1c2cebf38654404a96c06275e892909b2f5
+TREE 37781465d0385aaa1251349ebb21fa5af59357c0
+CI   #229 / 37392099387 SUCCESS
+```
+
+The exact eight-file GitHub review found no correction requirement. 133-B's
+three source modules are AST-pinned by the source gate, the checkpoint is
+source-only with no preflight/execute callback, and #229 passed the optimized
+batch, Ruff check/format, diff check, identity-stability check, and both 133-A
+and 133-B authority checks.
+
+Accepted validation covers:
+
+- exact closed SQLite schema/application/user versions;
+- atomic activation + READY-wake creation;
+- exact-identical read-only reopen and changed-material conflict;
+- one-shot optimistic compare-and-swap with monotonic revision;
+- transaction rollback and zero busy retry;
+- delegation to the accepted 133-A transition matrix;
+- terminal/INDETERMINATE persistence across restart;
+- deterministic complete-state fingerprinting with explicit sorting;
+- independent URI-`mode=ro` verifier that never constructs the writer;
+- malformed/partial/duplicate/noncanonical/binding-conflict rejection;
+- inert Architecture-131 paper-store material on admitted/verified paths;
+- no provider/OAuth/risk/review/paper-fill/scheduler/subprocess/environment/
+  clock/retry/polling authority.
+
+Focused implementation verification reported 107 store/verifier, 233
+activation-core, 1,067 runner, and 450 inventory cases across focused and
+corrected-failure runs. No broad certification was required at this local state
+boundary.
+
+## 133-C focused validation — FROZEN
+
+Composition tests use only bounded fake/double provider/effect seams and prove:
+
+- exact 131-S target-session schedule and accepted 131-M admission semantics;
+- READY -> PREPARE_STARTED is durable before the quote seam;
+- one quote/preparation seam invocation maximum;
+- exact 131-N snapshot and 131-O/K preview/risk material;
+- no quote reacquisition and no freshness extension;
+- PREPARED is durable before pre-effect revalidation;
+- risk rejection, stale quote, or expired/nonmatching session reaches STOPPED
+  with zero review-effect attempts;
+- exact predecessor history/risk drift rejection before REVIEW_STARTED;
+- REVIEW_STARTED is durable before the fake effect receives control;
+- one fake review/paper-effect invocation maximum;
+- successful fake effect can produce exactly one COMPLETED transition;
+- any exception/ambiguity after effect invocation produces INDETERMINATE;
+- COMPLETED/STOPPED/INDETERMINATE replay performs zero quote/effect calls;
+- REVIEW_STARTED replay performs zero effect calls and is reconciliation-only;
+- no historical catch-up, retry, polling, sleep, scheduler, real Robinhood MCP,
+  Architecture-131 paper operator/pipeline, or mutation-tool reachability;
+- source-only checkpoint registration immediately after 133-B with no
   preflight/execute callback.
 
-## 133-C focused validation
-
-Composition tests use doubles at all provider/effect boundaries and prove:
-
-- exact 131-S target-session schedule;
-- one quote acquisition maximum;
-- exact 131-N/O snapshot/risk material;
-- quote deadline remains valid at effect admission;
-- risk rejection never reaches review;
-- durable review-start fence precedes review invocation;
-- one review invocation maximum;
-- one synthetic fill maximum;
-- any ambiguity forbids same-activation retry;
-- zero historical catch-up;
-- forbidden mutation tools are unreachable.
+The production provider/review-paper binding remains 133-D and is not part of
+133-C source acceptance.
 
 ## 133-D focused validation
 

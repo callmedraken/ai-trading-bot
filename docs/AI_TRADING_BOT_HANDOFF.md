@@ -12114,3 +12114,45 @@ documents. 133-B adds no provider, review, paper-fill, scheduler, or broker/live
 authority.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-05 — Architecture 133-B durable wake state ACCEPTED
+
+Architecture 133-B is source-accepted after exact GitHub review and optimized
+source-gate certification.
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133b
+PARENT 0609c08d2a3dd89b773c3416b629f377d04264ad
+HEAD   e27ce1c2cebf38654404a96c06275e892909b2f5
+TREE   37781465d0385aaa1251349ebb21fa5af59357c0
+CI     #229 / 37392099387 SUCCESS
+```
+
+The accepted source adds the dedicated Architecture-133 SQLite schema/store and
+an independent read-only verifier. Admission and wake transitions are atomic,
+exact-identical reopen is idempotent, conflicting canonical activation material
+fails closed, revisions use one-shot compare-and-swap with no retry, and the
+accepted 133-A state machine remains the sole transition semantic authority.
+Complete metadata/activation/wake state is deterministically fingerprinted and
+the verifier opens SQLite through URI `mode=ro` without constructing the
+writer.
+
+No provider, OAuth, Robinhood review, Architecture-131 paper fill, scheduler,
+broker/live, subprocess/environment, clock, polling, or retry authority was
+added. Source-gate #229 passed the 34-participant optimized batch, Ruff
+check/format, git diff check, stable source identity, and the 133-A/133-B
+authority pins. Focused implementation verification reported 107 store/verifier,
+233 activation-core, 1,067 runner, and 450 inventory cases across focused and
+corrected-failure runs.
+
+Current certification inventory is FULL 118, ROBINHOOD 45, LEGACY 204,
+EXHAUSTIVE 322. ROBINHOOD/FULL remain deferred under Architecture 132 because
+133-B is still local-durability-only.
+
+The next checkpoint is **133-C effect-free one-wake composition**. Its exact
+fake-edge/state-ordering contract is frozen in the Architecture-133 architecture
+and validation documents. Production binding to accepted Robinhood/review-paper
+effect surfaces remains explicitly deferred to 133-D.
+
+Production/live real-money placement remains **NO-GO**.

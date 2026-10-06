@@ -294,67 +294,137 @@ runs, with Ruff and staged/diff checks passing. No FULL/ROBINHOOD certification
 is required at this pure-model checkpoint; Architecture 132 reserves those for
 the later coherent Robinhood/current-product boundaries.
 
-### 133-B — durable wake store + provider-free reconciliation — FROZEN NEXT
+### 133-B — durable wake store + provider-free reconciliation — ACCEPTED
 
-133-B adds local durability only. It must not add provider, OAuth, risk,
-Robinhood review, review-paper fill, scheduler, or broker/live authority.
+Accepted source:
 
-Freeze the following source contract:
+```text
+BRANCH feature/robinhood-unattended-review-paper-133b
+PARENT 0609c08d2a3dd89b773c3416b629f377d04264ad
+HEAD   e27ce1c2cebf38654404a96c06275e892909b2f5
+TREE   37781465d0385aaa1251349ebb21fa5af59357c0
+CI     #229 / 37392099387 SUCCESS
+```
 
-1. Add a dedicated Architecture-133 SQLite state store separate from the
-   Architecture-131 review-paper ledger. The state-store filesystem path is
-   explicit transport metadata and must never enter a deterministic UUID5.
-2. Persist canonical 133-A activation JSON and canonical wake JSON. The
-   activation's embedded Architecture-131 `store_path` is retained as inert
-   activation material only; 133-B must not open or mutate that review-paper
-   store.
-3. Use a closed schema/version with no migration or compatibility guessing in
-   v1. At minimum the durable model must provide exact activation identity,
-   exact wake identity, canonical activation/wake bytes, and a monotonic local
-   revision suitable for compare-and-swap transitions.
-4. First admission is one transaction: absent activation -> create exact
-   activation plus its exact READY wake. Reopening an exact-identical activation
-   is read-only/idempotent. Reuse of the same activation ID with different
-   canonical activation bytes is a hard conflict. This explicitly catches a
-   changed filesystem path even though paths are excluded from UUID5 identity.
-5. Every transition takes the exact expected persisted wake/revision, delegates
-   transition legality to accepted 133-A, and commits at most one compare-and-
-   swap update. Stale/conflicting state fails closed. There is no internal retry
-   loop.
-6. `REVIEW_STARTED`, `COMPLETED`, `STOPPED`, and `INDETERMINATE`
-   durability must survive close/reopen exactly. Terminal replay adds no
-   transition authority.
-7. Expose read-only snapshot/fingerprint material over the complete closed
-   metadata/activation/wake rows for later BEFORE/AFTER evidence. Canonical
-   fingerprinting must not depend on row-return order, Python hash, path
-   formatting, or ambient process state.
-8. Add an independent provider-free verifier that opens SQLite via URI
-   `mode=ro`, does not construct the write-capable store, parses canonical
-   133-A material independently through the accepted readers, validates exact
-   schema/metadata and activation/wake binding, and returns a bounded immutable
-   sanitized verification result.
-9. The verifier performs no repair, initialization, migration, transition,
-   retry, filesystem write, provider call, review-paper-store access, risk
-   evaluation, or scheduler action.
-10. All timestamps remain explicit caller inputs. 133-B reads no system clock.
+Accepted behavior:
 
-133-B focused tests must prove exact-identical reopen, conflicting reuse,
-transaction rollback, stale compare-and-swap rejection, legal transition
-durability, terminal/INDETERMINATE persistence across reopen, malformed/partial
-row rejection, complete deterministic fingerprinting, independent read-only
-verification, and absence of provider/review-paper/scheduler authority.
+- dedicated closed Architecture-133 SQLite state schema separate from the
+  Architecture-131 review-paper ledger;
+- exact canonical 133-A activation/wake JSON persisted with deterministic
+  activation/wake identity binding;
+- state-database path remains transport metadata and never enters deterministic
+  identity material;
+- exact-identical activation reopen is read-only/idempotent;
+- same activation ID with different canonical activation bytes is a hard
+  conflict, including a changed serialized paper-store path;
+- first activation + READY wake admission is atomic;
+- monotonic integer revision and exact one-shot optimistic compare-and-swap;
+- transition legality is delegated to accepted 133-A rather than reimplemented;
+- stale/conflicting writers fail closed with zero internal retry;
+- terminal and INDETERMINATE state survives close/reopen with no restored
+  transition authority;
+- complete metadata/activation/wake snapshot is explicitly sorted and
+  deterministically fingerprinted;
+- independent verifier opens SQLite through URI `mode=ro`, never constructs
+  the writer, and returns frozen/slotted sanitized verification facts;
+- malformed schema/metadata, partial rows, noncanonical JSON, duplicate/binding
+  conflicts, invalid revisions, and expected-state disagreement fail closed;
+- embedded Architecture-131 paper-store material remains inert during normal
+  admission/transition/verification paths;
+- no provider/OAuth/risk-manager/review/paper-fill/scheduler/subprocess/
+  environment/config/clock/retry/polling authority is introduced.
+
+The source-only checkpoint
+`arch133-robinhood-unattended-state-store` is registered exactly once after
+133-A with `preflight=None`, `execute=None`, and no trusted remote-head
+handoff. Source-gate #229 passed the 34-participant optimized batch, Ruff
+check/format, git diff check, source identity stability, and both 133-A/133-B
+authority pins.
+
+Focused implementation verification reported 107 store/verifier cases, 233
+activation-core cases, 1,067 runner cases, and 450 certification-inventory cases
+across focused and corrected-failure runs. No ROBINHOOD/FULL certification is
+required at this local-durability-only checkpoint.
+
+### 133-C — effect-free one-wake composition — FROZEN NEXT
+
+133-C proves the unattended ordering and one-attempt semantics without granting
+a real provider or paper-effect surface. It may use the accepted 133-B state
+store in tests and exact Architecture-131 domain/composition types, but any
+provider/review/paper-effect edge must remain a bounded injected test seam.
+Production binding of those seams is deferred to 133-D.
+
+Freeze this source contract:
+
+1. Add one source-owned 133-C coordinator/result model for exactly one activation
+   and one wake. No scheduler, CLI, environment/config, OAuth storage, network
+   transport, or broker/live mutation surface is added.
+2. The coordinator receives the exact accepted 133-A activation, exact current
+   133-B persisted wake/revision, the dedicated 133-B state store, and explicit
+   caller-supplied instants needed for deterministic tests. It must never derive
+   a historical/next session or manufacture a second activation/order identity.
+3. Resolve the activation's exact target date through accepted 131-S and require
+   the schedule/session date equals the activation target. Admission uses
+   accepted 131-M semantics and the activation's exact opening/closing buffers.
+4. Start only from durable `READY`. Atomically transition
+   `READY -> PREPARE_STARTED` before the quote/preparation edge. A terminal or
+   already-consumed/ambiguous wake returns/raises a bounded no-effect outcome and
+   never restarts.
+5. Provider acquisition is represented by one narrow typed quote/preparation
+   seam whose test implementation returns the exact accepted 131-N snapshot
+   material. The coordinator invokes that seam at most once. No generic
+   arbitrary-command callback and no retry loop are permitted.
+6. Build/validate the exact accepted 131-O/K risk-preview material from the
+   frozen proposal, frozen risk limits, exact review-paper predecessor state,
+   and the one returned snapshot. Risk rejection must durably terminate
+   `STOPPED` without reaching the review-effect seam.
+7. Require quote observation/source freshness and exact session admission at the
+   explicit pre-effect instant. The earliest mark deadline is authoritative;
+   freshness may never be extended or reacquired.
+8. Once preparation is complete, durably transition
+   `PREPARE_STARTED -> PREPARED`. Immediately before any simulated review
+   effect, revalidate the exact preview/risk material and durable predecessor
+   history required by accepted 131-Q semantics.
+9. Durably transition `PREPARED -> REVIEW_STARTED` **before** invoking the
+   narrow typed review/paper-effect seam. Tests must prove the seam observes the
+   already-persisted REVIEW_STARTED state.
+10. The review/paper-effect seam is invoked at most once and only for a
+    non-rejected, still-admitted, still-fresh wake. In 133-C it is always a
+    fake/double; no accepted 131-H/L production binding is reachable yet.
+11. A successful fake effect returns one exact immutable synthetic result and
+    permits `REVIEW_STARTED -> COMPLETED` once. Any exception/ambiguous result
+    after the seam is invoked must durably terminate
+    `REVIEW_STARTED -> INDETERMINATE`; no same-activation retry is possible.
+12. Any failure proven before the review-start fence terminates as `STOPPED`.
+    State-transition failure itself is fail-closed and cannot be compensated by
+    a provider/effect call.
+13. Reopen/replay of COMPLETED, STOPPED, or INDETERMINATE performs zero quote
+    calls and zero effect calls. Reopen of REVIEW_STARTED performs zero effect
+    calls and is classified ambiguous for independent reconciliation, never
+    resumed.
+14. Emit/return only bounded immutable composition facts suitable for later
+    evidence: activation/wake identities, state revisions/transitions, exact
+    schedule/admission classification, prepared quote deadline/risk outcome,
+    effect-attempt count, and final state. Do not expose credentials, arbitrary
+    exception text, account identifiers, or raw provider payloads.
+15. No 133-C source path may call Robinhood MCP transport, interactive OAuth,
+    `run_robinhood_forward_paper_cycle`, the deterministic paper pipeline, the
+    Architecture-131 paper operator, Task Scheduler, placement/cancel/options/
+    crypto mutation tools, or any sleep/poll/retry mechanism.
+
+133-C focused tests must prove exact state/edge ordering, one quote edge maximum,
+risk-rejected zero-effect behavior, stale/session-expired zero-effect behavior,
+review-start persistence before the fake effect sees control, one fake review
+attempt maximum, COMPLETED and INDETERMINATE terminal persistence, exception
+classification on both sides of the review-start fence, zero replay/catch-up,
+exact predecessor/risk drift rejection, and unreachable forbidden mutation
+surfaces.
 
 Register the next source-only checkpoint as
-`arch133-robinhood-unattended-state-store` immediately after 133-A. It must
-have `preflight=None` and `execute=None`. Source-gate/focused verification is
-sufficient for 133-B; ROBINHOOD certification remains deferred to the first
-coherent provider-composition boundary.
-
-### 133-C — effect-free one-wake composition
-
-Compose accepted 131-S/P/N/O/Q/K/J boundaries with doubles/fakes at provider and
-paper-effect edges. Prove exact ordering, one-attempt budgets, quote/session
-freshness, and no retry.
+`arch133-robinhood-unattended-one-wake-composition` immediately after 133-B.
+It must have `preflight=None` and `execute=None`. 133-C remains
+source/fake-only; ROBINHOOD certification stays deferred to 133-D, where the
+accepted provider/review-paper production boundaries are first bound.
 
 ### 133-D — bounded unattended review-paper execution
 

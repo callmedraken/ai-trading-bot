@@ -184,6 +184,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-unattended-activation-core",
         "arch133-robinhood-unattended-state-store",
         "arch133-robinhood-unattended-one-wake-composition",
+        "arch133-robinhood-unattended-review-paper-execution",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -240,6 +241,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-unattended-review-paper-133b"
         if spec.name == "arch133-robinhood-unattended-one-wake-composition":
             expected_branch = "feature/robinhood-unattended-review-paper-133c"
+        if spec.name == "arch133-robinhood-unattended-review-paper-execution":
+            expected_branch = "feature/robinhood-unattended-review-paper-133d"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -2166,10 +2169,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch133-robinhood-unattended-one-wake-composition\n"
+                "arch133-robinhood-unattended-review-paper-execution\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch133-robinhood-unattended-one-wake-composition\n          exit 0"),
+            ("arch133-robinhood-unattended-review-paper-execution\n          exit 0"),
         ),
     ],
 )
@@ -2473,6 +2476,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch133-robinhood-unattended-activation-core",
     "arch133-robinhood-unattended-state-store",
     "arch133-robinhood-unattended-one-wake-composition",
+    "arch133-robinhood-unattended-review-paper-execution",
 )
 
 
@@ -4535,8 +4539,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 35
-    assert runner.CI_CHECKPOINTS[-16:-2] == (
+    assert len(runner.CI_CHECKPOINTS) == 36
+    assert runner.CI_CHECKPOINTS[-17:-3] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4955,7 +4959,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 35
+    assert len(runner.CI_CHECKPOINTS) == 36
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5170,7 +5174,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 35
+    assert len(runner.CI_CHECKPOINTS) == 36
     assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
@@ -5435,7 +5439,7 @@ def test_133a_source_only_registration_and_single_ordered_batch():
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, _A133_SOURCE, _A133_TEST)
     assert runner.CI_CHECKPOINTS.count(_A133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-4:-2] == (
+    assert runner.CI_CHECKPOINTS[-5:-3] == (
         "arch131-robinhood-supervised-qualification",
         _A133_NAME,
     )
@@ -5577,7 +5581,7 @@ def test_133b_source_only_registration_exact_order_and_coverage():
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST, _B133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, *_B133_SOURCES, _B133_TEST)
     assert runner.CI_CHECKPOINTS.count(_B133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-3:-1] == (_A133_NAME, _B133_NAME)
+    assert runner.CI_CHECKPOINTS[-4:-2] == (_A133_NAME, _B133_NAME)
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_B133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -5738,7 +5742,7 @@ def test_133c_source_only_registration_exact_order_and_coverage():
         "tests/scripts/test_run_test_certification.py",
     )
     assert runner.CI_CHECKPOINTS.count(_C133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-3:] == (_A133_NAME, _B133_NAME, _C133_NAME)
+    assert runner.CI_CHECKPOINTS[-4:-1] == (_A133_NAME, _B133_NAME, _C133_NAME)
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_C133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -5841,18 +5845,186 @@ def test_133c_authority_registration_batch_and_workflow_drift(
         line = (
             f'    "{_C133_NAME}",\n'
             if target == "runner"
-            else f"              {_C133_NAME}\n"
+            else f"              {_C133_NAME} `\n"
         )
         assert text.count(line) == 1
         if mutation == "order":
             text = text.replace(
                 f"              {_B133_NAME} `\n" + line,
-                f"              {_C133_NAME} `\n              {_B133_NAME}\n",
+                f"              {_C133_NAME} `\n              {_B133_NAME} `\n",
             )
         else:
             text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_one_wake_authority_check(root)
+
+
+_D133_NAME = "arch133-robinhood-unattended-review-paper-execution"
+_D133_SOURCE = "src/trading_bot/review_paper/unattended_execution.py"
+_D133_TEST = "tests/review_paper/test_unattended_execution.py"
+
+
+def test_133d_source_only_registration_exact_order_and_coverage():
+    repo = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[_D133_NAME]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133d"
+    assert spec.authority_check is runner._arch133_execution_authority_check
+    assert spec.tests == (
+        *runner.COMMON_TESTS,
+        _A133_TEST,
+        _B133_TEST,
+        _C133_TEST,
+        _D133_TEST,
+        "tests/test_robinhood_paper_operator.py",
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.COMMON_RUFF_PATHS,
+        _D133_SOURCE,
+        _D133_TEST,
+        "src/trading_bot/robinhood_paper_operator.py",
+        "tests/scripts/test_run_test_certification.py",
+    )
+    assert runner.CI_CHECKPOINTS.count(_D133_NAME) == 1
+    assert runner.CI_CHECKPOINTS[-2:] == (_C133_NAME, _D133_NAME)
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert workflow.count(_D133_NAME) == 1
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert spec.authority_check(repo) == ()
+
+
+def _133d_authority_copy(tmp_path):
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in (
+        _D133_SOURCE,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch133_execution_authority_check(tmp_path) == ()
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    "addition",
+    [
+        "import os",
+        "import subprocess",
+        "import socket",
+        "from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter",
+        (
+            "from trading_bot.robinhood_paper_pipeline import "
+            "run_robinhood_deterministic_paper_pipeline"
+        ),
+        (
+            "from trading_bot.robinhood_forward_paper_cycle import "
+            "run_robinhood_forward_paper_cycle"
+        ),
+        "datetime.now(UTC)",
+        "callback()",
+        "while True:\n    pass",
+        "effect_seam.simulate_review_paper()",
+        "quote_seam.prepare_quote()",
+    ],
+)
+def test_133d_authority_pins_every_import_call_and_edge(tmp_path, addition):
+    root = _133d_authority_copy(tmp_path)
+    path = root / _D133_SOURCE
+    path.write_text(path.read_text() + "\n" + addition + "\n", encoding="utf-8")
+    assert f"133-D closed composition boundary drift: {_D133_SOURCE}" in (
+        runner._arch133_execution_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        _D133_SOURCE,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ],
+)
+def test_133d_authority_missing_files_fail_closed(tmp_path, relative):
+    root = _133d_authority_copy(tmp_path)
+    (root / relative).unlink()
+    assert runner._arch133_execution_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "target,mutation",
+    [
+        ("runner", "registration"),
+        ("runner", "missing"),
+        ("runner", "duplicate"),
+        ("workflow", "missing"),
+        ("workflow", "duplicate"),
+        ("workflow", "order"),
+    ],
+)
+def test_133d_authority_registration_batch_and_workflow_drift(
+    tmp_path, target, mutation
+):
+    root = _133d_authority_copy(tmp_path)
+    path = root / (
+        "scripts/checkpoint_runner.py"
+        if target == "runner"
+        else ".github/workflows/checkpoint-source-gates.yml"
+    )
+    text = path.read_text()
+    if mutation == "registration":
+        start = text.index('        "' + _D133_NAME + '": CheckpointSpec(')
+        end = text.index(
+            '        "arch131-robinhood-paper-operator": CheckpointSpec(', start
+        )
+        text = (
+            text[:start]
+            + text[start:end].replace("execute=None", "execute=_r8_execute")
+            + text[end:]
+        )
+    else:
+        line = (
+            f'    "{_D133_NAME}",\n'
+            if target == "runner"
+            else f"              {_D133_NAME}\n"
+        )
+        assert text.count(line) == 1
+        if mutation == "order":
+            text = text.replace(
+                f"              {_C133_NAME} `\n" + line,
+                f"              {_D133_NAME} `\n              {_C133_NAME}\n",
+            )
+        else:
+            text = text.replace(line, "" if mutation == "missing" else line * 2)
+    path.write_text(text, encoding="utf-8")
+    assert runner._arch133_execution_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflight": lambda: {}},
+        {"execute": lambda: {}},
+        {"remote_branch": "feature/wrong"},
+        {"remote_head_env": "UNSAFE"},
+        {"tests": ()},
+        {"ruff_paths": ()},
+        {"authority_check": lambda repo: ()},
+    ],
+)
+def test_133d_runtime_registration_drift_fails_closed(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    root = _133d_authority_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    specs[_D133_NAME] = replace(specs[_D133_NAME], **change)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert runner._arch133_execution_authority_check(root)
 
 
 @pytest.mark.parametrize(

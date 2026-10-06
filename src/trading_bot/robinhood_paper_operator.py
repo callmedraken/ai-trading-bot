@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 import warnings
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import ExitStack, contextmanager, redirect_stderr, redirect_stdout
 from dataclasses import asdict, dataclass
 from datetime import datetime
@@ -257,6 +257,13 @@ def _admit_source(
     return roots
 
 
+def admit_robinhood_paper_source(
+    *, expected_branch: str, expected_head: str, expected_tree: str
+) -> tuple[Path, ...]:
+    """Expose the accepted read-only source admission before a 133-D quote."""
+    return _admit_source(expected_branch, expected_head, expected_tree)
+
+
 def _admit_output(path: Path, roots: tuple[Path, ...]) -> Path:
     try:
         if not isinstance(path, Path) or not path.is_absolute():
@@ -297,14 +304,19 @@ def run_robinhood_paper_operator(
     starting_cash: Decimal,
     slippage_basis_points: Decimal = Decimal("0"),
     commission: Decimal = Decimal("0"),
+    oauth_factory: Callable[[], object] | None = None,
 ) -> RobinhoodPaperOperatorEvidence:
     """Run exactly one accepted paper cycle, returning PASS or sanitized FAIL.
 
     This function performs real read/review requests when called in production;
     source certification uses fakes only. It never evaluates risk or generates
-    an intent. Existing evidence files are never overwritten. Source/input/path
+    an intent. An explicit auth factory allows the 133-D persisted-only binding
+    to reuse this same operator without the supervised OAuth provider.
+    Existing evidence files are never overwritten. Source/input/path
     admission failures raise a fixed local error before Robinhood calls.
     """
+    if oauth_factory is not None and not callable(oauth_factory):
+        raise RobinhoodPaperOperatorError("invalid explicit OAuth factory")
     roots = _admit_source(expected_branch, expected_head, expected_tree)
     paper_path = _admit_output(paper_store_path, roots)
     output_path = _admit_output(evidence_path, roots)
@@ -347,11 +359,17 @@ def run_robinhood_paper_operator(
                     observation.phase = "paper_store"
                     store = ReviewPaperStore(paper_path, starting_cash=starting_cash)
                     observation.phase = "composition"
-                    oauth_factory = create_windows_robinhood_oauth_factory(
-                        redirect_uri=redirect_uri,
-                        browser_opener=observation.forbid_browser,
+                    active_oauth_factory = (
+                        create_windows_robinhood_oauth_factory(
+                            redirect_uri=redirect_uri,
+                            browser_opener=observation.forbid_browser,
+                        )
+                        if oauth_factory is None
+                        else oauth_factory
                     )
-                    transport = RobinhoodMcpStreamableHttpTransport(oauth_factory)
+                    transport = RobinhoodMcpStreamableHttpTransport(
+                        active_oauth_factory
+                    )
                     resolver = _ObservedResolver(
                         create_robinhood_agentic_account_resolver(transport),
                         observation,

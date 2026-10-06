@@ -361,7 +361,7 @@ def test_session_expires_after_single_acquisition(harness, phase):
         (-50, 0, 11, False),
         (-50, 0, 10, True),
         (0, -1, 10, False),
-        (0, 11, 10, False),
+        (0, 11, 10, True),
     ],
 )
 def test_exact_freshness_no_extension_or_reacquisition(

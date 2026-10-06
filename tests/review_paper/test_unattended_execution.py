@@ -84,6 +84,7 @@ def harness(tmp_path, monkeypatch):
         operator_calls=0,
         fault=None,
         previews=[],
+        review_received_at=None,
         quote_clock_calls=0,
         quote_observed_at=AT,
         quote_source_at=AT,
@@ -207,6 +208,7 @@ def harness(tmp_path, monkeypatch):
 
     def observed_operator(**kwargs):
         h.operator_calls += 1
+        h.review_received_at = kwargs["review_received_at"]
         assert (
             h.state_store.snapshot().current(h.activation).wake.state
             is State.REVIEW_STARTED
@@ -303,7 +305,7 @@ def test_post_quote_clock_advances_pre_effect_time(harness):
     result = run(h)
     assert result.wake.final_state is State.COMPLETED
     assert result.wake.admissions[-1].as_of == h.quote_observed_at
-    assert h.intent.proposed_at == h.quote_observed_at
+    assert h.review_received_at == h.quote_observed_at
     assert h.quote_clock_calls == 1
     assert h.operator_calls == 1
 
@@ -313,6 +315,9 @@ def test_quote_return_after_closing_buffer_stops_before_review(harness):
     late = datetime(2026, 10, 5, 19, 55, 1, tzinfo=UTC)
     h.quote_observed_at = late
     h.quote_source_at = late
+    h.binding = replace(
+        h.binding, oauth_valid_until=late + timedelta(minutes=5)
+    )
     admit(h)
     result = run(h)
     assert result.wake.final_state is State.STOPPED

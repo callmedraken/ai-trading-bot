@@ -103,7 +103,8 @@ jobs:
               arch131-robinhood-published-prepare-operator `
               arch131-robinhood-supervised-qualification `
               arch133-robinhood-unattended-activation-core `
-              arch133-robinhood-unattended-state-store
+              arch133-robinhood-unattended-state-store `
+              arch133-robinhood-unattended-one-wake-composition
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

@@ -23,7 +23,7 @@ except OSError:
         '"schema":"arch133-host-bootstrap/v1"}',
         file=sys.stderr,
     )
-    raise SystemExit(3)
+    raise SystemExit(3) from None
 else:
     print(
         '{"reason":"HOST_BOOTSTRAP_FAILED_CLOSED",'

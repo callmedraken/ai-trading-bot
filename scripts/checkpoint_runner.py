@@ -869,7 +869,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
                 "661023c46a3e088d338b67282effb7f35b00a93d"
             ),
             "scripts/run_arch133_unattended_host_preflight.py": (
-                "b27c9d61e52a11369a21647da4321d8c7f2575e4"
+                "7916c2a9c90e33302e9313e5d35d9a282b90b149"
             ),
         }
         for relative, expected in pins.items():

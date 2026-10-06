@@ -6236,6 +6236,7 @@ def test_133e_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_host_scheduler_authority_check(root)
 
+
 _G133_NAME = "arch133-robinhood-unattended-host-bootstrap"
 _G133_SOURCES = (
     "src/trading_bot/review_paper/unattended_host_identity.py",

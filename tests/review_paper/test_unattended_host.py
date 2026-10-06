@@ -494,12 +494,16 @@ def test_q133_1_bootstrap_is_prepublication_read_only(bootstrap_h):
     assert not bootstrap_h.root.exists()
 
 
-@pytest.mark.parametrize("drift", ["branch", "dirty", "version", "python", "principal", "root"])
+@pytest.mark.parametrize(
+    "drift", ["branch", "dirty", "version", "python", "principal", "root"]
+)
 def test_q133_1_bootstrap_drift_fails_closed(bootstrap_h, monkeypatch, drift):
     if drift == "branch":
         bootstrap_h.values[("branch", "--show-current")] = "feature/wrong"
     elif drift == "dirty":
-        bootstrap_h.values[("status", "--porcelain=v1", "--untracked-files=all")] = " M x"
+        bootstrap_h.values[
+            ("status", "--porcelain=v1", "--untracked-files=all")
+        ] = " M x"
     elif drift == "version":
         bootstrap_h.sys.version_info = (3, 14, 4)
     elif drift == "python":
@@ -571,8 +575,7 @@ def test_q133_1_bootstrap_launcher_is_zero_argument_and_sets_cache_before_import
         for node in ast.walk(tree)
         if isinstance(node, ast.Assign)
         and any(
-            isinstance(target, ast.Attribute)
-            and target.attr == "pycache_prefix"
+            isinstance(target, ast.Attribute) and target.attr == "pycache_prefix"
             for target in node.targets
         )
     ]

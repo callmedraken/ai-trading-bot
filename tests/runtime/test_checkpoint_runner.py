@@ -186,6 +186,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-unattended-one-wake-composition",
         "arch133-robinhood-unattended-review-paper-execution",
         "arch133-robinhood-unattended-host-scheduler-surface",
+        "arch133-robinhood-unattended-host-bootstrap",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -2172,10 +2173,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch133-robinhood-unattended-host-scheduler-surface\n"
+                "arch133-robinhood-unattended-host-bootstrap\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch133-robinhood-unattended-host-scheduler-surface\n          exit 0"),
+            ("arch133-robinhood-unattended-host-bootstrap\n          exit 0"),
         ),
     ],
 )
@@ -2481,6 +2482,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch133-robinhood-unattended-one-wake-composition",
     "arch133-robinhood-unattended-review-paper-execution",
     "arch133-robinhood-unattended-host-scheduler-surface",
+    "arch133-robinhood-unattended-host-bootstrap",
 )
 
 
@@ -4543,8 +4545,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 37
-    assert runner.CI_CHECKPOINTS[-18:-4] == (
+    assert len(runner.CI_CHECKPOINTS) == 38
+    assert runner.CI_CHECKPOINTS[-19:-5] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4963,7 +4965,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 37
+    assert len(runner.CI_CHECKPOINTS) == 38
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5178,7 +5180,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 37
+    assert len(runner.CI_CHECKPOINTS) == 38
     assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
@@ -6343,9 +6345,7 @@ def test_133g_runtime_registration_drift_rejected(tmp_path, monkeypatch, change)
         ("workflow", "order"),
     ],
 )
-def test_133g_registration_batch_and_workflow_fail_closed(
-    tmp_path, target, mutation
-):
+def test_133g_registration_batch_and_workflow_fail_closed(tmp_path, target, mutation):
     root = _133g_authority_copy(tmp_path)
     path = root / (
         "scripts/checkpoint_runner.py"

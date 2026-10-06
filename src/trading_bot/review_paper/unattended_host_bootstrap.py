@@ -83,7 +83,9 @@ def preflight_unattended_host_bootstrap() -> UnattendedHostBootstrapEvidence:
     """Q133-1 pre-publication read-only qualification; fail closed on any drift."""
     try:
         _require_host_root_absent()
-        python_sha256 = hashlib.sha256(identity.PRODUCTION_PYTHON.read_bytes()).hexdigest()
+        python_sha256 = hashlib.sha256(
+            identity.PRODUCTION_PYTHON.read_bytes()
+        ).hexdigest()
         if (
             sys.platform != "win32"
             or not sys.flags.isolated

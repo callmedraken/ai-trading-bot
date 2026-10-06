@@ -863,7 +863,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
                 "eb41d518af9ead0e4260b081af63d48b11560023"
             ),
             "src/trading_bot/review_paper/unattended_host_bootstrap.py": (
-                "8ab4142c69094c4cc2bca362bd6dfdf684f501d7"
+                "54623c8c1933b227194532ca9d1ed702d3797279"
             ),
             "scripts/run_arch133_unattended_review_paper.py": (
                 "661023c46a3e088d338b67282effb7f35b00a93d"
@@ -892,6 +892,22 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
                 for item in node.keywords
             )
         ]
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != "704bc5d1eaee06c1e58e8579e2616023ddce73df6346d993104c0f4886dc181d"
+            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+        ):
+            failures.append("133-G batch registration drift")
         spec = _checkpoint_specs()[name]
         if (
             len(registrations) != 1

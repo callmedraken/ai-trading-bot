@@ -46,9 +46,20 @@ post-readback is attempted even for a nonzero application status. Readback or
 handle-close failure preserves a returned native status but never PASSes.
 
 Qualification pins the three fixed parent directories through no-delete,
-no-follow handles. Parent ownership/ACLs must exclude untrusted mutation grants;
-source HEAD/TREE, fixed source worktree/branch/origin, clean index/worktree,
-administrator token, parent identity/security and scratch absence are admitted
+no-follow handles. The isolated package implements the reviewed paper-parent
+semantics locally: all three owners must be Administrators or SYSTEM and both
+principals must have effective full control. The `F:\` VOLUME role admits other
+effective concrete file rights only when FILE_DELETE_CHILD, WRITE_DAC and
+WRITE_OWNER are absent; the observed Authenticated Users `0x1301bf` and Users
+`0x1200a9` rights are admissible. Sibling/data creation is not child replacement.
+VOLUME flags may contain only OI/CI/IO/INHERITED; IO templates require OI or CI,
+are ineffective on the volume and cannot satisfy effective full control.
+The `F:\AI` and `F:\AI\temp` PARENT roles permit other principals only
+read/traverse rights (`0x1200a9`) and OI/CI/INHERITED flags. Every role rejects
+non-ALLOW ACEs and unsupported flags. No operator-user trust exception broadens
+these policies. Source HEAD/TREE, fixed source worktree/branch/origin, clean
+index/worktree, administrator token, parent identity/security and scratch absence
+are admitted
 before mutation. Source and parents are rechecked before success. An
 inadmissible scratch parent STOPs; this checkpoint does not provision or repair it.
 

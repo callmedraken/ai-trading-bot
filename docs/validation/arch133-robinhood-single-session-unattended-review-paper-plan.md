@@ -42,6 +42,28 @@ initial runner pass was stopped on registration failures and only affected
 cases were rerun after correction. No full-project certification or native
 qualification was run.
 
+Exact-review correction: source gate #264 / 37572770176 failed five mocked
+source-drift cases because they resolved the fixed operator path on CI. Those
+dimensions now bind the test-only source root to the repository containing the
+module; the production SOURCE_ROOT remains the exact reviewed literal. Tests
+also prove rejection of existing wrong source/module/Git-root locations and
+that platform/isolation/bytecode failures occur before path or Git access.
+
+Role-policy regressions admit the observed effective VOLUME Authenticated Users
+`0x1301bf` and Users `0x1200a9` ACEs, and valid OI/CI/IO templates. They reject
+effective FILE_DELETE_CHILD/WRITE_DAC/WRITE_OWNER, generic/unknown rights,
+DENY/unknown ACE types, unsupported inheritance flags, untrusted ownership and
+missing effective Administrator/SYSTEM full control. The conservative PARENT
+rule is checked independently on both fixed components; held handles and final
+identity/security re-observation remain covered. No runtime policy is imported.
+
+Correction focused evidence: all 309 scratch/publication cases passed (174
+scratch, 135 publication), all 26 affected 133-I runner cases passed, and all
+9 certification-inventory cases passed. Separate focused Ruff lint and format
+checks and normal git diff --check passed after formatting the added tests.
+No full-project certification, host plan or native qualification was run. The
+correction requires a new real source-gate event and exact-source review.
+
 After source review, the safe optional local SOURCE gate is:
 
 ```powershell

@@ -77,6 +77,43 @@ def _source() -> dict[str, str]:
     return {"source_head": head, "source_tree": tree}
 
 
+def _require_parent_security(
+    observed: primitive.DirectoryObservation, role: str
+) -> None:
+    """Admit the volume and components using distinct concrete-rights policies."""
+    administrators = {primitive.ADMINISTRATORS_SID, primitive.SYSTEM_SID}
+    if role == "VOLUME":
+        # Data/sibling creation and DELETE on the volume cannot replace its child.
+        # Generic/unknown effective rights cannot hide replacement authority.
+        non_admin_rights = 0x1F01FF & ~(0x40 | 0x40000 | 0x80000)
+        allowed_flags = 0x1B  # OI, CI, IO, INHERITED; no NO_PROPAGATE.
+    elif role == "PARENT":
+        # Components remain read/traverse-only for every unrelated principal.
+        non_admin_rights = 0x1200A9
+        allowed_flags = 0x13  # OI, CI, INHERITED; no inherit-only templates.
+    else:
+        raise QualificationError("scratch parent role rejected")
+    if observed.owner_sid not in administrators:
+        raise QualificationError("scratch parent owner rejected")
+    full: set[str] = set()
+    for sid, mask, kind, flags in observed.aces:
+        if kind != 0 or flags & ~allowed_flags:
+            raise QualificationError("scratch parent ACE rejected")
+        if role == "VOLUME" and flags & 0x08:
+            if not flags & 0x03:
+                raise QualificationError("scratch volume template rejected")
+            # Templates do not act on this volume or count as effective control.
+            # Each governed component is inspected independently below.
+            continue
+        if sid in administrators:
+            if mask == 0x1F01FF:
+                full.add(sid)
+        elif mask & ~non_admin_rights:
+            raise QualificationError("scratch parent replacement rejected")
+    if full != administrators:
+        raise QualificationError("scratch parent full control rejected")
+
+
 class ScratchNative:
     """Fixed namespace, pinned no-follow parents, one native creation/application."""
 
@@ -108,14 +145,9 @@ class ScratchNative:
             self._held.callback(primitive.close_handle, handle)
             self._parent_handles.append((handle, path))
             observed = primitive.inspect_directory(handle, path)
-            # No untrusted principal may mutate/retarget the fixed chain. This
-            # gate never attempts to provision or repair an inadmissible parent.
-            trusted = {primitive.ADMINISTRATORS_SID, primitive.SYSTEM_SID, self._sid}
-            if observed.owner_sid not in trusted or any(
-                kind == 0 and not flags & 8 and sid not in trusted and mask & 0x500D0156
-                for sid, mask, kind, flags in observed.aces
-            ):
-                raise QualificationError("scratch parent security rejected")
+            _require_parent_security(
+                observed, "VOLUME" if path == PARENTS[0] else "PARENT"
+            )
             facts.append(observed)
         self._parents = tuple(facts)
         self._guarded = True

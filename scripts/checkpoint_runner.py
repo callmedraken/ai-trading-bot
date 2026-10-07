@@ -865,7 +865,7 @@ ARCH133_SCRATCH_PINS: Final = {
         "b5fe62b81af8e971a06983de389fc6ab36fd5a08c03a1f82565144a6509c87ec"
     ),
     "src/trading_bot/arch133_acl/qualification.py": (
-        "54ac672a214cadf3c699bc481484657038a18a768147956931ccf3fa4ba612d6"
+        "55037965cb39fa7055ddbeccf8e617e4bbf80f39e1804512ec53d66f1a3b7656"
     ),
     "scripts/run_arch133_scratch_root_acl.py": (
         "6ef171aa76609dc48a4f3632b7e29845e1f5fe7e6cfadb6db946fb774252db73"

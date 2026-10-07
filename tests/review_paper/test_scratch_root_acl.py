@@ -263,6 +263,9 @@ def test_fixed_path_only_no_environment_selection(monkeypatch):
     monkeypatch.setenv("AI_TRADING_BOT_SCRATCH_ROOT", r"F:\AITradingBot\Arch133")
     monkeypatch.setenv("TEMP", r"F:\AITradingBot\Arch133")
     assert q.SCRATCH_PATH == r"F:\AI\temp\arch133i-root-acl-qualification-v1"
+    assert q.SOURCE_ROOT == Path(
+        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133i"
+    )
     assert list(inspect.signature(q.execute_scratch_once).parameters) == [
         "reviewed",
         "authorization",
@@ -620,8 +623,12 @@ def test_source_admission_rejects_drift_before_mutation(monkeypatch, wrong):
     monkeypatch.setattr(sys, "platform", "linux" if wrong == "platform" else "win32")
     monkeypatch.setattr(sys, "flags", SimpleNamespace(isolated=wrong != "isolation"))
     monkeypatch.setattr(sys, "dont_write_bytecode", wrong != "bytecode")
+    if wrong in {"branch", "origin", "head", "tree", "dirty"}:
+        monkeypatch.setattr(q, "SOURCE_ROOT", Path(q.__file__).resolve().parents[3])
+    reached = []
 
     def run(argv, **kwargs):
+        reached.append(tuple(argv[4:]))
         assert argv[:4] == ["git", "--no-optional-locks", "-C", str(q.SOURCE_ROOT)]
         values = {
             ("rev-parse", "--show-toplevel"): str(q.SOURCE_ROOT),
@@ -638,8 +645,19 @@ def test_source_admission_rejects_drift_before_mutation(monkeypatch, wrong):
         return SimpleNamespace(stdout=values[tuple(argv[4:])])
 
     monkeypatch.setattr(q.subprocess, "run", run)
-    with pytest.raises(q.QualificationError):
+    with pytest.raises(q.QualificationError, match="scratch source rejected"):
         q._source()
+    expected_last = {
+        "branch": ("branch", "--show-current"),
+        "origin": ("remote", "get-url", "origin"),
+        "head": ("rev-parse", "HEAD^{tree}"),
+        "tree": ("rev-parse", "HEAD^{tree}"),
+        "dirty": ("status", "--porcelain=v1", "--untracked-files=all"),
+    }
+    if wrong in expected_last:
+        assert reached[-1] == expected_last[wrong]
+    else:
+        assert not reached  # Platform/interpreter rejection precedes Git/path IO.
 
 
 def test_cli_plan_has_zero_execute_calls(monkeypatch, capsys):
@@ -676,3 +694,215 @@ def test_native_arm_is_bound_to_plan_and_cannot_repeat(monkeypatch):
     assert backend._armed
     with pytest.raises(q.QualificationError):
         backend.arm_once("a" * 64, "AUTHORIZE Q133-I SCRATCH " + "a" * 64)
+
+
+@pytest.mark.parametrize("wrong", ["source_root", "module_location", "git_root"])
+def test_source_admission_rejects_real_wrong_location(monkeypatch, tmp_path, wrong):
+    from types import SimpleNamespace
+
+    actual_root = Path(q.__file__).resolve().parents[3]
+    wrong_module = tmp_path / "src" / "trading_bot" / "arch133_acl" / "qualification.py"
+    wrong_module.parent.mkdir(parents=True)
+    wrong_module.write_text(
+        "# Real existing unrelated module location.\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "flags", SimpleNamespace(isolated=True))
+    monkeypatch.setattr(sys, "dont_write_bytecode", True)
+    monkeypatch.setattr(
+        q, "SOURCE_ROOT", tmp_path if wrong == "source_root" else actual_root
+    )
+    if wrong == "module_location":
+        monkeypatch.setattr(q, "__file__", str(wrong_module))
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(tuple(argv[4:]))
+        assert calls == [("rev-parse", "--show-toplevel")]
+        return SimpleNamespace(stdout=str(tmp_path))
+
+    monkeypatch.setattr(q.subprocess, "run", run)
+    with pytest.raises(q.QualificationError, match="scratch source rejected"):
+        q._source()
+    assert calls == ([("rev-parse", "--show-toplevel")] if wrong == "git_root" else [])
+
+
+AUTHENTICATED_USERS = "S-1-5-11"
+USERS = "S-1-5-32-545"
+
+
+def parent_observation(aces=native.ADMIN_ACES, owner=native.ADMINISTRATORS_SID):
+    return native.DirectoryObservation(owner, False, aces, (1, 2))
+
+
+def test_parent_volume_admits_known_qualified_acl_shape():
+    aces = native.ADMIN_ACES + (
+        (AUTHENTICATED_USERS, 0x1301BF, 0, 0),
+        (USERS, 0x1200A9, 0, 0),
+        (AUTHENTICATED_USERS, 0x10000000, 0, 0x0B),
+    )
+    q._require_parent_security(parent_observation(aces), "VOLUME")
+
+
+@pytest.mark.parametrize("role", ["VOLUME", "PARENT"])
+@pytest.mark.parametrize("flags", [0, 1, 2, 3, 0x10, 0x13])
+def test_parent_roles_admit_users_concrete_read_rights(role, flags):
+    q._require_parent_security(
+        parent_observation(native.ADMIN_ACES + ((USERS, 0x1200A9, 0, flags),)), role
+    )
+
+
+@pytest.mark.parametrize("flags", [0x09, 0x0A, 0x0B, 0x1B])
+def test_parent_volume_templates_are_ineffective(flags):
+    q._require_parent_security(
+        parent_observation(native.ADMIN_ACES + ((USERS, 0x10000000, 0, flags),)),
+        "VOLUME",
+    )
+
+
+@pytest.mark.parametrize("role", ["VOLUME", "PARENT"])
+@pytest.mark.parametrize(
+    "mask", [0x40, 0x40000, 0x80000, 0x10000000, 0x200000, 0xFFFFFFFF]
+)
+def test_parent_roles_reject_effective_replacement_security_or_unknown_rights(
+    role, mask
+):
+    with pytest.raises(q.QualificationError, match="replacement rejected"):
+        q._require_parent_security(
+            parent_observation(
+                native.ADMIN_ACES + ((AUTHENTICATED_USERS, mask, 0, 0),)
+            ),
+            role,
+        )
+
+
+@pytest.mark.parametrize("mask", [0x1301BF, 0x10000, 0x02, 0x04, 0x10, 0x100])
+def test_parent_component_does_not_inherit_permissive_volume_rule(mask):
+    observed = parent_observation(
+        native.ADMIN_ACES + ((AUTHENTICATED_USERS, mask, 0, 0),)
+    )
+    q._require_parent_security(observed, "VOLUME")
+    with pytest.raises(q.QualificationError, match="replacement rejected"):
+        q._require_parent_security(observed, "PARENT")
+
+
+@pytest.mark.parametrize("role", ["VOLUME", "PARENT"])
+@pytest.mark.parametrize("kind", [1, 2, 7, 255])
+@pytest.mark.parametrize("flags", [0, 0x0B])
+def test_parent_roles_reject_deny_and_unknown_aces_including_templates(
+    role, kind, flags
+):
+    with pytest.raises(q.QualificationError, match="ACE rejected"):
+        q._require_parent_security(
+            parent_observation(native.ADMIN_ACES + ((USERS, 0x1200A9, kind, flags),)),
+            role,
+        )
+
+
+@pytest.mark.parametrize(
+    "role, flags",
+    [("VOLUME", value) for value in (0x04, 0x07, 0x08, 0x18, 0x20, 0x40, 0x80)]
+    + [("PARENT", value) for value in (0x04, 0x07, 0x08, 0x09, 0x0B, 0x20, 0x40, 0x80)],
+)
+def test_parent_roles_reject_malformed_or_unsupported_inheritance(role, flags):
+    with pytest.raises(q.QualificationError):
+        q._require_parent_security(
+            parent_observation(native.ADMIN_ACES + ((USERS, 0x1200A9, 0, flags),)), role
+        )
+
+
+@pytest.mark.parametrize("role", ["VOLUME", "PARENT"])
+@pytest.mark.parametrize("sid", [native.ADMINISTRATORS_SID, native.SYSTEM_SID])
+@pytest.mark.parametrize("change", ["missing", "read_only", "template"])
+def test_parent_roles_require_both_effective_admin_full_control(role, sid, change):
+    aces = tuple(ace for ace in native.ADMIN_ACES if ace[0] != sid)
+    if change == "read_only":
+        aces += ((sid, 0x1200A9, 0, 0),)
+    elif change == "template":
+        aces += ((sid, 0x1F01FF, 0, 0x0B),)
+    with pytest.raises(q.QualificationError):
+        q._require_parent_security(parent_observation(aces), role)
+
+
+@pytest.mark.parametrize("role", ["VOLUME", "PARENT"])
+@pytest.mark.parametrize(
+    "owner", [AUTHENTICATED_USERS, native.TRADING_SID, "S-1-5-21-1-2-3-4"]
+)
+def test_parent_roles_reject_untrusted_owner_including_operator_user(role, owner):
+    with pytest.raises(q.QualificationError, match="owner rejected"):
+        q._require_parent_security(parent_observation(owner=owner), role)
+
+
+def test_parent_roles_reject_unknown_role():
+    with pytest.raises(q.QualificationError, match="role rejected"):
+        q._require_parent_security(parent_observation(), "ROOT")
+
+
+@pytest.mark.parametrize("changed", [None, "identity", "security"])
+def test_native_guard_keeps_role_checks_held_parents_and_reobservation(
+    monkeypatch, changed
+):
+    opened, closed, inspected = [], [], []
+    observations = {path: parent_observation() for path in q.PARENTS}
+    observations[q.PARENTS[0]] = parent_observation(
+        native.ADMIN_ACES + ((AUTHENTICATED_USERS, 0x1301BF, 0, 0),)
+    )
+
+    def open_directory(path, mutable=False):
+        assert mutable is False
+        opened.append(path)
+        return len(opened)
+
+    def inspect_directory(handle, path):
+        assert handle == opened.index(path) + 1
+        inspected.append((handle, path))
+        return observations[path]
+
+    monkeypatch.setattr(native, "administrator_sid", lambda: "S-1-5-21-1-2-3-4")
+    monkeypatch.setattr(native, "open_directory", open_directory)
+    monkeypatch.setattr(native, "close_handle", closed.append)
+    monkeypatch.setattr(native, "inspect_directory", inspect_directory)
+    monkeypatch.setattr(q, "_source", lambda: {})
+    with q.ScratchNative() as backend:
+        with backend.guard():
+            assert opened == list(q.PARENTS) and not closed
+            assert backend._guarded and len(backend._parents) == 3
+            if changed:
+                path = q.PARENTS[1]
+                updates = (
+                    {"identity": (1, 3)} if changed == "identity" else {"aces": ()}
+                )
+                observations[path] = replace(observations[path], **updates)
+                with pytest.raises(q.QualificationError, match="parent changed"):
+                    backend.finish()
+            else:
+                backend.finish()
+            assert not closed
+        assert not backend._guarded
+    assert closed == [3, 2, 1] and len(inspected) == 6
+
+
+@pytest.mark.parametrize("path", q.PARENTS[1:])
+def test_native_guard_never_assigns_volume_role_to_components(monkeypatch, path):
+    opened, closed = [], []
+
+    def open_directory(value):
+        opened.append(value)
+        return len(opened)
+
+    def observe(handle, value):
+        aces = native.ADMIN_ACES
+        if value in {q.PARENTS[0], path}:
+            aces += ((AUTHENTICATED_USERS, 0x1301BF, 0, 0),)
+        return parent_observation(aces)
+
+    monkeypatch.setattr(native, "administrator_sid", lambda: "S-1-5-21-1-2-3-4")
+    monkeypatch.setattr(native, "open_directory", open_directory)
+    monkeypatch.setattr(native, "close_handle", closed.append)
+    monkeypatch.setattr(native, "inspect_directory", observe)
+    with q.ScratchNative() as backend:
+        with pytest.raises(q.QualificationError, match="replacement rejected"):
+            with backend.guard():
+                pytest.fail("unsafe component admitted")
+        assert not backend._guarded and not backend._attempted
+    assert opened[-1] == path and closed == list(range(len(opened), 0, -1))

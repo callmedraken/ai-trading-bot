@@ -12,6 +12,56 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## 133-I source-only qualification validation — implementation pending review
+
+Focused fake-Win32 tests cover the fixed scratch/API/CLI/env rejection boundary,
+exact equality to the accepted root/admin policies, original SDDL revision and
+SetSecurityInfo ABI/flags, exact DWORD preservation (including 5, 87, 1307 and
+4294967295), nonzero fail-closed outcomes, zero-status readback disagreement,
+same-file identity, binary ACE/owner/protection inspection, local NTFS/reparse
+checks, original creation/open flags, descriptor-construction failures, consumed
+attempt budgets, occupancy, malformed authority before native construction,
+source drift and bounded sanitized output. A fresh isolated interpreter verifies
+the full import closure has no trading-runtime/provider/OAuth/scheduler/broker
+capability. The incident regression proves first verifier PASS followed by
+Trading-root failure stops before the second verifier with sanitized diagnostics.
+
+Runner tests cover all 133-H retained pins plus the new shared leaf, 133-I import
+closure pins, missing/changed files, exact branch/registration, CI ordering,
+duplicate/missing registration and injected preflight/execute callbacks.
+Both Ruff lint and format checks run separately, followed by git diff check.
+No real Win32 mutation/native qualification occurs during focused tests or CI.
+
+Implementation focused evidence: 216 qualifier/publication cases passed
+(81 scratch qualifier, 135 retained publication), 300 affected runner cases
+passed across focused correction batches, and 9 certification-inventory cases
+passed. The final backend-arming correction reran all 216 domain cases and all
+26 new 133-I runner cases successfully. Focused Ruff check and format --check
+passed for all 10 changed Python files; normal git diff --check passed. The
+initial runner pass was stopped on registration failures and only affected
+cases were rerun after correction. No full-project certification or native
+qualification was run.
+
+After source review, the safe optional local SOURCE gate is:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-scratch-root-acl-qualification
+```
+
+GitHub's real source-gate event is the routine verification owner. A local FULL
+or ROBINHOOD rerun is not performed by this implementation; ChatGPT selects any
+further certification after exact-source review. No source PASS grants native
+scratch acceptance. The first real scratch plan and execute require separately
+reviewed readiness and fresh PROTECTED authorization. This document supplies no
+effectful operator command and authorizes no production repair.
+
+Expected future native evidence: fixed schema/path, reviewed source HEAD/TREE,
+administrator/Trading SIDs, ADMIN_SYSTEM_ONLY pre-policy, exact numeric native
+status, post-policy classification, exact intended-policy match, NTFS,
+reparse=false, and six zero forbidden-effect counters. PASS requires status 0
+and independent exact same-object readback. Any failed/ambiguous result or scratch
+occupancy is STOP with retained evidence/object and no retry/cleanup.
+
 ## Q133-2 first-verifier replay — PASS / failure boundary frozen
 
 The retained namespace was replayed through the exact first

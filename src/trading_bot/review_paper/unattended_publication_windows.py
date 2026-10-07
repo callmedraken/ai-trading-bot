@@ -16,6 +16,7 @@ from contextlib import ExitStack, closing, contextmanager
 from dataclasses import asdict
 from pathlib import Path
 
+from trading_bot.arch133_acl import primitive as root_acl
 from trading_bot.review_paper import unattended_host_identity as identity
 from trading_bot.review_paper.store import ReviewPaperStore
 from trading_bot.review_paper.unattended_activation import ReviewPaperActivation
@@ -62,14 +63,7 @@ def publication_policy(name: str) -> SecurityPolicy:
     DELETE rights. Explicit protected final-file DACLs exclude that inheritance.
     """
     if name == "root":
-        aces = (
-            SecurityAce(identity.TRADING_SID, security.TRADING_DIRECTORY_READ | 2),
-            SecurityAce(identity.TRADING_SID, security.TRADING_FILE_DATA, ace_flags=9),
-            SecurityAce(
-                security.ADMINISTRATORS_SID, security.FILE_ALL_ACCESS, ace_flags=9
-            ),
-            SecurityAce(security.SYSTEM_SID, security.FILE_ALL_ACCESS, ace_flags=9),
-        )
+        aces = tuple(SecurityAce(*ace) for ace in root_acl.ROOT_ACES[2:])
     elif name in {"activation.json", "host-binding.json"}:
         aces = (SecurityAce(identity.TRADING_SID, security.TRADING_FILE_READ),)
     elif name in {"paper.sqlite", "wake.sqlite"}:
@@ -109,70 +103,11 @@ def apply_publication_root_policy(handle: int, policy: SecurityPolicy) -> None:
         or policy != publication_policy("root")
     ):
         raise PublicationError("publication root policy rejected")
-    sddl = f"O:{policy.owner_sid}D:P" + "".join(
-        f"(A;{'OIIO' if ace.ace_flags == 9 else ''};"
-        f"0x{ace.access_mask:x};;;{ace.principal_sid})"
-        for ace in policy.aces
-    )
-    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    pointer = ctypes.c_void_p
-    boolean = ctypes.c_int32
-    dword = ctypes.c_uint32
-    free = _bind(kernel, "LocalFree", [pointer], pointer)
-    convert = _bind(
-        advapi,
-        "ConvertStringSecurityDescriptorToSecurityDescriptorW",
-        [ctypes.c_wchar_p, dword, ctypes.POINTER(pointer), ctypes.POINTER(dword)],
-        boolean,
-    )
-    get_owner = _bind(
-        advapi,
-        "GetSecurityDescriptorOwner",
-        [pointer, ctypes.POINTER(pointer), ctypes.POINTER(boolean)],
-        boolean,
-    )
-    get_dacl = _bind(
-        advapi,
-        "GetSecurityDescriptorDacl",
-        [
-            pointer,
-            ctypes.POINTER(boolean),
-            ctypes.POINTER(pointer),
-            ctypes.POINTER(boolean),
-        ],
-        boolean,
-    )
-    set_security = _bind(
-        advapi,
-        "SetSecurityInfo",
-        [pointer, dword, dword, pointer, pointer, pointer, pointer],
-        dword,
-    )
-    descriptor, owner, dacl = pointer(), pointer(), pointer()
-    present, defaulted = boolean(), boolean()
     try:
-        if not convert(sddl, 1, ctypes.byref(descriptor), None) or not descriptor.value:
-            raise PublicationError("publication root descriptor rejected")
-        if (
-            not get_owner(descriptor, ctypes.byref(owner), ctypes.byref(defaulted))
-            or not owner.value
-            or not get_dacl(
-                descriptor,
-                ctypes.byref(present),
-                ctypes.byref(dacl),
-                ctypes.byref(defaulted),
-            )
-            or not present.value
-            or not dacl.value
-        ):
-            raise PublicationError("publication root descriptor rejected")
-        # SE_FILE_OBJECT; OWNER | DACL | PROTECTED_DACL_SECURITY_INFORMATION.
-        if set_security(handle, 1, 0x80000005, owner, None, dacl, None) != 0:
+        if root_acl.apply_root_policy_status(handle) != 0:
             raise PublicationError("publication root ACL application failed")
-    finally:
-        if descriptor.value:
-            free(descriptor)
+    except root_acl.RootAclError:
+        raise PublicationError("publication root ACL application failed") from None
 
 
 class PublicationReadApi(security.WindowsPaperReadNativeApi):
@@ -373,6 +308,8 @@ class WindowsPublication:
             identity.HOST_ROOT / ".host-binding.json.pending",
         }:
             raise PublicationError("publication native mutation rejected")
+        if path == identity.HOST_ROOT:
+            return WindowsHandle(root_acl.open_directory(str(path), mutable=True))
         create = _bind(
             self.kernel,
             "CreateFileW",
@@ -420,15 +357,7 @@ class WindowsPublication:
             raise PublicationError("publication already attempted")
         self._attempted = True  # Loss of acknowledgement grants no second call.
         self._absent(identity.HOST_ROOT)
-        create = _bind(
-            self.kernel,
-            "CreateDirectoryW",
-            [ctypes.c_wchar_p, ctypes.c_void_p],
-            ctypes.c_int32,
-        )
-        with build_security_attributes(ADMIN_POLICY) as bundle:
-            if not create(str(identity.HOST_ROOT), ctypes.byref(bundle.attributes)):
-                raise PublicationError("publication root create failed")
+        root_acl.create_admin_directory(str(identity.HOST_ROOT))
         self._root_handle = self._open_mutable(identity.HOST_ROOT)
         self._held.callback(self._root_handle.close)
         require_security_policy(
@@ -543,6 +472,11 @@ class WindowsPublication:
             ).security,
             policy,
         )
+        observed = root_acl.inspect_directory(
+            self._root_handle.value, str(identity.HOST_ROOT)
+        )
+        if observed.classification() != "EXACT_INTENDED_ROOT":
+            raise PublicationError("publication root readback rejected")
         self._trading_root = True
 
     @contextmanager

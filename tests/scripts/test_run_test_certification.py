@@ -718,10 +718,11 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 _UNATTENDED_EXECUTION_TEST,
                 _UNATTENDED_HOST_TEST,
                 "tests/review_paper/test_unattended_publication.py",
+                "tests/review_paper/test_scratch_root_acl.py",
             )
         )
     )
-    assert len(selected) == 49
+    assert len(selected) == 50
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -755,6 +756,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 _UNATTENDED_EXECUTION_TEST,
                 _UNATTENDED_HOST_TEST,
                 "tests/review_paper/test_unattended_publication.py",
+                "tests/review_paper/test_scratch_root_acl.py",
             )
         )
     )
@@ -768,10 +770,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 122,
-        "robinhood": 49,
+        "full": 123,
+        "robinhood": 50,
         "legacy": 204,
-        "exhaustive": 326,
+        "exhaustive": 327,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

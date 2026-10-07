@@ -5,6 +5,85 @@ only. It does not authorize scheduler mutation, unattended provider access,
 Robinhood review requests, synthetic paper mutation, broker placement, or live
 trading.
 
+## 133-I — scratch-only native root-ACL qualification source
+
+133-I derives from incident checkpoint `c3d87f7fe0ce5fed6c7bbcb16f1b6300162be82c`
+(TREE `baff21b72b7a7810603f29a0eeea5872db227b66`). This is a source-only
+successor; it grants no protected execution or production recovery authority.
+The later historical 133-H “not executed” statements describe its original
+acceptance and are superseded by the retained-failure record.
+
+`trading_bot.arch133_acl` imports only standard-library code plus the inert
+`trading_bot` configuration initializer. The qualifier cannot import the host
+publisher, HostRoot, stores, unattended host, Robinhood, provider, OAuth or Task
+Scheduler surfaces. Its only mutation destination is the versioned literal
+`F:\AI\temp\arch133i-root-acl-qualification-v1`; no CLI, API or environment
+value selects a filesystem path. No cleanup, delete, repair or recovery surface
+exists. Occupancy of any kind, including reparse/wrong-kind/partial objects,
+blocks another execution. The native backend separately requires one-time
+arming with the same exact reviewed plan/authorization. It consumes creation
+and application budgets
+before the corresponding native call; uncertainty never retries.
+
+Both production root creation and qualification now call the same specialized
+binary Administrator/SYSTEM security-attributes builder and CreateDirectoryW
+boundary. Both use the exact original mutable root CreateFileW access mask
+`0xC00E0081`, share mask 3 (deny delete), OPEN_EXISTING 3 and flags `0x02200000`
+(BACKUP_SEMANTICS | OPEN_REPARSE_POINT). The fixed policy material is identical
+to `publication_policy("root")`, including ACE order and OIIO flags 9.
+Both application paths use one shared revision-1 SDDL conversion and the original
+`SetSecurityInfo(handle, 1, 0x80000005, owner, NULL, dacl, NULL)` call. The
+returned DWORD is retained verbatim, never replaced by GetLastError or native
+exception text. Every nonzero status fails closed.
+
+The publisher retains its existing full no-follow inspector and additionally
+uses the shared independent binary GetSecurityInfo/ACE reader. Qualification
+uses that same reader before and after application, verifying exact owner,
+protected DACL, every ordered ACE, canonical final handle path, local fixed NTFS,
+no reparse, and unchanged volume/file identity. A zero status alone cannot PASS.
+The initial directory must be exactly Administrator/SYSTEM-only. Independent
+post-readback is attempted even for a nonzero application status. Readback or
+handle-close failure preserves a returned native status but never PASSes.
+
+Qualification pins the three fixed parent directories through no-delete,
+no-follow handles. Parent ownership/ACLs must exclude untrusted mutation grants;
+source HEAD/TREE, fixed source worktree/branch/origin, clean index/worktree,
+administrator token, parent identity/security and scratch absence are admitted
+before mutation. Source and parents are rechecked before success. An
+inadmissible scratch parent STOPs; this checkpoint does not provision or repair it.
+
+The isolated `scripts/run_arch133_scratch_root_acl.py` launcher requires `-I -B`.
+`plan` performs only source/native read-only admission and emits a canonical plan
+SHA-256. `execute-once` accepts only `--reviewed-plan-sha256`, requires real
+interactive terminal stdin, and requires the exact fresh authorization line
+`AUTHORIZE Q133-I SCRATCH <reviewed-plan-sha256>`. Readiness precedes the prompt;
+plan identity is repeated under the held guard before creation. Neither mode is
+run by source verification. The first native scratch mutation remains separately
+PROTECTED; this source checkpoint must stop after commit/push.
+
+Bounded stdout evidence uses `arch133i-scratch-root-acl-qualification/v1` and
+contains the fixed scratch identity, source HEAD/TREE, administrator and Trading
+SIDs, pre/post policy classifications, numeric SetSecurityInfo status (null only
+when no valid status was observed), exact intended-policy match, NTFS/no-reparse
+facts and zero provider/OAuth/scheduler/broker/production-Arch133 mutation counts.
+No raw security descriptors, exception payloads, credentials or provider data
+are emitted. CLI failures remain fixed sanitized diagnostics; normal Q133-2
+`PUBLICATION_FAILED_CLOSED` diagnostics remain unchanged.
+
+Successor source-pin ownership is intentional: the original 133-H native AST pin
+`c4b8000caa62acd1bf45d2c793dbfd08eac67da84c500cf89fd3d0739a3318e9` is replaced
+by the reviewed refactored wrapper plus the exact new shared primitive and
+package initializer. All other 133-H source and registration pins are unchanged.
+133-I also pins its qualifier/launcher and complete package import closure.
+The 17 CI-tuple pins advance only to append this single source-only participant;
+the existing reviewed `feature/robinhood-*` push admission is unchanged.
+
+`arch133-robinhood-scratch-root-acl-qualification` is registered once immediately
+after 133-H, on the exact 133-I remote branch, with `preflight=None`,
+`execute=None`, and no environment head override. CI runs fake-edge tests and
+static authority checks only. Q133-2 retry/production ACL repair, provider wakes,
+scheduler mutation and live trading remain unauthorized.
+
 ## 133-H — source prerequisite for protected Q133-2
 
 Q133-1 was accepted at the exact 133-G closeout HEAD

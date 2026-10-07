@@ -1135,6 +1135,11 @@ def test_root_admission_requires_successful_local_application_and_readback(
 
     backend.api = SimpleNamespace(inspect=inspect)
     monkeypatch.setattr(
+        native.root_acl,
+        "inspect_directory",
+        lambda *args: SimpleNamespace(classification=lambda: "EXACT_INTENDED_ROOT"),
+    )
+    monkeypatch.setattr(
         native,
         "apply_security_policy",
         lambda *args: pytest.fail("shared application reached"),
@@ -1165,3 +1170,29 @@ def test_final_file_policies_remain_explicit_and_unchanged():
                 identity.TRADING_SID, 0x120089 if name.endswith(".json") else 0x12019F
             ),
         )
+
+
+def test_first_verifier_pass_does_not_admit_trading_root(case, monkeypatch):
+    """Actual incident boundary: first PASS grants no root admission authority."""
+    calls = []
+    monkeypatch.setattr(
+        publication,
+        "verify_publication",
+        lambda *args: calls.append("verify") or {"state": "READY"},
+    )
+
+    def fail_root():
+        calls.append("root")
+        raise RuntimeError(SECRET)
+
+    case.backend.admit_trading_root = fail_root
+    plan = publication._plan(case.material, case.backend)
+    with pytest.raises(publication.PublicationError) as caught:
+        publication._execute_once(
+            case.material,
+            plan["plan_sha256"],
+            "AUTHORIZE Q133-2 " + plan["plan_sha256"],
+            case.backend,
+        )
+    assert calls == ["verify", "root"]
+    assert SECRET not in str(caught.value)

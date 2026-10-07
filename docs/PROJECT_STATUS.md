@@ -1,5 +1,37 @@
 # Project Status and Roadmap
 
+## 2026-10-06 — Q133-2 failed closed after semantic publication; retained root unadmitted
+
+The reviewed Q133-2 plan
+`c4f3cd1e5d4556c38e4c2100cee7ffc40702316bb446f80cd74d39f098eca7ba`
+was authorized once and the protected publisher returned
+`PUBLICATION_FAILED_CLOSED`. The one-shot boundary is consumed: **do not
+retry, delete, repair, rename, or ACL-modify the retained publication.**
+
+Read-only reconciliation proves that `F:\AITradingBot\Arch133` contains
+exactly `activation.json`, `host-binding.json`, `paper.sqlite`, and
+`wake.sqlite`; both JSON files are byte-exact/canonical, the paper store is
+the exact empty schema-v2 predecessor for starting cash 10000, and the wake
+store is the exact activation in `READY` revision 0. Both JSON/SQLite final-file
+ACLs are sealed for the Trading SID as designed and no pending files remain.
+The root itself is still protected Administrator/SYSTEM-only, so Trading root
+admission did not complete. Provider calls, OAuth reads, scheduler reads/writes,
+and broker effects remain zero.
+
+A separate in-memory Win32 diagnostic proved the intended root SDDL is valid:
+conversion and round-trip PASS, protected DACL, six ACEs. The next safe action
+is **read-only replay of the exact first publication verifier with Trading-root
+state false** to distinguish a verifier rejection from failure inside the native
+root `SetSecurityInfo` application boundary. Q133-2V, Q133-3 and Q133-4 remain
+ineligible/not authorized. Any recovery or ACL mutation requires a new reviewed
+Architecture-133 recovery checkpoint.
+
+Operator-workflow note: a diagnostic in this incident regressed to multiline
+PowerShell `python -c` and failed with a transport-induced `SyntaxError`
+without reaching Win32. Canonical workflow rules now explicitly prohibit
+multiline Python through `-c`; use stdin (`python -B -`) for tiny snippets or
+a temporary/reviewed `.py` file for larger diagnostics.
+
 ## 2026-10-06 — 133-H source/FULL accepted; Q133-2 plan next
 
 Q133-1 provider-free pre-publication bootstrap is accepted on frozen 133-G

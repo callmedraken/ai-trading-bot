@@ -12,6 +12,38 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## 2026-10-06 Q133-2 retained-failure reconciliation
+
+The exact reviewed plan
+`c4f3cd1e5d4556c38e4c2100cee7ffc40702316bb446f80cd74d39f098eca7ba`
+received one protected authorization and the execute-once publisher failed
+closed after creating the Arch133 root. Re-entry is forbidden.
+
+Provider-free/read-only reconciliation establishes:
+
+- exact final namespace only: `activation.json`, `host-binding.json`,
+  `paper.sqlite`, `wake.sqlite`;
+- exact/canonical activation and host-binding bytes;
+- exact empty schema-v2 paper predecessor for starting cash 10000;
+- exact one activation/wake in `READY`, revision 0;
+- no pending publication files;
+- final-file policies already sealed for Trading;
+- root policy still Administrator/SYSTEM-only;
+- zero provider, OAuth, scheduler, or broker effects.
+
+The intended protected root SDDL independently converts and round-trips through
+Win32 as a valid six-ACE protected DACL. Therefore do not redesign the policy
+semantics from this incident. Before any recovery design, replay the exact first
+complete-publication verifier read-only with the backend's Trading-root state
+false. A PASS localizes the production failure to the subsequent native root ACL
+application/readback boundary; a failure must be reconciled on its own evidence.
+Q133-2V/Q133-3/Q133-4 and any ACL/recovery mutation remain unauthorized.
+
+Operator diagnostics for this project must also obey the repository transport
+rule: multiline Python must never be passed from PowerShell through
+`python -c`. Tiny snippets may be piped by stdin to `python -B -`; larger
+diagnostics use a temporary/reviewed `.py` file.
+
 ## Goal
 
 Prove that one pre-authorized proposal can cross one unattended Robinhood

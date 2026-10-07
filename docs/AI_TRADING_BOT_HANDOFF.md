@@ -1,5 +1,32 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-06 — Q133-2 FAILED CLOSED / retained semantic publication is unadmitted
+
+The exact reviewed plan
+`c4f3cd1e5d4556c38e4c2100cee7ffc40702316bb446f80cd74d39f098eca7ba`
+was authorized once. The publisher returned `PUBLICATION_FAILED_CLOSED` after
+creating `F:\AITradingBot\Arch133`; **Q133-2 must not be retried or repaired**.
+
+Read-only reconciliation proves the retained namespace is exactly the four final
+objects. Activation/binding bytes are exact and canonical; `paper.sqlite` is
+the exact empty predecessor; `wake.sqlite` is `READY`, revision 0; final-file
+ACLs are sealed; no pending files exist. The root ACL remains
+Administrator/SYSTEM-only, so Trading root admission did not complete. Zero
+provider/OAuth/scheduler/broker effects occurred. The intended six-ACE protected
+root SDDL also converts, validates, and round-trips successfully in memory.
+
+Immediate safe next step: replay only the exact **first** publication verifier
+read-only against the retained root with Trading-root state false. Do not run
+Q133-2V, install the scheduler, run the unattended host, alter ACLs, delete the
+root, or retry publication. If the first verifier passes, freeze a new
+Architecture-133 recovery/source-correction checkpoint around the native root
+ACL application boundary before any production mutation.
+
+Hard operator-transport reminder: never send multiline Python from PowerShell
+through `python -c` (including `& $Python -c $Code` or here-string variants).
+Use a single-quoted here-string piped to `python -B -` only for tiny snippets;
+otherwise write/invoke a UTF-8 temporary or reviewed `.py` file.
+
 **Repository:** `callmedraken/ai-trading-bot`
 
 ## 2026-10-06 — Current 133-H source/FULL accepted / Q133-2 plan next

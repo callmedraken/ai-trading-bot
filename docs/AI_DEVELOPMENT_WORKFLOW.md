@@ -487,11 +487,18 @@ preference. Operator commands must use this order of preference:
    command-line quoting.
 
 Never pass structured JSON or other structured payloads as a raw native command
-argument when a file path or stdin can carry the bytes. Never embed substantial
-Python in `python -c` from PowerShell. If a tiny Python diagnostic must be sent
-through stdin, use a single-quoted PowerShell here-string and pipe it to
-`python -B -`; do not pass that here-string as the `-c` argument. Substantial
-logic belongs in reviewed repository files.
+argument when a file path or stdin can carry the bytes. **Hard rule: from
+PowerShell, never transport multiline Python through `python -c`.** This
+includes `python -c $Code`, `& $Python -c $Code`, `python -c $hereString`,
+and equivalent variable-expanded forms, even for temporary/read-only
+diagnostics. PowerShell/native argument parsing can strip or reinterpret quoting
+before Python sees the program. For a tiny diagnostic, use a single-quoted
+PowerShell here-string and pipe it to `python -B -`. For anything more than a
+tiny diagnostic, write UTF-8 source to an approved temporary `.py` file and
+invoke that file; reusable or protected logic belongs in reviewed repository
+source. Never pass a here-string as the `-c` argument. A `SyntaxError` caused
+by shell transport is a workflow regression, not diagnostic evidence, and must
+not be worked around by trying alternate `-c` quoting.
 
 This serialization rule does not override a protected operator contract that
 explicitly requires real interactive terminal stdin. In that case, do not pipe

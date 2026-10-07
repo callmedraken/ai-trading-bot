@@ -1,5 +1,37 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 133-K source implementation; exact review pending
+
+133-K implements the frozen retained production-root ACL recovery contract on
+`feature/robinhood-unattended-review-paper-133k`, isolated at
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133k`. Its exact parent is
+`da57105e3ac77e9f05ac8e8144ddf2f56eee0c46` /
+`220a5c25ce3a88779de6357c4ce2d81dc8697659` (base source gate #275 SUCCESS).
+This records implementation, not source or protected host acceptance.
+
+The operator-only read-only canonical plan pins the accepted 133-J root identity,
+security digest and all four retained file hashes. The separately protected
+execute-once surface requires the reviewed plan hash and distinct interactive
+Q133-K authorization, re-admits the held pre-state and consumes its attempt before
+one shared SetSecurityInfo call. Numeric status and independent readback determine
+PASS; parent/source/namespace/file drift, exceptions and close failures fail closed.
+No retries, fallback APIs or publication re-entry are implemented.
+
+The extracted application and Administrator-token leaves retain the accepted
+function ASTs and are re-exported by primitive.py. Recovery imports neither that
+creation-capable module nor publisher/store/scheduler/provider/OAuth/broker code.
+133-H/133-I retain their accepted behavior; 133-J production observations are
+unchanged. Source pins intentionally include the new common leaves.
+
+133-K is SOURCE ONLY in CI after 133-J, with no preflight, execute or remote-head
+environment callback. Certification inventory is FULL 125, ROBINHOOD 52,
+LEGACY 204, EXHAUSTIVE 329; frozen baseline sets remain unchanged.
+
+No real recovery plan/execution, production/scratch access or protected effect
+ran during implementation. Stop after ordinary exact-file commit/push and terminal
+green source gate for ChatGPT exact-source review and certification selection.
+Q133-2 remains consumed; scratch evidence remains retained. Live trading is NO-GO.
+
 ## 2026-10-07 — Architecture 133-J diagnostic ACCEPTED; 133-K retained-root ACL recovery design frozen
 
 Architecture 133-J source and fresh ROBINHOOD certification are accepted at

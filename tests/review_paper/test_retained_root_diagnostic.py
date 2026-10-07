@@ -592,7 +592,7 @@ def test_existing_mutation_function_asts_remain_accepted(name, expected):
 
     from trading_bot.arch133_acl import primitive
 
-    tree = ast.parse(Path(primitive.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(inspect.getsource(getattr(primitive, name)))
     function = next(
         node
         for node in tree.body

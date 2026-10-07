@@ -389,7 +389,9 @@ def test_real_shared_set_security_info_abi_and_status(monkeypatch, status):
         return invoke
 
     monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **k: object())
-    monkeypatch.setattr(native, "_bind", bind)
+    from trading_bot.arch133_acl import root_policy_apply
+
+    monkeypatch.setattr(root_policy_apply, "_bind", bind)
     assert native.apply_root_policy_status(77) == status
     assert [name for name, _ in calls].count("SetSecurityInfo") == 1
     assert calls[-1][0] == "LocalFree"
@@ -452,6 +454,8 @@ def test_isolated_import_graph_has_no_effect_capabilities(tmp_path):
         "trading_bot.config",
         "trading_bot.arch133_acl",
         "trading_bot.arch133_acl.primitive",
+        "trading_bot.arch133_acl.administrator",
+        "trading_bot.arch133_acl.root_policy_apply",
         "trading_bot.arch133_acl.read_only",
         "trading_bot.arch133_acl.qualification",
     }

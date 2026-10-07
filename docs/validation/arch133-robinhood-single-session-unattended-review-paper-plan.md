@@ -1,5 +1,52 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 133-K source-only validation (exact review pending)
+
+Base is exact 133-J closeout `da57105e3ac77e9f05ac8e8144ddf2f56eee0c46` /
+`220a5c25ce3a88779de6357c4ce2d81dc8697659`, gate #275 / 37601705838 SUCCESS.
+The requested 133-K branch/worktree were created from that verified commit with a
+clean index/worktree; the original checkout's unrelated generated artifacts and
+all other worktrees were preserved.
+
+Fake-native tests cover exact retained pins, canonical plan hashing, independent
+drift rejection, strict source/parent/token admission, terminal-only distinct
+authorization, immediate pre-state rejection, numeric native status preservation,
+independent readback even after errors, one consumed application, no fallback,
+close-once behavior and sanitized evidence. Fresh isolated import probes and
+native binding allowlists prove recovery has no publisher/store/scheduler/provider/
+OAuth/broker/creation/rename/delete/write capability. Function AST regressions
+prove the original ACL application and token admission bodies are unchanged.
+
+Runner tests reject altered/missing closure files, injected protected callbacks,
+registration drift and CI-order changes. The frozen batch hash is intentionally
+advanced from 41 to 42 checkpoints. 133-H/133-I shared source pins intentionally
+include both extracted leaves. Certification inventory tests retain the frozen
+113/40 baselines while admitting the new supported review_paper test module;
+current counts are FULL 125, ROBINHOOD 52, LEGACY 204, EXHAUSTIVE 329.
+
+Focused implementation evidence: 525 recovery/133-H/133-I/133-J cases
+(118 recovery and 407 accepted regressions), 473 selected runner/registration/
+batch cases and 299 inventory/profile cases passed. The final native-attempt
+counter correction was rechecked across all 525 domain cases and the affected
+H/I/J/K source-pin tests. Early failures were stale extraction-location and
+checkpoint-position expectations; the frozen function AST values and supported
+baseline sets were preserved. Separate focused Ruff lint/format and whitespace
+checks are required before the exact-file commit.
+
+Routine source verification uses the reviewed runner:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-retained-root-acl-recovery
+```
+
+That checkpoint has no real plan/execute callback. No real 133-K plan/execution,
+SetSecurityInfo, Q133-2/Q133-2V, retained production/scratch access or mutation,
+Task Scheduler, OAuth/provider or broker/live operation was run in implementation.
+No broad local certification was run. Stop after terminal green source CI for
+ChatGPT exact GitHub review, then certification selection. Real planning and
+protected execution require separate later handoffs; after an attempted execution,
+the operator must not restart/retry even if acknowledgement/readback is ambiguous.
+
 ## 133-J real retained-root diagnostic — PASS / recovery boundary frozen
 
 After source acceptance and fresh ROBINHOOD certification (4,470 / 4,470), the

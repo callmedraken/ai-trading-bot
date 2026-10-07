@@ -1,5 +1,40 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — 133-K implementation handoff; source review pending
+
+Worktree: `F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133k`.
+Branch: `feature/robinhood-unattended-review-paper-133k`.
+Startup parent HEAD/TREE:
+`da57105e3ac77e9f05ac8e8144ddf2f56eee0c46` /
+`220a5c25ce3a88779de6357c4ce2d81dc8697659`; source gate #275 SUCCESS.
+
+`trading_bot.arch133_acl.recovery` and its isolated launcher implement only the
+fixed retained-root plan and separately protected execute-once contract. The exact
+133-J baseline is mandatory. A reviewed canonical plan binds source HEAD/TREE,
+operator SID, held parent facts, namespace/file identities and frozen intended
+policy. Execution re-admits that entire plan after authorization, consumes its
+one attempt before the native call and independently observes the held root even
+after a nonzero DWORD or exception. Successful status alone cannot produce PASS.
+
+`root_policy_apply` is the single frozen SetSecurityInfo implementation;
+`administrator` is read-only token admission. primitive.py re-exports both for
+133-H/133-I, with unchanged function AST regression pins. Recovery's import closure
+excludes primitive, qualification, diagnostic, publisher, stores, scheduler and
+provider/OAuth/broker modules. Accepted read-only native/file leaves are unchanged.
+
+The checkpoint follows 133-J in source CI, with preflight=None, execute=None and
+remote_head_env=None. Fake-native focused verification and source pins cover the
+recovery boundary; CI never runs a real operator mode. No real plan, native ACL
+application, production/scratch access or other protected operation ran.
+
+Next owner: ChatGPT exact GitHub commit/tree review after terminal green CI,
+then selection of certification before a separately handed-off read-only plan.
+Do not run a real plan or execute from this implementation handoff. After any
+protected mutation attempt, authority is consumed even following ambiguous
+acknowledgement/crash; no restart or retry is authorized. No durable marker/file
+write is added. Q133-2 remains non-retryable, scratch is retained and Q133-2V remains
+a distinct later read-only gate after an accepted recovery execution.
+
 ## 2026-10-07 — 133-J PASS; 133-K retained-root ACL recovery frozen
 
 133-J is accepted at `3c8f2db97670410ae841bf053d075832b9a946dc` /

@@ -110,7 +110,8 @@ jobs:
               arch133-robinhood-unattended-host-bootstrap `
               arch133-robinhood-unattended-host-publication `
               arch133-robinhood-scratch-root-acl-qualification `
-              arch133-robinhood-retained-root-diagnostic
+              arch133-robinhood-retained-root-diagnostic `
+              arch133-robinhood-retained-root-acl-recovery
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

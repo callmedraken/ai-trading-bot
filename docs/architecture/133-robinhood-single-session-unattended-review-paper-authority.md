@@ -1,5 +1,64 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-K implementation boundary (exact source review pending)
+
+The implementation is `trading_bot.arch133_acl.recovery`, with isolated launcher
+`scripts/run_arch133_retained_root_acl_recovery.py`. Its only CLI modes are
+`plan` and `execute-once --reviewed-plan-sha256 <64-lowercase-hex>`. There is no
+path selector. Plan schema is `arch133k-retained-root-acl-recovery-plan/v1`;
+execution schema is `arch133k-retained-root-acl-recovery/v1`.
+
+Source admission requires the fixed 133-K worktree/branch/origin, Windows -I -B,
+clean complete worktree/index and exact local origin tracking HEAD/TREE. Both
+source IDs are included in the canonical reviewed plan, avoiding a self-hash
+cycle in source. Operators review those exact IDs before authorizing that plan.
+The payload excluding plan_sha256 is UTF-8 canonical JSON (sorted keys, compact
+separators, no NaN); its SHA-256 binds every observed and intended fact.
+
+Each planning scope opens the root once using the accepted exact mutable-root
+tuple, with no fallback. Held ancestors exclude rename/delete; retained files
+have read-only handles denying write/delete. Independent snapshots verify root
+identity/security, namespace/file identities and hashes, Administrator token,
+parents (including binary security hashes) and source stability. The intended
+Administrators owner, protected DACL and ordered six ACEs are frozen plan material.
+
+Before prompting, the CLI requires real terminal stdin and recomputes the complete
+plan. Exact authorization is `AUTHORIZE Q133-K ROOT-ACL <reviewed-plan-sha256>`.
+After authorization, a new held scope re-admits the entire reviewed plan and the
+immediate pre-state. Even the internal application boundary requires exact
+authority and a fresh matching plan. A lock guards consumption before the one
+native invocation; the same process cannot attempt another call after any result,
+exception or readback failure. Authority is not renewed by reopening the backend.
+The no-retry operator contract also prohibits restarting after an attempted call
+or crash. The fence is process-local; no durable marker is written because final
+files and their bytes must remain untouched. Ambiguous outcomes require a new
+architecture decision, never another invocation under the spent authorization.
+
+Independent held-root readback runs after every attempted application, including
+nonzero status or exceptions. PASS requires status 0, exact intended policy,
+unchanged root identity, NTFS/no-reparse, stable parent/source facts, exact retained
+namespace/file identities/hashes and successful handle closure. Bounded evidence
+preserves numeric DWORDs, pre/post security hashes and truthful
+acl_mutation_attempts (0 before SetSecurityInfo, 1 after its invocation). A
+context-local counter at the native binding distinguishes consumed authority
+from descriptor-preparation failure, without altering the frozen function body.
+No raw error text or retained file bytes escape.
+
+`root_policy_apply` contains the original accepted function body/ABI/SDDL and is
+the only SetSecurityInfo implementation. `administrator` contains the unchanged
+read-only token admission. primitive.py re-exports both for existing 133-H/133-I
+callers. Recovery imports only those minimal leaves, read_only and retained_reads,
+plus inert package initialization. It cannot reach creation/publication,
+SQLite/store mutation, scratch, scheduler, provider/OAuth or broker capabilities.
+Existing read-only 133-J modules and native reads remain byte-for-byte unchanged.
+Source authority pins cover the new closure and intentionally extend existing
+133-H/133-I pins to those shared leaves; frozen function AST checks remain intact.
+
+The source-only registered checkpoint follows 133-J, with preflight=None,
+execute=None and remote_head_env=None. Source CI imports no real operator surface;
+fake-edge tests are its only execution. Source acceptance/certification and each
+real operator gate remain separate. Neither operator mode ran during development.
+
 ## 133-K — retained production-root ACL recovery (frozen source design)
 
 133-J proved the retained production root is currently openable with the exact

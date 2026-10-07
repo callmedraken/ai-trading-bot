@@ -10,6 +10,7 @@ import ctypes
 from collections.abc import Iterator
 from contextlib import contextmanager
 
+from trading_bot.arch133_acl.administrator import administrator_sid as administrator_sid
 from trading_bot.arch133_acl.read_only import (
     ADMIN_ACES as ADMIN_ACES,
 )
@@ -40,85 +41,15 @@ from trading_bot.arch133_acl.read_only import (
 from trading_bot.arch133_acl.read_only import (
     open_directory as open_directory,
 )
+from trading_bot.arch133_acl.root_policy_apply import (
+    apply_root_policy_status as apply_root_policy_status,
+)
 
 
 def _bind(library: object, name: str, arguments: list, result: object):
     function = getattr(library, name)
     function.argtypes, function.restype = arguments, result
     return function
-
-
-def apply_root_policy_status(handle: int) -> int:
-    """The exact 133-H conversion/SetSecurityInfo primitive, without retry.
-
-    A DWORD is returned verbatim, never GetLastError, HRESULT conversion, text
-    formatting, or an exception payload. The caller must fail closed on nonzero.
-    """
-    sddl = f"O:{ADMINISTRATORS_SID}D:P" + "".join(
-        f"(A;{'OIIO' if ace[3] == 9 else ''};0x{ace[1]:x};;;{ace[0]})"
-        for ace in ROOT_ACES
-    )
-    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    pointer = ctypes.c_void_p
-    boolean = ctypes.c_int32
-    dword = ctypes.c_uint32
-    free = _bind(kernel, "LocalFree", [pointer], pointer)
-    convert = _bind(
-        advapi,
-        "ConvertStringSecurityDescriptorToSecurityDescriptorW",
-        [ctypes.c_wchar_p, dword, ctypes.POINTER(pointer), ctypes.POINTER(dword)],
-        boolean,
-    )
-    get_owner = _bind(
-        advapi,
-        "GetSecurityDescriptorOwner",
-        [pointer, ctypes.POINTER(pointer), ctypes.POINTER(boolean)],
-        boolean,
-    )
-    get_dacl = _bind(
-        advapi,
-        "GetSecurityDescriptorDacl",
-        [
-            pointer,
-            ctypes.POINTER(boolean),
-            ctypes.POINTER(pointer),
-            ctypes.POINTER(boolean),
-        ],
-        boolean,
-    )
-    set_security = _bind(
-        advapi,
-        "SetSecurityInfo",
-        [pointer, dword, dword, pointer, pointer, pointer, pointer],
-        dword,
-    )
-    descriptor, owner, dacl = pointer(), pointer(), pointer()
-    present, defaulted = boolean(), boolean()
-    try:
-        if not convert(sddl, 1, ctypes.byref(descriptor), None) or not descriptor.value:
-            raise RootAclError("publication root descriptor rejected")
-        if (
-            not get_owner(descriptor, ctypes.byref(owner), ctypes.byref(defaulted))
-            or not owner.value
-            or not get_dacl(
-                descriptor,
-                ctypes.byref(present),
-                ctypes.byref(dacl),
-                ctypes.byref(defaulted),
-            )
-            or not present.value
-            or not dacl.value
-        ):
-            raise RootAclError("publication root descriptor rejected")
-        # SE_FILE_OBJECT; OWNER | DACL | PROTECTED_DACL_SECURITY_INFORMATION.
-        status = set_security(handle, 1, 0x80000005, owner, None, dacl, None)
-        if type(status) is not int or not 0 <= status <= 0xFFFFFFFF:
-            raise RootAclError("root ACL status rejected")
-        return status
-    finally:
-        if descriptor.value:
-            free(descriptor)
 
 
 def create_admin_directory(path: str) -> None:
@@ -207,84 +138,3 @@ def admin_security_attributes() -> Iterator[ctypes.Structure]:
     finally:
         for sid in buffers:
             free(sid)
-
-
-def _sid_text(advapi: object, kernel: object, sid: object) -> str:
-    text = ctypes.c_wchar_p()
-    convert = _bind(
-        advapi,
-        "ConvertSidToStringSidW",
-        [ctypes.c_void_p, ctypes.POINTER(ctypes.c_wchar_p)],
-        ctypes.c_int32,
-    )
-    if not convert(sid, ctypes.byref(text)) or not text.value:
-        raise RootAclError("root SID observation failed")
-    try:
-        value = text.value
-        if len(value) > 184:
-            raise RootAclError("root SID bound rejected")
-        return value
-    finally:
-        _bind(kernel, "LocalFree", [ctypes.c_void_p], ctypes.c_void_p)(text)
-
-
-def administrator_sid() -> str:
-    """Require an elevated enabled Administrators token; exclude SYSTEM/Trading."""
-    advapi = ctypes.WinDLL("advapi32", use_last_error=True)
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    pointer, dword, boolean = ctypes.c_void_p, ctypes.c_uint32, ctypes.c_int32
-    token, admin = pointer(), pointer()
-    current = _bind(kernel, "GetCurrentProcess", [], pointer)
-    open_token = _bind(
-        advapi, "OpenProcessToken", [pointer, dword, ctypes.POINTER(pointer)], boolean
-    )
-    if not open_token(current(), 8, ctypes.byref(token)) or not token.value:
-        raise RootAclError("root administrator token rejected")
-    free = _bind(kernel, "LocalFree", [pointer], pointer)
-    try:
-        convert = _bind(
-            advapi,
-            "ConvertStringSidToSidW",
-            [ctypes.c_wchar_p, ctypes.POINTER(pointer)],
-            boolean,
-        )
-        membership = _bind(
-            advapi,
-            "CheckTokenMembership",
-            [pointer, pointer, ctypes.POINTER(boolean)],
-            boolean,
-        )
-        query = _bind(
-            advapi,
-            "GetTokenInformation",
-            [pointer, dword, pointer, dword, ctypes.POINTER(dword)],
-            boolean,
-        )
-        enabled, elevated, size = boolean(), dword(), dword()
-        if (
-            not convert(ADMINISTRATORS_SID, ctypes.byref(admin))
-            or not admin.value
-            or not membership(None, admin, ctypes.byref(enabled))
-            or not enabled.value
-            or not query(
-                token,
-                20,
-                ctypes.byref(elevated),
-                ctypes.sizeof(elevated),
-                ctypes.byref(size),
-            )
-            or elevated.value != 1
-        ):
-            raise RootAclError("root administrator token rejected")
-        buffer = ctypes.create_string_buffer(512)
-        if not query(token, 1, buffer, len(buffer), ctypes.byref(size)):
-            raise RootAclError("root administrator identity rejected")
-        user = ctypes.cast(buffer, ctypes.POINTER(pointer)).contents
-        sid = _sid_text(advapi, kernel, user)
-        if sid in {SYSTEM_SID, TRADING_SID}:
-            raise RootAclError("root administrator identity rejected")
-        return sid
-    finally:
-        if admin.value:
-            free(admin)
-        close_handle(token.value)

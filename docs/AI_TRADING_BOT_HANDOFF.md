@@ -1,5 +1,37 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Architecture 133-J implementation handoff (review pending)
+
+The requested isolated worktree is
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133j`; branch
+`feature/robinhood-unattended-review-paper-133j`. Its exact startup parent is
+`30c48fd6a89925405e42c97ff0712895ff8d7cdb` /
+`01d4be1ccb8df75ebf38998985600a59cbbf4a14`; base source gate #273 SUCCESS.
+
+The fixed-target diagnostic is in `trading_bot.arch133_acl.retained_diagnostic`,
+with isolated launcher `scripts/run_arch133_retained_root_diagnostic.py`.
+Only source HEAD/TREE arguments are accepted. Root CreateFileW access/share/
+disposition/flags are shared with accepted 133-H/133-I code; creation/application
+remain outside the diagnostic import closure. A failed exact root open returns
+numeric Win32 status and cannot reach another open or observation API.
+
+On success, read-only ancestor/file handles pin the namespace; binary
+owner/group/DACL hashes, ordered ACEs, directory/file identity, exact namespace
+and retained file hashes must reobserve unchanged. Close failures fail closed.
+Fixed failure stages disclose no exception text or file contents. No scratch
+comparison opens are needed: the shared classifier retains both known policies.
+
+Focused verification: 407 affected diagnostic/qualification/publication cases,
+475 runner cases across correction runs and three inventory checks passed.
+Separate focused Ruff lint/format and diff checks passed.
+
+133-J is SOURCE ONLY in the checkpoint runner and CI, after 133-I. No callback
+can perform the real host diagnostic. Codex stops after ordinary exact-file
+commit/push and terminal green source gate. ChatGPT then reviews the exact
+commit/tree and selects certification before any operator diagnostic handoff.
+Do not run the host command from this implementation handoff. No production or
+scratch repair, Q133-2 retry, provider/OAuth, scheduler or broker effect is granted.
+
 ## 2026-10-07 — Q133-I-R1 native scratch qualification PASS
 
 The one fresh protected scratch authorization was consumed successfully against

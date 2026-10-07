@@ -1,5 +1,59 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 133-J source-only validation and review handoff
+
+133-J derives from remote HEAD `30c48fd6a89925405e42c97ff0712895ff8d7cdb`,
+TREE `01d4be1ccb8df75ebf38998985600a59cbbf4a14`, source gate #273 /
+37593761378 SUCCESS. Its worktree/branch are the frozen 133-J identities above.
+All implementation verification uses fake native boundaries; the real retained
+production and successful scratch objects must not be accessed by these tests.
+
+Focused coverage includes exact target/signature/env exclusion and CreateFileW
+ABI; numeric open error with no retry/fallback; held final path/identity and
+binary security readback; both policy classifications; security/source/ancestor/
+namespace/file-identity/hash drift; exact four-name enumeration; read-only
+four-file access and deny-write/delete sharing; read bounds and failure handling;
+close-once failures; sanitized CLI; fresh-process import closure and a native
+binding allowlist without any mutation APIs. Existing publisher/qualifier tests
+remain in the new checkpoint. Runner tests reject missing/drifted source pins,
+callback injection and registration/workflow ordering changes. Inventory checks
+preserve the frozen 113/40 baselines and admit the new owned test automatically
+(FULL 124, ROBINHOOD 51, LEGACY 204, EXHAUSTIVE 328 modules).
+
+Local focused results: 407 diagnostic/qualifier/publication cases verified (403
+in the complete affected-module run plus four frozen mutation-AST regressions);
+475 affected runner cases verified across correction runs (437 before the last
+stale text assertion, then all 60 133-I/133-J cases including the 38 remaining
+cases); three inventory checks passed. The final owner/group/DACL refinement
+passed 112 affected diagnostic/readback cases. Separate focused Ruff lint,
+format --check and git diff --check passed. Initial corrections moved readback
+mocks to the extracted leaf, updated frozen CI tuple pins/counts, and removed a
+duplicate text match in the new order check. No native host operation ran.
+
+No full local certification or real host diagnostic is part of implementation.
+After terminal green source CI, ChatGPT must review exact source and choose the
+appropriate certification tier before issuing an operator diagnostic command.
+The source-only runner command, if local source verification is needed, is:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-retained-root-diagnostic
+```
+
+The following is documentation of the post-review CLI grammar, not an instruction
+to run it now; ChatGPT must replace both placeholders with exact reviewed IDs and
+provide the admitted operator context after review/certification:
+
+```text
+python -I -B scripts/run_arch133_retained_root_diagnostic.py diagnose --source-head <reviewed-HEAD> --source-tree <reviewed-TREE>
+```
+
+A host PASS requires the exact root open, stable expected ADMIN_SYSTEM_ONLY
+security/identity, unchanged binary descriptor hashes, exact stable four-file
+namespace and identical four-file hashes, clean source reobservation, successful
+handle close and all forbidden-effect counters zero. Failure/ambiguity returns
+exit 3 and bounded evidence; it never permits weaker opens or repair. Neither
+result grants production recovery, scratch cleanup/reuse or Q133-2 retry.
+
 Status: frozen design plan. No provider access, scheduler mutation, activation
 publication, paper mutation, or broker/live effect is authorized by this plan.
 

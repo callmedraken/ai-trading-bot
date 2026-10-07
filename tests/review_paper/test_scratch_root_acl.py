@@ -413,6 +413,9 @@ def test_shared_creation_and_open_flags(monkeypatch):
     monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **k: object())
     monkeypatch.setattr(native, "_bind", bind)
     monkeypatch.setattr(native, "admin_security_attributes", attributes)
+    from trading_bot.arch133_acl import read_only
+
+    monkeypatch.setattr(read_only, "_bind", bind)
     native.create_admin_directory(q.SCRATCH_PATH)
     assert native.open_directory(q.SCRATCH_PATH, mutable=True) == 77
     assert calls[0][0] == "CreateDirectoryW"
@@ -449,6 +452,7 @@ def test_isolated_import_graph_has_no_effect_capabilities(tmp_path):
         "trading_bot.config",
         "trading_bot.arch133_acl",
         "trading_bot.arch133_acl.primitive",
+        "trading_bot.arch133_acl.read_only",
         "trading_bot.arch133_acl.qualification",
     }
     for module in (q, native):
@@ -509,8 +513,14 @@ def test_isolated_import_graph_has_no_effect_capabilities(tmp_path):
         "ace_flags",
     ],
 )
-def test_independent_binary_readback_and_native_failures(monkeypatch, failure):
+@pytest.mark.parametrize("descriptor_hash", [False, True])
+def test_independent_binary_readback_and_native_failures(
+    monkeypatch, failure, descriptor_hash
+):
+    from trading_bot.arch133_acl import read_only
+
     path = q.SCRATCH_PATH
+    descriptor = ctypes.create_string_buffer(b"fixed descriptor payload bytes")
     buffers = []
     sid_map = {301: native.ADMINISTRATORS_SID}
     for sid, mask, kind, flags in native.ROOT_ACES:
@@ -549,10 +559,13 @@ def test_independent_binary_readback_and_native_failures(monkeypatch, failure):
                 values[6].value = "FAT32" if failure == "filesystem" else "NTFS"
                 return failure != "volume"
             elif name == "GetSecurityInfo":
-                assert values[:3] == (77, 1, 5)
+                assert values[:3] == (77, 1, 7 if descriptor_hash else 5)
+                assert (values[4] is not None) == descriptor_hash
                 values[3]._obj.value, values[5]._obj.value = 301, 302
-                values[7]._obj.value = 300
+                values[7]._obj.value = ctypes.addressof(descriptor)
                 return 5 if failure == "security" else 0
+            elif name == "GetSecurityDescriptorLength":
+                return len(descriptor)
             elif name == "GetSecurityDescriptorControl":
                 values[1]._obj.value = 0 if failure == "protected" else 0x1000
                 return failure != "control"
@@ -567,9 +580,9 @@ def test_independent_binary_readback_and_native_failures(monkeypatch, failure):
         return invoke
 
     monkeypatch.setattr(ctypes, "WinDLL", lambda *a, **k: object())
-    monkeypatch.setattr(native, "_bind", bind)
+    monkeypatch.setattr(read_only, "_bind", bind)
     monkeypatch.setattr(
-        native,
+        read_only,
         "_sid_text",
         lambda a, k, sid: (
             native.TRADING_SID
@@ -577,8 +590,18 @@ def test_independent_binary_readback_and_native_failures(monkeypatch, failure):
             else sid_map[sid.value]
         ),
     )
+
+    def observe():
+        if descriptor_hash:
+            import hashlib
+
+            observed, digest = read_only.inspect_directory_security(77, path)
+            assert digest == hashlib.sha256(descriptor.raw).hexdigest()
+            return observed
+        return native.inspect_directory(77, path)
+
     if failure in {None, "protected", "owner", "mask", "ace_flags"}:
-        observed = native.inspect_directory(77, path)
+        observed = observe()
         assert observed.identity == (1, 2)
         assert observed.filesystem == "NTFS" and observed.reparse is False
         assert observed.classification() == (
@@ -586,7 +609,7 @@ def test_independent_binary_readback_and_native_failures(monkeypatch, failure):
         )
     else:
         with pytest.raises(native.RootAclError):
-            native.inspect_directory(77, path)
+            observe()
     assert "SetSecurityInfo" not in calls
     if "GetSecurityInfo" in calls:
         assert calls[-1] == "LocalFree"

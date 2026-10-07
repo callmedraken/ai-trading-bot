@@ -1,5 +1,56 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-J implementation boundary (source review pending)
+
+The only production target is the checked-in literal `F:\AITradingBot\Arch133`.
+The source worktree/branch/origin are fixed; the isolated `-I -B` launcher requires
+reviewed source HEAD/TREE arguments, a clean index/worktree and matching local
+remote-tracking identity. Admission repeats before release and after handle close.
+No API, CLI or environment value selects a production filesystem path.
+
+`arch133_acl.read_only` owns shared policy material, observations, close and the
+original CreateFileW tuple `(path, 0xC00E0081, 3, NULL, 3, 0x02200000, NULL)`.
+The existing primitive explicitly re-exports its public reads. All existing
+creation/application/token functions retain their implementation. The diagnostic
+imports only the read-only leaf and `retained_reads`; primitive, qualification,
+publisher, recovery, stores, runtime, provider, OAuth, scheduler and broker
+modules are absent from its transitive import closure. Native bindings are an
+explicit tested allowlist of observation/handle operations; no object-mutation
+API is bound. `SetFilePointerEx` changes only an already held read handle's cursor.
+
+Root open failure preserves only numeric GetLastError and exits without retry,
+weaker rights, alternate root APIs or subsequent file/namespace inspection.
+After a successful exact open, inspection verifies the held canonical final path,
+volume/file identity, fixed NTFS/no-reparse state, owner, protected DACL and ordered
+ACEs. Separate calls reobserve all facts and hash the binary owner/group/DACL
+descriptor (SACL is outside the requested rights). Ancestors are pinned against
+rename/delete and independently reobserved. Namespace enumeration uses the held
+root handle, never a path glob, and admits exactly the four retained final names.
+
+Each retained file is opened solely for hashing, with read-only access
+`0x80000080`, share 1 (deny write/delete), OPEN_EXISTING and OPEN_REPARSE_POINT.
+There is no write-capable file open, SQLite connection or semantic store import.
+Files must be regular, single-link, no-reparse, at the exact final handle path,
+and have the volume/file identity observed by directory enumeration. Each is
+bounded to 256 MiB and read in 64 KiB chunks. Namespace/identity and SHA-256 values
+are compared before/after while handles remain pinned; root security is read
+again after file hashing. Handles close once, in reverse order; close uncertainty
+cannot PASS. Exceptions never disclose native text, contents or arbitrary names.
+
+Evidence schema is `arch133j-retained-production-root-diagnostic/v1`, with fixed
+source/target/open facts, numeric/null root error, observed identity/security,
+policy, equality evidence, bounded stage and zero provider/OAuth/scheduler/broker/
+ACL/file-mutation counters. `ADMIN_SYSTEM_ONLY` is the expected retained policy;
+the shared classifier also recognizes scratch's `EXACT_INTENDED_ROOT`, without
+opening scratch. Observations describe current state, not the historical sequence
+or a recovery recommendation.
+
+`arch133-robinhood-retained-root-diagnostic` follows 133-I in source-gate CI, with
+preflight=None, execute=None and no diagnostic import/callback. Source checks
+pin its full import closure and registration. Native execution is operator-only
+after exact source review; this implementation does not run that command or grant
+any recovery, cleanup, scratch reuse or Q133-2 retry authority.
+
 Status: **frozen design checkpoint**. This document authorizes source/design work
 only. It does not authorize scheduler mutation, unattended provider access,
 Robinhood review requests, synthetic paper mutation, broker placement, or live

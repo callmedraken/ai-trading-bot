@@ -1,5 +1,31 @@
 # Project Status and Roadmap
 
+## 2026-10-06 — Q133-2 first retained verifier replay PASS; failure localized to root ACL admission
+
+A provider/OAuth/scheduler/broker-free replay of the exact first
+`verify_publication()` boundary against retained `Arch133`, with
+`backend._trading_root == False`, passed exactly. It reproduced activation ID
+`f80de922-66ab-5dbb-8234-2318ad7e178c`, wake ID
+`5d7f62f7-a482-5d81-9bd5-47d57c6e06d5`, state `READY`, revision 0,
+state fingerprint
+`0e2e37f51dc9e63563a3047346da2b84b920693b7118e3138dd5ab7989bf7dc5`,
+and exact activation/binding/paper/source/runtime identities. Before/after root
+SDDL, final namespace, and all four file hashes were unchanged.
+
+The original Q133-2 execution is therefore localized to
+`admit_trading_root()`: all prior publication steps and the first complete
+verifier are proven PASS, while the retained root remains
+Administrator/SYSTEM-only. The intended six-ACE protected SDDL separately
+validates and round-trips in Win32. Q133-2 retry remains forbidden.
+
+Next source-only milestone: Architecture 133-I must add a checked-in
+**scratch-only native root-ACL qualification surface** that cannot address the
+production Arch133 namespace, can reproduce the exact root handle/policy
+application path and retain/report a sanitized native `SetSecurityInfo` status,
+and has no provider/OAuth/scheduler/broker reachability. A later scratch native
+execution requires fresh PROTECTED authorization. Production recovery/ACL
+mutation remains separately unauthorized.
+
 ## 2026-10-06 — Q133-2 failed closed after semantic publication; retained root unadmitted
 
 The reviewed Q133-2 plan

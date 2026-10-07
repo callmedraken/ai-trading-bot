@@ -12,6 +12,36 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## Q133-2 first-verifier replay — PASS / failure boundary frozen
+
+The retained namespace was replayed through the exact first
+`verify_publication(material, backend)` call with
+`backend._trading_root is False`. The verifier passed and returned the exact
+activation, wake, state fingerprint, paper predecessor, source, runtime and
+store identities. A before/after observation proved root SDDL, namespace and all
+four final file hashes unchanged. OAuth/provider/scheduler/broker effects and
+ACL mutations were all zero.
+
+This proves the Q133-2 attempt completed:
+
+```text
+create_root_once()                 PASS
+initialize_paper()                 PASS
+admit_ready()                      PASS
+publish activation/binding         PASS
+seal_files()                       PASS
+first verify_publication()         PASS
+admit_trading_root()               FAILED / not completed
+second verify_publication()        NOT REACHED
+```
+
+The next milestone is 133-I source-only scratch qualification of the exact
+native root-ACL application path. It must be structurally incapable of targeting
+`F:\AITradingBot\Arch133` and must not grant recovery authority. The first
+real scratch ACL mutation requires fresh PROTECTED authorization; retained
+production state remains immutable pending a separately reviewed recovery
+checkpoint.
+
 ## 2026-10-06 Q133-2 retained-failure reconciliation
 
 The exact reviewed plan

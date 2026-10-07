@@ -1,5 +1,27 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-06 — Q133-2 failure localized to `admit_trading_root()`
+
+The exact first complete-publication verifier was replayed read-only against the
+retained four-object namespace with `backend._trading_root=False` and **PASSed**.
+It returned the exact accepted activation/binding/paper/runtime facts, including
+wake `5d7f62f7-a482-5d81-9bd5-47d57c6e06d5` in `READY` revision 0 and state
+fingerprint
+`0e2e37f51dc9e63563a3047346da2b84b920693b7118e3138dd5ab7989bf7dc5`.
+Root SDDL, namespace, and all four file hashes were unchanged across the replay.
+
+Therefore the original Q133-2 failure occurred after the first verifier and
+inside/immediately within `admit_trading_root()`. The retained root is still
+Administrator/SYSTEM-only, and the intended six-ACE root SDDL is independently
+valid. Do not retry Q133-2 or modify retained production ACLs.
+
+Next safe source milestone is **133-I**: checked-in scratch-only native
+qualification for the exact root-ACL application path, with a fixed
+non-production scratch namespace, explicit no-Arch133 addressing, sanitized
+native status evidence, no provider/OAuth/scheduler/broker imports, and no
+production recovery authority. The later native scratch execution remains a
+fresh PROTECTED gate.
+
 ## 2026-10-06 — Q133-2 FAILED CLOSED / retained semantic publication is unadmitted
 
 The exact reviewed plan

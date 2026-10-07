@@ -1,5 +1,105 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-07 — Q133-2V FAILED_CLOSED; Architecture 133-M diagnostic next
+
+The single authorized real Q133-2V attempt reached the accepted 133-L launcher
+under the exact non-admin Trading principal
+`DESKTOP-I4DOKM7\\Trading` / SID
+`S-1-5-21-1397534616-3988210162-180023805-1009` after the source prelaunch
+admitted the synchronized 133-L docs-closeout checkout. The protected invocation
+is consumed and **must not be retried** under that authorization.
+
+Observed terminal result:
+
+```text
+Q1332V_INVOCATION_CONSUMED=TRUE
+Q1332V_EXIT=3
+{"reason":"POST_PUBLICATION_VERIFIER_FAILED_CLOSED","schema":"arch133l-post-publication-verifier/v1","status":"FAILED_CLOSED"}
+```
+
+The result is intentionally stage-sanitized. It does not establish which
+read-only gate rejected, and it does not prove whether the two bounded
+Credential Manager reads were reached. Do not infer a credential, retained-root,
+publication, paper, scheduler-specification, or final-reobservation failure from
+this result alone. The accepted verifier contains no provider/network,
+credential-write, Task Scheduler read/write, paper/state mutation, ACL mutation,
+wake delegation, broker or live-order authority.
+
+The launcher itself sets the fixed verifier-owned `sys.pycache_prefix` before
+importing the operator, so the protected invocation did not require an external
+`-X pycache_prefix` argument. Operator transport remains the reviewed
+production Python `-I -B` launcher; multiline PowerShell `python -c` remains
+prohibited.
+
+Q133-3 scheduler installation and Q133-4 unattended wake remain unauthorized.
+The next safe checkpoint is **Architecture 133-M**, a source-only,
+credential-free failure-stage diagnostic. 133-M is not a Q133-2V retry and
+grants no new Q133-2V authority.
+
+### Architecture 133-M frozen diagnostic contract
+
+Branch:
+`feature/robinhood-unattended-review-paper-133m`.
+
+Exact branch parent:
+`8881f2c6a3a587e0e2253fd7b6fa08b4679109c5` /
+`fe071a33a2d55393549cfc7a46af49df1c424342`.
+
+The implementation must add a separate checked-in zero-semantic-argument
+diagnostic launcher/module without changing the accepted 133-L verifier,
+the 133-G wake launcher, retained host files, ACLs, Q133-I scratch, Credential
+Manager, or scheduler state.
+
+The real diagnostic is read-only and must structurally exclude the credential
+reader and all OAuth targets/calls. It may perform only the accepted
+pre-credential observations needed to localize Q133-2V:
+
+1. diagnostic runtime/source and exact bound 133-G executable admission;
+2. exact standard Trading-token observation;
+3. retained root identity/filesystem/reparse/policy/security;
+4. exact four-name namespace, held-file identity/hash and final-file policy;
+5. canonical binding/activation, READY revision-zero wake, state and empty
+   schema-v2 paper predecessor;
+6. pure scheduler-specification construction;
+7. independent credential-free reobservation, handle closure, final
+   runtime/source and Trading-token admission.
+
+Result schema is
+`arch133m-post-publication-stage-diagnostic/v1`. A rejection may expose only
+one fixed stage enum from:
+
+```text
+RUNTIME_SOURCE
+TRADING_TOKEN
+ROOT_SECURITY
+NAMESPACE_FILES
+PUBLICATION_STATE_PAPER
+SCHEDULER_SPEC
+FINAL_REOBSERVATION
+```
+
+with bounded status/reason and zero-effect counters. No exception text, raw
+descriptor, retained file bytes, OAuth target/material, token groups, or secret
+data may escape. If every credential-free stage passes, emit
+`status=PASS` with `stage=PRE_CREDENTIAL_COMPLETE`.
+
+Each real 133-M invocation is one attempt with no retry, polling, repair,
+fallback or alternate path. A future real diagnostic requires fresh explicit
+authorization after exact source review and selected certification.
+
+133-M checkpoint CI remains **SOURCE ONLY**:
+`preflight=None`, `execute=None`, `remote_head_env=None`; fake/inert tests
+must prove the complete import closure excludes
+`trading_bot.arch133_verifier.credentials`, provider/MCP SDKs, writer/state
+transition APIs, scheduler access, wake execution, publication/recovery and ACL
+application.
+
+If a future real 133-M run blocks at a pre-credential stage, correct only that
+stage under a new source checkpoint. If it returns
+`PRE_CREDENTIAL_COMPLETE`, the next architecture decision is a separately
+designed credential-specific diagnostic or correction; do not simply retry
+Q133-2V.
+
 Direct source-review correction after the first real Q133-2V wrapper preflight
 stopped before verifier launch: the clean local 133-G checkout is the reviewed
 docs-closeout pair `65f0d40217f8ce129224531a5151f4acea889d89` /

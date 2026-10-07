@@ -1,5 +1,59 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-L implementation boundary (exact source review pending)
+
+The dedicated operator is `trading_bot.arch133_verifier.operator`; its launcher
+is `scripts/run_arch133_post_publication_verifier.py`. The isolated package is
+intentional: review_paper/runtime/robinhood_mcp package initializers eagerly expose
+writers or provider APIs. No accepted deployed module needs modification.
+
+Read-only projections contain only the accepted canonical activation/wake/binding
+models, state schema/reader, standard Trading-token observer and pure published-
+session/scheduler definitions. They exclude transition functions. Focused tests
+compare each retained definition AST against its accepted source and pin the
+existing wake launcher's normalized bytes. The complete 23-module project import
+closure is pinned in the source runner; it includes only the isolated verifier,
+two existing inert ACL leaves and immutable domain/configuration modules.
+
+The availability leaf retains the exact accepted CredReadW/native cleanup body
+without CredWriteW binding. It independently validates the token and associated
+registration's known persisted fields and emits only availability plus two
+record-read attempts. It deliberately does not import WindowsOAuthStorage or
+MCP SDK models, because their parent packages expose write/provider capabilities.
+This is a read-only projection of persisted availability, not new OAuth authority.
+There is no refresh, expiry extension, clock observation, client/provider
+construction or credential-registration mutation.
+
+The real launcher requires Windows protected Python -I -B, fixed verifier path,
+and an absent verifier-owned bytecode-cache namespace. The verifier independently
+checks its branch/origin/clean HEAD/TREE against its local origin tracking ref and
+includes those exact source IDs in evidence; exact GitHub source acceptance remains
+an external prerequisite. The bound 133-G worktree is independently checked against
+HEAD `4677ba442eafdcec56933b992f230a702012d573` and TREE
+`6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc`, with the frozen protected Python and
+binding-owned wake-launcher hash. sys.argv[0] is never changed. There is no network
+Git lookup, alternate source or use of admit_host_runtime() as a verifier shortcut.
+
+Read-only no-follow root/ancestor/file handles remain held throughout semantic
+verification. Exact post-K root identity, six ordered ACEs/security digest, NTFS,
+no reparse, four-name namespace and protected final-file policies/hashes are
+required. Canonical activation/binding, empty schema-v2 paper predecessor and
+exactly one READY revision-zero wake with updated_at == created_at are required
+before any credential read. Source/runtime/token, publication/state/paper,
+namespace/root/parent/file identity/security/bytes are independently reobserved;
+all handles must close before PASS. Scheduler evidence is built purely, with zero
+Task Scheduler reads or writes.
+
+Result schema: `arch133l-post-publication-verifier/v1`, canonical JSON bounded to
+8192 characters. All disagreements, including CLI/import/native/cleanup failures,
+return the same FAILED_CLOSED schema and reason
+`POST_PUBLICATION_VERIFIER_FAILED_CLOSED`. No raw error or credential material
+enters evidence. Each invocation has one attempt and no retry/polling/fallback.
+
+The source checkpoint follows 133-K and has preflight=None, execute=None and
+remote_head_env=None. Source/CI acceptance grants no real Q133-2V invocation,
+scheduler publication, Q133-4 wake, recovery, broker or live authority.
+
 ## 133-L — dedicated Q133-2V post-publication verifier operator (frozen source design)
 
 133-K completed the missing root ACL transition successfully. The retained host

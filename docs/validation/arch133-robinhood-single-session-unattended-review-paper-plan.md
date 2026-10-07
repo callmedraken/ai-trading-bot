@@ -1,5 +1,50 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 133-L source-only implementation validation (review pending)
+
+Exact base `baff9a333ceefe512829b68feadce5715a7410d5` /
+`8018d215b2883920cce27bb7ca30e77436e05aaf`, source gate #277 SUCCESS.
+The requested branch/worktree were created from that fetched exact commit;
+path, branch, HEAD/TREE, origin and clean index/worktree were admitted first.
+
+Fake-native tests cover canonical bounded evidence; zero-argument/fixed-path
+admission; exact independent 133-L/133-G source/runtime/Python/launcher identity;
+Trading standard-token requirements; exact root/namespace/file-policy/hash checks;
+canonical publication, empty paper schema/predecessor, wake cardinality and READY
+revision-zero/creation-time constraints; pre-OAuth rejection of consumed authority;
+two bounded credential record reads, buffer cleanup and secret suppression;
+pure scheduler construction; all required reobservations and close failures.
+Fresh-process imports prove the exact inert/read-only project closure. Definition-
+AST comparisons prove canonical readers, token observation and scheduler behavior
+retain accepted semantics; no accepted G/H/I/J/K executable bytes are changed.
+
+Runner tests fail closed on missing/altered closure files, source-registration
+changes, injected host callbacks, and changed/missing/duplicated CI order.
+The frozen batch advances to 43 checkpoints. Certification inventory admits one
+new supported test module: FULL 126, ROBINHOOD 53, LEGACY 204, EXHAUSTIVE 330;
+the 113/40 frozen baseline sets remain unchanged.
+
+Focused implementation evidence: 129 final verifier cases passed; 1,064 accepted
+host/H/I/J/K and inventory cases passed; 536 selected runner cases passed on the
+initial run, followed by 193 passing new-verifier/133-L-authority/corrected-runner
+cases. Final changed-source/inventory checks passed. Three initial runner failures
+were stale terminal-checkpoint expectations; a final nonempty-paper test double
+needed an argument-name correction. Only affected tests were rerun. Separate
+focused Ruff lint/format and git diff whitespace checks passed. No full local
+suite was run. Terminal source CI remains required before exact-source review.
+
+Routine source verification only:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-post-publication-verifier
+```
+
+No full local certification or real Q133-2V invocation is part of implementation.
+No retained production/scratch access, real credential access, provider call,
+scheduler operation, publication/recovery, ACL mutation or wake delegation ran.
+Stop after terminal green source CI for ChatGPT exact-source review and selection
+of certification. Real Q133-2V remains a separate later operator handoff.
+
 ## Q133-K protected retained-root ACL recovery — PASS
 
 The single authorized 133-K execution used reviewed plan

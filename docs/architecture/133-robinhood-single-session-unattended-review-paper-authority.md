@@ -5,6 +5,36 @@ only. It does not authorize scheduler mutation, unattended provider access,
 Robinhood review requests, synthetic paper mutation, broker placement, or live
 trading.
 
+## 133-I-R1 — host-evidence correction: protected scratch parent
+
+The source-accepted/certified 133-I implementation fixed its qualification
+destination at `F:\AI\temp\arch133i-root-acl-qualification-v1` and required
+production-style trusted PARENT semantics for `F:\AI` and `F:\AI\temp`.
+The first real read-only plan proved those assumptions are incompatible on the
+actual host: both components are owned by the elevated operator user rather
+than Administrators/SYSTEM, contain effective non-admin `0x1301bf` rights, and
+contain inherited inherit-only templates. The plan failed before mutation as
+designed.
+
+R1 must not broaden that PARENT policy. Instead, the only qualification
+destination becomes the versioned literal
+`F:\AITradingBot\Arch133IQualification-v1`. It is a direct sibling of
+`F:\AITradingBot\Arch133`, never equal to or below that retained production
+namespace. No CLI/API/environment value selects the path. The fixed parent chain
+is exactly `F:\` with VOLUME semantics plus `F:\AITradingBot` with the
+existing conservative PARENT semantics. Q133-2 already observed the latter as
+protected and Administrator/SYSTEM-only; the next read-only plan must independently
+re-prove its current owner, ACL, identity, NTFS/no-reparse facts and exact
+re-observation before any mutation authority can be considered.
+
+All native semantics remain frozen: explicit protected Administrator/SYSTEM
+creation security, the exact mutable root handle access/share/no-follow flags,
+the exact six-ACE root SDDL, one SetSecurityInfo call with returned DWORD
+preserved, independent same-object readback, no retry, retained occupancy after
+an attempted protected run, and zero provider/OAuth/scheduler/broker or Arch133
+mutation capability. R1 source work does not authorize creation of the new
+scratch object.
+
 ## 133-I — scratch-only native root-ACL qualification source
 
 133-I derives from incident checkpoint `c3d87f7fe0ce5fed6c7bbcb16f1b6300162be82c`

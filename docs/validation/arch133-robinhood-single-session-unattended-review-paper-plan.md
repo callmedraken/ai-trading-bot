@@ -12,6 +12,40 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## 133-I-R1 read-only host-plan rejection and correction contract
+
+The first post-certification 133-I `plan` returned the fixed
+`SCRATCH_QUALIFICATION_FAILED_CLOSED` diagnostic with exit 3 and zero native
+effects. A purpose-built read-only diagnostic then established:
+
+- source admission PASS at HEAD
+  `3496e63f5dca0e516b154129f8beabdf7c4123e7`, TREE
+  `81a3648c9a2570be35aaa07656c47ff721f892f5`;
+- elevated Administrator token PASS, operator SID
+  `S-1-5-21-1397534616-3988210162-180023805-1005`;
+- `F:\` VOLUME PASS with the expected effective `0x1301bf` /
+  `0x1200a9` principals and valid templates;
+- `F:\AI` PARENT FAIL: operator-owned and writable by unrelated principals;
+- `F:\AI\temp` PARENT FAIL for the same ownership class and writable ACL;
+- original scratch absence PASS;
+- exact preflight FAIL only at parent admission;
+- scratch creation false, SetSecurityInfo false, and all forbidden effects zero.
+
+The evidence means the original path/parent assumptions—not the native
+SetSecurityInfo primitive—blocked planning. Owner-only relaxation is
+insufficient because the observed component ACLs would subsequently fail the
+conservative PARENT rights/flag policy. R1 therefore relocates the fixed scratch
+object to `F:\AITradingBot\Arch133IQualification-v1`, whose only component
+parent is the already-qualified protected `F:\AITradingBot` root. The source
+correction must add tests proving exact path literal/disjointness from Arch133,
+exact PARENTS tuple, no caller/env override, and retention of all existing
+native/authorization/evidence invariants.
+
+No host plan or native execution is run during implementation/CI. After source
+acceptance, select fresh ROBINHOOD certification because the shared Architecture
+133 qualification surface changes. Only after that may a new read-only host plan
+be attempted.
+
 ## 133-I source-only qualification validation — implementation pending review
 
 Focused fake-Win32 tests cover the fixed scratch/API/CLI/env rejection boundary,

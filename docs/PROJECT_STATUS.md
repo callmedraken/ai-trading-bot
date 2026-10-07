@@ -1,5 +1,41 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Q133-I read-only plan rejected; 133-I-R1 relocation frozen
+
+The first provider-free/read-only Q133-I `plan` on certified executable source
+`3496e63f5dca0e516b154129f8beabdf7c4123e7` failed closed before any
+scratch creation or SetSecurityInfo call. A follow-up read-only diagnostic
+proved source admission, elevated Administrator token, the `F:\` VOLUME role,
+scratch absence and all zero forbidden-effect counters. It localized rejection
+to the two PARENT components:
+
+- `F:\AI` owner is the elevated operator SID
+  `S-1-5-21-1397534616-3988210162-180023805-1005`, not Administrators/SYSTEM;
+- `F:\AI\temp` has the same operator owner;
+- both components also expose effective `0x1301bf` ACEs to unrelated
+  principals and inherited inherit-only `0x1b` templates.
+
+Therefore relaxing only owner admission would not make the original
+`F:\AI\temp\arch133i-root-acl-qualification-v1` plan admissible, and
+broadening the production-style PARENT policy would weaken the one-shot
+namespace/occupancy guarantee.
+
+Architecture **133-I-R1** is frozen as a source-only correction: relocate the
+single fixed scratch object to the direct protected sibling
+`F:\AITradingBot\Arch133IQualification-v1`. Its governed parent chain becomes
+`F:\` (VOLUME) and `F:\AITradingBot` (PARENT). The latter was already
+qualified during Q133-2 as protected Administrator/SYSTEM-only. The qualifier
+must remain lexically and structurally disjoint from
+`F:\AITradingBot\Arch133`; it gains no delete/repair/retry/recovery surface.
+The existing root policy, native CreateDirectoryW/CreateFileW/SetSecurityInfo
+primitive, one-shot authorization, independent readback and zero
+provider/OAuth/scheduler/broker/Arch133 mutation guarantees remain unchanged.
+
+No native scratch execution is authorized. Next safe step: implement 133-I-R1
+source/tests/docs on the same isolated branch, then focused checks, ordinary
+push, terminal CI, exact GitHub review and a fresh ROBINHOOD certification
+decision before another host plan.
+
 ## 2026-10-06 — Architecture 133-I ROBINHOOD certification ACCEPTED
 
 Fresh ROBINHOOD certification is **ACCEPTED** on the exact source-accepted

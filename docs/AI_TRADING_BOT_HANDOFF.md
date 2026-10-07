@@ -1,5 +1,28 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Q133-I plan failed read-only; 133-I-R1 scratch relocation
+
+The certified 133-I source passed ROBINHOOD 4,336/4,336, but its first real
+read-only host `plan` failed closed with zero mutations. Read-only stage
+diagnostics proved exact source/administrator admission, `F:\` VOLUME PASS,
+scratch absence, and zero protected effects. Both original PARENT components
+(`F:\AI`, `F:\AI\temp`) are operator-owned rather than
+Administrators/SYSTEM-owned and contain effective `0x1301bf` non-admin rights;
+they also carry inherited IO templates. The conservative PARENT rule is
+therefore correctly rejecting the original scratch location.
+
+Do not weaken PARENT merely to make `F:\AI\temp` pass. 133-I-R1 instead moves
+the one fixed qualification object to
+`F:\AITradingBot\Arch133IQualification-v1`, a direct sibling of retained
+`F:\AITradingBot\Arch133` beneath the already-qualified protected
+Administrator/SYSTEM-only `F:\AITradingBot` parent. Tests must prove the fixed
+scratch path cannot equal or descend from Arch133 and no caller/env path can
+select another location.
+
+Q133-2 remains consumed; retained Arch133 remains immutable; no scratch native
+execution is authorized. Next is source-only 133-I-R1 implementation, followed
+by terminal CI and exact review.
+
 ## 2026-10-06 — Architecture 133-I ROBINHOOD certification ACCEPTED
 
 ROBINHOOD certification passed on exact executable source HEAD

@@ -110,7 +110,7 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _source(root: Path, branch: str) -> tuple[str, str]:
+def _clean_source(root: Path, branch: str) -> tuple[str, str]:
     head, tree = (_git(root, "rev-parse", name) for name in ("HEAD", "HEAD^{tree}"))
     if (
         any(re.fullmatch(r"[0-9a-f]{40}", value) is None for value in (head, tree))
@@ -119,11 +119,27 @@ def _source(root: Path, branch: str) -> tuple[str, str]:
         or _git(root, "branch", "--show-current") != branch
         or _git(root, "remote", "get-url", "origin") != ORIGIN
         or _git(root, "status", "--porcelain=v1", "--untracked-files=all")
-        or _git(root, "rev-parse", "refs/remotes/origin/" + branch) != head
-        or _git(root, "rev-parse", "refs/remotes/origin/" + branch + "^{tree}") != tree
     ):
         raise ValueError
     return head, tree
+
+
+def _verifier_source() -> tuple[str, str]:
+    head, tree = _clean_source(SOURCE_ROOT, SOURCE_BRANCH)
+    ref = "refs/remotes/origin/" + SOURCE_BRANCH
+    if (
+        _git(SOURCE_ROOT, "rev-parse", ref) != head
+        or _git(SOURCE_ROOT, "rev-parse", ref + "^{tree}") != tree
+    ):
+        raise ValueError
+    return head, tree
+
+
+def _bound_source() -> tuple[str, str]:
+    source = _clean_source(binding.SOURCE_ROOT, binding.SOURCE_BRANCH)
+    if source != (BOUND_HEAD, BOUND_TREE):
+        raise ValueError
+    return source
 
 
 def _runtime() -> dict:
@@ -143,8 +159,8 @@ def _runtime() -> dict:
         != binding.PRODUCTION_PYTHON_SHA256
     ):
         raise ValueError
-    own = _source(SOURCE_ROOT, SOURCE_BRANCH)
-    bound = _source(binding.SOURCE_ROOT, binding.SOURCE_BRANCH)
+    own = _verifier_source()
+    bound = _bound_source()
     if bound != (BOUND_HEAD, BOUND_TREE):
         raise ValueError
     return {
@@ -292,17 +308,6 @@ def verify_post_publication() -> dict:
             runtime = _runtime()
             _principal()
             with ExitStack() as held:
-                parents = []
-                for path in ("F:\\", r"F:\AITradingBot"):
-                    handle = read_only.open_directory(path)
-                    held.callback(read_only.close_handle, handle)
-                    parents.append(
-                        (
-                            handle,
-                            path,
-                            read_only.inspect_directory_security(handle, path),
-                        )
-                    )
                 root_handle = read_only.open_directory(retained_reads.TARGET_PATH)
                 held.callback(read_only.close_handle, root_handle)
                 root, security = read_only.inspect_directory_security(
@@ -362,12 +367,6 @@ def verify_post_publication() -> dict:
                     if (
                         retained_reads.file_snapshot(handle, name) != snapshot
                         or file_policy.observe_file_policy(handle) != policy
-                    ):
-                        raise ValueError
-                for handle, path, observation in parents:
-                    if (
-                        read_only.inspect_directory_security(handle, path)
-                        != observation
                     ):
                         raise ValueError
             # Close failures cannot produce PASS. Re-admit executable and token.

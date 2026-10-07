@@ -266,6 +266,40 @@ def test_pass_is_canonical_bounded_read_only_and_reobserved(fake):
     assert SECRET not in operator.canonical(result)
 
 
+def test_only_fixed_host_root_is_opened_and_root_files_remain_reobserved(
+    fake, monkeypatch
+):
+    security = read_only.inspect_directory_security
+    snapshot = retained_reads.file_snapshot
+    policy = file_policy.observe_file_policy
+    observations = []
+
+    def inspect_root(handle, path):
+        assert handle == path == retained_reads.TARGET_PATH
+        observations.append(("root", path))
+        return security(handle, path)
+
+    def inspect_file(handle, name):
+        observations.append(("file", name))
+        return snapshot(handle, name)
+
+    def inspect_policy(handle):
+        observations.append(("policy", handle))
+        return policy(handle)
+
+    monkeypatch.setattr(read_only, "inspect_directory_security", inspect_root)
+    monkeypatch.setattr(retained_reads, "file_snapshot", inspect_file)
+    monkeypatch.setattr(file_policy, "observe_file_policy", inspect_policy)
+    assert operator.verify_post_publication()["status"] == "PASS"
+    assert [
+        call for call in fake.calls if isinstance(call, tuple) and call[0] == "open"
+    ] == [("open", retained_reads.TARGET_PATH, {})]
+    assert observations.count(("root", retained_reads.TARGET_PATH)) == 2
+    for name in retained_reads.FINAL_NAMES:
+        assert observations.count(("file", name)) == 2
+        assert observations.count(("policy", name)) == 2
+
+
 @pytest.mark.parametrize(
     "drift",
     [
@@ -631,6 +665,7 @@ WAKE_LAUNCHER_HASH = "fb35635b201512c4c4c6e1caa9bfbc30945fd42c5bb5e96968934191db
     [
         None,
         "git_root",
+        "detached",
         "branch",
         "origin",
         "dirty",
@@ -640,14 +675,17 @@ WAKE_LAUNCHER_HASH = "fb35635b201512c4c4c6e1caa9bfbc30945fd42c5bb5e96968934191db
         "tracking_tree",
     ],
 )
-def test_exact_source_observation(tmp_path, monkeypatch, wrong):
+def test_exact_verifier_source_observation(tmp_path, monkeypatch, wrong):
     root = tmp_path
+    monkeypatch.setattr(operator, "SOURCE_ROOT", root)
     head, tree = "a" * 40, "b" * 40
     values = {
         ("rev-parse", "HEAD"): "bad" if wrong == "head" else head,
         ("rev-parse", "HEAD^{tree}"): "bad" if wrong == "tree" else tree,
         ("rev-parse", "--show-toplevel"): str(ROOT if wrong == "git_root" else root),
-        ("branch", "--show-current"): "wrong"
+        ("branch", "--show-current"): ""
+        if wrong == "detached"
+        else "wrong"
         if wrong == "branch"
         else operator.SOURCE_BRANCH,
         ("remote", "get-url", "origin"): "wrong"
@@ -665,10 +703,54 @@ def test_exact_source_observation(tmp_path, monkeypatch, wrong):
     }
     monkeypatch.setattr(operator, "_git", lambda root, *args: values[args])
     if wrong is None:
-        assert operator._source(root, operator.SOURCE_BRANCH) == (head, tree)
+        assert operator._verifier_source() == (head, tree)
     else:
         with pytest.raises(ValueError):
-            operator._source(root, operator.SOURCE_BRANCH)
+            operator._verifier_source()
+
+
+@pytest.mark.parametrize(
+    "wrong", [None, "git_root", "detached", "branch", "origin", "dirty", "head", "tree"]
+)
+def test_bound_source_frozen_local_identity_ignores_docs_tracking_advance(
+    tmp_path, monkeypatch, wrong
+):
+    monkeypatch.setattr(binding, "SOURCE_ROOT", tmp_path)
+    ref = "refs/remotes/origin/" + binding.SOURCE_BRANCH
+    values = {
+        ("rev-parse", "HEAD"): "a" * 40 if wrong == "head" else operator.BOUND_HEAD,
+        ("rev-parse", "HEAD^{tree}"): "b" * 40
+        if wrong == "tree"
+        else operator.BOUND_TREE,
+        ("rev-parse", "--show-toplevel"): str(
+            ROOT if wrong == "git_root" else tmp_path
+        ),
+        ("branch", "--show-current"): ""
+        if wrong == "detached"
+        else ("wrong" if wrong == "branch" else binding.SOURCE_BRANCH),
+        ("remote", "get-url", "origin"): "wrong"
+        if wrong == "origin"
+        else operator.ORIGIN,
+        ("status", "--porcelain=v1", "--untracked-files=all"): "dirty"
+        if wrong == "dirty"
+        else "",
+        ("rev-parse", ref): "65f0d40217f8ce129224531a5151f4acea889d89",
+        ("rev-parse", ref + "^{tree}"): "c" * 40,
+    }
+    calls = []
+
+    def git(root, *args):
+        assert root == tmp_path
+        calls.append(args)
+        return values[args]
+
+    monkeypatch.setattr(operator, "_git", git)
+    if wrong is None:
+        assert operator._bound_source() == (operator.BOUND_HEAD, operator.BOUND_TREE)
+    else:
+        with pytest.raises(ValueError):
+            operator._bound_source()
+    assert not any(ref in argument for args in calls for argument in args)
 
 
 @pytest.mark.parametrize(
@@ -709,16 +791,13 @@ def test_independent_runtime_admission(tmp_path, monkeypatch, wrong):
     monkeypatch.setattr(
         operator, "LAUNCHER", ROOT / "scripts/run_arch133_post_publication_verifier.py"
     )
+    monkeypatch.setattr(operator, "_verifier_source", lambda: ("a" * 40, "b" * 40))
     monkeypatch.setattr(
         operator,
-        "_source",
-        lambda root, branch: (
-            ("a" * 40, "b" * 40)
-            if branch == operator.SOURCE_BRANCH
-            else (
-                ("a" * 40 if wrong == "bound_head" else operator.BOUND_HEAD),
-                ("b" * 40 if wrong == "bound_tree" else operator.BOUND_TREE),
-            )
+        "_bound_source",
+        lambda: (
+            "a" * 40 if wrong == "bound_head" else operator.BOUND_HEAD,
+            "b" * 40 if wrong == "bound_tree" else operator.BOUND_TREE,
         ),
     )
     with monkeypatch.context() as context:
@@ -975,7 +1054,10 @@ def test_malformed_persisted_registration_rejected(change):
     assert not credentials._client_available({"client_id": SECRET, **change})
 
 
-@pytest.mark.parametrize("drift", ["file_policy", "ancestor", "principal"])
+@pytest.mark.parametrize(
+    "drift",
+    ["file_policy", "file_identity", "file_hash", "root", "root_security", "principal"],
+)
 def test_post_oauth_reobservation_required(fake, monkeypatch, drift):
     original = credentials.persisted_oauth_availability
 
@@ -988,16 +1070,28 @@ def test_post_oauth_reobservation_required(fake, monkeypatch, drift):
                 "observe_file_policy",
                 lambda handle: replace(observe(handle), protected=False),
             )
-        elif drift == "ancestor":
+        elif drift in ("file_identity", "file_hash"):
+            observe = retained_reads.file_snapshot
+
+            def changed_file(handle, name):
+                identity, digest = observe(handle, name)
+                return (
+                    (5, 6) if drift == "file_identity" else identity,
+                    "e" * 64 if drift == "file_hash" else digest,
+                )
+
+            monkeypatch.setattr(retained_reads, "file_snapshot", changed_file)
+        elif drift in ("root", "root_security"):
             observe = read_only.inspect_directory_security
 
             def changed(handle, path):
                 observation, digest = observe(handle, path)
                 return (
                     replace(observation, identity=(5, 6))
-                    if path != retained_reads.TARGET_PATH
-                    else observation
-                ), digest
+                    if drift == "root"
+                    else observation,
+                    "e" * 64 if drift == "root_security" else digest,
+                )
 
             monkeypatch.setattr(read_only, "inspect_directory_security", changed)
         else:

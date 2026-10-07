@@ -31,16 +31,21 @@ includes those exact source IDs in evidence; exact GitHub source acceptance rema
 an external prerequisite. The bound 133-G worktree is independently checked against
 HEAD `4677ba442eafdcec56933b992f230a702012d573` and TREE
 `6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc`, with the frozen protected Python and
-binding-owned wake-launcher hash. sys.argv[0] is never changed. There is no network
-Git lookup, alternate source or use of admit_host_runtime() as a verifier shortcut.
+binding-owned wake-launcher hash. Its origin tracking ref may advance through
+documentation commits; the local bound HEAD/TREE must remain exactly frozen.
+Separate fixed-source helpers preserve the verifier's own tracking-ref equality.
+sys.argv[0] is never changed. There is no network Git lookup, alternate source
+or use of admit_host_runtime() as a verifier shortcut.
 
-Read-only no-follow root/ancestor/file handles remain held throughout semantic
-verification. Exact post-K root identity, six ordered ACEs/security digest, NTFS,
+Read-only no-follow root/file handles remain held throughout semantic
+verification. The only host directory opened is `F:\AITradingBot\Arch133`;
+no parent security open is attempted under the standard Trading account. Exact
+post-K root identity, six ordered ACEs/security digest, NTFS,
 no reparse, four-name namespace and protected final-file policies/hashes are
 required. Canonical activation/binding, empty schema-v2 paper predecessor and
 exactly one READY revision-zero wake with updated_at == created_at are required
 before any credential read. Source/runtime/token, publication/state/paper,
-namespace/root/parent/file identity/security/bytes are independently reobserved;
+namespace/root/file identity/security/bytes are independently reobserved;
 all handles must close before PASS. Scheduler evidence is built purely, with zero
 Task Scheduler reads or writes.
 

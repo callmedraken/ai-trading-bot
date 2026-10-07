@@ -2,6 +2,14 @@
 
 ## 2026-10-07 — Architecture 133-L implementation; exact source review pending
 
+Review corrections keep verifier-source tracking equality while admitting the
+exact frozen local 133-G executable HEAD/TREE independently of its docs-only
+origin tracking advance to `65f0d40217f8ce129224531a5151f4acea889d89`.
+Only `F:\AITradingBot\Arch133` is opened for host directory security; parent
+ACL authority is never requested. Root and all held final files retain their
+post-credential reobservations. The 23-module isolation and source-only
+checkpoint are unchanged. ChatGPT re-review remains required.
+
 133-L adds the dedicated source-only Q133-2V operator on
 `feature/robinhood-unattended-review-paper-133l`, isolated at
 `F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133l`. Exact startup parent:

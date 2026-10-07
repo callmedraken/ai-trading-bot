@@ -2,6 +2,21 @@
 
 ## 133-L source-only implementation validation (review pending)
 
+Exact-source review correction parent:
+`5b5e517ad52a8c1c45ddb5a1149552e647cfb868` /
+`fdb159aa44190487f0c04170d12d2a9c2f6f6572`, source gate #279 SUCCESS.
+The two corrections separate own-source tracking admission from frozen bound
+source admission and remove Trading-account parent security opens. Regression
+coverage proves the known docs-only 133-G tracking advance is admissible,
+local bound identity/branch/origin/clean/root drift rejects, own tracking drift
+rejects, and only the fixed host target is opened. Post-OAuth root identity,
+root security, held-file identity/hash/policy and token drift remain fail closed.
+Focused correction verification passed: all 142 verifier cases, 1,064 affected
+host/H/I/J/K and inventory cases, and 63 affected runner cases (1,269 total).
+Separate Ruff check, Ruff format --check and git diff --check passed.
+Replacement terminal source CI remains required before ChatGPT re-review;
+source acceptance and real Q133-2V remain separate.
+
 Exact base `baff9a333ceefe512829b68feadce5715a7410d5` /
 `8018d215b2883920cce27bb7ca30e77436e05aaf`, source gate #277 SUCCESS.
 The requested branch/worktree were created from that fetched exact commit;

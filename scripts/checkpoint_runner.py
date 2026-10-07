@@ -989,7 +989,7 @@ ARCH133_VERIFIER_PINS: Final = {
         "628d121da26a0474fc98e7f7556ce8d3dbc8c189d04a7ecc6b4ec47eb7bd6a08"
     ),
     "src/trading_bot/arch133_verifier/operator.py": (
-        "142095eef23c642ab4f1ba4278730f545bf11bfd113881ca49ce948fb43bd9c1"
+        "a574acf2fa95e7623e8e8530728f33a82e9c273dec1006ce20c809eb54860572"
     ),
     "src/trading_bot/arch133_verifier/scheduler.py": (
         "327d092c852e762719e0c1d27eb9be0d1c470b6ffa5b7dd7a113352c1cf4946a"

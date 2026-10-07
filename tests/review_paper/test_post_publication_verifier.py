@@ -640,6 +640,15 @@ def test_fixed_paths_and_no_argv_impersonation():
     assert operator.ROOT_IDENTITY == (1855336320, 1407374886183770)
     assert operator.BOUND_HEAD == "4677ba442eafdcec56933b992f230a702012d573"
     assert operator.BOUND_TREE == "6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc"
+    assert operator.BOUND_CHECKOUTS == frozenset(
+        {
+            (operator.BOUND_HEAD, operator.BOUND_TREE),
+            (
+                "65f0d40217f8ce129224531a5151f4acea889d89",
+                "16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2",
+            ),
+        }
+    )
     for path in (
         ROOT / "scripts/run_arch133_post_publication_verifier.py",
         Path(operator.__file__),
@@ -709,19 +718,74 @@ def test_exact_verifier_source_observation(tmp_path, monkeypatch, wrong):
             operator._verifier_source()
 
 
-@pytest.mark.parametrize(
-    "wrong", [None, "git_root", "detached", "branch", "origin", "dirty", "head", "tree"]
+BOUND_DOCS_CHECKOUT = (
+    "65f0d40217f8ce129224531a5151f4acea889d89",
+    "16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2",
 )
-def test_bound_source_frozen_local_identity_ignores_docs_tracking_advance(
+
+
+@pytest.mark.parametrize(
+    "checkout",
+    [
+        (operator.BOUND_HEAD, operator.BOUND_TREE),
+        BOUND_DOCS_CHECKOUT,
+    ],
+)
+def test_bound_source_accepts_reviewed_checkout_pairs_and_reports_frozen(
+    tmp_path, monkeypatch, checkout
+):
+    monkeypatch.setattr(binding, "SOURCE_ROOT", tmp_path)
+    values = {
+        ("rev-parse", "HEAD"): checkout[0],
+        ("rev-parse", "HEAD^{tree}"): checkout[1],
+        ("rev-parse", "--show-toplevel"): str(tmp_path),
+        ("branch", "--show-current"): binding.SOURCE_BRANCH,
+        ("remote", "get-url", "origin"): operator.ORIGIN,
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
+    }
+    calls = []
+
+    def git(root, *args):
+        assert root == tmp_path
+        calls.append(args)
+        return values[args]
+
+    monkeypatch.setattr(operator, "_git", git)
+    assert operator._bound_source() == (operator.BOUND_HEAD, operator.BOUND_TREE)
+    assert not any(
+        "refs/remotes/origin/" in argument
+        for args in calls
+        for argument in args
+    )
+
+
+@pytest.mark.parametrize(
+    "wrong",
+    [
+        "git_root",
+        "detached",
+        "branch",
+        "origin",
+        "dirty",
+        "head",
+        "tree",
+        "mixed_pair",
+    ],
+)
+def test_bound_source_rejects_unreviewed_or_dirty_checkout(
     tmp_path, monkeypatch, wrong
 ):
     monkeypatch.setattr(binding, "SOURCE_ROOT", tmp_path)
-    ref = "refs/remotes/origin/" + binding.SOURCE_BRANCH
+    head, tree = BOUND_DOCS_CHECKOUT
+    if wrong == "head":
+        head = "a" * 40
+    elif wrong == "tree":
+        tree = "b" * 40
+    elif wrong == "mixed_pair":
+        head = operator.BOUND_HEAD
     values = {
-        ("rev-parse", "HEAD"): "a" * 40 if wrong == "head" else operator.BOUND_HEAD,
-        ("rev-parse", "HEAD^{tree}"): "b" * 40
-        if wrong == "tree"
-        else operator.BOUND_TREE,
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "HEAD^{tree}"): tree,
         ("rev-parse", "--show-toplevel"): str(
             ROOT if wrong == "git_root" else tmp_path
         ),
@@ -734,8 +798,6 @@ def test_bound_source_frozen_local_identity_ignores_docs_tracking_advance(
         ("status", "--porcelain=v1", "--untracked-files=all"): "dirty"
         if wrong == "dirty"
         else "",
-        ("rev-parse", ref): "65f0d40217f8ce129224531a5151f4acea889d89",
-        ("rev-parse", ref + "^{tree}"): "c" * 40,
     }
     calls = []
 
@@ -745,12 +807,13 @@ def test_bound_source_frozen_local_identity_ignores_docs_tracking_advance(
         return values[args]
 
     monkeypatch.setattr(operator, "_git", git)
-    if wrong is None:
-        assert operator._bound_source() == (operator.BOUND_HEAD, operator.BOUND_TREE)
-    else:
-        with pytest.raises(ValueError):
-            operator._bound_source()
-    assert not any(ref in argument for args in calls for argument in args)
+    with pytest.raises(ValueError):
+        operator._bound_source()
+    assert not any(
+        "refs/remotes/origin/" in argument
+        for args in calls
+        for argument in args
+    )
 
 
 @pytest.mark.parametrize(

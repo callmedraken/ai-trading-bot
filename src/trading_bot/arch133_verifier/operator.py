@@ -44,6 +44,15 @@ LAUNCHER = SOURCE_ROOT / "scripts" / "run_arch133_post_publication_verifier.py"
 NO_PYCACHE = SOURCE_ROOT / "no-pycache"
 BOUND_HEAD = "4677ba442eafdcec56933b992f230a702012d573"
 BOUND_TREE = "6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc"
+BOUND_CHECKOUTS = frozenset(
+    {
+        (BOUND_HEAD, BOUND_TREE),
+        (
+            "65f0d40217f8ce129224531a5151f4acea889d89",
+            "16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2",
+        ),
+    }
+)
 ROOT_IDENTITY = (1855336320, 1407374886183770)
 ROOT_SECURITY_SHA256 = (
     "6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7"
@@ -136,10 +145,10 @@ def _verifier_source() -> tuple[str, str]:
 
 
 def _bound_source() -> tuple[str, str]:
-    source = _clean_source(binding.SOURCE_ROOT, binding.SOURCE_BRANCH)
-    if source != (BOUND_HEAD, BOUND_TREE):
+    checkout = _clean_source(binding.SOURCE_ROOT, binding.SOURCE_BRANCH)
+    if checkout not in BOUND_CHECKOUTS:
         raise ValueError
-    return source
+    return BOUND_HEAD, BOUND_TREE
 
 
 def _runtime() -> dict:

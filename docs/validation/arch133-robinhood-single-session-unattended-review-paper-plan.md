@@ -1,5 +1,15 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+Direct source-review correction after the first real Q133-2V wrapper preflight
+stopped before verifier launch: the clean local 133-G checkout is the reviewed
+docs-closeout pair `65f0d40217f8ce129224531a5151f4acea889d89` /
+`16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2`. 133-L now admits only that exact
+pair or the original executable checkout `4677ba442eafdcec56933b992f230a702012d573`
+/ `6ce181b2900df0bf8c88cdd7509eb86a2b36d8dc`, while always reporting and
+validating the frozen executable identity as 4677/6ce. No generic descendant,
+tracking-ref, network-Git, reset, verifier invocation, credential read or host
+effect is authorized by this correction.
+
 ## 133-L source-only implementation validation (review pending)
 
 Exact-source review correction parent:

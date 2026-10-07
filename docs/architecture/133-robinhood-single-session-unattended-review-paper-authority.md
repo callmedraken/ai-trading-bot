@@ -5,6 +5,33 @@ only. It does not authorize scheduler mutation, unattended provider access,
 Robinhood review requests, synthetic paper mutation, broker placement, or live
 trading.
 
+## 133-J — retained production-root differential diagnostic (next source-only milestone)
+
+Q133-I-R1 proved the shared native root ACL primitive on the real host with
+numeric SetSecurityInfo status 0 and exact independent readback. The disposable
+scratch sibling is retained and cannot be reused. The retained production
+`F:\AITradingBot\Arch133` root and contents remained unchanged.
+
+133-J is read-only/source-only. Its purpose is to compare retained Arch133 with
+the successful scratch path without mutating either object. It may:
+
+- open the retained Arch133 directory with the exact original mutable-root
+  CreateFileW access/share/open/flags used by Q133-2 and Q133-I;
+- retain the native CreateFileW success/failure and sanitized Win32 error code
+  if the open itself fails;
+- independently inspect final path, file identity, filesystem/reparse state,
+  owner, DACL protection and ordered ACEs from the held handle;
+- compare those observations to the retained Q133-2 evidence and successful
+  Q133-I-R1 scratch evidence;
+- prove the root handle can be opened and re-observed stably under the current
+  host state.
+
+133-J must not call SetSecurityInfo, SetNamedSecurityInfo, SetFileSecurity,
+CreateDirectory, delete/rename/repair anything, alter ACLs, touch paper/wake
+semantics, access provider/OAuth/scheduler/broker surfaces, or grant recovery
+authority. Any later production ACL mutation remains a separate fresh PROTECTED
+checkpoint after exact source review and diagnostic reconciliation.
+
 ## 133-I-R1 — host-evidence correction: protected scratch parent
 
 The source-accepted/certified 133-I implementation fixed its qualification

@@ -12,6 +12,38 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## Q133-I-R1 protected scratch qualification — PASS
+
+The single authorized scratch execution used reviewed plan
+`bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6`
+and returned:
+
+```text
+status PASS
+pre_application_policy ADMIN_SYSTEM_ONLY
+native_set_security_info_status 0
+post_application_policy EXACT_INTENDED_ROOT
+exact_intended_policy_match true
+scratch_path F:\AITradingBot\Arch133IQualification-v1
+source_head 4260f80aea93607b285a75adf172605762c73029
+source_tree b596d52d75bd5e48f5e1f1edea773c41142f0a91
+```
+
+All provider/OAuth/scheduler/broker and production-Arch133 mutation counters were
+zero. Independent outer checks proved production root SDDL, namespace and all
+four final file hashes unchanged. The scratch object exists after PASS and is
+retained as evidence; no retry, cleanup or repair is authorized.
+
+This proves the shared real-host native primitive can successfully apply and
+independently read back the exact intended root policy. The original Q133-2
+failure must therefore be localized to production-object/sequence-specific state
+rather than a generally invalid SDDL or universally failing SetSecurityInfo
+primitive.
+
+Next validation target is 133-J: read-only retained-root exact-handle/open/
+security differential evidence. It must produce zero ACL mutations and no
+provider/broker effects.
+
 ## Q133-I-R1 accepted host plan
 
 Post-R1 source review and fresh ROBINHOOD certification, the real host read-only

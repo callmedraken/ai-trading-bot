@@ -1,5 +1,45 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Q133-I-R1 native scratch qualification ACCEPTED; shared primitive proven on-host
+
+The single authorized disposable scratch attempt completed **PASS** on certified
+R1 executable HEAD `4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91`, bound to reviewed plan
+`bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6`.
+
+Observed bounded evidence:
+
+- pre-application policy: `ADMIN_SYSTEM_ONLY`;
+- native `SetSecurityInfo` status: `0`;
+- post-application policy: `EXACT_INTENDED_ROOT`;
+- exact intended policy match: `true`;
+- local filesystem: NTFS, reparse=false;
+- provider/OAuth/scheduler/broker effects: all zero;
+- production Arch133 mutations: zero.
+
+The disposable object
+`F:\AITradingBot\Arch133IQualification-v1` now exists and is retained as
+qualification evidence. Do not delete, rename, ACL-edit, repair or rerun it.
+The one-shot scratch authority is consumed.
+
+A before/after retained-production check independently proved
+`F:\AITradingBot\Arch133` root SDDL unchanged, final namespace unchanged and
+all four final file SHA-256 values unchanged. Q133-2 retry remains unauthorized.
+
+This result proves the real-host shared Architecture-133 native path
+(CreateDirectoryW with explicit Administrator/SYSTEM security, the original
+mutable root handle flags, exact root SDDL conversion/SetSecurityInfo call, and
+independent binary readback) can succeed on this machine. The original Q133-2
+failure is therefore no longer attributable to malformed SDDL or a generally
+broken shared SetSecurityInfo primitive.
+
+Next safe milestone: **Architecture 133-J — retained production-root differential
+diagnostic**, source/read-only only. It should reproduce the exact mutable-root
+open and independent security/identity observation against retained Arch133,
+compare those facts to the successful scratch evidence, retain sanitized native
+open/error status, and perform zero SetSecurityInfo/ACL mutation. Production
+recovery remains a later separately reviewed PROTECTED checkpoint.
+
 ## 2026-10-07 — Q133-I-R1 read-only host plan ACCEPTED; protected scratch execution awaits fresh authorization
 
 The certified R1 executable source HEAD

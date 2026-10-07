@@ -1,5 +1,28 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Q133-I-R1 native scratch qualification PASS
+
+The one fresh protected scratch authorization was consumed successfully against
+reviewed plan
+`bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6`
+on executable HEAD `4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91`.
+
+Evidence: pre-policy `ADMIN_SYSTEM_ONLY`; native SetSecurityInfo status `0`;
+post-policy `EXACT_INTENDED_ROOT`; exact match true; all forbidden-effect
+counters zero. Retained production Arch133 root SDDL, namespace and four file
+hashes were unchanged.
+
+The disposable sibling `F:\AITradingBot\Arch133IQualification-v1` now exists
+and must be preserved exactly; do not delete/repair/retry it. Q133-2 remains
+consumed and non-retryable.
+
+Next source-only/read-only milestone is **133-J**, a retained-production-root
+differential diagnostic. It may open/pin/inspect Arch133 using the exact native
+root-handle semantics, but must not call SetSecurityInfo or mutate any ACL/file.
+Its purpose is to isolate what differs between the retained production root and
+the now-proven-good scratch primitive before any recovery design.
+
 ## 2026-10-07 — Q133-I-R1 host plan ACCEPTED; fresh PROTECTED authorization required
 
 The read-only R1 plan passed on executable HEAD

@@ -1,5 +1,52 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 133-J diagnostic ACCEPTED; 133-K retained-root ACL recovery design frozen
+
+Architecture 133-J source and fresh ROBINHOOD certification are accepted at
+HEAD `3c8f2db97670410ae841bf053d075832b9a946dc`, TREE
+`3ee9b19cc9e21d96fcc07f2acfe81f3887ea7bd5`. ROBINHOOD passed
+4,470 / 4,470 cases with zero skips/failures/errors.
+
+The real provider-free/read-only retained-root diagnostic also completed PASS.
+It opened `F:\AITradingBot\Arch133` exactly once with the original Q133-2
+root tuple (access `0xC00E0081`, share 3, disposition 3, flags
+`0x02200000`) and observed:
+
+- exact final path `\\?\F:\AITradingBot\Arch133`;
+- NTFS, reparse=false;
+- identity `[1855336320, 1407374886183770]`;
+- owner Administrators, protected DACL, ordered ADMIN/SYSTEM-only ACEs;
+- policy `ADMIN_SYSTEM_ONLY`;
+- root security SHA-256
+  `b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3`
+  before and after;
+- exact four-name namespace and stable re-observation;
+- unchanged file SHA-256 values:
+  activation.json `37873b490c3f2ccced53431c599e40ca54fdc008e09e9bfdb38eb61d10f3cab2`,
+  host-binding.json `c1106d1937dab615da0f12eb9170c020add2ffdece3d3b88a10d2edf26eb47ab`,
+  paper.sqlite `384828dd21e9abc82afabec955184eed22cf57839e72bcd43c74d162534663b9`,
+  wake.sqlite `210812b956aba6d59dcf3cfbf398ebd628c972cfffbb6dd39bd96ef308a6887f`;
+- provider/OAuth/scheduler/broker, ACL mutation and file mutation counters all 0.
+
+Therefore the original Q133-2 failure is not a persistent inability to acquire
+the required production-root handle. Together with Q133-I-R1's successful
+SetSecurityInfo/readback on the retained scratch sibling, the remaining recovery
+is narrowly the missing production root ACL transition.
+
+Architecture **133-K** is frozen as a new recovery checkpoint; it is not a Q133-2
+retry. Source work must provide a read-only canonical plan first and a separately
+PROTECTED execute-once surface whose sole possible mutation is one application
+of the already-frozen six-ACE root policy to the existing retained Arch133
+directory. It must never recreate/rewrite/delete/rename files or roots, touch
+paper/wake semantics, clean scratch, or reach provider/OAuth/scheduler/broker
+surfaces. The plan must pin the exact 133-J root identity/security digest and all
+four retained file hashes above. Drift is STOP.
+
+A successful 133-K ACL transition will still not make Q133-2 itself retryable.
+The next step after any accepted recovery execution is the existing provider-free
+Q133-2V post-publication verifier as a distinct read-only gate. Q133-3/Q133-4
+remain unauthorized.
+
 ## 2026-10-07 — Architecture 133-J source implementation; exact review pending
 
 133-J adds an operator-only retained production-root differential diagnostic on

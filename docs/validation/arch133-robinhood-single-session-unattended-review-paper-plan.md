@@ -1,5 +1,41 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 133-J real retained-root diagnostic — PASS / recovery boundary frozen
+
+After source acceptance and fresh ROBINHOOD certification (4,470 / 4,470), the
+real 133-J operator diagnostic completed with exit 0 and schema
+`arch133j-retained-production-root-diagnostic/v1`.
+
+The exact root open succeeded with:
+
+```text
+access       0xC00E0081
+share        3
+disposition  3
+flags        0x02200000
+open_success true
+win32_error  null
+```
+
+The retained root remained NTFS/no-reparse, identity
+`[1855336320, 1407374886183770]`, owner Administrators, protected DACL, ordered
+Administrators+SYSTEM full-control ACEs, classification `ADMIN_SYSTEM_ONLY`.
+Security descriptor SHA-256 was
+`b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3`
+both before and after. Namespace, identity and all four file hashes were exact
+and stable. ACL/file mutation counters and provider/OAuth/scheduler/broker
+counters were all zero.
+
+Together with Q133-I-R1's status-0 exact SetSecurityInfo/readback result, the
+remaining production discrepancy is the single unperformed root ACL transition.
+The next validation surface is 133-K: a read-only recovery plan bound to this
+exact retained baseline, followed only after separate review by a one-shot
+protected root ACL transition. Q133-2 publication itself remains non-retryable.
+
+A successful 133-K mutation must be followed by the existing Q133-2V
+provider-free verifier as a separate gate before any scheduler or unattended
+provider work becomes eligible.
+
 ## 133-J source-only validation and review handoff
 
 133-J derives from remote HEAD `30c48fd6a89925405e42c97ff0712895ff8d7cdb`,

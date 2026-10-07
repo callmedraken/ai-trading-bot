@@ -1,5 +1,71 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-K — retained production-root ACL recovery (frozen source design)
+
+133-J proved the retained production root is currently openable with the exact
+original mutable-root handle tuple and is stable in the expected
+`ADMIN_SYSTEM_ONLY` pre-state. Q133-I-R1 separately proved the shared root ACL
+SetSecurityInfo primitive and exact six-ACE policy on the same host. 133-K is a
+new, narrowly bounded recovery authority for the single missing root transition;
+it is not re-entry into or a retry of Q133-2.
+
+The source surface must have two modes:
+
+1. **plan** — provider-free/read-only, canonical and independently repeatable;
+2. **execute-once** — separately PROTECTED and bound to an exact reviewed plan
+   SHA-256 plus interactive terminal authorization.
+
+The fixed target is only `F:\AITradingBot\Arch133`. No CLI, API or environment
+path selector exists. The plan must require the exact 133-J retained baseline:
+
+```text
+root_identity [1855336320, 1407374886183770]
+root_policy ADMIN_SYSTEM_ONLY
+root_security_sha256 b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3
+activation.json 37873b490c3f2ccced53431c599e40ca54fdc008e09e9bfdb38eb61d10f3cab2
+host-binding.json c1106d1937dab615da0f12eb9170c020add2ffdece3d3b88a10d2edf26eb47ab
+paper.sqlite 384828dd21e9abc82afabec955184eed22cf57839e72bcd43c74d162534663b9
+wake.sqlite 210812b956aba6d59dcf3cfbf398ebd628c972cfffbb6dd39bd96ef308a6887f
+```
+
+The plan must also re-prove exact source identity, elevated non-Trading
+Administrator identity, parent/security stability, NTFS/no-reparse, exact
+four-name namespace, exact original root-open tuple, the frozen intended owner/
+protected DACL/six ACEs, and all forbidden-effect counters at zero. It must
+observe twice or otherwise independently prove no plan drift before emitting a
+canonical `plan_sha256`.
+
+The protected execution may perform exactly one root-ACL mutation attempt:
+
+- recompute the reviewed plan before asking for authority;
+- require real terminal stdin and exact authorization grammar bound to the plan;
+- open the existing retained root once with access `0xC00E0081`, share 3,
+  disposition 3, flags `0x02200000`;
+- independently confirm the exact reviewed pre-state from the held handle;
+- call the already-reviewed root-policy SetSecurityInfo primitive exactly once;
+- retain its numeric DWORD status verbatim;
+- independently read back the same object and require
+  `EXACT_INTENDED_ROOT`, unchanged identity/namespace/four file hashes,
+  NTFS/no-reparse and stable parents/source;
+- PASS only if native status is 0 and every postcondition matches.
+
+No retry or alternate access/API is allowed. If the mutation attempt is consumed,
+any failure retains evidence and requires a new architecture decision; the
+operator must not repair, revert or retry ad hoc.
+
+133-K must have no capability to create/delete/rename the root, create or rewrite
+any retained file, open SQLite for mutation, change wake/paper state, change
+final-file ACLs, alter the scratch evidence object, invoke the old Q133-2
+publisher, or access provider/OAuth/scheduler/broker/live surfaces. Prefer a
+minimal root-policy-application leaf so the recovery import closure does not gain
+unrelated creation/publication capabilities.
+
+133-K is SOURCE ONLY in checkpoint CI: `preflight=None`, `execute=None`,
+no protected callback. The real plan runs only after exact source review and
+selected certification. The real execute requires another fresh protected
+authorization. A successful 133-K execution does not itself authorize scheduler
+installation or unattended wake; Q133-2V is the next separate read-only gate.
+
 ## 133-J implementation boundary (source review pending)
 
 The only production target is the checked-in literal `F:\AITradingBot\Arch133`.

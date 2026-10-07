@@ -1,5 +1,25 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — 133-J PASS; 133-K retained-root ACL recovery frozen
+
+133-J is accepted at `3c8f2db97670410ae841bf053d075832b9a946dc` /
+`3ee9b19cc9e21d96fcc07f2acfe81f3887ea7bd5`; fresh ROBINHOOD passed
+4,470 / 4,470. The real read-only diagnostic PASSed the exact Q133-2 mutable-root
+open on retained `F:\AITradingBot\Arch133`, with stable
+`ADMIN_SYSTEM_ONLY` policy, exact namespace, unchanged root-security digest and
+unchanged four file hashes. All mutation/provider counters were zero.
+
+Combined with the successful Q133-I-R1 scratch SetSecurityInfo test, this
+localizes recovery to the missing production-root ACL transition rather than
+root-open, SDDL, ABI, or general Win32 capability.
+
+Next is source-only **133-K**. Its read-only plan must bind the exact 133-J
+retained identity/security/file hashes; its separately protected execute-once may
+perform only one root ACL SetSecurityInfo application plus independent readback.
+It is never allowed to recreate publication, rewrite files/stores, retry Q133-2,
+or access provider/OAuth/scheduler/broker surfaces. After a successful 133-K
+transition, Q133-2V remains a separate read-only qualification gate.
+
 ## 2026-10-07 — Architecture 133-J implementation handoff (review pending)
 
 The requested isolated worktree is

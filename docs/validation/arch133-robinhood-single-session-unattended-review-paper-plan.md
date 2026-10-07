@@ -362,9 +362,15 @@ publication, paper/state writer, or broker effect.
 
 ### Q133-2 — activation/host publication
 
-Architecture 133-H is the source-only prerequisite, awaiting exact GitHub review
-and source acceptance. Q133-1 is accepted on the unchanged runtime target 133-G
-HEAD `65f0d40217f8ce129224531a5151f4acea889d89`, TREE
+Architecture 133-H is the accepted source prerequisite. Its exact accepted
+source is HEAD `6c86105fcbd278758b3b782a53429eb246a72fb3`, TREE
+`3404c5ff98cb9e5dd4e48e7121ba7167372be8bc`; source-gate #260 /
+37549018483 passed. Fresh FULL current-supported certification passed 5,056
+cases: 5,053 passed, 3 skipped, 0 failed, 0 errors, with evidence at
+`F:\AI\temp\certification\arch133h-full-6c86105`.
+
+Q133-1 remains accepted on the unchanged runtime target 133-G HEAD
+`65f0d40217f8ce129224531a5151f4acea889d89`, TREE
 `16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2`. **Q133-2 is NOT EXECUTED** here.
 
 133-H focused validation covers target/runtime/principal drift, existing and
@@ -399,13 +405,18 @@ uses the existing runner:
 .\ops.ps1 verify arch133-robinhood-unattended-host-publication
 ```
 
-Do not run FULL/ROBINHOOD/LEGACY/EXHAUSTIVE during 133-H implementation. Native
-ACL acceptance/publication remains separately approved Q133-2 work. Successful
-publication must report exact source/runtime/JSON identities, empty-paper
-predecessor/store identity, activation/wake identity, READY revision 0, state
-fingerprint and zero OAuth/provider/scheduler/broker effects. The only final
-names are `paper.sqlite`, `wake.sqlite`, `activation.json`, `host-binding.json`;
-operator-evidence/no-pycache/pending names must be absent.
+The 133-H implementation phase is closed. FULL certification has passed on the
+exact accepted source; no duplicate ROBINHOOD/LEGACY/EXHAUSTIVE run is required
+for this checkpoint. Native ACL acceptance/publication remains separately
+protected Q133-2 work. Before execute, one actual external activation/binding
+material file must pass the read-only planner and its complete semantic output
+and exact `plan_sha256` must be reviewed.
+
+Successful publication must report exact source/runtime/JSON identities,
+empty-paper predecessor/store identity, activation/wake identity, READY revision
+0, state fingerprint and zero OAuth/provider/scheduler/broker effects. The only
+final names are `paper.sqlite`, `wake.sqlite`, `activation.json`,
+`host-binding.json`; operator-evidence/no-pycache/pending names must be absent.
 
 Fresh explicit approval. Provision/publish exactly one reviewed Architecture-133
 host namespace and single-session activation/binding material. No provider

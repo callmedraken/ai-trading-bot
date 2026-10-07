@@ -5,6 +5,7 @@ import ctypes
 import inspect
 import io
 import json
+import ntpath
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -244,6 +245,8 @@ def test_close_failure_retains_native_status(monkeypatch):
         ["repair"],
         ["plan", r"F:\AITradingBot\Arch133"],
         ["plan", "--root", r"F:\AITradingBot\Arch133"],
+        ["plan", r"F:\AI\temp\arch133i-root-acl-qualification-v1"],
+        ["execute-once", "--root", r"F:\AI\temp\arch133i-root-acl-qualification-v1"],
         ["execute-once"],
         ["execute-once", "--reviewed-plan-sha256", "a" * 64],
     ],
@@ -259,10 +262,33 @@ def test_cli_rejects_paths_and_redirected_authority_before_observation(
     assert "SCRATCH_QUALIFICATION_FAILED_CLOSED" in capsys.readouterr().err
 
 
-def test_fixed_path_only_no_environment_selection(monkeypatch):
-    monkeypatch.setenv("AI_TRADING_BOT_SCRATCH_ROOT", r"F:\AITradingBot\Arch133")
-    monkeypatch.setenv("TEMP", r"F:\AITradingBot\Arch133")
-    assert q.SCRATCH_PATH == r"F:\AI\temp\arch133i-root-acl-qualification-v1"
+def test_fixed_scratch_and_production_are_windows_siblings():
+    scratch = ntpath.normcase(ntpath.normpath(q.SCRATCH_PATH))
+    production = ntpath.normcase(r"F:\AITradingBot\Arch133")
+    parent = ntpath.normcase(r"F:\AITradingBot")
+    assert q.SCRATCH_PATH == r"F:\AITradingBot\Arch133IQualification-v1"
+    assert q.PARENTS == ("F:\\", r"F:\AITradingBot")
+    assert ntpath.dirname(scratch) == ntpath.dirname(production) == parent
+    assert ntpath.commonpath((scratch, production)) == parent
+    assert scratch != production
+    assert ntpath.commonpath((scratch, production)) != production
+    assert not scratch.startswith(production + ntpath.sep)
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        r"F:\AI\temp\arch133i-root-acl-qualification-v1",
+        r"F:\AITradingBot\Arch133",
+        r"F:\AITradingBot\Arch133\qualification",
+    ],
+)
+def test_fixed_path_only_no_environment_selection(monkeypatch, override):
+    monkeypatch.setenv("AI_TRADING_BOT_SCRATCH_ROOT", override)
+    monkeypatch.setenv("TEMP", override)
+    monkeypatch.setenv("TMP", override)
+    assert q.SCRATCH_PATH == r"F:\AITradingBot\Arch133IQualification-v1"
+    assert q.PARENTS == ("F:\\", r"F:\AITradingBot")
     assert q.SOURCE_ROOT == Path(
         r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133i"
     )
@@ -293,6 +319,10 @@ def test_native_occupied_scratch_stops_without_mutation(monkeypatch):
 
 
 def test_native_mutation_fixed_arguments_once(monkeypatch):
+    monkeypatch.setenv(
+        "AI_TRADING_BOT_SCRATCH_ROOT",
+        r"F:\AI\temp\arch133i-root-acl-qualification-v1",
+    )
     calls = []
     fake = q.ScratchNative()
     fake._guarded = True
@@ -318,8 +348,8 @@ def test_native_mutation_fixed_arguments_once(monkeypatch):
         with pytest.raises(q.QualificationError):
             fake.create_root_once()
     assert calls == [
-        ("create", q.SCRATCH_PATH),
-        ("open", q.SCRATCH_PATH, {"mutable": True}),
+        ("create", r"F:\AITradingBot\Arch133IQualification-v1"),
+        ("open", r"F:\AITradingBot\Arch133IQualification-v1", {"mutable": True}),
         ("set", 77),
         ("close", 77),
     ]
@@ -423,9 +453,15 @@ def test_isolated_import_graph_has_no_effect_capabilities(tmp_path):
     }
     for module in (q, native):
         source = Path(module.__file__).read_text(encoding="utf-8")
-        assert "HOST_ROOT" not in source and r"F:\AITradingBot" not in source
+        assert "HOST_ROOT" not in source
+        assert r"F:\AI\temp\arch133i-root-acl-qualification-v1" not in source
         tree = ast.parse(source)
         for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                value = ntpath.normcase(ntpath.normpath(node.value))
+                production = ntpath.normcase(r"F:\AITradingBot\Arch133")
+                assert value != production
+                assert not value.startswith(production + ntpath.sep)
             if isinstance(node, ast.ImportFrom) and node.module:
                 assert not any(
                     word in node.module
@@ -866,7 +902,7 @@ def test_native_guard_keeps_role_checks_held_parents_and_reobservation(
     with q.ScratchNative() as backend:
         with backend.guard():
             assert opened == list(q.PARENTS) and not closed
-            assert backend._guarded and len(backend._parents) == 3
+            assert backend._guarded and len(backend._parents) == 2
             if changed:
                 path = q.PARENTS[1]
                 updates = (
@@ -879,7 +915,7 @@ def test_native_guard_keeps_role_checks_held_parents_and_reobservation(
                 backend.finish()
             assert not closed
         assert not backend._guarded
-    assert closed == [3, 2, 1] and len(inspected) == 6
+    assert closed == [2, 1] and len(inspected) == 4
 
 
 @pytest.mark.parametrize("path", q.PARENTS[1:])
@@ -906,3 +942,27 @@ def test_native_guard_never_assigns_volume_role_to_components(monkeypatch, path)
                 pytest.fail("unsafe component admitted")
         assert not backend._guarded and not backend._attempted
     assert opened[-1] == path and closed == list(range(len(opened), 0, -1))
+
+
+def test_native_guard_assigns_exact_relocated_parent_roles(monkeypatch):
+    roles = []
+    closed = []
+    require_security = q._require_parent_security
+
+    def require_parent_security(observed, role):
+        roles.append(role)
+        require_security(observed, role)
+
+    monkeypatch.setattr(q, "_require_parent_security", require_parent_security)
+    monkeypatch.setattr(native, "administrator_sid", lambda: "S-1-5-21-1-2-3-4")
+    monkeypatch.setattr(native, "open_directory", lambda path: path)
+    monkeypatch.setattr(native, "close_handle", closed.append)
+    monkeypatch.setattr(native, "inspect_directory", lambda *args: parent_observation())
+    with q.ScratchNative() as backend:
+        with backend.guard():
+            assert backend._parent_handles == [
+                ("F:\\", "F:\\"),
+                (r"F:\AITradingBot", r"F:\AITradingBot"),
+            ]
+            assert roles == ["VOLUME", "PARENT"]
+    assert closed == [r"F:\AITradingBot", "F:\\"]

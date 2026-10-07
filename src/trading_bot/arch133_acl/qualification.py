@@ -19,8 +19,8 @@ from pathlib import Path
 
 from trading_bot.arch133_acl import primitive
 
-SCRATCH_PATH = r"F:\AI\temp\arch133i-root-acl-qualification-v1"
-PARENTS = ("F:\\", r"F:\AI", r"F:\AI\temp")
+SCRATCH_PATH = r"F:\AITradingBot\Arch133IQualification-v1"
+PARENTS = ("F:\\", r"F:\AITradingBot")
 SOURCE_ROOT = Path(r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133i")
 SOURCE_BRANCH = "feature/robinhood-unattended-review-paper-133i"
 ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"

@@ -46,6 +46,33 @@ acceptance, select fresh ROBINHOOD certification because the shared Architecture
 133 qualification surface changes. Only after that may a new read-only host plan
 be attempted.
 
+### R1 implementation evidence — exact review pending
+
+R1 changes only SCRATCH_PATH/PARENTS and the qualifier AST pin. Fake-edge
+regressions assert the exact new literal and two-element tuple; `ntpath`
+normalization/common-parent checks prove scratch and retained Arch133 are siblings
+and scratch cannot equal or descend from Arch133. API signatures, rejected CLI
+path arguments and environment overrides cover both old and production paths.
+Fake native calls assert the literal new mutation target; held guard observations
+assert exactly VOLUME then PARENT. Existing operator-owner/writable-parent,
+source-drift, occupancy, authorization, numeric-status, independent readback,
+import-closure and Q133-2 PUBLICATION_FAILED_CLOSED regressions remain active.
+Runner drift tests reject old/production/descendant destinations and old parents.
+
+Focused results: 314 scratch/publication cases passed across the initial run
+(313 passed, one stale import-closure namespace assertion failed) and the isolated
+corrected-test rerun (1 passed). The assertion now excludes retained production
+Arch133 and descendants while allowing the frozen scratch sibling. All 75 affected
+133-I/133-H runner cases and 3 partition/baseline/count inventory checks passed.
+Separate Ruff check and format --check passed on the four changed Python files.
+The system Python lacked pytest; checks used the existing repository `.venv`
+interpreter without installing dependencies. No host plan, native scratch run,
+production Arch133 access, full certification or provider effect was performed.
+
+The prior source/certification/failed-plan evidence below is preserved as
+pre-R1 provenance. Routine GitHub source-gate success and exact-source review
+precede any fresh ROBINHOOD certification decision or host-plan authorization.
+
 ## 133-I source-only qualification validation — implementation pending review
 
 Focused fake-Win32 tests cover the fixed scratch/API/CLI/env rejection boundary,

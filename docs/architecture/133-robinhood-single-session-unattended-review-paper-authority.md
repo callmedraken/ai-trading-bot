@@ -35,6 +35,12 @@ an attempted protected run, and zero provider/OAuth/scheduler/broker or Arch133
 mutation capability. R1 source work does not authorize creation of the new
 scratch object.
 
+R1 source implementation changes only the two qualification namespace constants
+and their qualifier AST pin. Regression tests prove Windows sibling/disjointness,
+exact parent roles, old-path/API/CLI/environment exclusion and source-pin rejection
+of namespace drift. The shared native primitive and parent-policy function remain
+unchanged. Exact-source review and fresh certification remain pending.
+
 ## 133-I — scratch-only native root-ACL qualification source
 
 133-I derives from incident checkpoint `c3d87f7fe0ce5fed6c7bbcb16f1b6300162be82c`
@@ -47,7 +53,7 @@ acceptance and are superseded by the retained-failure record.
 `trading_bot` configuration initializer. The qualifier cannot import the host
 publisher, HostRoot, stores, unattended host, Robinhood, provider, OAuth or Task
 Scheduler surfaces. Its only mutation destination is the versioned literal
-`F:\AI\temp\arch133i-root-acl-qualification-v1`; no CLI, API or environment
+`F:\AITradingBot\Arch133IQualification-v1`; no CLI, API or environment
 value selects a filesystem path. No cleanup, delete, repair or recovery surface
 exists. Occupancy of any kind, including reparse/wrong-kind/partial objects,
 blocks another execution. The native backend separately requires one-time
@@ -75,16 +81,16 @@ The initial directory must be exactly Administrator/SYSTEM-only. Independent
 post-readback is attempted even for a nonzero application status. Readback or
 handle-close failure preserves a returned native status but never PASSes.
 
-Qualification pins the three fixed parent directories through no-delete,
+Qualification pins the two fixed parent directories through no-delete,
 no-follow handles. The isolated package implements the reviewed paper-parent
-semantics locally: all three owners must be Administrators or SYSTEM and both
+semantics locally: both owners must be Administrators or SYSTEM and both
 principals must have effective full control. The `F:\` VOLUME role admits other
 effective concrete file rights only when FILE_DELETE_CHILD, WRITE_DAC and
 WRITE_OWNER are absent; the observed Authenticated Users `0x1301bf` and Users
 `0x1200a9` rights are admissible. Sibling/data creation is not child replacement.
 VOLUME flags may contain only OI/CI/IO/INHERITED; IO templates require OI or CI,
 are ineffective on the volume and cannot satisfy effective full control.
-The `F:\AI` and `F:\AI\temp` PARENT roles permit other principals only
+The `F:\AITradingBot` PARENT role permits other principals only
 read/traverse rights (`0x1200a9`) and OI/CI/INHERITED flags. Every role rejects
 non-ALLOW ACEs and unsupported flags. No operator-user trust exception broadens
 these policies. Source HEAD/TREE, fixed source worktree/branch/origin, clean

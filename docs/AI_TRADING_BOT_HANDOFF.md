@@ -1,5 +1,33 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — 133-I-R1 source correction implemented; exact review pending
+
+On the same `feature/robinhood-unattended-review-paper-133i` branch, the known
+local docs-only lag was admitted and fast-forwarded from
+`3496e63f5dca0e516b154129f8beabdf7c4123e7` /
+`81a3648c9a2570be35aaa07656c47ff721f892f5` to reviewed remote
+`9133e987fbe8fa99baad0f7b7488a623eaaeaeb3` /
+`429ea0b1c12c6e5c6df974e07361baf0c687714b` before implementation.
+
+The sole scratch path is now `F:\AITradingBot\Arch133IQualification-v1`.
+PARENTS is exactly `F:\` (VOLUME), `F:\AITradingBot` (PARENT). Regression
+coverage proves Windows sibling/disjointness semantics, rejects old-path and
+production-path selection, preserves role/owner/rights rejection, and pins the
+new namespace against source drift. The shared native primitive and all
+security/one-shot/effect boundaries are unchanged.
+
+Focused evidence: 314 scratch/publication cases passed across the initial run
+and corrected import-closure rerun; 75 affected runner and 3 inventory cases
+passed. Separate focused Ruff lint and format checks passed. No full suite,
+host plan, real native qualification or production/provider operation was run.
+The failed old-parent plan below remains historical evidence; previous
+ROBINHOOD certification applies only to the pre-R1 executable checkpoint.
+
+Codex stops after ordinary correction push and terminal green source gate.
+Next owner: ChatGPT exact GitHub correction review, then fresh ROBINHOOD
+certification selection before any host plan. Q133-2 retry/repair, retained
+Arch133 mutation and every protected scratch effect remain unauthorized.
+
 ## 2026-10-07 — Q133-I plan failed read-only; 133-I-R1 scratch relocation
 
 The certified 133-I source passed ROBINHOOD 4,336/4,336, but its first real

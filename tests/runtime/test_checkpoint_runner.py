@@ -6597,3 +6597,33 @@ def test_133i_ci_registration_drift_fails_closed(tmp_path, target, mutation):
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_scratch_root_acl_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        (
+            r'SCRATCH_PATH = r"F:\AITradingBot\Arch133IQualification-v1"',
+            r'SCRATCH_PATH = r"F:\AI\temp\arch133i-root-acl-qualification-v1"',
+        ),
+        (
+            r'SCRATCH_PATH = r"F:\AITradingBot\Arch133IQualification-v1"',
+            r'SCRATCH_PATH = r"F:\AITradingBot\Arch133"',
+        ),
+        (
+            r'SCRATCH_PATH = r"F:\AITradingBot\Arch133IQualification-v1"',
+            r'SCRATCH_PATH = r"F:\AITradingBot\Arch133\qualification"',
+        ),
+        (
+            r'PARENTS = ("F:\\", r"F:\AITradingBot")',
+            r'PARENTS = ("F:\\", r"F:\AI", r"F:\AI\temp")',
+        ),
+    ],
+)
+def test_133i_relocated_namespace_pin_rejects_drift(tmp_path, old, new):
+    root = _133i_copy(tmp_path)
+    path = root / "src/trading_bot/arch133_acl/qualification.py"
+    text = path.read_text(encoding="utf-8")
+    assert text.count(old) == 1
+    path.write_text(text.replace(old, new), encoding="utf-8")
+    assert runner._arch133_scratch_root_acl_authority_check(root)

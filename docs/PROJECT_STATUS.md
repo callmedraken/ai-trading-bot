@@ -1,5 +1,30 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — 133-I-R1 scratch relocation implemented; exact review pending
+
+The source-only correction relocates the sole qualification destination to
+`F:\AITradingBot\Arch133IQualification-v1` and reduces its exact parent chain
+to `F:\` (VOLUME) and `F:\AITradingBot` (PARENT). Windows-path regressions
+prove the scratch object is a direct sibling of retained Arch133, never equal
+to or below it. The old scratch path cannot be selected through API, CLI or
+environment. The qualifier AST pin advances; the shared native primitive,
+conservative parent policies and one-shot authority remain unchanged.
+
+Focused verification passed 314 scratch/publication cases across the initial
+run and one corrected import-closure rerun, 75 affected runner cases, and 3
+certification-inventory cases. Separate focused Ruff lint and format checks
+passed. The original import-closure assertion prohibited the entire protected
+parent namespace; its correction rejects production Arch133 and descendants
+while permitting the frozen sibling. No host plan, native qualification,
+production Arch133 access, or provider/OAuth/scheduler/broker operation was run.
+The historical failed-plan evidence below remains applicable to the old path.
+
+Next: terminal source-gate success and ChatGPT exact GitHub review of this
+correction, followed by a fresh ROBINHOOD certification decision. Previous
+4,336/4,336 certification remains provenance for the pre-R1 executable source.
+No host plan or protected effect is authorized here. Q133-2 remains consumed;
+retained Arch133 remains immutable; live trading remains NO-GO.
+
 ## 2026-10-07 — Q133-I read-only plan rejected; 133-I-R1 relocation frozen
 
 The first provider-free/read-only Q133-I `plan` on certified executable source

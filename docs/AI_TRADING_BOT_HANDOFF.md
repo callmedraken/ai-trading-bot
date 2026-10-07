@@ -1,34 +1,36 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-06 — 133-I scratch ACL source implemented; review pending
+## 2026-10-06 — Architecture 133-I SOURCE ACCEPTED; ROBINHOOD certification next
 
-Architecture 133-I is implemented on the isolated
-`feature/robinhood-unattended-review-paper-133i` branch from exact 133-H incident
-checkpoint HEAD `c3d87f7fe0ce5fed6c7bbcb16f1b6300162be82c`, TREE
-`baff21b72b7a7810603f29a0eeea5872db227b66` (source gate #263 /
-37569816973 SUCCESS). Source acceptance and native qualification remain pending.
+Architecture 133-I executable source is **SOURCE ACCEPTED** on
+`feature/robinhood-unattended-review-paper-133i` at HEAD
+`3496e63f5dca0e516b154129f8beabdf7c4123e7`, TREE
+`81a3648c9a2570be35aaa07656c47ff721f892f5`. Source gate #265 /
+37579800230 completed SUCCESS: pytest, Ruff lint, Ruff format and git diff check
+all returned zero; all 40 registered authority checks PASS and
+`IDENTITY_STABLE=True`.
 
-The only qualification mutation destination is the fixed, versioned
-`F:\AI\temp\arch133i-root-acl-qualification-v1`. The isolated standard-library
-native leaf is now shared by the publisher and qualifier for Administrator-only
-directory creation, root handle flags, exact six-ACE SDDL/SetSecurityInfo and
-independent binary readback. The qualifier retains the numeric DWORD status,
-requires exact same-object readback for PASS, and has no production HostRoot,
-provider/OAuth/scheduler/broker or unattended execution imports. Occupancy blocks
-re-entry; failures retain scratch; there is no retry, cleanup or repair API.
+Exact review accepted both corrections from failed source gate #264. Mocked
+source-drift tests now isolate the fixed operator SOURCE_ROOT without weakening
+the production literal. Parent admission is role-aware: `F:\` uses the
+previously qualified VOLUME semantics whose maximum non-admin effective mask is
+exactly `0x1301bf`, while `F:\AI` and `F:\AI\temp` retain conservative
+PARENT read/traverse semantics at `0x1200a9`. Unsupported ACE types/flags,
+FILE_DELETE_CHILD, WRITE_DAC, WRITE_OWNER, untrusted owners, and missing
+Administrator/SYSTEM effective full control remain fail-closed.
 
-The new test module is automatically owned by FULL/ROBINHOOD: current module
-counts are FULL 123, ROBINHOOD 50, LEGACY 204, EXHAUSTIVE 327. Frozen 113/40
-baselines remain unchanged. The new registered checkpoint is SOURCE ONLY with no preflight/execute callback.
-The 133-H native AST pin is intentionally succeeded by the refactored wrapper
-and pinned shared leaf; other 133-H source/registration pins are retained.
-Focused verification uses fake native calls only. No native scratch run was
-performed and retained production Arch133 was not accessed or changed.
+The fixed scratch destination, one-shot reviewed authorization, shared native
+root creation/open/SDDL/SetSecurityInfo primitive, independent exact readback,
+and zero provider/OAuth/scheduler/broker/production-Arch133 reachability remain
+unchanged. The retained `F:\AITradingBot\Arch133` publication was not accessed
+or changed and Q133-2 remains consumed with no retry/repair authority.
 
-Next: ChatGPT exact GitHub source review and real source-gate acceptance on the
-pushed 133-I commit. Stop there before any separately reviewed PROTECTED scratch
-plan/execution. Q133-2 remains consumed and must never be retried or repaired by
-this surface. Live trading remains NO-GO.
+Because 133-I refactors a native primitive shared with the 133-H publisher and
+the new module belongs to the ROBINHOOD profile, the next safe checkpoint is a
+fresh **ROBINHOOD certification** of executable source `3496e63f...`. Do not
+run the host `plan` or native scratch qualification before that certification
+is accepted. Native scratch execution remains a separate fresh PROTECTED gate;
+live trading remains NO-GO.
 
 ## 2026-10-06 — Q133-2 failure localized to `admit_trading_root()`
 

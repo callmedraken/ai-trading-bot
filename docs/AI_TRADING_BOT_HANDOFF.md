@@ -1,5 +1,18 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Architecture 133-I-R1 ROBINHOOD certification ACCEPTED
+
+The exact R1 executable source HEAD
+`4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91` passed fresh ROBINHOOD
+certification: 50 modules, 4,345 / 4,345 cases passed, 0 skipped/fail/error.
+Evidence: `F:\AI\temp\certification\arch133i-r1-robinhood-4260f80`.
+
+No protected effect ran. Next is only the provider-free/read-only R1 `plan`.
+Review its exact host facts and `plan_sha256` before any fresh authorization for
+the disposable native scratch mutation. Retained Arch133 remains immutable and
+Q133-2 remains non-retryable.
+
 ## 2026-10-07 — Architecture 133-I-R1 SOURCE ACCEPTED
 
 R1 executable source is accepted at HEAD

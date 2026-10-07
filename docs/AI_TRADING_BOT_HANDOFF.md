@@ -1,6 +1,23 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-07 — 133-I-R1 source correction implemented; exact review pending
+## 2026-10-07 — Architecture 133-I-R1 SOURCE ACCEPTED
+
+R1 executable source is accepted at HEAD
+`4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91`; source gate #269 /
+37589686978 is SUCCESS. The exact review found no remaining correction.
+
+The only executable change from the frozen R1 design point is the qualification
+namespace relocation to `F:\AITradingBot\Arch133IQualification-v1` with
+exact parents `F:\` and `F:\AITradingBot`. The native root primitive and
+parent policy implementation are unchanged. Regression/source-pin coverage
+proves the scratch object is a sibling of retained Arch133, never equal to or
+beneath it, and cannot be redirected to the old or production namespace.
+
+No host plan or protected effect ran. Next: fresh ROBINHOOD certification on
+the exact accepted executable source. Only after certification acceptance may
+the provider-free/read-only R1 host plan be retried.
+
 
 On the same `feature/robinhood-unattended-review-paper-133i` branch, the known
 local docs-only lag was admitted and fast-forwarded from

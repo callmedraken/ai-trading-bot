@@ -1,6 +1,34 @@
 # Project Status and Roadmap
 
-## 2026-10-07 — 133-I-R1 scratch relocation implemented; exact review pending
+## 2026-10-07 — Architecture 133-I-R1 SOURCE ACCEPTED; ROBINHOOD certification next
+
+Architecture 133-I-R1 executable source is **SOURCE ACCEPTED** on
+`feature/robinhood-unattended-review-paper-133i` at HEAD
+`4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91`. Source gate #269 /
+37589686978 completed SUCCESS with pytest, Ruff lint, Ruff format and git diff
+check all returning zero; the 133-H host-publication and 133-I scratch authority
+checks both PASS, `IDENTITY_STABLE=True`, and `OVERALL=PASS`.
+
+Exact review confirmed the R1 executable delta changes only the qualifier's
+fixed `SCRATCH_PATH` and `PARENTS` constants. The shared
+`arch133_acl/primitive.py` blob is byte-identical to the frozen R1 parent, and
+`_require_parent_security` semantics are unchanged. Tests prove the new
+`F:\AITradingBot\Arch133IQualification-v1` object is a direct Windows-path
+sibling of retained `F:\AITradingBot\Arch133`, cannot equal or descend from
+it, cannot be overridden by CLI/API/environment, and uses exactly
+`F:\` as VOLUME plus `F:\AITradingBot` as PARENT. Old-path and production
+namespace drift fail the registered source authority pin.
+
+No host plan, real scratch creation, SetSecurityInfo call, provider/OAuth/
+scheduler/broker operation, or retained Arch133 access/mutation occurred.
+
+Because the ROBINHOOD profile includes the changed qualification module and R1
+changes the real host admission namespace, the next safe checkpoint is a fresh
+**ROBINHOOD certification** of exact executable source `4260f80a...`.
+Do not run another host plan or any native scratch mutation until that
+certification is accepted.
+
 
 The source-only correction relocates the sole qualification destination to
 `F:\AITradingBot\Arch133IQualification-v1` and reduces its exact parent chain

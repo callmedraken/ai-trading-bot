@@ -10,7 +10,34 @@ validating the frozen executable identity as 4677/6ce. No generic descendant,
 tracking-ref, network-Git, reset, verifier invocation, credential read or host
 effect is authorized by this correction.
 
-## 133-L implementation boundary (exact source review pending)
+## 2026-10-07 — Architecture 133-L SOURCE ACCEPTED + ROBINHOOD CERTIFIED
+
+Accepted source checkpoint:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133l
+HEAD    9bc8b436579af011557815bb72dc42b016d61412
+TREE    3623cf424bcbe1e9d9c0208557d69ea509d6059d
+CI      terminal source gate GREEN
+```
+
+Fresh ROBINHOOD certification passed on that exact source: 53 modules,
+4,834 cases, 4,834 passed, 0 skipped, 0 failed, 0 errors. Evidence:
+`F:\AI\temp\pytest\certification-evidence-c3112cedcb404ed78c3d7c035d9e5c82`.
+The earlier local admission STOP at HEAD
+`985ee221da57038a882f0d589f05b3fafafc9fda` was a reviewed local-lag
+condition; the clean worktree was fast-forwarded under the bounded
+ChatGPT-direct catch-up rule before the successful certification.
+
+This closeout changes documentation only; accepted 133-L executable/test source
+remains the certified tree above. The next gate is one real **Q133-2V**
+post-publication read-only verifier attempt under the standard Trading account.
+That invocation is separately protected. It grants no Q133-3 scheduler
+publication, Q133-4 wake, provider/broker, credential-write, ACL-mutation, or
+live-trading authority. Q133-2 and Q133-K remain consumed/non-retryable;
+Q133-I retained scratch remains untouched.
+
+## 133-L accepted implementation boundary
 
 The dedicated operator is `trading_bot.arch133_verifier.operator`; its launcher
 is `scripts/run_arch133_post_publication_verifier.py`. The isolated package is

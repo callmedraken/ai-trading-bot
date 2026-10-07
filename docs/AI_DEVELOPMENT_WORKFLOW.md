@@ -118,6 +118,12 @@ Codex is the bounded implementation agent. It should:
   commit, and ordinary-push the isolated feature branch;
 - report files changed, focused commands/results, commit/push result when
   authorized, and deviations/blockers;
+- after an authorized ordinary push that triggers CI/source gates, wait/poll the
+  relevant run to a terminal state rather than handing back an `in_progress`
+  run as completion; if the gate fails, inspect the exact job/logs, apply the
+  smallest contract-preserving correction, rerun focused checks, ordinary-push,
+  and wait for the replacement run; repeat until green or until a
+  protected/ambiguous boundary requires ChatGPT/user review;
 - stop before broad local certification unless the task explicitly says
   otherwise.
 

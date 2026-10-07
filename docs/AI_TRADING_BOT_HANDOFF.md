@@ -1,5 +1,27 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-06 — Architecture 133-I ROBINHOOD certification ACCEPTED
+
+ROBINHOOD certification passed on exact executable source HEAD
+`3496e63f5dca0e516b154129f8beabdf7c4123e7`, TREE
+`81a3648c9a2570be35aaa07656c47ff721f892f5`, with evidence at
+`F:\AI\temp\certification\arch133i-robinhood-3496e63`.
+
+Results: 50 modules, 4,336 cases, 4,336 passed, 0 skipped, 0 failed, 0 errors
+(2,280 in robinhood-1 and 2,056 in robinhood-2). No protected opt-in or native
+scratch execution was used. Retained production Arch133 remains untouched and
+Q133-2 remains non-retryable.
+
+Delegation workflow is hardened: after an ordinary push, Codex should wait/poll
+the relevant CI/source gate until terminal. A failing gate must be inspected and
+corrected in the same implementation workflow, then re-pushed and re-waited,
+rather than handed back merely as "in progress". Stop only for a
+protected/ambiguous boundary or after the gate is green.
+
+Next: run only the provider-free/read-only Q133-I `plan` against the accepted
+executable source. Review its exact `plan_sha256` before any fresh PROTECTED
+scratch mutation.
+
 ## 2026-10-06 — Architecture 133-I SOURCE ACCEPTED; ROBINHOOD certification next
 
 Architecture 133-I executable source is **SOURCE ACCEPTED** on

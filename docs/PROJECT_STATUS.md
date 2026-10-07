@@ -1,5 +1,36 @@
 # Project Status and Roadmap
 
+## 2026-10-06 — Architecture 133-I ROBINHOOD certification ACCEPTED
+
+Fresh ROBINHOOD certification is **ACCEPTED** on the exact source-accepted
+executable checkpoint HEAD
+`3496e63f5dca0e516b154129f8beabdf7c4123e7`, TREE
+`81a3648c9a2570be35aaa07656c47ff721f892f5`. Evidence is retained at
+`F:\AI\temp\certification\arch133i-robinhood-3496e63`.
+
+The run executed 50 Robinhood-profile modules in two lanes:
+
+- robinhood-1: 23 modules, 2,280 / 2,280 passed;
+- robinhood-2: 27 modules, 2,056 / 2,056 passed;
+- total: 4,336 cases, 4,336 passed, 0 skipped, 0 failed, 0 errors;
+- wall time: 311.178 seconds.
+
+The executable source remains `3496e63f...`/`81a3648c...`; later branch
+HEADs are docs-only closeout and must not be conflated with the certified source.
+No protected native scratch mutation, provider/OAuth/scheduler/broker effect, or
+production Arch133 mutation occurred.
+
+Workflow hardening: future Codex implementation pushes with CI are not complete
+while the gate is merely queued/in-progress. Codex should wait/poll to a terminal
+result, inspect red jobs, make the smallest reviewed correction, ordinary-push,
+and continue through the replacement run until green or until a
+protected/ambiguous boundary requires escalation.
+
+Next safe step is the provider-free/read-only **Q133-I scratch qualification
+plan** against the accepted executable source. Review its exact
+`plan_sha256` and host facts before any fresh PROTECTED authorization for the
+one-shot native scratch ACL mutation.
+
 ## 2026-10-06 — Architecture 133-I SOURCE ACCEPTED; ROBINHOOD certification next
 
 Architecture 133-I executable source is **SOURCE ACCEPTED** on

@@ -753,9 +753,7 @@ def test_bound_source_accepts_reviewed_checkout_pairs_and_reports_frozen(
     monkeypatch.setattr(operator, "_git", git)
     assert operator._bound_source() == (operator.BOUND_HEAD, operator.BOUND_TREE)
     assert not any(
-        "refs/remotes/origin/" in argument
-        for args in calls
-        for argument in args
+        "refs/remotes/origin/" in argument for args in calls for argument in args
     )
 
 
@@ -810,9 +808,7 @@ def test_bound_source_rejects_unreviewed_or_dirty_checkout(
     with pytest.raises(ValueError):
         operator._bound_source()
     assert not any(
-        "refs/remotes/origin/" in argument
-        for args in calls
-        for argument in args
+        "refs/remotes/origin/" in argument for args in calls for argument in args
     )
 
 

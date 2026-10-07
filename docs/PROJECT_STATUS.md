@@ -1,5 +1,50 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Q133-K retained-root ACL recovery ACCEPTED; 133-L Q133-2V operator surface frozen
+
+The single protected Architecture 133-K recovery attempt completed **PASS** on
+source-accepted/certified executable HEAD
+`a7e014913cfe1b1c2790078ee555ef3aa77f2a37`, TREE
+`dc35ea7c2c7cee0871a090bad4158896b83795e1`, bound to reviewed plan
+`4c39eea3d079934730677abc649de1aae2324e312e537a0b23f36720851624bd`.
+
+Observed recovery evidence:
+
+- `acl_mutation_attempts=1`;
+- native `SetSecurityInfo` status `0`;
+- pre-policy `ADMIN_SYSTEM_ONLY`;
+- post-policy `EXACT_INTENDED_ROOT`;
+- exact intended policy match true;
+- root identity unchanged at `[1855336320, 1407374886183770]`;
+- root security changed only as authorized, from
+  `b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3`
+  to
+  `6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7`;
+- retained namespace unchanged;
+- all four final file SHA-256 values unchanged;
+- retained Q133-I scratch ACL unchanged;
+- provider/OAuth/scheduler/broker calls/effects all zero during recovery;
+- file mutations zero.
+
+The 133-K protected authority is consumed. Q133-2 remains non-retryable. No
+manual ACL repair/revert/retry is permitted.
+
+The next required gate is Q133-2V, but the repository currently exposes its logic
+only as `preflight_unattended_host()`; the only zero-argument production launcher
+invokes the actual wake path. Therefore do not use the wake launcher to reach
+Q133-2V.
+
+Architecture **133-L** is frozen as a SOURCE-ONLY dedicated Q133-2V operator
+surface. It must expose only the existing read-only preflight semantics and must
+not change the existing wake launcher/hash/binding. Q133-2V is provider-free but
+intentionally performs local persisted OAuth credential reads under the Trading
+account to prove token/client-registration availability. It must not refresh,
+write credentials, open a browser, contact Robinhood/provider endpoints, mutate
+paper/wake state, or inspect/mutate Task Scheduler.
+
+Q133-3/Q133-4 remain unauthorized until 133-L source is accepted, certified if
+selected, and the real Q133-2V verifier passes.
+
 ## 2026-10-07 — Architecture 133-K source implementation; exact review pending
 
 133-K implements the frozen retained production-root ACL recovery contract on

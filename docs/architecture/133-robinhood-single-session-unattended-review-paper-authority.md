@@ -1,5 +1,76 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-L — dedicated Q133-2V post-publication verifier operator (frozen source design)
+
+133-K completed the missing root ACL transition successfully. The retained host
+root now independently reads back `EXACT_INTENDED_ROOT` with unchanged object
+identity and unchanged final-file bytes.
+
+The existing Q133-2V semantic implementation is
+`review_paper.unattended_host.preflight_unattended_host()`. It verifies exact
+published host binding/activation/wake material, paper predecessor, proposed
+scheduler specification, zero consumed wake authority, and persisted OAuth
+availability. It constructs no paper/state writers and delegates no wake.
+
+However, no dedicated operator launcher currently exists. The existing
+`run_arch133_unattended_review_paper.py` launcher invokes
+`run_unattended_host()`; it must never be repurposed or invoked merely to reach
+Q133-2V, because that path owns Q133-4 wake delegation authority.
+
+133-L must add a separate, zero-semantic-argument, read-only verifier launcher
+and minimal verifier entry point. It must not modify the existing wake launcher
+bytes, scheduler action, host-binding launcher hash, retained activation/binding,
+or runtime identity.
+
+The verifier must independently prove:
+
+- fixed retained host root `F:\AITradingBot\Arch133`;
+- exact post-recovery root policy `EXACT_INTENDED_ROOT`;
+- exact retained root identity and expected post-recovery security digest
+  `6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7`;
+- exact four-name namespace and accepted final-file policies;
+- exact host binding and activation canonical bytes;
+- binding runtime/source/Python identities against the accepted 133-G runtime
+  target;
+- paper schema-v2 predecessor fingerprint and no paper rows;
+- exactly one activation/wake, READY revision 0, unchanged state fingerprint;
+- proposed scheduler spec only, with no Task Scheduler reads/writes;
+- consumed wake authority 0 and execution delegations 0;
+- Trading account identity;
+- persisted OAuth availability through current-account Windows Credential Manager
+  reads only.
+
+Provider-free does **not** mean zero local OAuth storage reads for Q133-2V.
+Credential reads may use only `CredReadW` through the accepted
+`WindowsOAuthStorage.get_tokens()` path and may summarize availability only.
+The verifier must not expose token/client bytes or metadata beyond the bounded
+availability result. It must structurally exclude `CredWriteW`,
+`set_tokens`, `set_client_info`, refresh, OAuth browser/callback/provider
+composition, Robinhood network/provider calls and any registration mutation.
+
+It must also structurally exclude:
+
+- `run_unattended_host`;
+- `execute_one_unattended_review_paper_wake`;
+- `ReviewPaperStore` construction;
+- `UnattendedStateStore` construction;
+- wake/state transitions;
+- paper writes;
+- scheduler inspection/registration/mutation;
+- Q133-2 publication/recovery;
+- Q133-K ACL application.
+
+The operator result should be bounded canonical JSON with a dedicated schema,
+including at least source/runtime/deployment identities, activation/wake IDs,
+READY/revision, state fingerprint, paper predecessor, persisted OAuth available,
+scheduler specification, consumed wake authority 0, execution delegations 0,
+provider_calls 0, scheduler_reads/writes 0, state_mutations 0, paper_mutations 0,
+and sanitized local OAuth-read accounting.
+
+133-L is SOURCE ONLY in checkpoint CI: `preflight=None`, `execute=None`; CI
+must use fake/inert tests only and never read real retained state or credentials.
+The real Q133-2V run occurs only after exact source review.
+
 ## 133-K implementation boundary (exact source review pending)
 
 The implementation is `trading_bot.arch133_acl.recovery`, with isolated launcher

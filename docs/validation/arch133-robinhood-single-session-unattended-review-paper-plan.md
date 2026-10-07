@@ -1,5 +1,47 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## Q133-K protected retained-root ACL recovery — PASS
+
+The single authorized 133-K execution used reviewed plan
+`4c39eea3d079934730677abc649de1aae2324e312e537a0b23f36720851624bd`
+and returned PASS:
+
+```text
+acl_mutation_attempts 1
+native_set_security_info_status 0
+pre_application_policy ADMIN_SYSTEM_ONLY
+post_application_policy EXACT_INTENDED_ROOT
+exact_intended_policy_match true
+root_identity_before [1855336320, 1407374886183770]
+root_identity_after  [1855336320, 1407374886183770]
+pre_root_security_sha256  b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3
+post_root_security_sha256 6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7
+namespace_unchanged true
+file_hashes_unchanged true
+file_mutations 0
+provider_calls 0
+oauth_reads 0
+scheduler_reads 0
+scheduler_writes 0
+broker_effects 0
+```
+
+Outer reconciliation independently proved the production namespace and all four
+final file hashes unchanged and the retained Q133-I scratch ACL unchanged. The
+133-K protected authority is consumed. No retry/revert/repair is authorized.
+
+Q133-2V is now eligible as the next read-only gate, but no dedicated operator
+launcher exists in accepted source. Do not invoke the wake launcher as a
+substitute. 133-L must add a dedicated source-only Q133-2V operator surface for
+the already-tested `preflight_unattended_host()` semantics, preserving the wake
+launcher and host binding unchanged.
+
+The real Q133-2V verifier may perform bounded current-Trading-account persisted
+OAuth credential reads needed to establish availability; this is local storage
+observation, not provider/network authority. It must make zero credential writes,
+zero provider calls, zero scheduler reads/writes, zero paper/state mutations and
+zero wake delegations.
+
 ## 133-K source-only validation (exact review pending)
 
 Base is exact 133-J closeout `da57105e3ac77e9f05ac8e8144ddf2f56eee0c46` /

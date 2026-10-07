@@ -1,5 +1,23 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Q133-K recovery PASS; 133-L Q133-2V surface next
+
+Q133-K's one protected root-ACL recovery attempt succeeded on reviewed plan
+`4c39eea3d079934730677abc649de1aae2324e312e537a0b23f36720851624bd`:
+native status 0, exact intended root policy, same root identity, unchanged
+namespace/files, unchanged scratch evidence, and zero provider/scheduler/broker
+effects. The new production root-security digest is
+`6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7`.
+The 133-K authority is consumed; Q133-2 remains permanently non-retryable.
+
+Q133-2V logic already exists in `preflight_unattended_host()`, but there is no
+safe dedicated operator launcher. The existing production launcher invokes
+`run_unattended_host()`, which would cross into Q133-4. 133-L therefore adds a
+source-only dedicated verifier surface for the existing preflight behavior,
+without changing the wake launcher/binding. It may read persisted Trading-account
+OAuth credentials only to summarize availability; no refresh/write/browser/
+provider/scheduler or state mutation is allowed.
+
 ## 2026-10-07 — 133-K implementation handoff; source review pending
 
 Worktree: `F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133k`.

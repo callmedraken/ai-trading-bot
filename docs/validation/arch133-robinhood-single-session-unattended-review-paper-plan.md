@@ -12,6 +12,33 @@ Architecture 131 merged via PR #24
 post-merge source gate #222 SUCCESS
 ```
 
+## Q133-I-R1 accepted host plan
+
+Post-R1 source review and fresh ROBINHOOD certification, the real host read-only
+`plan` completed successfully with no mutation:
+
+```text
+source_head 4260f80aea93607b285a75adf172605762c73029
+source_tree b596d52d75bd5e48f5e1f1edea773c41142f0a91
+scratch_path F:\AITradingBot\Arch133IQualification-v1
+scratch_absent true
+filesystem NTFS
+reparse false
+parents_sha256 ec06624825ad30fd50b09b2a298139a99b0608e50fc3b2f22b0dfcb26be32fb2
+plan_sha256 bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6
+```
+
+The intended ordered ACE masks are exactly `0x1f01ff`, `0x1f01ff`,
+`0x1200ab`, `0x13019f` with flags 9, `0x1f01ff` with flags 9 and
+`0x1f01ff` with flags 9 for Administrators/SYSTEM/Trading as frozen. The
+canonical SHA independently recomputes exactly. Provider/OAuth/scheduler/broker
+and production-Arch133 mutation counters are all zero.
+
+This closes the read-only plan gate. Native execution is separately PROTECTED
+and requires the exact fresh terminal authorization
+`AUTHORIZE Q133-I SCRATCH <reviewed-plan-sha256>`. The plan record itself
+authorizes no mutation.
+
 ## 133-I-R1 read-only host-plan rejection and correction contract
 
 The first post-certification 133-I `plan` returned the fixed

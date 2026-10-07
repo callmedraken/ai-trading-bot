@@ -1,5 +1,24 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Q133-I-R1 host plan ACCEPTED; fresh PROTECTED authorization required
+
+The read-only R1 plan passed on executable HEAD
+`4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91`. Reviewed/canonical
+`plan_sha256`:
+`bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6`.
+
+It proves the fixed scratch sibling
+`F:\AITradingBot\Arch133IQualification-v1` absent, NTFS/no-reparse,
+accepted Administrator/Trading identities, exact parent fingerprint and frozen
+six-ACE root policy, with every forbidden-effect counter zero. Independent hash
+recomputation matches the emitted plan SHA.
+
+Do not execute without a fresh explicit authorization bound to that exact SHA.
+Any such authorization is limited to the one-shot disposable scratch native ACL
+qualification; production Arch133 recovery/retry, scheduler/provider/OAuth,
+broker and live effects remain unauthorized.
+
 ## 2026-10-07 — Architecture 133-I-R1 ROBINHOOD certification ACCEPTED
 
 The exact R1 executable source HEAD

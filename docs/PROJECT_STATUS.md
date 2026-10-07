@@ -1,5 +1,32 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Q133-I-R1 read-only host plan ACCEPTED; protected scratch execution awaits fresh authorization
+
+The certified R1 executable source HEAD
+`4260f80aea93607b285a75adf172605762c73029`, TREE
+`b596d52d75bd5e48f5e1f1edea773c41142f0a91` produced a successful
+provider-free/read-only host plan for the fixed disposable scratch object
+`F:\AITradingBot\Arch133IQualification-v1`.
+
+The canonical plan SHA-256 is
+`bc56bd22503fd36c968f38a0143d23d8b021d07786fe9d5ae8d390ace9c9b5d6`.
+Independent recomputation over the plan payload excluding `plan_sha256`
+matches exactly. The plan proves scratch absence, local NTFS/no-reparse,
+Administrator operator SID
+`S-1-5-21-1397534616-3988210162-180023805-1005`, Trading SID
+`S-1-5-21-1397534616-3988210162-180023805-1009`, parent fingerprint
+`ec06624825ad30fd50b09b2a298139a99b0608e50fc3b2f22b0dfcb26be32fb2`,
+and the frozen six-ACE intended root policy. Provider calls, OAuth reads,
+scheduler reads/writes, broker effects, and production Arch133 mutations are all
+zero.
+
+The next boundary is **PROTECTED**. No native scratch creation or SetSecurityInfo
+call is authorized by this record. A fresh exact authorization line bound to the
+reviewed plan SHA is required before executing the one-shot disposable scratch
+qualification. That authorization grants only the R1 scratch qualification; it
+does not grant Q133-2 retry/repair, retained Arch133 mutation, scheduler changes,
+provider/OAuth access, broker effects, or live trading.
+
 ## 2026-10-07 — Architecture 133-I-R1 ROBINHOOD certification ACCEPTED
 
 Fresh ROBINHOOD certification is **ACCEPTED** on exact source-accepted R1

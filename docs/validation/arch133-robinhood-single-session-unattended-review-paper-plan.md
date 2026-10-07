@@ -33,6 +33,14 @@ needed an argument-name correction. Only affected tests were rerun. Separate
 focused Ruff lint/format and git diff whitespace checks passed. No full local
 suite was run. Terminal source CI remains required before exact-source review.
 
+Source-gate #278 / 37675078697 on implementation commit
+`33d175adbf2d54ac09544137d6a97e0f3c453265` reported one remaining stale
+registered-profile expected set: 6,153 passed, 3 skipped, 1 failed. All 43
+authority checks, Ruff check/format, whitespace and source-identity checks passed.
+The correction adds only the missing 133-L name to that test's expected set;
+verifier/deployed executable source is unchanged. The exact failing test is
+rerun locally, followed by a normal correction commit/push and replacement CI.
+
 Routine source verification only:
 
 ```powershell

@@ -191,6 +191,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-scratch-root-acl-qualification",
         "arch133-robinhood-retained-root-diagnostic",
         "arch133-robinhood-retained-root-acl-recovery",
+        "arch133-robinhood-post-publication-verifier",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests

@@ -843,6 +843,16 @@ def native_fixture(tmp_path, request):
                 "[Security.Principal.WindowsIdentity]::GetCurrent()",
                 "$global:FakeIdentity",
             )
+            # Only this copied fake transport reports a bounded failure location.
+            # Never emit the exception message or request/credential material.
+            source = source.replace(
+                "} catch {\n    if ($attempted)",
+                "} catch {\n"
+                "    [Console]::Error.WriteLine('FAKE_INSTALLER_STAGE=' + "
+                "[string]$_.InvocationInfo.ScriptLineNumber + ';TYPE=' + "
+                "$_.Exception.GetType().FullName)\n"
+                "    if ($attempted)",
+            )
             if getattr(request, "param", False):
                 # Newer Windows JSON parsers may coerce ISO UTC strings.
                 source = source.replace(
@@ -1013,11 +1023,18 @@ def test_fake_com_installer_exact_one_create_or_no_call(native_fixture, mode):
         text=True,
         timeout=20,
     )
-    assert not result.stderr, result.stderr
+    if result.returncode == (2 if mode == "create-exception" else 1):
+        # Expected fake exceptions report only a source line and exception type.
+        assert result.stderr.startswith("FAKE_INSTALLER_STAGE="), result.stderr
+        assert "fake-native-test-secret" not in result.stderr
+    else:
+        assert not result.stderr, result.stderr
     data = json.loads(result.stdout)
     assert "fake-native-test-secret" not in result.stdout
     if mode == "create":
-        assert result.returncode == 0 and data["disposition"] == "CALL_RETURNED"
+        assert result.returncode == 0 and data["disposition"] == "CALL_RETURNED", (
+            result.stderr
+        )
     elif mode == "create-exception":
         assert result.returncode == 2 and data["disposition"] == "INDETERMINATE"
     else:

@@ -173,6 +173,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-publication-state-paper-corrected",
     "arch133-robinhood-single-session-scheduler-installation",
     "arch133-robinhood-fresh-activation-reprovision",
+    "arch133-robinhood-reprovision-admission-diagnostic",
 )
 
 
@@ -1373,6 +1374,74 @@ ARCH133_REPROVISION_PINS: Final = {
 ARCH133_REPROVISION_REGISTRATION_PIN: Final = (
     "54882c9d46d181d465e03fdff642317c4af373c6bda759685c6dff745404df1b"
 )
+
+
+
+
+ARCH133_REPROVISION_DIAGNOSTIC_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py",
+    "src/trading_bot/arch133_reprovision_diagnostic/operator.py",
+    "scripts/run_arch133_reprovision_admission_diagnostic.py",
+)
+ARCH133_REPROVISION_DIAGNOSTIC_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py": "a161e6533bcdc3bb7c9caa29cc27422fc2120b2d",
+    "src/trading_bot/arch133_reprovision_diagnostic/operator.py": "ab1ca2054fadd51ffb19896a9a9a6f565289474f",
+    "scripts/run_arch133_reprovision_admission_diagnostic.py": "b1efbfcb86f49c298498876e16334ba0f171ea35",
+}
+
+
+def _arch133_reprovision_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the 133-R zero-effect staged admission diagnostic."""
+    failures = list(_arch133_reprovision_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_REPROVISION_DIAGNOSTIC_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-R diagnostic source drift: {relative}")
+        if tuple(ARCH133_REPROVISION_DIAGNOSTIC_PINS) != ARCH133_REPROVISION_DIAGNOSTIC_SOURCES:
+            failures.append("133-R diagnostic inventory drift")
+        name = "arch133-robinhood-reprovision-admission-diagnostic"
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check is not _arch133_reprovision_diagnostic_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133r"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-R diagnostic registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[-2:]
+            != (
+                "arch133-robinhood-fresh-activation-reprovision",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-R diagnostic ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-R diagnostic workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-R diagnostic boundary unavailable")
+    return tuple(failures)
 
 
 def _arch133_reprovision_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -7005,7 +7074,28 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             execute=None,
             remote_head_env=None,
         ),
-        "arch133-robinhood-fresh-activation-reprovision": CheckpointSpec(
+                "arch133-robinhood-reprovision-admission-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-reprovision-admission-diagnostic",
+            description="Architecture 133-R source-only reprovision admission diagnostic",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_REPROVISION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133r",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+"arch133-robinhood-fresh-activation-reprovision": CheckpointSpec(
             name="arch133-robinhood-fresh-activation-reprovision",
             description="Architecture 133-Q source-only fresh activation reprovision",
             tests=(

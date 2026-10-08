@@ -592,8 +592,8 @@ def test_consumed_sources_unchanged_and_new_topology_admitted():
     spec = runner._checkpoint_specs()["arch133-robinhood-fresh-activation-reprovision"]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (
-        "arch133-robinhood-single-session-scheduler-installation",
         spec.name,
+        "arch133-robinhood-reprovision-admission-diagnostic",
     )
 
 

@@ -116,6 +116,7 @@ jobs:
           name: checkpoint-source-gate-evidence
           path: |
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest-results.xml
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
             !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**

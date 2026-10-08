@@ -29,8 +29,17 @@ ROBINHOOD_DIRECTORIES = (
     "tests/robinhood_mcp",
 )
 ROBINHOOD_INFRASTRUCTURE_MODULES = (
-    "tests/runtime/test_checkpoint_runner.py",
-    "tests/scripts/test_run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
 )
 # Frozen Architecture 132 baseline at accepted HEAD:
 # 69327a7d5fbea7499329902ff96fd98e77a62591.
@@ -67,8 +76,17 @@ ROBINHOOD_REQUIRED_MODULES = (
     "tests/robinhood_mcp/test_adapter.py",
     "tests/robinhood_mcp/test_sdk_transport.py",
     "tests/robinhood_mcp/test_windows_oauth.py",
-    "tests/runtime/test_checkpoint_runner.py",
-    "tests/scripts/test_run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
     "tests/test_robinhood_forward_paper_cycle.py",
     "tests/test_robinhood_live_qualification_verifier.py",
     "tests/test_robinhood_paper_cycle.py",
@@ -124,13 +142,22 @@ FULL_EXACT_MODULES = (
     "tests/market_data/test_historical_models.py",
     "tests/market_data/test_multi_symbol_models.py",
     "tests/market_data/test_multi_symbol_provider.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
     "tests/scripts/test_create_walk_forward_research_bundle.py",
     "tests/scripts/test_research_session_archive_scripts.py",
     "tests/scripts/test_run_backtest.py",
     "tests/scripts/test_run_historical_experiment.py",
     "tests/scripts/test_run_rolling_historical_simulation.py",
-    "tests/scripts/test_run_test_certification.py",
     "tests/scripts/test_run_walk_forward_experiment.py",
     "tests/test_config.py",
 )
@@ -231,13 +258,22 @@ FULL_REQUIRED_MODULES = (
     "tests/robinhood_mcp/test_adapter.py",
     "tests/robinhood_mcp/test_sdk_transport.py",
     "tests/robinhood_mcp/test_windows_oauth.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
     "tests/scripts/test_create_walk_forward_research_bundle.py",
     "tests/scripts/test_research_session_archive_scripts.py",
     "tests/scripts/test_run_backtest.py",
     "tests/scripts/test_run_historical_experiment.py",
     "tests/scripts/test_run_rolling_historical_simulation.py",
-    "tests/scripts/test_run_test_certification.py",
     "tests/scripts/test_run_walk_forward_experiment.py",
     "tests/simulation/test_optimized_paper_portfolio.py",
     "tests/simulation/test_paper_portfolio.py",
@@ -256,7 +292,11 @@ LEGACY_DIRECTORIES = (
     "tests/gui",
     "tests/runtime",
 )
+LEGACY_REQUIRED_MODULES = (
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
+)
 LEGACY_EXACT_MODULES = (
+    *LEGACY_REQUIRED_MODULES,
     "tests/cli/test_checkpoint_lineage.py",
     "tests/cli/test_checkpoint_transition.py",
     "tests/cli/test_daily_snapshot_capture.py",
@@ -426,6 +466,7 @@ def classify_inventory(inventory: tuple[str, ...]) -> dict[str, tuple[str, ...]]
         )
         historical = module in LEGACY_EXACT_MODULES or (
             any(module.startswith(f"{directory}/") for directory in LEGACY_DIRECTORIES)
+            and not module.startswith("tests/runtime/checkpoint_runner/")
             and module not in FULL_EXACT_MODULES
         )
         if supported and historical:
@@ -458,7 +499,19 @@ def select_inventory(inventory: tuple[str, ...], profile: str) -> tuple[str, ...
     """Select one profile from the fully admitted repository inventory."""
     if profile not in PROFILES:
         raise CertificationError(f"Unknown certification profile: {profile}")
-    return classify_inventory(inventory)[profile]
+    selected = classify_inventory(inventory)[profile]
+    _validate_legacy_required(selected, profile)
+    return selected
+
+
+def _validate_legacy_required(selected: tuple[str, ...], profile: str) -> None:
+    """Preserve the relocated retained baseline at every profile admission path."""
+    if profile in {"legacy", "exhaustive"}:
+        missing = set(LEGACY_REQUIRED_MODULES) - set(selected)
+        if missing:
+            raise CertificationError(
+                f"Missing required LEGACY modules: {sorted(missing)}"
+            )
 
 
 def build_lanes(
@@ -834,6 +887,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise CertificationError(f"Unknown certification profile: {profile}")
     profiles = classify_inventory(repository_inventory)
     inventory = profiles[profile]
+    _validate_legacy_required(inventory, profile)
     lanes = build_lanes(args.root, inventory, profile)
     serial = lanes.get("serial", ())
     broad = tuple(module for module in inventory if module not in set(serial))

@@ -1,5 +1,81 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-07 — Architecture 132-R2-B implementation (source review pending)
+
+R2-B splits test infrastructure by responsibility and isolates redundant
+predecessor work in local authority mutation tests. R2-C/R2-D have not started.
+The implementation does not claim ChatGPT source/topology or certification
+acceptance. Terminal source CI evidence will be recorded in a separate docs-only
+evidence checkpoint after the implementation source gate completes.
+
+The exact 36 active and eight retained checkpoint sequences are unchanged.
+All product test/Ruff requirements retain first-seen order. All eight production
+source-pin dictionaries are unchanged. All 46 authority-function ASTs preserve
+their logic after accounting only for family test selection and migrated source
+registration hashes. Production chaining M → L → K → J → I → H remains real.
+Local I–M pin/runtime tests replace only the immediate predecessor with PASS;
+workflow/order mutation tests retain the complete real predecessor chain;
+separate tests prove predecessor calls, rejection propagation, and complete real
+chain PASS. H mutations use the real H layer with no predecessor stub.
+
+`COMMON_TESTS` is exactly:
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+```
+
+Architecture 131, 133-A–G, 133-H–K, 133-L–M, and retained 128/130 checkpoints
+select only their own runner family module in addition to that common pair.
+Inventory-dependent checkpoints select only
+`tests/scripts/certification_runner/test_profiles.py`; the other four
+certification modules remain independently runnable FULL/ROBINHOOD contracts.
+The workflow preserves `feature/test-suite-*`, its docs-only fast path, and one
+serial source-gate job. Existing R2-A monotonic timing and top-100 flags are
+unchanged; an external `pytest-results.xml` is additionally uploaded for exact
+per-module case accounting.
+
+| Inventory / union | Before | R2-B |
+| --- | ---: | ---: |
+| FULL modules | 127 | 136 |
+| ROBINHOOD modules | 54 | 63 |
+| LEGACY modules | 204 | 205 |
+| EXHAUSTIVE modules | 331 | 341 |
+| FULL required baseline | 113 | 122 |
+| ROBINHOOD required baseline | 40 | 49 |
+| Active TEST_PATHS | 42 | 47 |
+| Active RUFF_PATHS | 120 | 127 |
+| Retained TEST_PATHS | 27 | 29 |
+| Retained RUFF_PATHS | 32 | 36 |
+
+Path counts rise because files are split; no speedup is inferred from path
+counts. The required legacy replacement is explicitly pinned in
+`LEGACY_REQUIRED_MODULES` for LEGACY/EXHAUSTIVE selection. Unknown files in the
+new runner infrastructure namespace fail closed instead of inheriting the broad
+historical runtime family. FULL/LEGACY remain disjoint, their union equals
+EXHAUSTIVE, and ROBINHOOD remains a subset of FULL.
+
+All 2,003 distinct final focused cases passed; Ruff check/format and diff checks
+passed. The validation plan records exact commands, module counts and every
+original test relocation. The original 1,941 collected cases are accounted for
+in that split inventory. The 36 additional required-baseline mutation cases exercise the expanded
+replacement baselines. Original missing/changed pins, registration, workflow,
+ordering, callback/capability, wrong source/authority configuration, and
+predecessor rejection dimensions remain covered.
+
+The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent.
+Focused checks use the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe`
+and fresh external `F:\AI\temp\pytest-r2b-*` basetemps. No certification
+profile run or protected host/provider/credential/scheduler/broker operation
+was performed. Real 133-M remains paused; Q133-2V is consumed/non-retryable;
+Q133-3/Q133-4 remain unauthorized.
+
+Next owner: ChatGPT for exact GitHub diff review and source acceptance, then
+final certification selection. FULL current-product certification is expected
+because inventory topology changed, unless exact review establishes stronger
+equivalent evidence. Do not begin R2-C/R2-D or resume real 133-M here.
+
+
 ## 2026-10-07 — Architecture 132-R2-A ACCEPTED; R2-B split/selection frozen
 
 Architecture 132-R2-A is **SOURCE/TOPOLOGY ACCEPTED**.

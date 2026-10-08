@@ -69,10 +69,55 @@ class CommandOutcome:
     elapsed_seconds: float = 0.0
 
 
-COMMON_TESTS: Final = ("tests/runtime/test_checkpoint_runner.py",)
+COMMON_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+)
 COMMON_RUFF_PATHS: Final = (
     "scripts/checkpoint_runner.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/helpers.py",
+    "tests/runtime/checkpoint_runner/__init__.py",
+)
+ARCH131_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+)
+ARCH131_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+)
+ARCH133_A_G_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+)
+ARCH133_A_G_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+)
+ARCH133_H_K_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+)
+ARCH133_H_K_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+)
+ARCH133_L_M_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+)
+ARCH133_L_M_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+)
+RETAINED_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
+)
+RETAINED_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
 )
 
 
@@ -467,7 +512,7 @@ R8_HALT_RUNNER_PINS: Final = {
     "_write_json": ("bd3cabc882528e471e226c434eb3657c3f461b520112f60782eb0bda4b3d5f82"),
 }
 R8_HALT_REGISTRATION_PIN: Final = (
-    "cde19fec3d2899be468ae96247f8b4b7794cd176cbe79915a4adb33a331f9ee9"
+    "d610b7fc74b3c670d83188641d7f0e00425c1c83e052d32b08cf76b87bf1b991"
 )
 
 ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "4dece99d8993934e9747f091415927353b70a2e3"
@@ -742,7 +787,7 @@ def _arch131_forward_paper_cycle_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8cf69056ebee325d28c2487709f121ca09796a1c6b301bec0e099b581a9ff67d"
+            != "15be2da1498de847845d155f0f0b5e65544fa6c307b9a5a3727a59250f976e07"
         ):
             failures.append("131-L source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -800,7 +845,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "a56111bf9d6e7bf6c8044082949b2b52fc4dc3f71199923803ee226d8069e02c"
+            != "9b526e5cca493208ec999ce427c09df0d731b039a897382f1b085d07f7481cbb"
         ):
             failures.append("133-E source-only registration drift")
         assignments = [
@@ -828,20 +873,20 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_host_scheduler_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-E source-only coverage/authority drift")
@@ -895,7 +940,7 @@ ARCH133_RETAINED_PINS: Final = {
     ),
 }
 ARCH133_RETAINED_REGISTRATION_PIN: Final = (
-    "8097bb1dbf6b85fa909d1e3a4eaabe1a2af61e65e2c53820a8257eabeaaf1421"
+    "f800d31cde47819f296db53593130d21b122139ca95383444f0debb7dd858246"
 )
 
 
@@ -938,7 +983,7 @@ ARCH133_RECOVERY_PINS: Final = {
     ),
 }
 ARCH133_RECOVERY_REGISTRATION_PIN: Final = (
-    "9f7faedeca4e55f2e80ecd4582eba46fbc0dc139c379067ef50fcb34d34bd5cb"
+    "825e732a03cf568a9b4be81e9ecd6d2b0707028a1fe7a2cb27f226888477d66c"
 )
 
 
@@ -1043,7 +1088,7 @@ ARCH133_VERIFIER_PINS: Final = {
 }
 ARCH133_VERIFIER_SOURCES: Final = tuple(ARCH133_VERIFIER_PINS)
 ARCH133_VERIFIER_REGISTRATION_PIN: Final = (
-    "7ddee1287bec652385dfc37762d440bff5fe853dedf76c6c73aa8d605b4e292d"
+    "478391462b59486e3a5432ec859eb8ec0bd867dbf8634c84df57e0043c7e4bb2"
 )
 
 
@@ -1078,7 +1123,7 @@ ARCH133_DIAGNOSTIC_PINS: Final = {
 }
 ARCH133_DIAGNOSTIC_SOURCES: Final = tuple(ARCH133_DIAGNOSTIC_PINS)
 ARCH133_DIAGNOSTIC_REGISTRATION_PIN: Final = (
-    "2949454e289f8d0daf3c03d295a1f471add7e70db87294b989aa01c6b57cc028"
+    "3d91876e57fb5bfe7f2ce7ffb62040fe9f0953e9a5b33337692d2b1c4fe9653f"
 )
 
 
@@ -1129,7 +1174,7 @@ def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_diagnostic_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_L_M_TESTS,
                 "tests/review_paper/test_post_publication_stage_diagnostic.py",
                 "tests/review_paper/test_post_publication_verifier.py",
                 "tests/review_paper/test_unattended_host.py",
@@ -1137,15 +1182,15 @@ def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_L_M_RUFF_PATHS,
                 *ARCH133_DIAGNOSTIC_SOURCES,
                 "tests/review_paper/test_post_publication_stage_diagnostic.py",
                 "tests/review_paper/test_post_publication_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-M source-only capability drift")
@@ -1215,21 +1260,21 @@ def _arch133_verifier_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_verifier_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_L_M_TESTS,
                 "tests/review_paper/test_post_publication_verifier.py",
                 "tests/review_paper/test_unattended_host.py",
                 "tests/review_paper/test_retained_root_acl_recovery.py",
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_L_M_RUFF_PATHS,
                 *ARCH133_VERIFIER_SOURCES,
                 "tests/review_paper/test_post_publication_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-L source-only capability drift")
@@ -1306,7 +1351,7 @@ def _arch133_recovery_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_recovery_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_retained_root_acl_recovery.py",
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
@@ -1314,7 +1359,7 @@ def _arch133_recovery_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_RECOVERY_SOURCES,
                 "tests/review_paper/test_retained_root_acl_recovery.py",
             )
@@ -1380,14 +1425,14 @@ def _arch133_retained_root_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_retained_root_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_RETAINED_SOURCES,
                 "tests/review_paper/test_retained_root_diagnostic.py",
             )
@@ -1444,7 +1489,7 @@ ARCH133_SCRATCH_PINS: Final = {
     ),
 }
 ARCH133_SCRATCH_REGISTRATION_PIN: Final = (
-    "91bb8cc14715874abadefd47482bbba91656bc6c1d872698f4597a477c915ec8"
+    "93e30428d22ce71372e9cd9d29b7511feb9875b1bd5830186404a8c307092afa"
 )
 
 
@@ -1493,13 +1538,13 @@ def _arch133_scratch_root_acl_authority_check(repo_root: Path) -> tuple[str, ...
             or spec.authority_check is not _arch133_scratch_root_acl_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_SCRATCH_SOURCES,
                 "src/trading_bot/review_paper/unattended_publication_windows.py",
                 "tests/review_paper/test_scratch_root_acl.py",
@@ -1562,10 +1607,10 @@ def _arch133_host_publication_authority_check(repo_root: Path) -> tuple[str, ...
             or spec.remote_branch != "feature/robinhood-unattended-review-paper-133h"
             or spec.authority_check is not _arch133_host_publication_authority_check
             or spec.tests
-            != (*COMMON_TESTS, "tests/review_paper/test_unattended_publication.py")
+            != (*ARCH133_H_K_TESTS, "tests/review_paper/test_unattended_publication.py")
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_PUBLICATION_SOURCES,
                 "tests/review_paper/test_unattended_publication.py",
             )
@@ -1671,7 +1716,7 @@ ARCH133_PUBLICATION_PINS: Final = {
     ),
 }
 ARCH133_PUBLICATION_REGISTRATION_PIN: Final = (
-    "4b955ecbec1504c8cbf54f33d348e282600612dac3314b3f57560cc0c129c88d"
+    "14b2fabf7c5c7bcbc029bea006456f8dcc7ff54e329aaa09e3b389782d74c74a"
 )
 
 
@@ -1744,20 +1789,20 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_host_bootstrap_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-G source-only coverage/authority drift")
@@ -1813,7 +1858,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "ee37045e518b8996918d3a8009a48fa531f833f0ac79080a16937558290831f5"
+            != "2ceac689f87333f29d7389a315199bd580fc250a45d00856efd3829e554475e9"
         ):
             failures.append("133-D source-only registration drift")
         assignments = [
@@ -1841,21 +1886,21 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_execution_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/test_robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_execution.py",
                 "src/trading_bot/robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-D source-only coverage/authority drift")
@@ -1911,7 +1956,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f27e9f8bae3b05bf9157138c3a394092cdd615af00a30e0faf6b09f4104382ba"
+            != "4cefb0203b851fde16f5ee5f35cbff4e54f3fae04df508bfe84a4341c460a10c"
         ):
             failures.append("133-C source-only registration drift")
         assignments = [
@@ -1939,18 +1984,18 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_one_wake_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-C source-only coverage/authority drift")
@@ -2015,7 +2060,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "9c4545b38e5ac5a22d134c4675be76fbfcde36904a8b507ead63f2f3aa01a008"
+            != "33a9e39be9c3094ee8cdd31c2b11b00e0a5bc3e7dfd6770a54f867f322fed594"
         ):
             failures.append("133-B source-only registration drift")
         assignments = [
@@ -2043,13 +2088,13 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or spec.authority_check is not _arch133_unattended_state_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_state_store.py",
             )
@@ -2111,7 +2156,7 @@ def _arch133_unattended_activation_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e211daf645d1cfa4ef74d7556c7c870d54dc61b8729ec3de4ccd78f67c4546d7"
+            != "fc97901789ef914ecc1550919cab9a04ab3f8969ea3a380a20b522d99b53221e"
         ):
             failures.append("133-A source-only checkpoint registration drift")
 
@@ -2141,10 +2186,10 @@ def _arch133_unattended_activation_authority_check(
             failures.append("133-A checkpoint remote branch drift")
         if (
             spec.tests
-            != (*COMMON_TESTS, "tests/review_paper/test_unattended_activation.py")
+            != (*ARCH133_A_G_TESTS, "tests/review_paper/test_unattended_activation.py")
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_activation.py",
                 "tests/review_paper/test_unattended_activation.py",
             )
@@ -2212,7 +2257,7 @@ def _arch131_nyse_published_regular_session_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "ea64c087a1bc95927e3cb2859ca96c5b4bef76fdc4b560618aa359a2fab50e93"
+            != "0016427c31d574f73132803031404ff293ffdda00ef7f113d5bbb238177b1a71"
         ):
             failures.append("131-S source-only checkpoint registration drift")
 
@@ -2322,7 +2367,7 @@ def _arch131_published_session_prepare_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "96c920b26ef94304732b07eaf4df2f7ff18dcac2a2ddd1cab7b4de6dd6d540b0"
+            != "0c83b9828c88cb93dce677e6bc229cff6070457146e659c344aa062b9db84a82"
         ):
             failures.append("131-T source-only checkpoint registration drift")
 
@@ -2437,7 +2482,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode()
             ).hexdigest()
-            != "e42577ccd29ef09c30aae31e0f8e624328ac0f0a879b47181e9c0058aee9f0b7"
+            != "66d7c5b592b044a3e6803c48d927d58688792df3fe7fa0c0da82617298972993"
         ):
             failures.append("131-V source-only registration drift")
         ci = [
@@ -2522,7 +2567,7 @@ def _arch131_published_prepare_operator_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "175474f9594995f68ee317ba21635d3a6aa193a2c878898e1c41cec1740d4168"
+            != "284134d18999c57e6804b38aed32fe314a55997f64a4d2d398cec172bec892ed"
         ):
             failures.append("131-U source-only checkpoint registration drift")
 
@@ -2621,7 +2666,7 @@ def _arch131_session_admission_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d2c29698ef6cff2d52c65f4f6a880c758384900c23b91eb48e247983aa5ae593"
+            != "1bc810681800fe4ee34053bb0dde0458f916ad1e445e2c8996a09e7754e8d95f"
         ):
             failures.append("131-M source-only checkpoint registration drift")
 
@@ -2720,7 +2765,7 @@ def _arch131_risk_price_snapshot_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "7856aa4f4bdf47bd73213ae4aac577f1c35b0a0b4e419f86e7669544a76779ff"
+            != "8ce08250dfb33311c8755a086c93a5ef72618834c100b326662af1b50f6fa6cd"
         ):
             failures.append("131-N source-only checkpoint registration drift")
 
@@ -2816,7 +2861,7 @@ def _arch131_forward_paper_preview_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "14158ca87e328e2bd990251c4adf729b3f83fba647adcf02163b128888ae8226"
+            != "aea7a5069b96a9d9467751fe4fb2a6a894967bb9115969bdda3f2cd9c02e8408"
         ):
             failures.append("131-O source-only checkpoint registration drift")
 
@@ -2912,7 +2957,7 @@ def _arch131_risk_price_acquisition_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "c247d2cf1a8a6b2892a73db3a99f904102c7eb97f663f7bada586b3cceeab256"
+            != "bdbab6decc92b66f3e7973910b4c0f8e4d6f552249ac5562dacaf1e5cd7b58a5"
         ):
             failures.append("131-P source-only checkpoint registration drift")
 
@@ -3010,7 +3055,7 @@ def _arch131_supervised_forward_paper_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "267ef22d26c6fcb154a386872fb61967f19406ead279f1cf971a40e7edd1ed1f"
+            != "883effee55b5a3e0ac0888575d0a3079ae33c0df22add5e8f9e46f651e5f696e"
         ):
             failures.append("131-Q source-only checkpoint registration drift")
 
@@ -3108,7 +3153,7 @@ def _arch131_prepare_qualification_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "00e856b35a66e8a84959411aed0feeb20a47304639a0c1e68838dc8c5d9d7071"
+            != "609db74ff7dc0436e06dfec6a2127ccd248882b1d4c1d5dcb722081c95769fbe"
         ):
             failures.append(
                 "131-R PREPARE qualification source-only checkpoint registration drift"
@@ -3216,7 +3261,7 @@ def _arch131_prepare_verifier_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "9698532930293c76c29055fef6a32cbc80eca11217b59d6c465e4fa66dcb8a63"
+            != "b9efd873a9705fea3130b8d74e45d6d2628d499c85507504645b5bc5cf1a5a89"
         ):
             failures.append(
                 "131-R PREPARE verifier source-only checkpoint registration drift"
@@ -3322,7 +3367,7 @@ def _arch131_live_qualification_verifier_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "2c436c254f013788cb0a5f238687a386e6030e240047883695a3d07d598219ba"
+            != "e122534ab36defb989812bdf1575806a0eeada2c9a1db286b58d22fce848339c"
         ):
             failures.append("131-LQ source-only checkpoint registration drift")
 
@@ -3414,7 +3459,7 @@ def _arch131_virtual_risk_context_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "58e753d8d40f6323289a609960ec36e9abf68cb56207b5d205b1ac5ec8473b67"
+            != "94fc142aa4272e37708964b62244b280213a9a26b63fa3520c5d262a9b9f6cec"
         ):
             failures.append("131-K source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -3477,7 +3522,7 @@ def _arch131_deterministic_paper_pipeline_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "11a7b1d02f2809026c941643a380b5af23cf781f14c1a5b008e3c72373eba2f0"
+            != "59c840ae9e36569ba06afc08624d9bb8e47de59bd19d20f217866c51d3fcc8dc"
         ):
             failures.append("131-J source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -5756,7 +5801,7 @@ def _r7_execute() -> dict[str, object]:
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_parent_acl_repair.py",
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
@@ -5768,7 +5813,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_windows_authority.py",
     )
     parent_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_parent_acl_repair.py",
         "tests/runtime/test_d10_arch128_parent_acl_repair.py",
         "scripts/d10_arch128_r4_operator.py",
@@ -5781,7 +5826,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r4_windows.py",
     )
     r4_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
         "tests/runtime/test_d10_arch128_r4_replacement.py",
@@ -5793,7 +5838,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_protected_replacement_windows.py",
     )
     r4_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "scripts/d10_arch128_r4_orchestration.py",
@@ -5804,33 +5849,33 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r4_windows.py",
     )
     r5_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r5_trading_child.py",
         "tests/runtime/test_d10_python_substrate_harness.py",
         "tests/runtime/test_d10_python_substrate_windows.py",
         "tests/runtime/test_personal_desktop_d10_python_substrate.py",
     )
     r5_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r5_trading_child.py",
         "tests/runtime/test_d10_arch128_r5_trading_child.py",
         "scripts/d10_python_substrate_harness.py",
         "scripts/d10_python_substrate_windows.py",
     )
     r6_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r6_reactivation.py",
         "tests/runtime/test_personal_desktop_d10_activation_lease.py",
         "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
         "tests/runtime/test_personal_desktop_unattended_scheduler_contract.py",
     )
     r6_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r6_reactivation.py",
         "tests/runtime/test_d10_arch128_r6_reactivation.py",
     )
     r7_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_protected.py",
         "tests/runtime/test_d10_arch128_r7_windows.py",
@@ -5842,7 +5887,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r3_preflight.py",
     )
     r7_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "scripts/d10_arch128_r7_protected.py",
@@ -5855,14 +5900,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_python_substrate_windows.py",
     )
     r8_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r8_readonly.py",
         "tests/runtime/test_d10_durable_wake_evidence_observe.py",
         "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
         "tests/runtime/test_personal_desktop_d10_guard_evidence.py",
     )
     r8_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r8_readonly.py",
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
@@ -5871,7 +5916,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-paper-intent-bridge",
             description="Architecture 131-I deterministic risk-to-paper-intent bridge",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_intent_bridge.py",
                 "tests/review_paper/test_store.py",
                 "tests/risk/test_risk_models.py",
@@ -5880,7 +5925,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/execution/test_order_engine.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/intent_bridge.py",
                 "src/trading_bot/review_paper/__init__.py",
                 "tests/review_paper/test_intent_bridge.py",
@@ -5894,7 +5939,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-deterministic-paper-pipeline",
             description="Architecture 131-J one-cycle deterministic paper pipeline",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_pipeline.py",
                 "tests/review_paper/test_intent_bridge.py",
                 "tests/test_robinhood_paper_operator.py",
@@ -5903,7 +5948,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/risk/test_manager.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_pipeline.py",
                 "tests/test_robinhood_paper_pipeline.py",
             ),
@@ -5916,14 +5961,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-virtual-risk-context",
             description="Architecture 131-K durable virtual-paper risk context",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_context.py",
                 "tests/review_paper/test_store.py",
                 "tests/ledger/test_ledger.py",
                 "tests/risk/test_risk_models.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_context.py",
                 "src/trading_bot/review_paper/__init__.py",
                 "tests/review_paper/test_risk_context.py",
@@ -5937,13 +5982,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-forward-paper-cycle",
             description="Architecture 131-L human-started durable-context paper cycle",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_forward_paper_cycle.py",
                 "tests/review_paper/test_risk_context.py",
                 "tests/test_robinhood_paper_pipeline.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_forward_paper_cycle.py",
                 "tests/test_robinhood_forward_paper_cycle.py",
             ),
@@ -5956,11 +6001,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-live-qualification-verifier",
             description="Architecture 131-LQ read-only live-qualification verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_live_qualification_verifier.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_live_qualification_verifier.py",
                 "tests/test_robinhood_live_qualification_verifier.py",
             ),
@@ -5975,11 +6020,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-M explicit-schedule regular-session admission"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_session_admission.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/session_admission.py",
                 "tests/review_paper/test_session_admission.py",
             ),
@@ -5994,11 +6039,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-N canonical Robinhood quote-to-risk-price snapshot"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_prices.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_prices.py",
                 "tests/review_paper/test_risk_prices.py",
             ),
@@ -6013,11 +6058,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-O effect-free durable forward-paper risk preview"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_forward_preview.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/forward_preview.py",
                 "tests/review_paper/test_forward_preview.py",
             ),
@@ -6032,11 +6077,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-P bounded read-only Robinhood risk-price acquisition"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_price_acquisition.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_price_acquisition.py",
                 "tests/review_paper/test_risk_price_acquisition.py",
             ),
@@ -6052,11 +6097,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "operator composition"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_supervised_forward_paper.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/supervised_forward_paper.py",
                 "tests/review_paper/test_supervised_forward_paper.py",
             ),
@@ -6069,11 +6114,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-prepare-qualification",
             description="Architecture 131-R supervised PREPARE qualification harness",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_prepare_qualification.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/prepare_qualification.py",
                 "tests/review_paper/test_prepare_qualification.py",
             ),
@@ -6086,11 +6131,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-prepare-verifier",
             description="Architecture 131-R read-only PREPARE qualification verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_prepare_qualification_verifier.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_prepare_qualification_verifier.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
             ),
@@ -6103,11 +6148,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-nyse-published-regular-session-authority",
             description=("Architecture 131-S NYSE published regular-session authority"),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_nyse_published_regular_sessions.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/nyse_published_regular_sessions.py",
                 "tests/review_paper/test_nyse_published_regular_sessions.py",
             ),
@@ -6122,18 +6167,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-T explicit-date published-session PREPARE binding"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_published_session_prepare.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/published_session_prepare.py",
                 "tests/review_paper/test_published_session_prepare.py",
                 "src/trading_bot/robinhood_prepare_qualification_verifier.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch131_published_session_prepare_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
@@ -6144,17 +6189,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-published-prepare-operator",
             description="Architecture 131-U source-owned PREPARE transport composition",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_prepare_operator.py",
                 "tests/review_paper/test_published_session_prepare.py",
                 "tests/review_paper/test_prepare_qualification.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_prepare_operator.py",
                 "tests/test_robinhood_prepare_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch131_published_prepare_operator_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
@@ -6165,7 +6210,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-qualification",
             description=("Architecture 131-V supervised qualification and verifier"),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_supervised_qualification.py",
                 "tests/review_paper/test_supervised_forward_paper.py",
                 "tests/review_paper/test_prepare_qualification.py",
@@ -6173,7 +6218,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/test_robinhood_prepare_operator.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_supervised_qualification.py",
                 "src/trading_bot/robinhood_execute_qualification_verifier.py",
                 "scripts/robinhood_supervised_qualification.py",
@@ -6191,11 +6236,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-A pure activation and wake identity/state core"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_activation.py",
                 "tests/review_paper/test_unattended_activation.py",
             ),
@@ -6208,12 +6253,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-state-store",
             description="Architecture 133-B durable wake store and read-only verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_state_schema.py",
                 "src/trading_bot/review_paper/unattended_state_store.py",
                 "src/trading_bot/review_paper/unattended_state_verifier.py",
@@ -6228,17 +6273,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-one-wake-composition",
             description="Architecture 133-C effect-free one-wake composition",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_one_wake.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_one_wake_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133c",
@@ -6249,20 +6294,20 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-review-paper-execution",
             description="Architecture 133-D bounded unattended review-paper execution",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/test_robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_execution.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "src/trading_bot/robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_execution_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133d",
@@ -6275,22 +6320,22 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-E zero-argument host and pure scheduler surface"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_host_identity.py",
                 "src/trading_bot/review_paper/unattended_scheduler.py",
                 "src/trading_bot/review_paper/unattended_host.py",
                 "scripts/run_arch133_unattended_review_paper.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_host_scheduler_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133e",
@@ -6301,7 +6346,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-post-publication-stage-diagnostic",
             description="Architecture 133-M source-only stage diagnostic",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_L_M_TESTS,
                 "tests/review_paper/test_post_publication_stage_diagnostic.py",
                 "tests/review_paper/test_post_publication_verifier.py",
                 "tests/review_paper/test_unattended_host.py",
@@ -6309,14 +6354,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_L_M_RUFF_PATHS,
                 *ARCH133_DIAGNOSTIC_SOURCES,
                 "tests/review_paper/test_post_publication_stage_diagnostic.py",
                 "tests/review_paper/test_post_publication_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_diagnostic_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133m",
@@ -6328,20 +6373,20 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-post-publication-verifier",
             description="Architecture 133-L source-only post-publication verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_L_M_TESTS,
                 "tests/review_paper/test_post_publication_verifier.py",
                 "tests/review_paper/test_unattended_host.py",
                 "tests/review_paper/test_retained_root_acl_recovery.py",
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_L_M_RUFF_PATHS,
                 *ARCH133_VERIFIER_SOURCES,
                 "tests/review_paper/test_post_publication_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_verifier_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133l",
@@ -6353,14 +6398,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-retained-root-acl-recovery",
             description="Architecture 133-K source-only retained-root ACL recovery",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_retained_root_acl_recovery.py",
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_RECOVERY_SOURCES,
                 "tests/review_paper/test_retained_root_acl_recovery.py",
             ),
@@ -6373,13 +6418,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-retained-root-diagnostic",
             description="Architecture 133-J source-only retained-root diagnostic",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_retained_root_diagnostic.py",
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_RETAINED_SOURCES,
                 "tests/review_paper/test_retained_root_diagnostic.py",
             ),
@@ -6394,12 +6439,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-I source-only scratch native root ACL qualification"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_H_K_TESTS,
                 "tests/review_paper/test_scratch_root_acl.py",
                 "tests/review_paper/test_unattended_publication.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_SCRATCH_SOURCES,
                 "src/trading_bot/review_paper/unattended_publication_windows.py",
                 "tests/review_paper/test_scratch_root_acl.py",
@@ -6415,9 +6460,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             description=(
                 "Architecture 133-H source-only Q133-2 publication prerequisite"
             ),
-            tests=(*COMMON_TESTS, "tests/review_paper/test_unattended_publication.py"),
+            tests=(
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_unattended_publication.py",
+            ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_H_K_RUFF_PATHS,
                 *ARCH133_PUBLICATION_SOURCES,
                 "tests/review_paper/test_unattended_publication.py",
             ),
@@ -6432,16 +6480,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-G pre-publication host/runtime bootstrap surface"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_host_identity.py",
                 "src/trading_bot/review_paper/unattended_scheduler.py",
                 "src/trading_bot/review_paper/unattended_host.py",
@@ -6449,7 +6497,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "scripts/run_arch133_unattended_review_paper.py",
                 "scripts/run_arch133_unattended_host_preflight.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_host_bootstrap_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133g",
@@ -6460,7 +6508,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-paper-operator",
             description="Architecture 131-H one-cycle Robinhood paper operator",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_operator.py",
                 "tests/test_robinhood_paper_cycle.py",
                 "tests/robinhood_mcp/test_account_resolution.py",
@@ -6468,7 +6516,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/robinhood_mcp/test_windows_oauth.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_operator.py",
                 "tests/test_robinhood_paper_operator.py",
             ),
@@ -6481,13 +6529,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-agentic-account",
             description="Architecture 131-G internal Agentic-account resolution",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_account_resolution.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
                 "tests/test_robinhood_paper_cycle.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/account_resolution.py",
                 "src/trading_bot/robinhood_mcp/sdk_transport.py",
                 "src/trading_bot/robinhood_mcp/__init__.py",
@@ -6505,12 +6553,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-oauth-windows",
             description="Architecture 131-F Windows OAuth persistence and callback",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_windows_oauth.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/windows_oauth.py",
                 "tests/robinhood_mcp/test_windows_oauth.py",
             ),
@@ -6523,11 +6571,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-direct-mcp",
             description="Architecture 131-E direct Robinhood MCP transport",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_sdk_transport.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/__init__.py",
                 "src/trading_bot/robinhood_mcp/sdk_transport.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
@@ -6539,11 +6587,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-performance",
             description="Architecture 131-D durable Robinhood paper performance",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_performance.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/__init__.py",
                 "src/trading_bot/review_paper/performance.py",
                 "tests/review_paper/test_performance.py",
@@ -6555,11 +6603,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-paper-cycle",
             description="Architecture 131-C fail-closed Robinhood paper cycle",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_cycle.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_cycle.py",
                 "tests/test_robinhood_paper_cycle.py",
             ),
@@ -6570,11 +6618,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-mcp-schema",
             description="Architecture 131-B typed Robinhood MCP read/review schema",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_adapter.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/__init__.py",
                 "src/trading_bot/robinhood_mcp/models.py",
                 "src/trading_bot/robinhood_mcp/parsing.py",
@@ -6588,11 +6636,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-review-paper",
             description="Architecture 131 Robinhood review-based paper ledger",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_store.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/__init__.py",
                 "src/trading_bot/review_paper/models.py",
                 "src/trading_bot/review_paper/store.py",
@@ -6607,12 +6655,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 130 failed first-wake read-only effect reconciliation"
             ),
             tests=(
-                *COMMON_TESTS,
+                *RETAINED_TESTS,
                 "tests/runtime/test_d10_arch130_r8i_d1.py",
             ),
             ruff_paths=(
-                "scripts/checkpoint_runner.py",
-                "tests/runtime/test_checkpoint_runner.py",
+                *RETAINED_RUFF_PATHS,
                 "scripts/d10_arch130_r8i_d1.py",
                 "tests/runtime/test_d10_arch130_r8i_d1.py",
             ),
@@ -6624,14 +6671,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch128-r8-terminal-halt",
             description="R8I-H1 exact terminal first-wake scheduler halt source",
             tests=(
-                *COMMON_TESTS,
+                *RETAINED_TESTS,
                 "tests/runtime/test_d10_arch128_r8_terminal_halt.py",
                 "tests/runtime/test_d10_arch128_r8_readonly.py",
                 "tests/runtime/test_d10_durable_wake_evidence_observe.py",
             ),
             ruff_paths=(
-                "scripts/checkpoint_runner.py",
-                "tests/runtime/test_checkpoint_runner.py",
+                *RETAINED_RUFF_PATHS,
                 "scripts/d10_arch128_r8_terminal_halt.py",
                 "scripts/d10_arch128_r8_halt_windows.py",
                 "scripts/d10_arch128_r8_halt_diagnostic.py",
@@ -6823,6 +6869,7 @@ def build_verification_steps(
                 "no:cacheprovider",
                 "--durations=100",
                 "--durations-min=0.0",
+                f"--junitxml={basetemp.parent / 'pytest-results.xml'}",
             ),
         ),
         Step(

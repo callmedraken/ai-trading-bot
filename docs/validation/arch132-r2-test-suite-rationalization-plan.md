@@ -1,5 +1,79 @@
 # Architecture 132-R2 — Test Suite Rationalization Validation Plan
 
+## 2026-10-07 — Architecture 132-R2-B implementation (source review pending)
+
+R2-B splits test infrastructure by responsibility and isolates redundant
+predecessor work in local authority mutation tests. R2-C/R2-D have not started.
+The implementation does not claim ChatGPT source/topology or certification
+acceptance. Terminal source CI evidence will be recorded in a separate docs-only
+evidence checkpoint after the implementation source gate completes.
+
+The exact 36 active and eight retained checkpoint sequences are unchanged.
+All product test/Ruff requirements retain first-seen order. All eight production
+source-pin dictionaries are unchanged. All 46 authority-function ASTs preserve
+their logic after accounting only for family test selection and migrated source
+registration hashes. Production chaining M → L → K → J → I → H remains real.
+Local I–M pin/runtime tests replace only the immediate predecessor with PASS;
+workflow/order mutation tests retain the complete real predecessor chain;
+separate tests prove predecessor calls, rejection propagation, and complete real
+chain PASS. H mutations use the real H layer with no predecessor stub.
+
+`COMMON_TESTS` is exactly:
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+```
+
+Architecture 131, 133-A–G, 133-H–K, 133-L–M, and retained 128/130 checkpoints
+select only their own runner family module in addition to that common pair.
+Inventory-dependent checkpoints select only
+`tests/scripts/certification_runner/test_profiles.py`; the other four
+certification modules remain independently runnable FULL/ROBINHOOD contracts.
+The workflow preserves `feature/test-suite-*`, its docs-only fast path, and one
+serial source-gate job. Existing R2-A monotonic timing and top-100 flags are
+unchanged; an external `pytest-results.xml` is additionally uploaded for exact
+per-module case accounting.
+
+| Inventory / union | Before | R2-B |
+| --- | ---: | ---: |
+| FULL modules | 127 | 136 |
+| ROBINHOOD modules | 54 | 63 |
+| LEGACY modules | 204 | 205 |
+| EXHAUSTIVE modules | 331 | 341 |
+| FULL required baseline | 113 | 122 |
+| ROBINHOOD required baseline | 40 | 49 |
+| Active TEST_PATHS | 42 | 47 |
+| Active RUFF_PATHS | 120 | 127 |
+| Retained TEST_PATHS | 27 | 29 |
+| Retained RUFF_PATHS | 32 | 36 |
+
+Path counts rise because files are split; no speedup is inferred from path
+counts. The required legacy replacement is explicitly pinned in
+`LEGACY_REQUIRED_MODULES` for LEGACY/EXHAUSTIVE selection. Unknown files in the
+new runner infrastructure namespace fail closed instead of inheriting the broad
+historical runtime family. FULL/LEGACY remain disjoint, their union equals
+EXHAUSTIVE, and ROBINHOOD remains a subset of FULL.
+
+The original 1,941 collected cases are accounted for in the split inventory
+below. The 36 additional required-baseline mutation cases exercise the expanded
+replacement baselines. Original missing/changed pins, registration, workflow,
+ordering, callback/capability, wrong source/authority configuration, and
+predecessor rejection dimensions remain covered.
+
+The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent.
+Focused checks use the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe`
+and fresh external `F:\AI\temp\pytest-r2b-*` basetemps. No certification
+profile run or protected host/provider/credential/scheduler/broker operation
+was performed. Real 133-M remains paused; Q133-2V is consumed/non-retryable;
+Q133-3/Q133-4 remain unauthorized.
+
+Next owner: ChatGPT for exact GitHub diff review and source acceptance, then
+final certification selection. FULL current-product certification is expected
+because inventory topology changed, unless exact review establishes stronger
+equivalent evidence. Do not begin R2-C/R2-D or resume real 133-M here.
+
+
 ## 2026-10-07 — Architecture 132-R2-A ACCEPTED; R2-B split/selection frozen
 
 Architecture 132-R2-A is **SOURCE/TOPOLOGY ACCEPTED**.
@@ -434,3 +508,527 @@ After ordinary push, follow the source gate to terminal and report:
 
 ChatGPT then reviews the exact GitHub diff and decides the next R2-B split
 checkpoint.
+
+## R2-B exact relocation and requirement inventory
+
+### Required-baseline migration
+
+`tests/runtime/test_checkpoint_runner.py` →
+
+- `tests/runtime/checkpoint_runner/test_arch131.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_arch133_a_g.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_arch133_h_k.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_arch133_l_m.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_ci.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_core.py` — FULL + ROBINHOOD required
+- `tests/runtime/checkpoint_runner/test_retained_arch128_130.py` — LEGACY required (LEGACY/EXHAUSTIVE)
+
+`tests/scripts/test_run_test_certification.py` →
+
+- `tests/scripts/certification_runner/test_children.py` — FULL + ROBINHOOD required
+- `tests/scripts/certification_runner/test_lanes.py` — FULL + ROBINHOOD required
+- `tests/scripts/certification_runner/test_profiles.py` — FULL + ROBINHOOD required
+- `tests/scripts/certification_runner/test_results.py` — FULL + ROBINHOOD required
+- `tests/scripts/certification_runner/test_source.py` — FULL + ROBINHOOD required
+
+### Exact active checkpoint test union (first-seen order)
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/review_paper/test_store.py
+tests/robinhood_mcp/test_adapter.py
+tests/test_robinhood_paper_cycle.py
+tests/review_paper/test_performance.py
+tests/robinhood_mcp/test_sdk_transport.py
+tests/robinhood_mcp/test_windows_oauth.py
+tests/robinhood_mcp/test_account_resolution.py
+tests/test_robinhood_paper_operator.py
+tests/review_paper/test_intent_bridge.py
+tests/risk/test_risk_models.py
+tests/risk/test_manager.py
+tests/execution/test_execution_models.py
+tests/execution/test_order_engine.py
+tests/test_robinhood_paper_pipeline.py
+tests/review_paper/test_risk_context.py
+tests/ledger/test_ledger.py
+tests/test_robinhood_forward_paper_cycle.py
+tests/test_robinhood_live_qualification_verifier.py
+tests/review_paper/test_session_admission.py
+tests/review_paper/test_risk_prices.py
+tests/review_paper/test_forward_preview.py
+tests/review_paper/test_risk_price_acquisition.py
+tests/review_paper/test_supervised_forward_paper.py
+tests/review_paper/test_prepare_qualification.py
+tests/test_robinhood_prepare_qualification_verifier.py
+tests/review_paper/test_nyse_published_regular_sessions.py
+tests/review_paper/test_published_session_prepare.py
+tests/scripts/certification_runner/test_profiles.py
+tests/test_robinhood_prepare_operator.py
+tests/test_robinhood_supervised_qualification.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+tests/review_paper/test_unattended_activation.py
+tests/review_paper/test_unattended_state_store.py
+tests/review_paper/test_unattended_one_wake.py
+tests/review_paper/test_unattended_execution.py
+tests/review_paper/test_unattended_host.py
+tests/runtime/checkpoint_runner/test_arch133_h_k.py
+tests/review_paper/test_unattended_publication.py
+tests/review_paper/test_scratch_root_acl.py
+tests/review_paper/test_retained_root_diagnostic.py
+tests/review_paper/test_retained_root_acl_recovery.py
+tests/runtime/checkpoint_runner/test_arch133_l_m.py
+tests/review_paper/test_post_publication_verifier.py
+tests/review_paper/test_post_publication_stage_diagnostic.py
+```
+
+### Exact retained checkpoint test union (first-seen order)
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+tests/runtime/checkpoint_runner/test_retained_arch128_130.py
+tests/runtime/test_d10_arch128_parent_acl_repair.py
+tests/runtime/test_d10_arch128_r4_operator.py
+tests/runtime/test_d10_arch128_r4_orchestration.py
+tests/runtime/test_d10_arch128_r4_replacement.py
+tests/runtime/test_d10_arch128_r4_windows.py
+tests/runtime/test_d10_protected_deployment.py
+tests/runtime/test_d10_protected_replacement.py
+tests/runtime/test_d10_protected_replacement_windows.py
+tests/runtime/test_windows_authority.py
+tests/runtime/test_d10_arch128_r3_preflight.py
+tests/runtime/test_d10_activation_scheduler_operator.py
+tests/runtime/test_d10_arch128_r5_trading_child.py
+tests/runtime/test_d10_python_substrate_harness.py
+tests/runtime/test_d10_python_substrate_windows.py
+tests/runtime/test_personal_desktop_d10_python_substrate.py
+tests/runtime/test_d10_arch128_r6_reactivation.py
+tests/runtime/test_personal_desktop_d10_activation_lease.py
+tests/runtime/test_personal_desktop_d10_wake_evidence_log.py
+tests/runtime/test_personal_desktop_unattended_scheduler_contract.py
+tests/runtime/test_d10_arch128_r7_readonly.py
+tests/runtime/test_d10_arch128_r7_protected.py
+tests/runtime/test_d10_arch128_r7_windows.py
+tests/runtime/test_d10_arch128_r8_terminal_halt.py
+tests/runtime/test_d10_arch128_r8_readonly.py
+tests/runtime/test_d10_durable_wake_evidence_observe.py
+tests/runtime/test_d10_arch130_r8i_d1.py
+```
+
+### Every original logical test accounted for
+
+All rows refer to the admitted parent `4b81a822d55fa5e79460294f46239d133170a157`.
+Each original function appears exactly once. Parameter matrices retain their
+original dimensions; path/registration literals are deliberately relocated.
+
+#### `tests/runtime/checkpoint_runner/test_arch131.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_131f_authority_detects_boundary_drift` | 1684 | 7 |
+| `test_131f_authority_rejects_new_effects` | 1711 | 8 |
+| `test_131f_authority_rejects_host_registration` | 1727 | 2 |
+| `test_131f_source_registration_and_workflow` | 1743 | 1 |
+| `test_131g_source_registration` | 1756 | 1 |
+| `test_131g_authority_rejects_boundary_drift` | 1841 | 13 |
+| `test_131h_source_registration_and_workflow` | 1862 | 1 |
+| `test_131h_authority_rejects_boundary_drift` | 1987 | 21 |
+| `test_131i_source_registration_and_workflow` | 2013 | 1 |
+| `test_131i_authority_freezes_each_mapping` | 2074 | 14 |
+| `test_131i_authority_freezes_validation_and_identity` | 2108 | 13 |
+| `test_131i_authority_rejects_imports_calls_and_module_effects` | 2150 | 27 |
+| `test_131i_authority_freezes_source_only_registration_and_ci` | 2204 | 9 |
+| `test_131i_authority_rejects_reversed_workflow_order` | 2218 | 1 |
+| `test_131j_source_registration_and_workflow` | 2230 | 1 |
+| `test_131j_authority_freezes_each_forwarded_argument` | 2288 | 11 |
+| `test_131j_authority_freezes_composition_and_result` | 2345 | 15 |
+| `test_131j_authority_rejects_unreviewed_effects` | 2383 | 22 |
+| `test_131j_authority_freezes_source_only_registration` | 2404 | 6 |
+| `test_131j_authority_freezes_workflow_invocations` | 2443 | 3 |
+| `test_131j_authority_rejects_reversed_workflow_order` | 2452 | 1 |
+| `test_131k_source_only_registration_and_batch` | 3096 | 1 |
+| `test_131k_authority_freezes_builder` | 3182 | 20 |
+| `test_131k_authority_rejects_expanded_effect_surface` | 3216 | 19 |
+| `test_131k_authority_freezes_registration` | 3238 | 7 |
+| `test_131k_authority_freezes_batch_workflow` | 3261 | 4 |
+| `test_131l_source_only_registration_and_batch` | 3284 | 1 |
+| `test_131l_authority_freezes_composition_and_every_input` | 3388 | 27 |
+| `test_131l_authority_rejects_expanded_effect_or_retry_surface` | 3428 | 26 |
+| `test_131l_authority_freezes_source_only_registration` | 3452 | 7 |
+| `test_131l_authority_rejects_runtime_effect_registration` | 3475 | 2 |
+| `test_131l_authority_freezes_batch_workflow` | 3496 | 5 |
+| `test_131l_authority_fails_closed_when_source_is_unavailable` | 3528 | 3 |
+| `test_131lq_source_only_registration_and_batch` | 3535 | 1 |
+| `test_131lq_authority_rejects_effect_surface_drift` | 3589 | 8 |
+| `test_131lq_authority_rejects_runtime_effect_registration` | 3600 | 2 |
+| `test_131m_source_only_registration_and_batch` | 3619 | 1 |
+| `test_131m_authority_rejects_effect_surface_drift` | 3673 | 8 |
+| `test_131m_authority_rejects_runtime_effect_registration` | 3684 | 2 |
+| `test_131m_authority_rejects_registration_drift` | 3720 | 7 |
+| `test_131m_authority_rejects_source_authority_drift` | 3740 | 4 |
+| `test_131m_authority_rejects_runtime_remote_drift` | 3766 | 1 |
+| `test_131n_source_only_registration_and_batch` | 3780 | 1 |
+| `test_131n_authority_rejects_effect_surface_drift` | 3831 | 8 |
+| `test_131n_authority_rejects_runtime_effect_registration` | 3842 | 2 |
+| `test_131n_authority_rejects_registration_drift` | 3878 | 7 |
+| `test_131n_authority_rejects_source_authority_drift` | 3898 | 4 |
+| `test_131n_authority_rejects_runtime_remote_drift` | 3924 | 1 |
+| `test_131o_source_only_registration_and_batch` | 3938 | 1 |
+| `test_131o_authority_rejects_effect_surface_drift` | 3989 | 8 |
+| `test_131o_authority_rejects_runtime_effect_registration` | 4000 | 2 |
+| `test_131o_authority_rejects_registration_drift` | 4036 | 7 |
+| `test_131o_authority_rejects_source_authority_drift` | 4056 | 4 |
+| `test_131o_authority_rejects_runtime_remote_drift` | 4082 | 1 |
+| `test_131o_authority_pins_composition_validation_and_projection` | 4116 | 8 |
+| `test_131p_source_only_registration_and_batch` | 4131 | 1 |
+| `test_131p_authority_rejects_effect_surface_drift` | 4185 | 8 |
+| `test_131p_authority_rejects_runtime_effect_registration` | 4196 | 2 |
+| `test_131p_authority_rejects_registration_drift` | 4232 | 7 |
+| `test_131p_authority_rejects_source_authority_drift` | 4252 | 4 |
+| `test_131p_authority_rejects_runtime_remote_drift` | 4278 | 1 |
+| `test_131p_authority_pins_complete_acquisition` | 4312 | 9 |
+| `test_131q_source_only_registration_and_batch` | 4324 | 1 |
+| `test_131q_authority_rejects_effect_surface_drift` | 4378 | 8 |
+| `test_131q_authority_rejects_runtime_effect_registration` | 4389 | 2 |
+| `test_131q_authority_rejects_registration_drift` | 4425 | 7 |
+| `test_131q_authority_rejects_source_authority_drift` | 4445 | 4 |
+| `test_131q_authority_rejects_runtime_remote_drift` | 4471 | 1 |
+| `test_131q_authority_pins_complete_composition` | 4541 | 18 |
+| `test_131r_source_only_registration_and_batch` | 4573 | 2 |
+| `test_131r_complete_module_pinned` | 4640 | 20 |
+| `test_131r_exact_registration_pinned` | 4659 | 12 |
+| `test_131r_source_authority_drift` | 4677 | 8 |
+| `test_131r_runtime_registration_drift` | 4712 | 6 |
+| `test_131r_critical_guards_pinned` | 4742 | 11 |
+| `test_131s_source_only_registration_and_batch` | 4753 | 1 |
+| `test_131s_authority_rejects_effect_surface_drift` | 4812 | 8 |
+| `test_131s_authority_rejects_runtime_effect_registration` | 4823 | 2 |
+| `test_131s_authority_rejects_registration_drift` | 4859 | 7 |
+| `test_131s_authority_rejects_source_authority_drift` | 4879 | 4 |
+| `test_131s_authority_rejects_runtime_remote_drift` | 4907 | 1 |
+| `test_131s_authority_pins_manifest_and_schedule` | 4945 | 17 |
+| `test_131s_authority_rejects_ci_invocation_drift` | 4957 | 4 |
+| `test_131t_source_only_registration_and_batch` | 4988 | 1 |
+| `test_131t_complete_boundaries_pinned` | 5063 | 36 |
+| `test_131t_resolution_delegation_and_verifier_guards_pinned` | 5095 | 12 |
+| `test_131t_registration_drift` | 5121 | 7 |
+| `test_131t_runtime_capability_drift` | 5138 | 3 |
+| `test_131t_authority_drift` | 5157 | 4 |
+| `test_131t_ci_invocation_drift` | 5179 | 4 |
+| `test_131u_source_only_registration_and_batch` | 5206 | 1 |
+| `test_131u_complete_boundaries_pinned` | 5296 | 35 |
+| `test_131u_composition_and_blocker_pinned` | 5327 | 10 |
+| `test_131u_registration_drift` | 5351 | 7 |
+| `test_131u_runtime_capability_drift` | 5368 | 3 |
+| `test_131u_authority_drift` | 5387 | 4 |
+| `test_131u_ci_invocation_drift` | 5414 | 4 |
+| `test_131u_source_gate_participant_drift` | 5437 | 2 |
+| `test_131v_source_only_registration_and_boundaries` | 5448 | 1 |
+
+#### `tests/runtime/checkpoint_runner/test_arch133_a_g.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_133a_source_only_registration_and_single_ordered_batch` | 5486 | 1 |
+| `test_133a_authority_pins_every_import_and_call` | 5542 | 14 |
+| `test_133a_authority_fails_closed_on_missing_or_drifting_material` | 5565 | 9 |
+| `test_133a_runtime_registration_drift_is_rejected` | 5610 | 5 |
+| `test_133b_source_only_registration_exact_order_and_coverage` | 5629 | 1 |
+| `test_133b_authority_pins_every_import_and_call` | 5682 | 30 |
+| `test_133b_authority_missing_files_fail_closed` | 5699 | 5 |
+| `test_133b_authority_registration_batch_and_workflow_drift` | 5716 | 6 |
+| `test_133b_runtime_registration_drift_fails_closed` | 5768 | 7 |
+| `test_133c_source_only_registration_exact_order_and_coverage` | 5783 | 1 |
+| `test_133c_authority_pins_every_import_call_and_edge` | 5855 | 11 |
+| `test_133c_authority_missing_files_fail_closed` | 5872 | 3 |
+| `test_133c_authority_registration_batch_and_workflow_drift` | 5889 | 6 |
+| `test_133d_source_only_registration_exact_order_and_coverage` | 5932 | 1 |
+| `test_133d_authority_pins_every_import_call_and_edge` | 6005 | 11 |
+| `test_133d_authority_missing_files_fail_closed` | 6022 | 3 |
+| `test_133d_authority_registration_batch_and_workflow_drift` | 6039 | 6 |
+| `test_133d_runtime_registration_drift_fails_closed` | 6089 | 7 |
+| `test_133c_runtime_registration_drift_fails_closed` | 6111 | 7 |
+| `test_133e_source_only_registration_exact_order_and_coverage` | 6131 | 1 |
+| `test_133e_authority_pins_all_host_runtime_scheduler_and_launcher_edges` | 6190 | 24 |
+| `test_133e_authority_missing_files_fail_closed` | 6210 | 6 |
+| `test_133e_runtime_registration_drift_rejected` | 6228 | 7 |
+| `test_133e_registration_batch_and_workflow_fail_closed` | 6249 | 6 |
+| `test_133g_source_only_registration_exact_order_and_coverage` | 6407 | 1 |
+| `test_133g_authority_pins_bootstrap_runtime_and_launcher_edges` | 6451 | 6 |
+| `test_133g_authority_missing_files_fail_closed` | 6469 | 8 |
+| `test_133g_runtime_registration_drift_rejected` | 6487 | 7 |
+| `test_133g_registration_batch_and_workflow_fail_closed` | 6507 | 5 |
+
+#### `tests/runtime/checkpoint_runner/test_arch133_h_k.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_133h_checkpoint_is_source_only_and_ci_registered` | 6290 | 1 |
+| `test_133h_complete_authority_pins_fail_closed` | 6319 | 36 |
+| `test_133h_runtime_capability_drift_rejected` | 6343 | 7 |
+| `test_133h_batch_workflow_registration_drift` | 6355 | 6 |
+| `test_133h_verify_preflight_execute_callbacks_unreachable` | 6382 | 1 |
+| `test_133i_source_only_registration_and_inert_callbacks` | 6535 | 1 |
+| `test_133i_source_import_closure_pins_fail_closed` | 6577 | 18 |
+| `test_133i_runtime_callback_injection_fails_closed` | 6601 | 7 |
+| `test_133i_ci_registration_drift_fails_closed` | 6613 | 6 |
+| `test_133i_relocated_namespace_pin_rejects_drift` | 6661 | 4 |
+| `test_133j_source_only_registration_no_host_callbacks` | 6691 | 1 |
+| `test_133j_read_only_import_closure_pins_fail_closed` | 6716 | 14 |
+| `test_133j_runtime_callback_injection_fails_closed` | 6740 | 7 |
+| `test_133j_ci_registration_drift_fails_closed` | 6752 | 6 |
+| `test_133k_source_only_registration_no_host_callbacks` | 6801 | 1 |
+| `test_133k_read_only_import_closure_pins_fail_closed` | 6826 | 18 |
+| `test_133k_runtime_callback_injection_fails_closed` | 6850 | 7 |
+| `test_133k_ci_registration_drift_fails_closed` | 6862 | 6 |
+
+#### `tests/runtime/checkpoint_runner/test_arch133_l_m.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_133l_source_only_registration_no_host_callbacks` | 6905 | 1 |
+| `test_133l_complete_import_closure_pins_fail_closed` | 6929 | 48 |
+| `test_133l_runtime_callback_injection_fails_closed` | 6953 | 7 |
+| `test_133l_ci_registration_drift_fails_closed` | 6965 | 6 |
+| `test_133m_source_only_registration_no_host_callbacks` | 7008 | 1 |
+| `test_133m_complete_import_closure_pins_fail_closed` | 7032 | 48 |
+| `test_133m_runtime_callback_injection_fails_closed` | 7056 | 7 |
+| `test_133m_ci_registration_drift_fails_closed` | 7068 | 6 |
+
+#### `tests/runtime/checkpoint_runner/test_ci.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_docs_changed_path_classification` | 2780 | 14 |
+| `test_ci_classification_uses_exact_event_base_and_nul_paths` | 2799 | 2 |
+| `test_ci_invalid_base_falls_back_without_git` | 2832 | 7 |
+| `test_ci_missing_or_malformed_event_falls_back` | 2843 | 5 |
+| `test_ci_unavailable_base_or_nonancestor_falls_back` | 2852 | 2 |
+| `test_ci_unknown_diff_and_moved_source_fall_back` | 2874 | 5 |
+| `test_ci_docs_gate_evidence_range_check_and_output` | 2897 | 7 |
+| `test_docs_gate_rejects_dirty_source` | 2942 | 1 |
+| `test_ci_workflow_batch_order_conditions_and_slim_artifacts` | 2957 | 1 |
+| `test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation` | 3011 | 5 |
+| `test_ci_change_gate_against_real_git_range` | 3040 | 8 |
+| `test_r2a_workflow_scope_and_narrow_branch_trigger` | 7175 | 1 |
+
+#### `tests/runtime/checkpoint_runner/test_core.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_build_verification_steps_runs_both_nonmutating_ruff_gates` | 41 | 1 |
+| `test_run_verification_steps_continues_after_lint_failure` | 78 | 1 |
+| `test_run_verification_steps_collects_both_ruff_diagnostics` | 116 | 1 |
+| `test_registered_profiles_include_current_arch128_gates` | 148 | 1 |
+| `test_default_evidence_root_is_outside_repo` | 318 | 1 |
+| `test_read_only_effect_guard_rejects_unexpected_mutation` | 537 | 1 |
+| `test_remote_branch_head_is_bounded_and_noninteractive` | 549 | 1 |
+| `test_remote_branch_head_timeout_fails_closed` | 577 | 1 |
+| `test_trusted_remote_head_handoff_requires_exact_lower_hex` | 594 | 1 |
+| `test_preflight_checkpoint_accepts_bound_trusted_remote_head` | 612 | 1 |
+| `test_preflight_checkpoint_rejects_mismatched_trusted_remote_head` | 659 | 1 |
+| `test_preflight_checkpoint_requires_live_remote_head` | 704 | 1 |
+| `test_preflight_checkpoint_writes_external_evidence` | 755 | 1 |
+| `test_preflight_checkpoint_allows_detached_with_pinned_remote` | 799 | 1 |
+| `test_execute_checkpoint_requires_live_remote_head` | 844 | 1 |
+| `test_execute_checkpoint_writes_attempt_and_final_evidence` | 896 | 1 |
+| `test_execute_checkpoint_preserves_attempt_on_runner_exception` | 945 | 1 |
+| `test_batch_first_seen_requirements_and_all_current_coverage` | 2558 | 1 |
+| `test_batch_shares_commands_preserves_order_and_collects_authorities` | 2578 | 5 |
+| `test_batch_authority_failure_attribution_and_continuation` | 2643 | 2 |
+| `test_batch_source_drift_fails` | 2669 | 3 |
+| `test_batch_dirty_source_rejected_before_commands_or_authority` | 2684 | 1 |
+| `test_batch_cli_rejects_invalid_selection` | 2708 | 4 |
+| `test_batch_cli_preserves_order_and_single_verify_dispatch` | 2717 | 1 |
+| `test_single_verify_report_and_command_selection_unchanged` | 2735 | 1 |
+| `test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout` | 7202 | 4 |
+| `test_r2a_elapsed_is_additive_report_evidence_without_status_threshold` | 7238 | 8 |
+| `test_r2a_pytest_top_100_duration_flags_are_exact_and_diagnostic_only` | 7265 | 1 |
+
+#### `tests/runtime/checkpoint_runner/test_retained_arch128_130.py`
+
+Original module: `tests/runtime/test_checkpoint_runner.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_current_arch128_authority_profiles_pass` | 299 | 1 |
+| `test_parent_preflight_uses_read_only_operator` | 365 | 1 |
+| `test_parent_execute_delegates_through_existing_interlock` | 379 | 1 |
+| `test_parent_execute_rejects_forbidden_side_effect_evidence` | 398 | 1 |
+| `test_r4_execute_delegates_through_existing_interlock` | 417 | 1 |
+| `test_r4_execute_accepts_exact_complete_result` | 436 | 1 |
+| `test_r4_execute_marks_indeterminate_effect_conservatively` | 458 | 1 |
+| `test_r4_execute_rejects_forbidden_side_effect_evidence` | 479 | 1 |
+| `test_r4_preflight_attaches_parent_acl_diagnostic` | 504 | 1 |
+| `test_r5_substrate_preflight_requires_exact_pid_interlock` | 991 | 1 |
+| `test_r5_trading_preflight_uses_fixed_production_command` | 1003 | 1 |
+| `test_r7_preflight_delegates_to_read_only_admission` | 1046 | 1 |
+| `test_r7_preflight_rejects_effect_evidence` | 1065 | 1 |
+| `test_r7_registration_preserves_source_and_preflight_profiles` | 1080 | 1 |
+| `test_r7_execute_missing_exact_authorization_never_constructs_host` | 1125 | 4 |
+| `test_r7_execute_exact_dispatch_composition_and_pass` | 1149 | 1 |
+| `test_r7_execute_possible_mutation_is_conservative` | 1196 | 15 |
+| `test_r7_execute_unproven_pre_effect_result_is_conservative` | 1222 | 8 |
+| `test_r7_execute_rejects_forbidden_effects` | 1247 | 14 |
+| `test_r7_execute_rejects_malformed_pass_recovery_evidence` | 1267 | 16 |
+| `test_r7_execute_rejects_incomplete_pass` | 1291 | 5 |
+| `test_r7_execute_rejects_malformed_dispatch_result` | 1302 | 4 |
+| `test_r7_runner_records_dispatch_failures_as_possible_effect` | 1311 | 3 |
+| `test_r7d_authority_rejects_direct_host_and_recovery_calls` | 1371 | 12 |
+| `test_r7d_authority_rejects_composition_or_contract_drift` | 1414 | 9 |
+| `test_r7d_wrapper_has_no_direct_host_authority` | 1433 | 1 |
+| `test_r8_registration_is_read_only` | 1447 | 1 |
+| `test_r8_preflight_delegates_once_and_preserves_runner_shape` | 1474 | 2 |
+| `test_r8_runner_independently_rejects_effect_drift` | 1509 | 40 |
+| `test_r8_runner_rejects_malformed_result` | 1526 | 3 |
+| `test_r8_authority_rejects_direct_host_or_effect_calls` | 1591 | 23 |
+| `test_r8_authority_freezes_boundary_identity_and_first_wake_policy` | 1643 | 21 |
+| `test_r8_authority_rejects_execute_registration_and_wrapper_effects` | 1662 | 3 |
+| `test_r2a_active_retained_partition_and_retained_authorities` | 7095 | 1 |
+| `test_r2a_explicit_retained_and_mixed_batches_preserve_all_requirements` | 7123 | 3 |
+| `test_r2a_retained_individual_cli_dispatch` | 7164 | 8 |
+
+#### `tests/scripts/certification_runner/test_children.py`
+
+Original module: `tests/scripts/test_run_test_certification.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_empty_or_malformed_junit_fails` | 55 | 4 |
+| `test_failed_or_error_testcase_fails` | 63 | 2 |
+| `test_skipped_is_counted_separately` | 73 | 1 |
+| `test_subprocess_failure_propagates` | 96 | 1 |
+
+#### `tests/scripts/certification_runner/test_lanes.py`
+
+Original module: `tests/scripts/test_run_test_certification.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_inventory_partition_is_complete_disjoint_and_deterministic` | 28 | 1 |
+| `test_missing_serial_and_duplicate_or_overlap_fail` | 42 | 1 |
+| `test_robinhood_has_two_deterministic_balanced_nonempty_lanes` | 871 | 1 |
+| `test_empty_lane_never_launches_pytest` | 893 | 3 |
+
+#### `tests/scripts/certification_runner/test_profiles.py`
+
+Original module: `tests/scripts/test_run_test_certification.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_current_robinhood_baseline_and_arch131_registration_coverage` | 700 | 1 |
+| `test_current_profile_counts_support_partition_and_serial_allowlist` | 740 | 1 |
+| `test_new_owned_modules_are_automatically_admitted` | 812 | 7 |
+| `test_missing_or_renamed_required_module_fails_closed` | 822 | 80 |
+| `test_retired_families_are_legacy_and_research_is_supported` | 832 | 1 |
+| `test_full_missing_or_renamed_frozen_baseline_fails_closed` | 1016 | 226 |
+| `test_new_supported_files_are_discovered_and_admitted` | 1050 | 19 |
+| `test_unclassified_namespace_fails_every_profile` | 1075 | 20 |
+| `test_classification_invariants_fail_closed` | 1085 | 6 |
+| `test_ownership_overlap_fails_closed` | 1104 | 1 |
+
+#### `tests/scripts/certification_runner/test_results.py`
+
+Original module: `tests/scripts/test_run_test_certification.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_protected_opt_in_presence_fails_closed` | 90 | 1 |
+| `test_plan_never_launches_pytest_and_saves_summary` | 128 | 4 |
+| `test_failed_child_sets_failed_summary` | 470 | 1 |
+| `test_parser_defaults_to_full_and_rejects_unknown_profile` | 675 | 1 |
+| `test_exact_profile_lane_success_accounting` | 907 | 28 |
+| `test_all_profiles_reject_protected_opt_ins_before_source` | 956 | 16 |
+| `test_static_checks_remain_whole_repository` | 974 | 4 |
+| `test_all_profiles_retain_temp_root_requirement` | 995 | 4 |
+
+#### `tests/scripts/certification_runner/test_source.py`
+
+Original module: `tests/scripts/test_run_test_certification.py`.
+
+| Original test function | Parent line | Original cases |
+| --- | ---: | ---: |
+| `test_source_identity_mismatch_fails` | 191 | 1 |
+| `test_live_develop_matching_expected_head_is_accepted` | 286 | 1 |
+| `test_live_develop_move_is_rejected_when_local_tracking_ref_is_stale` | 309 | 1 |
+| `test_live_feature_move_is_rejected_when_local_tracking_ref_is_stale` | 324 | 1 |
+| `test_live_feature_query_maps_tracking_ref_to_exact_remote_branch` | 351 | 1 |
+| `test_live_origin_resolver_rejects_nontracking_ref_form` | 369 | 1 |
+| `test_missing_live_feature_ref_is_rejected` | 376 | 1 |
+| `test_malformed_or_multiple_live_origin_response_is_rejected` | 394 | 2 |
+| `test_live_origin_query_failure_is_rejected` | 403 | 1 |
+| `test_final_source_verification_repeats_live_origin_proof` | 416 | 4 |
+| `test_feature_ref_must_name_origin` | 502 | 1 |
+
+### Focused verification commands
+
+From the named R2-B worktree, with the existing development interpreter:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/runtime/checkpoint_runner/test_core.py tests/runtime/checkpoint_runner/test_ci.py tests/runtime/checkpoint_runner/test_retained_arch128_130.py tests/scripts/certification_runner -q --tb=short --basetemp=F:/AI/temp/pytest-r2b-focused-20261008-b -p no:cacheprovider --junitxml=F:/AI/temp/r2b-evidence/focused-b.xml
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/runtime/checkpoint_runner/test_arch131.py tests/runtime/checkpoint_runner/test_arch133_a_g.py tests/runtime/checkpoint_runner/test_arch133_h_k.py tests/runtime/checkpoint_runner/test_arch133_l_m.py -q --tb=short --maxfail=8 --basetemp=F:/AI/temp/pytest-r2b-focused-20261008-c -p no:cacheprovider --junitxml=F:/AI/temp/r2b-evidence/focused-c.xml
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/runtime/checkpoint_runner/test_retained_arch128_130.py -k retained_individual_verification -q --tb=short --basetemp=F:/AI/temp/pytest-r2b-focused-20261008-e -p no:cacheprovider --junitxml=F:/AI/temp/r2b-evidence/focused-e.xml
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m ruff check --no-cache scripts/checkpoint_runner.py scripts/run_test_certification.py tests/runtime/checkpoint_runner tests/scripts/certification_runner
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m ruff format --check --no-cache scripts/checkpoint_runner.py scripts/run_test_certification.py tests/runtime/checkpoint_runner tests/scripts/certification_runner
+git diff --check
+```
+
+Group B: 817 passed / 0 skipped / 0 failed/errors in 28.59 s.
+The additional retained individual source-contract proof: 1 passed / 211
+deselected in 0.29 s. The first combined attempt stopped at 12 relocation-only
+failures after 478 passes; registration-mutation literals and one expected
+module set were corrected. Its duration was 128.61 s. The new retained proof's
+first attempt asserted a nonexistent report field; the assertion was corrected
+to inspect the existing recorded command requirements without changing schema.
+Ruff check/format and diff checks pass; terminal remaining group and CI results
+will be recorded separately. Reusing these exact basetemps is not permitted;
+choose fresh names for any future rerun.
+
+### R2-B focused completion before implementation publication
+
+All **2,003 distinct final cases passed**, with no skipped, failed or error
+outcomes remaining. This comprises group B's 817, Architecture 131/A–G's 903
+passes from group C, the corrected H–M group's 282, and the extra retained
+individual verification proof's one pass. Group C stopped at eight expected
+workflow/order isolation failures after 1,006 passes in 270.15 s; those cases
+were restored to real-chain execution and only H–M was rerun. Group F passed
+282 in 116.88 s. A final certification-admission follow-up (group G) passed
+469 in 3.94 s after ensuring real `run()` admission and direct `select_inventory()`
+both enforce the deliberately required retained replacement. Group G repeats
+already counted cases and does not increase the 2,003 distinct count.
+
+Additional exact focused commands:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/runtime/checkpoint_runner/test_arch133_h_k.py tests/runtime/checkpoint_runner/test_arch133_l_m.py -q --tb=short --maxfail=5 --basetemp=F:/AI/temp/pytest-r2b-focused-20261008-f -p no:cacheprovider --junitxml=F:/AI/temp/r2b-evidence/focused-f.xml
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/scripts/certification_runner/test_profiles.py tests/scripts/certification_runner/test_results.py -q --tb=short --basetemp=F:/AI/temp/pytest-r2b-focused-20261008-g -p no:cacheprovider --junitxml=F:/AI/temp/r2b-evidence/focused-g.xml
+```
+
+| Split module | Final focused cases |
+| --- | ---: |
+| `tests/runtime/checkpoint_runner/test_arch131.py` | 698 |
+| `tests/runtime/checkpoint_runner/test_arch133_a_g.py` | 205 |
+| `tests/runtime/checkpoint_runner/test_arch133_h_k.py` | 153 |
+| `tests/runtime/checkpoint_runner/test_arch133_l_m.py` | 129 |
+| `tests/runtime/checkpoint_runner/test_ci.py` | 58 |
+| `tests/runtime/checkpoint_runner/test_core.py` | 50 |
+| `tests/runtime/checkpoint_runner/test_retained_arch128_130.py` | 212 |
+| `tests/scripts/certification_runner/test_children.py` | 8 |
+| `tests/scripts/certification_runner/test_lanes.py` | 6 |
+| `tests/scripts/certification_runner/test_profiles.py` | 410 |
+| `tests/scripts/certification_runner/test_results.py` | 59 |
+| `tests/scripts/certification_runner/test_source.py` | 15 |

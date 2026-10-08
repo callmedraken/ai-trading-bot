@@ -1,5 +1,53 @@
 # Architecture 132-R2 — Test Suite Rationalization Validation Plan
 
+## 2026-10-07 — Architecture 132-R2-A implementation (source review pending)
+
+R2-A separates the routine source batch from retained compatibility without
+changing the checkpoint registry or certification ownership. The exact 36 active
+Architecture 131/133 checkpoints retain their previous relative order and all
+registered tests, Ruff paths, source pins and authority boundaries. The eight
+Architecture 128/130 checkpoints listed in the frozen R2-A contract remain
+registered, individually verifiable and selectable in retained-only or mixed
+explicit batches. First-seen requirement deduplication is unchanged.
+
+Measured requirement unions against the admitted frozen design parent:
+
+| Routine source gate | Before | R2-A |
+| --- | ---: | ---: |
+| Checkpoints | 44 | 36 |
+| Test paths | 68 | 42 |
+| Ruff paths | 150 | 120 |
+
+Accepted baseline CI #286 / 37708975995 recorded 6,393 passed / 3 skipped
+in 696.12 seconds. R2-A terminal measurements remain pending.
+
+Command reports add observational `elapsed_seconds` from a monotonic timer.
+Pytest stdout preserves `--durations=100 --durations-min=0.0` output in the
+existing uploaded command evidence. Timing has no PASS/FAIL threshold. Report
+schema, authority results, source identity and protected `NOT_RUN` fields remain
+unchanged. Active tuple AST pins now freeze
+`8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a`;
+production source and registration pins are unchanged.
+
+The workflow adds only the explicitly requested `feature/test-suite-*` push
+family. Its active invocation and docs-only classification remain source-pinned.
+Terminal CI timing/case counts will be recorded in a separate evidence checkpoint
+after the implementation run completes; this is not certification acceptance.
+ChatGPT owns exact GitHub source review, topology acceptance and certification
+choice. R2-B has not started. Real 133-M remains paused; Q133-2V is consumed and
+Q133-3/Q133-4 remain unauthorized. No protected operation was invoked.
+
+The requested development interpreter path `F:\AI\ai-trading-bot.venv` was
+absent; implementation uses the existing `F:\AI\ai-trading-bot\.venv` instead,
+with fresh explicit external basetemp directories under `F:\AI\temp\pytest...`.
+Focused verification exercised all 1,491 runner cases: the first pass reported
+1,488 passed / 3 failed in 725.29 seconds. Those three existing workflow-mutation
+cases still targeted retained names; they were corrected to mutate active names.
+The affected five-case group then passed (5 passed / 1,486 deselected).
+Focused Ruff check/format and `git diff --check` passed. No certification profile
+suite was run locally; `run_test_certification.py` and its tests are unchanged.
+
+
 ## 2026-10-07 — Architecture 132-R2 test-suite rationalization interlude
 
 Architecture 133-M is source-accepted and docs-closed, but the real protected

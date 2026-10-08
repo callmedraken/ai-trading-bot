@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -2464,7 +2465,7 @@ def test_131j_authority_rejects_reversed_workflow_order(tmp_path):
 
 # CI source-gate optimization regressions. Frozen independently of the runner
 # registry to detect omissions/order changes in the workflow and its pins.
-_EXPECTED_CI_CHECKPOINTS = (
+_EXPECTED_RETAINED_CHECKPOINTS = (
     "arch128-parent-acl-repair",
     "arch128-r4",
     "arch128-r5-substrate",
@@ -2473,6 +2474,9 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch128-r7",
     "arch128-r8-terminal-halt",
     "arch130-r8i-d1",
+)
+
+_EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
     "arch131-robinhood-paper-cycle",
@@ -2556,7 +2560,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
     assert tests == ("tests/shared.py", "tests/first.py", "tests/second.py")
     assert ruff == ("shared.py", "first.py", "second.py", "third.py")
     specs = runner._checkpoint_specs()
-    selected = [specs[name] for name in _EXPECTED_CI_CHECKPOINTS]
+    selected = [specs[name] for name in _EXPECTED_ACTIVE_CI_CHECKPOINTS]
     tests, ruff = runner.batch_requirements(selected)
     assert len(tests) == len(set(tests))
     assert len(ruff) == len(set(ruff))
@@ -2565,7 +2569,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
     for spec in selected:
         assert set(spec.tests) <= set(tests)
         assert set(spec.ruff_paths) <= set(ruff)
-    assert runner.CI_CHECKPOINTS == _EXPECTED_CI_CHECKPOINTS
+    assert runner.ACTIVE_CI_CHECKPOINTS == _EXPECTED_ACTIVE_CI_CHECKPOINTS
 
 
 @pytest.mark.parametrize(
@@ -2972,7 +2976,7 @@ def test_ci_workflow_batch_order_conditions_and_slim_artifacts():
     )[0]
     assert (
         tuple(line.strip().removesuffix(" `") for line in command.splitlines())
-        == _EXPECTED_CI_CHECKPOINTS
+        == _EXPECTED_ACTIVE_CI_CHECKPOINTS
     )
     assert workflow.index("classify-ci") < workflow.index(
         "Install source-gate dependencies"
@@ -3008,20 +3012,23 @@ def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mut
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     if mutation == "duplicate":
-        workflow += "\nverify-batch arch128-r4\n"
+        workflow += "\nverify-batch arch131-robinhood-review-paper\n"
     elif mutation == "comment":
         workflow = workflow.replace(
-            "              arch128-r4", "              # arch128-r4"
+            "              arch131-robinhood-review-paper",
+            "              # arch131-robinhood-review-paper",
         )
     elif mutation == "exit":
         workflow = workflow.replace("exit $LASTEXITCODE", "exit 0")
     elif mutation == "rename":
-        workflow = workflow.replace("arch128-r4", "missing-checkpoint")
+        workflow = workflow.replace(
+            "arch131-robinhood-review-paper", "missing-checkpoint"
+        )
     else:
         workflow = (
-            workflow.replace("arch128-r4", "TEMP")
-            .replace("arch128-r6", "arch128-r4")
-            .replace("TEMP", "arch128-r6")
+            workflow.replace("arch131-robinhood-review-paper", "TEMP")
+            .replace("arch131-robinhood-mcp-schema", "arch131-robinhood-review-paper")
+            .replace("TEMP", "arch131-robinhood-mcp-schema")
         )
     assert not runner._batch_workflow_is_reviewed(workflow)
 
@@ -3106,10 +3113,12 @@ def test_131k_source_only_registration_and_batch():
         "src/trading_bot/review_paper/__init__.py",
         "tests/review_paper/test_risk_context.py",
     }
-    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
     assert (
-        runner.CI_CHECKPOINTS.index(name)
-        == runner.CI_CHECKPOINTS.index("arch131-robinhood-deterministic-paper-pipeline")
+        runner.ACTIVE_CI_CHECKPOINTS.index(name)
+        == runner.ACTIVE_CI_CHECKPOINTS.index(
+            "arch131-robinhood-deterministic-paper-pipeline"
+        )
         + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
@@ -3289,9 +3298,9 @@ def test_131l_source_only_registration_and_batch():
         "src/trading_bot/robinhood_forward_paper_cycle.py",
         "tests/test_robinhood_forward_paper_cycle.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-virtual-risk-context") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-virtual-risk-context") + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -3541,9 +3550,9 @@ def test_131lq_source_only_registration_and_batch():
         "src/trading_bot/robinhood_live_qualification_verifier.py",
         "tests/test_robinhood_live_qualification_verifier.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -3622,9 +3631,12 @@ def test_131m_source_only_registration_and_batch():
         "src/trading_bot/review_paper/session_admission.py",
         "tests/review_paper/test_session_admission.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index(
+            "arch131-robinhood-live-qualification-verifier"
+        )
+        + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -3780,9 +3792,9 @@ def test_131n_source_only_registration_and_batch():
         "src/trading_bot/review_paper/risk_prices.py",
         "tests/review_paper/test_risk_prices.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -3938,9 +3950,9 @@ def test_131o_source_only_registration_and_batch():
         "src/trading_bot/review_paper/forward_preview.py",
         "tests/review_paper/test_forward_preview.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -4133,9 +4145,10 @@ def test_131p_source_only_registration_and_batch():
         "src/trading_bot/review_paper/risk_price_acquisition.py",
         "tests/review_paper/test_risk_price_acquisition.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview")
+        + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -4325,9 +4338,10 @@ def test_131q_source_only_registration_and_batch():
         "src/trading_bot/review_paper/supervised_forward_paper.py",
         "tests/review_paper/test_supervised_forward_paper.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition")
+        + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -4565,14 +4579,14 @@ def test_131r_source_only_registration_and_batch(boundary):
     assert spec.remote_branch == "feature/robinhood-review-paper-side-foundation"
     assert spec.tests == (*runner.COMMON_TESTS, test)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, source, test)
-    assert runner.CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
     assert (
-        runner.CI_CHECKPOINTS.index(name)
-        == runner.CI_CHECKPOINTS.index(predecessor) + 1
+        runner.ACTIVE_CI_CHECKPOINTS.index(name)
+        == runner.ACTIVE_CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 44
-    assert runner.CI_CHECKPOINTS[-25:-11] == (
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 36
+    assert runner.ACTIVE_CI_CHECKPOINTS[-25:-11] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4754,9 +4768,12 @@ def test_131s_source_only_registration_and_batch():
         "src/trading_bot/review_paper/nyse_published_regular_sessions.py",
         "tests/review_paper/test_nyse_published_regular_sessions.py",
     )
-    assert runner.CI_CHECKPOINTS.count(name) == 1
-    assert runner.CI_CHECKPOINTS.index(name) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier") + 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(name) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(name) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index(
+            "arch131-robinhood-supervised-prepare-verifier"
+        )
+        + 1
     )
     assert spec.authority_check(Path(runner.__file__).resolve().parent.parent) == ()
 
@@ -4991,10 +5008,12 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 44
-    assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
-    assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
-        runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 36
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_T_NAME) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(_T_NAME) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index(
+            "arch131-nyse-published-regular-session-authority"
+        )
         + 1
     )
     assert _T_AUTHORITY(Path(runner.__file__).resolve().parents[1]) == ()
@@ -5206,10 +5225,13 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 44
-    assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
-    assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
-        runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 36
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_U_NAME) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS.index(_U_NAME) == (
+        runner.ACTIVE_CI_CHECKPOINTS.index(
+            "arch131-robinhood-published-session-prepare"
+        )
+        + 1
     )
     assert _U_AUTHORITY(Path(runner.__file__).resolve().parents[1]) == ()
 
@@ -5470,9 +5492,9 @@ def test_133a_source_only_registration_and_single_ordered_batch():
     assert spec.authority_check is runner._arch133_unattended_activation_authority_check
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, _A133_SOURCE, _A133_TEST)
-    assert runner.CI_CHECKPOINTS.count(_A133_NAME) == 1
-    index = runner.CI_CHECKPOINTS.index(_A133_NAME)
-    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_A133_NAME) == 1
+    index = runner.ACTIVE_CI_CHECKPOINTS.index(_A133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1] == (
         "arch131-robinhood-supervised-qualification",
         _A133_NAME,
     )
@@ -5613,9 +5635,9 @@ def test_133b_source_only_registration_exact_order_and_coverage():
     assert spec.authority_check is runner._arch133_unattended_state_authority_check
     assert spec.tests == (*runner.COMMON_TESTS, _A133_TEST, _B133_TEST)
     assert spec.ruff_paths == (*runner.COMMON_RUFF_PATHS, *_B133_SOURCES, _B133_TEST)
-    assert runner.CI_CHECKPOINTS.count(_B133_NAME) == 1
-    index = runner.CI_CHECKPOINTS.index(_B133_NAME)
-    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_B133_NAME) == 1
+    index = runner.ACTIVE_CI_CHECKPOINTS.index(_B133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1] == (
         _A133_NAME,
         _B133_NAME,
     )
@@ -5778,10 +5800,10 @@ def test_133c_source_only_registration_exact_order_and_coverage():
         _C133_TEST,
         "tests/scripts/test_run_test_certification.py",
     )
-    assert runner.CI_CHECKPOINTS.count(_C133_NAME) == 1
-    start = runner.CI_CHECKPOINTS.index(_A133_NAME)
-    end = runner.CI_CHECKPOINTS.index(_C133_NAME)
-    assert runner.CI_CHECKPOINTS[start : end + 1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_C133_NAME) == 1
+    start = runner.ACTIVE_CI_CHECKPOINTS.index(_A133_NAME)
+    end = runner.ACTIVE_CI_CHECKPOINTS.index(_C133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[start : end + 1] == (
         _A133_NAME,
         _B133_NAME,
         _C133_NAME,
@@ -5930,9 +5952,9 @@ def test_133d_source_only_registration_exact_order_and_coverage():
         "src/trading_bot/robinhood_paper_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert runner.CI_CHECKPOINTS.count(_D133_NAME) == 1
-    index = runner.CI_CHECKPOINTS.index(_D133_NAME)
-    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_D133_NAME) == 1
+    index = runner.ACTIVE_CI_CHECKPOINTS.index(_D133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1] == (
         _C133_NAME,
         _D133_NAME,
     )
@@ -6127,9 +6149,9 @@ def test_133e_source_only_registration_exact_order_and_coverage():
         _E133_TEST,
         "tests/scripts/test_run_test_certification.py",
     )
-    assert runner.CI_CHECKPOINTS.count(_E133_NAME) == 1
-    index = runner.CI_CHECKPOINTS.index(_E133_NAME)
-    assert runner.CI_CHECKPOINTS[index - 1 : index + 1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_E133_NAME) == 1
+    index = runner.ACTIVE_CI_CHECKPOINTS.index(_E133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1] == (
         _D133_NAME,
         _E133_NAME,
     )
@@ -6274,7 +6296,7 @@ def test_133h_checkpoint_is_source_only_and_ci_registered():
         *runner.COMMON_TESTS,
         "tests/review_paper/test_unattended_publication.py",
     )
-    assert runner.CI_CHECKPOINTS[-7:-5] == (_G133_NAME, _H133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (_G133_NAME, _H133_NAME)
     assert runner._arch133_host_publication_authority_check(repo) == ()
 
 
@@ -6403,8 +6425,8 @@ def test_133g_source_only_registration_exact_order_and_coverage():
         _E133_TEST,
         "tests/scripts/test_run_test_certification.py",
     )
-    assert runner.CI_CHECKPOINTS.count(_G133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-8:-6] == (_E133_NAME, _G133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS.count(_G133_NAME) == 1
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-6] == (_E133_NAME, _G133_NAME)
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_G133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -6515,7 +6537,7 @@ def test_133i_source_only_registration_and_inert_callbacks(tmp_path, monkeypatch
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133i"
     assert spec.authority_check is runner._arch133_scratch_root_acl_authority_check
-    assert runner.CI_CHECKPOINTS[-6:-4] == (_H133_NAME, _I133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (_H133_NAME, _I133_NAME)
     assert (
         runner._arch133_scratch_root_acl_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6671,7 +6693,7 @@ def test_133j_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133j"
     assert spec.authority_check is runner._arch133_retained_root_authority_check
-    assert runner.CI_CHECKPOINTS[-5:-3] == (_I133_NAME, _J133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (_I133_NAME, _J133_NAME)
     assert (
         runner._arch133_retained_root_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6781,7 +6803,7 @@ def test_133k_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133k"
     assert spec.authority_check is runner._arch133_recovery_authority_check
-    assert runner.CI_CHECKPOINTS[-4:-2] == (_J133_NAME, _K133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (_J133_NAME, _K133_NAME)
     assert (
         runner._arch133_recovery_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6884,7 +6906,7 @@ def test_133l_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_L133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133l"
-    assert runner.CI_CHECKPOINTS[-3:] == (_K133_NAME, _L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-3:] == (_K133_NAME, _L133_NAME, _M133_NAME)
     assert (
         runner._arch133_verifier_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6987,7 +7009,7 @@ def test_133m_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_M133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133m"
-    assert runner.CI_CHECKPOINTS[-2:] == (_L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (_L133_NAME, _M133_NAME)
     assert (
         runner._arch133_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -7068,3 +7090,189 @@ def test_133m_ci_registration_drift_fails_closed(tmp_path, target, mutation):
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_diagnostic_authority_check(root)
+
+
+def test_r2a_active_retained_partition_and_retained_authorities():
+    assert runner.ACTIVE_CI_CHECKPOINTS == _EXPECTED_ACTIVE_CI_CHECKPOINTS
+    assert runner.RETAINED_CHECKPOINTS == _EXPECTED_RETAINED_CHECKPOINTS
+    assert not set(runner.ACTIVE_CI_CHECKPOINTS) & set(runner.RETAINED_CHECKPOINTS)
+    assert not hasattr(runner, "CI_CHECKPOINTS")
+    specs = runner._checkpoint_specs()
+    repo = Path(runner.__file__).resolve().parent.parent
+    for name in (*_EXPECTED_ACTIVE_CI_CHECKPOINTS, *_EXPECTED_RETAINED_CHECKPOINTS):
+        assert name in specs
+    for name in _EXPECTED_RETAINED_CHECKPOINTS:
+        spec = specs[name]
+        assert spec.tests and spec.ruff_paths
+        assert spec.authority_check(repo) == ()
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        _EXPECTED_RETAINED_CHECKPOINTS,
+        tuple(reversed(_EXPECTED_RETAINED_CHECKPOINTS)),
+        (
+            _EXPECTED_ACTIVE_CI_CHECKPOINTS[-1],
+            _EXPECTED_RETAINED_CHECKPOINTS[0],
+            _EXPECTED_ACTIVE_CI_CHECKPOINTS[0],
+            _EXPECTED_RETAINED_CHECKPOINTS[-1],
+        ),
+    ],
+)
+def test_r2a_explicit_retained_and_mixed_batches_preserve_all_requirements(
+    names, monkeypatch, tmp_path
+):
+    registry = runner._checkpoint_specs()
+    specs = [registry[name] for name in names]
+    expected_tests, expected_ruff = [], []
+    for spec in specs:
+        for path in spec.tests:
+            if path not in expected_tests:
+                expected_tests.append(path)
+        for path in spec.ruff_paths:
+            if path not in expected_ruff:
+                expected_ruff.append(path)
+    assert runner.batch_requirements(specs) == (
+        tuple(expected_tests),
+        tuple(expected_ruff),
+    )
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    monkeypatch.setattr(
+        runner, "_execute_step", lambda step, **kw: _outcome(step.name, 0)
+    )
+    # Exercise real registered requirements/authorities, mocking only child commands
+    # and source admission; host capabilities must never be called by verify-batch.
+    repo = Path(runner.__file__).resolve().parent.parent
+    passed, path = runner.verify_batch(specs, repo_root=repo, evidence_root=tmp_path)
+    assert passed
+    report = json.loads(path.read_text())
+    assert report["checkpoints"] == list(names)
+    assert report["tests"] == expected_tests
+    assert report["ruff_paths"] == expected_ruff
+    assert report["authority_failures"] == dict.fromkeys(names, [])
+    for field in (
+        "production_effects",
+        "scheduler_mutation",
+        "provider_effects",
+        "broker_live_effects",
+    ):
+        assert report[field] == "NOT_RUN"
+
+
+@pytest.mark.parametrize("name", _EXPECTED_RETAINED_CHECKPOINTS)
+def test_r2a_retained_individual_cli_dispatch(name, monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(
+        runner,
+        "verify_checkpoint",
+        lambda spec, **kw: (seen.append(spec) or True, tmp_path),
+    )
+    assert runner.main(["verify", name]) == 0
+    assert seen == [runner._checkpoint_specs()[name]]
+
+
+def test_r2a_workflow_scope_and_narrow_branch_trigger():
+    repo = Path(runner.__file__).resolve().parent.parent
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    branches = workflow.split("    branches:\n", 1)[1].split("  pull_request:", 1)[0]
+    assert tuple(
+        line.strip().removeprefix("- ").strip('"')
+        for line in branches.splitlines()
+        if line.strip()
+    ) == (
+        "develop",
+        "feature/d10c-durable-wake-evidence",
+        "feature/d10c-r8-terminal-halt",
+        "feature/d10c-r8-incident-reconciliation",
+        "feature/robinhood-*",
+        "feature/test-suite-*",
+    )
+    for name in _EXPECTED_RETAINED_CHECKPOINTS:
+        assert name not in workflow
+        modified = workflow.replace(
+            "            verify-batch `\n",
+            f"            verify-batch `\n              {name} `\n",
+        )
+        assert not runner._batch_workflow_is_reviewed(modified)
+
+
+@pytest.mark.parametrize("diagnostic", [False, True])
+@pytest.mark.parametrize("elapsed", [0.0, 1234567890.25])
+def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
+    tmp_path, monkeypatch, diagnostic, elapsed
+):
+    ticks = iter([7.0, 7.0 + elapsed])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(ticks))
+    step = runner.Step("pytest", ("python", "-m", "pytest"), ("diagnostic",))
+    stdout = b"100 slowest durations\n12.00s call tests/example.py::test_example\n"
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append((argv, kwargs))
+        return subprocess.CompletedProcess(argv, 0, stdout, b"")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    outcome = runner._execute_step(
+        step,
+        repo_root=tmp_path,
+        command_dir=tmp_path,
+        index=1,
+        diagnostic=diagnostic,
+    )
+    assert outcome.elapsed_seconds == elapsed
+    assert outcome.elapsed_seconds >= 0
+    assert outcome.exit_code == 0
+    assert Path(outcome.stdout_path).read_bytes() == stdout
+    assert calls == [
+        (
+            step.diagnostic_argv if diagnostic else step.argv,
+            {"cwd": tmp_path, "capture_output": True, "check": False},
+        )
+    ]
+
+
+@pytest.mark.parametrize("batch", [False, True])
+@pytest.mark.parametrize("elapsed", [0.0, 1234567890.25])
+@pytest.mark.parametrize("exit_code", [0, 1])
+def test_r2a_elapsed_is_additive_report_evidence_without_status_threshold(
+    tmp_path, monkeypatch, batch, elapsed, exit_code
+):
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    monkeypatch.setattr(
+        runner,
+        "_execute_step",
+        lambda step, **kw: replace(
+            _outcome(step.name, exit_code), elapsed_seconds=elapsed
+        ),
+    )
+    if batch:
+        passed, path = runner.verify_batch(
+            [_spec()], repo_root=tmp_path, evidence_root=tmp_path
+        )
+    else:
+        passed, path = runner.verify_checkpoint(
+            _spec(), repo_root=tmp_path, evidence_root=tmp_path
+        )
+    assert passed == (exit_code == 0)
+    report = json.loads(path.read_text())
+    assert report["schema"] == runner.SCHEMA
+    assert report["identity_stable"] is True
+    assert report["status"] == ("PASS" if exit_code == 0 else "FAIL")
+    assert all(command["elapsed_seconds"] == elapsed for command in report["commands"])
+
+
+def test_r2a_pytest_top_100_duration_flags_are_exact_and_diagnostic_only(tmp_path):
+    steps = runner.build_verification_steps(
+        _spec(), python_executable="python", basetemp=tmp_path
+    )
+    argv = steps[0].argv
+    assert tuple(arg for arg in argv if arg.startswith("--durations")) == (
+        "--durations=100",
+        "--durations-min=0.0",
+    )
+    assert steps[0].diagnostic_argv is None
+    assert all(
+        not any(arg.startswith("--durations") for arg in step.argv)
+        for step in steps[1:]
+    )

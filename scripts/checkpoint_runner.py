@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -65,6 +66,7 @@ class CommandOutcome:
     stderr_sha256: str
     stdout_path: str
     stderr_path: str
+    elapsed_seconds: float = 0.0
 
 
 COMMON_TESTS: Final = ("tests/runtime/test_checkpoint_runner.py",)
@@ -74,7 +76,7 @@ COMMON_RUFF_PATHS: Final = (
 )
 
 
-CI_CHECKPOINTS: Final = (
+RETAINED_CHECKPOINTS: Final = (
     "arch128-parent-acl-repair",
     "arch128-r4",
     "arch128-r5-substrate",
@@ -83,6 +85,9 @@ CI_CHECKPOINTS: Final = (
     "arch128-r7",
     "arch128-r8-terminal-halt",
     "arch130-r8i-d1",
+)
+
+ACTIVE_CI_CHECKPOINTS: Final = (
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
     "arch131-robinhood-paper-cycle",
@@ -123,7 +128,7 @@ CI_CHECKPOINTS: Final = (
 
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all registered participants and their order,
+    # Freeze the executable active batch command, its participants and their order,
     # and exit propagation. Comments, duplicates and missing phases must drift.
     invocation = (
         "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
@@ -131,8 +136,8 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "            verify-batch `\n"
         + "".join(
             f"              {name}"
-            + (" `\n" if index < len(CI_CHECKPOINTS) - 1 else "\n")
-            for index, name in enumerate(CI_CHECKPOINTS)
+            + (" `\n" if index < len(ACTIVE_CI_CHECKPOINTS) - 1 else "\n")
+            for index, name in enumerate(ACTIVE_CI_CHECKPOINTS)
         )
         + "          exit $LASTEXITCODE\n"
     )
@@ -803,15 +808,15 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -840,8 +845,12 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         ):
             failures.append("133-E source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-review-paper-execution")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-review-paper-execution"
+            )
             + 1
         ):
             failures.append("133-E checkpoint ordering drift")
@@ -1141,8 +1150,9 @@ def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             failures.append("133-M source-only capability drift")
         if (
-            CI_CHECKPOINTS[-2:] != ("arch133-robinhood-post-publication-verifier", name)
-            or CI_CHECKPOINTS.count(name) != 1
+            ACTIVE_CI_CHECKPOINTS[-2:]
+            != ("arch133-robinhood-post-publication-verifier", name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
         ):
             failures.append("133-M checkpoint ordering drift")
     except (
@@ -1226,11 +1236,14 @@ def _arch133_verifier_authority_check(repo_root: Path) -> tuple[str, ...]:
         predecessor = "arch133-robinhood-retained-root-acl-recovery"
         successor = "arch133-robinhood-post-publication-stage-diagnostic"
         if (
-            CI_CHECKPOINTS[
-                CI_CHECKPOINTS.index(name) - 1 : CI_CHECKPOINTS.index(name) + 2
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 2
             ]
             != (predecessor, name, successor)
-            or CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
         ):
             failures.append("133-L checkpoint ordering drift")
     except (
@@ -1308,10 +1321,10 @@ def _arch133_recovery_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             failures.append("133-K runtime capability drift")
         if (
-            CI_CHECKPOINTS.count(name) != 1
-            or CI_CHECKPOINTS[CI_CHECKPOINTS.index(name) + 1]
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) + 1]
             != "arch133-robinhood-post-publication-verifier"
-            or CI_CHECKPOINTS[CI_CHECKPOINTS.index(name) - 1]
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
             != "arch133-robinhood-retained-root-diagnostic"
         ):
             failures.append("133-K batch successor registration drift")
@@ -1381,8 +1394,8 @@ def _arch133_retained_root_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             failures.append("133-J runtime capability drift")
         if (
-            CI_CHECKPOINTS.count(name) != 1
-            or CI_CHECKPOINTS[CI_CHECKPOINTS.index(name) - 1]
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
             != "arch133-robinhood-scratch-root-acl-qualification"
         ):
             failures.append("133-J batch successor registration drift")
@@ -1495,8 +1508,8 @@ def _arch133_scratch_root_acl_authority_check(repo_root: Path) -> tuple[str, ...
         ):
             failures.append("133-I runtime capability drift")
         if (
-            CI_CHECKPOINTS.count(name) != 1
-            or CI_CHECKPOINTS[CI_CHECKPOINTS.index(name) - 1]
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
             != "arch133-robinhood-unattended-host-publication"
         ):
             failures.append("133-I batch successor registration drift")
@@ -1563,13 +1576,13 @@ def _arch133_host_publication_authority_check(repo_root: Path) -> tuple[str, ...
             for n in runner_tree.body
             if isinstance(n, ast.AnnAssign)
             and isinstance(n.target, ast.Name)
-            and n.target.id == "CI_CHECKPOINTS"
+            and n.target.id == "ACTIVE_CI_CHECKPOINTS"
         )
         if (
-            tuple(ast.literal_eval(ci.value)) != CI_CHECKPOINTS
-            or CI_CHECKPOINTS[CI_CHECKPOINTS.index(name) - 1]
+            tuple(ast.literal_eval(ci.value)) != ACTIVE_CI_CHECKPOINTS
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
             != "arch133-robinhood-unattended-host-bootstrap"
-            or CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
         ):
             failures.append("133-H batch registration drift")
         workflow = (
@@ -1710,15 +1723,15 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -1748,8 +1761,12 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         ):
             failures.append("133-G source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-host-scheduler-surface")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-host-scheduler-surface"
+            )
             + 1
         ):
             failures.append("133-G checkpoint ordering drift")
@@ -1804,15 +1821,15 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -1842,8 +1859,12 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         ):
             failures.append("133-D source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-one-wake-composition")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-one-wake-composition"
+            )
             + 1
         ):
             failures.append("133-D checkpoint ordering drift")
@@ -1898,15 +1919,15 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -1933,8 +1954,10 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         ):
             failures.append("133-C source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-state-store") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch133-robinhood-unattended-state-store") + 1
         ):
             failures.append("133-C checkpoint ordering drift")
         workflow = (
@@ -2000,15 +2023,15 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -2032,8 +2055,11 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             )
         ):
             failures.append("133-B source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-activation-core") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch133-robinhood-unattended-activation-core")
+            + 1
         ):
             failures.append("133-B checkpoint ordering drift")
         workflow = (
@@ -2094,7 +2120,7 @@ def _arch133_unattended_activation_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2103,8 +2129,8 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
 
@@ -2126,8 +2152,11 @@ def _arch133_unattended_activation_authority_check(
             is not _arch133_unattended_activation_authority_check
         ):
             failures.append("133-A checkpoint coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-qualification") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-qualification")
+            + 1
         ):
             failures.append("133-A checkpoint ordering drift")
 
@@ -2206,7 +2235,7 @@ def _arch131_nyse_published_regular_session_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2215,8 +2244,8 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
 
@@ -2225,8 +2254,11 @@ def _arch131_nyse_published_regular_session_authority_check(
             failures.append("131-S checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-S checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier")
+            + 1
         ):
             failures.append("131-S checkpoint ordering drift")
 
@@ -2313,7 +2345,7 @@ def _arch131_published_session_prepare_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2322,8 +2354,8 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
 
@@ -2332,8 +2364,13 @@ def _arch131_published_session_prepare_authority_check(
             failures.append("131-T checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-T checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-nyse-published-regular-session-authority"
+            )
+            + 1
         ):
             failures.append("131-T checkpoint ordering drift")
 
@@ -2408,15 +2445,15 @@ def _arch131_supervised_qualification_authority_check(
             for node in tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci) != 1
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
         spec = _checkpoint_specs()[name]
@@ -2427,9 +2464,12 @@ def _arch131_supervised_qualification_authority_check(
         ):
             failures.append("131-V source-only capability drift")
         if (
-            CI_CHECKPOINTS.count(name) != 1
-            or CI_CHECKPOINTS.index(name)
-            != CI_CHECKPOINTS.index("arch131-robinhood-published-prepare-operator") + 1
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS.index(name)
+            != ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-robinhood-published-prepare-operator"
+            )
+            + 1
         ):
             failures.append("131-V checkpoint ordering drift")
         if not _batch_workflow_is_reviewed(
@@ -2505,7 +2545,7 @@ def _arch131_published_prepare_operator_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2514,8 +2554,8 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
 
@@ -2524,8 +2564,11 @@ def _arch131_published_prepare_operator_authority_check(
             failures.append("131-U checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-U checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare")
+            + 1
         ):
             failures.append("131-U checkpoint ordering drift")
 
@@ -2601,7 +2644,7 @@ def _arch131_session_admission_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2610,8 +2653,8 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
 
@@ -2620,8 +2663,11 @@ def _arch131_session_admission_authority_check(
             failures.append("131-M checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-M checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier")
+            + 1
         ):
             failures.append("131-M checkpoint ordering drift")
 
@@ -2697,7 +2743,7 @@ def _arch131_risk_price_snapshot_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2706,8 +2752,8 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
 
@@ -2716,9 +2762,9 @@ def _arch131_risk_price_snapshot_authority_check(
             failures.append("131-N checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-N checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1):
             failures.append("131-N checkpoint ordering drift")
 
         workflow = (
@@ -2793,7 +2839,7 @@ def _arch131_forward_paper_preview_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2802,8 +2848,8 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
 
@@ -2812,9 +2858,9 @@ def _arch131_forward_paper_preview_authority_check(
             failures.append("131-O checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-O checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1):
             failures.append("131-O checkpoint ordering drift")
 
         workflow = (
@@ -2889,7 +2935,7 @@ def _arch131_risk_price_acquisition_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2898,8 +2944,8 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
 
@@ -2908,8 +2954,10 @@ def _arch131_risk_price_acquisition_authority_check(
             failures.append("131-P checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-P checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
         ):
             failures.append("131-P checkpoint ordering drift")
 
@@ -2985,7 +3033,7 @@ def _arch131_supervised_forward_paper_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2994,8 +3042,8 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
 
@@ -3004,8 +3052,10 @@ def _arch131_supervised_forward_paper_authority_check(
             failures.append("131-Q checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-Q checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition") + 1
         ):
             failures.append("131-Q checkpoint ordering drift")
 
@@ -3083,7 +3133,7 @@ def _arch131_prepare_qualification_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -3092,8 +3142,8 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
                 "131-R PREPARE qualification checkpoint batch registration drift"
@@ -3108,8 +3158,11 @@ def _arch131_prepare_qualification_authority_check(
             failures.append(
                 "131-R PREPARE qualification checkpoint remote branch drift"
             )
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-forward-paper") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-forward-paper")
+            + 1
         ):
             failures.append("131-R PREPARE qualification checkpoint ordering drift")
 
@@ -3188,7 +3241,7 @@ def _arch131_prepare_verifier_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -3197,8 +3250,8 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "8d4e3a71fdc283a8406887b41a79809fbf1f1bd09c53c1f1ead6e2376b80b482"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != "8aaf63458ec12dea75e130e257577c0d00ba3bba5a4bb7a4db4059c7a8ab8b2a"
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
                 "131-R PREPARE verifier checkpoint batch registration drift"
@@ -3211,8 +3264,12 @@ def _arch131_prepare_verifier_authority_check(
             )
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-R PREPARE verifier checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-qualification")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-robinhood-supervised-prepare-qualification"
+            )
             + 1
         ):
             failures.append("131-R PREPARE verifier checkpoint ordering drift")
@@ -3288,20 +3345,20 @@ def _arch131_live_qualification_verifier_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-LQ checkpoint batch registration drift")
 
         spec = _checkpoint_specs()[name]
         if spec.preflight is not None or spec.execute is not None:
             failures.append("131-LQ checkpoint has host/effect capability")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1):
             failures.append("131-LQ checkpoint ordering drift")
 
         workflow = (
@@ -6764,6 +6821,8 @@ def build_verification_steps(
                 f"--basetemp={basetemp}",
                 "-p",
                 "no:cacheprovider",
+                "--durations=100",
+                "--durations-min=0.0",
             ),
         ),
         Step(
@@ -6828,12 +6887,14 @@ def _execute_step(
     if argv is None:
         raise ValueError("diagnostic command is unavailable")
 
+    started = time.monotonic()
     completed = subprocess.run(
         argv,
         cwd=repo_root,
         capture_output=True,
         check=False,
     )
+    elapsed_seconds = time.monotonic() - started
     stdout = completed.stdout
     stderr = completed.stderr
     prefix = f"{index:02d}-{_safe_step_name(label)}"
@@ -6858,6 +6919,7 @@ def _execute_step(
         stderr_sha256=hashlib.sha256(stderr).hexdigest(),
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
+        elapsed_seconds=elapsed_seconds,
     )
 
 

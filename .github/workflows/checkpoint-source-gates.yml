@@ -8,6 +8,7 @@ on:
       - feature/d10c-r8-terminal-halt
       - feature/d10c-r8-incident-reconciliation
       - "feature/robinhood-*"
+      - "feature/test-suite-*"
   pull_request:
 
 permissions:
@@ -70,14 +71,6 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
             verify-batch `
-              arch128-parent-acl-repair `
-              arch128-r4 `
-              arch128-r5-substrate `
-              arch128-r5-trading `
-              arch128-r6 `
-              arch128-r7 `
-              arch128-r8-terminal-halt `
-              arch130-r8i-d1 `
               arch131-robinhood-review-paper `
               arch131-robinhood-mcp-schema `
               arch131-robinhood-paper-cycle `

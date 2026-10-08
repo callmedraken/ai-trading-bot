@@ -1,5 +1,52 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-07 — Architecture 133-M SOURCE ACCEPTED; CI coverage accepted without duplicate broad certification
+
+Exact accepted source:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133m
+HEAD    4c972f66a32edae919fd9a835a556c9883a025e7
+TREE    467679d44fdea36b8880ee52d8a0f8c27f3a546b
+CI      #286 / 37708975995 SUCCESS
+```
+
+ChatGPT exact-source review found no correction required. The accepted operator
+implements the frozen seven-stage credential-free diagnostic, its fresh-process
+23-module project import closure excludes both
+`trading_bot.arch133_verifier.credentials` and
+`trading_bot.arch133_verifier.operator`, and the checkpoint remains source-only
+with `preflight=None`, `execute=None`, and `remote_head_env=None`.
+
+Source gate #286 did not merely run the new diagnostic test. Its shared,
+deduplicated batch covered 44 registered checkpoints and 68 test paths, with
+`PYTEST=0`, Ruff check/format and git-diff checks all green, every authority
+check PASS, and stable source identity. The pytest batch reported:
+
+```text
+6,393 passed
+3 skipped
+0 failed
+0 errors
+```
+
+The batch included the new 133-M diagnostic and 42 of the current 54 ROBINHOOD
+profile modules. The 12 ROBINHOOD modules outside that batch are unchanged core
+domain/execution/ledger/risk modules not touched by 133-M. Because 133-M is a
+bounded source-only credential-free diagnostic and the changed/authority surface
+already received the larger relevant CI batch plus the recorded 2,835-case
+focused implementation verification, ChatGPT selects **no additional broad
+certification**. Re-running the full ROBINHOOD profile would duplicate 42 already
+green modules without adding proportionate evidence at this boundary.
+
+Q133-2V remains consumed and non-retryable. Q133-3 scheduler installation and
+Q133-4 unattended wake remain unauthorized. The next gate is one real
+**133-M credential-free Trading-account diagnostic**. It is separately
+protected/read-only, performs no Credential Manager access, provider/network
+call, Task Scheduler read/write, paper/state mutation, ACL mutation, wake
+delegation, broker effect, or live-order effect, and requires fresh explicit
+authorization before invocation.
+
 ## 2026-10-07 — Architecture 133-M implementation; exact-source review pending
 
 The source-only 133-M checkpoint is implemented on

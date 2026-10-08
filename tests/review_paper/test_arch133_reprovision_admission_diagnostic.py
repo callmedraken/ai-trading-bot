@@ -162,6 +162,18 @@ def test_runner_registers_source_only_successor():
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133r"
+    assert spec.tests == (
+        *runner.ARCH133_L_M_TESTS,
+        "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+        "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.ARCH133_L_M_RUFF_PATHS,
+        *runner.ARCH133_REPROVISION_DIAGNOSTIC_SOURCES,
+        "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
     assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (
         "arch133-robinhood-fresh-activation-reprovision",
         name,

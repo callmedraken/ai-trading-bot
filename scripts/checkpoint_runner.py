@@ -1416,6 +1416,13 @@ def _arch133_reprovision_diagnostic_authority_check(repo_root: Path) -> tuple[st
                 "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
                 "tests/scripts/certification_runner/test_profiles.py",
             )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_REPROVISION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
         ):
             failures.append("133-R diagnostic registration drift")
         if (

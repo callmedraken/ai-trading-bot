@@ -1,5 +1,126 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-08 — Architecture 133-R SOURCE/TOPOLOGY ACCEPTED; real diagnostic read remains unauthorized
+
+Architecture 133-R is **SOURCE/TOPOLOGY ACCEPTED** as the zero-effect staged
+successor to the consumed 133-Q read-only plan attempt.
+
+Accepted executable/test source:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133r
+HEAD    78acc849707519f002a5e7ab477b6a6f57706448
+TREE    dd62ec6acbfa8f8a2fc85c93616fff66ea1fadd5
+CI      #322 / 37857242492 SUCCESS
+```
+
+The final accepted source supersedes the earlier coarse 133-R diagnostic head.
+The accepted diagnostic now reports the first rejected admission stage from this
+closed vocabulary while preserving sanitized output:
+
+```text
+MATERIAL_READ
+PREDECESSOR_RUNTIME
+PREDECESSOR_ADMINISTRATOR
+PREDECESSOR_ROOT
+PREDECESSOR_NAMESPACE
+PREDECESSOR_FILES
+PREDECESSOR_PUBLICATION_PATH
+PREDECESSOR_PUBLICATION_PARSE
+PREDECESSOR_PUBLICATION_SEMANTICS
+PREDECESSOR_STATE_PATH
+PREDECESSOR_STATE
+PREDECESSOR_PAPER
+PREDECESSOR_FINAL_REOBSERVATION
+PREDECESSOR_RUNTIME_REOBSERVATION
+PREDECESSOR_ADMINISTRATOR_REOBSERVATION
+PREDECESSOR_MATERIAL
+PREDECESSOR_STALE
+FRESH_MATERIAL
+NAMESPACE_VACANCY
+PARENT_VOLUME
+PARENT_HOST
+PARENT_COMBINED
+ADMISSION_COMPLETE
+```
+
+The diagnostic is read-only and zero-effect:
+
+- it imports no `arch133_reprovision.native` writer capability;
+- it imports no unattended host/wake execution surface;
+- it imports no Robinhood MCP/provider boundary;
+- it contains no CreateDirectory, SetSecurityInfo, rename, scheduler mutation,
+  credential mutation, provider call, wake delegation, broker or manual-start
+  path;
+- every PASS or BLOCKED result contains the same explicit fifteen zero effect
+  counters used by the 133-Q boundary;
+- upstream/native exception text is never emitted; only the sanitized stage is
+  evidence.
+
+The first refined source-gate attempt proved pytest and all 41 authority checks
+green but failed only Ruff formatting. The final formatting-only correction was
+then certified on the exact accepted HEAD above.
+
+Terminal source gate #322 reports:
+
+```text
+CHECKPOINTS      41
+TEST_PATHS       52
+RUFF_PATHS       155
+
+pytest cases     5,350
+passed           5,349
+skipped          1
+failed           0
+errors           0
+
+PYTEST           0
+RUFF_CHECK       0
+RUFF_FORMAT      0
+GIT_DIFF_CHECK   0
+AUTHORITY        41/41 PASS
+IDENTITY_STABLE  True
+OVERALL          PASS
+```
+
+The single skip remains the unchanged optional MCP authentication dependency
+unavailable on CI. The exact evidence artifact is bound to the accepted source
+HEAD/tree and has digest:
+
+```text
+sha256:1e5d0ba5d01b06600f072697271e6bb4a5eefbdb7cb29e354d106c0585c64e1e
+```
+
+All real protected effects remain NOT_RUN.
+
+No additional ROBINHOOD or FULL certification is selected. 133-R is a bounded
+source-only diagnostic whose active source gate already exercises the affected
+Architecture-133 chain, runner/profile topology and authority pins. A broad
+profile cannot add evidence about the real host admission stage.
+
+### Protected boundary
+
+The prior authorized 133-Q real plan attempt is consumed and **MUST NOT be
+rerun**. Its result remains BLOCKED / ADMISSION_REJECTED with every effect
+counter zero.
+
+Architecture 133-Q `execute-once` remains unauthorized.
+
+A real Architecture 133-R diagnostic host read has **not** been authorized by
+source acceptance or this docs closeout. It requires one fresh explicit
+authorization. That diagnostic may only read the exact retained host material,
+the already-prepared fresh material file and the fixed parent/root facts needed
+to identify the rejecting stage. It grants no reprovision, scheduler, provider,
+wake or broker authority.
+
+After a real 133-R result, continue automatically through all safe source-only
+remediation and exact review. Do not retry the consumed 133-Q plan unless a
+future separately reviewed successor contract explicitly establishes a new
+one-shot plan boundary.
+
+Q133-3 for any replacement activation remains unauthorized. Q133-4 remains
+unauthorized. Production/live placement remains NO-GO.
+
 ## 2026-10-08 — Real 133-Q read-only plan BLOCKED at admission; zero effects; plan attempt consumed
 
 One real Architecture 133-Q `plan --material-file` attempt was authorized for

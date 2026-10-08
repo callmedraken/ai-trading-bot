@@ -231,9 +231,7 @@ def _observe_predecessor() -> tuple[object, dict]:
             )
             held.callback(paper_connection.close)
             paper_connection.execute("BEGIN")
-            paper = predecessor.require_empty_paper(
-                paper_connection, activation, host
-            )
+            paper = predecessor.require_empty_paper(paper_connection, activation, host)
         except BaseException:
             raise AdmissionStageError("PREDECESSOR_PAPER") from None
 
@@ -243,9 +241,7 @@ def _observe_predecessor() -> tuple[object, dict]:
                 or predecessor._state_path_resolution(activation) != state_path
                 or predecessor.require_ready_state(state_connection, activation)
                 != state
-                or predecessor.require_empty_paper(
-                    paper_connection, activation, host
-                )
+                or predecessor.require_empty_paper(paper_connection, activation, host)
                 != paper
                 or retained_reads.namespace(root_handle) != names
                 or read_only.inspect_directory_security(
@@ -278,6 +274,7 @@ def _observe_predecessor() -> tuple[object, dict]:
         "wake_revision": 0,
         "consumed_wake_authority": 0,
     }
+
 
 def _require_retained(old: object) -> None:
     retained = generation.predecessor_material()

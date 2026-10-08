@@ -1386,7 +1386,7 @@ ARCH133_REPROVISION_DIAGNOSTIC_PINS: Final = {
         "a161e6533bcdc3bb7c9caa29cc27422fc2120b2d"
     ),
     "src/trading_bot/arch133_reprovision_diagnostic/operator.py": (
-        "2259beaa756cca871223b9134c5d76abe7217d98"
+        "4699aac0761df76c2c9ed67f7c4810c98dabb8b0"
     ),
     "scripts/run_arch133_reprovision_admission_diagnostic.py": (
         "6479389ccbfc3da4401e38b338f979376a5f418f"

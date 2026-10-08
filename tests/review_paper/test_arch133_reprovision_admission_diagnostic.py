@@ -119,7 +119,9 @@ def test_each_stage_fails_closed_with_zero_effects(
         "PREDECESSOR_ADMINISTRATOR_REOBSERVATION",
     ],
 )
-def test_detailed_predecessor_stage_is_sanitized(admitted, monkeypatch, tmp_path, detail):
+def test_detailed_predecessor_stage_is_sanitized(
+    admitted, monkeypatch, tmp_path, detail
+):
     def blocked():
         raise operator.AdmissionStageError(detail)
 

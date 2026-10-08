@@ -1,5 +1,50 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Real 133-Q read-only plan BLOCKED at admission; zero effects; plan attempt consumed
+
+One real Architecture 133-Q `plan --material-file` attempt was authorized for
+material SHA-256
+`7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686`
+and run from an elevated Administrator PowerShell under principal
+`DESKTOP-I4DOKM7\John`.
+
+Exact admitted source at invocation:
+
+```text
+HEAD  f5dc2d4a0cd407787f8e5bef55bdfbe6bc20038d
+TREE  a11f06fc3efd36452d03cfc87441a45ce3fe8cff
+```
+
+The operator returned:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"ADMISSION_REJECTED","execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133q-fresh-activation-reprovision/v1","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+Wrapper exit: `ARCH133Q_PLAN_EXIT=3`.
+
+This is a valid pre-effect fail-closed result. Every recorded effect counter is
+zero. No staging directory, archive, publication, state, paper, ACL, scheduler,
+credential, provider, wake, execution or broker effect was attempted.
+
+The authorized real 133-Q plan attempt is **consumed and MUST NOT be rerun**.
+`execute-once` is not authorized and must not be invoked.
+
+The current evidence intentionally does not disclose which internal admission
+substage rejected. Source review identifies the bounded candidate stages as:
+canonical material read, operator/runtime admission, Administrator token,
+retained predecessor admission, retained-material equivalence, stale proof,
+fresh-material proof, fixed reprovision-namespace vacancy and protected parent
+ACL admission.
+
+The next safe milestone is a new source-only, zero-effect staged admission
+diagnostic. It must not mutate or weaken Architecture 133-Q and must not import
+its native writer module. Any real diagnostic host read requires separate fresh
+authorization after source acceptance.
+
+Q133-3 for any replacement activation remains unauthorized. Q133-4 remains
+unauthorized. Provider/broker effects remain NO-GO.
+
 ## 2026-10-08 — Architecture 133-Q SOURCE/TOPOLOGY ACCEPTED; real reprovision remains unauthorized
 
 Architecture 133-Q is **SOURCE/TOPOLOGY ACCEPTED**.

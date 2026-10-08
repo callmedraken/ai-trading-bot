@@ -2147,7 +2147,7 @@ def test_131r_source_only_registration_and_batch(boundary):
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
     assert len(runner.ACTIVE_CI_CHECKPOINTS) == 41
-    assert runner.ACTIVE_CI_CHECKPOINTS[-29:-15] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-30:-16] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",

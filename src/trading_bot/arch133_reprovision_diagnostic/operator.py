@@ -282,9 +282,7 @@ def diagnose(path: Path) -> dict:
         stage = "PREDECESSOR_STALE"
         require_stale(old, datetime.now(UTC))
         stage = "FRESH_MATERIAL"
-        require_fresh(
-            material, old, facts["runtime"], datetime.now(UTC)
-        )
+        require_fresh(material, old, facts["runtime"], datetime.now(UTC))
         stage = "NAMESPACE_VACANCY"
         namespace.require_vacant()
         stage = "PARENT_VOLUME"

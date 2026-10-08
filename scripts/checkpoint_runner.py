@@ -1382,9 +1382,15 @@ ARCH133_REPROVISION_DIAGNOSTIC_SOURCES: Final = (
     "scripts/run_arch133_reprovision_admission_diagnostic.py",
 )
 ARCH133_REPROVISION_DIAGNOSTIC_PINS: Final = {
-    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py": "a161e6533bcdc3bb7c9caa29cc27422fc2120b2d",
-    "src/trading_bot/arch133_reprovision_diagnostic/operator.py": "1ba938d01d421453e410d62277960acb86cbd21a",
-    "scripts/run_arch133_reprovision_admission_diagnostic.py": "6479389ccbfc3da4401e38b338f979376a5f418f",
+    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py": (
+        "a161e6533bcdc3bb7c9caa29cc27422fc2120b2d"
+    ),
+    "src/trading_bot/arch133_reprovision_diagnostic/operator.py": (
+        "2a3d4acac48dd06523f810ff52d33eefd1bf7f41"
+    ),
+    "scripts/run_arch133_reprovision_admission_diagnostic.py": (
+        "6479389ccbfc3da4401e38b338f979376a5f418f"
+    ),
 }
 
 
@@ -7086,7 +7092,9 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         "arch133-robinhood-reprovision-admission-diagnostic": CheckpointSpec(
             name="arch133-robinhood-reprovision-admission-diagnostic",
-            description="Architecture 133-R source-only reprovision admission diagnostic",
+            description=(
+                "Architecture 133-R source-only reprovision admission diagnostic"
+            ),
             tests=(
                 *ARCH133_L_M_TESTS,
                 "tests/review_paper/test_arch133_fresh_activation_reprovision.py",

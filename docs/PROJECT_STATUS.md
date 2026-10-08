@@ -1,5 +1,63 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 132-R2-B2 terminal source CI green; review/FULL pending
+
+R2-B2 is implemented and its source gate is terminal **SUCCESS**. This is
+implementation evidence only; ChatGPT exact-source acceptance and the deferred
+FULL current-product certification remain pending.
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    ff21c05b93d862d2299dd1574c2f931b9ea5acb5
+TREE    3e714d054516dfd156def89c2a21e51b85e8861e
+CI      #294 / 37731218114 SUCCESS
+```
+
+The change is confined to three checkpoint-runner test/helper files. Twenty
+copy helpers now defer accepted-source PASS checks to 21 dedicated cases rather
+than repeating them before every mutation. Five Architecture-131 G/H predecessor
+edges are isolated only for wholly local source mutations; separate invocation,
+rejection-propagation and complete real-chain PASS proofs remain. All original
+mutation matrices and all 4,612 prior CI case identities remain; 32 proof cases
+are added. No production source, authority implementation/chaining, pin,
+registration, workflow, certification ownership or module topology changed.
+The 30 H-M workflow/order cases retain real chaining.
+
+```text
+active / retained checkpoints   36 / 8 (exact order unchanged)
+TEST_PATHS / RUFF_PATHS          47 / 127
+FULL / ROBINHOOD modules         136 / 63
+LEGACY / EXHAUSTIVE modules      205 / 341
+required FULL / ROBINHOOD        122 / 49 (accepted R2-B migrated baselines)
+focused tests                   1,627 passed / 0 failed
+source CI                       4,643 passed / 1 skipped / 0 failed / 0 errors
+pytest wall                     198.14 s
+pytest command elapsed_seconds  199.42576060000002
+workflow end-to-end             250 s
+```
+
+Observed pytest time decreased 43.72% from R2-B's 352.07 s;
+workflow time decreased 38.42% from 406 s. Relative to historical
+medians (188.41 s / 242 s), pytest is +5.16% and workflow is
++3.31%. Timing is diagnostic and has no PASS/FAIL threshold.
+Recorded testcase time totals 192.039 s; checkpoint-runner
+infrastructure contributes 175.592 s / 1325 cases /
+91.44%, and other tests contribute 16.447 s.
+
+See the R2-B2 terminal implementation report in
+`docs/validation/arch132-r2-test-suite-rationalization-plan.md` for the exact
+isolated edges, coverage accounting, active path unions, JUnit module timings,
+commands, deviations and all top-100 durations. Source evidence is retained in
+[CI #294](https://github.com/callmedraken/ai-trading-bot/actions/runs/37731218114) as `checkpoint-source-gate-evidence`, including
+`pytest-results.xml`, `report.json`, and command output.
+
+Next owner: **ChatGPT** for exact GitHub source review against frozen parent
+`bd9729e2dc8ca728908fc75ad906d78ddfa833b5`. If accepted, supply one fresh FULL
+certification command against this final executable/test source. FULL remains
+deferred, not waived. Do not begin R2-C/R2-D, run real 133-M, retry Q133-2V,
+perform Q133-3/Q133-4, or cross credential/scheduler/provider/broker/live
+boundaries. Production/live real-money placement remains **NO-GO**.
+
 ## 2026-10-07 — Architecture 132-R2-B SOURCE ACCEPTED; historical CI gap localizes R2-B2
 
 Architecture 132-R2-B is **SOURCE/TOPOLOGY ACCEPTED**.

@@ -1,5 +1,616 @@
 # Architecture 132-R2 — Test Suite Rationalization Validation Plan
 
+## 2026-10-07 — Architecture 132-R2-B2 terminal source CI green; review/FULL pending
+
+R2-B2 is implemented and its source gate is terminal **SUCCESS**. This is
+implementation evidence only; ChatGPT exact-source acceptance and the deferred
+FULL current-product certification remain pending.
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    ff21c05b93d862d2299dd1574c2f931b9ea5acb5
+TREE    3e714d054516dfd156def89c2a21e51b85e8861e
+CI      #294 / 37731218114 SUCCESS
+```
+
+The change is confined to three checkpoint-runner test/helper files. Twenty
+copy helpers now defer accepted-source PASS checks to 21 dedicated cases rather
+than repeating them before every mutation. Five Architecture-131 G/H predecessor
+edges are isolated only for wholly local source mutations; separate invocation,
+rejection-propagation and complete real-chain PASS proofs remain. All original
+mutation matrices and all 4,612 prior CI case identities remain; 32 proof cases
+are added. No production source, authority implementation/chaining, pin,
+registration, workflow, certification ownership or module topology changed.
+The 30 H-M workflow/order cases retain real chaining.
+
+```text
+active / retained checkpoints   36 / 8 (exact order unchanged)
+TEST_PATHS / RUFF_PATHS          47 / 127
+FULL / ROBINHOOD modules         136 / 63
+LEGACY / EXHAUSTIVE modules      205 / 341
+required FULL / ROBINHOOD        122 / 49 (accepted R2-B migrated baselines)
+focused tests                   1,627 passed / 0 failed
+source CI                       4,643 passed / 1 skipped / 0 failed / 0 errors
+pytest wall                     198.14 s
+pytest command elapsed_seconds  199.42576060000002
+workflow end-to-end             250 s
+```
+
+Observed pytest time decreased 43.72% from R2-B's 352.07 s;
+workflow time decreased 38.42% from 406 s. Relative to historical
+medians (188.41 s / 242 s), pytest is +5.16% and workflow is
++3.31%. Timing is diagnostic and has no PASS/FAIL threshold.
+Recorded testcase time totals 192.039 s; checkpoint-runner
+infrastructure contributes 175.592 s / 1325 cases /
+91.44%, and other tests contribute 16.447 s.
+
+See the R2-B2 terminal implementation report in
+`docs/validation/arch132-r2-test-suite-rationalization-plan.md` for the exact
+isolated edges, coverage accounting, active path unions, JUnit module timings,
+commands, deviations and all top-100 durations. Source evidence is retained in
+[CI #294](https://github.com/callmedraken/ai-trading-bot/actions/runs/37731218114) as `checkpoint-source-gate-evidence`, including
+`pytest-results.xml`, `report.json`, and command output.
+
+Next owner: **ChatGPT** for exact GitHub source review against frozen parent
+`bd9729e2dc8ca728908fc75ad906d78ddfa833b5`. If accepted, supply one fresh FULL
+certification command against this final executable/test source. FULL remains
+deferred, not waived. Do not begin R2-C/R2-D, run real 133-M, retry Q133-2V,
+perform Q133-3/Q133-4, or cross credential/scheduler/provider/broker/live
+boundaries. Production/live real-money placement remains **NO-GO**.
+
+## R2-B2 terminal implementation report
+
+### Admission, implementation and publication
+
+The designated worktree is
+`F:\AI\worktrees\ai-trading-bot-test-suite-rationalization-132r2` on
+`feature/test-suite-rationalization-132r2`, origin
+`https://github.com/callmedraken/ai-trading-bot.git`. It was initially clean at
+known docs-lag HEAD `4c89d5b968da5a26a0967766c164b49349c158f0`, tree
+`f795a236fb7d220e6dbc5a806c3d1ce81ddc2710`. The exact live remote was
+`bd9729e2dc8ca728908fc75ad906d78ddfa833b5`, tree
+`7e38840a609eee3fbd07cdda1f3adb88ecb42005`. Ancestry and the four-file docs-only
+diff were proved before the expressly authorized `git merge --ff-only` against
+the exact local origin tracking ref. Final identity and clean index/worktree
+were reverified before edits. No other worktree was changed.
+
+Implementation changes exactly:
+
+```text
+tests/runtime/checkpoint_runner/helpers.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+```
+
+A distinct docs-only evidence checkpoint updates exactly:
+
+```text
+docs/AI_TRADING_BOT_HANDOFF.md
+docs/PROJECT_STATUS.md
+docs/architecture/132-tiered-certification-profiles.md
+docs/validation/arch132-r2-test-suite-rationalization-plan.md
+```
+
+These are independently useful source and evidence checkpoints: terminal CI
+measurements only exist after the implementation push. Each checkpoint uses
+one normal atomic commit and one ordinary push, exact staging, clean-index
+admission, staged filename verification and `git diff --cached --check`.
+No amend, rebase, force-push, PR metadata/review-thread change or integration
+merge is authorized or performed.
+
+### Authority-edge isolation and integration proof
+
+The actual frozen production graph has five G/H edges:
+
+| Real local layer | Isolated immediate predecessor | Local mutation scope |
+| --- | --- | --- |
+| 131-G agentic account | `_arch131_direct_mcp_authority_check` | resolver/package only |
+| 131-G agentic account | `_arch131_mcp_schema_authority_check` | resolver/package only |
+| 131-G agentic account | `_arch131_paper_cycle_authority_check` | resolver/package only |
+| 131-H paper operator | `_arch131_agentic_account_authority_check` | operator source only |
+| 131-H paper operator | `_arch131_windows_oauth_authority_check` | operator source only |
+
+G isolates five of its 13 mutation cases (four resolver, one package). H isolates
+13 of its 21 cases (operator source). Both execute the real local production
+body. G's eight transport/adapter/registration cases and H's eight
+predecessor-source/registration/workflow cases retain complete real chaining.
+No local layer under test is mocked, and no registration/workflow mutation is
+newly isolated.
+
+`test_predecessor_called_once_and_failure_propagates` runs two outcomes for each
+of these five edges: predecessor PASS and a unique rejection marker. It invokes
+the real local body, verifies exactly one predecessor call with the exact root,
+and requires exact fail-closed marker propagation. The new
+`test_full_real_authority_chain_passes_and_visits_every_predecessor` transparently
+traces H -> G -> direct MCP -> schema -> paper cycle -> Windows OAuth, executes
+every real body, and requires accepted-source PASS and exact call order. Existing
+G/H accepted-source registration tests remain unpatched real-chain PASS checks.
+
+Source inspection found no predecessor calls in 131 I-U or 133 A-G. In
+particular, Q does not call P, and A-G are locally pinned independent authority
+functions in this source. No hypothetical chain was added or altered. Their
+redundant work was the accepted-copy PASS assertion before each local mutation.
+Twenty copy helpers no longer run those repetitive assertions. The actual local
+authority remains real in every mutation; 21 explicit baseline cases prove each
+exact copied closure once (15 Architecture-131 cases including both R closures,
+six A-G cases). Existing real-repository PASS tests also remain. This discovery
+refines the test-harness optimization without changing the frozen production
+authority graph.
+
+No H-K/L-M source/test/helper implementation was rewritten. All 30 I-M
+runner/workflow missing/duplicate/order cases retain `isolate_predecessor=False`
+and complete real-chain rejection, alongside the existing five-edge
+invocation/failure and M-to-H transparent full-chain PASS proofs.
+
+### Function and logical-dimension accounting
+
+| Module | R2-B functions | R2-B2 functions | Original functions missing |
+| --- | ---: | ---: | ---: |
+| Architecture 131 | 99 | 103 | 0 |
+| Architecture 133 A-G | 29 | 30 | 0 |
+| Architecture 133 H-K | 19 | 19 | 0 |
+| Architecture 133 L-M | 10 | 10 | 0 |
+| CI | 12 | 12 | 0 |
+| core | 30 | 30 | 0 |
+| retained 128/130 | 37 | 37 | 0 |
+| runner total | 236 | 241 | 0 |
+| certification infrastructure | 38 | 38 | 0 |
+
+No function was renamed, deleted or replaced. Every original function's
+parameter decorators/matrices were mechanically compared against the frozen
+parent AST and remain identical. JUnit `(classname, name)` identity comparison
+also proves all 4,612 R2-B CI cases remain, with exactly 32 additions: 21 copied
+closure PASS cases, ten G/H predecessor outcome cases, and one full-chain trace.
+
+Source missing/changed, effect/capability drift, registration drift, checkpoint
+order, workflow mutation, callback injection, predecessor rejection propagation
+and accepted complete-chain PASS dimensions remain. All 182 H-M source-pin
+mutations remain unchanged. Production source/registration pins and capability
+checks are unchanged; there is no diff in `src/`, `scripts/`, or `.github/`.
+
+### Focused verification
+
+The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` was absent.
+As in R2-B, verification used the existing development interpreter
+`F:\AI\ai-trading-bot\.venv\Scripts\python.exe`.
+From the designated worktree, the exact focused test command was:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m pytest tests/runtime/checkpoint_runner/test_arch131.py tests/runtime/checkpoint_runner/test_arch133_a_g.py tests/runtime/checkpoint_runner/test_arch133_h_k.py tests/runtime/checkpoint_runner/test_arch133_l_m.py tests/scripts/certification_runner/test_profiles.py -q --tb=short --maxfail=5 --basetemp=F:/AI/temp/pytest-r2b2-focused-20261007-a -p no:cacheprovider --junitxml=F:/AI/temp/r2b2-evidence/focused-a.xml
+```
+
+Result: **1,627 passed / zero failed, errors or skips in 277.44 s**.
+Per-module counts: 131 = 724, A-G = 211, H-K = 153, L-M = 129, profiles = 410.
+The profile tests prove exact inventory, support partition, required baselines,
+unknown-ownership rejection and missing/renamed-module fail-closed behavior.
+
+Focused non-mutating checks, all PASS:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m ruff check --no-cache tests/runtime/checkpoint_runner/helpers.py tests/runtime/checkpoint_runner/test_arch131.py tests/runtime/checkpoint_runner/test_arch133_a_g.py
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -m ruff format --check --no-cache tests/runtime/checkpoint_runner/helpers.py tests/runtime/checkpoint_runner/test_arch131.py tests/runtime/checkpoint_runner/test_arch133_a_g.py
+git diff --check
+git diff --cached --check
+```
+
+Both Ruff phases ran before the combined result was assessed. Formatting was
+explicitly applied as a source-edit step before these checks. No broad local
+FULL, ROBINHOOD, LEGACY or EXHAUSTIVE certification ran.
+
+### Unchanged selectability and certification topology
+
+36 ACTIVE_CI_CHECKPOINTS and eight RETAINED_CHECKPOINTS retain their exact R2-B
+ordering. Retained explicit verification behavior is unchanged and retained
+runner tests are not selected by routine active CI. FULL/ROBINHOOD/LEGACY/
+EXHAUSTIVE remain 136/63/205/341 modules. Required FULL/ROBINHOOD baselines
+remain exactly the accepted R2-B migrated tuples (122/49); no membership changed.
+
+`COMMON_TESTS` remains exactly:
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+```
+
+The terminal artifact's path unions were compared exactly, in first-seen order,
+against the admitted R2-B2 inventory. They remain 47 TEST_PATHS / 127 RUFF_PATHS.
+
+<details>
+<summary>Exact active TEST_PATHS</summary>
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/review_paper/test_store.py
+tests/robinhood_mcp/test_adapter.py
+tests/test_robinhood_paper_cycle.py
+tests/review_paper/test_performance.py
+tests/robinhood_mcp/test_sdk_transport.py
+tests/robinhood_mcp/test_windows_oauth.py
+tests/robinhood_mcp/test_account_resolution.py
+tests/test_robinhood_paper_operator.py
+tests/review_paper/test_intent_bridge.py
+tests/risk/test_risk_models.py
+tests/risk/test_manager.py
+tests/execution/test_execution_models.py
+tests/execution/test_order_engine.py
+tests/test_robinhood_paper_pipeline.py
+tests/review_paper/test_risk_context.py
+tests/ledger/test_ledger.py
+tests/test_robinhood_forward_paper_cycle.py
+tests/test_robinhood_live_qualification_verifier.py
+tests/review_paper/test_session_admission.py
+tests/review_paper/test_risk_prices.py
+tests/review_paper/test_forward_preview.py
+tests/review_paper/test_risk_price_acquisition.py
+tests/review_paper/test_supervised_forward_paper.py
+tests/review_paper/test_prepare_qualification.py
+tests/test_robinhood_prepare_qualification_verifier.py
+tests/review_paper/test_nyse_published_regular_sessions.py
+tests/review_paper/test_published_session_prepare.py
+tests/scripts/certification_runner/test_profiles.py
+tests/test_robinhood_prepare_operator.py
+tests/test_robinhood_supervised_qualification.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+tests/review_paper/test_unattended_activation.py
+tests/review_paper/test_unattended_state_store.py
+tests/review_paper/test_unattended_one_wake.py
+tests/review_paper/test_unattended_execution.py
+tests/review_paper/test_unattended_host.py
+tests/runtime/checkpoint_runner/test_arch133_h_k.py
+tests/review_paper/test_unattended_publication.py
+tests/review_paper/test_scratch_root_acl.py
+tests/review_paper/test_retained_root_diagnostic.py
+tests/review_paper/test_retained_root_acl_recovery.py
+tests/runtime/checkpoint_runner/test_arch133_l_m.py
+tests/review_paper/test_post_publication_verifier.py
+tests/review_paper/test_post_publication_stage_diagnostic.py
+```
+
+</details>
+
+<details>
+<summary>Exact active RUFF_PATHS</summary>
+
+```text
+scripts/checkpoint_runner.py
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+tests/runtime/checkpoint_runner/helpers.py
+tests/runtime/checkpoint_runner/__init__.py
+tests/runtime/checkpoint_runner/test_arch131.py
+src/trading_bot/review_paper/__init__.py
+src/trading_bot/review_paper/models.py
+src/trading_bot/review_paper/store.py
+tests/review_paper/test_store.py
+src/trading_bot/robinhood_mcp/__init__.py
+src/trading_bot/robinhood_mcp/models.py
+src/trading_bot/robinhood_mcp/parsing.py
+src/trading_bot/robinhood_mcp/adapter.py
+tests/robinhood_mcp/test_adapter.py
+src/trading_bot/robinhood_paper_cycle.py
+tests/test_robinhood_paper_cycle.py
+src/trading_bot/review_paper/performance.py
+tests/review_paper/test_performance.py
+src/trading_bot/robinhood_mcp/sdk_transport.py
+tests/robinhood_mcp/test_sdk_transport.py
+src/trading_bot/robinhood_mcp/windows_oauth.py
+tests/robinhood_mcp/test_windows_oauth.py
+src/trading_bot/robinhood_mcp/account_resolution.py
+tests/robinhood_mcp/test_account_resolution.py
+src/trading_bot/robinhood_paper_operator.py
+tests/test_robinhood_paper_operator.py
+src/trading_bot/review_paper/intent_bridge.py
+tests/review_paper/test_intent_bridge.py
+src/trading_bot/robinhood_paper_pipeline.py
+tests/test_robinhood_paper_pipeline.py
+src/trading_bot/review_paper/risk_context.py
+tests/review_paper/test_risk_context.py
+src/trading_bot/robinhood_forward_paper_cycle.py
+tests/test_robinhood_forward_paper_cycle.py
+src/trading_bot/robinhood_live_qualification_verifier.py
+tests/test_robinhood_live_qualification_verifier.py
+src/trading_bot/review_paper/session_admission.py
+tests/review_paper/test_session_admission.py
+src/trading_bot/review_paper/risk_prices.py
+tests/review_paper/test_risk_prices.py
+src/trading_bot/review_paper/forward_preview.py
+tests/review_paper/test_forward_preview.py
+src/trading_bot/review_paper/risk_price_acquisition.py
+tests/review_paper/test_risk_price_acquisition.py
+src/trading_bot/review_paper/supervised_forward_paper.py
+tests/review_paper/test_supervised_forward_paper.py
+src/trading_bot/review_paper/prepare_qualification.py
+tests/review_paper/test_prepare_qualification.py
+src/trading_bot/robinhood_prepare_qualification_verifier.py
+tests/test_robinhood_prepare_qualification_verifier.py
+src/trading_bot/review_paper/nyse_published_regular_sessions.py
+tests/review_paper/test_nyse_published_regular_sessions.py
+src/trading_bot/review_paper/published_session_prepare.py
+tests/review_paper/test_published_session_prepare.py
+tests/scripts/certification_runner/test_profiles.py
+src/trading_bot/robinhood_prepare_operator.py
+tests/test_robinhood_prepare_operator.py
+src/trading_bot/robinhood_supervised_qualification.py
+src/trading_bot/robinhood_execute_qualification_verifier.py
+scripts/robinhood_supervised_qualification.py
+tests/test_robinhood_supervised_qualification.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+src/trading_bot/review_paper/unattended_activation.py
+tests/review_paper/test_unattended_activation.py
+src/trading_bot/review_paper/unattended_state_schema.py
+src/trading_bot/review_paper/unattended_state_store.py
+src/trading_bot/review_paper/unattended_state_verifier.py
+tests/review_paper/test_unattended_state_store.py
+src/trading_bot/review_paper/unattended_one_wake.py
+tests/review_paper/test_unattended_one_wake.py
+src/trading_bot/review_paper/unattended_execution.py
+tests/review_paper/test_unattended_execution.py
+src/trading_bot/review_paper/unattended_host_identity.py
+src/trading_bot/review_paper/unattended_scheduler.py
+src/trading_bot/review_paper/unattended_host.py
+scripts/run_arch133_unattended_review_paper.py
+tests/review_paper/test_unattended_host.py
+src/trading_bot/review_paper/unattended_host_bootstrap.py
+scripts/run_arch133_unattended_host_preflight.py
+tests/runtime/checkpoint_runner/test_arch133_h_k.py
+src/trading_bot/review_paper/unattended_publication.py
+src/trading_bot/review_paper/unattended_publication_windows.py
+scripts/run_arch133_host_publication.py
+src/trading_bot/arch133_acl/__init__.py
+src/trading_bot/arch133_acl/primitive.py
+src/trading_bot/arch133_acl/read_only.py
+src/trading_bot/arch133_acl/root_policy_apply.py
+src/trading_bot/arch133_acl/administrator.py
+tests/review_paper/test_unattended_publication.py
+src/trading_bot/arch133_acl/qualification.py
+scripts/run_arch133_scratch_root_acl.py
+tests/review_paper/test_scratch_root_acl.py
+src/trading_bot/arch133_acl/retained_reads.py
+src/trading_bot/arch133_acl/retained_diagnostic.py
+scripts/run_arch133_retained_root_diagnostic.py
+tests/review_paper/test_retained_root_diagnostic.py
+src/trading_bot/arch133_acl/recovery.py
+scripts/run_arch133_retained_root_acl_recovery.py
+tests/review_paper/test_retained_root_acl_recovery.py
+tests/runtime/checkpoint_runner/test_arch133_l_m.py
+src/trading_bot/__init__.py
+src/trading_bot/config.py
+src/trading_bot/arch133_verifier/__init__.py
+src/trading_bot/arch133_verifier/activation.py
+src/trading_bot/arch133_verifier/binding.py
+src/trading_bot/arch133_verifier/credentials.py
+src/trading_bot/arch133_verifier/file_policy.py
+src/trading_bot/arch133_verifier/operator.py
+src/trading_bot/arch133_verifier/scheduler.py
+src/trading_bot/arch133_verifier/sessions.py
+src/trading_bot/arch133_verifier/state.py
+src/trading_bot/arch133_verifier/state_schema.py
+src/trading_bot/arch133_verifier/token.py
+src/trading_bot/domain/__init__.py
+src/trading_bot/domain/_validation.py
+src/trading_bot/domain/enums.py
+src/trading_bot/domain/market.py
+src/trading_bot/domain/orders.py
+src/trading_bot/domain/positions.py
+src/trading_bot/domain/proposals.py
+scripts/run_arch133_post_publication_verifier.py
+tests/review_paper/test_post_publication_verifier.py
+src/trading_bot/arch133_diagnostic/__init__.py
+src/trading_bot/arch133_diagnostic/operator.py
+scripts/run_arch133_post_publication_stage_diagnostic.py
+tests/review_paper/test_post_publication_stage_diagnostic.py
+```
+
+</details>
+
+### Terminal CI, JUnit and performance evidence
+
+[Source gate #294 / 37731218114](https://github.com/callmedraken/ai-trading-bot/actions/runs/37731218114) reached terminal
+**SUCCESS** on HEAD `ff21c05b93d862d2299dd1574c2f931b9ea5acb5`, tree `3e714d054516dfd156def89c2a21e51b85e8861e`.
+All 36 authority results passed, identity remained stable and all four command
+exit codes were zero. The downloaded command bytes/SHA-256 values were verified
+against `report.json`. The sole skip is the unchanged optional MCP OAuth import
+(`mcp.shared.auth` unavailable in source CI).
+
+Artifact `checkpoint-source-gate-evidence` retains:
+
+```text
+source-gate-batch-20261008T051306.659003Z/report.json
+source-gate-batch-20261008T051306.659003Z/pytest-results.xml
+source-gate-batch-20261008T051306.659003Z/commands/01-pytest.stdout.txt
+```
+
+| Measurement | R2-B | R2-B2 | Historical median |
+| --- | ---: | ---: | ---: |
+| Passed / skipped | 4,611 / 1 | 4,643 / 1 | varies |
+| Total cases | 4,612 | 4,644 | varies |
+| Pytest wall seconds | 352.07 | 198.14 | 188.41 |
+| Pytest command elapsed_seconds | 353.5722111 | 199.42576060000002 | unavailable |
+| Workflow end-to-end seconds | 406 | 250 | 242 |
+| Recorded testcase seconds | 344.615 | 192.039 | unavailable |
+
+Workflow elapsed is terminal `updated_at` minus `created_at`, using the same
+convention as the historical comparison. Historical pytest/workflow ranges are
+150.67-234.87 s / 195-288 s. Pytest changes by -43.72% against R2-B
+and +5.16% against its historical median; workflow changes by
+-38.42% and +3.31% respectively. Timing is
+observational, never a correctness criterion or threshold.
+
+| JUnit module | R2-B cases | R2-B seconds | R2-B2 cases | R2-B2 seconds |
+| --- | ---: | ---: | ---: | ---: |
+| `test_arch131.py` | 698 | 172.955 | 724 | 71.088 |
+| `test_arch133_a_g.py` | 205 | 44.751 | 211 | 18.983 |
+| `test_arch133_h_k.py` | 153 | 43.902 | 153 | 35.826 |
+| `test_arch133_l_m.py` | 129 | 55.094 | 129 | 44.269 |
+| `test_ci.py` | 58 | 6.433 | 58 | 5.345 |
+| `test_core.py` | 50 | 0.112 | 50 | 0.081 |
+
+Checkpoint-runner aggregate: **175.592 s / 1325 cases /
+91.44%** of 192.039 s recorded testcase
+time, versus R2-B's 323.247 s / 1,293 cases / 93.8%. Non-runner tests total
+**16.447 s**, versus approximately 21.368 s in R2-B.
+
+| CI command | Exit | elapsed_seconds |
+| --- | ---: | ---: |
+| `pytest` | 0 | 199.42576060000002 |
+| `ruff_check` | 0 | 0.10405910000002905 |
+| `ruff_format` | 0 | 0.08929960000000392 |
+| `git_diff_check` | 0 | 0.024824200000011842 |
+
+### Top-100 slowest durations
+
+The retained stdout contains all 100 durations; their rounded sum is
+54.95 s. Counts by module:
+
+- `tests/runtime/checkpoint_runner/test_arch133_l_m.py`: 56.
+- `tests/runtime/checkpoint_runner/test_arch133_h_k.py`: 25.
+- `tests/runtime/checkpoint_runner/test_ci.py`: 8.
+- `tests/runtime/checkpoint_runner/test_arch131.py`: 11.
+
+<details>
+<summary>All 100 recorded slowest durations (seconds / phase / test)</summary>
+
+```text
+1.58s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[order-runner]
+1.57s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[order-workflow]
+1.50s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[duplicate-runner]
+1.46s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[missing-workflow]
+1.43s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[missing-runner]
+1.38s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[order-runner]
+1.36s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[missing-workflow]
+1.36s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[duplicate-workflow]
+1.35s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[duplicate-workflow]
+1.28s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[missing-runner]
+1.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[order-workflow]
+1.14s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_ci_registration_drift_fails_closed[duplicate-runner]
+1.13s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[duplicate-runner]
+1.00s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[order-runner]
+1.00s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[missing-workflow]
+0.98s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[duplicate-workflow]
+0.94s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[order-workflow]
+0.93s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[missing-runner]
+0.86s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_ci_registration_drift_fails_closed[missing-runner]
+0.83s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[missing-workflow]
+0.82s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[duplicate-runner]
+0.76s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[order-workflow]
+0.75s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[whitespace-pull_request]
+0.75s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_full_real_authority_chain_passes_and_visits_every_predecessor
+0.73s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[docs-push]
+0.69s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[order-runner]
+0.68s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[whitespace-push]
+0.68s call tests/runtime/checkpoint_runner/test_arch131.py::test_131v_source_only_registration_and_boundaries
+0.68s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_ci_registration_drift_fails_closed[duplicate-workflow]
+0.67s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[docs-pull_request]
+0.67s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_source_only_registration_no_host_callbacks
+0.67s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[moved_source-pull_request]
+0.66s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[moved_source-push]
+0.66s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_source_only_registration_no_host_callbacks
+0.61s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[order-workflow]
+0.58s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[unavailable-pull_request]
+0.56s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[duplicate-runner]
+0.54s call tests/runtime/checkpoint_runner/test_ci.py::test_ci_change_gate_against_real_git_range[unavailable-push]
+0.53s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[duplicate-workflow]
+0.53s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[missing-runner]
+0.51s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[missing-workflow]
+0.51s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_ci_registration_drift_fails_closed[order-runner]
+0.43s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_source_only_registration_no_host_callbacks
+0.36s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/__init__.py]
+0.35s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change2]
+0.35s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/credentials.py]
+0.34s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133j_source_only_registration_no_host_callbacks
+0.34s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/__init__.py]
+0.33s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_acl/retained_reads.py]
+0.32s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-scripts/run_arch133_post_publication_stage_diagnostic.py]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[src/trading_bot/robinhood_paper_cycle.py-        post_review, post_review_pages = _collect_agentic_orders(-        if review_failure is not None:\n            raise review_failure\n        post_review, post_review_pages = _collect_agentic_orders(]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_full_real_authority_chain_passes_and_visits_every_predecessor
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[.github/workflows/checkpoint-source-gates.yml-arch131-robinhood-paper-operator-missing-checkpoint]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[scripts/checkpoint_runner.py-execute=None,-execute=host_effect,]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_source_registration_and_workflow
+0.30s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_runtime_callback_injection_fails_closed[change6]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[scripts/checkpoint_runner.py-preflight=None,-preflight=host_effect,]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[src/trading_bot/robinhood_paper_cycle.py-except Exception as error:-except BaseException as error:]
+0.30s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[src/trading_bot/robinhood_mcp/sdk_transport.py-    def get_equity_orders(-    def call_tool(]
+0.29s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[src/trading_bot/robinhood_mcp/sdk_transport.py-    "get_equity_orders",-    "get_accounts",\n    "get_equity_orders",]
+0.29s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[missing-src/trading_bot/domain/orders.py]
+0.29s call tests/runtime/checkpoint_runner/test_arch131.py::test_131h_authority_rejects_boundary_drift[src/trading_bot/robinhood_mcp/sdk_transport.py-    def _get_accounts(-    def get_accounts(]
+0.29s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133h_complete_authority_pins_fail_closed[changed-src/trading_bot/review_paper/unattended_activation.py]
+0.29s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change6]
+0.28s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change5]
+0.28s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_read_only_import_closure_pins_fail_closed[changed-src/trading_bot/config.py]
+0.28s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/config.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/activation.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change0]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change4]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[missing-src/trading_bot/arch133_verifier/state_schema.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/token.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/enums.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/sessions.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/enums.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_acl/__init__.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/__init__.py]
+0.27s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/binding.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-scripts/run_arch133_post_publication_verifier.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/_validation.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_acl/retained_reads.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/file_policy.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/operator.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change3]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/orders.py]
+0.26s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_runtime_callback_injection_fails_closed[change1]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133i_source_only_registration_and_inert_callbacks
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_runtime_callback_injection_fails_closed[change0]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_runtime_callback_injection_fails_closed[change4]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/positions.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/positions.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/market.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/activation.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/state.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_verifier/state_schema.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_runtime_callback_injection_fails_closed[change3]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_acl/read_only.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_h_k.py::test_133k_read_only_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_acl/retained_reads.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133l_complete_import_closure_pins_fail_closed[changed-src/trading_bot/domain/proposals.py]
+0.25s call tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_complete_import_closure_pins_fail_closed[changed-src/trading_bot/arch133_diagnostic/__init__.py]
+```
+
+</details>
+
+### Deviations, limitations and next owner
+
+The requested interpreter path was absent; the existing development `.venv`
+was used. The Windows sandbox helper failed before commands could start, so
+approved commands ran outside that broken sandbox while remaining confined to
+the expressly named source worktree and external test/evidence roots. The first
+push approval attempt hit a reviewer usage limit and executed no push; after
+the user's Continue instruction, the ordinary push succeeded through the same
+approval mechanism.
+
+The main 131/A-G optimization moves repeated setup PASS checks into dedicated
+cases because those real local authority functions have no predecessor calls.
+Only the five actually present G/H edges are isolated, for 18 wholly local
+mutation cases. Production chaining and all logical rejection dimensions remain
+unchanged. This is a single observational CI sample; timing variability is not a
+correctness failure. No unresolved focused/source-CI failure remains.
+
+ChatGPT exact-source acceptance and FULL certification are pending. No protected
+operation, real 133-M, Q133-2V retry, Q133-3/Q133-4, R2-C or R2-D was performed.
+Production/live placement remains NO-GO.
+
+Ready-to-paste next action for ChatGPT:
+
+> Review Architecture 132-R2-B2 implementation HEAD
+> `ff21c05b93d862d2299dd1574c2f931b9ea5acb5`, TREE `3e714d054516dfd156def89c2a21e51b85e8861e`, against
+> frozen parent `bd9729e2dc8ca728908fc75ad906d78ddfa833b5`, using terminal
+> source gate #294 / 37731218114 SUCCESS and this evidence report.
+> Check all original function/mutation/case identities, copied-closure PASS
+> proofs, five G/H invocation/failure/full-real-chain proofs, unchanged H-M
+> workflow/order integration, unchanged active unions and profile baselines.
+> Decide exact-source acceptance. If accepted, supply one fresh FULL certification
+> command on this final executable/test source to close R2-B's deferred obligation.
+> Do not begin R2-C/R2-D or resume protected Architecture-133 operations.
+
 ## 2026-10-07 — Architecture 132-R2-B SOURCE ACCEPTED; historical CI gap localizes R2-B2
 
 Architecture 132-R2-B is **SOURCE/TOPOLOGY ACCEPTED**.

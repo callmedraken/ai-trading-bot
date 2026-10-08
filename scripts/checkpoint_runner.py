@@ -1507,8 +1507,9 @@ def _arch133_reprovision_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.remote_branch != "feature/robinhood-unattended-review-paper-133q"
         ):
             failures.append("133-Q source-only capability drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
         if (
-            ACTIVE_CI_CHECKPOINTS[-2:]
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
             != ("arch133-robinhood-single-session-scheduler-installation", name)
             or ACTIVE_CI_CHECKPOINTS.count(name) != 1
         ):
@@ -7074,7 +7075,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             execute=None,
             remote_head_env=None,
         ),
-                "arch133-robinhood-reprovision-admission-diagnostic": CheckpointSpec(
+        "arch133-robinhood-reprovision-admission-diagnostic": CheckpointSpec(
             name="arch133-robinhood-reprovision-admission-diagnostic",
             description="Architecture 133-R source-only reprovision admission diagnostic",
             tests=(
@@ -7095,7 +7096,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             execute=None,
             remote_head_env=None,
         ),
-"arch133-robinhood-fresh-activation-reprovision": CheckpointSpec(
+        "arch133-robinhood-fresh-activation-reprovision": CheckpointSpec(
             name="arch133-robinhood-fresh-activation-reprovision",
             description="Architecture 133-Q source-only fresh activation reprovision",
             tests=(

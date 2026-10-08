@@ -1,26 +1,39 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
-## 2026-10-08 — 133-N consumed; Architecture 133-O corrected diagnostic source pending review
+## 2026-10-08 — Architecture 133-O SOURCE/TOPOLOGY ACCEPTED; no additional broad certification selected
 
-The single real 133-N attempt is **consumed/non-retryable**. Operator evidence
-reported **BLOCKED**, stage **PUBLICATION_SEMANTICS**, exit **3**. All twelve
-effect counters were integer zero:
+Architecture 133-O is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted executable/test source:
 
 ```text
-credential_reads=0 credential_writes=0 provider_calls=0
-scheduler_reads=0 scheduler_writes=0 paper_mutations=0 state_mutations=0
-acl_mutations=0 wake_delegations=0 execution_delegations=0
-consumed_wake_authority=0 broker_effects=0
+BRANCH  feature/robinhood-unattended-review-paper-133o
+HEAD    d08b85267cda14494733677a74d96ca988587388
+TREE    c0c7f9d4d471f69d511e9a9c7b0c748f69f05794
+CI      #303 / 37750650470 SUCCESS
 ```
 
-This evidence supersedes the historical next-step wording below that proposed
-a real 133-N invocation. Q133-2V and 133-M also remain consumed/non-retryable;
-none of their accepted launchers or executable behavior is changed.
+The exact GitHub compare against parent
+`054193bc6bcf1d2dd0b64413c5bcb770d458663d` is one commit with exactly
+17 changed paths. The remote feature branch resolves exactly to the accepted
+HEAD. The implementation is a new source-only successor; the consumed 133-N,
+133-M and Q133-2V executable entrypoints remain unchanged and non-retryable.
 
-Source review identified a publication-identity conflation. The separately
-published Q133-2 host runtime and activation use the exact reviewed 133-G
-docs-closeout checkout. The executable source baseline remains independently
-frozen:
+The real 133-N evidence is now closed as:
+
+```text
+status  BLOCKED
+stage   PUBLICATION_SEMANTICS
+exit    3
+```
+
+All twelve effect counters were integer zero. That result proved fixed
+publication path access and canonical parsing before the first semantic
+rejection, and it did not reach SQLite state or paper access.
+
+Exact-source review confirms the 133-N rejection was caused by a source-contract
+identity conflation, not evidence of retained publication corruption. 133-O now
+pins the two identities separately:
 
 ```text
 EXECUTABLE_SOURCE_HEAD 4677ba442eafdcec56933b992f230a702012d573
@@ -29,60 +42,95 @@ PUBLISHED_RUNTIME_HEAD 65f0d40217f8ce129224531a5151f4acea889d89
 PUBLISHED_RUNTIME_TREE 16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
 ```
 
-The 65f0 commit descends from 4677 with changes only to PROJECT_STATUS,
-AI_TRADING_BOT_HANDOFF, and the Architecture-133 authority/validation documents.
-That provenance does not authorize generic descendants: actual 133-G checkout
-admission accepts only those two exact HEAD/tree pairs and still reports the
-independently frozen executable baseline.
+The 65f0/16cb checkout is an exact reviewed docs-only descendant of 4677/6ce.
+133-O therefore uses 65f0/16cb for serialized host-runtime and activation
+publication semantics while retaining 4677/6ce as the independently frozen
+executable baseline. Actual 133-G checkout admission remains closed to the two
+reviewed exact HEAD/tree pairs; no generic descendant or ancestry admission was
+introduced.
 
-Architecture 133-O is a **new source-only successor pending exact-source review**,
-implemented from parent `054193bc6bcf1d2dd0b64413c5bcb770d458663d`, tree
-`ad83f7b250ed6f8be248c58b636248947dba160b`, on
-`feature/robinhood-unattended-review-paper-133o` at
-`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133o`.
-Its independent package is
-`trading_bot.arch133_publication_state_paper_corrected`, launcher
-`scripts/run_arch133_publication_state_paper_corrected.py`, and result schema
-`arch133o-publication-state-paper-diagnostic/v1`. The consumed 133-N executable
-entrypoint is neither imported nor reused.
-
-For publication comparison, expected HostRuntimeIdentity and both serialized
-host.runtime and activation HEAD/tree must use PUBLISHED_RUNTIME_HEAD/TREE.
-Activation deployment identity must equal host.runtime.deployment_identity.
-Production Python hash/version, wake-launcher hash, activation and binding hashes,
-store path/identity, OAuth-valid-until relation, and the independently rebuilt
-Q133-2 predecessor fingerprint retain their accepted checks. Serialized
-4677/6ce publication identities are rejected before any SQLite access.
-
-The nine stages, twelve integer-zero counters, fixed bounded publication reads,
-exact held-object final reobservation and exactly-once closure are preserved.
-Each fixed SQLite URI opens with `mode=ro`, `uri=True`, `timeout=0`, then `BEGIN`
-only at its OPEN stage. No ATTACH, VACUUM, mutable PRAGMA, writer, Credential
-Manager, provider/MCP, scheduler access, wake/execution delegation, ACL mutation,
-broker effect, or live capability is added. Source tests use temporary fixtures
-and fake native edges only.
+The corrected operator preserves the nine-stage vocabulary, fixed bounded
+publication reads, exact retained-object admission, twelve zero-effect counters,
+read-only SQLite transport (`mode=ro`, `uri=True`, `timeout=0`, `BEGIN`
+only), exact state/paper semantics, final held-object reobservation and
+exactly-once closure. Its fresh-process import closure remains free of Credential
+Manager, provider/MCP, scheduler, state/paper writer, wake/execution delegation,
+ACL mutation and broker/live capability. The separate launcher remains
+zero-semantic-argument and fail-closed.
 
 The source-only checkpoint
 `arch133-robinhood-publication-state-paper-corrected` is registered immediately
-after 133-N, with `preflight=None`, `execute=None`, `remote_head_env=None`.
-Retained checkpoints and frozen required certification tuples are unchanged.
-Adding one supported test module yields FULL 138, ROBINHOOD 65, LEGACY 205,
-EXHAUSTIVE 343; required FULL/ROBINHOOD remain 122/49.
+after consumed 133-N with:
 
-Focused verification is complete: 204 corrected-diagnostic cases, 657 affected
-registration/inventory cases, 190 unchanged consumed-133-N cases, and 64 selected
-topology cases pass after targeted fixture corrections. Both non-mutating Ruff
-phases pass on all 12 changed Python files; git diff check passes. Pure source
-authority checks pass 38/38. The active batch has 49 test paths and 135 Ruff paths.
-No broad certification was run. The user explicitly authorized exact-file
-commit/ordinary push and terminal source-gate verification after local checks.
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+```
 
-Next: publish this 17-file checkpoint, wait for its source gate to finish, then
-request ChatGPT exact-source review. Source acceptance remains pending; broad
-certification remains for ChatGPT to select after exact-source review.
-No real 133-O diagnostic has run or is authorized by this source change. A later
-single real invocation requires separate fresh protected authorization; Q133-3,
-Q133-4 and all broker/live effects remain unauthorized. Live trading is NO-GO.
+Current topology is:
+
+```text
+ACTIVE CHECKPOINTS  38
+BATCH TEST PATHS    49
+BATCH RUFF PATHS   135
+
+FULL        138 modules
+ROBINHOOD    65 modules
+LEGACY      205 modules
+EXHAUSTIVE  343 modules
+
+required FULL       122 modules
+required ROBINHOOD   49 modules
+```
+
+Source gate #303 on the exact accepted source produced:
+
+```text
+cases    5,156
+passed   5,155
+skipped  1
+failed   0
+errors   0
+wall     322.63 s
+
+PYTEST          0
+RUFF_CHECK      0
+RUFF_FORMAT     0
+GIT_DIFF_CHECK  0
+AUTHORITY       38/38 PASS
+```
+
+The single skip is the unchanged optional MCP OAuth import unavailable on CI.
+The evidence report confirms source identity remained stable at the accepted
+HEAD/tree and that production, provider, scheduler and broker/live effects were
+NOT_RUN.
+
+No additional ROBINHOOD or FULL certification is selected. The new corrected
+functional module, its predecessor, the affected Architecture-133 chain,
+registration/profile topology, shared risk/execution/ledger dependencies and all
+active authority checks were exercised by the terminal source gate. The
+ROBINHOOD modules omitted from the 49-path active gate remain the same 16
+unchanged modules already accepted at 133-N; this checkpoint changes no such
+source.
+
+### Protected boundary
+
+133-O source acceptance does **not** authorize a real invocation.
+
+Q133-2V is consumed/non-retryable.
+133-M is consumed/non-retryable.
+133-N is consumed/non-retryable.
+Q133-3 scheduler installation and Q133-4 unattended wake remain unauthorized.
+Production/live broker placement remains **NO-GO**.
+
+The immediate next gate is one separately authorized real 133-O credential-free,
+read-only diagnostic under the exact standard non-elevated Trading principal.
+It is one attempt only: no retry, polling, repair, fallback or alternate
+launcher. Its sole purpose is to continue the already-localized
+publication/state/paper qualification through corrected publication semantics
+and identify the first remaining stage, if any. A real 133-O invocation requires
+fresh explicit user authorization after this accepted source checkpoint.
 
 ## 2026-10-08 — Architecture 133-N SOURCE ACCEPTED; no additional broad certification selected
 

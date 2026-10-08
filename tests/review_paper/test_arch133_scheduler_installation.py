@@ -839,6 +839,12 @@ def native_fixture(tmp_path, request):
             encoding="utf-8"
         )
         if name == "install":
+            # A distinct fake name cannot be shadowed by module command imports.
+            assert source.count("Get-FileHash -LiteralPath") == 1
+            source = source.replace(
+                "Get-FileHash -LiteralPath", "Get-FakeActivationHash -LiteralPath"
+            )
+            assert "Get-FileHash" not in source
             source = source.replace(
                 "[Security.Principal.WindowsIdentity]::GetCurrent()",
                 "$global:FakeIdentity",
@@ -877,10 +883,14 @@ $global:FakeIdentity = [pscustomobject]@{
     User=[pscustomobject]@{Value='S-1-5-21-1397534616-3988210162-180023805-1009'}
 }
 $global:FakeCalls = 0
-function Get-FileHash {
+$global:FakeHashReads = 0
+function Get-FakeActivationHash {
     param([string]$LiteralPath, [string]$Algorithm)
     if ($LiteralPath -cne 'F:\AITradingBot\Arch133\activation.json' -or
         $Algorithm -cne 'SHA256') { throw 'unexpected file access' }
+    $global:FakeHashReads += 1
+    $hashCountPath = Join-Path $PSScriptRoot 'hash-count.txt'
+    [IO.File]::WriteAllText($hashCountPath, [string]$global:FakeHashReads)
     return [pscustomobject]@{
         Hash='37873b490c3f2ccced53431c599e40ca54fdc008e09e9bfdb38eb61d10f3cab2'
     }
@@ -1043,6 +1053,8 @@ def test_fake_com_installer_exact_one_create_or_no_call(native_fixture, mode):
     assert data["registration_attempts"] == count
     calls = temp / "call-count.txt"
     assert (int(calls.read_text()) if calls.exists() else 0) == count
+    hashes = temp / "hash-count.txt"
+    assert (int(hashes.read_text()) if hashes.exists() else 0) == count
 
 
 def test_133p_source_checkpoint_has_no_protected_callbacks():

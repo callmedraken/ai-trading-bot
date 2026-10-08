@@ -192,6 +192,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-retained-root-diagnostic",
         "arch133-robinhood-retained-root-acl-recovery",
         "arch133-robinhood-post-publication-verifier",
+        "arch133-robinhood-post-publication-stage-diagnostic",
     }
     for spec in specs.values():
         assert "tests/runtime/test_checkpoint_runner.py" in spec.tests
@@ -264,6 +265,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-unattended-review-paper-133k"
         if spec.name == "arch133-robinhood-post-publication-verifier":
             expected_branch = "feature/robinhood-unattended-review-paper-133l"
+        if spec.name == "arch133-robinhood-post-publication-stage-diagnostic":
+            expected_branch = "feature/robinhood-unattended-review-paper-133m"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -2190,10 +2193,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch133-robinhood-post-publication-verifier\n"
+                "arch133-robinhood-post-publication-stage-diagnostic\n"
                 "          exit $LASTEXITCODE"
             ),
-            ("arch133-robinhood-post-publication-verifier\n          exit 0"),
+            ("arch133-robinhood-post-publication-stage-diagnostic\n          exit 0"),
         ),
     ],
 )
@@ -2505,6 +2508,7 @@ _EXPECTED_CI_CHECKPOINTS = (
     "arch133-robinhood-retained-root-diagnostic",
     "arch133-robinhood-retained-root-acl-recovery",
     "arch133-robinhood-post-publication-verifier",
+    "arch133-robinhood-post-publication-stage-diagnostic",
 )
 
 
@@ -4567,8 +4571,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.CI_CHECKPOINTS) == 43
-    assert runner.CI_CHECKPOINTS[-24:-10] == (
+    assert len(runner.CI_CHECKPOINTS) == 44
+    assert runner.CI_CHECKPOINTS[-25:-11] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -4987,7 +4991,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 43
+    assert len(runner.CI_CHECKPOINTS) == 44
     assert runner.CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_T_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority")
@@ -5202,7 +5206,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/test_run_test_certification.py",
     )
-    assert len(runner.CI_CHECKPOINTS) == 43
+    assert len(runner.CI_CHECKPOINTS) == 44
     assert runner.CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.CI_CHECKPOINTS.index(_U_NAME) == (
         runner.CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
@@ -6270,7 +6274,7 @@ def test_133h_checkpoint_is_source_only_and_ci_registered():
         *runner.COMMON_TESTS,
         "tests/review_paper/test_unattended_publication.py",
     )
-    assert runner.CI_CHECKPOINTS[-6:-4] == (_G133_NAME, _H133_NAME)
+    assert runner.CI_CHECKPOINTS[-7:-5] == (_G133_NAME, _H133_NAME)
     assert runner._arch133_host_publication_authority_check(repo) == ()
 
 
@@ -6400,7 +6404,7 @@ def test_133g_source_only_registration_exact_order_and_coverage():
         "tests/scripts/test_run_test_certification.py",
     )
     assert runner.CI_CHECKPOINTS.count(_G133_NAME) == 1
-    assert runner.CI_CHECKPOINTS[-7:-5] == (_E133_NAME, _G133_NAME)
+    assert runner.CI_CHECKPOINTS[-8:-6] == (_E133_NAME, _G133_NAME)
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_G133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -6511,7 +6515,7 @@ def test_133i_source_only_registration_and_inert_callbacks(tmp_path, monkeypatch
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133i"
     assert spec.authority_check is runner._arch133_scratch_root_acl_authority_check
-    assert runner.CI_CHECKPOINTS[-5:-3] == (_H133_NAME, _I133_NAME)
+    assert runner.CI_CHECKPOINTS[-6:-4] == (_H133_NAME, _I133_NAME)
     assert (
         runner._arch133_scratch_root_acl_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6667,7 +6671,7 @@ def test_133j_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133j"
     assert spec.authority_check is runner._arch133_retained_root_authority_check
-    assert runner.CI_CHECKPOINTS[-4:-2] == (_I133_NAME, _J133_NAME)
+    assert runner.CI_CHECKPOINTS[-5:-3] == (_I133_NAME, _J133_NAME)
     assert (
         runner._arch133_retained_root_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6777,7 +6781,7 @@ def test_133k_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133k"
     assert spec.authority_check is runner._arch133_recovery_authority_check
-    assert runner.CI_CHECKPOINTS[-3:-1] == (_J133_NAME, _K133_NAME)
+    assert runner.CI_CHECKPOINTS[-4:-2] == (_J133_NAME, _K133_NAME)
     assert (
         runner._arch133_recovery_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6880,7 +6884,7 @@ def test_133l_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_L133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133l"
-    assert runner.CI_CHECKPOINTS[-2:] == (_K133_NAME, _L133_NAME)
+    assert runner.CI_CHECKPOINTS[-3:] == (_K133_NAME, _L133_NAME, _M133_NAME)
     assert (
         runner._arch133_verifier_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -6947,7 +6951,7 @@ def test_133l_ci_registration_drift_fails_closed(tmp_path, target, mutation):
     line = (
         f'    "{_L133_NAME}",\n'
         if target == "runner"
-        else f"              {_L133_NAME}\n"
+        else f"              {_L133_NAME} `\n"
     )
     assert text.count(line) == 1
     if mutation == "order":
@@ -6961,3 +6965,106 @@ def test_133l_ci_registration_drift_fails_closed(tmp_path, target, mutation):
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_verifier_authority_check(root)
+
+
+_M133_NAME = "arch133-robinhood-post-publication-stage-diagnostic"
+
+
+def _133m_copy(tmp_path):
+    root = _133l_copy(tmp_path)
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in runner.ARCH133_DIAGNOSTIC_PINS:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    assert runner._arch133_diagnostic_authority_check(root) == ()
+    return root
+
+
+def test_133m_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
+    spec = runner._checkpoint_specs()[_M133_NAME]
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133m"
+    assert runner.CI_CHECKPOINTS[-2:] == (_L133_NAME, _M133_NAME)
+    assert (
+        runner._arch133_diagnostic_authority_check(
+            Path(runner.__file__).resolve().parents[1]
+        )
+        == ()
+    )
+    monkeypatch.setattr(runner, "_git_state", lambda *a: pytest.fail("host accessed"))
+    with pytest.raises(RuntimeError):
+        runner.preflight_checkpoint(
+            spec, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+        )
+    with pytest.raises(RuntimeError):
+        runner.execute_checkpoint(
+            spec, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+        )
+
+
+@pytest.mark.parametrize("relative", tuple(runner.ARCH133_DIAGNOSTIC_PINS))
+@pytest.mark.parametrize("mutation", ["missing", "changed"])
+def test_133m_complete_import_closure_pins_fail_closed(tmp_path, relative, mutation):
+    root = _133m_copy(tmp_path)
+    path = root / relative
+    if mutation == "missing":
+        path.unlink()
+    else:
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\nUNREVIEWED = True\n", encoding="utf-8"
+        )
+    assert runner._arch133_diagnostic_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflight": lambda: pytest.fail("host accessed")},
+        {"execute": lambda: pytest.fail("host accessed")},
+        {"remote_branch": "wrong"},
+        {"remote_head_env": "INJECTED"},
+        {"tests": ()},
+        {"ruff_paths": ()},
+        {"authority_check": lambda _: ()},
+    ],
+)
+def test_133m_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, change):
+    from dataclasses import replace
+
+    root = _133m_copy(tmp_path)
+    specs = runner._checkpoint_specs()
+    specs[_M133_NAME] = replace(specs[_M133_NAME], **change)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert runner._arch133_diagnostic_authority_check(root)
+
+
+@pytest.mark.parametrize("target", ["runner", "workflow"])
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "order"])
+def test_133m_ci_registration_drift_fails_closed(tmp_path, target, mutation):
+    root = _133m_copy(tmp_path)
+    path = root / (
+        "scripts/checkpoint_runner.py"
+        if target == "runner"
+        else ".github/workflows/checkpoint-source-gates.yml"
+    )
+    text = path.read_text(encoding="utf-8")
+    line = (
+        f'    "{_M133_NAME}",\n'
+        if target == "runner"
+        else f"              {_M133_NAME}\n"
+    )
+    assert text.count(line) == 1
+    if mutation == "order":
+        prior = (
+            f'    "{_L133_NAME}",\n'
+            if target == "runner"
+            else f"              {_L133_NAME} `\n"
+        )
+        text = text.replace(prior + line, line + prior)
+    else:
+        text = text.replace(line, "" if mutation == "missing" else line * 2)
+    path.write_text(text, encoding="utf-8")
+    assert runner._arch133_diagnostic_authority_check(root)

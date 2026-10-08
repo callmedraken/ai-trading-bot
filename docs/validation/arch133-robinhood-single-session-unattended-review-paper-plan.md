@@ -1,5 +1,132 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-07 — Architecture 133-M implementation; exact-source review pending
+
+The source-only 133-M checkpoint is implemented on
+`feature/robinhood-unattended-review-paper-133m`, in
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133m`, from admitted parent
+`d0f32c9aefed030f0e74be00c01c8b95eb2571d0` /
+`22e2fcc7c09f8587bd1c279e0f5c7f56a318ee65` (source gate #285 SUCCESS).
+
+The separate `trading_bot.arch133_diagnostic.operator` and
+`scripts/run_arch133_post_publication_stage_diagnostic.py` implement the seven
+frozen credential-free stages in order. The 23-module project import closure
+contains only inert/read-only leaves and excludes both the 133-L operator and
+credential reader. Independent read-only projections mirror accepted 133-L
+source/Git/publication/paper admission; tests compare definition ASTs and frozen
+root/file constants. Both exact accepted 133-G checkouts report/bind 4677/6ce.
+
+Canonical result schema is `arch133m-post-publication-stage-diagnostic/v1`.
+Rejection returns `BLOCKED`, reason `POST_PUBLICATION_STAGE_DIAGNOSTIC_BLOCKED`,
+and one fixed failed stage. All-stage success returns `PASS`, reason
+`POST_PUBLICATION_STAGE_DIAGNOSTIC_COMPLETE`, stage `PRE_CREDENTIAL_COMPLETE`.
+Both results contain only fixed vocabulary and explicit zero-effect counters;
+no runtime/host contents, credential material, exception text or native errors
+are exported. All acquired retained handles close exactly once, including on
+partial acquisition or stage failure. Any close failure takes precedence as
+`FINAL_REOBSERVATION` and prevents PASS. No later stage runs after rejection.
+
+The new source-only runner checkpoint
+`arch133-robinhood-post-publication-stage-diagnostic` follows 133-L, with
+`preflight=None`, `execute=None`, `remote_head_env=None`. CI pins the complete
+source/import closure, registration and order; existing source-authority pins
+remain unchanged; exact CI-order digests advance only to include 133-M.
+Inventory automatically admits the supported new test module:
+FULL 127, ROBINHOOD 54, LEGACY 204, EXHAUSTIVE 331. Frozen 113/40 baselines remain
+unchanged.
+
+Implementation verification uses fake/inert tests with fresh explicit external
+basetemp paths only. No real 133-M invocation, Q133-2V retry, retained-state or
+credential observation, provider/scheduler access, native ACL operation, wake or
+production mutation is part of this checkpoint. The accepted verifier/operator
+and wake-launcher bytes remain unchanged. Q133-2V's prior FAILED_CLOSED attempt
+remains consumed, with failed stage unknown. Q133-3/Q133-4 remain unauthorized.
+
+Next owner: ChatGPT for exact GitHub source review after terminal-green source
+CI, then certification selection. No ROBINHOOD/full local certification runs
+inside implementation; no real diagnostic is authorized by source CI.
+
+
+### Focused implementation verification record
+
+These independent invocations ran from the 133-M worktree with the existing
+development interpreter, never the protected production interpreter. Use a fresh
+unique `--basetemp` for any later rerun.
+
+Diagnostic plus accepted 133-L regression run: 286 passed before the last 20
+new diagnostic cases were added (142 diagnostic + 144 accepted 133-L).
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/review_paper/test_post_publication_stage_diagnostic.py tests/review_paper/test_post_publication_verifier.py --basetemp F:\AI\temp\pytest\arch133m-diagnostic-verifier-04
+```
+
+Final diagnostic module: 162 passed.
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/review_paper/test_post_publication_stage_diagnostic.py --basetemp F:\AI\temp\pytest\arch133m-diagnostic-final-07
+```
+
+Affected H/I/J/K and host regressions: 614 passed.
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/review_paper/test_unattended_host.py tests/review_paper/test_retained_root_acl_recovery.py tests/review_paper/test_retained_root_diagnostic.py tests/review_paper/test_scratch_root_acl.py tests/review_paper/test_unattended_publication.py --basetemp F:\AI\temp\pytest\arch133m-retained-regressions-06
+```
+
+Inventory and two isolated registration regressions: 452 passed.
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/runtime/test_checkpoint_runner.py::test_131m_source_only_registration_and_batch tests/runtime/test_checkpoint_runner.py::test_133m_source_only_registration_no_host_callbacks tests/scripts/test_run_test_certification.py -x --basetemp F:\AI\temp\pytest\arch133m-authority-inventory-12
+```
+
+Runner verification preserved 752 passing cases from the full-module fail-fast
+run below, which then stopped at the first old checkpoint-count assertion:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/runtime/test_checkpoint_runner.py -x --tb=short --basetemp F:\AI\temp\pytest\arch133m-runner-final-13
+```
+
+After advancing only the affected exact count/order assertions for the appended
+checkpoint, the remaining authority groups are verified by:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/runtime/test_checkpoint_runner.py -k '131r or 131s or 131t or 131u or 133' -x --tb=short --basetemp F:\AI\temp\pytest\arch133m-runner-affected-15
+```
+
+That affected run retained 583 passing cases before a textual mutation fixture
+matched a second checkpoint literal. The order assertion was expressed with
+fixed predecessor/successor variables, preserving its exact semantics. The final
+K/L/M authority rerun passed all 156 cases:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/runtime/test_checkpoint_runner.py -k '133k or 133l or 133m' -x --tb=short --basetemp F:\AI\temp\pytest\arch133m-runner-final-tail-17
+```
+
+The sole remaining runner case outside those groups passed independently:
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q tests/runtime/test_checkpoint_runner.py::test_131v_source_only_registration_and_boundaries --basetemp F:\AI\temp\pytest\arch133m-runner-131v-16
+```
+
+Together, the retained results and targeted reruns cover all 1,465 distinct
+runner cases. Total distinct focused coverage is 2,835 cases (162 diagnostic,
+144 accepted 133-L, 614 H/I/J/K/host, 1,465 runner, 450 inventory). Both Ruff
+lint and format checks passed across 28 affected source/test files. The source
+authority chain and git diff --check passed.
+
+Both focused non-mutating Ruff phases and git diff --check must pass before
+the exact-file commit. Exact commit/tree/terminal CI evidence and the final
+runner coverage counts are reported in the implementation handoff. Routine
+source verification remains the reviewed runner:
+
+```powershell
+.\ops.ps1 verify arch133-robinhood-post-publication-stage-diagnostic
+```
+
+CI runs that source checkpoint as part of the registered batch. ChatGPT selects
+any broader certification only after exact GitHub source review; implementation
+must not run ROBINHOOD certification or any real diagnostic. The frozen failed
+Q133-2V attempt remains non-retryable.
+
 ## 2026-10-07 — Q133-2V FAILED_CLOSED; Architecture 133-M diagnostic next
 
 The single authorized real Q133-2V attempt reached the accepted 133-L launcher

@@ -1,5 +1,52 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-07 — Architecture 133-M implementation; exact-source review pending
+
+The source-only 133-M checkpoint is implemented on
+`feature/robinhood-unattended-review-paper-133m`, in
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133m`, from admitted parent
+`d0f32c9aefed030f0e74be00c01c8b95eb2571d0` /
+`22e2fcc7c09f8587bd1c279e0f5c7f56a318ee65` (source gate #285 SUCCESS).
+
+The separate `trading_bot.arch133_diagnostic.operator` and
+`scripts/run_arch133_post_publication_stage_diagnostic.py` implement the seven
+frozen credential-free stages in order. The 23-module project import closure
+contains only inert/read-only leaves and excludes both the 133-L operator and
+credential reader. Independent read-only projections mirror accepted 133-L
+source/Git/publication/paper admission; tests compare definition ASTs and frozen
+root/file constants. Both exact accepted 133-G checkouts report/bind 4677/6ce.
+
+Canonical result schema is `arch133m-post-publication-stage-diagnostic/v1`.
+Rejection returns `BLOCKED`, reason `POST_PUBLICATION_STAGE_DIAGNOSTIC_BLOCKED`,
+and one fixed failed stage. All-stage success returns `PASS`, reason
+`POST_PUBLICATION_STAGE_DIAGNOSTIC_COMPLETE`, stage `PRE_CREDENTIAL_COMPLETE`.
+Both results contain only fixed vocabulary and explicit zero-effect counters;
+no runtime/host contents, credential material, exception text or native errors
+are exported. All acquired retained handles close exactly once, including on
+partial acquisition or stage failure. Any close failure takes precedence as
+`FINAL_REOBSERVATION` and prevents PASS. No later stage runs after rejection.
+
+The new source-only runner checkpoint
+`arch133-robinhood-post-publication-stage-diagnostic` follows 133-L, with
+`preflight=None`, `execute=None`, `remote_head_env=None`. CI pins the complete
+source/import closure, registration and order; existing source-authority pins
+remain unchanged; exact CI-order digests advance only to include 133-M.
+Inventory automatically admits the supported new test module:
+FULL 127, ROBINHOOD 54, LEGACY 204, EXHAUSTIVE 331. Frozen 113/40 baselines remain
+unchanged.
+
+Implementation verification uses fake/inert tests with fresh explicit external
+basetemp paths only. No real 133-M invocation, Q133-2V retry, retained-state or
+credential observation, provider/scheduler access, native ACL operation, wake or
+production mutation is part of this checkpoint. The accepted verifier/operator
+and wake-launcher bytes remain unchanged. Q133-2V's prior FAILED_CLOSED attempt
+remains consumed, with failed stage unknown. Q133-3/Q133-4 remain unauthorized.
+
+Next owner: ChatGPT for exact GitHub source review after terminal-green source
+CI, then certification selection. No ROBINHOOD/full local certification runs
+inside implementation; no real diagnostic is authorized by source CI.
+
+
 ## 2026-10-07 — Q133-2V FAILED_CLOSED; Architecture 133-M diagnostic next
 
 The single authorized real Q133-2V attempt reached the accepted 133-L launcher

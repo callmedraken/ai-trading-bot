@@ -1,12 +1,68 @@
 # Architecture 132-R2 — Test Suite Rationalization Validation Plan
 
+## 2026-10-07 — Architecture 132-R2-B terminal source CI green; review pending
+
+R2-B is implemented and ordinary-pushed on
+`feature/test-suite-rationalization-132r2`.
+
+```text
+IMPLEMENTATION HEAD 40aa7ef55a528fe7b7d9482d083ef1dcfed4dfb1
+IMPLEMENTATION TREE 0781d9ecb3dcaf87888506e2b833fb8106f35990
+SOURCE CI           #291 / 37726690416 SUCCESS
+PYTEST              4,611 passed / 1 skipped / 0 failed / 0 errors
+PYTEST WALL         352.07 s
+COMMAND ELAPSED     353.5722111 s
+ACTIVE CHECKPOINTS  36 (reviewed sequence unchanged)
+TEST_PATHS          42 -> 47
+RUFF_PATHS          120 -> 127
+```
+
+All 36 authority results passed, source identity stayed stable, and production,
+scheduler, provider and broker/live fields remained `NOT_RUN`. The single skip
+is the existing optional `mcp.shared.auth` import in the Windows OAuth test;
+the source-gate environment does not install `mcp`.
+
+Against accepted R2-A's 790.08 s, this run's pytest wall time is 438.01 s
+(55.44%) lower. Command elapsed decreased from 792.1711838 s to 353.5722111 s.
+This is observed cross-run evidence, with no timing threshold or performance
+claim beyond the measured runs. Splitting increases path counts while reducing
+routine collection from 4,850 to 4,612 outcomes and redundant predecessor work.
+
+The [terminal source run](https://github.com/callmedraken/ai-trading-bot/actions/runs/37726690416)
+uploaded [evidence artifact 11528162705](https://github.com/callmedraken/ai-trading-bot/actions/runs/37726690416/artifacts/11528162705).
+Its batch prefix is `source-gate-batch-20261008T041656.870000Z/`:
+`report.json` contains command timings and authority/effect evidence;
+`commands/01-pytest.stdout.txt` contains all top-100 durations; and
+`pytest-results.xml` contains exact total/per-module case counts.
+
+All 100 slowest entries are calls in supported runner infrastructure: 41 in
+133-L–M, 20 in 133-H–K, 29 in Architecture 131, eight in CI, and two in 133-A–G.
+The slowest three are real-chain 133-M runner ordering/registration mutations:
+1.94 s duplicate, 1.93 s missing, and 1.91 s order. The validation plan records
+every split module's CI and focused counts, all original test mappings, exact
+unions and required-baseline migration.
+
+All 2,003 distinct focused infrastructure cases passed; focused Ruff
+check/format and diff checks passed. No FULL/ROBINHOOD/LEGACY/EXHAUSTIVE
+certification was run locally. This separate docs-only checkpoint records
+terminal implementation evidence and grants no source/topology or certification
+acceptance. ChatGPT owns exact GitHub diff review and final certification
+selection; FULL is expected after source acceptance unless exact review
+establishes stronger equivalent evidence.
+
+R2-C/R2-D have not started. No historical production source was deleted.
+Real 133-M remains paused. Q133-2V remains consumed/non-retryable;
+Q133-3/Q133-4 and all protected/provider/credential/scheduler/broker operations
+remain unauthorized and were not run.
+
+
 ## 2026-10-07 — Architecture 132-R2-B implementation (source review pending)
 
 R2-B splits test infrastructure by responsibility and isolates redundant
 predecessor work in local authority mutation tests. R2-C/R2-D have not started.
 The implementation does not claim ChatGPT source/topology or certification
-acceptance. Terminal source CI evidence will be recorded in a separate docs-only
-evidence checkpoint after the implementation source gate completes.
+acceptance. Terminal source CI evidence is recorded above in the separate
+docs-only evidence checkpoint after implementation source CI completed.
 
 The exact 36 active and eight retained checkpoint sequences are unchanged.
 All product test/Ruff requirements retain first-seen order. All eight production
@@ -1032,3 +1088,159 @@ Additional exact focused commands:
 | `tests/scripts/certification_runner/test_profiles.py` | 410 |
 | `tests/scripts/certification_runner/test_results.py` | 59 |
 | `tests/scripts/certification_runner/test_source.py` | 15 |
+
+## R2-B terminal implementation report
+
+### Startup admission
+
+The exact existing worktree was clean at the documented lag parent
+`8129bac92ce84628048ccafc76815f6511c0990d` / tree
+`3ee934821ace692e74bebe201445300062487d17`. Branch and origin matched exactly.
+Only the named remote feature branch was fetched; live origin was proved at
+`4b81a822d55fa5e79460294f46239d133170a157` / tree
+`5725e64ac35be890f3e6ab00793d1a11c0b7b5f0`. Ancestry was proved before the
+expressly authorized `git merge --ff-only` to that exact admitted HEAD.
+Final HEAD/tree and clean worktree/index were reverified before editing.
+
+### Exact implementation file set
+
+Against the admitted parent (A = added, D = deleted, M = modified):
+
+```text
+M	.github/workflows/checkpoint-source-gates.yml
+M	docs/AI_TRADING_BOT_HANDOFF.md
+M	docs/PROJECT_STATUS.md
+M	docs/architecture/132-tiered-certification-profiles.md
+M	docs/validation/arch132-r2-test-suite-rationalization-plan.md
+M	scripts/checkpoint_runner.py
+M	scripts/run_test_certification.py
+A	tests/runtime/checkpoint_runner/__init__.py
+A	tests/runtime/checkpoint_runner/helpers.py
+A	tests/runtime/checkpoint_runner/test_arch131.py
+A	tests/runtime/checkpoint_runner/test_arch133_a_g.py
+A	tests/runtime/checkpoint_runner/test_arch133_h_k.py
+A	tests/runtime/checkpoint_runner/test_arch133_l_m.py
+A	tests/runtime/checkpoint_runner/test_ci.py
+A	tests/runtime/checkpoint_runner/test_core.py
+A	tests/runtime/checkpoint_runner/test_retained_arch128_130.py
+D	tests/runtime/test_checkpoint_runner.py
+A	tests/scripts/certification_runner/__init__.py
+A	tests/scripts/certification_runner/helpers.py
+A	tests/scripts/certification_runner/test_children.py
+A	tests/scripts/certification_runner/test_lanes.py
+A	tests/scripts/certification_runner/test_profiles.py
+A	tests/scripts/certification_runner/test_results.py
+A	tests/scripts/certification_runner/test_source.py
+D	tests/scripts/test_run_test_certification.py
+```
+
+The two removed monoliths are test relocations only. Their complete 267-function,
+1,941-original-case mapping appears above. Inert shared `helpers.py` and
+`__init__.py` files contain no collected tests. All production source pins,
+product test/Ruff path order, active/retained sequences and production authority
+chaining remain unchanged. Thirty-eight registration AST hashes were deliberately
+migrated for infrastructure tuple references; no production source pin was
+relaxed.
+
+### Terminal module accounting
+
+Zero CI cases below means deliberately unselected by routine active CI; those
+contracts were independently exercised in focused verification.
+
+| Split module | Focused cases | Terminal source CI cases |
+| --- | ---: | ---: |
+| `tests/runtime/checkpoint_runner/test_arch131.py` | 698 | 698 |
+| `tests/runtime/checkpoint_runner/test_arch133_a_g.py` | 205 | 205 |
+| `tests/runtime/checkpoint_runner/test_arch133_h_k.py` | 153 | 153 |
+| `tests/runtime/checkpoint_runner/test_arch133_l_m.py` | 129 | 129 |
+| `tests/runtime/checkpoint_runner/test_ci.py` | 58 | 58 |
+| `tests/runtime/checkpoint_runner/test_core.py` | 50 | 50 |
+| `tests/runtime/checkpoint_runner/test_retained_arch128_130.py` | 212 | 0 |
+| `tests/scripts/certification_runner/test_children.py` | 8 | 0 |
+| `tests/scripts/certification_runner/test_lanes.py` | 6 | 0 |
+| `tests/scripts/certification_runner/test_profiles.py` | 410 | 410 |
+| `tests/scripts/certification_runner/test_results.py` | 59 | 0 |
+| `tests/scripts/certification_runner/test_source.py` | 15 | 0 |
+
+### Missing/changed source-pin proof
+
+| Layer | Pinned sources | Missing cases | Changed cases |
+| --- | ---: | ---: | ---: |
+| 133-H | 18 | 18 | 18 |
+| 133-I | 9 | 9 | 9 |
+| 133-J | 7 | 7 | 7 |
+| 133-K | 9 | 9 | 9 |
+| 133-L | 24 | 24 | 24 |
+| 133-M | 24 | 24 | 24 |
+
+All 182 H–M pin mutations remain. Every original runtime test decorator/matrix
+was compared against the admitted parent's AST; only deliberate registration
+literal/path relocations differ. Original 131/A–G matrices and retained rejection
+contracts remain accounted for in the inventory. Runtime injection matrices
+retain preflight, execute, wrong branch, wrong remote-authority environment,
+missing tests, missing Ruff coverage and wrong authority callbacks.
+
+Local I–M pin/runtime tests patch only the immediate predecessor. They copy only
+the local pinned closure plus runner/workflow and exercise the actual local
+function both on valid input and the mutation. H pin tests exercise real H.
+All 30 I–M runner/workflow missing/duplicate/order cases explicitly use
+`isolate_predecessor=False`, copying the complete predecessor closure and
+retaining real-chain rejection. Recursive copy-helper assertions are eliminated.
+Separate parameterized tests prove each I–M function calls its predecessor once
+and propagates a rejection marker. The transparent trace test executes every
+real M→L→K→J→I→H body and verifies call order/PASS; the original accepted-source
+registration tests also retain unpatched real-chain PASS checks.
+
+Retained source-only verification is proved by the individual `arch128-r4`
+verification test with fake child commands and real authority, eight individual
+CLI dispatch cases, real retained authority PASS checks, and retained-only/mixed
+batch cases with fake child commands. No retained protected execution ran.
+
+### Command evidence
+
+| CI command | Exit | elapsed_seconds |
+| --- | ---: | ---: |
+| `pytest` | 0 | 353.5722111 |
+| `ruff_check` | 0 | 0.12955919999996013 |
+| `ruff_format` | 0 | 0.11001320000002579 |
+| `git_diff_check` | 0 | 0.03126209999999219 |
+
+### Top-100 slowest summary
+
+All 100 entries are call durations. Exact unabridged output is in the artifact
+stdout path cited above. Counts by module: 133-L–M 41, Architecture 131 29,
+133-H–K 20, CI eight, 133-A–G two. The five slowest are:
+
+| Seconds | Test |
+| ---: | --- |
+| 1.94 | `tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[duplicate-runner]` |
+| 1.93 | `tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[missing-runner]` |
+| 1.91 | `tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[order-runner]` |
+| 1.82 | `tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[duplicate-workflow]` |
+| 1.82 | `tests/runtime/checkpoint_runner/test_arch133_l_m.py::test_133m_ci_registration_drift_fails_closed[order-workflow]` |
+
+### Deviations and next owner
+
+The requested interpreter path was absent; the existing development `.venv`
+interpreter was used. Path counts increase due to deliberate selectability;
+measured case count and wall time decrease. Source CI adds JUnit artifact
+output solely for module-count evidence; R2-A timing, execution order, branch
+triggers, docs-only fast path and single-job topology remain unchanged.
+
+No unresolved focused/source-CI failure remains. Source acceptance and final
+certification are pending. No protected operation or broad local certification
+was run. The one optional MCP OAuth import skip is recorded above.
+
+Ready-to-paste next action for ChatGPT:
+
+> Review Architecture 132-R2-B's exact GitHub implementation commit
+> `40aa7ef55a528fe7b7d9482d083ef1dcfed4dfb1`, tree
+> `0781d9ecb3dcaf87888506e2b833fb8106f35990`, against admitted parent
+> `4b81a822d55fa5e79460294f46239d133170a157`, with source CI
+> #291 / 37726690416 SUCCESS and this terminal evidence descendant. Check
+> complete logical relocation, frozen baseline migration, active/retained
+> selectivity, real workflow/order rejection and predecessor/full-chain coverage.
+> Decide source acceptance and final certification selection; FULL is expected
+> after acceptance because topology changed unless exact review establishes
+> stronger equivalent evidence. Supply the exact admitted local certification
+> command. Do not begin R2-C/R2-D or resume real 133-M/protected operations.

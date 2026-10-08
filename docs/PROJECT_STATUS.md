@@ -1,12 +1,68 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 132-R2-B terminal source CI green; review pending
+
+R2-B is implemented and ordinary-pushed on
+`feature/test-suite-rationalization-132r2`.
+
+```text
+IMPLEMENTATION HEAD 40aa7ef55a528fe7b7d9482d083ef1dcfed4dfb1
+IMPLEMENTATION TREE 0781d9ecb3dcaf87888506e2b833fb8106f35990
+SOURCE CI           #291 / 37726690416 SUCCESS
+PYTEST              4,611 passed / 1 skipped / 0 failed / 0 errors
+PYTEST WALL         352.07 s
+COMMAND ELAPSED     353.5722111 s
+ACTIVE CHECKPOINTS  36 (reviewed sequence unchanged)
+TEST_PATHS          42 -> 47
+RUFF_PATHS          120 -> 127
+```
+
+All 36 authority results passed, source identity stayed stable, and production,
+scheduler, provider and broker/live fields remained `NOT_RUN`. The single skip
+is the existing optional `mcp.shared.auth` import in the Windows OAuth test;
+the source-gate environment does not install `mcp`.
+
+Against accepted R2-A's 790.08 s, this run's pytest wall time is 438.01 s
+(55.44%) lower. Command elapsed decreased from 792.1711838 s to 353.5722111 s.
+This is observed cross-run evidence, with no timing threshold or performance
+claim beyond the measured runs. Splitting increases path counts while reducing
+routine collection from 4,850 to 4,612 outcomes and redundant predecessor work.
+
+The [terminal source run](https://github.com/callmedraken/ai-trading-bot/actions/runs/37726690416)
+uploaded [evidence artifact 11528162705](https://github.com/callmedraken/ai-trading-bot/actions/runs/37726690416/artifacts/11528162705).
+Its batch prefix is `source-gate-batch-20261008T041656.870000Z/`:
+`report.json` contains command timings and authority/effect evidence;
+`commands/01-pytest.stdout.txt` contains all top-100 durations; and
+`pytest-results.xml` contains exact total/per-module case counts.
+
+All 100 slowest entries are calls in supported runner infrastructure: 41 in
+133-L–M, 20 in 133-H–K, 29 in Architecture 131, eight in CI, and two in 133-A–G.
+The slowest three are real-chain 133-M runner ordering/registration mutations:
+1.94 s duplicate, 1.93 s missing, and 1.91 s order. The validation plan records
+every split module's CI and focused counts, all original test mappings, exact
+unions and required-baseline migration.
+
+All 2,003 distinct focused infrastructure cases passed; focused Ruff
+check/format and diff checks passed. No FULL/ROBINHOOD/LEGACY/EXHAUSTIVE
+certification was run locally. This separate docs-only checkpoint records
+terminal implementation evidence and grants no source/topology or certification
+acceptance. ChatGPT owns exact GitHub diff review and final certification
+selection; FULL is expected after source acceptance unless exact review
+establishes stronger equivalent evidence.
+
+R2-C/R2-D have not started. No historical production source was deleted.
+Real 133-M remains paused. Q133-2V remains consumed/non-retryable;
+Q133-3/Q133-4 and all protected/provider/credential/scheduler/broker operations
+remain unauthorized and were not run.
+
+
 ## 2026-10-07 — Architecture 132-R2-B implementation (source review pending)
 
 R2-B splits test infrastructure by responsibility and isolates redundant
 predecessor work in local authority mutation tests. R2-C/R2-D have not started.
 The implementation does not claim ChatGPT source/topology or certification
-acceptance. Terminal source CI evidence will be recorded in a separate docs-only
-evidence checkpoint after the implementation source gate completes.
+acceptance. Terminal source CI evidence is recorded above in the separate
+docs-only evidence checkpoint after implementation source CI completed.
 
 The exact 36 active and eight retained checkpoint sequences are unchanged.
 All product test/Ruff requirements retain first-seen order. All eight production

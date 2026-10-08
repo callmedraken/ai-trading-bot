@@ -196,6 +196,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-post-publication-verifier",
     "arch133-robinhood-post-publication-stage-diagnostic",
     "arch133-robinhood-publication-state-paper-diagnostic",
+    "arch133-robinhood-publication-state-paper-corrected",
 )
 
 
@@ -730,6 +731,7 @@ def _copy_chain_authority(tmp_path, local_pins):
         runner.ARCH133_VERIFIER_PINS,
         runner.ARCH133_DIAGNOSTIC_PINS,
         runner.ARCH133_PUBLICATION_DIAGNOSTIC_PINS,
+        runner.ARCH133_PUBLICATION_CORRECTED_PINS,
     ):
         paths.extend(pins)
         if pins is local_pins:

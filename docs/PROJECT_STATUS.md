@@ -1,5 +1,111 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 132-R2 COMPLETE; FULL CERTIFIED
+
+Architecture 132-R2 test-suite rationalization is **ACCEPTED and CLOSED**.
+
+Final certified checkout:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    9d6e1b1c376c5f366e2dbac43d430b5683b7ad28
+TREE    792bbc7b5010cdcbfa833ef548a672f8f23ec910
+
+R2-B2 implementation
+HEAD    ff21c05b93d862d2299dd1574c2f931b9ea5acb5
+TREE    3e714d054516dfd156def89c2a21e51b85e8861e
+CI      #294 / 37731218114 SUCCESS
+
+R2-B2 acceptance/policy source gate
+CI      #296 / 37732562660 SUCCESS
+```
+
+Fresh FULL current-product certification on the exact final checkout:
+
+```text
+profile     full
+broad-1     67 modules / 3,259 cases / 3,257 passed / 2 skipped
+broad-2     69 modules / 2,632 cases / 2,631 passed / 1 skipped
+
+TOTAL       136 modules
+cases       5,891
+passed      5,888
+skipped     3
+failed      0
+errors      0
+wall        259.314 s
+evidence    F:\AI\temp\certification\arch132-r2b2-full-9d6e1b1
+```
+
+The certification runner admitted and re-admitted the exact clean source,
+current live feature ref and current live develop ref, then completed whole-
+repository Ruff check, Ruff format check and git-diff check through the accepted
+FULL profile. No protected opt-in was enabled.
+
+### Final R2 outcome
+
+Routine current-product source CI is restored to its historical operating
+envelope without reducing logical authority coverage:
+
+```text
+                         pre-R2 / regression     final R2-B2
+routine checkpoints              44                  36
+active TEST_PATHS                68                  47
+active RUFF_PATHS               150                 127
+source-CI pytest              696-790 s          198.14 s
+source-CI workflow             >13 min              250 s
+```
+
+Historical successful non-docs source-gate medians were 188.41 s pytest and
+242 s workflow. Final R2-B2 is +5.16% and +3.31% respectively, inside the
+historical operating range.
+
+All accepted R2-B logical test identities remain, with additional proof cases.
+Production authority code/pins/chaining were not weakened. The final
+certification topology is:
+
+```text
+FULL        136 modules
+ROBINHOOD    63 modules
+LEGACY      205 modules
+EXHAUSTIVE  341 modules
+
+required FULL       122 modules
+required ROBINHOOD   49 modules
+
+ACTIVE_CI_CHECKPOINTS   36
+RETAINED_CHECKPOINTS     8
+```
+
+### R2-C / R2-D disposition
+
+R2-C retained-source/test provenance cleanup and R2-D source-gate
+parallelization are **deferred maintenance**, not blockers for current product
+work.
+
+- R2-C remains useful before any deliberate historical source deletion, but
+  routine current-product CI no longer executes the retained Architecture
+  128/130 checkpoints or retained runner contracts.
+- R2-D is not justified as an immediate prerequisite now that serial routine CI
+  is back to the historical ~4-minute end-to-end regime. Parallelization may be
+  revisited if current-product growth again makes the measured serial gate
+  materially expensive.
+
+Do not delete retained production/security primitives merely because R2 is
+closed. Any future R2-C removal still requires provenance classification
+`KEEP_COMPAT`, `DISTILL_INVARIANTS`, or `DELETE_WITH_SOURCE`.
+
+### Project resumes Architecture 133
+
+The test-suite interlude no longer blocks Architecture 133. Resume from the
+already source-accepted Architecture 133-M credential-free stage diagnostic.
+Q133-2V remains consumed and non-retryable. Q133-3 scheduler installation and
+Q133-4 unattended wake remain unauthorized. The real 133-M diagnostic remains a
+separately protected one-attempt read-only boundary and requires fresh explicit
+authorization before invocation.
+
+Production/live real-money placement remains **NO-GO**.
+
 ## 2026-10-07 — Architecture 132-R2-B2 SOURCE ACCEPTED; FULL certification next
 
 Architecture 132-R2-B2 is **SOURCE/TOPOLOGY ACCEPTED**.

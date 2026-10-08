@@ -1064,7 +1064,7 @@ def test_133p_source_checkpoint_has_no_protected_callbacks():
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133p"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (
         "arch133-robinhood-publication-state-paper-corrected",
         name,
     )
@@ -1142,7 +1142,7 @@ def test_133p_registration_workflow_drift_fails_closed(
     text = path.read_text(encoding="utf-8")
     name = "arch133-robinhood-single-session-scheduler-installation"
     prior = "arch133-robinhood-publication-state-paper-corrected"
-    line = f'    "{name}",\n' if target == "runner" else f"              {name}\n"
+    line = f'    "{name}",\n' if target == "runner" else f"              {name} `\n"
     previous = (
         f'    "{prior}",\n' if target == "runner" else f"              {prior} `\n"
     )

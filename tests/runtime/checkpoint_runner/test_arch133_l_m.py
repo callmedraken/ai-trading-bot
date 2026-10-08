@@ -22,7 +22,7 @@ def test_133l_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_L133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133l"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-3] == (_K133_NAME, _L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-4] == (_K133_NAME, _L133_NAME, _M133_NAME)
     assert (
         runner._arch133_verifier_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -112,7 +112,7 @@ def test_133m_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_M133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133m"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (_L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (_L133_NAME, _M133_NAME)
     assert (
         runner._arch133_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -275,7 +275,7 @@ def test_133n_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_N133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133n"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-2] == (_L133_NAME, _M133_NAME, _N133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-3] == (_L133_NAME, _M133_NAME, _N133_NAME)
     assert (
         runner._arch133_publication_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -384,7 +384,7 @@ def test_133o_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_O133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133o"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (_N133_NAME, _O133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (_N133_NAME, _O133_NAME)
     assert (
         runner._arch133_publication_corrected_authority_check(
             Path(runner.__file__).resolve().parents[1]

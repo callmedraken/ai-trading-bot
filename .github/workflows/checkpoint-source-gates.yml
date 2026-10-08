@@ -109,7 +109,8 @@ jobs:
               arch133-robinhood-post-publication-stage-diagnostic `
               arch133-robinhood-publication-state-paper-diagnostic `
               arch133-robinhood-publication-state-paper-corrected `
-              arch133-robinhood-single-session-scheduler-installation
+              arch133-robinhood-single-session-scheduler-installation `
+              arch133-robinhood-fresh-activation-reprovision
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

@@ -171,6 +171,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-post-publication-stage-diagnostic",
     "arch133-robinhood-publication-state-paper-diagnostic",
     "arch133-robinhood-publication-state-paper-corrected",
+    "arch133-robinhood-single-session-scheduler-installation",
 )
 
 
@@ -862,7 +863,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -1201,6 +1202,218 @@ ARCH133_PUBLICATION_CORRECTED_SOURCES: Final = tuple(ARCH133_PUBLICATION_CORRECT
 ARCH133_PUBLICATION_CORRECTED_REGISTRATION_PIN: Final = (
     "1e19a84ed6ae2a4be90b2245bee1ad38b7beceb1b4613b94c1201252472e6d5d"
 )
+
+
+ARCH133_SCHEDULER_MODULES: Final = (
+    "trading_bot",
+    "trading_bot.arch133_acl",
+    "trading_bot.arch133_acl.read_only",
+    "trading_bot.arch133_acl.retained_reads",
+    "trading_bot.arch133_scheduler_installation",
+    "trading_bot.arch133_scheduler_installation.admission",
+    "trading_bot.arch133_scheduler_installation.operator",
+    "trading_bot.arch133_scheduler_installation.specification",
+    "trading_bot.arch133_verifier",
+    "trading_bot.arch133_verifier.activation",
+    "trading_bot.arch133_verifier.binding",
+    "trading_bot.arch133_verifier.file_policy",
+    "trading_bot.arch133_verifier.scheduler",
+    "trading_bot.arch133_verifier.sessions",
+    "trading_bot.arch133_verifier.state",
+    "trading_bot.arch133_verifier.state_schema",
+    "trading_bot.arch133_verifier.token",
+    "trading_bot.config",
+    "trading_bot.domain",
+    "trading_bot.domain._validation",
+    "trading_bot.domain.enums",
+    "trading_bot.domain.market",
+    "trading_bot.domain.orders",
+    "trading_bot.domain.positions",
+    "trading_bot.domain.proposals",
+)
+ARCH133_SCHEDULER_PINS: Final = {
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/retained_reads.py": (
+        "98fdab5017615be21bd95ec3f0ca25f792018f6325e20d11736df8842e47cbbb"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/__init__.py": (
+        "67726876bbccbf569d95cc6e9c7dca42ca5d3cc50601cbbfd2f848bf98e08d21"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/admission.py": (
+        "2c426ea952ee109f26481003e53670f36054b09781385aec078bb60746ff931b"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/operator.py": (
+        "b6db26e036e52d688257e27723509c6e541f462a789c2044d0b6d01f80fcd27c"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/specification.py": (
+        "bdd841b4d2acfd7dec09cb9c7df16f14082602fd63f59e0351dac505cbd6d985"
+    ),
+    "src/trading_bot/arch133_verifier/__init__.py": (
+        "ece882f6a0f8605cae553bd80be524421a98f25c3d6fd2276c44558612cfc980"
+    ),
+    "src/trading_bot/arch133_verifier/activation.py": (
+        "3e842e244576abcc5d560e942cd355c598ce42df5c2ffea71e120d1e254482b5"
+    ),
+    "src/trading_bot/arch133_verifier/binding.py": (
+        "f24ee022779619e3a19915835ac3fd766135b1fba4f90f94a9e8b65764835262"
+    ),
+    "src/trading_bot/arch133_verifier/file_policy.py": (
+        "628d121da26a0474fc98e7f7556ce8d3dbc8c189d04a7ecc6b4ec47eb7bd6a08"
+    ),
+    "src/trading_bot/arch133_verifier/scheduler.py": (
+        "327d092c852e762719e0c1d27eb9be0d1c470b6ffa5b7dd7a113352c1cf4946a"
+    ),
+    "src/trading_bot/arch133_verifier/sessions.py": (
+        "278c43c61461c7163e8a641b27aaea8e2b9a6782b77ad805144c7137aa75b503"
+    ),
+    "src/trading_bot/arch133_verifier/state.py": (
+        "0753b532ef58cc7699863e3114e1e3dd2caaa0e1aab7b48b2d546a7f8142d5e4"
+    ),
+    "src/trading_bot/arch133_verifier/state_schema.py": (
+        "902525afadbaabd0afc997b7702de06b5160a7df61f8f97e6d38ec351b74c7d3"
+    ),
+    "src/trading_bot/arch133_verifier/token.py": (
+        "b93236774ee2509947024786fd54ed6a9e702e8d68ef10a8a0ad6376706c5cb6"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+    "src/trading_bot/domain/__init__.py": (
+        "5d0baf9be17341641d07504176366c5041be9d73e17230377b8167e012f082ee"
+    ),
+    "src/trading_bot/domain/_validation.py": (
+        "b94d183b2dceff5c844bf3584fabf4a21b4a58cabb0b3088e78099c0dbd7c101"
+    ),
+    "src/trading_bot/domain/enums.py": (
+        "c47b5894f80cb271573e0be4869dde81a4b2a0cf9dc97019864f19f96712cd39"
+    ),
+    "src/trading_bot/domain/market.py": (
+        "eb82f9727ce3fd83f41b96411f49b77e34ff5f75d39372bdb97ce94a3efc7040"
+    ),
+    "src/trading_bot/domain/orders.py": (
+        "3f21c1f9ad197b187ac6a4588ef470ef7266a3b30e026df6288b7b2337a0070a"
+    ),
+    "src/trading_bot/domain/positions.py": (
+        "e9a8d7615a6bd86ed206196d03ced50ae8aee273f632a56bece4427b212c68a9"
+    ),
+    "src/trading_bot/domain/proposals.py": (
+        "eb47d71dcfab0ce64ff03a0d5b8a4091e6dca6d7a53c134f6f842ea40672d738"
+    ),
+    "scripts/run_arch133_scheduler_installation.py": (
+        "64f50e19cf72a234ae8cd76c01704fdea9a9d2ed10728545e30d72d62544800a"
+    ),
+    "scripts/arch133_scheduler_definition.ps1": (
+        "e705dbd03ad10bbcd619538156d6f88c961fb074d35c9f7956b4fb04efa8e88e"
+    ),
+    "scripts/arch133_scheduler_observe.ps1": (
+        "45e1c9dbf62738ff2667969ed3716b39313c1977ee7693572a17c078616c0a2a"
+    ),
+    "scripts/arch133_scheduler_install.ps1": (
+        "30bf66aa048b65f08ed006f8d304379d6973e9c927d30e994da4e7b1db4ff154"
+    ),
+    "src/trading_bot/review_paper/unattended_scheduler.py": (
+        "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"
+    ),
+}
+ARCH133_SCHEDULER_SOURCES: Final = tuple(ARCH133_SCHEDULER_PINS)
+ARCH133_SCHEDULER_REGISTRATION_PIN: Final = (
+    "e6f119c53e5ecc7ea2d56fba3b0da9d661823f553b80bb64a5913877cb57206a"
+)
+
+
+def _arch133_scheduler_installation_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin full inert closure, canonical builder and native transport; no invocation."""
+    failures = list(_arch133_publication_corrected_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_SCHEDULER_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8")
+            material = (
+                ast.dump(ast.parse(source), include_attributes=False)
+                if relative.endswith(".py")
+                else source
+            )
+            if hashlib.sha256(material.encode()).hexdigest() != expected:
+                failures.append(f"133-P installation boundary drift: {relative}")
+        name = "arch133-robinhood-single-session-scheduler-installation"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        registrations = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_SCHEDULER_REGISTRATION_PIN
+        ):
+            failures.append("133-P source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133p"
+            or spec.authority_check
+            is not _arch133_scheduler_installation_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *(p for p in ARCH133_SCHEDULER_SOURCES if p.endswith(".py")),
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-P source-only capability drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != ("arch133-robinhood-publication-state-paper-corrected", name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-P checkpoint ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-P source workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-P installation boundary unavailable")
+    return tuple(failures)
 
 
 def _arch133_publication_corrected_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -2035,7 +2248,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -2133,7 +2346,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -2231,7 +2444,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -2335,7 +2548,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -2434,7 +2647,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -2549,7 +2762,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -2659,7 +2872,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -2757,7 +2970,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -2859,7 +3072,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -2958,7 +3171,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -3057,7 +3270,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -3153,7 +3366,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -3249,7 +3462,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -3347,7 +3560,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -3447,7 +3660,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -3555,7 +3768,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "e113bf1b6faf788974a0d9f4e1e754f7bccc27208988342bd8a87ec37945e0a8"
+            != "a62d0fe0eef4180a1a41fef44615614a5593fecb026b965e9859762d63524065"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -6654,6 +6867,26 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_publication_diagnostic_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133n",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-single-session-scheduler-installation": CheckpointSpec(
+            name="arch133-robinhood-single-session-scheduler-installation",
+            description="Architecture 133-P source-only protected Q133-3 installation",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *(p for p in ARCH133_SCHEDULER_SOURCES if p.endswith(".py")),
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_scheduler_installation_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133p",
             preflight=None,
             execute=None,
             remote_head_env=None,

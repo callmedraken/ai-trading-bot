@@ -197,6 +197,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-post-publication-stage-diagnostic",
     "arch133-robinhood-publication-state-paper-diagnostic",
     "arch133-robinhood-publication-state-paper-corrected",
+    "arch133-robinhood-single-session-scheduler-installation",
 )
 
 

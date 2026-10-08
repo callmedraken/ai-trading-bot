@@ -1,5 +1,127 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-08 — Architecture 133-P source prerequisite for authorized Q133-3
+
+The real 133-O PASS/consumed result remains authoritative. Q133-2V, 133-M,
+133-N and 133-O remain consumed and non-retryable; their executable source is
+unchanged. Q133-3 authorization has now been granted and remains **UNCONSUMED**.
+This source checkpoint, fake tests and CI consume no protected authorization.
+133-P requires exact source review before a real Q133-3 plan/execute invocation.
+Q133-4 remains **UNAUTHORIZED**. No real plan/execute, scheduler observation,
+password access, scheduler mutation, provider/wake delegation or broker effect
+is performed during this implementation checkpoint.
+
+133-P freezes a two-phase source-owned operator: `plan`, then
+`execute-once --reviewed-plan-sha256 <64 lowercase hex>`. The hash is the only
+execute value. There are no caller-controlled session, path, task, principal,
+action, runtime, source or boundary parameters and no retry surface. Plan
+material excludes observation time and effect counters so it remains comparable
+across a password pause, while every admission checks the current UTC anew.
+
+Read-only admission independently proves the exact production root identity/ACL,
+four retained files and hashes, canonical publication with the corrected
+65f0/16cb runtime identity, exact 133-G runtime/launcher, one activation/one
+READY wake at revision 0, zero consumed authority and the empty paper predecessor.
+It imports inert model/read helpers only, never a consumed diagnostic entrypoint.
+The accepted `review_paper/unattended_scheduler.py` remains authoritative and
+unchanged. An adapter checks its complete AST pin and invokes only its exact
+unchanged builder FunctionDef, bound to accepted inert verifier models. This
+avoids the canonical package initializer's writer imports without copying or
+altering the scheduler algorithm. Focused parity tests cover full and early-close
+sessions. The canonical function, inert dependencies and native scripts are
+source-gate pinned as one closure.
+
+Every pre-effect admission requires `current_utc < start_boundary < end_boundary`.
+Arrival at either boundary returns sanitized `STALE_EXPIRED` with zero writes
+and no credential read. A stale retained activation is never moved or replaced.
+Execute reconstructs the reviewed plan before password acquisition and again
+under retained deny-write/delete handles immediately before native registration.
+Those handles span registration and final admission/readback. Any password-pause
+or source/publication/state/paper/task drift blocks before registration.
+
+The observer takes zero arguments, uses local `Schedule.Service`, root folder
+`\`, and only `\AITradingBot-Arch133-SingleSessionReviewPaper-v1`. It reads
+twice through independent COM connections and emits bounded sanitized fingerprints
+of the complete XML tree and XML bytes. Every XML element and attribute participates
+in equivalence; unexpected additional actions, triggers, repetition, restart,
+network/environment or other settings fail closed. A running task is rejected.
+Unknown task material is never echoed. ABSENT permits at most one TASK_CREATE=2
+registration, using TASK_LOGON_PASSWORD=1. An exactly matching existing task
+performs zero registrations; every other existing definition blocks. There is
+no create-or-update, task run, delete, stop, enable or disable API.
+
+### Explicit Windows task contract
+
+The action, principal/SID, LeastPrivilege, one TIME trigger, IgnoreNew, zero
+restart/repetition, no scheduler environment/semantic arguments and
+StartWhenAvailable=false retain the accepted pure specification exactly.
+The Windows extension is explicitly frozen as follows:
+
+| Property | Value |
+| --- | --- |
+| LogonType | Password (1) |
+| Enabled | false |
+| AllowDemandStart | false |
+| DisallowStartIfOnBatteries | true |
+| StopIfGoingOnBatteries | true |
+| RunOnlyIfNetworkAvailable | false |
+| RunOnlyIfIdle | false |
+| WakeToRun | false |
+| Hidden | false |
+| ExecutionTimeLimit | PT1H |
+| Priority | 7 |
+| Compatibility / XML version | V2 (2) / 1.2 |
+| AllowHardTerminate | true |
+| Idle StopOnIdleEnd / RestartOnIdle | true / false |
+| DeleteExpiredTaskAfter | absent |
+| Network ID/name, restart interval, repetition, random delay | absent |
+
+The task is deliberately registered disabled: installation cannot schedule an
+unauthorized Q133-4 provider wake. A later enabling transition requires separately
+reviewed source and fresh explicit Q133-4 authorization. 133-P cannot enable it.
+Strict full-XML comparison may block service-normalized definitions; no native
+acceptance is claimed by fake tests. Such a mismatch requires source review,
+never an automatic update or normalization fallback.
+
+Password acquisition requires original real interactive console handles and
+Windows no-echo input, only in protected execute for an absent task. The password
+travels once as JSON over private anonymous child stdin, never argv, environment,
+files, evidence, logs or hashes. References are cleared after the call; Python
+strings cannot promise physical memory erasure. The native child accepts no
+public semantic arguments, independently reconstructs fixed XML constants, pins
+the retained activation hash, checks temporal admission again immediately before
+registration and never retries or rolls back. Boundaries are internal values
+derived by the Python canonical builder, never public caller input.
+
+Plan/result schemas are `arch133p-scheduler-installation-plan/v1` and
+`arch133p-scheduler-installation/v1`. Thirteen integer counters include the
+existing twelve plus `manual_task_starts`. Scheduler reads count attempted read
+budgets (two per observer/installer); scheduler writes conservatively count one
+potential registration once the native boundary is entered, or zero for an
+explicit NOT_CALLED acknowledgement. A successful create requires exactly one
+write and independent stable double readback. Any exception, timeout, malformed
+acknowledgement or failed proof after a potential registration is INDETERMINATE,
+non-retryable and requires separately reviewed read-only reconciliation. All
+provider/wake/paper/state/broker/manual-start counters remain zero. Credential
+writes mean direct application secret-store writes; Windows may retain its own
+Task Scheduler logon credential as part of registration.
+
+Source checkpoint: `arch133-robinhood-single-session-scheduler-installation`,
+branch `feature/robinhood-unattended-review-paper-133p`, immediately after 133-O.
+CI preflight, execute and remote_head_env are all None. CI invokes only source
+checks and fake edges, never the real operator. Existing integration workflow
+already admits the reviewed `feature/robinhood-*` family before this first push.
+Broad certification remains deferred until ChatGPT reviews the exact source.
+
+Active source topology is 39 checkpoints, 50 distinct test paths and 141 Ruff
+paths. Certification inventory is FULL 139 / ROBINHOOD 66 / LEGACY 205 /
+EXHAUSTIVE 344; required frozen baselines remain FULL 122 / ROBINHOOD 49.
+
+Immediate next step: ChatGPT exact source/diff and native-boundary review after
+focused checks and source-gate CI. Q133-3 remains unconsumed until that review
+admits an explicit protected invocation; Q133-4 stays unauthorized. Production
+and real-money broker placement remain **NO-GO**.
+
 ## 2026-10-08 — Real Architecture 133-O diagnostic PASS; Q133-3 is next protected boundary
 
 The single real Architecture 133-O diagnostic attempt is **PASS and consumed**.

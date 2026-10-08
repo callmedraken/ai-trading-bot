@@ -1,5 +1,100 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-07 — Architecture 132-R2-B2 SOURCE ACCEPTED; FULL certification next
+
+Architecture 132-R2-B2 is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted executable/test implementation:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    ff21c05b93d862d2299dd1574c2f931b9ea5acb5
+TREE    3e714d054516dfd156def89c2a21e51b85e8861e
+CI      #294 / 37731218114 SUCCESS
+```
+
+Implementation-evidence docs descendant before this closeout:
+
+```text
+HEAD    ad43c9c45b3ff10e33833c49823fc74cd6b2ba91
+TREE    e1e7485d9a607194ac8d142af87c57f4d2c6f15e
+CI      #295 / 37731687297 SUCCESS
+```
+
+ChatGPT exact-source review found no correction required. The implementation
+diff changes only:
+
+```text
+tests/runtime/checkpoint_runner/helpers.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+```
+
+No production `src/`, source-gate workflow, checkpoint registration,
+production authority function, certification runner, profile ownership, source
+pin or protected capability changed.
+
+Independent JUnit identity comparison against accepted R2-B source gate #291
+proves all **4,612** prior testcase identities remain in R2-B2, with **zero**
+missing and exactly **32** new proof cases. Those additions are 21 copied-closure
+baseline PASS cases, ten predecessor PASS/rejection cases for five real G/H
+edges, and one complete transparent real-chain PASS trace.
+
+The only newly isolated predecessor edges are:
+
+```text
+131-G agentic account -> direct MCP
+131-G agentic account -> MCP schema
+131-G agentic account -> paper cycle
+131-H paper operator  -> 131-G agentic account
+131-H paper operator  -> Windows OAuth
+```
+
+Isolation is confined to wholly local G/H source mutations. The real local
+authority body still executes. Separate tests prove each predecessor is invoked
+exactly once, predecessor rejection propagates fail-closed, and the complete
+real H -> G -> direct MCP -> schema -> paper-cycle plus Windows-OAuth chain
+passes on accepted source. G transport/adapter/registration mutations, H
+predecessor-source/registration/workflow mutations, and all 30 H-M
+workflow/order cases retain real chaining.
+
+Terminal source evidence was independently checked from artifact
+`checkpoint-source-gate-evidence`:
+
+```text
+CHECKPOINTS       36
+TEST_PATHS        47
+RUFF_PATHS       127
+pytest            4,643 passed / 1 skipped / 0 failed / 0 errors
+pytest wall       198.14 s
+command elapsed   199.42576060000002 s
+workflow elapsed  250 s
+identity stable   true
+all source/static commands exit 0
+```
+
+R2-B2 therefore restores routine source CI to the historical operating envelope
+without reducing logical coverage. Pytest is 5.16% above the historical median
+188.41 s and end-to-end workflow time is 3.31% above the historical median
+242 s; timing remains diagnostic only.
+
+Certification topology is unchanged from accepted R2-B:
+
+```text
+FULL / ROBINHOOD modules      136 / 63
+LEGACY / EXHAUSTIVE modules   205 / 341
+required FULL / ROBINHOOD     122 / 49
+active / retained checkpoints 36 / 8
+```
+
+The deferred R2-B certification obligation is now due. The immediate next gate
+is exactly one fresh **FULL current-product certification** on the clean current
+R2 branch checkout. R2-C, R2-D and real Architecture-133 protected work remain
+paused until FULL is reviewed.
+
+Q133-2V remains consumed/non-retryable. Q133-3 and Q133-4 remain unauthorized.
+Production/live real-money placement remains **NO-GO**.
+
 ## 2026-10-07 — Architecture 132-R2-B2 terminal source CI green; review/FULL pending
 
 R2-B2 is implemented and its source gate is terminal **SUCCESS**. This is

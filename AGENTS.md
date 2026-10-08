@@ -59,9 +59,12 @@ starting a new milestone or preparing a broad implementation plan.
 
 ## Tiered certification policy
 
-Architecture 132-R1 separates current product certification from retained
-historical compatibility. See `docs/architecture/132-tiered-certification-profiles.md`
-for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
+Architecture 132-R2 retains the R1 current/legacy ownership model while applying
+the accepted R2-B test-topology migration. See
+`docs/architecture/132-tiered-certification-profiles.md` for reviewed ownership
+and the current required FULL/Robinhood baselines (122/49 modules). The original
+R1 113/40 required tuples remain historical provenance, not the active required
+baselines.
 
 - **FOCUSED:** every implementation/correction; Codex runs affected tests and
   focused checks.
@@ -70,8 +73,8 @@ for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
 - **ROBINHOOD:** when ChatGPT declares a coherent Architecture 131 integration
   boundary, before protected Robinhood qualification, and after material changes
   to shared domain/execution/ledger/risk foundations used by Architecture 131.
-  `--profile robinhood` preserves the 40-module baseline in two nonempty balanced
-  lanes. Missing/renamed baseline modules fail closed; new owned tests enter
+  `--profile robinhood` preserves the current 49-module required baseline in two
+  nonempty balanced lanes. Missing/renamed baseline modules fail closed; new owned tests enter
   automatically.
 - **FULL:** the default `--profile full` certifies all CURRENTLY SUPPORTED
   functionality in exactly two nonempty balanced lanes, with no historical
@@ -93,9 +96,10 @@ for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
   production effects; all profiles reject protected opt-ins.
 
 FULL and LEGACY are disjoint and together equal EXHAUSTIVE; Robinhood is a
-subset of FULL. Freeze the 113-module supported and 40-module Robinhood
-baselines. New modules in supported whole-directory families are automatically
-admitted. Unknown ownership fails closed and requires an explicit support-status
+subset of FULL. Freeze the current 122-module supported and 49-module Robinhood
+required baselines established by the accepted R2-B migration. The original R1
+113/40 tuples remain historical provenance. New modules in supported
+whole-directory families are automatically admitted. Unknown ownership fails closed and requires an explicit support-status
 decision; it must never silently default to legacy.
 
 D10/Windows/Paper-v2/Alpaca operational paths are historical compatibility.

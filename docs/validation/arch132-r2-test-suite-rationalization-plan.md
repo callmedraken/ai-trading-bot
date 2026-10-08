@@ -1,6 +1,6 @@
 # Architecture 132-R2 — Test Suite Rationalization Validation Plan
 
-## 2026-10-07 — Architecture 132-R2-A implementation (source review pending)
+## 2026-10-07 — Architecture 132-R2-A terminal CI green (source review pending)
 
 R2-A separates the routine source batch from retained compatibility without
 changing the checkpoint registry or certification ownership. The exact 36 active
@@ -19,7 +19,34 @@ Measured requirement unions against the admitted frozen design parent:
 | Ruff paths | 150 | 120 |
 
 Accepted baseline CI #286 / 37708975995 recorded 6,393 passed / 3 skipped
-in 696.12 seconds. R2-A terminal measurements remain pending.
+in 696.12 seconds. Implementation CI **#288 / 37713529571 SUCCESS** recorded
+**4,849 passed / 1 skipped / 0 failed / 0 errors in 790.08 seconds**.
+All 36 authority results passed, identity remained stable, and protected
+production/scheduler/provider/broker evidence remained `NOT_RUN`.
+
+```text
+IMPLEMENTATION HEAD d86c13c00b72f8800bddb15a57c582dbd790b774
+IMPLEMENTATION TREE 8c06d080fb936c40bccf74c523572e5152c6d12d
+PYTEST             0 / elapsed_seconds 792.1711838
+RUFF_CHECK         0 / elapsed_seconds 0.130218000000013
+RUFF_FORMAT        0 / elapsed_seconds 0.120859800000062
+GIT_DIFF           0 / elapsed_seconds 0.038282099999833
+```
+
+The pytest-reported duration was 93.96 seconds higher than the accepted
+baseline despite the smaller file union. This single cross-run comparison does
+not establish a speedup or explain the timing difference. No timing threshold
+was applied.
+
+The [source workflow](https://github.com/callmedraken/ai-trading-bot/actions/runs/37713529571)
+uploaded [checkpoint-source-gate-evidence](https://github.com/callmedraken/ai-trading-bot/actions/runs/37713529571/artifacts/11522378514).
+Within that artifact, machine-readable command timings are in
+`source-gate-batch-20261008T013401.428982Z/report.json`, and the complete top-100
+pytest output is in the adjacent `commands/01-pytest.stdout.txt`. All 100 slowest
+entries came from `tests/runtime/test_checkpoint_runner.py`. The slowest three
+were 133-L import-closure pin drift (5.79s), 133-H complete-authority pin drift
+(4.72s), and 133-M import-closure pin drift (3.70s). These are source tests;
+the real protected 133-M diagnostic was not run.
 
 Command reports add observational `elapsed_seconds` from a monotonic timer.
 Pytest stdout preserves `--durations=100 --durations-min=0.0` output in the
@@ -31,8 +58,9 @@ production source and registration pins are unchanged.
 
 The workflow adds only the explicitly requested `feature/test-suite-*` push
 family. Its active invocation and docs-only classification remain source-pinned.
-Terminal CI timing/case counts will be recorded in a separate evidence checkpoint
-after the implementation run completes; this is not certification acceptance.
+Terminal implementation measurements are recorded above in this separate
+docs-only evidence checkpoint. This records implementation evidence and does
+not claim source/topology or certification acceptance.
 ChatGPT owns exact GitHub source review, topology acceptance and certification
 choice. R2-B has not started. Real 133-M remains paused; Q133-2V is consumed and
 Q133-3/Q133-4 remain unauthorized. No protected operation was invoked.
@@ -40,6 +68,7 @@ Q133-3/Q133-4 remain unauthorized. No protected operation was invoked.
 The requested development interpreter path `F:\AI\ai-trading-bot.venv` was
 absent; implementation uses the existing `F:\AI\ai-trading-bot\.venv` instead,
 with fresh explicit external basetemp directories under `F:\AI\temp\pytest...`.
+
 Focused verification exercised all 1,491 runner cases: the first pass reported
 1,488 passed / 3 failed in 725.29 seconds. Those three existing workflow-mutation
 cases still targeted retained names; they were corrected to mutate active names.

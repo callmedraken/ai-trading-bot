@@ -1,5 +1,206 @@
 # Project Status and Roadmap
 
+## 2026-10-07 — Architecture 132-R2-A ACCEPTED; R2-B split/selection frozen
+
+Architecture 132-R2-A is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted executable/test source:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    d86c13c00b72f8800bddb15a57c582dbd790b774
+TREE    8c06d080fb936c40bccf74c523572e5152c6d12d
+CI      #288 / 37713529571 SUCCESS
+```
+
+Evidence/docs descendant:
+
+```text
+HEAD    8129bac92ce84628048ccafc76815f6511c0990d
+TREE    3ee934821ace692e74bebe201445300062487d17
+CI      #289 / 37714920814 SUCCESS
+```
+
+ChatGPT exact-source review found no correction required. The retained eight
+Architecture 128/130 checkpoints remain registered, individually runnable and
+available to explicit retained-only or mixed `verify-batch` calls. The routine
+workflow invokes exactly the 36 active Architecture 131/133 checkpoints in
+reviewed order. First-seen batch de-duplication, active source/registration
+pins, authority checks, docs-only classification, clean identity requirements,
+and protected `NOT_RUN` semantics remain fail-closed.
+
+R2-A adds only observational timing evidence. `elapsed_seconds` is measured
+with a monotonic timer and does not participate in PASS/FAIL. Pytest top-100
+durations remain in uploaded stdout evidence.
+
+No additional FULL or ROBINHOOD certification is required for R2-A.
+`scripts/run_test_certification.py`, certification ownership, frozen FULL and
+ROBINHOOD required baselines, lane semantics and protected-opt-in rejection are
+unchanged. Source gate #288 already exercised the changed runner together with
+the complete active checkpoint requirement union and every active authority
+check. A product certification would not add material evidence for this
+source-gate topology-only change.
+
+R2-A measurement outcome:
+
+```text
+routine checkpoints   44 -> 36
+test paths            68 -> 42
+ruff paths           150 -> 120
+cases              6,393 -> 4,850 collected outcomes
+R2-A pytest         4,849 passed / 1 skipped
+R2-A pytest time    790.08 s
+command elapsed     792.1711838 s
+```
+
+The smaller routine union did not reduce wall time in this single comparison.
+The diagnostic evidence localizes the next bottleneck: **all 100 slowest R2-A
+tests are in the checkpoint-runner infrastructure suite**, led by repeated
+133-L/133-M/H authority mutation tests. Therefore R2-B must improve
+selectability and repeated-test cost before R2-D parallelization.
+
+### R2-B frozen contract — split infrastructure without losing logical coverage
+
+R2-B remains test/workflow infrastructure only. It grants no production,
+provider, credential, scheduler, wake, broker or live authority. Real
+Architecture 133-M remains paused.
+
+#### 1. Split checkpoint-runner tests by responsibility
+
+Replace the monolithic
+`tests/runtime/test_checkpoint_runner.py` with independently collectible
+modules under a dedicated runtime subpackage. The target responsibility split
+is:
+
+```text
+tests/runtime/checkpoint_runner/test_core.py
+tests/runtime/checkpoint_runner/test_ci.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+tests/runtime/checkpoint_runner/test_arch133_h_k.py
+tests/runtime/checkpoint_runner/test_arch133_l_m.py
+tests/runtime/checkpoint_runner/test_retained_arch128_130.py
+```
+
+A `conftest.py` and/or non-test helper module may hold inert shared fixtures.
+Do not leave duplicate collected copies of moved tests in the old monolith.
+
+The first six modules are current supported test infrastructure. The retained
+Architecture 128/130 module is LEGACY compatibility. Routine active source CI
+must not collect the retained module merely because every checkpoint shares a
+common test path.
+
+`COMMON_TESTS` must become a genuinely small core/CI contract, not a new alias
+for every historical/current runner test. Architecture-specific runner contract
+modules must be attached only to the checkpoints whose source/authority
+contracts they protect. Explicit retained checkpoint verification must still
+select the retained runner contract.
+
+#### 2. Split certification-runner tests by responsibility
+
+Replace the monolithic
+`tests/scripts/test_run_test_certification.py` with independently collectible
+supported modules covering at least:
+
+```text
+profile / inventory classification
+lane construction
+source identity / admission
+child execution + JUnit aggregation
+protected opt-in + result/evidence semantics
+```
+
+Shared inert fixtures/helpers may live in non-collected support files. Routine
+Architecture 131/133 source checkpoints should include only the certification
+test module(s) actually needed by their source/inventory authority contract;
+they must no longer pull the entire certification-runner regression suite merely
+because one inventory assertion is relevant.
+
+#### 3. Deliberately update Architecture-132 ownership
+
+Because the two old supported monoliths are being replaced by multiple test
+modules, R2-B is an explicit certification-topology change.
+
+Update `run_test_certification.py` ownership and required baselines
+deliberately:
+
+- current/core/Architecture-131/Architecture-133 runner split modules are FULL
+  and ROBINHOOD infrastructure;
+- retained Architecture-128/130 runner tests are LEGACY, not ROBINHOOD/FULL;
+- all certification-runner split modules remain supported infrastructure and
+  retain their appropriate FULL/ROBINHOOD ownership;
+- FULL ∩ LEGACY remains empty;
+- FULL ∪ LEGACY remains EXHAUSTIVE;
+- unknown ownership remains fail-closed;
+- no required baseline may silently disappear because a monolith was renamed.
+
+Record the exact old-to-new baseline mapping and new profile module counts.
+Module counts may rise because one file becomes several; that is expected and
+must not be mistaken for broader product scope.
+
+#### 4. Preserve logical tests while removing recursive test-harness waste
+
+R2-B does **not** weaken production authority functions or their source pins.
+
+For expensive chained authority mutation tests (especially 133-H/L/M), retain
+the full missing/changed pin matrix and runtime/workflow/callback rejection
+coverage, but unit tests for a checkpoint's *local* authority layer need not
+re-execute every already-proven predecessor authority layer for every
+parameterized mutation.
+
+It is acceptable and preferred to isolate local-layer tests by replacing only
+the predecessor authority function with a deterministic PASS stub in the test
+process, provided separate integration tests prove:
+
+- each production authority function invokes its real predecessor;
+- predecessor failures propagate fail-closed;
+- the complete real chain passes on the accepted repository;
+- workflow/order/registration checks remain real where they are the subject of
+  the test.
+
+Do not mock the local layer under test. Do not weaken the production chain.
+Do not remove any missing/changed source-pin dimension merely for speed.
+
+The goal is to preserve logical coverage while eliminating thousands of
+redundant predecessor source reads/copies/AST checks caused by parameterization.
+
+#### 5. Measure R2-B rather than guessing
+
+Keep R2-A timing instrumentation. Terminal R2-B CI must report:
+
+- active TEST_PATHS/RUFF_PATHS before vs after;
+- total pytest cases/passed/skipped;
+- pytest wall time and command elapsed time;
+- top-100 durations;
+- case counts by each new infrastructure test module;
+- confirmation retained-only explicit verification still selects its retained
+  runner tests;
+- profile module counts and old-to-new required baseline mapping.
+
+No timing threshold is a correctness gate.
+
+#### 6. No deletion/provenance audit or parallelization yet
+
+R2-B may remove the two old monolith files only as a test relocation after all
+logical coverage is accounted for. It may not delete historical production
+source or retire legacy behavioral suites. That belongs to R2-C.
+
+Do not implement parallel source-gate lanes in R2-B. R2-D remains after accepted
+R2-B measurements.
+
+### R2-B verification/acceptance
+
+Implementation uses Astra. Run focused split-module, checkpoint registration,
+inventory/classification and source-authority tests with fresh external
+basetemps. No FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification during
+implementation. After exact source review, because R2-B deliberately changes
+certification inventory topology, ChatGPT will select the final certification
+tier; a FULL current-product certification is expected unless the reviewed
+evidence establishes a stronger equivalent.
+
+R2-B does not authorize the real 133-M diagnostic. Q133-2V remains consumed;
+Q133-3 and Q133-4 remain unauthorized.
+
 ## 2026-10-07 — Architecture 132-R2-A terminal CI green (source review pending)
 
 R2-A separates the routine source batch from retained compatibility without

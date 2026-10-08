@@ -1,5 +1,265 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-07 — Real 133-M BLOCKED at PUBLICATION_STATE_PAPER; 133-N frozen
+
+The single freshly authorized real Architecture 133-M credential-free diagnostic
+was invoked exactly once under the admitted standard Trading principal and is
+**consumed permanently**. It must not be retried.
+
+Admitted prelaunch facts:
+
+```text
+PRINCIPAL  DESKTOP-I4DOKM7\Trading
+SID        S-1-5-21-1397534616-3988210162-180023805-1009
+
+133-M HEAD 0e856691c2d1ce350d1846720182bba2bea64f0a
+133-M TREE 1536e7a45a67d214ee97454290e2781b3b7001d9
+
+133-G HEAD 65f0d40217f8ce129224531a5151f4acea889d89
+133-G TREE 16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
+
+production Python SHA-256
+cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+Observed consumed result:
+
+```json
+{"acl_mutations":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"execution_delegations":0,"paper_mutations":0,"provider_calls":0,"reason":"POST_PUBLICATION_STAGE_DIAGNOSTIC_BLOCKED","scheduler_reads":0,"scheduler_writes":0,"schema":"arch133m-post-publication-stage-diagnostic/v1","stage":"PUBLICATION_STATE_PAPER","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+Transport validation passed: exit 3 is the frozen BLOCKED exit; schema/status/
+reason/stage are in the frozen vocabulary; every effect counter is zero.
+
+This result proves the following credential-free stages completed before the
+failure:
+
+```text
+RUNTIME_SOURCE     PASS
+TRADING_TOKEN      PASS
+ROOT_SECURITY      PASS
+NAMESPACE_FILES    PASS
+```
+
+Therefore the exact recovered root identity/security and all four retained file
+names, held-file identities, pinned SHA-256 values and final file policies were
+accepted under the standard Trading token. The first rejected stage is inside
+133-M's combined `PUBLICATION_STATE_PAPER` operation.
+
+The result does **not** establish which operation inside that stage rejected.
+Do not infer JSON-path access, model parsing, state SQLite transport/semantics,
+or paper SQLite transport/semantics without a further bounded diagnostic.
+
+Q133-2V remains consumed/non-retryable. 133-M is now also consumed/non-retryable.
+Q133-3 scheduler installation and Q133-4 unattended wake remain unauthorized.
+There were zero credential reads, scheduler reads/writes, provider calls,
+retained-state mutations, paper mutations, ACL mutations, wake delegations,
+execution delegations or broker effects.
+
+### Architecture 133-N — publication/state/paper substage diagnostic
+
+Create a new source-only checkpoint on:
+
+```text
+BRANCH feature/robinhood-unattended-review-paper-133n
+PARENT a1297e52a59c07dbf9fec6b0e956d443894f27fe
+```
+
+The parent contains the accepted 133-M implementation plus the completed
+Architecture 132-R2 test-suite rationalization. 133-N must not modify the
+accepted 133-M launcher/operator or any accepted 133-G/L executable.
+
+133-N is **not** a retry of 133-M or Q133-2V. It is a separate, zero-semantic-
+argument, credential-free read-only diagnostic whose sole purpose is to subdivide
+the already-localized `PUBLICATION_STATE_PAPER` boundary.
+
+#### Frozen real-stage vocabulary
+
+After independently re-admitting the exact 133-N runtime/source, standard Trading
+token, recovered root security and exact held four-file namespace/hash/policy,
+133-N may report only the first rejected substage from:
+
+```text
+PUBLICATION_PATH_READ
+PUBLICATION_PARSE
+PUBLICATION_SEMANTICS
+STATE_PATH_RESOLUTION
+STATE_SQLITE_OPEN
+STATE_SEMANTICS
+PAPER_SQLITE_OPEN
+PAPER_SEMANTICS
+FINAL_REOBSERVATION
+```
+
+If all publication/state/paper substages pass, emit:
+
+```text
+status = PASS
+stage  = PUBLICATION_STATE_PAPER_COMPLETE
+```
+
+Result schema:
+
+```text
+arch133n-publication-state-paper-diagnostic/v1
+```
+
+Allowed status/reason pairs:
+
+```text
+PASS    / PUBLICATION_STATE_PAPER_DIAGNOSTIC_COMPLETE
+BLOCKED / PUBLICATION_STATE_PAPER_DIAGNOSTIC_BLOCKED
+```
+
+No exception text, Win32/SQLite error text or numeric native status, path beyond
+the already-public fixed architecture paths, raw JSON/database bytes, IDs from
+retained material, OAuth material, token groups, or secret data may escape.
+
+The result must carry the same explicit zero-effect counters as 133-M:
+
+```text
+credential_reads
+credential_writes
+provider_calls
+scheduler_reads
+scheduler_writes
+paper_mutations
+state_mutations
+acl_mutations
+wake_delegations
+execution_delegations
+consumed_wake_authority
+broker_effects
+```
+
+all fixed to integer zero.
+
+#### Substage contract
+
+1. **PUBLICATION_PATH_READ**
+   - Read exactly fixed `activation.json` and `host-binding.json` through the
+     same path-based Python reads used by 133-M.
+   - Bound sizes before retaining bytes in memory.
+   - Require their already-frozen SHA-256 values.
+   - No alternate path, glob, search or fallback.
+
+2. **PUBLICATION_PARSE**
+   - Decode UTF-8 and parse only through the accepted independent
+     `arch133_verifier.activation.ReviewPaperActivation` and
+     `arch133_verifier.binding.HostBinding` parsers.
+   - Require canonical round-trip bytes.
+   - Parsing failure is this stage only.
+
+3. **PUBLICATION_SEMANTICS**
+   - Independently require the frozen executable identity 4677/6ce, production
+     Python version/hash, wake-launcher hash, activation/source/deployment
+     identity, paper path/store identity, activation hash and OAuth-valid-until
+     relation already checked by 133-M.
+   - Also compare `host.paper_predecessor_sha256` to a pure independently
+     reconstructed expected empty-paper fingerprint using the accepted
+     publication fingerprint contract; no SQLite access in this substage.
+
+4. **STATE_PATH_RESOLUTION**
+   - Exercise exactly the accepted verifier state's fixed-path normalization
+     for `wake.sqlite`, with no directory enumeration or alternate path.
+   - Require the resolved fixed path only.
+
+5. **STATE_SQLITE_OPEN**
+   - Open exactly `wake.sqlite` via SQLite URI `mode=ro`, timeout 0.
+   - Begin one read transaction.
+   - Do not issue writes, journal-mode changes, VACUUM, ATTACH or mutable PRAGMA.
+   - This stage proves transport/open only.
+
+6. **STATE_SEMANTICS**
+   - On the already-open read-only connection, call the accepted independent
+     read-state validation.
+   - Require exact v1 application/user/schema/metadata, exactly one activation
+     and one wake, canonical activation binding, READY state, revision 0 and
+     wake timestamp equal to activation creation.
+   - No state transition/writer import.
+
+7. **PAPER_SQLITE_OPEN**
+   - Open exactly `paper.sqlite` via SQLite URI `mode=ro`, timeout 0.
+   - Begin one read transaction.
+   - No writes or alternate database.
+
+8. **PAPER_SEMANTICS**
+   - Read exact metadata and the frozen full review-fills column order.
+   - Require schema_version 2, exact activation starting cash, zero rows, unique
+     expected columns and exact predecessor fingerprint matching the binding.
+   - Use the accepted fingerprint algorithm or an independently AST-equivalent
+     local implementation; tests must prove equivalence to publication source.
+
+9. **FINAL_REOBSERVATION**
+   - While the root/four retained handles remain held, independently reobserve
+     root security, namespace, file identities/hashes/policies and any successful
+     publication/state/paper facts needed to rule out a changed object.
+   - Close each acquired handle/SQLite connection exactly once.
+   - Any close/reobservation failure maps only to FINAL_REOBSERVATION.
+   - Re-admit runtime/source and Trading token after closure before PASS.
+
+#### Structural exclusions
+
+The 133-N real import closure must exclude:
+
+- `trading_bot.arch133_verifier.credentials`;
+- Robinhood/provider/MCP SDK/client modules;
+- state/paper writers or transition APIs;
+- publication/recovery/root-policy application;
+- Task Scheduler access;
+- wake execution/delegation;
+- broker/live-order modules.
+
+It may import only inert/read-only parser, token, retained-read, file-policy,
+scheduler-free state-reader, SQLite and fixed-domain dependencies required by
+the frozen substages.
+
+No Credential Manager call of any kind is part of 133-N.
+
+#### Source/runner contract
+
+Add a separate fixed launcher and module; do not alter 133-M.
+
+Register:
+
+```text
+arch133-robinhood-publication-state-paper-diagnostic
+```
+
+immediately after the accepted 133-M source checkpoint with:
+
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+remote_branch   = feature/robinhood-unattended-review-paper-133n
+```
+
+Use the current R2 active/retained checkpoint topology. Add 133-N to the active
+sequence after 133-M. Do not restore any retained Architecture 128/130 checkpoint
+to routine CI.
+
+Functional tests should live under `tests/review_paper` so they are
+automatically current FULL/ROBINHOOD-supported by Architecture 132 ownership.
+Extend the existing Architecture-133 runner contract module rather than creating
+a new runtime test module solely for 133-N unless exact review shows that is
+necessary.
+
+#### Verification
+
+Implementation is source-only. Use focused tests first, then ordinary-push and
+follow the Checkpoint Source Gates workflow to terminal. No real 133-N invocation
+is authorized by implementation or CI.
+
+Because the new supported functional test module will be automatically admitted,
+report the resulting FULL/ROBINHOOD/LEGACY/EXHAUSTIVE profile counts. Do not
+silently change the 122/49 required baseline tuples unless a separately reviewed
+topology reason requires it.
+
+After exact-source review, ChatGPT selects certification. Only after source/
+certification acceptance may a future **single real 133-N invocation** be
+separately authorized.
+
 ## 2026-10-07 — Architecture 133-M SOURCE ACCEPTED; CI coverage accepted without duplicate broad certification
 
 Exact accepted source:

@@ -1,101 +1,130 @@
 # Project Status and Roadmap
 
-## 2026-10-08 — Architecture 133-Q source implementation pending exact review
+## 2026-10-08 — Architecture 133-Q SOURCE/TOPOLOGY ACCEPTED; real reprovision remains unauthorized
 
-133-Q implements a new provider-free fresh-activation reprovision operator on
-`feature/robinhood-unattended-review-paper-133q`, based on canonical parent
-`5f50ee00a342926ea2f6e5a04cde21e62d72d9fc` / tree
-`354498af15cc2c500f13994424a7bdeb422399cf`. This is source-only work;
-implementation and CI authorize no real plan, reprovision or scheduler effect.
+Architecture 133-Q is **SOURCE/TOPOLOGY ACCEPTED**.
 
-The new isolated launcher is `scripts/run_arch133_fresh_activation_reprovision.py`.
-Its interfaces are `plan --material-file <absolute reviewed file>` and
-`execute-once --material-file <same file> --reviewed-plan-sha256 <lowercase hash>`.
-The material envelope is canonical UTF-8 JSON with exactly `schema`,
-`activation` and `host_binding`; the last two fields contain complete canonical
-serialized strings. The schema is `arch133q-fresh-activation-material/v1`.
-The operator binds the exact envelope bytes and both publication hashes. It
-never generates proposal/session material or obtains/refreshes OAuth. Every
-risk, order, cash, timing, source/runtime, store and OAuth-bound field is thereby
-part of external material review and the reviewed plan hash.
+Accepted executable/test source:
 
-Planning independently admits the exact retained four-file publication, root
-identity/security, accepted hashes, canonical activation/binding, one READY
-revision-zero wake and unchanged empty schema-v2 paper predecessor. Expiration
-is derived from the pinned canonical NYSE scheduler builder, never caller input.
-Fresh material requires a new session, activation timestamp, proposal identity,
-local order identity and store identity; proposal and activation creation times
-must agree. The frozen five-minute opening/closing buffers remain enforced.
-Python, wake-launcher, deployment and published 133-G runtime identities remain
-independently bound. The reviewed OAuth upper bound must cover the new window.
-The new start must be strictly future at planning and immediately before each
-publication rename. A date-only rollover is rejected.
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133q
+HEAD    efcb0b40109dba3b178538f4b26d37b14974b07a
+TREE    7ba28b71dfd61dbd0dc054d326f3537eb0e1a3cb
+CI      #312 / 37836890559 SUCCESS
+```
 
-Fixed namespaces are:
+The exact GitHub comparison against canonical parent
+`5f50ee00a342926ea2f6e5a04cde21e62d72d9fc` is one normal commit with
+exactly 24 changed paths. The remote feature branch resolves exactly to the
+accepted HEAD.
 
-- active: `F:\AITradingBot\Arch133`;
-- inaccessible administrator staging parent: `F:\AITradingBot\Arch133Q-stage`;
-- complete staged generation: `F:\AITradingBot\Arch133Q-stage\generation`;
-- immutable-to-Trading predecessor archive: `F:\AITradingBot\Arch133Q-stale`.
+Exact-source review accepts the intended stale-session successor contract:
 
-The staging parent and archive must initially be absent. A fresh interactive
-human authorization of the exact plan hash is required before any filesystem
-mutation. The source operator stages complete activation/binding/state/paper
-material under the administrator-only parent and independently verifies it.
-It then holds the protected parents, source roots and deny-data-write file
-handles, re-admits the exact predecessor/material/staged generation and checks
-the future window immediately before the one publication sequence.
+- canonical external material is byte-bound and contains the complete new
+  activation and host binding; the operator does not synthesize proposal,
+  session, risk, order, store or OAuth-bound authority;
+- the exact retained stale predecessor is independently admitted before staging,
+  including the fixed root/file identities and hashes, canonical activation and
+  binding, one READY revision-zero wake, empty schema-v2 paper predecessor and
+  corrected 65f0/16cb published-runtime identity;
+- stale status is independently derived from the pinned canonical scheduler
+  builder;
+- new material must have a strictly future scheduler window, a later target
+  session and activation time, new proposal/local-order/store/activation/wake
+  identities, exact five-minute buffers and an OAuth validity upper bound beyond
+  the new session end;
+- a date-only rollover is rejected;
+- the fixed staging and archive namespaces must both be absent before any write;
+- execution imports native writer capability only after exact plan-hash match and
+  an interactive `AUTHORIZE ARCH133Q <plan_sha256>` gate;
+- complete generation staging and independent readback occur before the active
+  predecessor is touched;
+- the stale generation is sealed and renamed by held object to the fixed
+  no-overwrite archive; its original root/file identities and bytes must remain
+  independently provable;
+- the staged generation is then renamed by held object to the active name, with
+  no overwrite/fallback path;
+- PASS requires the new active generation to equal the previously verified
+  staged generation and requires the archived predecessor, final namespace,
+  ACLs, runtime and material to remain stable;
+- the fixed staging parent remains as a single-use fence even on PASS;
+- after the first staging/filesystem mutation attempt, every exception or
+  disagreement is `INDETERMINATE / PRESERVE_RECONCILE_NO_RETRY`; there is no
+  retry, rollback, cleanup, deletion or alternative publication path.
 
-That sequence seals the stale root/files, renames the held stale root to the
-fixed no-overwrite archive, independently proves its preserved identities,
-bytes/state/paper and sealed policies, rechecks the future window, then renames
-the held staged root to the now-vacant active name. The two directory renames
-are **not** an atomic Windows directory exchange. An interruption may leave the
-active name absent, which fails closed; it can never justify a mixed-generation
-PASS. The archive keeps the original root/file identities and exact bytes while
-removing Trading write access. Independent final readback must prove that the
-active generation exactly matches the verified staged identities/hashes and
-that the archived predecessor, policies, namespace and runtime still agree.
+The two directory renames are intentionally **not** claimed to be one atomic
+Windows exchange. An interruption may leave the active name absent after the
+old generation has been archived. That state is truthful indeterminate evidence,
+not retry authority. The source cannot report a mixed-generation PASS.
 
-Any exception/ambiguity after the first filesystem mutation attempt is
-`INDETERMINATE / PRESERVE_RECONCILE_NO_RETRY`. There is no retry, rollback,
-cleanup, deletion, overwrite or fallback. The surviving fixed staging parent
-is retained even on PASS and fences later reprovision attempts. Failed native
-sharing/rename calls are not permission to reopen with weaker guarantees.
-Source tests use inert native edges only; actual Windows rename/ACL acceptance
-remains unqualified and requires separate review/authorization.
+The fresh plan/import surface remains provider-, scheduler-, wake- and
+broker-free. Consumed Q133-2/Q133-2V and 133-M/133-N/133-O entrypoints remain
+unchanged and unreachable from the new operator. Q133-4 is not present.
 
-Evidence schemas are `arch133q-fresh-activation-reprovision-plan/v1` and
-`arch133q-fresh-activation-reprovision/v1`. They track explicit integer counters
-for credentials, provider, scheduler, publication, archive, paper/state/ACL,
-wake/execution delegation, consumed authority, broker effects and manual starts.
-Every plan counter is zero. Writer counters describe only the separately
-protected reprovision sequence, including staging; no real effects were run.
+The exact source-gate evidence artifact for #312 independently reports:
 
-`arch133-robinhood-fresh-activation-reprovision` is registered immediately after
-133-P with `preflight=None`, `execute=None`, `remote_head_env=None`. The existing
-reviewed `feature/robinhood-*` workflow family admits the branch. FULL and
-ROBINHOOD automatically own the new review-paper test module; LEGACY and the
-historical serial lane are unchanged. Broad certification remains deferred
-until ChatGPT exact-source review.
+```text
+CHECKPOINTS      40
+TEST_PATHS       51
+RUFF_PATHS       151
 
-Consumed Q133-2/Q133-2V and 133-M/N/O entrypoints remain unchanged and are not
-imported/invoked. No scheduler installation/enabling or Q133-4 path is present.
-After a future real reprovision, old 133-P remains unusable: a new scheduler
-source checkpoint must bind the exact new retained identities/hashes and new
-activation before **fresh** Q133-3 authorization. The stale authorization is
-not transferable. Q133-4 remains UNAUTHORIZED; live-money trading remains NO-GO.
+pytest cases     5,323
+passed           5,322
+skipped          1
+failed           0
+errors           0
+pytest wall      475.62 s
 
+PYTEST           0
+RUFF_CHECK       0
+RUFF_FORMAT      0
+GIT_DIFF_CHECK   0
+AUTHORITY        40/40 PASS
+IDENTITY_STABLE  True
+OVERALL          PASS
+```
 
-Focused verification completed: 57 new reprovision cases, 271 affected
-checkpoint-registration cases, 32 affected 133-P topology/capability/native-ack
-cases, and two current profile-inventory cases passed. All 40 static authority
-checks, focused Ruff lint/format and `git diff --check` passed. Current batch
-coverage is 40 checkpoints / 51 test paths / 151 Ruff paths. Profile inventory
-is FULL 140 / ROBINHOOD 67 / LEGACY 205 / EXHAUSTIVE 345 modules.
-Exact-file commit and ordinary push are explicitly authorized. The normal
-GitHub source gate is pending publication. No broad certification or real
-protected effect was run.
+The one skip is the unchanged optional MCP-auth dependency unavailable on CI.
+The artifact is bound to the accepted source HEAD/tree and records broker/live
+effects as NOT_RUN.
+
+No additional ROBINHOOD or FULL certification is selected at 133-Q. This is a
+bounded source-only native reprovision checkpoint: the terminal source gate
+already exercises the complete changed source/test/topology closure plus all
+active Architecture-133 authority pins. The additional profile modules are
+unchanged, and neither ROBINHOOD nor FULL can establish real Windows
+`SetFileInformationByHandle` rename/share-mode or ACL acceptance. Native host
+qualification therefore belongs to the separately authorized real plan/execute
+sequence, not another synthetic broad test run.
+
+### Protected boundary after source acceptance
+
+No real 133-Q `plan` or `execute-once` has been authorized by source
+acceptance or this docs closeout.
+
+Before any protected host access:
+
+1. prepare one canonical externally reviewed fresh-activation material file;
+2. independently review its exact bytes and semantic fields;
+3. separately authorize the real **read-only 133-Q plan** under the required
+   Administrator principal;
+4. review the returned exact plan and plan SHA-256;
+5. only then may a new fresh explicit authorization permit one
+   `execute-once` reprovision attempt.
+
+A real execute attempt is one-shot. Once staging/filesystem mutation may have
+started, ambiguity is non-retryable and must move to separately reviewed
+provider-free reconciliation.
+
+After any future successful reprovision, accepted 133-P must **not** be used
+against the new generation. A new scheduler source successor must pin the new
+active root/file identities and hashes, followed by a new explicit Q133-3
+authorization. The stale Q133-3 authorization is not transferable.
+
+Q133-4 remains **UNAUTHORIZED**. Scheduler installation/enabling, provider calls,
+wake execution, paper trading effects and production/live broker placement
+remain NO-GO.
+
 ## 2026-10-08 — Real 133-P plan BLOCKED STALE_EXPIRED; current activation is terminal for scheduling
 
 The accepted 133-P read-only plan was run under the exact standard non-elevated

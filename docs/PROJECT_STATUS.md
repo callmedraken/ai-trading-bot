@@ -1,5 +1,62 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Real 133-P plan BLOCKED STALE_EXPIRED; current activation is terminal for scheduling
+
+The accepted 133-P read-only plan was run under the exact standard non-elevated
+Trading principal after the accepted source/docs closeout. It returned:
+
+```json
+{"acl_mutations":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"STALE_EXPIRED","execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133p-scheduler-installation/v1","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+The wrapper reported `ARCH133P_PLAN_EXIT=3`.
+
+This is a valid fail-closed result. The stale-window fence executes before Task
+Scheduler observation, so the zero scheduler-read count is expected and proves
+that the operator did not inspect or mutate the task after learning that the
+published single-session window was already stale. It also performed zero
+credential reads/writes, provider calls, paper/state/ACL mutations, wake or
+execution delegation, manual task starts and broker effects.
+
+No `execute-once` invocation is permitted for this plan. Re-running plan cannot
+make the frozen session current and must not be used as polling.
+
+The Architecture-133 frozen policy already states:
+
+```text
+A missed first qualification requires a newly reviewed activation,
+not reuse of the expired one.
+```
+
+Therefore the retained activation is terminal for Q133-3 scheduling purposes.
+The original Q133-2 publication remains consumed and must not be retried or
+repurposed as a replacement publisher.
+
+The previously granted Q133-3 authorization remains **unconsumed for the stale
+published activation**, because no scheduler mutation boundary was reached.
+However, it is not transferable to a future replacement activation: any newly
+reviewed activation changes the authority-bearing session material and requires
+fresh explicit Q133-3 approval after that successor material is accepted and
+published.
+
+Q133-4 remains **UNAUTHORIZED**. No task was created or enabled and no unattended
+wake was consumed.
+
+### Next source milestone — 133-Q fresh-activation reprovision design
+
+The next safe step is source-only design for a new successor that can retire the
+missed retained single-session publication and provision one newly reviewed
+single-session activation without invoking consumed Q133-2.
+
+That successor must preserve the stale publication as auditable evidence, must
+not overwrite it in place without an independently verifiable predecessor, and
+must provide a separate reviewed protected reprovision boundary. It must not
+bundle scheduler installation, Q133-4 wake execution, provider calls or broker
+effects. After a real successor publication, scheduler source must be rebound to
+the new exact retained root/file identities before any fresh Q133-3 approval.
+
+Production/live trading remains **NO-GO**.
+
 ## 2026-10-08 — Architecture 133-P SOURCE/TOPOLOGY ACCEPTED; Q133-3 remains authorized and unconsumed
 
 Architecture 133-P is **SOURCE/TOPOLOGY ACCEPTED**.

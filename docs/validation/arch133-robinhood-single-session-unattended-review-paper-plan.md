@@ -26,7 +26,23 @@ Focused functional verification: **190 passed**; the final test-only lint-bindin
 correction was separately rerun (1 passed). Affected runner/CI/profile checks
 initially reported 782 passed and six ordering-text assertion failures; the
 corrected runner cases and relevant authority/order checks then passed
-**26/26**. Focused Ruff check/format and `git diff --check` passed.
+**26/26**. Two additional shared registry/workflow-tail expectations in
+`test_core.py` and `test_arch131.py` were updated for 133-N; their focused
+rerun passed **10/10** with both Ruff phases green. Diagnostic source and
+authority pins were unchanged by that test-only correction.
+Source gate #300 / 37741679178 on implementation commit
+`2c18e1c20ce4758747ffa0a58458137271045781` finished FAIL: 39 failed,
+4,854 passed and 1 skipped. All 133-N functional tests and its authority check
+passed; Ruff check/format, diff check and source identity were green. Failures
+were stale shared registration expectations: the 36-checkpoint batch AST pins,
+absolute tail offsets/counts and the two registry/workflow-tail assertions.
+A bounded correction refreshes only the exact 37-checkpoint batch hash and
+those expectations, without changing diagnostic source or diagnostic authority
+pins. All 37 active authority checks now pass, and focused affected
+registration/authority cases pass **95/95** (1,043 unrelated cases deselected).
+Replacement source CI must reach terminal success before handoff.
+
+Focused Ruff check/format and `git diff --check` passed.
 The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent; tests
 used the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe` fallback
 with fresh explicit pytest roots under `F:\AI\temp`.
@@ -115,14 +131,27 @@ Focused commands run from the authorized 133-N worktree (all fake/temp-only):
 & F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/runtime/checkpoint_runner/test_arch133_l_m.py -k 'ci_registration or 133n_source or predecessor_called_once or full_real' --basetemp=F:/AI/temp/pytest-133n-runner-correction-20261008-05
 & F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/review_paper/test_publication_state_paper_diagnostic.py --basetemp=F:/AI/temp/pytest-133n-functional-final-20261008-06
 & F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/review_paper/test_publication_state_paper_diagnostic.py -k projections --basetemp=F:/AI/temp/pytest-133n-projection-final-20261008-07
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/runtime/checkpoint_runner/test_core.py::test_registered_profiles_include_current_arch128_gates tests/runtime/checkpoint_runner/test_arch131.py -k 'registered_profiles or test_131i_authority_freezes_source_only_registration_and_ci' --basetemp=F:/AI/temp/pytest-133n-shared-registration-final-20261008-09
 ```
+
+CI-correction focused command (95 passed):
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/runtime/checkpoint_runner/test_core.py tests/runtime/checkpoint_runner/test_arch131.py tests/runtime/checkpoint_runner/test_arch133_a_g.py tests/runtime/checkpoint_runner/test_arch133_h_k.py -k 'source_only_registration or copied_local_authority_baseline_passes or copied_prepare_authority_baseline_passes or 133h_checkpoint or registered_profiles or 131i_authority_freezes' --basetemp=F:/AI/temp/pytest-133n-ci300-correction-20261008-10
+```
+
+All 12 affected Python files then passed both non-mutating Ruff phases. The
+correction additionally checks `test_arch133_a_g.py` and `test_arch133_h_k.py`;
+existing batch-hash mutation checks remain fail-closed. No diagnostic source,
+launcher, import closure, semantic test or required certification tuple changed.
 
 The affected Python paths for both `ruff check --no-cache` and
 `ruff format --check --no-cache` were the new package, new launcher,
 `scripts/checkpoint_runner.py`, the new functional module,
 `tests/runtime/checkpoint_runner/helpers.py`,
 `tests/runtime/checkpoint_runner/test_arch133_l_m.py`, and
-`tests/scripts/certification_runner/test_profiles.py`. Both phases and
+`tests/scripts/certification_runner/test_profiles.py`. The follow-up also checked
+`tests/runtime/checkpoint_runner/test_core.py` and `test_arch131.py`. Both phases and
 `git diff --check` passed. No broad local certification or real launcher
 invocation was run. ChatGPT owns certification selection after exact-source
 review; this evidence does not prescribe or authorize a protected invocation.

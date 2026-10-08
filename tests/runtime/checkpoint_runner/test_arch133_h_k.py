@@ -29,7 +29,7 @@ def test_133h_checkpoint_is_source_only_and_ci_registered():
         *runner.ARCH133_H_K_TESTS,
         "tests/review_paper/test_unattended_publication.py",
     )
-    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (_G133_NAME, _H133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-6] == (_G133_NAME, _H133_NAME)
     assert runner._arch133_host_publication_authority_check(repo) == ()
 
 
@@ -117,7 +117,7 @@ def test_133i_source_only_registration_and_inert_callbacks(tmp_path, monkeypatch
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133i"
     assert spec.authority_check is runner._arch133_scratch_root_acl_authority_check
-    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (_H133_NAME, _I133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (_H133_NAME, _I133_NAME)
     assert (
         runner._arch133_scratch_root_acl_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -238,7 +238,7 @@ def test_133j_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133j"
     assert spec.authority_check is runner._arch133_retained_root_authority_check
-    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (_I133_NAME, _J133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (_I133_NAME, _J133_NAME)
     assert (
         runner._arch133_retained_root_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -329,7 +329,7 @@ def test_133k_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133k"
     assert spec.authority_check is runner._arch133_recovery_authority_check
-    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (_J133_NAME, _K133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (_J133_NAME, _K133_NAME)
     assert (
         runner._arch133_recovery_authority_check(
             Path(runner.__file__).resolve().parents[1]

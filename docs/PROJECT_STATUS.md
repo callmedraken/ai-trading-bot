@@ -26,7 +26,23 @@ Focused functional verification: **190 passed**; the final test-only lint-bindin
 correction was separately rerun (1 passed). Affected runner/CI/profile checks
 initially reported 782 passed and six ordering-text assertion failures; the
 corrected runner cases and relevant authority/order checks then passed
-**26/26**. Focused Ruff check/format and `git diff --check` passed.
+**26/26**. Two additional shared registry/workflow-tail expectations in
+`test_core.py` and `test_arch131.py` were updated for 133-N; their focused
+rerun passed **10/10** with both Ruff phases green. Diagnostic source and
+authority pins were unchanged by that test-only correction.
+Source gate #300 / 37741679178 on implementation commit
+`2c18e1c20ce4758747ffa0a58458137271045781` finished FAIL: 39 failed,
+4,854 passed and 1 skipped. All 133-N functional tests and its authority check
+passed; Ruff check/format, diff check and source identity were green. Failures
+were stale shared registration expectations: the 36-checkpoint batch AST pins,
+absolute tail offsets/counts and the two registry/workflow-tail assertions.
+A bounded correction refreshes only the exact 37-checkpoint batch hash and
+those expectations, without changing diagnostic source or diagnostic authority
+pins. All 37 active authority checks now pass, and focused affected
+registration/authority cases pass **95/95** (1,043 unrelated cases deselected).
+Replacement source CI must reach terminal success before handoff.
+
+Focused Ruff check/format and `git diff --check` passed.
 The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent; tests
 used the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe` fallback
 with fresh explicit pytest roots under `F:\AI\temp`.
@@ -1161,6 +1177,18 @@ Focused verification exercised all 1,491 runner cases: the first pass reported
 1,488 passed / 3 failed in 725.29 seconds. Those three existing workflow-mutation
 cases still targeted retained names; they were corrected to mutate active names.
 The affected five-case group then passed (5 passed / 1,486 deselected).
+Source gate #300 / 37741679178 on implementation commit
+`2c18e1c20ce4758747ffa0a58458137271045781` finished FAIL: 39 failed,
+4,854 passed and 1 skipped. All 133-N functional tests and its authority check
+passed; Ruff check/format, diff check and source identity were green. Failures
+were stale shared registration expectations: the 36-checkpoint batch AST pins,
+absolute tail offsets/counts and the two registry/workflow-tail assertions.
+A bounded correction refreshes only the exact 37-checkpoint batch hash and
+those expectations, without changing diagnostic source or diagnostic authority
+pins. All 37 active authority checks now pass, and focused affected
+registration/authority cases pass **95/95** (1,043 unrelated cases deselected).
+Replacement source CI must reach terminal success before handoff.
+
 Focused Ruff check/format and `git diff --check` passed. No certification profile
 suite was run locally; `run_test_certification.py` and its tests are unchanged.
 

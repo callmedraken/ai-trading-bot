@@ -831,7 +831,7 @@ def test_registration_guard_holds_four_deny_write_handles(fake):
 
 
 @pytest.fixture
-def native_fixture(tmp_path):
+def native_fixture(tmp_path, request):
     # Every native command in this external fixture is a fake. No production
     # transport is invoked; the copied script cannot construct real COM.
     for name in ("definition", "observe", "install"):
@@ -843,6 +843,16 @@ def native_fixture(tmp_path):
                 "[Security.Principal.WindowsIdentity]::GetCurrent()",
                 "$global:FakeIdentity",
             )
+            if getattr(request, "param", False):
+                # Newer Windows JSON parsers may coerce ISO UTC strings.
+                source = source.replace(
+                    "$request = $line | ConvertFrom-Json",
+                    "$request = $line | ConvertFrom-Json\n"
+                    "$request.start_boundary = [DateTime]::Parse("
+                    "$request.start_boundary)\n"
+                    "$request.end_boundary = [DateTime]::Parse("
+                    "$request.end_boundary)",
+                )
         (tmp_path / f"arch133_scheduler_{name}.ps1").write_text(
             source, encoding="utf-8"
         )
@@ -962,6 +972,7 @@ def test_fake_com_observer_and_cross_language_fingerprint(native_fixture, mode):
     assert not (temp / "call-count.txt").exists()
 
 
+@pytest.mark.parametrize("native_fixture", [False, True], indirect=True)
 @pytest.mark.parametrize(
     "mode", ["create", "create-exception", "stale", "present-install"]
 )

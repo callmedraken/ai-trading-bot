@@ -1317,7 +1317,7 @@ ARCH133_SCHEDULER_PINS: Final = {
         "45e1c9dbf62738ff2667969ed3716b39313c1977ee7693572a17c078616c0a2a"
     ),
     "scripts/arch133_scheduler_install.ps1": (
-        "30bf66aa048b65f08ed006f8d304379d6973e9c927d30e994da4e7b1db4ff154"
+        "9764b40dc6953b3fda2028e35f6e68a39d71c8b052dde9710fe60ce9bd4eaa8f"
     ),
     "src/trading_bot/review_paper/unattended_scheduler.py": (
         "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"

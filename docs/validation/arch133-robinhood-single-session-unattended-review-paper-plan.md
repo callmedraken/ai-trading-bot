@@ -1,5 +1,147 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-08 — Architecture 133-P SOURCE/TOPOLOGY ACCEPTED; Q133-3 remains authorized and unconsumed
+
+Architecture 133-P is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted executable/test source:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133p
+HEAD    b9ae4daa453b29340b9e63e219247e980218b983
+TREE    d2428532d2bcb8d5e3a7bb0f059a9949dc42049f
+CI      37764151438 SUCCESS
+```
+
+The exact cumulative GitHub comparison against admitted parent
+`a8dcb8891f48534b8558a8ee22068a6d231b10f3` is four normal commits with
+exactly 22 changed paths. The final remote feature branch resolves exactly to
+the accepted HEAD. The correction commits after the initial implementation are
+bounded test/transport-compatibility corrections; consumed Q133-2V, 133-M,
+133-N and 133-O executable entrypoints remain unchanged.
+
+The accepted Q133-3 source keeps scheduler authority narrower than the original
+generic create/update wording:
+
+- the canonical pure scheduler builder remains independently AST-pinned;
+- retained publication semantics use the corrected 65f0/16cb serialized runtime
+  identity while preserving the independent 4677/6ce executable baseline;
+- every admission rechecks the exact four-file retained namespace, root/file
+  identity and policy, canonical activation/binding, READY revision 0 wake,
+  unchanged empty schema-v2 paper predecessor and exact standard Trading token;
+- the fixed task is
+  `\AITradingBot-Arch133-SingleSessionReviewPaper-v1`;
+- task creation uses exactly `TASK_CREATE=2`; there is no CREATE_OR_UPDATE;
+- an exact already-present task is accepted read-only with zero registration
+  calls;
+- any unexpected existing task blocks before credential acquisition/mutation;
+- the task is installed disabled and with demand-start disabled;
+- the task action is only the exact protected Python plus the frozen 133-G wake
+  launcher, with no semantic arguments or scheduler-owned environment;
+- Password logon and LeastPrivilege are frozen; credential acquisition requires
+  a real interactive console and the password is transferred only through the
+  fixed private child stdin payload;
+- plan hash, publication/state/paper facts, scheduler observation and time window
+  are revalidated before credential acquisition, after the credential pause and
+  immediately before the one registration attempt;
+- retained final files are held through deny-write/delete handles across the
+  final admission/registration boundary;
+- the native installer performs at most one `RegisterTaskDefinition` call and
+  contains no task Run/Start/Stop/Delete/Enable/Disable path;
+- success requires independent stable double COM readback whose complete
+  semantic XML-tree fingerprint equals the reviewed task definition;
+- a native call/timeout/return ambiguity or any post-call disagreement is
+  `INDETERMINATE` and grants no retry.
+
+The fresh import closure is verifier/domain-only. It excludes
+`run_unattended_host`, wake execution, OAuth storage/provider/MCP clients,
+paper/state writers and broker mutation capability. Q133-4 capability is not
+reachable from the 133-P Python import closure or its PowerShell transports.
+
+The real Task Scheduler service is intentionally not exercised by source tests.
+Therefore source acceptance does **not** assert that Windows will preserve the
+submitted XML without service normalization. If one real TASK_CREATE call later
+returns but independent readback normalizes semantics outside the exact accepted
+projection, Q133-3 must end INDETERMINATE and must not be retried. This is a
+fail-closed limitation, not permission to loosen readback after the fact.
+
+Current topology is:
+
+```text
+ACTIVE CHECKPOINTS  39
+BATCH TEST PATHS    50
+BATCH RUFF PATHS   141
+
+FULL        139 modules
+ROBINHOOD    66 modules
+LEGACY      205 modules
+EXHAUSTIVE  344 modules
+
+required FULL       122 modules
+required ROBINHOOD   49 modules
+```
+
+Terminal source gate 37764151438 on the exact accepted source produced:
+
+```text
+cases    5,266
+passed   5,265
+skipped  1
+failed   0
+errors   0
+wall     402.56 s
+
+PYTEST          0
+RUFF_CHECK      0
+RUFF_FORMAT     0
+GIT_DIFF_CHECK  0
+AUTHORITY       39/39 PASS
+IDENTITY_STABLE True
+OVERALL         PASS
+```
+
+The single skip is the unchanged optional MCP authentication import unavailable
+on CI. Evidence independently records the same accepted branch/HEAD/TREE before
+and after the gate and reports scheduler mutation and broker/live effects
+`NOT_RUN`.
+
+No additional ROBINHOOD or FULL certification is selected for this source-only
+checkpoint. The active source gate already exercised the new protected
+scheduler implementation tests together with every changed runner/profile and
+Architecture-133 predecessor surface. The additional broad-profile coverage
+would add unchanged modules and would not provide native Task Scheduler
+acceptance evidence.
+
+### Q133-3 protected boundary
+
+The user's existing explicit Q133-3 authorization remains **ACTIVE and
+UNCONSUMED**. Source implementation, pushes, CI, review and this docs closeout do
+not consume it.
+
+The next real action is the accepted operator's **read-only `plan` mode**.
+Plan may read the retained publication/state/paper material and the one fixed
+Task Scheduler identity, but it may not acquire the Trading password or write
+Task Scheduler state.
+
+The plan must classify one of:
+
+```text
+ABSENT
+ALREADY_MATCHING
+UNEXPECTED_EXISTING
+STALE_EXPIRED / blocked
+```
+
+Only a reviewed PASS plan may supply its exact `plan_sha256` to
+`execute-once`. The protected registration call, if needed, consumes Q133-3
+when attempted; a returned/ambiguous attempt is never retry authority.
+
+Q133-4 remains **UNAUTHORIZED**. The 133-P task is deliberately disabled, so
+Q133-3 cannot itself produce an unattended wake. Enabling/arming the one-session
+task requires a separately reviewed source boundary and fresh explicit Q133-4
+authorization. Provider/broker calls, paper/state mutation, manual task start,
+wake delegation and live placement remain **NO-GO**.
+
 ## 2026-10-08 — Architecture 133-P source prerequisite for authorized Q133-3
 
 The real 133-O PASS/consumed result remains authoritative. Q133-2V, 133-M,

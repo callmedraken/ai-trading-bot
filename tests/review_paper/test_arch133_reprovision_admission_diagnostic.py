@@ -100,6 +100,36 @@ def test_each_stage_fails_closed_with_zero_effects(
     assert all(result[name] == 0 for name in operator.ZERO_EFFECTS)
 
 
+@pytest.mark.parametrize(
+    "detail",
+    [
+        "PREDECESSOR_RUNTIME",
+        "PREDECESSOR_ADMINISTRATOR",
+        "PREDECESSOR_ROOT",
+        "PREDECESSOR_NAMESPACE",
+        "PREDECESSOR_FILES",
+        "PREDECESSOR_PUBLICATION_PATH",
+        "PREDECESSOR_PUBLICATION_PARSE",
+        "PREDECESSOR_PUBLICATION_SEMANTICS",
+        "PREDECESSOR_STATE_PATH",
+        "PREDECESSOR_STATE",
+        "PREDECESSOR_PAPER",
+        "PREDECESSOR_FINAL_REOBSERVATION",
+        "PREDECESSOR_RUNTIME_REOBSERVATION",
+        "PREDECESSOR_ADMINISTRATOR_REOBSERVATION",
+    ],
+)
+def test_detailed_predecessor_stage_is_sanitized(admitted, monkeypatch, tmp_path, detail):
+    def blocked():
+        raise operator.AdmissionStageError(detail)
+
+    monkeypatch.setattr(operator, "_observe_predecessor", blocked)
+    result = operator.diagnose(tmp_path / "material.json")
+    assert result["status"] == "BLOCKED"
+    assert result["stage"] == detail
+    assert all(result[name] == 0 for name in operator.ZERO_EFFECTS)
+
+
 def test_complete_diagnostic_is_effect_free(admitted, tmp_path):
     result = operator.diagnose(tmp_path / "material.json")
     assert result["status"] == "PASS"

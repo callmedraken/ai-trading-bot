@@ -137,77 +137,135 @@ def _runtime() -> dict:
     }
 
 
+class AdmissionStageError(RuntimeError):
+    """Sanitized internal stage marker; never carries native/upstream text."""
+
+    def __init__(self, stage: str) -> None:
+        super().__init__(stage)
+        self.stage = stage
+
+
+def _stage(stage: str, function, /, *args):
+    try:
+        return function(*args)
+    except AdmissionStageError:
+        raise
+    except BaseException:
+        raise AdmissionStageError(stage) from None
+
+
 def _observe_predecessor() -> tuple[object, dict]:
-    runtime = _runtime()
-    administrator_sid()
+    runtime = _stage("PREDECESSOR_RUNTIME", _runtime)
+    _stage("PREDECESSOR_ADMINISTRATOR", administrator_sid)
     with ExitStack() as held:
-        root_handle = reads.open_generation_directory(retained_reads.TARGET_PATH)
-        held.callback(read_only.close_handle, root_handle)
-        root, security = read_only.inspect_directory_security(
-            root_handle, retained_reads.TARGET_PATH
-        )
-        if (
-            root.identity != predecessor.ROOT_IDENTITY
-            or root.filesystem != "NTFS"
-            or root.reparse is not False
-            or root.classification() != "EXACT_INTENDED_ROOT"
-            or security != predecessor.ROOT_SECURITY_SHA256
-        ):
-            raise ValueError("root rejected")
-        names = retained_reads.namespace(root_handle)
-        if tuple(name for name, _ in names) != retained_reads.FINAL_NAMES:
-            raise ValueError("namespace rejected")
-        files = []
-        for name in retained_reads.FINAL_NAMES:
-            handle = retained_reads.open_retained_file(name)
-            held.callback(read_only.close_handle, handle)
-            snapshot = retained_reads.file_snapshot(handle, name)
-            policy = file_policy.observe_file_policy(handle)
-            file_policy.require_file_policy(name, policy)
-            if snapshot != (
-                (predecessor.ROOT_IDENTITY[0], dict(names)[name]),
-                predecessor.FILE_HASHES[name],
-            ):
-                raise ValueError("file rejected")
-            files.append((handle, name, snapshot, policy))
-        raw = predecessor._publication_path_read()
-        activation, host = predecessor._publication_parse(raw)
-        predecessor._publication_semantics(runtime, raw, activation, host)
-        state_path = predecessor._state_path_resolution(activation)
-        state_connection = sqlite3.connect(
-            state_path.as_uri() + "?mode=ro", uri=True, timeout=0
-        )
-        held.callback(state_connection.close)
-        state_connection.execute("BEGIN")
-        state = predecessor.require_ready_state(state_connection, activation)
-        paper_connection = sqlite3.connect(
-            binding.PAPER_PATH.as_uri() + "?mode=ro", uri=True, timeout=0
-        )
-        held.callback(paper_connection.close)
-        paper_connection.execute("BEGIN")
-        paper = predecessor.require_empty_paper(paper_connection, activation, host)
-        if (
-            predecessor._publication_path_read() != raw
-            or predecessor._state_path_resolution(activation) != state_path
-            or predecessor.require_ready_state(state_connection, activation) != state
-            or predecessor.require_empty_paper(paper_connection, activation, host)
-            != paper
-            or retained_reads.namespace(root_handle) != names
-            or read_only.inspect_directory_security(
+        try:
+            root_handle = reads.open_generation_directory(retained_reads.TARGET_PATH)
+            held.callback(read_only.close_handle, root_handle)
+            root, security = read_only.inspect_directory_security(
                 root_handle, retained_reads.TARGET_PATH
             )
-            != (root, security)
-        ):
-            raise ValueError("predecessor changed")
-        for handle, name, snapshot, policy in files:
             if (
-                retained_reads.file_snapshot(handle, name) != snapshot
-                or file_policy.observe_file_policy(handle) != policy
+                root.identity != predecessor.ROOT_IDENTITY
+                or root.filesystem != "NTFS"
+                or root.reparse is not False
+                or root.classification() != "EXACT_INTENDED_ROOT"
+                or security != predecessor.ROOT_SECURITY_SHA256
             ):
-                raise ValueError("predecessor file changed")
-    if _runtime() != runtime:
-        raise ValueError("runtime changed")
-    administrator_sid()
+                raise ValueError
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_ROOT") from None
+
+        try:
+            names = retained_reads.namespace(root_handle)
+            if tuple(name for name, _ in names) != retained_reads.FINAL_NAMES:
+                raise ValueError
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_NAMESPACE") from None
+
+        files = []
+        try:
+            for name in retained_reads.FINAL_NAMES:
+                handle = retained_reads.open_retained_file(name)
+                held.callback(read_only.close_handle, handle)
+                snapshot = retained_reads.file_snapshot(handle, name)
+                policy = file_policy.observe_file_policy(handle)
+                file_policy.require_file_policy(name, policy)
+                if snapshot != (
+                    (predecessor.ROOT_IDENTITY[0], dict(names)[name]),
+                    predecessor.FILE_HASHES[name],
+                ):
+                    raise ValueError
+                files.append((handle, name, snapshot, policy))
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_FILES") from None
+
+        raw = _stage("PREDECESSOR_PUBLICATION_PATH", predecessor._publication_path_read)
+        activation, host = _stage(
+            "PREDECESSOR_PUBLICATION_PARSE", predecessor._publication_parse, raw
+        )
+        _stage(
+            "PREDECESSOR_PUBLICATION_SEMANTICS",
+            predecessor._publication_semantics,
+            runtime,
+            raw,
+            activation,
+            host,
+        )
+        state_path = _stage(
+            "PREDECESSOR_STATE_PATH", predecessor._state_path_resolution, activation
+        )
+
+        try:
+            state_connection = sqlite3.connect(
+                state_path.as_uri() + "?mode=ro", uri=True, timeout=0
+            )
+            held.callback(state_connection.close)
+            state_connection.execute("BEGIN")
+            state = predecessor.require_ready_state(state_connection, activation)
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_STATE") from None
+
+        try:
+            paper_connection = sqlite3.connect(
+                binding.PAPER_PATH.as_uri() + "?mode=ro", uri=True, timeout=0
+            )
+            held.callback(paper_connection.close)
+            paper_connection.execute("BEGIN")
+            paper = predecessor.require_empty_paper(
+                paper_connection, activation, host
+            )
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_PAPER") from None
+
+        try:
+            if (
+                predecessor._publication_path_read() != raw
+                or predecessor._state_path_resolution(activation) != state_path
+                or predecessor.require_ready_state(state_connection, activation)
+                != state
+                or predecessor.require_empty_paper(
+                    paper_connection, activation, host
+                )
+                != paper
+                or retained_reads.namespace(root_handle) != names
+                or read_only.inspect_directory_security(
+                    root_handle, retained_reads.TARGET_PATH
+                )
+                != (root, security)
+            ):
+                raise ValueError
+            for handle, name, snapshot, policy in files:
+                if (
+                    retained_reads.file_snapshot(handle, name) != snapshot
+                    or file_policy.observe_file_policy(handle) != policy
+                ):
+                    raise ValueError
+        except BaseException:
+            raise AdmissionStageError("PREDECESSOR_FINAL_REOBSERVATION") from None
+
+    if _stage("PREDECESSOR_RUNTIME_REOBSERVATION", _runtime) != runtime:
+        raise AdmissionStageError("PREDECESSOR_RUNTIME_REOBSERVATION")
+    _stage("PREDECESSOR_ADMINISTRATOR_REOBSERVATION", administrator_sid)
     return activation, {
         "runtime": runtime,
         "publication_files": predecessor.FILE_HASHES,
@@ -220,7 +278,6 @@ def _observe_predecessor() -> tuple[object, dict]:
         "wake_revision": 0,
         "consumed_wake_authority": 0,
     }
-
 
 def _require_retained(old: object) -> None:
     retained = generation.predecessor_material()
@@ -293,6 +350,8 @@ def diagnose(path: Path) -> dict:
         with namespace.parent_guard():
             pass
         return stage_result("ADMISSION_COMPLETE", passed=True)
+    except AdmissionStageError as error:
+        return stage_result(error.stage)
     except BaseException:
         return stage_result(stage)
 

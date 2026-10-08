@@ -59,7 +59,9 @@ def _fail():
         "PARENT_COMBINED",
     ],
 )
-def test_each_stage_fails_closed_with_zero_effects(admitted, monkeypatch, tmp_path, stage):
+def test_each_stage_fails_closed_with_zero_effects(
+    admitted, monkeypatch, tmp_path, stage
+):
     if stage == "MATERIAL_READ":
         monkeypatch.setattr(operator, "read_material", lambda path: _fail())
     elif stage == "PREDECESSOR_ADMISSION":
@@ -83,6 +85,7 @@ def test_each_stage_fails_closed_with_zero_effects(admitted, monkeypatch, tmp_pa
 
         monkeypatch.setattr(operator, "_parent", parent)
     else:
+
         @contextmanager
         def bad_guard():
             _fail()
@@ -131,8 +134,7 @@ def test_fresh_import_closure_has_no_reprovision_writer_or_effect_surface(tmp_pa
 
 def test_diagnostic_source_has_no_mutation_or_effect_entrypoints():
     source = (
-        ROOT
-        / "src/trading_bot/arch133_reprovision_diagnostic/operator.py"
+        ROOT / "src/trading_bot/arch133_reprovision_diagnostic/operator.py"
     ).read_text(encoding="utf-8")
     launcher = (
         ROOT / "scripts/run_arch133_reprovision_admission_diagnostic.py"

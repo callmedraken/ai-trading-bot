@@ -21,7 +21,9 @@ try:
     sys.path.insert(0, str(_SOURCE_ROOT / "src"))
     from trading_bot.arch133_reprovision_diagnostic.operator import main
 except BaseException:
-    print('{"reason":"ARCH133R_RUNTIME_BLOCKED","schema":"arch133r-reprovision-admission-diagnostic/v1","status":"BLOCKED"}')
+    print(
+        '{"reason":"ARCH133R_RUNTIME_BLOCKED","schema":"arch133r-reprovision-admission-diagnostic/v1","status":"BLOCKED"}'
+    )
     raise SystemExit(3) from None
 
 if __name__ == "__main__":

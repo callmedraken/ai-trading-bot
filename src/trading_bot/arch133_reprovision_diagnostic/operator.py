@@ -10,6 +10,7 @@ import sqlite3
 import subprocess
 import sys
 from contextlib import ExitStack
+from datetime import UTC, datetime
 from pathlib import Path
 
 from trading_bot.arch133_acl import read_only, retained_reads
@@ -189,9 +190,7 @@ def _observe_predecessor() -> tuple[object, dict]:
             predecessor._publication_path_read() != raw
             or predecessor._state_path_resolution(activation) != state_path
             or predecessor.require_ready_state(state_connection, activation) != state
-            or predecessor.require_empty_paper(
-                paper_connection, activation, host
-            )
+            or predecessor.require_empty_paper(paper_connection, activation, host)
             != paper
             or retained_reads.namespace(root_handle) != names
             or read_only.inspect_directory_security(
@@ -281,10 +280,10 @@ def diagnose(path: Path) -> dict:
         stage = "PREDECESSOR_MATERIAL"
         _require_retained(old)
         stage = "PREDECESSOR_STALE"
-        require_stale(old, predecessor.datetime.now(predecessor.UTC))
+        require_stale(old, datetime.now(UTC))
         stage = "FRESH_MATERIAL"
         require_fresh(
-            material, old, facts["runtime"], predecessor.datetime.now(predecessor.UTC)
+            material, old, facts["runtime"], datetime.now(UTC)
         )
         stage = "NAMESPACE_VACANCY"
         namespace.require_vacant()

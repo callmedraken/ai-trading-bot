@@ -1,5 +1,189 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Architecture 133-N SOURCE ACCEPTED; no additional broad certification selected
+
+Architecture 133-N is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted final source:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133n
+HEAD    44d8d44f74cbc7932e117971147af1e489a12f95
+TREE    cdadf8276f1c216e93a76f52944e31a5d325546f
+CI      #301 / 37742547123 SUCCESS
+```
+
+Original diagnostic implementation commit:
+
+```text
+HEAD    2c18e1c20ce4758747ffa0a58458137271045781
+TREE    dec0f6bc877b65d703b4b604c13236dd83f78118
+```
+
+The final descendant is one bounded registration correction. It refreshes the
+shared 37-checkpoint batch AST pin and stale absolute registry/workflow-tail test
+expectations after adding 133-N. It does not modify the 133-N diagnostic
+operator, launcher, semantic tests, import-closure pins, production authority,
+or protected capability surface.
+
+Exact-source review found no correction required. The new diagnostic remains
+credential-free and read-only. Its real import closure is exactly 21
+`trading_bot` modules:
+
+```text
+trading_bot
+trading_bot.config
+trading_bot.arch133_acl
+trading_bot.arch133_acl.read_only
+trading_bot.arch133_acl.retained_reads
+trading_bot.arch133_verifier
+trading_bot.arch133_verifier.activation
+trading_bot.arch133_verifier.binding
+trading_bot.arch133_verifier.file_policy
+trading_bot.arch133_verifier.state
+trading_bot.arch133_verifier.state_schema
+trading_bot.arch133_verifier.token
+trading_bot.domain
+trading_bot.domain._validation
+trading_bot.domain.enums
+trading_bot.domain.market
+trading_bot.domain.orders
+trading_bot.domain.positions
+trading_bot.domain.proposals
+trading_bot.arch133_publication_diagnostic
+trading_bot.arch133_publication_diagnostic.operator
+```
+
+Credential/verifier-operator/scheduler/session modules are absent. Fresh-process
+tests additionally reject credential APIs/targets, MCP/http clients,
+runtime/review-paper effect modules, state/paper writers, scheduler access,
+publication/recovery/ACL application, wake execution and broker effects.
+
+The frozen diagnostic stages are preserved exactly:
+
+```text
+PUBLICATION_PATH_READ
+PUBLICATION_PARSE
+PUBLICATION_SEMANTICS
+STATE_PATH_RESOLUTION
+STATE_SQLITE_OPEN
+STATE_SEMANTICS
+PAPER_SQLITE_OPEN
+PAPER_SEMANTICS
+FINAL_REOBSERVATION
+```
+
+PASS reports `PUBLICATION_STATE_PAPER_COMPLETE`. Pre-publication prerequisite
+failure returns only fixed `ARCH133N_RUNTIME_BLOCKED`; no invented diagnostic
+stage or raw exception/native/SQLite text escapes.
+
+Both SQLite OPEN stages use only exact fixed URI `mode=ro`, `uri=True`,
+`timeout=0`, followed by one `BEGIN` before semantic reads. Tests prove
+state/paper connections and retained handles close exactly once across PASS,
+partial acquisition, semantic failure and close failure; close failure maps only
+to `FINAL_REOBSERVATION`.
+
+Every JSON PASS/BLOCKED result carries integer zero for:
+
+```text
+credential_reads
+credential_writes
+provider_calls
+scheduler_reads
+scheduler_writes
+paper_mutations
+state_mutations
+acl_mutations
+wake_delegations
+execution_delegations
+consumed_wake_authority
+broker_effects
+```
+
+Source CI #301 independently executed:
+
+```text
+CHECKPOINTS      37
+TEST_PATHS       48
+RUFF_PATHS      131
+pytest           4,893 passed / 1 skipped / 0 failed / 0 errors
+pytest wall      270.69 s
+command elapsed  272.2487685 s
+authority        37 / 37 PASS
+Ruff check       PASS
+Ruff format      PASS
+git diff check   PASS
+identity stable  true
+```
+
+The single skip is the optional MCP OAuth import unavailable on CI.
+
+### Certification selection
+
+No additional broad certification is selected for 133-N.
+
+The current ROBINHOOD profile contains 64 modules. Source CI #301 executed
+48/64, including every changed functional/runner/profile surface and the new
+133-N module. The 16 omitted Robinhood modules are unchanged:
+
+```text
+tests/domain/test_market.py
+tests/domain/test_orders.py
+tests/domain/test_positions.py
+tests/domain/test_proposals.py
+tests/execution/test_paper_fill_application.py
+tests/execution/test_paper_fills.py
+tests/execution/test_paper_submission.py
+tests/execution/test_portfolio_orders.py
+tests/ledger/test_checkpoint_state.py
+tests/ledger/test_initialization.py
+tests/ledger/test_models.py
+tests/risk/test_orchestration.py
+tests/scripts/certification_runner/test_children.py
+tests/scripts/certification_runner/test_lanes.py
+tests/scripts/certification_runner/test_results.py
+tests/scripts/certification_runner/test_source.py
+```
+
+The first twelve are unchanged core product modules already outside the active
+source-gate union in the accepted 133-M precedent. The final four are unchanged
+certification-runner mechanics; 133-N changes neither
+`scripts/run_test_certification.py` nor those modules. Re-running ROBINHOOD
+would therefore duplicate all 48 affected/already-green modules merely to add
+16 unrelated unchanged modules. The terminal source gate plus focused
+implementation evidence is sufficient for this source-only diagnostic.
+
+Certification ownership remains:
+
+```text
+FULL        137 modules
+ROBINHOOD    64 modules
+LEGACY      205 modules
+EXHAUSTIVE  342 modules
+
+required FULL       122 modules
+required ROBINHOOD   49 modules
+```
+
+No required baseline migration is authorized or needed.
+
+### Protected boundary
+
+133-N source acceptance does **not** authorize a real invocation.
+
+Q133-2V remains consumed/non-retryable.
+The real 133-M diagnostic remains consumed/non-retryable after valid
+`PUBLICATION_STATE_PAPER` localization.
+Q133-3 scheduler installation and Q133-4 unattended wake remain unauthorized.
+Production/live broker placement remains **NO-GO**.
+
+The immediate next gate is one separately authorized real 133-N credential-free,
+read-only diagnostic under the exact standard Trading principal. It is one
+attempt only: no retry, polling, repair, fallback or alternate launcher. Its
+purpose is solely to distinguish the first failing publication/state/paper
+substage. A real 133-N invocation requires fresh explicit user authorization
+after this accepted source checkpoint.
+
 ## 2026-10-08 — Architecture 133-N implemented; exact-source review pending
 
 Implemented `trading_bot.arch133_publication_diagnostic.operator`, the separate

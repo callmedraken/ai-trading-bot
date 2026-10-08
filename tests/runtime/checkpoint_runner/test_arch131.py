@@ -205,7 +205,21 @@ def test_131g_source_registration():
         ("scripts/checkpoint_runner.py", "execute=None,", "execute=dangerous_host,"),
     ],
 )
-def test_131g_authority_rejects_boundary_drift(tmp_path, relative, before, after):
+def test_131g_authority_rejects_boundary_drift(
+    tmp_path, monkeypatch, relative, before, after
+):
+    # Only resolver/package mutations are wholly local to G. Transport, adapter
+    # and registration mutations keep their complete real predecessor coverage.
+    if relative in {
+        "src/trading_bot/robinhood_mcp/account_resolution.py",
+        "src/trading_bot/robinhood_mcp/__init__.py",
+    }:
+        for predecessor in (
+            "_arch131_direct_mcp_authority_check",
+            "_arch131_mcp_schema_authority_check",
+            "_arch131_paper_cycle_authority_check",
+        ):
+            monkeypatch.setattr(runner, predecessor, lambda _: ())
     repo = Path(runner.__file__).resolve().parent.parent
     paths = (
         "src/trading_bot/robinhood_mcp/sdk_transport.py",
@@ -351,7 +365,17 @@ def test_131h_source_registration_and_workflow():
         ),
     ],
 )
-def test_131h_authority_rejects_boundary_drift(tmp_path, relative, before, after):
+def test_131h_authority_rejects_boundary_drift(
+    tmp_path, monkeypatch, relative, before, after
+):
+    # Predecessor-file and registration/workflow mutations retain real chaining.
+    if relative == "src/trading_bot/robinhood_paper_operator.py":
+        monkeypatch.setattr(
+            runner, "_arch131_agentic_account_authority_check", lambda _: ()
+        )
+        monkeypatch.setattr(
+            runner, "_arch131_windows_oauth_authority_check", lambda _: ()
+        )
     repo = Path(runner.__file__).resolve().parent.parent
     for path in (
         "src/trading_bot/robinhood_paper_operator.py",
@@ -368,7 +392,6 @@ def test_131h_authority_rejects_boundary_drift(tmp_path, relative, before, after
         destination = tmp_path / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(source, encoding="utf-8")
-    assert runner._arch131_paper_operator_authority_check(tmp_path) == ()
     destination = tmp_path / relative
     source = destination.read_text(encoding="utf-8")
     assert before in source
@@ -2930,3 +2953,109 @@ def test_131v_source_only_registration_and_boundaries(tmp_path):
     ):
         source.write_text(text_value + "\n" + addition + "\n", encoding="utf-8")
         assert authority(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "copy,authority",
+    [
+        (_131i_authority_copy, runner._arch131_paper_intent_bridge_authority_check),
+        (
+            _131j_authority_copy,
+            runner._arch131_deterministic_paper_pipeline_authority_check,
+        ),
+        (_131k_authority_copy, runner._arch131_virtual_risk_context_authority_check),
+        (_131l_authority_copy, runner._arch131_forward_paper_cycle_authority_check),
+        (
+            _131lq_authority_copy,
+            runner._arch131_live_qualification_verifier_authority_check,
+        ),
+        (_131m_authority_copy, runner._arch131_session_admission_authority_check),
+        (_131n_authority_copy, runner._arch131_risk_price_snapshot_authority_check),
+        (_131o_authority_copy, runner._arch131_forward_paper_preview_authority_check),
+        (_131p_authority_copy, runner._arch131_risk_price_acquisition_authority_check),
+        (
+            _131q_authority_copy,
+            runner._arch131_supervised_forward_paper_authority_check,
+        ),
+        (
+            _131s_authority_copy,
+            runner._arch131_nyse_published_regular_session_authority_check,
+        ),
+        (_131t_copy, _T_AUTHORITY),
+        (_131u_copy, _U_AUTHORITY),
+    ],
+)
+def test_copied_local_authority_baseline_passes(tmp_path, copy, authority):
+    # Prove each exact copied closure once instead of before every mutation.
+    assert authority(copy(tmp_path)) == ()
+
+
+@pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
+def test_copied_prepare_authority_baseline_passes(tmp_path, boundary):
+    assert boundary[4](_131r_copy(tmp_path, boundary)) == ()
+
+
+@pytest.mark.parametrize(
+    "authority,predecessor",
+    [
+        (
+            "_arch131_agentic_account_authority_check",
+            "_arch131_direct_mcp_authority_check",
+        ),
+        (
+            "_arch131_agentic_account_authority_check",
+            "_arch131_mcp_schema_authority_check",
+        ),
+        (
+            "_arch131_agentic_account_authority_check",
+            "_arch131_paper_cycle_authority_check",
+        ),
+        (
+            "_arch131_paper_operator_authority_check",
+            "_arch131_agentic_account_authority_check",
+        ),
+        (
+            "_arch131_paper_operator_authority_check",
+            "_arch131_windows_oauth_authority_check",
+        ),
+    ],
+)
+@pytest.mark.parametrize("failure", [(), ("predecessor rejected",)])
+def test_predecessor_called_once_and_failure_propagates(
+    monkeypatch, authority, predecessor, failure
+):
+    repo = Path(runner.__file__).resolve().parents[1]
+    seen = []
+
+    def previous(root):
+        seen.append(root)
+        return failure
+
+    monkeypatch.setattr(runner, predecessor, previous)
+    assert getattr(runner, authority)(repo) == failure
+    assert seen == [repo]
+
+
+def test_full_real_authority_chain_passes_and_visits_every_predecessor(monkeypatch):
+    repo = Path(runner.__file__).resolve().parents[1]
+    seen = []
+    names = (
+        "_arch131_agentic_account_authority_check",
+        "_arch131_direct_mcp_authority_check",
+        "_arch131_mcp_schema_authority_check",
+        "_arch131_paper_cycle_authority_check",
+        "_arch131_windows_oauth_authority_check",
+    )
+    for name in names:
+        original = getattr(runner, name)
+
+        def traced(root, original=original, name=name):
+            seen.append((name, root))
+            return original(root)
+
+        monkeypatch.setattr(runner, name, traced)
+    # Wrappers execute every real body; registry identities match the wrappers.
+    registry = runner._checkpoint_specs()
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: registry)
+    assert runner._arch131_paper_operator_authority_check(repo) == ()
+    assert seen == [(name, repo) for name in names]

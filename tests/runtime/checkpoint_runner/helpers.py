@@ -129,7 +129,6 @@ def _131i_authority_copy(tmp_path: Path) -> Path:
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_paper_intent_bridge_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -145,7 +144,6 @@ def _131j_authority_copy(tmp_path: Path) -> Path:
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_deterministic_paper_pipeline_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -265,7 +263,6 @@ def _131k_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_virtual_risk_context_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -281,7 +278,6 @@ def _131l_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_forward_paper_cycle_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -297,7 +293,6 @@ def _131lq_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_live_qualification_verifier_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -313,7 +308,6 @@ def _131m_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_session_admission_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -329,7 +323,6 @@ def _131n_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_risk_price_snapshot_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -345,7 +338,6 @@ def _131o_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_forward_paper_preview_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -361,7 +353,6 @@ def _131p_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_risk_price_acquisition_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -377,7 +368,6 @@ def _131q_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch131_supervised_forward_paper_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -413,7 +403,6 @@ def _131r_copy(tmp_path, boundary):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert boundary[4](tmp_path) == ()
     return tmp_path
 
 
@@ -429,9 +418,6 @@ def _131s_authority_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert (
-        runner._arch131_nyse_published_regular_session_authority_check(tmp_path) == ()
-    )
     return tmp_path
 
 
@@ -457,7 +443,6 @@ def _131t_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert _T_AUTHORITY(tmp_path) == ()
     return tmp_path
 
 
@@ -480,7 +465,6 @@ def _131u_copy(tmp_path):
         destination.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert _U_AUTHORITY(tmp_path) == ()
     return tmp_path
 
 
@@ -503,7 +487,6 @@ def _133a_authority_copy(tmp_path):
         target.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch133_unattended_activation_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -530,7 +513,6 @@ def _133b_authority_copy(tmp_path):
         target.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch133_unattended_state_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -553,7 +535,6 @@ def _133c_authority_copy(tmp_path):
         target.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch133_one_wake_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -576,7 +557,6 @@ def _133d_authority_copy(tmp_path):
         target.write_text(
             (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
         )
-    assert runner._arch133_execution_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -602,7 +582,6 @@ def _133e_authority_copy(tmp_path):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text((repo / relative).read_text(), encoding="utf-8")
-    assert runner._arch133_host_scheduler_authority_check(tmp_path) == ()
     return tmp_path
 
 
@@ -636,7 +615,6 @@ def _133g_authority_copy(tmp_path):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text((repo / relative).read_text(), encoding="utf-8")
-    assert runner._arch133_host_bootstrap_authority_check(tmp_path) == ()
     return tmp_path
 
 

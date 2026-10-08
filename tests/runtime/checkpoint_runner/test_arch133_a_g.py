@@ -834,3 +834,19 @@ def test_133g_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_host_bootstrap_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "copy,authority",
+    [
+        (_133a_authority_copy, runner._arch133_unattended_activation_authority_check),
+        (_133b_authority_copy, runner._arch133_unattended_state_authority_check),
+        (_133c_authority_copy, runner._arch133_one_wake_authority_check),
+        (_133d_authority_copy, runner._arch133_execution_authority_check),
+        (_133e_authority_copy, runner._arch133_host_scheduler_authority_check),
+        (_133g_authority_copy, runner._arch133_host_bootstrap_authority_check),
+    ],
+)
+def test_copied_local_authority_baseline_passes(tmp_path, copy, authority):
+    # A-G have no predecessor calls. Keep their exact copy/PASS proof once each.
+    assert authority(copy(tmp_path)) == ()

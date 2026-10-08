@@ -1,5 +1,77 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-08 — Real 133-R diagnostic BLOCKED at PREDECESSOR_RUNTIME; zero effects; operator topology corrected
+
+One real Architecture 133-R read-only reprovision admission diagnostic was
+explicitly authorized and executed from elevated Administrator PowerShell under
+principal `DESKTOP-I4DOKM7\John`.
+
+Operator checkout and fresh-material identity at invocation:
+
+```text
+HEAD             b0d5078bf74ecebef2af175b03740a69ec393dd2
+TREE             f35a8c86f3afed8e066832bed524e418c39643c2
+MATERIAL         F:\AI\temp\arch133q\fresh-material-2026-10-09.json
+MATERIAL_SHA256  7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+```
+
+The diagnostic returned:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"reason":"REPROVISION_ADMISSION_DIAGNOSTIC_BLOCKED","scheduler_reads":0,"scheduler_writes":0,"schema":"arch133r-reprovision-admission-diagnostic/v1","stage":"PREDECESSOR_RUNTIME","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+Wrapper exit: `ARCH133R_DIAGNOSTIC_EXIT=3`.
+
+This is a valid zero-effect fail-closed result. All fifteen effect counters are
+zero. No credential, provider, scheduler, publication, archive, paper, state,
+ACL, wake, execution, broker or manual-task-start effect occurred. The
+authorization used for this real diagnostic invocation is consumed.
+
+Exact source review localizes this `PREDECESSOR_RUNTIME` result to the operator
+checkout topology used for that invocation. The accepted 133-R runtime calls
+`_clean_source(SOURCE_ROOT, SOURCE_BRANCH)`, which requires
+`git branch --show-current` to equal
+`feature/robinhood-unattended-review-paper-133r`. The operator worktree had
+been created at the exact reviewed HEAD as detached HEAD, so runtime admission
+necessarily rejected before predecessor-host admission. This result supplies no
+evidence about any later diagnostic stage.
+
+Subsequent read-only topology verification established that the frozen bound
+133-G checkout was already valid:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133g
+HEAD    65f0d40217f8ce129224531a5151f4acea889d89
+TREE    16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
+```
+
+Under separate explicit repository-control authorization, the existing clean
+133-R worktree was then attached to its exact expected local tracking branch
+without changing HEAD or tree:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133r
+HEAD      b0d5078bf74ecebef2af175b03740a69ec393dd2
+TREE      f35a8c86f3afed8e066832bed524e418c39643c2
+UPSTREAM  origin/feature/robinhood-unattended-review-paper-133r
+```
+
+No Architecture 133-R source-code correction is indicated by this result. The
+remediation is the corrected named-branch operator topology plus this canonical
+evidence reconciliation.
+
+The consumed Architecture 133-Q read-only plan MUST NOT be rerun.
+Architecture 133-Q `execute-once` remains unauthorized.
+
+The next protected boundary is one **new fresh explicit authorization** for one
+additional Architecture 133-R read-only diagnostic using the corrected
+named-branch topology and the same already-reviewed fresh-material file. The
+consumed 133-R authorization does not transfer to that future invocation.
+
+Q133-3 and Q133-4 remain unauthorized. Provider/OAuth access, unattended wake
+execution and production/live broker effects remain NO-GO.
+
 ## 2026-10-08 — Architecture 133-R SOURCE/TOPOLOGY ACCEPTED; real diagnostic read remains unauthorized
 
 Architecture 133-R is **SOURCE/TOPOLOGY ACCEPTED** as the zero-effect staged

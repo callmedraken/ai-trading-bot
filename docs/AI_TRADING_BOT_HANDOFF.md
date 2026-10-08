@@ -1,5 +1,194 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-07 — Architecture 132-R2-B SOURCE ACCEPTED; historical CI gap localizes R2-B2
+
+Architecture 132-R2-B is **SOURCE/TOPOLOGY ACCEPTED**.
+
+Accepted implementation source:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2
+HEAD    40aa7ef55a528fe7b7d9482d083ef1dcfed4dfb1
+TREE    0781d9ecb3dcaf87888506e2b833fb8106f35990
+CI      #291 / 37726690416 SUCCESS
+```
+
+Evidence/docs descendant:
+
+```text
+HEAD    4c89d5b968da5a26a0967766c164b49349c158f0
+TREE    f795a236fb7d220e6dbc5a806c3d1ce81ddc2710
+CI      #292 / 37727527551 SUCCESS
+```
+
+ChatGPT exact-source review found no correction required. No production
+`src/` file changed. The checkpoint-runner authority-function edits are
+coverage/registration/test-path migrations required by the split, while
+production source pins and production authority chaining remain intact.
+Certification ownership remains fail-closed: current split runner/certification
+infrastructure is supported FULL/ROBINHOOD, the retained Architecture 128/130
+runner replacement is LEGACY-required, FULL and LEGACY remain disjoint, and
+unknown ownership remains rejected.
+
+Independent relocation verification found all original test functions preserved:
+
+```text
+old checkpoint-runner functions       230
+new checkpoint-runner functions       236
+missing original runner functions       0
+
+old certification-runner functions     37
+new certification-runner functions     38
+missing original certification funcs    0
+
+original functions total              267
+missing originals                       0
+```
+
+The six additional proof functions cover R2-B selectability, external JUnit
+evidence, predecessor invocation/failure propagation, full real-chain PASS, and
+retained individual verification. The repeated predecessor propagation test name
+exists in two different split modules and is intentional.
+
+R2-B terminal active source CI:
+
+```text
+CHECKPOINTS        36
+TEST_PATHS         47
+RUFF_PATHS        127
+pytest             4,611 passed / 1 skipped / 0 failed / 0 errors
+pytest wall        352.07 s
+command elapsed    353.5722111 s
+```
+
+This is a 55.44% pytest-time reduction from R2-A's 790.08 s, but historical
+same-workflow evidence proves the suite is still materially slower than its
+pre-regression baseline.
+
+### Historical same-workflow baseline
+
+The comparison below uses successful non-docs **Checkpoint Source Gates** runs
+whose `Verify batch source checkpoints` step actually executed; docs-only
+20-40 second fast paths are excluded.
+
+```text
+run   checkpoints paths  passed  pytest_s  workflow_s
+#224      32       57    4,508    215.40      266
+#227      33       58    4,770    198.08      250
+#229      34       59    4,926    178.74      234
+#239      37       62    5,251    159.04      195
+#247      37       62    5,255    150.67      200
+#252      37       62    5,255    223.56      266
+#256      38       62    5,291    234.87      288
+#259      39       63    5,436    161.31      212
+#260      39       63    5,466    220.10      265
+#265      40       64    5,671    174.69      212
+```
+
+For those ten successful full gates:
+
+```text
+historical pytest median    188.41 s
+historical pytest range     150.67 - 234.87 s
+historical workflow median  242 s
+historical workflow range   195 - 288 s
+
+R2-B pytest               352.07 s   (+86.86% vs historical median)
+R2-B workflow             406 s      (+67.77% vs historical median)
+```
+
+R2-B therefore recovered most of the R2-A/L-M explosion but is **not yet back
+to the original sub-300-second CI regime**. It has fewer active cases and paths
+than many historical gates, so raw test count is not the explanation.
+
+The regression becomes visible around Architecture 133-I/J and compounds through
+L/M:
+
+```text
+#265  40 checkpoints / 64 paths / 5,671 passed -> 174.69 s
+#269  40 checkpoints / 64 paths / 5,680 passed -> 307.58 s
+#274  41 / 65 / 5,805                         -> 324.17 s
+#276  42 / 66 / 5,963                         -> 300.17 s
+#279  43 / 67 / 6,154                         -> 378.51 s
+#282  43 / 67 / 6,169                         -> 522.90 s
+#286  44 / 68 / 6,393                         -> 696.12 s
+#288  36 / 42 / 4,849                         -> 790.08 s
+#291  36 / 47 / 4,611                         -> 352.07 s
+```
+
+### R2-B JUnit localization
+
+R2-B's newly retained JUnit artifact makes the remaining cost explicit:
+
+```text
+all recorded testcase time                    344.615 s
+
+checkpoint-runner infrastructure              323.247 s / 1,293 cases
+                                               93.8% of testcase time
+
+  Architecture 131 runner                     172.955 s / 698
+  Architecture 133 L-M                         55.094 s / 129
+  Architecture 133 A-G                         44.751 s / 205
+  Architecture 133 H-K                         43.902 s / 153
+  CI contracts                                  6.433 s / 58
+  core runner                                   0.112 s / 50
+
+all non-checkpoint-runner tests combined       ~21.368 s
+```
+
+The top 100 slowest tests account for only 77.04 s, so optimizing only the
+headline L/M cases cannot recover the historical baseline. The dominant next
+target is the broad Architecture-131 source-authority mutation matrix, followed
+by Architecture-133 chained authority tests.
+
+### Certification decision
+
+R2-B deliberately changed certification inventory topology, so a **FULL
+current-product certification remains required before Architecture 132-R2 is
+closed**. It is intentionally deferred until R2-B2 because R2-B2 will modify the
+test source again; certifying 40aa7ef now would create knowingly stale evidence
+and force a duplicate broad certification. This is a selected/deferred
+certification, not a waiver.
+
+### R2-B2 frozen checkpoint — recover active authority-test efficiency
+
+R2-B2 is the final source-only performance checkpoint before FULL certification.
+It does not change product behavior, production authority, certification
+ownership, or profile module topology.
+
+1. Preserve all R2-B split files and ownership.
+2. Do not delete logical test dimensions.
+3. Keep production authority functions and predecessor chaining real and
+   fail-closed.
+4. Apply the immediate-predecessor isolation pattern already accepted for
+   Architecture 133 I-M to expensive **Architecture 131 local mutation/unit
+   tests** and, where independently justified by JUnit evidence, Architecture
+   133 A-G local mutation/unit tests.
+5. A local authority mutation test may stub only the already-separately-proven
+   predecessor authority call. It must execute the real local authority layer
+   under test.
+6. For every isolated production chain edge preserve separate tests proving:
+   - the real predecessor is invoked;
+   - predecessor rejection propagates fail-closed;
+   - the accepted full real chain passes.
+7. Registration/workflow/order tests may be isolated only when equivalent
+   dedicated real-chain integration proves the same edge. Do not silently
+   convert all workflow/order coverage to mocked predecessors.
+8. Do not change source/registration pins merely for performance.
+9. Keep R2-A timing and R2-B JUnit evidence. Report per-module testcase time
+   from the terminal JUnit artifact.
+10. Timing remains diagnostic. The historical envelope is a comparison target,
+    not a PASS/FAIL threshold. The desired outcome is to return routine pytest
+    close to the historical 150-235 second range and end-to-end CI below roughly
+    300 seconds without dropping logical coverage.
+11. Do not begin R2-C legacy deletion/provenance work or R2-D parallelization.
+12. After terminal-green R2-B2 exact-source review, run one fresh FULL
+    certification on that final source identity; do not run FULL during
+    implementation.
+
+Real Architecture 133-M remains paused. Q133-2V is consumed/non-retryable.
+Q133-3 and Q133-4 remain unauthorized.
+
 ## 2026-10-07 — Architecture 132-R2-B terminal source CI green; review pending
 
 R2-B is implemented and ordinary-pushed on

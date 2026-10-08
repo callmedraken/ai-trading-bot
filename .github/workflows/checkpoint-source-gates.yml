@@ -106,7 +106,8 @@ jobs:
               arch133-robinhood-retained-root-diagnostic `
               arch133-robinhood-retained-root-acl-recovery `
               arch133-robinhood-post-publication-verifier `
-              arch133-robinhood-post-publication-stage-diagnostic
+              arch133-robinhood-post-publication-stage-diagnostic `
+              arch133-robinhood-publication-state-paper-diagnostic
           exit $LASTEXITCODE
 
       - name: Upload checkpoint evidence

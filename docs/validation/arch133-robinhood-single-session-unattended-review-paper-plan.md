@@ -1,5 +1,132 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-08 — Architecture 133-N implemented; exact-source review pending
+
+Implemented `trading_bot.arch133_publication_diagnostic.operator`, the separate
+`scripts/run_arch133_publication_state_paper_diagnostic.py` launcher, and the
+source-only `arch133-robinhood-publication-state-paper-diagnostic` checkpoint.
+Admitted parent: `74f3c947704e5e6192170556eb365935096224fc`, tree
+`af131e7fbefecef5715c5e09741883a788b938fd`, branch
+`feature/robinhood-unattended-review-paper-133n`, authorized worktree
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133n`.
+
+The nine frozen stages and twelve zero-effect JSON fields are unchanged.
+Prerequisite failure emits fixed `ARCH133N_RUNTIME_BLOCKED` text and exit 3,
+outside the diagnostic JSON schema, without inventing a stage or attributing
+prerequisite rejection to publication. PASS requires final held-object
+reobservation, exactly-once cleanup, runtime/source and Trading-token admission.
+Both SQLite OPEN stages are transport-only: `mode=ro`, `uri=True`, `timeout=0`,
+and only `BEGIN`; semantics use the already-open connections. The independent
+empty-paper fingerprint matches the accepted publication contract in tests.
+The fresh isolated import probe proves a 21-module project closure excluding
+credentials, provider/MCP, scheduler, writers/transitions, publication/recovery,
+wake execution and broker/live execution.
+
+Focused functional verification: **190 passed**; the final test-only lint-binding
+correction was separately rerun (1 passed). Affected runner/CI/profile checks
+initially reported 782 passed and six ordering-text assertion failures; the
+corrected runner cases and relevant authority/order checks then passed
+**26/26**. Focused Ruff check/format and `git diff --check` passed.
+The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent; tests
+used the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe` fallback
+with fresh explicit pytest roots under `F:\AI\temp`.
+
+Discovery before/after: FULL **136 -> 137**, ROBINHOOD **63 -> 64**, LEGACY
+**205 -> 205**, EXHAUSTIVE **341 -> 342**. Required FULL/ROBINHOOD tuples remain
+**122/49**; the certification implementation is unchanged. Active source CI is
+**37 checkpoints**, ending 133-L -> 133-M -> 133-N. All eight retained
+checkpoints remain unchanged. Accepted 133-M/G/L executable and shared
+verifier/read-only sources are unchanged.
+
+This records implementation evidence only. The handoff must identify the exact
+commit/tree and terminal Checkpoint Source Gates run. CI grants neither source
+acceptance nor real-invocation authority. Next owner: ChatGPT for exact-source
+review, certification selection and canonical acceptance closeout, then a
+separate decision on whether one real 133-N invocation may be authorized.
+No real diagnostic, credential/provider/scheduler operation or protected
+qualification was performed. 133-M and Q133-2V remain consumed/non-retryable;
+Q133-3/Q133-4 remain unauthorized.
+
+### 133-N implementation verification detail
+
+The functional module is
+`tests/review_paper/test_publication_state_paper_diagnostic.py`. Its nine-case
+first-rejection test asserts the exact prefix of visited substages for each
+forced rejection, then verifies retained-handle cleanup and closed SQLite
+connections. Separate tests cover read/parse separation, state path/open
+separation, both OPEN/SEMANTICS boundaries, BEGIN failure, every retained/SQLite
+close failure (including earlier stage failure), root/file prerequisite failures,
+closed state schema/metadata and READY/revision/time, paper columns/metadata/
+empty rows/fingerprint, and changed final observations. Failure-output probes
+exercise Python stdout/stderr, logging and native descriptor writes; none of
+the injected exception material escapes. SQLite transport spies assert exact
+URIs/kwargs and that only BEGIN ran before each semantic boundary.
+
+The exact project import closure measured by a fresh `-I -B` process is:
+
+```text
+trading_bot
+trading_bot.arch133_acl
+trading_bot.arch133_acl.read_only
+trading_bot.arch133_acl.retained_reads
+trading_bot.arch133_publication_diagnostic
+trading_bot.arch133_publication_diagnostic.operator
+trading_bot.arch133_verifier
+trading_bot.arch133_verifier.activation
+trading_bot.arch133_verifier.binding
+trading_bot.arch133_verifier.file_policy
+trading_bot.arch133_verifier.state
+trading_bot.arch133_verifier.state_schema
+trading_bot.arch133_verifier.token
+trading_bot.config
+trading_bot.domain
+trading_bot.domain._validation
+trading_bot.domain.enums
+trading_bot.domain.market
+trading_bot.domain.orders
+trading_bot.domain.positions
+trading_bot.domain.proposals
+```
+
+The runner AST-pins that closure plus the isolated launcher. Tests reject every
+missing/changed pinned file, source capability injection and active CI ordering
+mutation. The predecessor authority chain remains in force; it inspects source
+without importing effectful operators. `preflight`, `execute`, and
+`remote_head_env` remain None. ACTIVE_CI_CHECKPOINTS adds only
+`arch133-robinhood-publication-state-paper-diagnostic` immediately after
+`arch133-robinhood-post-publication-stage-diagnostic`. Retained topology is
+exactly:
+
+```text
+arch128-parent-acl-repair
+arch128-r4
+arch128-r5-substrate
+arch128-r5-trading
+arch128-r6
+arch128-r7
+arch128-r8-terminal-halt
+arch130-r8i-d1
+```
+
+Focused commands run from the authorized 133-N worktree (all fake/temp-only):
+
+```powershell
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/review_paper/test_publication_state_paper_diagnostic.py tests/runtime/checkpoint_runner/test_arch133_l_m.py tests/runtime/checkpoint_runner/test_ci.py tests/scripts/certification_runner/test_profiles.py --basetemp=F:/AI/temp/pytest-133n-affected-20261008-02
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/runtime/checkpoint_runner/test_arch133_l_m.py -k 'ci_registration or 133n_source or predecessor_called_once or full_real' --basetemp=F:/AI/temp/pytest-133n-runner-correction-20261008-05
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/review_paper/test_publication_state_paper_diagnostic.py --basetemp=F:/AI/temp/pytest-133n-functional-final-20261008-06
+& F:\AI\ai-trading-bot\.venv\Scripts\python.exe -B -m pytest -q --tb=short tests/review_paper/test_publication_state_paper_diagnostic.py -k projections --basetemp=F:/AI/temp/pytest-133n-projection-final-20261008-07
+```
+
+The affected Python paths for both `ruff check --no-cache` and
+`ruff format --check --no-cache` were the new package, new launcher,
+`scripts/checkpoint_runner.py`, the new functional module,
+`tests/runtime/checkpoint_runner/helpers.py`,
+`tests/runtime/checkpoint_runner/test_arch133_l_m.py`, and
+`tests/scripts/certification_runner/test_profiles.py`. Both phases and
+`git diff --check` passed. No broad local certification or real launcher
+invocation was run. ChatGPT owns certification selection after exact-source
+review; this evidence does not prescribe or authorize a protected invocation.
+
 ## 2026-10-07 — Real 133-M BLOCKED at PUBLICATION_STATE_PAPER; 133-N frozen
 
 The single freshly authorized real Architecture 133-M credential-free diagnostic

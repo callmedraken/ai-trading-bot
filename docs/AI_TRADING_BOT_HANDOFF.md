@@ -1,5 +1,52 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-08 — Architecture 133-N implemented; exact-source review pending
+
+Implemented `trading_bot.arch133_publication_diagnostic.operator`, the separate
+`scripts/run_arch133_publication_state_paper_diagnostic.py` launcher, and the
+source-only `arch133-robinhood-publication-state-paper-diagnostic` checkpoint.
+Admitted parent: `74f3c947704e5e6192170556eb365935096224fc`, tree
+`af131e7fbefecef5715c5e09741883a788b938fd`, branch
+`feature/robinhood-unattended-review-paper-133n`, authorized worktree
+`F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133n`.
+
+The nine frozen stages and twelve zero-effect JSON fields are unchanged.
+Prerequisite failure emits fixed `ARCH133N_RUNTIME_BLOCKED` text and exit 3,
+outside the diagnostic JSON schema, without inventing a stage or attributing
+prerequisite rejection to publication. PASS requires final held-object
+reobservation, exactly-once cleanup, runtime/source and Trading-token admission.
+Both SQLite OPEN stages are transport-only: `mode=ro`, `uri=True`, `timeout=0`,
+and only `BEGIN`; semantics use the already-open connections. The independent
+empty-paper fingerprint matches the accepted publication contract in tests.
+The fresh isolated import probe proves a 21-module project closure excluding
+credentials, provider/MCP, scheduler, writers/transitions, publication/recovery,
+wake execution and broker/live execution.
+
+Focused functional verification: **190 passed**; the final test-only lint-binding
+correction was separately rerun (1 passed). Affected runner/CI/profile checks
+initially reported 782 passed and six ordering-text assertion failures; the
+corrected runner cases and relevant authority/order checks then passed
+**26/26**. Focused Ruff check/format and `git diff --check` passed.
+The requested `F:\AI\ai-trading-bot.venv\Scripts\python.exe` is absent; tests
+used the existing `F:\AI\ai-trading-bot\.venv\Scripts\python.exe` fallback
+with fresh explicit pytest roots under `F:\AI\temp`.
+
+Discovery before/after: FULL **136 -> 137**, ROBINHOOD **63 -> 64**, LEGACY
+**205 -> 205**, EXHAUSTIVE **341 -> 342**. Required FULL/ROBINHOOD tuples remain
+**122/49**; the certification implementation is unchanged. Active source CI is
+**37 checkpoints**, ending 133-L -> 133-M -> 133-N. All eight retained
+checkpoints remain unchanged. Accepted 133-M/G/L executable and shared
+verifier/read-only sources are unchanged.
+
+This records implementation evidence only. The handoff must identify the exact
+commit/tree and terminal Checkpoint Source Gates run. CI grants neither source
+acceptance nor real-invocation authority. Next owner: ChatGPT for exact-source
+review, certification selection and canonical acceptance closeout, then a
+separate decision on whether one real 133-N invocation may be authorized.
+No real diagnostic, credential/provider/scheduler operation or protected
+qualification was performed. 133-M and Q133-2V remain consumed/non-retryable;
+Q133-3/Q133-4 remain unauthorized.
+
 ## 2026-10-07 — Real 133-M BLOCKED at PUBLICATION_STATE_PAPER; 133-N frozen
 
 The single freshly authorized real Architecture 133-M credential-free diagnostic

@@ -169,6 +169,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-retained-root-acl-recovery",
     "arch133-robinhood-post-publication-verifier",
     "arch133-robinhood-post-publication-stage-diagnostic",
+    "arch133-robinhood-publication-state-paper-diagnostic",
 )
 
 
@@ -1127,6 +1128,138 @@ ARCH133_DIAGNOSTIC_REGISTRATION_PIN: Final = (
 )
 
 
+ARCH133_PUBLICATION_DIAGNOSTIC_MODULES: Final = tuple(
+    module
+    for module in ARCH133_DIAGNOSTIC_MODULES
+    if module
+    not in {
+        "trading_bot.arch133_verifier.scheduler",
+        "trading_bot.arch133_verifier.sessions",
+        "trading_bot.arch133_diagnostic",
+        "trading_bot.arch133_diagnostic.operator",
+    }
+) + (
+    "trading_bot.arch133_publication_diagnostic",
+    "trading_bot.arch133_publication_diagnostic.operator",
+)
+ARCH133_PUBLICATION_DIAGNOSTIC_PINS: Final = {
+    path: digest
+    for path, digest in ARCH133_DIAGNOSTIC_PINS.items()
+    if path
+    not in {
+        "src/trading_bot/arch133_verifier/scheduler.py",
+        "src/trading_bot/arch133_verifier/sessions.py",
+        "src/trading_bot/arch133_diagnostic/__init__.py",
+        "src/trading_bot/arch133_diagnostic/operator.py",
+        "scripts/run_arch133_post_publication_stage_diagnostic.py",
+    }
+} | {
+    "src/trading_bot/arch133_publication_diagnostic/__init__.py": (
+        "be2ef19da93cb7ea14b040db8fb7c97572ee7218f75699350f420570d0d4b692"
+    ),
+    "src/trading_bot/arch133_publication_diagnostic/operator.py": (
+        "5eb8825eb4dc4aeb4d691efea5bb0fc7e50af4efbdac07e505c3c33d99331fb6"
+    ),
+    "scripts/run_arch133_publication_state_paper_diagnostic.py": (
+        "8611b042fea0b8c925746593a30c2799652597c9be9b9ff9736b22ba029971e6"
+    ),
+}
+ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES: Final = tuple(
+    ARCH133_PUBLICATION_DIAGNOSTIC_PINS
+)
+ARCH133_PUBLICATION_DIAGNOSTIC_REGISTRATION_PIN: Final = (
+    "03f1c492c51dd6ca6e74f12bd6fb0fdf6f43464b8d815304b1aee98dd3e83c98"
+)
+
+
+def _arch133_publication_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the exact read-only import closure; never import/invoke the operator."""
+    failures = list(_arch133_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_PUBLICATION_DIAGNOSTIC_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-N verifier boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-publication-state-paper-diagnostic"
+        registrations = [
+            n
+            for n in ast.walk(runner_tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_PUBLICATION_DIAGNOSTIC_REGISTRATION_PIN
+        ):
+            failures.append("133-N source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133n"
+            or spec.authority_check
+            is not _arch133_publication_diagnostic_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-N source-only capability drift")
+        predecessor = "arch133-robinhood-post-publication-verifier"
+        prior = "arch133-robinhood-post-publication-stage-diagnostic"
+        if (
+            ACTIVE_CI_CHECKPOINTS[-3:] != (predecessor, prior, name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-N checkpoint ordering drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-N verifier boundary unavailable")
+    return tuple(failures)
+
+
 def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Pin the exact read-only import closure; never import/invoke the operator."""
     failures = list(_arch133_verifier_authority_check(repo_root))
@@ -1195,7 +1328,12 @@ def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             failures.append("133-M source-only capability drift")
         if (
-            ACTIVE_CI_CHECKPOINTS[-2:]
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 1
+            ]
             != ("arch133-robinhood-post-publication-verifier", name)
             or ACTIVE_CI_CHECKPOINTS.count(name) != 1
         ):
@@ -6365,6 +6503,35 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_diagnostic_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133m",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-publication-state-paper-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-publication-state-paper-diagnostic",
+            description=(
+                "Architecture 133-N source-only publication/state/paper diagnostic"
+            ),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_publication_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133n",
             preflight=None,
             execute=None,
             remote_head_env=None,

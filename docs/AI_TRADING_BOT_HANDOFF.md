@@ -1,5 +1,114 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-08 — Architecture 132-R2-B3 SOURCE ACCEPTED; hygiene continues before R2-D
+
+Architecture 132-R2-B3 is **SOURCE ACCEPTED** as a test-only routine source-gate
+hygiene correction.
+
+Accepted source:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2b3
+PARENT  d811bfefcf7b6dbb7f1e72d6c847aef1d3c573eb
+HEAD    06ee31e020d6d46d327e9fb3b6dbda1b97947809
+TREE    c110f86a25cb88cd880e50ad40ca28cf72887dc0
+CI      #325 / 37863303291 SUCCESS
+```
+
+The exact implementation diff changes only:
+
+```text
+tests/review_paper/test_arch133_scheduler_installation.py
+tests/runtime/checkpoint_runner/helpers.py
+tests/runtime/checkpoint_runner/test_arch133_h_k.py
+tests/runtime/checkpoint_runner/test_arch133_l_m.py
+```
+
+No production `src/`, scripts, authority implementation, source/registration
+pin, protected callback, `ACTIVE_CI_CHECKPOINTS`, retained/active
+classification, source-gate workflow, certification ownership, external-effect
+policy or certification profile topology changed.
+
+Exact review confirms the optimization preserves the security/authority test
+contract:
+
+- local pin/capability mutation matrices isolate only independently proven
+  immediate predecessors;
+- runner/workflow/order mutations retain H's real whole-batch validator plus
+  each local authority's own checks;
+- dedicated copied-source baselines prove local and workflow fixtures PASS;
+- predecessor invocation/rejection propagation remains explicit through O/P;
+- complete H->P real-chain tests prove accepted PASS plus predecessor-pin,
+  runner-registration and workflow rejection;
+- P pin coverage expands from the original eight explicit paths to all thirty
+  local scheduler-installation pins.
+
+Independent JUnit comparison against accepted 133-R source gate #322 proves all
+**5,350** prior testcase identities remain, with zero missing/renamed identities
+and exactly **69** additional proof cases.
+
+Terminal #325 evidence:
+
+```text
+CHECKPOINTS       41
+TEST_PATHS        52
+RUFF_PATHS        155
+pytest cases      5,419
+passed            5,418
+skipped           1
+failed/errors     0
+pytest elapsed    322.6453311 s
+workflow elapsed  387 s
+AUTHORITY         41/41 PASS
+IDENTITY_STABLE   True
+OVERALL           PASS
+```
+
+Compared with #322, pytest elapsed fell from 492.8505088 s to 322.6453311 s, a
+34.53% reduction. The affected focused modules reduced their summed JUnit
+testcase time from 303.844 s to 131.578 s while adding proof coverage.
+
+### Certification-tier decision
+
+No ROBINHOOD, FULL, LEGACY or EXHAUSTIVE certification is selected for B3.
+This checkpoint changes test setup/coverage structure only; no supported
+production behavior or certification topology changed. The registered source
+gate exercised every changed module, all active checkpoint requirements and all
+41 authority checks. A broad product certification would not add evidence about
+a changed production surface.
+
+B3 is accepted, but the CI-hygiene interlude is **not closed**. The 387-second
+workflow remains materially above the accepted R2-B2 approximately 250-second
+operating envelope.
+
+The largest remaining cost is the unchanged
+`tests/runtime/checkpoint_runner/test_arch131.py`: 724 identities consumed
+112.651 s in #325 versus 71.088 s in R2-B2 #294. The unchanged
+`test_arch133_a_g.py` also rose from 18.983 s to 28.767 s. This demonstrates
+that old runner-contract tests still contain a source-topology growth
+multiplier even when their testcase identities do not grow.
+
+### Immediate next checkpoint
+
+Continue test hygiene with **Architecture 132-R2-B4** before R2-D
+parallelization. B4 is a bounded test/helper refactor targeting repeated
+runner-source parsing/copying/accepted-baseline work in the unchanged
+Architecture-131 and early-133 runner-contract suites. Preserve every logical
+authority invariant and prior testcase identity wherever practical, using the
+same accepted B2/B3 pattern: one explicit accepted baseline, isolated local
+mutation checks, exact-once predecessor/rejection proofs, and explicit complete
+real-chain integration proofs.
+
+Timing remains diagnostic only. If B4 restores serial routine CI near the
+accepted operating envelope, R2-D remains deferred. If redundant work is
+exhausted and serial CI remains materially expensive, proceed to the already
+defined R2-D deterministic parallel active-source-gate lanes.
+
+Architecture 133 protected work remains paused during this hygiene checkpoint.
+The consumed 133-Q plan MUST NOT be rerun; 133-Q `execute-once`, Q133-3,
+Q133-4, provider/OAuth access, wake execution and production/live broker effects
+remain unauthorized / NO-GO.
+
 ## 2026-10-08 — Real 133-R diagnostic BLOCKED at PREDECESSOR_RUNTIME; zero effects; operator topology corrected
 
 One real Architecture 133-R read-only reprovision admission diagnostic was

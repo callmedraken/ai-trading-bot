@@ -8,13 +8,14 @@ import pytest
 from scripts import checkpoint_runner as runner
 
 from .helpers import (
+    _H133_NAME,
     _K133_NAME,
     _L133_NAME,
     _M133_NAME,
     _133l_copy,
     _133m_copy,
     _copy_chain_authority,
-    _copy_local_authority,
+    _copy_mutation_authority,
 )
 
 
@@ -82,7 +83,7 @@ def test_133l_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133l_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133l_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133l_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -172,7 +173,7 @@ def test_133m_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133m_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133m_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133m_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -206,6 +207,10 @@ def test_133m_ci_registration_drift_fails_closed(
         (
             "_arch133_publication_diagnostic_authority_check",
             "_arch133_diagnostic_authority_check",
+        ),
+        (
+            "_arch133_publication_corrected_authority_check",
+            "_arch133_publication_diagnostic_authority_check",
         ),
     ],
 )
@@ -255,20 +260,14 @@ def test_full_real_authority_chain_passes_and_visits_every_predecessor(monkeypat
 _N133_NAME = "arch133-robinhood-publication-state-paper-diagnostic"
 
 
-def _133n_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_diagnostic_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(
-            tmp_path, runner.ARCH133_PUBLICATION_DIAGNOSTIC_PINS
-        )
-    else:
-        root = _copy_chain_authority(
-            tmp_path, runner.ARCH133_PUBLICATION_DIAGNOSTIC_PINS
-        )
-    assert runner._arch133_publication_diagnostic_authority_check(root) == ()
-    return root
+def _133n_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_diagnostic_authority_check",
+        runner.ARCH133_PUBLICATION_DIAGNOSTIC_PINS,
+        workflow=workflow,
+    )
 
 
 def test_133n_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
@@ -335,7 +334,7 @@ def test_133n_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133n_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133n_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133n_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -364,20 +363,14 @@ def test_133n_ci_registration_drift_fails_closed(
 _O133_NAME = "arch133-robinhood-publication-state-paper-corrected"
 
 
-def _133o_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_publication_diagnostic_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(
-            tmp_path, runner.ARCH133_PUBLICATION_CORRECTED_PINS
-        )
-    else:
-        root = _copy_chain_authority(
-            tmp_path, runner.ARCH133_PUBLICATION_CORRECTED_PINS
-        )
-    assert runner._arch133_publication_corrected_authority_check(root) == ()
-    return root
+def _133o_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_publication_diagnostic_authority_check",
+        runner.ARCH133_PUBLICATION_CORRECTED_PINS,
+        workflow=workflow,
+    )
 
 
 def test_133o_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
@@ -444,7 +437,7 @@ def test_133o_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133o_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133o_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133o_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -468,3 +461,79 @@ def test_133o_ci_registration_drift_fails_closed(
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_publication_corrected_authority_check(root)
+
+
+@pytest.mark.parametrize("workflow", [False, True], ids=["local", "workflow"])
+@pytest.mark.parametrize(
+    "copy,authority",
+    [
+        (_133l_copy, runner._arch133_verifier_authority_check),
+        (_133m_copy, runner._arch133_diagnostic_authority_check),
+        (_133n_copy, runner._arch133_publication_diagnostic_authority_check),
+        (_133o_copy, runner._arch133_publication_corrected_authority_check),
+    ],
+)
+def test_copied_local_authority_baseline_passes(
+    tmp_path, monkeypatch, copy, authority, workflow
+):
+    assert authority(copy(tmp_path, monkeypatch, workflow=workflow)) == ()
+
+
+@pytest.mark.parametrize(
+    "mutation", ["accepted", "predecessor_pin", "runner", "workflow"]
+)
+def test_complete_133p_real_chain_pass_and_rejection(tmp_path, monkeypatch, mutation):
+    root = _copy_chain_authority(tmp_path, runner.ARCH133_SCHEDULER_PINS)
+    expected = None
+    if mutation == "predecessor_pin":
+        # This source belongs to H and is outside P's local pin closure.
+        relative = "scripts/run_arch133_host_publication.py"
+        assert relative not in runner.ARCH133_SCHEDULER_PINS
+        (root / relative).unlink()
+        expected = "133-H source or structural boundary unavailable"
+    elif mutation in ("runner", "workflow"):
+        path = root / (
+            "scripts/checkpoint_runner.py"
+            if mutation == "runner"
+            else ".github/workflows/checkpoint-source-gates.yml"
+        )
+        line = (
+            f'    "{_H133_NAME}",\n'
+            if mutation == "runner"
+            else f"              {_H133_NAME} `\n"
+        )
+        text = path.read_text(encoding="utf-8")
+        assert text.count(line) == 1
+        path.write_text(text.replace(line, ""), encoding="utf-8")
+        expected = (
+            "133-H batch registration drift"
+            if mutation == "runner"
+            else "133-H workflow invocation drift"
+        )
+    names = (
+        "_arch133_publication_corrected_authority_check",
+        "_arch133_publication_diagnostic_authority_check",
+        "_arch133_diagnostic_authority_check",
+        "_arch133_verifier_authority_check",
+        "_arch133_recovery_authority_check",
+        "_arch133_retained_root_authority_check",
+        "_arch133_scratch_root_acl_authority_check",
+        "_arch133_host_publication_authority_check",
+    )
+    seen = []
+    for name in names:
+        original = getattr(runner, name)
+
+        def traced(repo, original=original, name=name):
+            seen.append((name, repo))
+            return original(repo)
+
+        monkeypatch.setattr(runner, name, traced)
+    registry = runner._checkpoint_specs()
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: registry)
+    failures = runner._arch133_scheduler_installation_authority_check(root)
+    assert seen == [(name, root) for name in names]
+    if expected is None:
+        assert failures == ()
+    else:
+        assert expected in failures

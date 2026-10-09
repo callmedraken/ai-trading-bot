@@ -17,6 +17,7 @@ from uuid import UUID
 
 import pytest
 
+from scripts import checkpoint_runner as runner
 from trading_bot.arch133_acl import read_only, retained_reads
 from trading_bot.arch133_scheduler_installation import admission as operator
 from trading_bot.arch133_scheduler_installation import operator as scheduler
@@ -1072,43 +1073,54 @@ def test_133p_source_checkpoint_has_no_protected_callbacks():
 
 
 @pytest.fixture
-def authority_copy(tmp_path):
-    from scripts import checkpoint_runner as runner
-
-    # Copy only the source authority closure and its registration workflow.
-    paths = {
+def authority_copy(tmp_path, monkeypatch):
+    # P's local pin/capability checks remain real. O and the complete
+    # predecessor chain have dedicated PASS and rejection proofs.
+    monkeypatch.setattr(
+        runner, "_arch133_publication_corrected_authority_check", lambda _: ()
+    )
+    for relative in (
+        *runner.ARCH133_SCHEDULER_PINS,
         "scripts/checkpoint_runner.py",
         ".github/workflows/checkpoint-source-gates.yml",
-    }
-    for constant, pins in vars(runner).items():
-        if (
-            constant.startswith("ARCH133_")
-            and constant.endswith("_PINS")
-            and isinstance(pins, dict)
-        ):
-            paths.update(pins)
-    for relative in paths:
+    ):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(
-            (ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
-    assert runner._arch133_scheduler_installation_authority_check(tmp_path) == ()
+        destination.write_bytes((ROOT / relative).read_bytes())
     return tmp_path
+
+
+@pytest.fixture
+def workflow_authority_copy(authority_copy, monkeypatch):
+    # Runner-file ordering delegates to H's whole-batch check. Keep that real
+    # validation alongside P's local workflow check; full chaining is separate.
+    monkeypatch.setattr(
+        runner,
+        "_arch133_publication_corrected_authority_check",
+        runner._arch133_host_publication_authority_check,
+    )
+    for relative in runner.ARCH133_PUBLICATION_PINS:
+        destination = authority_copy / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((ROOT / relative).read_bytes())
+    return authority_copy
+
+
+_ORIGINAL_133P_PIN_CASES = [
+    "src/trading_bot/arch133_scheduler_installation/operator.py",
+    "src/trading_bot/arch133_scheduler_installation/admission.py",
+    "src/trading_bot/arch133_scheduler_installation/specification.py",
+    "scripts/arch133_scheduler_definition.ps1",
+    "scripts/arch133_scheduler_observe.ps1",
+    "scripts/arch133_scheduler_install.ps1",
+    "scripts/run_arch133_scheduler_installation.py",
+    "src/trading_bot/review_paper/unattended_scheduler.py",
+]
 
 
 @pytest.mark.parametrize(
     "relative",
-    [
-        "src/trading_bot/arch133_scheduler_installation/operator.py",
-        "src/trading_bot/arch133_scheduler_installation/admission.py",
-        "src/trading_bot/arch133_scheduler_installation/specification.py",
-        "scripts/arch133_scheduler_definition.ps1",
-        "scripts/arch133_scheduler_observe.ps1",
-        "scripts/arch133_scheduler_install.ps1",
-        "scripts/run_arch133_scheduler_installation.py",
-        "src/trading_bot/review_paper/unattended_scheduler.py",
-    ],
+    tuple(dict.fromkeys((*_ORIGINAL_133P_PIN_CASES, *runner.ARCH133_SCHEDULER_PINS))),
 )
 @pytest.mark.parametrize("mutation", ["missing", "changed"])
 def test_133p_source_pins_fail_closed(authority_copy, relative, mutation):
@@ -1130,11 +1142,11 @@ def test_133p_source_pins_fail_closed(authority_copy, relative, mutation):
 @pytest.mark.parametrize("target", ["runner", "workflow"])
 @pytest.mark.parametrize("mutation", ["missing", "duplicate", "order"])
 def test_133p_registration_workflow_drift_fails_closed(
-    authority_copy, target, mutation
+    workflow_authority_copy, target, mutation
 ):
     from scripts import checkpoint_runner as runner
 
-    path = authority_copy / (
+    path = workflow_authority_copy / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
         else ".github/workflows/checkpoint-source-gates.yml"
@@ -1152,7 +1164,9 @@ def test_133p_registration_workflow_drift_fails_closed(
     else:
         text = text.replace(line, "" if mutation == "missing" else line * 2)
     path.write_text(text, encoding="utf-8")
-    assert runner._arch133_scheduler_installation_authority_check(authority_copy)
+    assert runner._arch133_scheduler_installation_authority_check(
+        workflow_authority_copy
+    )
 
 
 @pytest.mark.parametrize(
@@ -1211,3 +1225,31 @@ def test_native_exit_acknowledgement_disagreement_blocks(
     with pytest.raises(ValueError):
         scheduler._native("arch133_scheduler_install.ps1", request)
     assert request["password"] is None
+
+
+def test_copied_local_scheduler_authority_baseline_passes(authority_copy):
+    assert runner._arch133_scheduler_installation_authority_check(authority_copy) == ()
+
+
+@pytest.mark.parametrize("failure", [(), ("predecessor rejected",)])
+def test_scheduler_predecessor_called_once_and_rejection_propagates(
+    monkeypatch, failure
+):
+    seen = []
+
+    def previous(root):
+        seen.append(root)
+        return failure
+
+    monkeypatch.setattr(
+        runner, "_arch133_publication_corrected_authority_check", previous
+    )
+    assert runner._arch133_scheduler_installation_authority_check(ROOT) == failure
+    assert seen == [ROOT]
+
+
+def test_copied_workflow_scheduler_authority_baseline_passes(workflow_authority_copy):
+    assert (
+        runner._arch133_scheduler_installation_authority_check(workflow_authority_copy)
+        == ()
+    )

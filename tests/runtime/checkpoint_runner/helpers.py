@@ -626,86 +626,66 @@ def _133g_authority_copy(tmp_path):
 _I133_NAME = "arch133-robinhood-scratch-root-acl-qualification"
 
 
-def _133i_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    # Only the predecessor is isolated. The local authority and all local pins,
-    # registration, workflow/order and runtime capability checks remain real.
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_host_publication_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(tmp_path, runner.ARCH133_SCRATCH_PINS)
-    else:
-        root = _copy_chain_authority(tmp_path, runner.ARCH133_SCRATCH_PINS)
-    assert runner._arch133_scratch_root_acl_authority_check(root) == ()
-    return root
+def _133i_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_host_publication_authority_check",
+        runner.ARCH133_SCRATCH_PINS,
+        workflow=workflow,
+    )
 
 
 _J133_NAME = "arch133-robinhood-retained-root-diagnostic"
 
 
-def _133j_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    # Only the predecessor is isolated. The local authority and all local pins,
-    # registration, workflow/order and runtime capability checks remain real.
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_scratch_root_acl_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(tmp_path, runner.ARCH133_RETAINED_PINS)
-    else:
-        root = _copy_chain_authority(tmp_path, runner.ARCH133_RETAINED_PINS)
-    assert runner._arch133_retained_root_authority_check(root) == ()
-    return root
+def _133j_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_scratch_root_acl_authority_check",
+        runner.ARCH133_RETAINED_PINS,
+        workflow=workflow,
+    )
 
 
 _K133_NAME = "arch133-robinhood-retained-root-acl-recovery"
 
 
-def _133k_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    # Only the predecessor is isolated. The local authority and all local pins,
-    # registration, workflow/order and runtime capability checks remain real.
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_retained_root_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(tmp_path, runner.ARCH133_RECOVERY_PINS)
-    else:
-        root = _copy_chain_authority(tmp_path, runner.ARCH133_RECOVERY_PINS)
-    assert runner._arch133_recovery_authority_check(root) == ()
-    return root
+def _133k_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_retained_root_authority_check",
+        runner.ARCH133_RECOVERY_PINS,
+        workflow=workflow,
+    )
 
 
 _L133_NAME = "arch133-robinhood-post-publication-verifier"
 
 
-def _133l_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    # Only the predecessor is isolated. The local authority and all local pins,
-    # registration, workflow/order and runtime capability checks remain real.
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_recovery_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(tmp_path, runner.ARCH133_VERIFIER_PINS)
-    else:
-        root = _copy_chain_authority(tmp_path, runner.ARCH133_VERIFIER_PINS)
-    assert runner._arch133_verifier_authority_check(root) == ()
-    return root
+def _133l_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_recovery_authority_check",
+        runner.ARCH133_VERIFIER_PINS,
+        workflow=workflow,
+    )
 
 
 _M133_NAME = "arch133-robinhood-post-publication-stage-diagnostic"
 
 
-def _133m_copy(tmp_path, monkeypatch, *, isolate_predecessor=True):
-    # Only the predecessor is isolated. The local authority and all local pins,
-    # registration, workflow/order and runtime capability checks remain real.
-    if isolate_predecessor:
-        monkeypatch.setattr(
-            runner, "_arch133_verifier_authority_check", lambda repo: ()
-        )
-        root = _copy_local_authority(tmp_path, runner.ARCH133_DIAGNOSTIC_PINS)
-    else:
-        root = _copy_chain_authority(tmp_path, runner.ARCH133_DIAGNOSTIC_PINS)
-    assert runner._arch133_diagnostic_authority_check(root) == ()
-    return root
+def _133m_copy(tmp_path, monkeypatch, *, workflow=False):
+    return _copy_mutation_authority(
+        tmp_path,
+        monkeypatch,
+        "_arch133_verifier_authority_check",
+        runner.ARCH133_DIAGNOSTIC_PINS,
+        workflow=workflow,
+    )
 
 
 def _copy_local_authority(tmp_path, pins):
@@ -722,9 +702,8 @@ def _copy_local_authority(tmp_path, pins):
 
 
 def _copy_chain_authority(tmp_path, local_pins):
-    # Workflow/order mutations are predecessor integration cases, so retain the
-    # complete real chain and copy every predecessor closure without recursive
-    # helper assertions. Only local pin/runtime matrices isolate predecessors.
+    # Dedicated integration proofs use the complete real H-P chain. Mutation
+    # matrices use _copy_mutation_authority instead of repeating this chain.
     paths = []
     for pins in (
         runner.ARCH133_PUBLICATION_PINS,
@@ -735,8 +714,26 @@ def _copy_chain_authority(tmp_path, local_pins):
         runner.ARCH133_DIAGNOSTIC_PINS,
         runner.ARCH133_PUBLICATION_DIAGNOSTIC_PINS,
         runner.ARCH133_PUBLICATION_CORRECTED_PINS,
+        runner.ARCH133_SCHEDULER_PINS,
     ):
         paths.extend(pins)
         if pins is local_pins:
             break
     return _copy_local_authority(tmp_path, dict.fromkeys(paths))
+
+
+def _copy_mutation_authority(
+    tmp_path, monkeypatch, predecessor, pins, *, workflow=False
+):
+    # Local pin/capability mutations isolate an independently proven predecessor.
+    # Registration/order matrices retain H's real whole-batch validator, which
+    # owns their delegated checks, without replaying every intervening layer.
+    # Separate edge and full-chain tests prove the production routing unchanged.
+    previous = (
+        runner._arch133_host_publication_authority_check if workflow else lambda _: ()
+    )
+    monkeypatch.setattr(runner, predecessor, previous)
+    paths = (
+        dict.fromkeys((*runner.ARCH133_PUBLICATION_PINS, *pins)) if workflow else pins
+    )
+    return _copy_local_authority(tmp_path, paths)

@@ -177,7 +177,7 @@ def test_133i_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133i_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133i_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133i_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -298,7 +298,7 @@ def test_133j_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133j_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133j_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133j_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -389,7 +389,7 @@ def test_133k_runtime_callback_injection_fails_closed(tmp_path, monkeypatch, cha
 def test_133k_ci_registration_drift_fails_closed(
     tmp_path, monkeypatch, target, mutation
 ):
-    root = _133k_copy(tmp_path, monkeypatch, isolate_predecessor=False)
+    root = _133k_copy(tmp_path, monkeypatch, workflow=True)
     path = root / (
         "scripts/checkpoint_runner.py"
         if target == "runner"
@@ -443,3 +443,22 @@ def test_predecessor_called_once_and_failure_propagates(
     monkeypatch.setattr(runner, predecessor, previous)
     assert getattr(runner, authority)(repo) == failure
     assert seen == [repo]
+
+
+def test_copied_133h_authority_baseline_passes(tmp_path):
+    assert runner._arch133_host_publication_authority_check(_133h_copy(tmp_path)) == ()
+
+
+@pytest.mark.parametrize("workflow", [False, True], ids=["local", "workflow"])
+@pytest.mark.parametrize(
+    "copy,authority",
+    [
+        (_133i_copy, runner._arch133_scratch_root_acl_authority_check),
+        (_133j_copy, runner._arch133_retained_root_authority_check),
+        (_133k_copy, runner._arch133_recovery_authority_check),
+    ],
+)
+def test_copied_local_authority_baseline_passes(
+    tmp_path, monkeypatch, copy, authority, workflow
+):
+    assert authority(copy(tmp_path, monkeypatch, workflow=workflow)) == ()

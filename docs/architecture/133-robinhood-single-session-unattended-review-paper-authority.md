@@ -1,5 +1,123 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Architecture 133-Y SOURCE ACCEPTED
+
+Architecture 133-Y scratch-only Windows rename qualification source is
+**SOURCE ACCEPTED** after exact GitHub review of the final two-commit checkpoint
+and terminal push-triggered source gate.
+
+Exact accepted source identity:
+
+```text
+BRANCH              feature/robinhood-unattended-review-paper-133y
+CONTRACT HEAD       238352239d4dc421ed9d161c5749007d94cdcfa0
+IMPLEMENTATION HEAD 8a18596334493e3608482d9d590c845c33d710ca
+ACCEPTED HEAD       e85f0959e14ab56f25aa9f43c84488f0ba7ed3a3
+ACCEPTED TREE       f2ec2f15ffc0b71dfa01f5b8840f6bd6e74abeaf
+SOURCE-GATE         #364 / 37919563540 SUCCESS
+```
+
+The bounded follow-up
+`e85f0959e14ab56f25aa9f43c84488f0ba7ed3a3` adds explicit rejection of a
+dangling `no-pycache` Windows junction in both the isolated launcher and runtime
+admission, updates the corresponding Y source pins, and adds focused regression
+coverage. It does not widen the Y scratch namespace or any production effect
+authority.
+
+Exact-source review accepted the frozen Y contract:
+
+- Y uses a separate native/operator/launcher surface and does not import U/W
+  native writers, consumed production execute/reconciliation operators, the
+  production publisher, ACL mutation/repair, scheduler mutation,
+  credential/provider/OAuth, wake/paper execution or broker/live surfaces;
+- the native module contains no Architecture-133 production namespace path and
+  restricts mutation to the fixed scratch root
+  `F:\AI\temp\arch133y-rename-qualification`;
+- source/runtime admission binds the clean named Y tracking checkout, exact
+  accepted 133-G host source, Windows, isolated/no-bytecode production Python
+  path/version/hash, elevated Administrator identity and an absent
+  `no-pycache` file/symlink/junction collision;
+- the scratch volume must be local NTFS and fixed ancestors/objects are opened
+  no-follow, identity-pinned and repeatedly re-observed;
+- the scratch root must be absent before creation. The operator creates only
+  the fixed ACTIVE/STAGE synthetic topology and exactly eight fixed synthetic
+  files; no production material is read or copied;
+- the candidate rename primitive uses only
+  `SetFileInformationByHandle(FileRenameInfo)`, with
+  `ReplaceIfExists=FALSE`, `RootDirectory=NULL`, and the fixed fully
+  qualified absolute destination encoded in the rename buffer;
+- ACTIVE/STAGE source handles retain DELETE access and use share mode 7
+  (read/write/delete); held synthetic child handles use share mode 5
+  (read/delete, no write);
+- there is one native rename call site consumed in exactly two fixed roles:
+  scratch ACTIVE -> ARCHIVE, complete verification, then scratch STAGE -> ACTIVE;
+- no MoveFile/MoveFileEx/NtSetInformationFile fallback, alternate destination,
+  replacement or retry surface exists;
+- directory identities, all eight file identities/hashes and held-child
+  observations are verified before/after both renames;
+- failure before scratch mutation is
+  `BLOCKED / QUALIFICATION_REJECTED`; once scratch mutation begins, failure is
+  `INDETERMINATE / PRESERVE_SCRATCH_NO_RETRY`;
+- native error output is limited to a bounded unsigned numeric
+  `native_error_code`;
+- cleanup is authorized only after both renames and complete verification,
+  successful handle close and same-invocation ownership. Cleanup revalidates
+  the fixed tree, uses no recursive deletion and removes only the eight known
+  files/four known directories. Any failure preserves remaining scratch
+  evidence and grants no retry;
+- PASS is only `PASS / RENAME_PRIMITIVE_QUALIFIED`, proving both scratch
+  renames and final scratch-root absence;
+- all fifteen production protected-effect counters remain explicit integer
+  zeroes. Scratch activity is reported only in separate scratch counters.
+
+The registered source-only checkpoint is:
+
+```text
+arch133-robinhood-windows-rename-qualification
+remote_branch   = feature/robinhood-unattended-review-paper-133y
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority chain includes complete accepted 133-X authority and pins the Y
+source/launcher/inventory/registration/order/workflow surface. Final source gate
+#364 independently reported:
+
+```text
+CHECKPOINTS=48
+TEST_PATHS=59
+RUFF_PATHS=189
+PYTEST=0
+RUFF_CHECK=0
+RUFF_FORMAT=0
+GIT_DIFF_CHECK=0
+AUTHORITY[arch133-robinhood-windows-rename-qualification]=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Certification ownership is coherent at FULL 148, Robinhood 75, LEGACY 205 and
+EXHAUSTIVE 353. No additional FULL/ROBINHOOD/LEGACY/EXHAUSTIVE run is selected
+for this bounded scratch-only qualification source checkpoint.
+
+No real Y qualification occurred during implementation/review. No real
+ACTIVE/STAGE/ARCHIVE observation, U/V/W/X rerun, production cleanup/repair,
+scheduler/provider/OAuth access, wake execution, paper execution, broker effect
+or live effect occurred or is authorized by this source acceptance.
+
+### Next protected boundary
+
+The next main-flow operation is one real Architecture 133-Y scratch
+qualification. It is a separately protected one-attempt scratch WRITE operation.
+Source acceptance does not authorize it.
+
+Before requesting fresh authorization, fast-forward the local Y worktree to this
+docs-closeout commit and prove exact branch/HEAD/tree/upstream/clean state. The
+fixed scratch root must remain absent. A real Y PASS is required before any new
+production recovery architecture may be frozen.
+
+
 ## 2026-10-09 — Real 133-X PASS; Architecture 133-Y Windows rename qualification FROZEN
 
 The separately authorized real Architecture 133-X reconciliation diagnostic ran

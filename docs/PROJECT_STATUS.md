@@ -1,5 +1,97 @@
 # Project Status and Roadmap
 
+## 2026-10-08 - Architecture 133-U SOURCE ACCEPTED
+
+Architecture 133-U corrected fresh-activation reprovision source is **SOURCE
+ACCEPTED** after exact GitHub review of the final two-commit checkpoint and the
+terminal push-triggered source gate.
+
+Exact accepted identity:
+
+```text
+BRANCH              feature/robinhood-unattended-review-paper-133u
+START HEAD          e5cb6c6e2ef207697c5f900fe6b1bb37bdad7120
+IMPLEMENTATION HEAD 729e5cbb8344ecdff83db2996e2efad418303839
+ACCEPTED HEAD       bf7a80957da22e23895872edfb24a36e0448b7e8
+ACCEPTED TREE       c1a56afd9fffd3d1363cc722c1c7c7ec58e845a7
+SOURCE-GATE         #344 / 37891163905 SUCCESS
+```
+
+The first push exposed only four stale topology fixtures that still assumed
+133-T was the final active checkpoint. The bounded follow-up
+`bf7a80957da22e23895872edfb24a36e0448b7e8` corrected those fixture slices
+without changing the U operator source.
+
+Exact-source review accepted the frozen U contract:
+
+- U owns a separate launcher/admission/operator identity and U-specific
+  plan/result schemas; the consumed Q plan hash cannot authorize U.
+- Runtime admission binds the named clean U tracking checkout, exact origin,
+  production Python identity and the accepted bound 133-G checkout before any
+  writer import.
+- U independently preserves the accepted Q predecessor root/files/publication/
+  state/paper predicates while changing only the operator source identity.
+- `plan` remains read-only, computes a new canonical plan hash, emits all
+  fifteen zero-effect counters, and imports no native writer capability.
+- `execute-once` requires the exact lowercase reviewed U plan hash, exact
+  interactive TTY phrase, and a complete post-authorization plan recomputation
+  before lazily importing `WindowsEdges`.
+- The accepted 133-T role-aware `namespace.parent_guard()` is reused by both
+  planning and execution. Volume-parent policy remains the corrected bounded
+  `0x1301BF` model while the host parent retains the stricter policy.
+- The first staging mutation is the ambiguity/single-use fence. Failures before
+  it are `BLOCKED / ADMISSION_REJECTED`; every failure after it is
+  `INDETERMINATE / PRESERVE_RECONCILE_NO_RETRY`, with no rollback, cleanup or
+  retry authority.
+- The source-gate authority chain reaches 133-T -> 133-S -> 133-R -> 133-Q, so
+  shared Q material/generation/native/namespace source remains transitively
+  pinned. U itself is source-only with no preflight/execute callback.
+
+Implementation verification reported 63 U-focused cases passing. The follow-up
+topology correction reported 12 focused regressions passing, with Ruff
+check/format and `git diff --check` clean. Source-gate #344 independently
+passed:
+
+```text
+CHECKPOINTS=44
+TEST_PATHS=55
+RUFF_PATHS=170
+PYTEST=0
+RUFF_CHECK=0
+RUFF_FORMAT=0
+GIT_DIFF_CHECK=0
+AUTHORITY[arch133-robinhood-fresh-activation-reprovision-corrected]=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+No additional ROBINHOOD/FULL/LEGACY/EXHAUSTIVE certification is selected for
+this narrow source-only successor. It does not alter supported product-domain
+behavior or certification partition semantics; the new owned test is admitted
+through the existing profile ownership rules. The registered source gate plus
+focused verification and exact GitHub review are the selected source acceptance
+gate.
+
+No real U plan, native reprovision, ACL mutation, publication/archive mutation,
+scheduler operation, provider/OAuth access, unattended wake, paper trade,
+broker effect or live-trading effect occurred or is authorized by this source
+acceptance.
+
+### Next protected boundary
+
+The next main-flow operation is one real U `plan --material-file` run. It is a
+fresh, separately protected, one-attempt **read-only** authorization boundary.
+Before requesting that authorization, safely fast-forward the local U worktree
+to this docs closeout and prove exact branch/HEAD/tree/upstream/clean state plus
+the externally reviewed material identity.
+
+Source acceptance does not authorize the real U plan. A future U plan PASS and
+reviewed `plan_sha256` will still not authorize `execute-once`; that write
+operation requires a later separate fresh authorization. Q133-3 remains later
+and separately protected. Consumed 133-T/133-S/133-R diagnostics and the
+consumed 133-Q plan MUST NOT be rerun.
+
+
 ## 2026-10-08 — Real 133-T PASS; Architecture 133-U corrected reprovision successor FROZEN
 
 One separately authorized real Architecture 133-T read-only parent-policy

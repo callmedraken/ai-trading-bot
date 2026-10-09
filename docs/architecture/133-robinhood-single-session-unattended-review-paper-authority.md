@@ -1,5 +1,147 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Real 133-Z INDETERMINATE after first rename success; Architecture 133-AA reconciliation CONTRACT FROZEN
+
+The single separately authorized **real Architecture 133-Z scratch qualification** ran once from the accepted Z source/closeout state:
+
+```text
+SOURCE BRANCH  feature/robinhood-unattended-review-paper-133z
+SOURCE HEAD    cb7121bc23d80019f01c45e81295976ae6b88253
+SOURCE TREE    fd1400fd25468814e80c2c942a2bff4b6b403bbc
+SCHEMA         arch133z-windows-rename-qualification/v1
+EXIT           3
+```
+
+Operator-reported result:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"PRESERVE_SCRATCH_NO_RETRY","execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133z-windows-rename-qualification/v1","scratch":{"cleanup_attempts":0,"cleanups_completed":0,"first_rename_attempts":1,"first_renames_completed":1,"second_rename_attempts":0,"second_renames_completed":0,"topology_creation_attempts":1,"topology_creations_completed":1},"state_mutations":0,"status":"INDETERMINATE","wake_delegations":0}
+```
+
+This exact counter pattern is materially different from Y:
+
+- scratch topology creation completed once;
+- the first Z native rename was attempted once **and returned success**;
+- post-first-rename qualification did not complete;
+- the second rename was never attempted;
+- cleanup was never attempted;
+- every reported production protected-effect counter remained zero;
+- no bounded `native_error_code` was emitted.
+
+The Z one-shot qualification authority is **CONSUMED**. Never rerun Z. Preserve
+`F:\AI\temp\arch133z-rename-qualification` exactly as left by the operator:
+do not enumerate it, open it, mutate it, delete it, clean it up or reuse it
+except through a separately reviewed reconciliation diagnostic. Continue to
+preserve the consumed Y scratch evidence independently. No production
+ACTIVE/STAGE/ARCHIVE, scheduler, credential/provider/OAuth, wake, paper,
+broker/live or cleanup effect is authorized.
+
+### Exact failure interval and evidence quality
+
+From the accepted source, `first_renames_completed` is incremented only after
+`SetFileInformationByHandle(FileRenameInfo)` returns success. The next
+effect-capable operation would be the second rename, whose attempt counter stayed
+zero. Therefore the failure occurred in the **post-first-rename verification
+interval**, before first verification established authority for the second
+rename.
+
+The accepted operator serializes a numeric diagnostic only for
+`NativeError`. Because this result contains no `native_error_code`, the
+returned evidence does **not** identify which non-native verification check
+failed. Do not infer a specific assertion from the result alone.
+
+A source-review hypothesis is that Z's fake Windows model is too strong for the
+held source-directory handle after rename. The fake model rewrites its stored
+handle path to the destination, while Windows `GetFinalPathNameByHandle`
+semantics are name/handle based and public Microsoft guidance notes that an
+existing handle can report the name by which it was opened. Z's first
+`verify(1)` begins by expecting its pre-rename ACTIVE directory handle to
+resolve as ARCHIVE. This is a plausible source of a non-native fail-closed
+verification rejection, but it is **not proven** by the operator output and must
+not be treated as the durable scratch state.
+
+References:
+https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew
+https://devblogs.microsoft.com/oldnewthing/20160406-00/?p=93271
+
+### Architecture 133-AA — read-only Z scratch reconciliation
+
+**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; REAL DIAGNOSTIC NOT AUTHORIZED.**
+
+133-AA is a new source-bound **read-only diagnostic** over the preserved Z
+scratch tree. It is not a Z retry, does not call the Z qualification operator,
+does not rename or clean anything and grants no future write authority.
+
+```text
+BRANCH      feature/robinhood-unattended-review-paper-133aa
+WORKTREE    F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133aa
+BASE        this Z outcome documentation-closeout commit
+TARGET      F:\AI\temp\arch133z-rename-qualification
+SCHEMA      arch133aa-z-scratch-reconciliation/v1
+CHECKPOINT  arch133-robinhood-z-scratch-reconciliation
+```
+
+Frozen scope and rules:
+
+- Observe **only** the fixed Z scratch root and its fixed ancestors needed to
+  establish local NTFS/no-follow identity. Never observe Y scratch or any
+  Architecture-133 production namespace.
+- No write-capable filesystem handle, DELETE access, rename, create, truncate,
+  delete, cleanup, ACL mutation, scheduler/provider/credential/wake/paper/
+  broker/live surface or recursive traversal is allowed.
+- Bind exact clean AA branch/HEAD/tree/origin, accepted Z source/closeout
+  ancestry, accepted 133-G host identity, exact production Python
+  path/version/SHA-256, Windows/elevated Administrator identity and fixed target
+  path. Reject semantic/path overrides.
+- Enumerate only the expected fixed Z topology with no-follow operations and
+  bounded fixed-name reads. Record directory/file volume+file identities,
+  reparse/type facts, exact synthetic SHA-256 values and exact namespace.
+- Compare file bytes only against Z's frozen synthetic role bytes:
+  predecessor bytes belong under the expected post-first-rename ARCHIVE role and
+  staged bytes belong under STAGE. Do **not** claim pre-rename file-ID continuity
+  because Z's baseline identities were not emitted before failure.
+- A clean expected post-first-rename state is:
+  `active` absent, `archive` present with exactly the four predecessor
+  synthetic files, `stage-parent\generation` present with exactly the four
+  staged synthetic files, and no unexpected names/reparse points.
+- PASS disposition:
+  `FIRST_RENAME_NAMESPACE_RECONCILED`. It proves only that the preserved
+  durable scratch namespace/content matches the expected role state after the
+  first successful rename. It does not prove which Z verification assertion
+  failed and does not qualify a second rename.
+- Any missing/extra/reparse/identity/byte/type/access ambiguity is a fail-closed
+  non-mutating diagnostic result such as
+  `INDETERMINATE / PRESERVED_Z_SCRATCH_STATE_UNRESOLVED`; no repair or cleanup.
+- Every production protected-effect counter and every scratch mutation counter
+  must be explicit zero. The diagnostic itself may expose only bounded
+  fixed-scope observation counts.
+- Register AA as a **source-only** checkpoint immediately after Z with
+  `preflight=None`, `execute=None`, `remote_head_env=None`. Chain complete
+  accepted Z authority and pin the AA source/launcher/inventory/registration/
+  workflow surface.
+- Fake/temp tests must cover exact expected post-first-rename topology, ACTIVE
+  unexpectedly present, ARCHIVE absent, wrong-role bytes, extra names, reparse
+  points, duplicate/aliased identities, volume drift, inaccessible objects,
+  target/path override attempts, production/Y path exclusion, zero write APIs,
+  zero protected effects and source/registration/workflow drift.
+
+Implementation may be handled as a bounded source-only checkpoint. Because it is
+Windows-native evidence reconciliation but contains **no mutation authority**,
+ChatGPT should first review the exact file surface; implementation may remain
+direct if small and mechanical or use Sol High if the read-only native observer
+is nontrivial.
+
+Do not inspect the real Z scratch during implementation or source testing. A real
+133-AA diagnostic remains separately authorized only after exact source review
+and terminal source-gate CI.
+
+### Immediate next action
+
+Implement and source-review the read-only 133-AA reconciliation checkpoint. Do
+not rerun Z/Y, do not clean preserved scratch, and do not design or authorize
+production recovery until AA has independently reconciled the Z scratch state.
+
+
 ## 2026-10-09 — Architecture 133-Z SOURCE ACCEPTED
 
 Architecture 133-Z scratch-only closed-descendant Windows rename qualification source is **SOURCE ACCEPTED** after exact GitHub review of the complete 21-file delta and terminal push-triggered source gate. No source correction was required.

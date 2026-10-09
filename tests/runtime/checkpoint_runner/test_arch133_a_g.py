@@ -848,5 +848,10 @@ def test_133g_registration_batch_and_workflow_fail_closed(tmp_path, target, muta
     ],
 )
 def test_copied_local_authority_baseline_passes(tmp_path, copy, authority):
-    # A-G have no predecessor calls. Keep their exact copy/PASS proof once each.
-    assert authority(copy(tmp_path)) == ()
+    # A-G have no predecessor calls. Prove compact and full runner copies.
+    root = copy(tmp_path)
+    assert authority(root) == ()
+    (root / "scripts/checkpoint_runner.py").write_bytes(
+        Path(runner.__file__).read_bytes()
+    )
+    assert authority(root) == ()

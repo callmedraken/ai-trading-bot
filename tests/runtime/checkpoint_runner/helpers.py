@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from scripts import checkpoint_runner as runner
@@ -127,7 +129,7 @@ def _131i_authority_copy(tmp_path: Path) -> Path:
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -142,7 +144,7 @@ def _131j_authority_copy(tmp_path: Path) -> Path:
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -266,7 +268,7 @@ def _131k_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -281,7 +283,7 @@ def _131l_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -296,7 +298,7 @@ def _131lq_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -311,7 +313,7 @@ def _131m_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -326,7 +328,7 @@ def _131n_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -341,7 +343,7 @@ def _131o_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -356,7 +358,7 @@ def _131p_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -371,7 +373,7 @@ def _131q_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -406,7 +408,7 @@ def _131r_copy(tmp_path, boundary):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -421,7 +423,7 @@ def _131s_authority_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -446,7 +448,7 @@ def _131t_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -468,7 +470,7 @@ def _131u_copy(tmp_path):
         destination = tmp_path / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
+            _authority_fixture_text(repo, relative), encoding="utf-8"
         )
     return tmp_path
 
@@ -489,9 +491,7 @@ def _133a_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -515,9 +515,7 @@ def _133b_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -537,9 +535,7 @@ def _133c_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -559,9 +555,7 @@ def _133d_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -586,7 +580,7 @@ def _133e_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text((repo / relative).read_text(), encoding="utf-8")
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -619,7 +613,7 @@ def _133g_authority_copy(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text((repo / relative).read_text(), encoding="utf-8")
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     return tmp_path
 
 
@@ -737,3 +731,67 @@ def _copy_mutation_authority(
         dict.fromkeys((*runner.ARCH133_PUBLICATION_PINS, *pins)) if workflow else pins
     )
     return _copy_local_authority(tmp_path, paths)
+
+
+@lru_cache(maxsize=1)
+def _runner_contract_source(source: str) -> str:
+    """Keep real AST contract material; this fixture is never imported/executed.
+
+    Authorities still parse each mutated copy normally. Only extraction of the
+    identical accepted source is cached, keyed by its complete text. No parsed
+    authority result or mutated fixture is cached, and runner.ast is untouched.
+    """
+    tree = ast.parse(source)
+    declarations = ("ACTIVE_CI_CHECKPOINTS", "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH")
+    for name in declarations:
+        matches = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == name
+        ]
+        if len(matches) != 1:
+            raise ValueError(f"runner fixture requires one {name} declaration")
+    if (
+        sum(
+            isinstance(node, ast.FunctionDef) and node.name == "_checkpoint_specs"
+            for node in tree.body
+        )
+        != 1
+    ):
+        raise ValueError("runner fixture requires one _checkpoint_specs definition")
+    selected = []
+    for node in tree.body:
+        owns_declaration = (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id in declarations
+        )
+        owns_registration = any(
+            isinstance(child, ast.Call)
+            and isinstance(child.func, ast.Name)
+            and child.func.id == "CheckpointSpec"
+            for child in ast.walk(node)
+        )
+        if owns_declaration or owns_registration:
+            selected.append(node)
+    # Copy original source segments, not ast.unparse: preserve registration
+    # hashes, literal spellings and existing mutation anchors/parameter IDs.
+    lines = source.splitlines(keepends=True)
+    return (
+        "\n\n".join(
+            "".join(lines[node.lineno - 1 : node.end_lineno]).rstrip()
+            for node in selected
+        )
+        + "\n"
+    )
+
+
+def _authority_fixture_text(repo: Path, relative: str | Path) -> str:
+    source = (repo / relative).read_text(encoding="utf-8")
+    return (
+        _runner_contract_source(source)
+        if Path(relative).as_posix() == "scripts/checkpoint_runner.py"
+        else source
+    )

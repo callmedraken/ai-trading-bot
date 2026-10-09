@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 from dataclasses import replace
 from pathlib import Path
 
@@ -30,6 +31,8 @@ from .helpers import (
     _131s_authority_copy,
     _131t_copy,
     _131u_copy,
+    _authority_fixture_text,
+    _runner_contract_source,
 )
 
 
@@ -53,12 +56,14 @@ def test_131f_authority_detects_boundary_drift(tmp_path, before, after):
     relative = Path("src/trading_bot/robinhood_mcp/windows_oauth.py")
     destination = tmp_path / relative
     destination.parent.mkdir(parents=True)
-    source = (repo / relative).read_text(encoding="utf-8")
+    source = _authority_fixture_text(repo, relative)
     assert before in source
     destination.write_text(source.replace(before, after), encoding="utf-8")
     script = tmp_path / "scripts/checkpoint_runner.py"
     script.parent.mkdir()
-    script.write_bytes((repo / "scripts/checkpoint_runner.py").read_bytes())
+    script.write_text(
+        _authority_fixture_text(repo, "scripts/checkpoint_runner.py"), encoding="utf-8"
+    )
     assert runner._arch131_windows_oauth_authority_check(tmp_path)
 
 
@@ -81,12 +86,14 @@ def test_131f_authority_rejects_new_effects(tmp_path, addition):
     destination = tmp_path / relative
     destination.parent.mkdir(parents=True)
     destination.write_text(
-        (repo / relative).read_text(encoding="utf-8") + "\n" + addition,
+        _authority_fixture_text(repo, relative) + "\n" + addition,
         encoding="utf-8",
     )
     script = tmp_path / "scripts/checkpoint_runner.py"
     script.parent.mkdir()
-    script.write_bytes((repo / "scripts/checkpoint_runner.py").read_bytes())
+    script.write_text(
+        _authority_fixture_text(repo, "scripts/checkpoint_runner.py"), encoding="utf-8"
+    )
     assert runner._arch131_windows_oauth_authority_check(tmp_path)
 
 
@@ -99,7 +106,7 @@ def test_131f_authority_rejects_host_registration(tmp_path, capability):
     destination.write_bytes((repo / relative).read_bytes())
     script = tmp_path / "scripts/checkpoint_runner.py"
     script.parent.mkdir()
-    source = (repo / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    source = _authority_fixture_text(repo, "scripts/checkpoint_runner.py")
     script.write_text(
         source.replace(f"{capability}=None,", f"{capability}=dangerous_host,"),
         encoding="utf-8",
@@ -232,7 +239,7 @@ def test_131g_authority_rejects_boundary_drift(
     for path in paths:
         destination = tmp_path / path
         destination.parent.mkdir(parents=True, exist_ok=True)
-        source = (repo / path).read_text(encoding="utf-8")
+        source = _authority_fixture_text(repo, path)
         if path == relative:
             assert before in source
             source = source.replace(before, after)
@@ -388,7 +395,7 @@ def test_131h_authority_rejects_boundary_drift(
         "scripts/checkpoint_runner.py",
         ".github/workflows/checkpoint-source-gates.yml",
     ):
-        source = (repo / path).read_text(encoding="utf-8")
+        source = _authority_fixture_text(repo, path)
         destination = tmp_path / path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_text(source, encoding="utf-8")
@@ -2939,9 +2946,7 @@ def test_131v_source_only_registration_and_boundaries(tmp_path):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(
-            (repo / relative).read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
     assert authority(tmp_path) == ()
     source = tmp_path / "src/trading_bot/robinhood_supervised_qualification.py"
     text_value = source.read_text(encoding="utf-8")
@@ -2986,13 +2991,23 @@ def test_131v_source_only_registration_and_boundaries(tmp_path):
     ],
 )
 def test_copied_local_authority_baseline_passes(tmp_path, copy, authority):
-    # Prove each exact copied closure once instead of before every mutation.
-    assert authority(copy(tmp_path)) == ()
+    # Prove compact and complete runner material once per accepted closure.
+    root = copy(tmp_path)
+    assert authority(root) == ()
+    (root / "scripts/checkpoint_runner.py").write_bytes(
+        Path(runner.__file__).read_bytes()
+    )
+    assert authority(root) == ()
 
 
 @pytest.mark.parametrize("boundary", _R_PREPARE_BOUNDARIES)
 def test_copied_prepare_authority_baseline_passes(tmp_path, boundary):
-    assert boundary[4](_131r_copy(tmp_path, boundary)) == ()
+    root = _131r_copy(tmp_path, boundary)
+    assert boundary[4](root) == ()
+    (root / "scripts/checkpoint_runner.py").write_bytes(
+        Path(runner.__file__).read_bytes()
+    )
+    assert boundary[4](root) == ()
 
 
 @pytest.mark.parametrize(
@@ -3059,3 +3074,157 @@ def test_full_real_authority_chain_passes_and_visits_every_predecessor(monkeypat
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: registry)
     assert runner._arch131_paper_operator_authority_check(repo) == ()
     assert seen == [(name, repo) for name in names]
+
+
+def test_runner_contract_fixture_preserves_registration_and_authority_material():
+    source = Path(runner.__file__).read_text(encoding="utf-8")
+    full, compact = ast.parse(source), ast.parse(_runner_contract_source(source))
+
+    def registrations(tree):
+        return [
+            ast.dump(node, include_attributes=False)
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+        ]
+
+    # Includes the batch constructor outside _checkpoint_specs, all retained and
+    # active registrations, and any future constructor wherever it is declared.
+    assert registrations(full) == registrations(compact)
+    for name in ("ACTIVE_CI_CHECKPOINTS", "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH"):
+
+        def declaration(tree, name=name):
+            return [
+                ast.dump(node, include_attributes=False)
+                for node in tree.body
+                if isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id == name
+            ]
+
+        assert declaration(full) == declaration(compact)
+
+    def registry(tree):
+        return next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef) and node.name == "_checkpoint_specs"
+        )
+
+    assert ast.dump(registry(full), include_attributes=False) == ast.dump(
+        registry(compact), include_attributes=False
+    )
+
+
+def test_later_authority_implementation_growth_does_not_grow_runner_fixture():
+    source = Path(runner.__file__).read_text(encoding="utf-8")
+    addition = (
+        "\n\ndef later_authority_implementation():\n    return (\n"
+        + "        'later source',\n" * 1000
+        + "    )\n"
+    )
+    assert _runner_contract_source(source + addition) == _runner_contract_source(source)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "ACTIVE_CI_CHECKPOINTS",
+        "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH",
+        "_checkpoint_specs",
+    ],
+)
+@pytest.mark.parametrize("mutation", ["missing", "duplicate"])
+def test_runner_contract_fixture_rejects_missing_or_duplicate_contract(name, mutation):
+    source = _runner_contract_source(Path(runner.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(source)
+    node = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == name
+        or isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == name
+    )
+    material = ast.get_source_segment(source, node)
+    assert source.count(material) == 1
+    changed = source.replace(
+        material, "" if mutation == "missing" else material + "\n\n" + material
+    )
+    with pytest.raises(ValueError, match="runner fixture requires one"):
+        _runner_contract_source(changed)
+
+
+@pytest.mark.parametrize(
+    "mutation", ["accepted", "predecessor_pin", "registration", "workflow"]
+)
+def test_complete_real_chain_with_full_runner_material(tmp_path, monkeypatch, mutation):
+    repo = Path(runner.__file__).resolve().parents[1]
+    for relative in (
+        "src/trading_bot/robinhood_paper_operator.py",
+        "src/trading_bot/robinhood_mcp/sdk_transport.py",
+        "src/trading_bot/robinhood_mcp/windows_oauth.py",
+        "src/trading_bot/robinhood_mcp/adapter.py",
+        "src/trading_bot/robinhood_mcp/account_resolution.py",
+        "src/trading_bot/robinhood_mcp/__init__.py",
+        "src/trading_bot/robinhood_paper_cycle.py",
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((repo / relative).read_bytes())
+    if mutation == "predecessor_pin":
+        path = tmp_path / "src/trading_bot/robinhood_mcp/windows_oauth.py"
+        before, after = "CRED_TYPE_GENERIC: Final = 1", "CRED_TYPE_GENERIC: Final = 2"
+    elif mutation == "registration":
+        path = tmp_path / "scripts/checkpoint_runner.py"
+        before, after = "preflight=None,", "preflight=host_effect,"
+    elif mutation == "workflow":
+        path = tmp_path / ".github/workflows/checkpoint-source-gates.yml"
+        before, after = "arch131-robinhood-paper-operator", "missing-checkpoint"
+    if mutation != "accepted":
+        source = path.read_text(encoding="utf-8")
+        assert before in source
+        path.write_text(source.replace(before, after), encoding="utf-8")
+    names = (
+        "_arch131_agentic_account_authority_check",
+        "_arch131_direct_mcp_authority_check",
+        "_arch131_mcp_schema_authority_check",
+        "_arch131_paper_cycle_authority_check",
+        "_arch131_windows_oauth_authority_check",
+    )
+    seen, outcomes, workflow_results = [], {}, []
+    for name in names:
+        original = getattr(runner, name)
+
+        def traced(root, name=name, original=original):
+            seen.append((name, root))
+            result = original(root)
+            outcomes[name] = result
+            return result
+
+        monkeypatch.setattr(runner, name, traced)
+    workflow_check = runner._batch_workflow_is_reviewed
+
+    def traced_workflow(workflow):
+        result = workflow_check(workflow)
+        workflow_results.append(result)
+        return result
+
+    monkeypatch.setattr(runner, "_batch_workflow_is_reviewed", traced_workflow)
+    registry = runner._checkpoint_specs()
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: registry)
+    failures = runner._arch131_paper_operator_authority_check(tmp_path)
+    assert seen == [(name, tmp_path) for name in names]
+    assert workflow_results == [mutation != "workflow"]
+    if mutation == "accepted":
+        assert failures == ()
+    elif mutation == "workflow":
+        assert failures
+    else:
+        propagated = outcomes["_arch131_windows_oauth_authority_check"]
+        assert propagated
+        assert set(propagated) <= set(failures)

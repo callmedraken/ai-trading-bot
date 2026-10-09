@@ -695,11 +695,11 @@ def test_authority_chains_u_and_has_exact_source_only_topology():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == operator.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (
         "arch133-robinhood-fresh-activation-reprovision-corrected",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 48
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 49
 
 
 @pytest.mark.parametrize(

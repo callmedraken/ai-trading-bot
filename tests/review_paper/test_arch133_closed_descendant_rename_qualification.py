@@ -1,4 +1,4 @@
-"""Y source-only qualification tests: fake Win32 edges and external temp files only."""
+"""Z source-only qualification tests: fake Win32 edges and external temp files only."""
 
 from __future__ import annotations
 
@@ -17,11 +17,11 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import checkpoint_runner as runner
-from trading_bot.arch133_windows_rename_qualification import native, operator
+from trading_bot.arch133_closed_descendant_rename_qualification import native, operator
 
 ROOT = Path(__file__).resolve().parents[2]
-NAME = "arch133-robinhood-windows-rename-qualification"
-X_NAME = "arch133-robinhood-reprovision-recovery-reconciliation"
+NAME = "arch133-robinhood-closed-descendant-rename-qualification"
+Y_NAME = "arch133-robinhood-windows-rename-qualification"
 
 
 class Function:
@@ -33,7 +33,7 @@ class Function:
 
 
 class FakeKernel:
-    """Exercise Y native code against disposable synthetic objects."""
+    """Exercise Z native code against disposable synthetic objects."""
 
     def __init__(self, tmp_path):
         self.volume = tmp_path / "volume"
@@ -45,6 +45,10 @@ class FakeKernel:
         self.fail = None
         self.fail_rename = 0
         self.rename_calls = 0
+        self.rename_descendant_counts = []
+        self.close_fail_handle = None
+        self.close_calls = []
+        self.observations = []
         self.filesystem = "NTFS"
         self.drive = 3
         self.reparse = set()
@@ -102,8 +106,13 @@ class FakeKernel:
         return self.next_handle
 
     def CloseHandle(self, handle):
+        self.close_calls.append(handle)
+        self.calls.append(("close", self.windows(self.handles[handle])))
+        if self.rejecting("CloseHandle") or handle == self.close_fail_handle:
+            self.error = 5
+            return 0
         self.handles.pop(handle)
-        return 0 if self.rejecting("CloseHandle") else 1
+        return 1
 
     def GetFinalPathNameByHandleW(self, handle, buffer, size, flags):
         if self.rejecting("GetFinalPathNameByHandleW"):
@@ -132,6 +141,7 @@ class FakeKernel:
     def ReadFile(self, handle, buffer, bound, count, overlapped):
         if self.rejecting("ReadFile"):
             return 0
+        self.observations.append(self.windows(self.handles[handle]))
         raw = self.handles[handle].read_bytes()
         ctypes.memmove(buffer, raw, len(raw))
         ctypes.cast(count, ctypes.POINTER(ctypes.c_uint32)).contents.value = len(raw)
@@ -181,6 +191,11 @@ class FakeKernel:
             self.error = 87
             return 0
         source, target = self.handles[handle], self.path(destination)
+        descendants = [p for p in self.handles.values() if source in p.parents]
+        self.rename_descendant_counts.append(len(descendants))
+        if descendants:
+            self.error = 5  # NTFS directory rename with open descendants.
+            return 0
         assert not target.exists()
         source.rename(target)
         for number, path in tuple(self.handles.items()):
@@ -233,11 +248,11 @@ def assert_result(outcome, status):
 
 
 def test_fixed_path_source_identity_and_synthetic_only_bytes():
-    assert native.SCRATCH_ROOT == r"F:\AI\temp\arch133y-rename-qualification"
+    assert native.SCRATCH_ROOT == r"F:\AI\temp\arch133z-rename-qualification"
     assert operator.SOURCE_ROOT == Path(
-        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133y"
+        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133z"
     )
-    assert operator.SOURCE_BRANCH == "feature/robinhood-unattended-review-paper-133y"
+    assert operator.SOURCE_BRANCH == "feature/robinhood-unattended-review-paper-133z"
     assert operator.PRODUCTION_PYTHON == Path(r"F:\AITradingBot\runtime\python.exe")
     assert operator.PRODUCTION_PYTHON_VERSION == "3.14.3"
     assert operator.PRODUCTION_PYTHON_SHA256 == (
@@ -249,7 +264,7 @@ def test_fixed_path_source_identity_and_synthetic_only_bytes():
     for role, files in native.SYNTHETIC_BYTES.items():
         assert tuple(files) == native.FINAL_NAMES
         for name, raw in files.items():
-            assert raw == f"ARCH133Y SYNTHETIC ONLY v1 {role} {name}\n".encode("ascii")
+            assert raw == f"ARCH133Z SYNTHETIC ONLY v1 {role} {name}\n".encode("ascii")
 
 
 @pytest.mark.parametrize(
@@ -389,7 +404,8 @@ def test_post_mutation_failure_preserves_scratch_no_retry(fake, monkeypatch, bou
     else:
         fake.fail = boundary
     result = assert_result(operator.run(), "INDETERMINATE")
-    assert not fake.handles
+    assert bool(fake.handles) == (boundary == "CloseHandle")
+    assert len(fake.close_calls) == len(set(fake.close_calls))
     assert result["scratch"]["cleanups_completed"] == 0
     assert result["scratch"]["cleanup_attempts"] == (1 if boundary == "cleanup" else 0)
     assert fake.rename_calls <= 2
@@ -559,7 +575,7 @@ def test_cli_and_launcher_reject_every_override_before_observation(
             sys.executable,
             "-I",
             "-B",
-            str(ROOT / "scripts/run_arch133_windows_rename_qualification.py"),
+            str(ROOT / "scripts/run_arch133_closed_descendant_rename_qualification.py"),
             *args,
         ],
         cwd=tmp_path,
@@ -580,14 +596,14 @@ class Terminal(io.StringIO):
 )
 def test_tty_phrase_exactly_binds_current_source_once(monkeypatch, case):
     head = "a" * 40
-    phrase = "AUTHORIZE ARCH133Y " + head
+    phrase = "AUTHORIZE ARCH133Z " + head
     value = (
         phrase + "\n"
         if case == "ok"
         else "PRIVATE\n"
         if case == "wrong"
         else (
-            "AUTHORIZE ARCH133Y " + "b" * 40 + "\n"
+            "AUTHORIZE ARCH133Z " + "b" * 40 + "\n"
             if case == "old_head"
             else phrase + " " * 300 + "\n"
             if case == "oversized"
@@ -610,7 +626,7 @@ def runtime_fixture(tmp_path, monkeypatch):
     root.mkdir()
     host = tmp_path / "host"
     host.mkdir()
-    launcher = root / "scripts/run_arch133_windows_rename_qualification.py"
+    launcher = root / "scripts/run_arch133_closed_descendant_rename_qualification.py"
     launcher.parent.mkdir()
     launcher.write_bytes(b"synthetic launcher")
     python = tmp_path / "python.exe"
@@ -629,7 +645,12 @@ def runtime_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(
         operator,
         "__file__",
-        str(root / "src/trading_bot/arch133_windows_rename_qualification/operator.py"),
+        str(
+            root
+            / "src/trading_bot"
+            / "arch133_closed_descendant_rename_qualification"
+            / "operator.py"
+        ),
     )
     state = SimpleNamespace(
         argv=[str(launcher)],
@@ -641,6 +662,15 @@ def runtime_fixture(tmp_path, monkeypatch):
         version_info=(3, 14, 3),
     )
     monkeypatch.setattr(operator, "sys", state)
+    monkeypatch.setattr(
+        operator,
+        "_git",
+        lambda root, *args: (
+            operator.ACCEPTED_BASE_TREE
+            if args[0] == "rev-parse"
+            else operator.ACCEPTED_BASE_HEAD
+        ),
+    )
     monkeypatch.setattr(
         operator,
         "require_checkout",
@@ -780,11 +810,11 @@ def test_checkout_binding_exact_tracking_identity(tmp_path, monkeypatch, drift):
             operator.require_checkout(tmp_path.parent, branch)
 
 
-def test_import_closure_contains_only_inert_admin_reader_and_y(tmp_path):
+def test_import_closure_contains_only_inert_admin_reader_and_z(tmp_path):
     program = (
         "import sys\n"
         f"sys.path.insert(0, {str(ROOT / 'src')!r})\n"
-        "import trading_bot.arch133_windows_rename_qualification.operator\n"
+        "import trading_bot.arch133_closed_descendant_rename_qualification.operator\n"
         "names = (n for n in sys.modules if n.startswith('trading_bot'))\n"
         "print('\\n'.join(sorted(names)))\n"
     )
@@ -803,12 +833,13 @@ def test_import_closure_contains_only_inert_admin_reader_and_y(tmp_path):
         "trading_bot.arch133_acl",
         "trading_bot.arch133_acl.administrator",
         "trading_bot.arch133_acl.read_only",
-        "trading_bot.arch133_windows_rename_qualification",
-        "trading_bot.arch133_windows_rename_qualification.native",
-        "trading_bot.arch133_windows_rename_qualification.operator",
+        "trading_bot.arch133_closed_descendant_rename_qualification",
+        "trading_bot.arch133_closed_descendant_rename_qualification.native",
+        "trading_bot.arch133_closed_descendant_rename_qualification.operator",
     }
     source = (
-        ROOT / "src/trading_bot/arch133_windows_rename_qualification/native.py"
+        ROOT
+        / "src/trading_bot/arch133_closed_descendant_rename_qualification/native.py"
     ).read_text(encoding="utf-8-sig")
     tree = ast.parse(source)
     constants = [
@@ -827,15 +858,15 @@ def test_import_closure_contains_only_inert_admin_reader_and_y(tmp_path):
     assert not any("AITradingBot" in value for value in constants)
 
 
-def test_y_real_complete_authority_and_source_only_registration():
+def test_z_real_complete_authority_and_source_only_registration():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == operator.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (X_NAME, NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (Y_NAME, NAME)
     assert len(runner.ACTIVE_CI_CHECKPOINTS) == 49
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,
-        "tests/review_paper/test_arch133_windows_rename_qualification.py",
+        "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
     assert spec.authority_check(ROOT) == ()
@@ -845,10 +876,10 @@ def slim_authority(tmp_path, monkeypatch):
     # B4: local pin matrix copies bounded AST declarations/registration only.
     monkeypatch.setattr(
         runner,
-        "_arch133_reprovision_recovery_reconciliation_authority_check",
+        "_arch133_windows_rename_qualification_authority_check",
         lambda _: (),
     )
-    for relative in runner.ARCH133Y_QUALIFICATION_SOURCES:
+    for relative in runner.ARCH133Z_QUALIFICATION_SOURCES:
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes((ROOT / relative).read_bytes())
@@ -858,7 +889,7 @@ def slim_authority(tmp_path, monkeypatch):
         for n in tree.body
         if isinstance(n, ast.AnnAssign)
         and isinstance(n.target, ast.Name)
-        and n.target.id in ("ARCH133Y_QUALIFICATION_SOURCES", "ACTIVE_CI_CHECKPOINTS")
+        and n.target.id in ("ARCH133Z_QUALIFICATION_SOURCES", "ACTIVE_CI_CHECKPOINTS")
     ]
     reg = next(
         n
@@ -885,45 +916,52 @@ def slim_authority(tmp_path, monkeypatch):
     workflow.write_bytes(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_bytes()
     )
-    assert runner._arch133_windows_rename_qualification_authority_check(tmp_path) == ()
+    assert (
+        runner._arch133_closed_descendant_rename_qualification_authority_check(tmp_path)
+        == ()
+    )
     return path, workflow
 
 
-@pytest.mark.parametrize("relative", runner.ARCH133Y_QUALIFICATION_SOURCES)
+@pytest.mark.parametrize("relative", runner.ARCH133Z_QUALIFICATION_SOURCES)
 @pytest.mark.parametrize("mutation", ["missing", "changed"])
-def test_y_all_source_pins_fail_closed(tmp_path, monkeypatch, relative, mutation):
+def test_z_all_source_pins_fail_closed(tmp_path, monkeypatch, relative, mutation):
     slim_authority(tmp_path, monkeypatch)
     path = tmp_path / relative
     if mutation == "missing":
         path.unlink()
     else:
         path.write_text(path.read_text(encoding="utf-8-sig") + "\nDRIFT = True\n")
-    assert runner._arch133_windows_rename_qualification_authority_check(tmp_path)
+    assert runner._arch133_closed_descendant_rename_qualification_authority_check(
+        tmp_path
+    )
 
 
 @pytest.mark.parametrize(
     "mutation",
     ["inventory", "registration", "active", "order", "duplicate", "workflow"],
 )
-def test_y_inventory_registration_order_workflow_fail_closed(
+def test_z_inventory_registration_order_workflow_fail_closed(
     tmp_path, monkeypatch, mutation
 ):
     path, workflow = slim_authority(tmp_path, monkeypatch)
     text = path.read_text()
     if mutation == "inventory":
-        text = text.replace("ARCH133Y_QUALIFICATION_SOURCES", "MISSING_INVENTORY")
+        text = text.replace("ARCH133Z_QUALIFICATION_SOURCES", "MISSING_INVENTORY")
     elif mutation == "registration":
         text = text.replace("preflight=None", "preflight=effect")
     elif mutation == "active":
         text = text.replace("ACTIVE_CI_CHECKPOINTS", "MISSING_ACTIVE")
     elif mutation == "order":
-        text = text.replace(f"'{X_NAME}', '{NAME}'", f"'{NAME}', '{X_NAME}'")
+        text = text.replace(f"'{Y_NAME}', '{NAME}'", f"'{NAME}', '{Y_NAME}'")
     elif mutation == "duplicate":
-        text = text.replace(f"'{X_NAME}', '{NAME}'", f"'{NAME}', '{NAME}'")
+        text = text.replace(f"'{Y_NAME}', '{NAME}'", f"'{NAME}', '{NAME}'")
     else:
         workflow.write_text(workflow.read_text().replace(NAME, "missing-checkpoint"))
     path.write_text(text)
-    assert runner._arch133_windows_rename_qualification_authority_check(tmp_path)
+    assert runner._arch133_closed_descendant_rename_qualification_authority_check(
+        tmp_path
+    )
 
 
 @pytest.mark.parametrize(
@@ -938,18 +976,20 @@ def test_y_inventory_registration_order_workflow_fail_closed(
         {"authority_check": lambda _: ()},
     ],
 )
-def test_y_registration_runtime_capability_injection_rejected(
+def test_z_registration_runtime_capability_injection_rejected(
     tmp_path, monkeypatch, change
 ):
     slim_authority(tmp_path, monkeypatch)
     specs = runner._checkpoint_specs()
     specs[NAME] = replace(specs[NAME], **change)
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
-    assert runner._arch133_windows_rename_qualification_authority_check(tmp_path)
+    assert runner._arch133_closed_descendant_rename_qualification_authority_check(
+        tmp_path
+    )
 
 
-@pytest.mark.parametrize("failure", [(), ("X rejected",)])
-def test_y_chains_complete_x_once_and_propagates_rejection(monkeypatch, failure):
+@pytest.mark.parametrize("failure", [(), ("Y rejected",)])
+def test_z_chains_complete_y_once_and_propagates_rejection(monkeypatch, failure):
     seen = []
 
     def predecessor(root):
@@ -958,10 +998,13 @@ def test_y_chains_complete_x_once_and_propagates_rejection(monkeypatch, failure)
 
     monkeypatch.setattr(
         runner,
-        "_arch133_reprovision_recovery_reconciliation_authority_check",
+        "_arch133_windows_rename_qualification_authority_check",
         predecessor,
     )
-    assert runner._arch133_windows_rename_qualification_authority_check(ROOT) == failure
+    assert (
+        runner._arch133_closed_descendant_rename_qualification_authority_check(ROOT)
+        == failure
+    )
     assert seen == [ROOT]
 
 
@@ -1007,3 +1050,341 @@ def test_dangling_cache_junction_blocks_runtime(runtime_fixture, monkeypatch):
     monkeypatch.setattr(Path, "is_junction", lambda path: path == cache)
     with pytest.raises(ValueError):
         operator.observe_runtime()
+
+
+@pytest.mark.parametrize("step", [1, 2])
+def test_former_held_descendant_pattern_gets_native_error_5_once(
+    fake, monkeypatch, step
+):
+    previous = native.WindowsScratch.rename
+
+    def held_pattern(edge, source, destination):
+        if edge.rename_step + 1 == step:
+            # Deliberately reproduce the old held-file lifecycle in the fake only.
+            edge._open(ntpath.join(source, native.FINAL_NAMES[0]), directory=False)
+        return previous(edge, source, destination)
+
+    monkeypatch.setattr(native.WindowsScratch, "rename", held_pattern)
+    monkeypatch.setattr(
+        native.WindowsScratch, "_assert_descendants_closed", lambda *a: None
+    )
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert result["native_error_code"] == 5
+    assert fake.rename_calls == step
+    assert fake.rename_descendant_counts[-1] == 1
+    assert result["scratch"]["cleanup_attempts"] == 0
+    assert result["scratch"]["second_rename_attempts"] == (step - 1)
+    assert result["scratch"]["first_renames_completed"] == (step - 1)
+    assert not fake.handles and fake.path(native.SCRATCH_ROOT).exists()
+
+
+def test_closed_children_at_both_native_entries_and_independent_reopens(fake):
+    result = assert_result(operator.run(), "PASS")
+    assert fake.rename_descendant_counts == [0, 0]
+    for role in ("predecessor", "staged"):
+        before = result["before"][role]
+        assert before == result["after_first"][role] == result["after_second"][role]
+    for root in (native.ACTIVE, native.STAGE, native.ARCHIVE):
+        for name in native.FINAL_NAMES:
+            assert ntpath.join(root, name) in fake.observations
+    renames = [
+        i for i, c in enumerate(fake.calls) if isinstance(c, tuple) and c[0] == "rename"
+    ]
+    for index, root in zip(renames, (native.ACTIVE, native.STAGE), strict=True):
+        for name in native.FINAL_NAMES:
+            path = ntpath.join(root, name)
+            last_open = max(
+                i
+                for i, c in enumerate(fake.calls[:index])
+                if isinstance(c, tuple) and c[:2] == ("open", path)
+            )
+            assert any(
+                isinstance(c, tuple) and c == ("close", path)
+                for c in fake.calls[last_open:index]
+            )
+    assert not fake.handles
+
+
+@pytest.mark.parametrize("step", [1, 2])
+def test_ledger_rejects_unclosed_child_before_native_entry_no_retry(fake, step):
+    edge = native.WindowsScratch()
+    edge.admit()
+    edge.create(dict.fromkeys(operator.SCRATCH_COUNTERS, 0))
+    edge.snapshot()
+    if step == 2:
+        edge.rename(native.ACTIVE, native.ARCHIVE)
+        edge.verify(1)
+    source, target = (
+        (native.ACTIVE, native.ARCHIVE) if step == 1 else (native.STAGE, native.ACTIVE)
+    )
+    edge._open(ntpath.join(source, native.FINAL_NAMES[0]), directory=False)
+    with pytest.raises(ValueError):
+        edge.rename(source, target)
+    edge.close()
+    with pytest.raises(ValueError):
+        edge.rename(source, target)
+    assert fake.rename_calls == step - 1
+
+
+@pytest.mark.parametrize(
+    "phase",
+    [
+        "snapshot",
+        "before_first",
+        "after_first",
+        "before_second",
+        "after_second",
+        "final_directory",
+        "cleanup_child",
+    ],
+)
+def test_failed_close_is_retained_never_retried_and_blocks_following_effect(
+    fake, monkeypatch, phase
+):
+    previous = native.WindowsScratch._close
+    failed = []
+
+    def close(edge, handle):
+        path, directory = edge.live_handles[handle]
+        when = (
+            phase == "snapshot"
+            and edge.baseline is None
+            and not directory
+            and edge.mutation_started
+            or phase == "before_first"
+            and edge.baseline is not None
+            and edge.rename_step == 0
+            and not directory
+            or phase == "after_first"
+            and edge.rename_step == 1
+            and not edge.first_verified
+            and not directory
+            or phase == "before_second"
+            and edge.rename_step == 1
+            and edge.first_verified
+            and not directory
+            or phase == "after_second"
+            and edge.rename_step == 2
+            and not edge.verified
+            and not directory
+            or phase == "final_directory"
+            and edge.verified
+            and directory
+            and not edge.cleanup_started
+            or phase == "cleanup_child"
+            and edge.cleanup_started
+            and not directory
+        )
+        if when and not failed:
+            failed.append(handle)
+            fake.close_fail_handle = handle
+        return previous(edge, handle)
+
+    monkeypatch.setattr(native.WindowsScratch, "_close", close)
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert failed and failed[0] in fake.handles
+    assert fake.close_calls.count(failed[0]) == 1
+    assert result["native_error_code"] == 5
+    assert result["scratch"]["cleanups_completed"] == 0
+    expected = (
+        0
+        if phase in ("snapshot", "before_first")
+        else 1
+        if phase in ("after_first", "before_second")
+        else 2
+    )
+    assert fake.rename_calls == expected
+    assert "DeleteFileW" not in fake.calls
+
+
+@pytest.mark.parametrize("drift", ["tree", "ancestry"])
+def test_runtime_requires_exact_accepted_y_base_ancestry(
+    runtime_fixture, monkeypatch, drift
+):
+    monkeypatch.setattr(
+        operator,
+        "_git",
+        lambda root, *args: (
+            "c" * 40
+            if (args[0] == "rev-parse") == (drift == "tree")
+            else operator.ACCEPTED_BASE_TREE
+            if args[0] == "rev-parse"
+            else operator.ACCEPTED_BASE_HEAD
+        ),
+    )
+    with pytest.raises(ValueError):
+        operator.observe_runtime()
+
+
+@pytest.mark.parametrize("primitive", ["DeleteFileW", "RemoveDirectoryW"])
+def test_cleanup_native_failure_preserves_remaining_tree_no_retry(fake, primitive):
+    fake.fail = primitive
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert result["scratch"]["cleanup_attempts"] == 1
+    assert result["scratch"]["cleanups_completed"] == 0
+    assert fake.path(native.SCRATCH_ROOT).exists()
+    assert fake.calls.count(primitive) == 1
+
+
+@pytest.mark.parametrize("step", [1, 2])
+def test_namespace_injected_during_last_child_close_blocks_native_rename(
+    fake, monkeypatch, step
+):
+    previous = native.WindowsScratch._close
+
+    def close(edge, handle):
+        path, directory = edge.live_handles[handle]
+        previous(edge, handle)
+        if (
+            not directory
+            and edge.baseline is not None
+            and edge.rename_step + 1 == step
+            and path.endswith(native.FINAL_NAMES[-1])
+        ):
+            (fake.path(ntpath.dirname(path)) / "unexpected").write_bytes(b"PRESERVE")
+
+    monkeypatch.setattr(native.WindowsScratch, "_close", close)
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert fake.rename_calls == step - 1
+    assert result["scratch"]["cleanup_attempts"] == 0
+
+
+@pytest.mark.parametrize("step", [1, 2])
+def test_ambiguous_rename_that_moved_then_failed_stops_without_reconciliation(
+    fake, monkeypatch, step
+):
+    previous = fake.SetFileInformationByHandle.function
+
+    def ambiguous(*args):
+        result = previous(*args)
+        if fake.rename_calls == step:
+            fake.error = 5
+            return 0
+        return result
+
+    monkeypatch.setattr(fake.SetFileInformationByHandle, "function", ambiguous)
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert result["native_error_code"] == 5
+    assert result["scratch"]["cleanup_attempts"] == 0
+    assert fake.rename_calls == step
+    assert not any(
+        k in result for k in ("after_first", "after_second", "scratch_root_absent")
+    )
+    assert fake.path(native.SCRATCH_ROOT).exists()
+
+
+def test_failed_native_rename_cannot_be_verified_to_gain_second_attempt(fake):
+    edge = native.WindowsScratch()
+    edge.admit()
+    edge.create(dict.fromkeys(operator.SCRATCH_COUNTERS, 0))
+    edge.snapshot()
+    fake.fail_rename = 1
+    with pytest.raises(native.NativeError):
+        edge.rename(native.ACTIVE, native.ARCHIVE)
+    with pytest.raises(ValueError):
+        edge.verify(1)
+    with pytest.raises(ValueError):
+        edge.rename(native.STAGE, native.ACTIVE)
+    assert fake.rename_calls == 1
+    edge.close()
+
+
+@pytest.mark.parametrize(
+    "drift",
+    [
+        "volume",
+        "alias",
+        "links",
+        "short_write",
+        "byte_count",
+        "reparse_child",
+        "source_present",
+    ],
+)
+def test_fixed_synthetic_observation_and_native_shape_drift_fail_closed(
+    fake, monkeypatch, drift
+):
+    if drift == "short_write":
+        previous = fake.WriteFile.function
+
+        def short(*args):
+            result = previous(*args)
+            ctypes.cast(args[3], ctypes.POINTER(ctypes.c_uint32)).contents.value = 0
+            return result
+
+        monkeypatch.setattr(fake.WriteFile, "function", short)
+    elif drift == "byte_count":
+        previous = fake.ReadFile.function
+
+        def oversized(*args):
+            result = previous(*args)
+            ctypes.cast(args[3], ctypes.POINTER(ctypes.c_uint32)).contents.value = 1025
+            return result
+
+        monkeypatch.setattr(fake.ReadFile, "function", oversized)
+    elif drift in ("volume", "alias", "links"):
+        previous = fake.GetFileInformationByHandle.function
+
+        def facts(handle, pointer):
+            result = previous(handle, pointer)
+            info = ctypes.cast(pointer, ctypes.POINTER(native.FileInformation)).contents
+            if fake.handles[handle].is_file():
+                if drift == "volume":
+                    info.volume = 456
+                elif drift == "alias":
+                    info.index_low, info.index_high = 1, 0
+                else:
+                    info.links = 2
+            return result
+
+        monkeypatch.setattr(fake.GetFileInformationByHandle, "function", facts)
+    elif drift == "reparse_child":
+        fake.reparse.add(ntpath.join(native.ACTIVE, native.FINAL_NAMES[0]))
+    else:
+        previous = native.WindowsScratch.verify
+
+        def verify(edge, step):
+            if step == 1:
+                fake.path(native.ACTIVE).mkdir()
+            return previous(edge, step)
+
+        monkeypatch.setattr(native.WindowsScratch, "verify", verify)
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert result["scratch"]["cleanup_attempts"] == 0
+    assert fake.rename_calls == (1 if drift == "source_present" else 0)
+    assert fake.path(native.SCRATCH_ROOT).exists()
+
+
+def test_close_failure_at_cleanup_delete_observation_never_deletes(fake, monkeypatch):
+    previous = native.WindowsScratch._close
+    seen = []
+
+    def close(edge, handle):
+        path, directory = edge.live_handles[handle]
+        if edge.cleanup_started and not directory:
+            seen.append(path)
+            # verify(2) observes eight children through two handles each. The
+            # next child belongs to the deletion phase and must close first.
+            if len(seen) == 17:
+                fake.close_fail_handle = handle
+        previous(edge, handle)
+
+    monkeypatch.setattr(native.WindowsScratch, "_close", close)
+    result = assert_result(operator.run(), "INDETERMINATE")
+    assert result["native_error_code"] == 5
+    assert "DeleteFileW" not in fake.calls
+    assert fake.close_calls.count(fake.close_fail_handle) == 1
+
+
+def test_snapshot_observation_failure_cannot_retry_in_same_invocation(fake):
+    edge = native.WindowsScratch()
+    edge.admit()
+    edge.create(dict.fromkeys(operator.SCRATCH_COUNTERS, 0))
+    fake.fail = "ReadFile"
+    with pytest.raises(native.NativeError):
+        edge.snapshot()
+    fake.fail = None
+    with pytest.raises(ValueError):
+        edge.snapshot()
+    assert fake.rename_calls == 0
+    edge.close()

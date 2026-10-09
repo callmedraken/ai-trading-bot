@@ -206,7 +206,7 @@ def test_runner_registers_source_only_successor():
         "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
-    assert runner.ACTIVE_CI_CHECKPOINTS[-9:-7] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-10:-8] == (
         "arch133-robinhood-fresh-activation-reprovision",
         name,
     )

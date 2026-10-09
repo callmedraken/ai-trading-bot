@@ -187,6 +187,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-reprovision-sealed-predecessor-recovery",
         "arch133-robinhood-reprovision-recovery-reconciliation",
         "arch133-robinhood-windows-rename-qualification",
+        "arch133-robinhood-closed-descendant-rename-qualification",
     }
     for spec in specs.values():
         assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
@@ -285,6 +286,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-unattended-review-paper-133x"
         if spec.name == "arch133-robinhood-windows-rename-qualification":
             expected_branch = "feature/robinhood-unattended-review-paper-133y"
+        if spec.name == "arch133-robinhood-closed-descendant-rename-qualification":
+            expected_branch = "feature/robinhood-unattended-review-paper-133z"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None

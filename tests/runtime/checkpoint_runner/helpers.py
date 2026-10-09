@@ -209,6 +209,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-reprovision-sealed-predecessor-recovery",
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
+    "arch133-robinhood-closed-descendant-rename-qualification",
 )
 
 

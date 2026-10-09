@@ -1,5 +1,293 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-08 — Real 133-T PASS; Architecture 133-U corrected reprovision successor FROZEN
+
+One separately authorized real Architecture 133-T read-only parent-policy
+diagnostic was executed from the exact accepted docs-closeout source.
+
+Exact invocation identity:
+
+```text
+PRINCIPAL        DESKTOP-I4DOKM7\John / Administrator
+T_BRANCH         feature/robinhood-unattended-review-paper-133t
+T_HEAD           13708436515815a07f932c1cc6ce9d555446c70d
+T_TREE           b08f7692557b0690b90eea28b436d63d134c751c
+G_BRANCH         feature/robinhood-unattended-review-paper-133g
+G_HEAD           65f0d40217f8ce129224531a5151f4acea889d89
+G_TREE           16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
+MATERIAL_SHA256  7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+PYTHON_SHA256    cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+The sanitized diagnostic result was:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"reason":"PARENT_POLICY_DIAGNOSTIC_COMPLETE","scheduler_reads":0,"scheduler_writes":0,"schema":"arch133t-parent-policy-diagnostic/v1","stage":"ADMISSION_COMPLETE","state_mutations":0,"status":"PASS","wake_delegations":0}
+```
+
+Wrapper exit: `ARCH133T_DIAGNOSTIC_EXIT=0`.
+
+The one real 133-T authorization is consumed. All fifteen effect counters are
+zero.
+
+This PASS establishes on one real host observation that all accepted
+predecessor/runtime/Administrator/publication/state/paper/material/freshness/
+namespace-vacancy checks passed, both standalone parents passed the corrected
+role-aware metadata/ACL/re-observation checks, and the combined held-parent guard
+also passed through both re-observations and closes.
+
+No ACL repair or mutation is required by this result.
+
+### Do not fall back to consumed 133-Q
+
+The consumed Architecture 133-Q planner/executor is not the next executable
+surface.
+
+Its checked-in launcher and predecessor runtime admission are hard-bound to:
+
+```text
+F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133q
+feature/robinhood-unattended-review-paper-133q
+```
+
+and its consumed reviewed plan was computed before the Architecture-133-T parent
+policy correction. Reusing the old Q plan hash, modifying/floating the 133-Q
+checkout to newer source, or rerunning its plan would violate the frozen
+source/plan boundary.
+
+The consumed Q plan MUST NOT be rerun and its plan hash MUST NOT be reused.
+Q `execute-once` remains unauthorized and is superseded by the new corrected
+source successor below.
+
+## Architecture 133-U — corrected fresh-activation reprovision successor
+
+Architecture 133-U is the source-only successor that carries the accepted
+133-T parent policy into a new source-bound two-phase reprovision operator.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133u
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133u
+```
+
+133-U must start from the current accepted 133-T docs line. Do not merge/rebase
+an older 133-Q line.
+
+### Separate source identity; consumed Q remains immutable
+
+Do not modify the consumed 133-Q launcher/operator/predecessor semantics solely
+to make them executable from U.
+
+Add a separate U source surface, suggested as:
+
+```text
+src/trading_bot/arch133_reprovision_corrected/__init__.py
+src/trading_bot/arch133_reprovision_corrected/admission.py
+src/trading_bot/arch133_reprovision_corrected/operator.py
+scripts/run_arch133_fresh_activation_reprovision_corrected.py
+tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py
+```
+
+The U launcher/runtime admission must bind exactly to the 133-U named clean
+tracking checkout, exact origin, production Python path/version/hash and the
+accepted bound 133-G checkout. It must reject branch/ref/tree/runtime drift
+before any writer import.
+
+U may reuse the accepted and source-pinned inert/shared Q modules where their
+semantics are unchanged:
+
+```text
+arch133_reprovision.material
+arch133_reprovision.generation
+arch133_reprovision.reads
+arch133_reprovision.namespace
+arch133_reprovision.native
+```
+
+The shared `namespace` is the accepted 133-T role-aware implementation. The
+writer `native` must remain lazily imported only after reviewed-plan equality
+and fresh interactive authorization.
+
+The U admission implementation must independently preserve the accepted
+predecessor/runtime/publication/state/paper predicates while changing only its
+own operator source/worktree identity from the consumed Q source to U. Do not
+import a consumed diagnostic operator as authority.
+
+### New schemas and new plan identity
+
+U must use U-specific schemas so no consumed Q plan/result can be mistaken for
+U authority, for example:
+
+```text
+arch133u-fresh-activation-reprovision-plan/v1
+arch133u-fresh-activation-reprovision/v1
+```
+
+The U plan must be recomputed from current observations and must include the
+current U operator source HEAD/TREE in predecessor runtime facts. Therefore its
+`plan_sha256` is necessarily a new reviewed authority value.
+
+U `execute-once` must accept only the exact lowercase 64-hex U plan hash
+recomputed from the same canonical U plan. The consumed Q plan hash is never an
+accepted alias.
+
+### U plan mode
+
+`plan` is read-only. It must repeat, independently and fail closed:
+
+1. exact U source/runtime/Administrator admission;
+2. retained predecessor root/files/publication/state/paper observation;
+3. retained-material equivalence;
+4. stale predecessor;
+5. exact external fresh material;
+6. namespace vacancy;
+7. corrected 133-T role-aware parent guard, including both held parents and
+   security re-observation.
+
+The emitted plan must preserve Q's canonical semantic content:
+
+```text
+material_sha256
+activation_sha256
+host_binding_sha256
+predecessor facts
+parents facts
+fresh-window facts
+active_root
+staging_parent
+staged_root
+archive_root
+all fifteen zero-effect counters
+```
+
+Plan performs no writer/native import, no directory creation, no ACL mutation,
+no publication/archive mutation, no credentials/provider access, no scheduler
+access, no wake/broker effect.
+
+A real U plan remains a separately protected **one-attempt read-only** boundary
+requiring fresh explicit user authorization after source acceptance.
+
+### U execute-once boundary
+
+U must preserve the accepted Q one-shot write semantics, but against the new U
+plan and corrected role-aware parent policy:
+
+1. recompute the complete U plan;
+2. require exact reviewed `plan_sha256` equality;
+3. require a real interactive TTY authorization phrase containing that exact
+   U plan hash;
+4. independently recompute the plan after the human authorization pause;
+5. import `arch133_reprovision.native.WindowsEdges` only after all previous
+   gates pass;
+6. hold the corrected production parent guard;
+7. recheck namespace vacancy before the first write;
+8. treat entry into staging as the single-use ambiguity fence;
+9. stage the reviewed material;
+10. independently verify staged generation;
+11. hold staging/publication guards;
+12. re-observe predecessor/material/staleness/freshness before archive;
+13. archive the exact retained predecessor with no replacement;
+14. independently verify preservation;
+15. recheck freshness before publication;
+16. publish the exact staged generation;
+17. independently verify active/archive/final namespace and runtime/
+    Administrator facts.
+
+No automatic retry, cleanup or repair is allowed after the first staging
+mutation. Any post-fence exception remains `INDETERMINATE /
+PRESERVE_RECONCILE_NO_RETRY`.
+
+Before the ambiguity fence, rejection remains `BLOCKED / ADMISSION_REJECTED`.
+
+The writer's effect counters and mutation accounting remain the accepted Q
+contract. U introduces no provider/OAuth read, Task Scheduler access, unattended
+wake, paper trade, broker/live execution or credential operation.
+
+A real U `execute-once` is a **separate fresh protected write authorization**
+after a real U PASS plan has been returned and its exact complete output and
+`plan_sha256` have been reviewed. Source acceptance or plan authorization does
+not authorize execute.
+
+### Required source tests
+
+At minimum prove:
+
+1. U admission/source/runtime is bound to exact U branch/worktree/origin/
+   upstream/tracking HEAD/TREE and production Python;
+2. U predecessor observation/material predicates are source-equivalent to the
+   accepted Q predicates except for own source identity;
+3. shared corrected `namespace.parent_guard()` is used by plan and execute;
+4. plan imports no writer/effect module and all fifteen counters remain zero;
+5. U plan schema/hash cannot alias the consumed Q plan schema/hash;
+6. wrong/replayed Q hash cannot authorize U execute;
+7. execute requires TTY and exact phrase/hash;
+8. complete U plan is recomputed before and after authorization;
+9. `WindowsEdges` import occurs only after reviewed hash + human authorization
+   + post-pause plan equality;
+10. no mutation occurs before the ambiguity fence;
+11. every pre-fence failure is BLOCKED/zero-write;
+12. every post-fence failure is INDETERMINATE/PRESERVE_RECONCILE_NO_RETRY;
+13. staging, archive, publication and preservation semantics remain equivalent
+    to accepted Q for the synthetic matrix;
+14. corrected volume masks accepted by 133-T are accepted through U plan/
+    execution admission, while the protected host rule remains strict;
+15. fresh-process plan import excludes native writer, credentials/provider,
+    scheduler, wake, paper-trade and broker/live surfaces;
+16. checkpoint pins, source inventories, registration, active order and workflow
+    drift fail closed.
+
+All tests use fake/temp inputs only. No real parent ACL observation, namespace
+mutation, reprovision, provider/scheduler/wake/broker effect or protected plan/
+execute invocation occurs during source verification.
+
+### Source-gate registration
+
+Register one new active source-only checkpoint immediately after 133-T:
+
+```text
+arch133-robinhood-fresh-activation-reprovision-corrected
+```
+
+with:
+
+```text
+remote_branch   = feature/robinhood-unattended-review-paper-133u
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority check must chain the complete accepted 133-T authority and pin the
+new U source/launcher/registration. Shared Q writer/material/namespace source
+must remain transitively pinned by the accepted predecessor authority chain.
+
+Preserve B3/B4 source-gate hygiene.
+
+### Verification / protected sequencing
+
+Implementation uses focused tests first and then the registered push-triggered
+source gate to terminal state. ChatGPT performs exact-source review and selects
+any broader certification afterward.
+
+After source acceptance:
+
+```text
+U real plan          -> fresh explicit one-attempt read-only authorization
+review exact output  -> no effect authorization implied
+U execute-once       -> separate fresh explicit one-attempt write authorization
+post-execute result  -> reconciliation before Q133-3
+```
+
+Q133-3 scheduler installation remains a separate protected boundary after
+successful reprovision and post-publication verification. Q133-4 remains
+unauthorized until the scheduler boundary is separately completed/reviewed.
+
+The consumed 133-T, 133-S and 133-R diagnostics MUST NOT be rerun. The consumed
+133-Q plan MUST NOT be rerun. Old Q `execute-once`, ACL repair, provider/OAuth
+access, scheduler mutation, unattended wake execution and production/live broker
+effects remain unauthorized / NO-GO.
+
 ## 2026-10-08 — Architecture 133-T SOURCE ACCEPTED; role-aware parent policy corrected
 
 Architecture 133-T is **SOURCE ACCEPTED**.

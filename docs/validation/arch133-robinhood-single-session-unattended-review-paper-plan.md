@@ -1,5 +1,107 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-09 — Architecture 133-X SOURCE ACCEPTED
+
+Architecture 133-X post-W recovery reconciliation is **SOURCE ACCEPTED** after
+exact GitHub review of the single implementation commit and terminal
+push-triggered source gate.
+
+Exact accepted executable/source identity:
+
+```text
+BRANCH        feature/robinhood-unattended-review-paper-133x
+CONTRACT HEAD c920501e9799b676ced73a8403c7d099a405fd46
+ACCEPTED HEAD 5d5aa514bc5d4f321c9303d4ea6b2aebb0da8487
+ACCEPTED TREE 524871ec79e3978a08ba407a896b3eebfddb65c4
+SOURCE-GATE   #358 / 37911057079 SUCCESS
+```
+
+Exact-source review accepted the frozen X contract:
+
+- X uses a separate read-only reconciliation operator and isolated launcher;
+- X binds its own clean named tracking checkout, the exact consumed W/V/U
+  checkouts, the accepted production Python path/version/hash, the accepted
+  host-composition checkout, the exact reviewed material hash, the reviewed U
+  plan SHA-256 and the reviewed W plan SHA-256;
+- the fresh-process import closure excludes W/U native writers, consumed
+  recovery/reconciliation operators, ACL mutation primitives, credential
+  surfaces, scheduler mutation surfaces, unattended execution surfaces and
+  broker/live execution surfaces;
+- ACTIVE and ARCHIVE are classified through read-only no-follow directory opens
+  and only explicit FILE_NOT_FOUND/PATH_NOT_FOUND observations count as absent;
+- exactly one of ACTIVE/ARCHIVE must be present;
+- whichever root is present must independently verify as the exact sealed
+  predecessor using the fixed root identity/security, exact namespace/file
+  identities, byte hashes and archive-sealed file policies;
+- STAGING_PARENT must independently match the fixed V/W identity/security and
+  contain exactly one child named `generation`;
+- STAGE is held and independently validated as the exact reviewed staged
+  generation using fixed root/file identities, hashes, policies, state/paper
+  fingerprints, activation ID, wake ID and revision zero;
+- runtime, material, administrator, STAGE, predecessor, staging-parent and
+  absent-path facts are re-observed before PASS;
+- PASS is constructed only after all held handles close and the corrected
+  133-T parent guard completes its final re-observation;
+- reconciliation intentionally does not re-admit the scheduler freshness window;
+  X observes durable evidence only and grants no recovery/publication authority;
+- the only PASS dispositions are
+  `W_ARCHIVE_RENAME_NOT_COMMITTED` and
+  `W_ARCHIVE_RENAME_COMMITTED`;
+- every other topology, source/runtime/material drift, identity/hash/policy
+  mismatch, observation failure or close failure returns sanitized
+  `BLOCKED / RECONCILIATION_UNRESOLVED`;
+- all fifteen protected-effect counters are explicit integer zeroes.
+
+The registered source-only checkpoint is:
+
+```text
+arch133-robinhood-reprovision-recovery-reconciliation
+remote_branch   = feature/robinhood-unattended-review-paper-133x
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority chain includes the complete accepted 133-W authority and pins the
+X source/launcher/inventory/registration/order/workflow surface. Final source
+gate #358 independently reported:
+
+```text
+CHECKPOINTS=47
+TEST_PATHS=58
+RUFF_PATHS=184
+PYTEST=0
+RUFF_CHECK=0
+RUFF_FORMAT=0
+GIT_DIFF_CHECK=0
+AUTHORITY[arch133-robinhood-reprovision-recovery-reconciliation]=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Certification ownership is coherent at FULL 147, Robinhood 74, LEGACY 205 and
+EXHAUSTIVE 352. No additional FULL/ROBINHOOD/LEGACY/EXHAUSTIVE run is selected
+for this narrow source-only read-only diagnostic checkpoint.
+
+No real X diagnostic or production namespace observation occurred during source
+implementation/review. No U/V/W rerun, recovery, cleanup, rename, scheduler,
+provider/OAuth, wake, paper, broker or live effect is authorized by this source
+acceptance.
+
+### Next protected boundary
+
+The next main-flow operation is one real Architecture 133-X reconciliation
+diagnostic. It is a separately protected one-attempt **read-only** production
+namespace observation. Source acceptance does not authorize that invocation.
+
+Before requesting that fresh authorization, fast-forward the local X worktree to
+this docs-closeout commit and prove exact branch/HEAD/tree/upstream/clean state
+while preserving the consumed W/V/U checkouts at their frozen identities.
+
+The X result must be reviewed before any new recovery/publication architecture
+is frozen. No cleanup, retry, rename or publication authority exists yet.
+
+
 ## 2026-10-09 — Real 133-W execute INDETERMINATE; Architecture 133-X reconciliation FROZEN
 
 The separately authorized real Architecture 133-W read-only plan PASSed from the

@@ -1,5 +1,134 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-09 — Architecture 133-W SOURCE ACCEPTED
+
+Architecture 133-W sealed-predecessor recovery source is **SOURCE ACCEPTED**
+after exact GitHub review of the final two-commit checkpoint and the terminal
+push-triggered source gate.
+
+Exact accepted executable/source identity:
+
+```text
+BRANCH              feature/robinhood-unattended-review-paper-133w
+CONTRACT HEAD       9dfa4f9aa178317b47e9e3d5ad20c6213378c051
+IMPLEMENTATION HEAD 747252d69a721ed412bd456930c8dc1381bba1c4
+ACCEPTED HEAD       26e6bc5272e7761bec09174fb65dde13d5ed2867
+ACCEPTED TREE       f538f17625011edccdde464b0f1e27630465caa8
+SOURCE-GATE         #354 / 37904777350 SUCCESS
+```
+
+The first implementation push reached the intended W production source. Its
+source gate failed only because the W runtime unit fixture attempted to hash the
+real accepted 133-G host launcher path on the GitHub Actions runner. The bounded
+follow-up `26e6bc5272e7761bec09174fb65dde13d5ed2867` changes only
+`tests/review_paper/test_arch133_reprovision_recovery.py`: it redirects the
+fixture's bound launcher to the fake executable and asserts the resulting
+launcher digest. No W production source, launcher, checkpoint registration or
+workflow behavior changed in the follow-up.
+
+Exact-source review accepted the frozen W contract:
+
+- W uses separate admission/native/operator/launcher source and distinct
+  `arch133w-sealed-predecessor-recovery-plan/v1` /
+  `arch133w-sealed-predecessor-recovery/v1` schemas;
+- admission binds W's own clean tracking checkout, the exact consumed V and U
+  checkouts, the accepted production Python path/version/hash, the accepted
+  host-composition checkout, the exact reviewed material hash and the reviewed
+  U plan SHA-256;
+- W independently reconstructs the exact V-proven durable state: ACTIVE is the
+  exact sealed predecessor, ARCHIVE is absent, STAGING_PARENT is exact with
+  exactly child `generation`, and STAGE is the exact V-proven fresh
+  generation including fixed root/file identities, byte hashes, policies,
+  state/paper fingerprints, activation ID and wake ID;
+- W plan mode is read-only and does not import the W native writer. It requires
+  the predecessor to remain stale and the staged activation to remain fresh
+  for publication under the accepted `require_fresh` semantics;
+- execution requires the exact reviewed W plan hash, exact interactive TTY
+  phrase, and a complete second plan recomputation/equality check before the
+  W native writer is lazily imported;
+- W native code does not import or call the consumed U writer. It exposes only
+  a held publication guard plus the fixed ACTIVE -> ARCHIVE and STAGE -> ACTIVE
+  no-replace relative renames;
+- rename root/parent opens use `dwShareMode == 7`
+  (FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE); ACTIVE/STAGE source
+  handles retain DELETE access, while held child files use read/delete sharing
+  without write sharing;
+- there is no restage, reseal, ACL writer, SQLite/state writer, cleanup,
+  fallback rename API, overwrite or retry surface in W native code;
+- immediately before the first rename W re-observes the exact V state under the
+  corrected T parent guard, staging guard and held publication guard;
+- `archive_writes` increments immediately before exactly one ACTIVE -> ARCHIVE
+  attempt. ARCHIVE must then independently verify as the exact sealed
+  predecessor and ACTIVE must be absent before publication can proceed;
+- freshness is rechecked after archive verification and before
+  `publication_writes` increments immediately before exactly one
+  STAGE -> ACTIVE attempt;
+- final PASS requires ACTIVE to equal the exact reviewed fresh generation,
+  ARCHIVE to remain the exact predecessor, STAGE to be absent, STAGING_PARENT
+  to be empty with the same fixed identity/security, and runtime/material/Admin
+  facts to remain unchanged;
+- any failure before the first archive attempt is
+  `BLOCKED / ADMISSION_REJECTED`; any failure once the archive attempt begins
+  is `INDETERMINATE / PRESERVE_RECONCILE_NO_RETRY`;
+- a successful recovery is `PASS / REPROVISION_RECOVERED`;
+- all protected counters except the two successful rename counters remain zero.
+  A successful W execution has exactly `archive_writes=1` and
+  `publication_writes=1`, with ACL/state/paper mutations remaining zero.
+
+The registered source-only checkpoint is:
+
+```text
+arch133-robinhood-reprovision-sealed-predecessor-recovery
+remote_branch   = feature/robinhood-unattended-review-paper-133w
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its source authority chains through the complete accepted 133-V authority and
+pins the W source inventory, launcher, registration, ordering and workflow.
+Final source gate #354 independently reported:
+
+```text
+CHECKPOINTS=46
+TEST_PATHS=57
+RUFF_PATHS=180
+PYTEST=0
+RUFF_CHECK=0
+RUFF_FORMAT=0
+GIT_DIFF_CHECK=0
+AUTHORITY[arch133-robinhood-reprovision-sealed-predecessor-recovery]=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Certification ownership is coherent at FULL 146, Robinhood 73, LEGACY 205 and
+EXHAUSTIVE 351. No additional FULL/ROBINHOOD/LEGACY/EXHAUSTIVE run is selected
+for this narrow source-only recovery checkpoint. Focused verification,
+push-triggered source-gate CI and exact GitHub source review are the selected
+source acceptance gate.
+
+No real W plan or execute occurred during source implementation/review. No
+ACTIVE/STAGE/ARCHIVE production observation, U/V rerun, scheduler/provider/OAuth
+access, wake execution, paper execution, broker effect or live effect is
+authorized by this source acceptance.
+
+### Next protected boundary
+
+The next main-flow operation is one real Architecture 133-W `plan` invocation.
+It is a fresh, separately protected, one-attempt **read-only** production-state
+observation. Before requesting authorization, fast-forward the local W worktree
+to this docs-closeout commit and prove exact branch/HEAD/tree/upstream/clean
+state while preserving the consumed V and U checkouts at their frozen
+identities.
+
+A real W plan PASS and its new `plan_sha256` still will not authorize
+`execute-once`; the two-rename recovery remains a later separate fresh write
+authorization. If the staged activation has reached its start boundary, W must
+BLOCK with zero effects and the recovery path must be reconsidered rather than
+publishing late.
+
+
 ## 2026-10-09 — Real 133-V PASS; Architecture 133-W sealed-predecessor recovery FROZEN
 
 The separately authorized real Architecture 133-V reconciliation diagnostic ran

@@ -1,5 +1,302 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-09 — Real 133-V PASS; Architecture 133-W sealed-predecessor recovery FROZEN
+
+The separately authorized real Architecture 133-V reconciliation diagnostic ran
+once from the exact accepted V source:
+
+```text
+V_SOURCE_HEAD   432001e3dcae48e589adf8e60c7dac5ffc08d591
+V_SOURCE_TREE   96f2f41caa6d17a32fe729ae8786560252a0c9a8
+U_SOURCE_HEAD   49686d7f61717b9ee7452cee633d23b0c7db873e
+U_SOURCE_TREE   12b430743786ba6650aa720fc27a6d9b0d95ea74
+MATERIAL_SHA256 7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+U_PLAN_SHA256   a223d8fa606da9cc129d5d095c6c94ec6be42f350da0bec7fe4825fe6ef8bb81
+STATUS          PASS
+DISPOSITION     ARCHIVE_RENAME_NOT_COMMITTED
+EXIT            0
+```
+
+All fifteen protected-effect counters were zero. The real 133-V diagnostic
+authorization is consumed and MUST NOT be rerun.
+
+133-V independently proved the exact durable post-U state:
+
+```text
+ACTIVE
+  present
+  exact sealed predecessor
+  root identity [1855336320,1407374886183770]
+  root security sha256
+  d6f7112da6508b0413e243fb666e98d7711a8adffcd618623c1f4c78f68efdab
+
+STAGE
+  F:\AITradingBot\Arch133Q-stage\generation
+  present
+  exact reviewed fresh generation
+  root identity [1855336320,844424933411687]
+  root security sha256
+  6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7
+
+ARCHIVE
+  F:\AITradingBot\Arch133Q-stale
+  absent
+
+STAGING_PARENT
+  identity [1855336320,2251799815590570]
+  security sha256
+  b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3
+```
+
+The exact predecessor namespace/file identities and hashes remain the reviewed
+U-plan values. The exact fresh staged files are:
+
+```text
+activation.json
+  identity [1855336320,281474979990386]
+  sha256 27600cc899eeeb22b81aff32e460299e1bf44c7e7ba00a42772d5808dc8aef24
+
+host-binding.json
+  identity [1855336320,281474979990387]
+  sha256 1ad3ae62cca87c6d6ccbd5c08f48dd0c3199b0f857981a2295d114157dfe5a65
+
+paper.sqlite
+  identity [1855336320,1970324840254325]
+  sha256 bc9cea80d7384106233adae55f858c39951194f06b504fb21ef18e1960e6a68d
+
+wake.sqlite
+  identity [1855336320,281474979990388]
+  sha256 df74e849655832eb202876364aca1147f243624037631a0c9a0a358353661877
+
+state_sha256
+  6454b1132ee93ac5af6694b2c30ae3645ccf42ea0aed98e6bf4035cedf477967
+
+paper_predecessor_sha256
+  bf437d0a1a0313dda9480f3a791fa711467f503a80302287e0f56751c32375c8
+
+activation_id
+  3ca52d02-55cf-57d2-a8c2-fd1020cd51f7
+
+wake_id
+  917fed9a-2b0b-5fce-ba9e-2cfb94b51470
+```
+
+Therefore the U failure occurred at the first ACTIVE -> ARCHIVE rename call.
+Archive verification and STAGE -> ACTIVE publication were never reached.
+
+The consumed U rename source opens rename roots with share mode `3`
+(FILE_SHARE_READ | FILE_SHARE_WRITE), omitting FILE_SHARE_DELETE. Windows
+documents rename as a delete-access operation and FILE_SHARE_DELETE as the
+sharing mode that permits delete/rename-compatible access. This is a concrete
+source defect candidate consistent with the observed boundary, but the U
+operator intentionally sanitized the native error and therefore the exact
+Win32 error code/root cause is not asserted as proven.
+
+### Architecture 133-W — sealed-predecessor recovery
+
+133-W is a new source-bound two-phase recovery operator. It is **not a retry of
+133-U**. It is permitted to act only from the exact 133-V-proven durable state
+above.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133w
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133w
+START     432001e3dcae48e589adf8e60c7dac5ffc08d591
+```
+
+Suggested separate source surface:
+
+```text
+src/trading_bot/arch133_reprovision_recovery/__init__.py
+src/trading_bot/arch133_reprovision_recovery/admission.py
+src/trading_bot/arch133_reprovision_recovery/native.py
+src/trading_bot/arch133_reprovision_recovery/operator.py
+scripts/run_arch133_reprovision_recovery.py
+tests/review_paper/test_arch133_reprovision_recovery.py
+```
+
+Use distinct schemas:
+
+```text
+arch133w-sealed-predecessor-recovery-plan/v1
+arch133w-sealed-predecessor-recovery/v1
+```
+
+The W source must bind exactly to its own clean named W tracking checkout, the
+exact consumed clean V checkout at the source identity above, the exact consumed
+U checkout, the production Python identity, the reviewed material bytes/hash and
+the reviewed U plan SHA-256. Consumed V/U operators must not be imported as
+runtime authority.
+
+#### W plan mode — read-only only
+
+A W plan independently and fail-closed re-establishes:
+
+1. exact W runtime/source/Admin identity;
+2. exact consumed V and U checkout identities;
+3. exact reviewed material bytes/hash;
+4. corrected 133-T role-aware parent guard and re-observation;
+5. ACTIVE is the exact sealed predecessor proven by V;
+6. ARCHIVE is absent;
+7. STAGING_PARENT has the exact V identity/security and exactly child
+   `generation`;
+8. STAGE is the exact V-proven fresh generation, including exact root/file
+   identities, hashes, policies, state/paper fingerprints, activation/wake IDs;
+9. predecessor is stale;
+10. the reviewed staged material is still **fresh for publication now**, using
+    the accepted `require_fresh` semantics. W MUST NOT publish after the
+    scheduler start boundary has arrived.
+
+Plan output carries all exact V identities plus the current fresh-window facts,
+material hash, consumed U plan hash, and all fifteen zero-effect counters.
+
+Plan mode imports no W native writer and performs no namespace, ACL, state,
+paper, scheduler, credential/provider, wake, broker or live mutation.
+
+A real W plan is a fresh separately protected one-attempt read-only operation
+requiring explicit authorization after source acceptance.
+
+#### Corrected W native rename primitive
+
+W must not import or call the consumed U `WindowsEdges` writer.
+
+Its separate native module may implement only the two fixed relative directory
+renames needed by recovery:
+
+```text
+F:\AITradingBot\Arch133
+  -> F:\AITradingBot\Arch133Q-stale
+
+F:\AITradingBot\Arch133Q-stage\generation
+  -> F:\AITradingBot\Arch133
+```
+
+No replace, overwrite, fallback, path-based MoveFile convenience API, alternate
+destination or retry is allowed.
+
+The source and parent directory handles used for rename must explicitly include
+FILE_SHARE_DELETE in addition to FILE_SHARE_READ | FILE_SHARE_WRITE
+(`dwShareMode == 7`). Source handles must retain DELETE access. Fixed child
+file handles remain held with read/delete sharing but without write sharing so
+the four files cannot be opened for mutation across the swap boundary.
+
+The writer performs **no restaging and no resealing**. In a valid V state the
+predecessor is already sealed and STAGE is already complete. Therefore a
+successful W recovery has:
+
+```text
+acl_mutations   = 0
+state_mutations = 0
+paper_mutations = 0
+archive_writes  = 1
+publication_writes = 1
+```
+
+No other protected-effect counter may become nonzero.
+
+#### W execute-once
+
+Execution must:
+
+1. recompute the complete W plan;
+2. require the exact reviewed W plan SHA-256;
+3. require an exact interactive TTY authorization phrase containing that hash;
+4. recompute the complete W plan after the human pause and require equality;
+5. only then lazily import the separate W native writer;
+6. hold corrected parent/staging/publication guards and fixed child handles;
+7. independently reobserve exact V state one final time;
+8. re-run accepted freshness admission;
+9. increment `archive_writes` and attempt exactly one no-replace
+   ACTIVE -> ARCHIVE rename using the corrected share-compatible handles;
+10. independently verify ARCHIVE is the exact sealed predecessor and ACTIVE is
+    absent;
+11. re-run accepted freshness admission;
+12. increment `publication_writes` and attempt exactly one no-replace
+    STAGE -> ACTIVE rename;
+13. independently verify ACTIVE is the exact reviewed fresh generation,
+    ARCHIVE is unchanged exact predecessor, STAGING_PARENT is empty and the
+    final parent/runtime/Admin facts remain unchanged.
+
+Before the first archive rename mutation, any failure is:
+
+```text
+BLOCKED / ADMISSION_REJECTED
+```
+
+Once the first archive rename is attempted, any exception is:
+
+```text
+INDETERMINATE / PRESERVE_RECONCILE_NO_RETRY
+```
+
+There is no rollback, automatic cleanup, automatic retry, ACL repair, restage or
+re-seal authority. If archive commits but publication fails, all surviving
+evidence is preserved for a new reconciliation checkpoint.
+
+A PASS result is:
+
+```text
+status      PASS
+disposition REPROVISION_RECOVERED
+```
+
+No scheduler installation/start, credential/provider/OAuth access, wake
+execution, paper execution, broker effect or live effect is authorized.
+
+#### W required tests/source gate
+
+Tests are fake/temp only and cover at least:
+
+- exact W/V/U/runtime/material identities;
+- W plan import closure excludes the native writer;
+- distinct W schema/hash cannot alias U;
+- exact V state required; reject any identity/hash/security/policy drift;
+- plan rejects after the reviewed fresh start boundary;
+- exact T parent guard reused;
+- corrected rename handle opens use `dwShareMode == 7` and source DELETE access;
+- no replace/fallback/retry surface;
+- child held handles continue to deny write sharing;
+- no restage/reseal/ACL/state/paper mutation path exists;
+- exact TTY/hash authorization and full pre/post-pause plan recomputation;
+- lazy native import ordering;
+- BLOCKED before first rename;
+- INDETERMINATE after first rename attempt;
+- archive verification precedes publication;
+- freshness is rechecked after archive verification and before publication;
+- final active/archive/staging identities are exact;
+- all unrelated protected-effect counters remain zero;
+- source pins/inventory/registration/order/workflow fail closed.
+
+Register immediately after 133-V:
+
+```text
+arch133-robinhood-reprovision-sealed-predecessor-recovery
+remote_branch   = feature/robinhood-unattended-review-paper-133w
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority chain must include complete accepted 133-V authority and pin the W
+source/launcher/registration/workflow surface. Preserve B3/B4 source-gate
+hygiene and proactively update terminal-slice fixtures affected by checkpoint
+count growth.
+
+Implementation model: **Sol High**. This checkpoint changes native Windows
+rename authority and crash-recovery ordering.
+
+Normal source verification applies: focused tests first, exact-file Ruff
+check/format, `git diff --check`, exact-file staging, staged audit, normal
+commit/push, and wait for terminal source CI. FULL/ROBINHOOD/LEGACY/EXHAUSTIVE
+are not part of implementation verification unless ChatGPT later selects one.
+
+Do NOT run a real W plan or execute during implementation. Do NOT inspect or
+mutate ACTIVE/STAGE/ARCHIVE, rerun U/V, access scheduler/provider/OAuth/wake,
+or perform paper/broker/live effects.
+
+
 ## 2026-10-09 — Architecture 133-V SOURCE ACCEPTED
 
 Architecture 133-V indeterminate-reprovision reconciliation is **SOURCE

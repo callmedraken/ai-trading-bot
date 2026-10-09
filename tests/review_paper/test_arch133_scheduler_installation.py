@@ -1065,7 +1065,7 @@ def test_133p_source_checkpoint_has_no_protected_callbacks():
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133p"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (
         "arch133-robinhood-publication-state-paper-corrected",
         name,
     )

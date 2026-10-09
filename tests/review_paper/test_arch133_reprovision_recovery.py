@@ -691,11 +691,11 @@ def test_source_authority_and_source_only_registration():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == admission.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (
         "arch133-robinhood-reprovision-indeterminate-reconciliation",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 47
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 48
 
 
 @pytest.mark.parametrize(

@@ -995,6 +995,7 @@ def runtime(tmp_path, monkeypatch):
         )
 
     monkeypatch.setattr(admission, "require_checkout", source)
+    monkeypatch.setattr(binding, "LAUNCHER", executable)
     return executable
 
 
@@ -1056,7 +1057,12 @@ def test_exact_runtime_and_consumed_u_checkout(runtime, monkeypatch, drift):
         with pytest.raises(ValueError):
             admission.observe_runtime()
     else:
-        assert admission.observe_runtime()["u_source_head"] == admission.U_HEAD
+        facts = admission.observe_runtime()
+        assert facts["u_source_head"] == admission.U_HEAD
+        assert (
+            facts["wake_launcher_sha256"]
+            == hashlib.sha256(runtime.read_bytes()).hexdigest()
+        )
 
 
 @pytest.mark.parametrize("which", ["V_ROOT", "U_ROOT", "bound"])

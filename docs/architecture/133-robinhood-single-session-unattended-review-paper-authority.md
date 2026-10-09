@@ -1,5 +1,156 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Supervised immutable-release foundation SOURCE ACCEPTED; Architecture 133-AB CONTRACT FROZEN
+
+The first source checkpoint under the simplified supervised-release architecture is **SOURCE ACCEPTED** after exact GitHub review.
+
+```text
+CHECKPOINT            arch133-robinhood-supervised-release-foundation
+BRANCH                feature/robinhood-supervised-release-foundation
+BASE HEAD             cdbce74af2d5e3d3ee743b8572203601ba76f01e
+BASE TREE             a412fdde5cd3d6fc0bb934d4db19455ec8eee33e
+IMPLEMENTATION HEAD   2707d429616925b6ceaacbef812959596e62c014
+IMPLEMENTATION TREE   3b5ea914ec885f7103d040a583c60a65491f33b3
+ACCEPTED HEAD         6e5c01d388f61bc0719742926dae64a3f4ae0cca
+ACCEPTED TREE         728814bcbc699ff153b4f5cd3d1af83ecad65439
+SOURCE GATE           #372 / 37995378481 SUCCESS
+MANIFEST SCHEMA       arch133-supervised-release/v1
+```
+
+Exact-source review confirms:
+
+- `trading_bot.supervised_release` is a pure declaration/projection surface. It imports no filesystem/native/scheduler/provider/broker capability and performs no host observation or mutation.
+- Release identity is deterministic UUID5 over canonical logical material and excludes host paths, clocks and input JSON byte layout.
+- Git source HEAD/tree, production Python version/SHA-256, exact launcher relative path/SHA-256, ordered source inventory plus inventory digest, strategy ID/version/config plus config digest, and risk-policy ID/version/digest are bound into the manifest.
+- The only supported strategy is the existing `MovingAverageCrossoverStrategy` / `MovingAverageCrossoverConfig`. Decimal quantity canonicalization is exact and independent of ambient Decimal context; equivalent Decimal quantities produce the same strategy-config digest.
+- Inventory names are canonical slash-separated release-relative names. Windows aliases/path traversal, duplicate case-insensitive names, durable-data/runtime-substrate aliases and unsupported material are rejected. The reviewed launcher must occur exactly once in inventory with the exact launcher digest.
+- Release roots are derived lexically from `F:\AITradingBot\releases\<release-id>`. The scheduler projection is inert and produces exactly the shared production Python, `-I -B <release>\scripts\run_arch133_unattended_review_paper.py`, and the release root as working directory.
+- The fixed durable-data root remains `F:\AITradingBot\Arch133` and is not part of the immutable release inventory.
+- The checkpoint is source-only: `preflight=None`, `execute=None`, `remote_head_env=None`.
+- The five-file second commit changes only retained assertions from 49 to 50 active source checkpoints. GitHub run #371 failed only those five count assertions (6996 passed / 5 failed / 1 skipped); the bounded correction did not modify implementation source. Replacement run #372 completed SUCCESS on the exact accepted HEAD.
+- Current certification ownership is FULL 150, Robinhood 77, LEGACY 205 and EXHAUSTIVE 355. The frozen required FULL/Robinhood baselines remain 122/49 modules. No additional broad certification is selected for this isolated source-only checkpoint.
+
+The accepted foundation intentionally does **not** claim installed-release completeness, installed-byte verification, ACL/reparse safety, runtime dependency closure, durable-state migration compatibility or maintenance/trading exclusion. It also does not change the existing scheduler or current 133-G runtime binding. Those limitations are correct boundaries, not acceptance defects.
+
+No real release was created or installed. No Y/Z scratch, production namespace, Task Scheduler, provider/OAuth, paper/broker or live effect was accessed or mutated.
+
+### Architecture 133-AB — complete release bundle, verifier and runtime-binding foundation
+
+**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; NO REAL RELEASE OR PROTECTED EFFECT AUTHORIZED.**
+
+```text
+BRANCH      feature/robinhood-supervised-release-build-verification
+WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-release-build-verification
+BASE        this source-acceptance documentation-closeout commit
+CHECKPOINT  arch133-robinhood-supervised-release-build-verification
+```
+
+133-AB remains source-only. It must not create `F:\AITradingBot\releases`, touch `F:\AITradingBot\Arch133`, inspect Y/Z scratch, access Task Scheduler, read credentials/OAuth, call providers, mutate paper state, or produce broker/live effects.
+
+#### Frozen release-bundle policy
+
+The release bundle is the exact runtime source required by the existing launcher:
+
+- canonical `manifest.json` bytes from the accepted v1 manifest;
+- `pyproject.toml`;
+- every regular, non-symlink/non-reparse file under `src/trading_bot` whose suffix is `.py`, `.json` or `.sql`;
+- exactly `scripts/run_arch133_unattended_review_paper.py`;
+- no `.git`, tests, docs, caches, generated evidence, databases, credentials, durable state or unrelated scripts.
+
+The collector must derive a unique case-insensitive canonical relative-path set, sort it by canonical relative path, hash exact bytes and construct the foundation `ReleaseInventoryEntry` tuple. The resulting manifest launcher digest must equal the collected launcher bytes. Source collection must prove the supplied checkout is the exact expected Git HEAD/tree and clean before and after collection. Symlink/reparse/identity drift, namespace drift or byte drift fails closed.
+
+A source collector may read only the supplied development checkout and Git metadata. It returns a bounded in-memory release bundle; **133-AB does not install or write a production release directory**.
+
+#### Frozen bundle/installed-image verification model
+
+Implement a deterministic verifier that can replay a bundle/snapshot against its manifest and reject:
+
+- noncanonical or changed manifest bytes;
+- missing/extra/duplicate/case-alias inventory names;
+- changed bytes or SHA-256;
+- launcher mismatch;
+- wrong source HEAD/tree or inventory digest;
+- path traversal/absolute paths;
+- unsupported suffix/material;
+- durable-data/runtime-substrate content inside the release;
+- unexpected symlink/reparse/wrong object type facts supplied by the observer.
+
+The source checkpoint may include a read-only observer seam and temp-root implementation for tests, but it must not contain scheduler mutation or a registered production execution path. Any future fixed production-directory observer/execution remains separately reviewed and authorized.
+
+#### Frozen runtime-binding model
+
+Add a pure canonical runtime-binding record derived from one verified release manifest/bundle. It must bind at least:
+
+```text
+schema/version
+release_id
+manifest_sha256
+source_head
+source_tree
+source_inventory_sha256
+production_python_version
+production_python_sha256
+launcher_relative_path
+launcher_sha256
+strategy_id
+strategy_version
+strategy_config_sha256
+risk_policy_id
+risk_policy_version
+risk_policy_sha256
+derived fixed release_root
+fixed durable_data_root
+```
+
+The runtime binding must not claim that external Python packages are hermetically reproduced merely because `pyproject.toml` is present. Shared runtime dependency closure is a separate substrate fact. 133-AB should either carry an explicitly versioned opaque runtime-substrate/dependency identity supplied by a later reviewed observer or explicitly mark dependency closure as unproven; it must not synthesize false dependency certainty.
+
+The binding is pure evidence only. Do **not** wire it into the current production `unattended_host_identity` admission in 133-AB. The existing 133-G scheduler/runtime remains unchanged until an immutable release has been separately installed and verified.
+
+Durable-state schema migration is also not performed in 133-AB. The runtime binding may declare the current supported durable-state contract identity, but compatibility/migration requires a later explicit contract before a strategy/release that changes durable schemas is deployable.
+
+#### Tests and source authority
+
+Focused fake/temp tests must cover at least:
+
+- exact complete source inventory discovery and stable sorted order;
+- dirty checkout / wrong HEAD / wrong tree / before-after Git drift;
+- missing/extra source file and changed byte;
+- symlink/reparse/wrong-type rejection;
+- duplicate/case-alias/path traversal rejection;
+- canonical manifest/bundle round trip;
+- manifest/inventory/launcher tampering;
+- exact bundle namespace verification;
+- release-root and durable-root separation;
+- pure runtime-binding round trip and every identity field tamper;
+- strategy/config/risk identity propagation;
+- explicit dependency-closure limitation;
+- no scheduler/provider/credential/broker/live capability;
+- no production/Y/Z scratch access in implementation tests;
+- source-only registration and workflow/profile topology drift.
+
+Register immediately as a source-only checkpoint with:
+
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Use fresh external pytest basetemp roots, focused pytest, exact-file Ruff check/format and `git diff --check`. No broad FULL/ROBINHOOD/LEGACY/EXHAUSTIVE run is selected during implementation unless exact review later finds a broader affected surface.
+
+### After 133-AB
+
+If 133-AB is accepted, the next protected architecture sequence is intentionally short:
+
+1. separately reviewed immutable-release installer/installed-image observer;
+2. supervised maintenance-mode scheduler rebind with trading disabled/quiesced;
+3. migrate host admission from the 133-G Git-worktree identity to the verified release runtime binding;
+4. supervised deployment/rollback qualification;
+5. resume unattended review-paper operation.
+
+The old ACTIVE/STAGE/ARCHIVE rename/reprovision path remains historical and is not a prerequisite for this sequence.
+
+
 ## 2026-10-09 — Supervised immutable-release foundation (source checkpoint)
 
 Checkpoint `arch133-robinhood-supervised-release-foundation` implements the pure

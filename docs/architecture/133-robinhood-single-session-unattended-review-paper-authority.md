@@ -12,8 +12,16 @@ mutating or publishing anything.
 ```text
 BRANCH    feature/robinhood-unattended-review-paper-133s
 WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133s
-PARENT    3b9b885c56bce800939757b7e89a568989b73176
+BASE      03b2467a9fa7297f9ee861b677c2e9a2bad4a427
 ```
+
+
+The 133-S branch intentionally starts from the accepted Architecture 132-R2-B4
+closeout above so the restored routine-CI hygiene remains in force. Before any
+133-S source edit, carry forward the current four Architecture-133 canonical
+documents from this 133-R line unchanged onto the new branch. Do not merge or
+rebase the divergent B4 and 133-R histories; use a bounded docs-only carry-forward
+commit on the new branch.
 
 133-S must add a separate launcher/module/test surface. It MUST NOT alter the
 accepted 133-R diagnostic semantics, 133-Q reprovision operator, 133-G wake

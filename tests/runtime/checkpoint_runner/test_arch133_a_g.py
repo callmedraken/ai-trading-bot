@@ -748,7 +748,7 @@ def test_133g_source_only_registration_exact_order_and_coverage():
         "tests/scripts/certification_runner/test_profiles.py",
     )
     assert runner.ACTIVE_CI_CHECKPOINTS.count(_G133_NAME) == 1
-    assert runner.ACTIVE_CI_CHECKPOINTS[-13:-11] == (_E133_NAME, _G133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-14:-12] == (_E133_NAME, _G133_NAME)
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(_G133_NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)

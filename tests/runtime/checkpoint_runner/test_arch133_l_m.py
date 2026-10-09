@@ -23,7 +23,7 @@ def test_133l_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_L133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133l"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-5] == (_K133_NAME, _L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-9:-6] == (_K133_NAME, _L133_NAME, _M133_NAME)
     assert (
         runner._arch133_verifier_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -113,7 +113,7 @@ def test_133m_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_M133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133m"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (_L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-6] == (_L133_NAME, _M133_NAME)
     assert (
         runner._arch133_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -274,7 +274,7 @@ def test_133n_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_N133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133n"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-4] == (_L133_NAME, _M133_NAME, _N133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-5] == (_L133_NAME, _M133_NAME, _N133_NAME)
     assert (
         runner._arch133_publication_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -377,7 +377,7 @@ def test_133o_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_O133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133o"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-5:-3] == (_N133_NAME, _O133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:-4] == (_N133_NAME, _O133_NAME)
     assert (
         runner._arch133_publication_corrected_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -537,3 +537,160 @@ def test_complete_133p_real_chain_pass_and_rejection(tmp_path, monkeypatch, muta
         assert failures == ()
     else:
         assert expected in failures
+
+
+_S133_NAME = "arch133-robinhood-reprovision-parent-security-diagnostic"
+_R133_NAME = "arch133-robinhood-reprovision-admission-diagnostic"
+
+
+def _133s_copy(tmp_path, monkeypatch):
+    # B4: copy only the local sources and bounded real contract AST. Each matrix
+    # checks the immediate edge; one separate test runs the real complete chain.
+    from .helpers import _authority_fixture_text
+
+    repo = Path(runner.__file__).resolve().parents[1]
+    monkeypatch.setattr(
+        runner, "_arch133_reprovision_diagnostic_authority_check", lambda _: ()
+    )
+    for relative in (
+        *runner.ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS,
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_authority_fixture_text(repo, relative), encoding="utf-8")
+    return tmp_path
+
+
+def test_133s_real_chain_and_source_only_registration(tmp_path, monkeypatch):
+    spec = runner._checkpoint_specs()[_S133_NAME]
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133s"
+    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (_R133_NAME, _S133_NAME)
+    assert spec.tests == (
+        *runner.ARCH133_L_M_TESTS,
+        "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+        "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+        "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+    assert spec.ruff_paths == (
+        *runner.ARCH133_L_M_RUFF_PATHS,
+        *runner.ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES,
+        "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+        "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+    assert spec.authority_check(Path(runner.__file__).resolve().parents[1]) == ()
+    monkeypatch.setattr(runner, "_git_state", lambda *a: pytest.fail("host accessed"))
+    for invoke in (runner.preflight_checkpoint, runner.execute_checkpoint):
+        with pytest.raises(RuntimeError):
+            invoke(spec, repo_root=tmp_path, evidence_root=tmp_path / "evidence")
+
+
+@pytest.mark.parametrize(
+    "relative", tuple(runner.ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS)
+)
+@pytest.mark.parametrize("mutation", ["missing", "changed"])
+def test_133s_complete_local_pins_fail_closed(
+    tmp_path, monkeypatch, relative, mutation
+):
+    root = _133s_copy(tmp_path, monkeypatch)
+    path = root / relative
+    if mutation == "missing":
+        path.unlink()
+    else:
+        path.write_text(
+            path.read_text(encoding="utf-8") + "\nUNREVIEWED = True\n", encoding="utf-8"
+        )
+    assert runner._arch133_parent_security_diagnostic_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"preflight": lambda: pytest.fail("host accessed")},
+        {"execute": lambda: pytest.fail("host accessed")},
+        {"remote_branch": "wrong"},
+        {"remote_head_env": "INJECTED"},
+        {"tests": ()},
+        {"ruff_paths": ()},
+        {"authority_check": lambda _: ()},
+    ],
+)
+def test_133s_registration_capability_injection_fails_closed(
+    tmp_path, monkeypatch, change
+):
+    root = _133s_copy(tmp_path, monkeypatch)
+    specs = runner._checkpoint_specs()
+    specs[_S133_NAME] = replace(specs[_S133_NAME], **change)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert runner._arch133_parent_security_diagnostic_authority_check(root)
+
+
+@pytest.mark.parametrize("target", ["runner", "workflow"])
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "order"])
+def test_133s_active_order_drift_fails_closed(tmp_path, monkeypatch, target, mutation):
+    root = _133s_copy(tmp_path, monkeypatch)
+    path = root / (
+        "scripts/checkpoint_runner.py"
+        if target == "runner"
+        else ".github/workflows/checkpoint-source-gates.yml"
+    )
+    text = path.read_text(encoding="utf-8")
+    if target == "runner":
+        line, prior = f'    "{_S133_NAME}",\n', f'    "{_R133_NAME}",\n'
+    else:
+        line, prior = f"              {_S133_NAME}\n", f"              {_R133_NAME} `\n"
+    assert text.count(line) == 1
+    if mutation == "order":
+        text = text.replace(prior + line, line + prior)
+    else:
+        text = text.replace(line, "" if mutation == "missing" else line * 2)
+    path.write_text(text, encoding="utf-8")
+    assert runner._arch133_parent_security_diagnostic_authority_check(root)
+
+
+def test_133s_copied_baseline_passes_without_whole_chain_setup(tmp_path, monkeypatch):
+    assert (
+        runner._arch133_parent_security_diagnostic_authority_check(
+            _133s_copy(tmp_path, monkeypatch)
+        )
+        == ()
+    )
+
+
+@pytest.mark.parametrize("failure", [(), ("predecessor rejected",)])
+def test_133s_predecessor_called_once_and_failure_propagates(monkeypatch, failure):
+    root = Path(runner.__file__).resolve().parents[1]
+    seen = []
+
+    def previous(repo):
+        seen.append(repo)
+        return failure
+
+    monkeypatch.setattr(
+        runner, "_arch133_reprovision_diagnostic_authority_check", previous
+    )
+    assert runner._arch133_parent_security_diagnostic_authority_check(root) == failure
+    assert seen == [root]
+
+
+@pytest.mark.parametrize("mutation", ["inventory", "registration"])
+def test_133s_pin_inventory_and_source_registration_drift(
+    tmp_path, monkeypatch, mutation
+):
+    root = _133s_copy(tmp_path, monkeypatch)
+    if mutation == "inventory":
+        monkeypatch.setattr(runner, "ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES", ())
+    else:
+        path = root / "scripts/checkpoint_runner.py"
+        text = path.read_text(encoding="utf-8")
+        # Mutate only the S capability in the copied source contract.
+        start = text.index(f'"{_S133_NAME}": CheckpointSpec(')
+        text = text[:start] + text[start:].replace(
+            "preflight=None", "preflight=unreviewed", 1
+        )
+        path.write_text(text, encoding="utf-8")
+    assert runner._arch133_parent_security_diagnostic_authority_check(root)

@@ -1,5 +1,290 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Real 133-X PASS; Architecture 133-Y Windows rename qualification FROZEN
+
+The separately authorized real Architecture 133-X reconciliation diagnostic ran
+once from the exact accepted X source:
+
+```text
+X_SOURCE_HEAD   bc3bf20cfc62dc4e6421da8ea07c088359ddb3de
+X_SOURCE_TREE   a522a7c955db233e9ea0277410c8aad5584bd587
+W_SOURCE_HEAD   ca550cc9310aa59b2e42369491980402b2adf2c2
+W_SOURCE_TREE   3bd825fdaba21037c3381b504f5b545b13702e2d
+MATERIAL_SHA256 7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+W_PLAN_SHA256   a9a88fb1b505c138cb50887e9e06aebbfc7805c5a0a19d48f7f1f14dbeec60a4
+STATUS          PASS
+DISPOSITION     W_ARCHIVE_RENAME_NOT_COMMITTED
+EXIT            0
+```
+
+All fifteen protected-effect counters were zero. The real 133-X diagnostic
+authorization is consumed and MUST NOT be rerun.
+
+133-X independently proved that the real 133-W first rename did **not** commit.
+The exact durable state remains:
+
+```text
+ACTIVE
+  present
+  exact sealed predecessor
+  root identity [1855336320,1407374886183770]
+  root security sha256
+  d6f7112da6508b0413e243fb666e98d7711a8adffcd618623c1f4c78f68efdab
+
+STAGE
+  F:\AITradingBot\Arch133Q-stage\generation
+  present
+  exact reviewed staged generation
+  root identity [1855336320,844424933411687]
+  root security sha256
+  6f37254510de5246c3d8427a49743f013c339f60c205a2464b46e8aa4f8ab5c7
+
+ARCHIVE
+  F:\AITradingBot\Arch133Q-stale
+  absent
+
+STAGING_PARENT
+  identity [1855336320,2251799815590570]
+  security sha256
+  b8fc336502437d1599a257da32a20bb62966663bb20fa44694d614c0f59361a3
+```
+
+The exact predecessor/stage file identities, hashes, policies, state/paper
+fingerprints and activation/wake IDs remain the reviewed W-plan/X values.
+
+This is the second independently reconciled failure at the exact first archive
+rename boundary:
+
+- U failed before its ACTIVE -> ARCHIVE rename committed while its source-root
+  handle sharing omitted FILE_SHARE_DELETE;
+- W corrected the rename-source/parent sharing to
+  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE and still failed
+  before the same rename committed.
+
+Therefore the share-mode defect was real but not sufficient to make this Win32
+rename form viable on this host.
+
+The strongest remaining native-compatibility hypothesis is W's use of
+`SetFileInformationByHandle(FileRenameInfo)` with a non-NULL
+`FILE_RENAME_INFO.RootDirectory` and a relative target name. Public
+real-Windows reproductions report ERROR_INVALID_PARAMETER (87) for that exact
+Kernel32 shape, while RootDirectory=NULL with a fully qualified destination
+succeeds. Microsoft structure documentation describes the relative
+RootDirectory form, so this remains a compatibility hypothesis rather than a
+proven production error because W intentionally sanitizes its raw Win32 error.
+
+After two protected production failures, **no third production rename is to be
+attempted from an unqualified native shape**.
+
+### Architecture 133-Y — isolated Windows rename primitive qualification
+
+133-Y is a new source-bound **scratch-only Windows native qualification**. Its
+purpose is to prove the replacement rename primitive on this exact host/volume
+without observing or mutating ACTIVE, STAGE, ARCHIVE, scheduler, credentials,
+provider, wake, paper, broker or live state.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133y
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133y
+START     bc3bf20cfc62dc4e6421da8ea07c088359ddb3de
+```
+
+Suggested separate source surface:
+
+```text
+src/trading_bot/arch133_windows_rename_qualification/__init__.py
+src/trading_bot/arch133_windows_rename_qualification/native.py
+src/trading_bot/arch133_windows_rename_qualification/operator.py
+scripts/run_arch133_windows_rename_qualification.py
+tests/review_paper/test_arch133_windows_rename_qualification.py
+```
+
+Use result schema:
+
+```text
+arch133y-windows-rename-qualification/v1
+```
+
+133-Y MUST NOT import the U/W writers or any production reconciliation/execution
+operator as runtime authority.
+
+#### Fixed scratch scope
+
+The only filesystem namespace 133-Y may create, rename, verify or remove is:
+
+```text
+F:\AI\temp\arch133y-rename-qualification
+```
+
+The qualifier must fail closed unless that exact root is absent before the
+authorized run. It must never follow reparse points and must never accept a
+caller-supplied root or path override.
+
+Within that root, construct this fixed scratch topology:
+
+```text
+root\active\
+root\stage-parent\generation\
+root\archive   (initially absent)
+```
+
+Each source generation contains four inert fixed-name test files matching the
+production *shape* only:
+
+```text
+activation.json
+host-binding.json
+paper.sqlite
+wake.sqlite
+```
+
+The bytes are synthetic test bytes only. No production data may be copied or
+read.
+
+#### Candidate native primitive to qualify
+
+133-Y must use a separate native implementation and exercise exactly this
+candidate:
+
+- source directory opened with DELETE access;
+- source and rename-relevant directory handles use
+  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE (`dwShareMode == 7`);
+- fixed child files are held open with read/delete sharing and **without**
+  write sharing;
+- call `SetFileInformationByHandle(FileRenameInfo)`;
+- set `FILE_RENAME_INFO.RootDirectory = NULL`;
+- provide the fully qualified absolute destination path in `FileName`;
+- `ReplaceIfExists = FALSE`;
+- no MoveFile/MoveFileEx fallback;
+- no NtSetInformationFile fallback;
+- no retry;
+- no alternate destination.
+
+The scratch sequence must reproduce the production role/order:
+
+1. create the two synthetic generations;
+2. hold root/parent/source/child handles with the intended production sharing;
+3. verify exact identities and bytes;
+4. rename scratch ACTIVE -> scratch ARCHIVE once;
+5. verify source absent, archive identity unchanged, held children unchanged;
+6. rename scratch STAGE -> scratch ACTIVE once;
+7. verify final ACTIVE identity equals former STAGE, ARCHIVE equals former ACTIVE,
+   stage-parent is empty, all held child identities/bytes remain unchanged;
+8. close all held handles;
+9. only after PASS evidence is complete, remove the fixed scratch root.
+
+Cleanup authority is limited to the successfully verified scratch tree created
+by the same invocation. Any failure after the first scratch mutation preserves
+the scratch tree for evidence and performs no cleanup or retry.
+
+The operator must retain the raw Win32 status/error **only in a bounded,
+sanitized numeric diagnostic field** such as `native_error_code`; it must not
+emit arbitrary native strings, paths outside the fixed scratch root or other
+environment details.
+
+#### Source/runtime and one-shot authority
+
+The source must bind to its own clean named Y tracking checkout, exact production
+Python path/version/hash, Windows, NTFS scratch volume, Administrator identity,
+and the accepted host source identity. It must reject all CLI path overrides.
+
+A real Y qualification remains a separately protected one-attempt **scratch
+WRITE** operation after source acceptance. The real operator must require an
+interactive TTY phrase bound to the reviewed accepted Y source HEAD, e.g.:
+
+```text
+AUTHORIZE ARCH133Y <accepted-source-head>
+```
+
+The exact phrase/source identity will be supplied only after source acceptance.
+
+Before the first scratch mutation, failure is:
+
+```text
+BLOCKED / QUALIFICATION_REJECTED
+```
+
+After the first scratch mutation begins, failure is:
+
+```text
+INDETERMINATE / PRESERVE_SCRATCH_NO_RETRY
+```
+
+PASS is:
+
+```text
+PASS / RENAME_PRIMITIVE_QUALIFIED
+```
+
+All fifteen existing production protected-effect counters remain exactly zero.
+Scratch effects must be separately reported and may not be conflated with
+production counters.
+
+A successful result must prove exactly two scratch renames and successful final
+cleanup. No real Architecture-133 production namespace may be opened at any
+point.
+
+#### Y tests/source gate
+
+Tests are fake/temp only and must cover at least:
+
+- exact Y runtime/source binding;
+- no import of U/W native writers or production execution operators;
+- fixed scratch path and rejection of all path overrides;
+- scratch root must be initially absent;
+- synthetic bytes only; no production namespace reads;
+- exact `FILE_RENAME_INFO` layout used by the implementation;
+- RootDirectory is NULL;
+- destination is fully qualified absolute;
+- ReplaceIfExists is false;
+- source DELETE access;
+- rename handle sharing is exactly 7;
+- child handles deny write sharing while permitting delete;
+- no MoveFile/MoveFileEx/NtSetInformationFile fallback;
+- no retry path;
+- two fixed renames in exact order;
+- identity preservation across both renames;
+- held-child observations remain stable;
+- pre-mutation BLOCKED semantics;
+- post-mutation INDETERMINATE/preserve semantics;
+- bounded numeric native error reporting;
+- cleanup only after complete PASS and only within the invocation-created
+  scratch tree;
+- every production protected-effect counter stays zero;
+- source pins/inventory/registration/order/workflow fail closed.
+
+Register immediately after 133-X:
+
+```text
+arch133-robinhood-windows-rename-qualification
+remote_branch   = feature/robinhood-unattended-review-paper-133y
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority check must chain complete accepted 133-X authority and pin the Y
+source/launcher/registration/workflow surface. Preserve B3/B4 source-gate
+hygiene and proactively update topology/profile fixtures.
+
+Implementation model: **Sol High**. This checkpoint is Windows-native even
+though its writes are scratch-only.
+
+Do NOT run a real Y qualification during implementation. Do NOT read or mutate
+ACTIVE/STAGE/ARCHIVE. Do NOT rerun U/V/W/X. Do NOT perform scheduler,
+provider/OAuth, wake, paper, broker/live effects or broad certification.
+
+### After Y
+
+Only a real Y PASS may justify freezing the next production recovery primitive.
+If the current staged activation has crossed its scheduler start boundary by
+then, it must not be published late. The successor recovery must instead
+re-evaluate how to safely produce and publish a newly fresh generation while
+preserving the still-sealed predecessor and all evidence.
+
+
 ## 2026-10-09 — Architecture 133-X SOURCE ACCEPTED
 
 Architecture 133-X post-W recovery reconciliation is **SOURCE ACCEPTED** after

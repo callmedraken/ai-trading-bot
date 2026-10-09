@@ -575,11 +575,11 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch133-robinhood-reprovision-parent-policy-diagnostic\n"
+                "arch133-robinhood-fresh-activation-reprovision-corrected\n"
                 "          exit $LASTEXITCODE"
             ),
             (
-                "arch133-robinhood-reprovision-parent-policy-diagnostic\n"
+                "arch133-robinhood-fresh-activation-reprovision-corrected\n"
                 "          exit 0"
             ),
         ),

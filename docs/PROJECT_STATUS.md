@@ -1,5 +1,287 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Real 133-S BLOCKED at PARENT_VOLUME_ACL; Architecture 133-T role-aware volume-policy correction FROZEN
+
+One separately authorized real Architecture 133-S read-only parent-security
+diagnostic was executed from the exact accepted docs-closeout source.
+
+Exact invocation identity:
+
+```text
+PRINCIPAL        DESKTOP-I4DOKM7\John / Administrator
+S_BRANCH         feature/robinhood-unattended-review-paper-133s
+S_HEAD           08ac5a29c7871d949cb9497eca3af380098f5146
+S_TREE           4ecc491aa206d314b0d059f911b24038ba68a367
+G_HEAD           65f0d40217f8ce129224531a5151f4acea889d89
+G_TREE           16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
+MATERIAL_SHA256  7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+PYTHON_SHA256    cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+The sanitized diagnostic result was:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"reason":"PARENT_SECURITY_DIAGNOSTIC_BLOCKED","scheduler_reads":0,"scheduler_writes":0,"schema":"arch133s-parent-security-diagnostic/v1","stage":"PARENT_VOLUME_ACL","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+Wrapper exit: `ARCH133S_DIAGNOSTIC_EXIT=3`.
+
+The one real 133-S authorization is consumed. All fifteen effect counters are
+zero.
+
+Because 133-S reports the first rejected fixed substage, this establishes that
+all predecessor/material/namespace stages passed again, and that the standalone
+`F:\` parent additionally passed:
+
+```text
+PARENT_VOLUME_OPEN
+PARENT_VOLUME_OBSERVE
+PARENT_VOLUME_FILESYSTEM
+PARENT_VOLUME_REPARSE
+PARENT_VOLUME_OWNER
+```
+
+The first rejection is exactly `PARENT_VOLUME_ACL`. No host-parent or combined
+parent stage was reached.
+
+### Source diagnosis — 133 volume ACL policy is over-conservative
+
+No production ACL repair may be inferred from the sanitized result alone.
+However, exact repository review identifies a source-policy contradiction
+independent of the unknown real ACE identity.
+
+The current Architecture-133 `arch133_reprovision.namespace.parent_guard()`
+uses the same non-Administrator effective-ACE forbidden mask for both
+`F:\` and `F:\AITradingBot`:
+
+```text
+0xD0046
+= FILE_ADD_FILE
+| FILE_ADD_SUBDIRECTORY
+| FILE_DELETE_CHILD
+| DELETE
+| WRITE_DAC
+| WRITE_OWNER
+```
+
+The previously accepted Windows security model intentionally distinguishes
+these two roles.
+
+Architecture-124 freezes the volume rule as namespace protection: the actual
+untrusted token must lack only:
+
+```text
+FILE_DELETE_CHILD | WRITE_DAC | WRITE_OWNER
+= 0xC0040
+```
+
+on `F:\`. It explicitly records that volume-root child/sibling creation,
+metadata/data writes, and `DELETE` on the volume object itself do not establish
+authority to delete, rename or replace the independently protected
+`F:\AITradingBot` child.
+
+The accepted Architecture-103 paper-parent security model encodes the same role
+split and independently tests it. For `F:\`, a non-Administrator effective
+ALLOW ACE may contain only concrete file rights within:
+
+```text
+FILE_ALL_ACCESS & ~(FILE_DELETE_CHILD | WRITE_DAC | WRITE_OWNER)
+= 0x1301BF
+```
+
+and the tests explicitly accept ordinary masks including `0x2`, `0x4`,
+`0x10000` and `0x1301BF`. They reject `0x40`, `0x40000`, `0x80000`
+and generic/unknown rights.
+
+The immediate protected parent `F:\AITradingBot` remains intentionally
+stricter because its children include the governed Architecture-133 namespace.
+Its existing Architecture-133 policy is not broadened by this finding.
+
+Also correct the terminology in new Architecture-133 source/docs/tests:
+Windows ACE flag `0x08` is `INHERIT_ONLY_ACE`, not `INHERITED_ACE`.
+The existing code's `flags & 0x08` exemption means an inheritance template is
+not effective on the currently opened object. Do not change historical evidence
+text solely for terminology.
+
+No additional real-host read is required to establish this source contradiction.
+
+## Architecture 133-T — role-aware parent-policy correction
+
+Architecture 133-T is the source-only successor.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133t
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133t
+```
+
+133-T must preserve the accepted B3/B4 CI-hygiene changes and all accepted 133-S
+source/history. It must not merge or rebase an older divergent line.
+
+### Production correction
+
+Correct only the parent-role policy in
+`src/trading_bot/arch133_reprovision/namespace.py`.
+
+For `F:\`:
+
+1. Preserve exact NTFS, non-reparse and Administrators-owner checks.
+2. Preserve same-handle security re-observation and exactly-once close.
+3. Administrators and SYSTEM ACEs remain exempt from the non-admin rights test.
+4. An ACE with `INHERIT_ONLY_ACE` flag `0x08` is not effective on the volume
+   object. Its template semantics may remain accepted only under a bounded,
+   source-owned flag rule; malformed/unknown inheritance flags fail closed.
+5. Every effective non-Administrator/non-SYSTEM ALLOW ACE must contain only
+   concrete rights within `0x1301BF`.
+6. Any `FILE_DELETE_CHILD`, `WRITE_DAC`, `WRITE_OWNER`, generic access bit
+   or unknown/out-of-contract right fails closed.
+7. Unsupported ACE type/flag shape fails closed rather than being interpreted
+   as permission.
+8. Do not require the volume DACL to equal the protected-host DACL; the volume
+   is explicitly allowed to have a broader host policy.
+
+For `F:\AITradingBot`:
+
+- preserve the current Architecture-133 predicate exactly unless a focused
+  source-equivalence test demonstrates a purely mechanical extraction;
+- do not broaden its accepted non-admin rights;
+- preserve held-handle re-observation and cleanup.
+
+The combined `parent_guard()` must apply the role-appropriate policy while
+holding both handles throughout the guarded interval.
+
+### Independent equivalence evidence
+
+Add tests proving the corrected `F:\` role is semantically equivalent to the
+already accepted volume-role contract in
+`personal_desktop_paper_account_security._require_parent_security` for the
+relevant synthetic ACE/mask/flag matrix, without importing that runtime module
+into the production 133 reprovision path.
+
+At minimum prove:
+
+```text
+ACCEPT volume:
+0x2
+0x4
+0x10
+0x100
+0x10000
+0x1200A9
+0x1301BF
+
+REJECT volume:
+0x40
+0x40000
+0x80000
+GENERIC_READ
+GENERIC_WRITE
+GENERIC_EXECUTE
+GENERIC_ALL
+unknown rights outside FILE_ALL_ACCESS
+unsupported ACE type/flag shape
+```
+
+Prove the unchanged host-parent matrix continues to reject the original frozen
+`0xD0046` components for effective non-admin ACEs.
+
+### 133-T read-only diagnostic
+
+Add a separate source-only diagnostic successor. Do not modify consumed 133-S
+operator semantics.
+
+Suggested surface:
+
+```text
+src/trading_bot/arch133_parent_policy_diagnostic/__init__.py
+src/trading_bot/arch133_parent_policy_diagnostic/admission.py
+src/trading_bot/arch133_parent_policy_diagnostic/operator.py
+scripts/run_arch133_parent_policy_diagnostic.py
+tests/review_paper/test_arch133_parent_policy_diagnostic.py
+```
+
+Register:
+
+```text
+arch133-robinhood-reprovision-parent-policy-diagnostic
+```
+
+immediately after 133-S, on branch
+`feature/robinhood-unattended-review-paper-133t`, with no preflight, execute
+or remote-head environment callback.
+
+The diagnostic must independently repeat every accepted predecessor/material/
+freshness/namespace predicate before parent inspection. Its parent stages must
+use the corrected production role-aware predicate, not a weaker test-only rule.
+
+Fixed sanitized parent stages remain:
+
+```text
+PARENT_VOLUME_OPEN
+PARENT_VOLUME_OBSERVE
+PARENT_VOLUME_FILESYSTEM
+PARENT_VOLUME_REPARSE
+PARENT_VOLUME_OWNER
+PARENT_VOLUME_ACL
+PARENT_VOLUME_REOBSERVATION
+PARENT_VOLUME_CLOSE
+
+PARENT_HOST_OPEN
+PARENT_HOST_OBSERVE
+PARENT_HOST_FILESYSTEM
+PARENT_HOST_REPARSE
+PARENT_HOST_OWNER
+PARENT_HOST_ACL
+PARENT_HOST_REOBSERVATION
+PARENT_HOST_CLOSE
+
+PARENT_COMBINED_VOLUME_OPEN
+PARENT_COMBINED_VOLUME_OBSERVE
+PARENT_COMBINED_VOLUME_POLICY
+PARENT_COMBINED_HOST_OPEN
+PARENT_COMBINED_HOST_OBSERVE
+PARENT_COMBINED_HOST_POLICY
+PARENT_COMBINED_VOLUME_REOBSERVATION
+PARENT_COMBINED_HOST_REOBSERVATION
+PARENT_COMBINED_HOST_CLOSE
+PARENT_COMBINED_VOLUME_CLOSE
+ADMISSION_COMPLETE
+```
+
+No SID, ACE, mask, descriptor hash/bytes, native exception text or other
+host-sensitive ACL detail may cross the JSON boundary.
+
+### Effect boundary
+
+133-T source implementation and diagnostic remain read-only. Preserve the same
+fifteen explicit zero-effect counters. Fresh-process imports must exclude ACL
+writers/repair, reprovision writers, Credential Manager, provider/MCP/network,
+Task Scheduler access, wake execution/delegation, paper/state mutation and
+broker/live execution.
+
+Tests use fake/temp inputs only. No real ACL read, ACL mutation, reprovision,
+scheduler/provider/wake/broker operation or protected diagnostic is part of
+source verification.
+
+### Verification and acceptance
+
+Use focused tests first, then the registered push-triggered source gate to a
+terminal result. Preserve B4 fixture hygiene: no repeated full
+`checkpoint_runner.py` fixture copies or redundant full predecessor-chain setup.
+
+ChatGPT performs exact-source review and selects any broader certification tier
+after terminal CI.
+
+Source acceptance grants no real 133-T diagnostic authority and no ACL repair
+authority. A real 133-T read-only diagnostic, if source-accepted, remains a fresh
+one-attempt protected boundary requiring explicit authorization.
+
+The consumed 133-S and 133-R diagnostics MUST NOT be rerun. The consumed 133-Q
+plan MUST NOT be rerun. 133-Q `execute-once`, Q133-3, Q133-4, ACL mutation,
+provider/OAuth access, unattended wake execution and production/live broker
+effects remain unauthorized / NO-GO.
+
 ## 2026-10-08 — Architecture 133-S SOURCE ACCEPTED; real parent-security diagnostic remains protected
 
 Architecture 133-S is **SOURCE ACCEPTED** as the separate zero-effect

@@ -1,5 +1,49 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-09 — Real 133-Y INDETERMINATE; Architecture 133-Z scratch qualification CONTRACT FROZEN
+
+The single separately authorized **real 133-Y scratch qualification** was executed by the operator from the accepted Y source. The operator-reported result was:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"PRESERVE_SCRATCH_NO_RETRY","execution_delegations":0,"manual_task_starts":0,"native_error_code":5,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133y-windows-rename-qualification/v1","scratch":{"cleanup_attempts":0,"cleanups_completed":0,"first_rename_attempts":1,"first_renames_completed":0,"second_rename_attempts":0,"second_renames_completed":0,"topology_creation_attempts":1,"topology_creations_completed":1},"state_mutations":0,"status":"INDETERMINATE","wake_delegations":0}
+```
+
+Wrapper: `ARCH133Y_QUALIFICATION_EXIT=3`. One topology creation completed and one first-rename API call was attempted; the first rename did not report success. Neither second rename nor cleanup was attempted. All 15 reported production effect counters are zero. `native_error_code=5` means `ERROR_ACCESS_DENIED`. This output is **not** an independent post-failure reconciliation: do not claim the first rename was proven uncommitted or that scratch was subsequently observed.
+
+The 133-Y one-shot authority is **CONSUMED**. Preserve without inspecting/mutating/deleting or reusing `F:\AI\temp\arch133y-rename-qualification` except under a separately reviewed diagnostic boundary. Never rerun Y, U, V, W, or X; never retry a consumed production write. The last independent production reconciliation remains 133-X `PASS / W_ARCHIVE_RENAME_NOT_COMMITTED`; do not infer any subsequent production observation. No ACTIVE/STAGE/ARCHIVE, ACL, publication, cleanup, scheduler, OAuth/provider, wake, paper, broker or live operation is authorized. Production/live remain NO-GO.
+
+### Diagnosis and evidence quality
+
+The accepted U, W and Y implementations hold child-file handles open across the first directory rename. Y uses the corrected `FILE_RENAME_INFO` shape (NULL `RootDirectory`, absolute UTF-16 destination, `ReplaceIfExists=FALSE`), source DELETE access and directory share 7, yet Windows returned error 5. Microsoft [MS-FSA] 2.1.5.15.12 and 2.1.4.2 specify that renaming a directory can fail with `STATUS_ACCESS_DENIED` when descendants remain open:
+https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/87f86c9b-6c2a-4803-84b7-131a74a434fa
+https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fsa/133840e4-778e-44ca-9b41-da2323615075
+
+Therefore **held descendants are the strongest supported explanation**, not an independently proven sole cause. The fake Y rename implementation modeled successful path moves but not the NTFS open-descendant rejection, exposing a real-Windows semantic coverage gap. Correct share modes and ABI layout are necessary but not sufficient evidence for native success.
+
+### Architecture 133-Z — distinct scratch-only successor
+
+**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; REAL EFFECT NOT AUTHORIZED.**
+Design 133-Z as a newly source-bound, single-attempt synthetic NTFS qualification of the **close-descendants → rename → reopen-and-reverify** lifecycle. Z is not a patch/retry of consumed Y and is not a production recovery operator.
+
+```text
+BRANCH      feature/robinhood-unattended-review-paper-133z
+WORKTREE    F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133z
+BASE        accepted 133-Y documentation-closeout commit from this checkpoint
+SCRATCH     F:\AI\temp\arch133z-rename-qualification
+SCHEMA      arch133z-windows-rename-qualification/v1
+CHECKPOINT  arch133-robinhood-closed-descendant-rename-qualification
+```
+
+Register Z as a **source-only** checkpoint after Y (`preflight=None`, `execute=None`, `remote_head_env=None`), with complete preceding authority checks, exact source/launcher/inventory/registration/workflow pins and no CI registration gap (the reviewed workflow admits `feature/robinhood-*`). No Z branch/worktree/source/effect is created by this docs-only contract.
+
+At each fixed scratch rename, Z must independently verify the synthetic directory/file identities and bytes, **successfully close all descendant file handles under the source directory before native rename**, and prove from its own handle ledger that none remains open at API entry. Retain the proper DELETE-capable directory-source handle and fixed no-replace absolute `FileRenameInfo` encoding. After success, reopen the destination children through the new path, revalidate unchanged identities/hashes and exact namespace, then close those children before any subsequent directory rename or cleanup. Fixed sequence: synthetic ACTIVE→ARCHIVE, verify, then synthetic STAGE→ACTIVE, verify, successful handle closure, success-only bounded cleanup. No MoveFile, NtSetInformationFile, fallback, alternate target, no automatic retry, or production-root reference.
+
+A Z fake-native negative test must reject a directory rename with any still-open descendant using numeric error 5; a positive test must assert zero descendant handles at both actual rename entry points and full independent pre/post identity+hash verification. Failures before mutation BLOCK; once scratch creation starts, any failure is INDETERMINATE / PRESERVE_SCRATCH_NO_RETRY. All 15 production-effect counters remain zero, including under failure injection. Real Z qualification needs **fresh, separate authorization** only after exact GitHub source review and terminal CI; it is not granted by this contract or any source-only gate. A Z scratch PASS would qualify that primitive only; subsequent production recovery design must separately resolve close-to-rename TOCTOU, expected source/archive topology, current session freshness and durable reconciliation before any production write.
+
+### Immediate next action
+
+Implement the bounded Z source-only checkpoint on its own named worktree, preferably **Sol High** because the change controls native Windows handle lifetime and fail-closed ordering. ChatGPT retains architecture, exact remote-diff review, certification and protected authorization. Focused fake/temp tests plus source-gate CI are the next verification tier; do not launch FULL/ROBINHOOD/LEGACY/EXHAUSTIVE merely for a docs-only contract. Do not execute a real Z/Y operation.
+
 ## 2026-10-09 — Architecture 133-Y SOURCE ACCEPTED
 
 Architecture 133-Y scratch-only Windows rename qualification source is

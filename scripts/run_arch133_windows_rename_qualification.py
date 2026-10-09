@@ -13,6 +13,7 @@ try:
         or Path(__file__).resolve().parents[1] != _SOURCE_ROOT.resolve(strict=True)
         or _NO_PYCACHE.exists()
         or _NO_PYCACHE.is_symlink()
+        or _NO_PYCACHE.is_junction()
     ):
         raise ValueError
     sys.pycache_prefix = str(_NO_PYCACHE)

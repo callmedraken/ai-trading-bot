@@ -999,3 +999,11 @@ def test_admission_runtime_or_admin_drift_before_create_has_zero_scratch(
     result = assert_result(operator.run(), "BLOCKED")
     assert result["scratch"] == dict.fromkeys(operator.SCRATCH_COUNTERS, 0)
     assert not fake.path(native.SCRATCH_ROOT).exists()
+
+
+def test_dangling_cache_junction_blocks_runtime(runtime_fixture, monkeypatch):
+    cache = runtime_fixture.cache
+    assert not cache.exists()
+    monkeypatch.setattr(Path, "is_junction", lambda path: path == cache)
+    with pytest.raises(ValueError):
+        operator.observe_runtime()

@@ -121,6 +121,7 @@ def observe_runtime() -> dict:
         or sys.pycache_prefix != str(NO_PYCACHE)
         or NO_PYCACHE.exists()
         or NO_PYCACHE.is_symlink()
+        or NO_PYCACHE.is_junction()
         or Path(__file__).resolve().parents[3] != SOURCE_ROOT.resolve(strict=True)
         or Path(sys.argv[0]).resolve(strict=True) != LAUNCHER.resolve(strict=True)
         or Path(sys.executable).resolve(strict=True)

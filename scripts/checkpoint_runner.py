@@ -2241,10 +2241,10 @@ ARCH133Y_QUALIFICATION_PINS: Final = {
         "df75e8bbb291a01484510f1a3d373a3236e6ecd764fb06e7e821c8800ebc4b2f"
     ),
     "src/trading_bot/arch133_windows_rename_qualification/operator.py": (
-        "bcc571c1cb6dc481d6ddcf61fd1f31ccbbde4ebf95fece88bd608d917b7af4b4"
+        "65c30f88ac91bd2fbf816da02d8fce6a64b8d95d205dde40c74737c6b5ec0296"
     ),
     "scripts/run_arch133_windows_rename_qualification.py": (
-        "b35cfe8cfb58c3a73f6c1d131f8f018cfd9b716adbe94bc2a764603f27800a23"
+        "d9ec4f0dfbf62ac373e9e6db159f1089d78372925f148d695b7067bbca16c89c"
     ),
 }
 ARCH133Y_QUALIFICATION_REGISTRATION_PIN: Final = (

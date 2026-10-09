@@ -14,6 +14,55 @@ from trading_bot.arch133_reprovision.generation import ACTIVE, ARCHIVE, STAGING_
 PARENTS = ("F:\\", r"F:\AITradingBot")
 
 
+VOLUME_NON_ADMIN_RIGHTS = 0x1301BF
+VOLUME_ACE_FLAGS = 0x1B
+INHERIT_ONLY_ACE = 0x08
+
+
+def require_parent_acl(path: str, observation: read_only.DirectoryObservation) -> None:
+    """Apply the frozen host policy or the concrete volume namespace policy."""
+    if path == PARENTS[0]:
+        for sid, mask, ace_type, flags in observation.aces:
+            if ace_type != 0 or flags & ~VOLUME_ACE_FLAGS:
+                raise ValueError("volume ACE unsupported")
+            if flags & INHERIT_ONLY_ACE:
+                if not flags & 0x03:  # OBJECT_INHERIT or CONTAINER_INHERIT
+                    raise ValueError("volume template lacks inheritance")
+                continue
+            if (
+                sid not in (read_only.ADMINISTRATORS_SID, read_only.SYSTEM_SID)
+                and mask & ~VOLUME_NON_ADMIN_RIGHTS
+            ):
+                raise ValueError("volume rights rejected")
+    elif path == PARENTS[1]:
+        # Keep the accepted Architecture-133 immediate-parent predicate exact.
+        if any(
+            sid not in (read_only.ADMINISTRATORS_SID, read_only.SYSTEM_SID)
+            and not flags & 8
+            and mask & 0xD0046
+            for sid, mask, _, flags in observation.aces
+        ):
+            raise ValueError("parent writable")
+    else:
+        raise ValueError("parent role rejected")
+
+
+def require_parent_policy(
+    path: str, observation: read_only.DirectoryObservation
+) -> None:
+    """Read-only role policy shared by production guard and staged diagnosis."""
+    reparse_rejected = (
+        observation.reparse is not False if path == PARENTS[0] else observation.reparse
+    )
+    if (
+        observation.filesystem != "NTFS"
+        or reparse_rejected
+        or observation.owner_sid != read_only.ADMINISTRATORS_SID
+    ):
+        raise ValueError("parent rejected")
+    require_parent_acl(path, observation)
+
+
 @contextmanager
 def parent_guard() -> Iterator[dict]:
     with ExitStack() as held:
@@ -22,19 +71,7 @@ def parent_guard() -> Iterator[dict]:
             handle = read_only.open_directory(path)
             held.callback(read_only.close_handle, handle)
             observation, security = read_only.inspect_directory_security(handle, path)
-            if (
-                observation.filesystem != "NTFS"
-                or observation.reparse
-                or observation.owner_sid != read_only.ADMINISTRATORS_SID
-            ):
-                raise ValueError("parent rejected")
-            if any(
-                sid not in (read_only.ADMINISTRATORS_SID, read_only.SYSTEM_SID)
-                and not flags & 8
-                and mask & 0xD0046
-                for sid, mask, _, flags in observation.aces
-            ):
-                raise ValueError("parent writable")
+            require_parent_policy(path, observation)
             observations.append((path, handle, observation, security))
         yield {
             path: {"identity": list(observation.identity), "security_sha256": security}

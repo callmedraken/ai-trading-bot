@@ -1,5 +1,236 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Real 133-W execute INDETERMINATE; Architecture 133-X reconciliation FROZEN
+
+The separately authorized real Architecture 133-W read-only plan PASSed from the
+exact accepted W source:
+
+```text
+W_SOURCE_HEAD     ca550cc9310aa59b2e42369491980402b2adf2c2
+W_SOURCE_TREE     3bd825fdaba21037c3381b504f5b545b13702e2d
+MATERIAL_SHA256   7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+W_PLAN_SHA256     a9a88fb1b505c138cb50887e9e06aebbfc7805c5a0a19d48f7f1f14dbeec60a4
+PLAN_STATUS       PASS
+PLAN_DISPOSITION  PLANNED_ONLY
+PLAN_EXIT         0
+```
+
+All fifteen protected-effect counters were zero. The real W plan authorization
+is consumed and MUST NOT be rerun.
+
+A separate fresh WRITE authorization was then granted for exactly one W
+`execute-once` attempt using that reviewed W plan hash. The exact source-owned
+interactive phrase was entered once. W returned:
+
+```json
+{"acl_mutations":0,"archive_writes":1,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"PRESERVE_RECONCILE_NO_RETRY","execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133w-sealed-predecessor-recovery/v1","state_mutations":0,"status":"INDETERMINATE","wake_delegations":0}
+```
+
+Wrapper exit:
+
+```text
+ARCH133W_EXECUTE_EXIT=4
+```
+
+The real W execute authorization is consumed. **No retry, rollback, cleanup,
+repair, manual rename/delete, restage/reseal, scheduler action, provider/OAuth
+access, wake execution, paper execution, broker effect or live effect is
+authorized.**
+
+### Exact W counter-window interpretation
+
+W increments `archive_writes` immediately before its first and only
+ACTIVE -> ARCHIVE rename attempt. It increments `publication_writes` only
+after that rename has returned, ARCHIVE has independently verified as the exact
+sealed predecessor, ACTIVE has independently verified absent, STAGE has
+reverified exact, and freshness has passed again.
+
+Therefore:
+
+```text
+archive_writes     = 1
+publication_writes = 0
+```
+
+proves that the first archive mutation fence was crossed and the later
+STAGE -> ACTIVE publication attempt was never reached.
+
+The exact remaining durable ambiguity is:
+
+1. the ACTIVE -> ARCHIVE rename itself did **not** commit; or
+2. the rename committed and one of the immediate post-archive read-only
+   verification/freshness checks failed before publication.
+
+No counter or sanitized W result can distinguish those states.
+
+The corrected W source already removed the previously identified delete-share
+mismatch: rename source and parent handles use
+FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE. A second native
+compatibility candidate now deserves explicit investigation only *after*
+durable-state reconciliation: W uses Win32
+`SetFileInformationByHandle(FileRenameInfo)` with a non-NULL
+`FILE_RENAME_INFO.RootDirectory` and a relative target. Public real-Windows
+reproductions report `ERROR_INVALID_PARAMETER (87)` for that exact Win32
+shape while a NULL RootDirectory plus a full destination path succeeds.
+Microsoft's public structure documentation says a relative name may use a
+directory handle, so this remains a compatibility hypothesis rather than a
+proven W root cause because W intentionally sanitizes the native error code.
+No new write design is authorized on the basis of this hypothesis alone.
+
+### Architecture 133-X — post-W archive-boundary reconciliation
+
+Architecture 133-X is a new **source-only/read-only** diagnostic successor. Its
+sole purpose is to distinguish the two W archive-boundary outcomes without
+retrying or mutating anything.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133x
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133x
+START     ca550cc9310aa59b2e42369491980402b2adf2c2
+```
+
+Suggested separate source surface:
+
+```text
+src/trading_bot/arch133_reprovision_recovery_reconciliation/__init__.py
+src/trading_bot/arch133_reprovision_recovery_reconciliation/operator.py
+scripts/run_arch133_reprovision_recovery_reconciliation.py
+tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py
+```
+
+133-X MUST import **no writer/native mutation surface** and must not import the
+consumed W operator as runtime authority.
+
+It must bind exactly to:
+
+```text
+W checkout
+  root   F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133w
+  branch feature/robinhood-unattended-review-paper-133w
+  HEAD   ca550cc9310aa59b2e42369491980402b2adf2c2
+  TREE   3bd825fdaba21037c3381b504f5b545b13702e2d
+
+V checkout
+  HEAD 432001e3dcae48e589adf8e60c7dac5ffc08d591
+  TREE 96f2f41caa6d17a32fe729ae8786560252a0c9a8
+
+U checkout
+  HEAD 49686d7f61717b9ee7452cee633d23b0c7db873e
+  TREE 12b430743786ba6650aa720fc27a6d9b0d95ea74
+
+MATERIAL
+  F:\AI\temp\arch133q\fresh-material-2026-10-09.json
+  SHA256 7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+
+REVIEWED W PLAN SHA256
+  a9a88fb1b505c138cb50887e9e06aebbfc7805c5a0a19d48f7f1f14dbeec60a4
+
+PRODUCTION PYTHON SHA256
+  cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+133-X may reuse accepted read-only V/W admission primitives only where they do
+not assume one of the two outcomes. It must independently verify the exact fixed
+predecessor and staged-generation evidence from the accepted W plan.
+
+The only production paths it may observe are:
+
+```text
+ACTIVE         F:\AITradingBot\Arch133
+STAGING_PARENT F:\AITradingBot\Arch133Q-stage
+STAGE          F:\AITradingBot\Arch133Q-stage\generation
+ARCHIVE        F:\AITradingBot\Arch133Q-stale
+PARENTS        F:\
+               F:\AITradingBot
+```
+
+It must independently revalidate:
+
+- exact X runtime/source/Admin identity;
+- exact consumed W/V/U checkout identities;
+- exact reviewed material bytes/hash;
+- corrected 133-T role-aware parent policy and security re-observation;
+- STAGING_PARENT exact identity/security and exactly child `generation`;
+- STAGE exact W-plan fresh generation including fixed root/file identities,
+  hashes, policies, state/paper fingerprints, activation/wake IDs;
+- predecessor exact root identity/security, namespace identities, file hashes
+  and archive-sealed policies at whichever one of ACTIVE/ARCHIVE is present;
+- held observations remain unchanged through final re-observation and close.
+
+133-X intentionally does **not** require the activation to remain before its
+scheduler start boundary. This is durable-state reconciliation, not new
+publication admission.
+
+Exactly two PASS dispositions exist:
+
+```text
+W_ARCHIVE_RENAME_NOT_COMMITTED
+  ACTIVE  = exact sealed predecessor
+  STAGE   = exact reviewed fresh generation
+  ARCHIVE = absent
+
+W_ARCHIVE_RENAME_COMMITTED
+  ACTIVE  = absent
+  STAGE   = exact reviewed fresh generation
+  ARCHIVE = exact sealed predecessor
+```
+
+Any other topology, identity/hash/policy/security drift, source/runtime/material
+drift, close failure or observation failure must return:
+
+```text
+status      BLOCKED
+disposition RECONCILIATION_UNRESOLVED
+```
+
+with sanitized output and all fifteen protected-effect counters exactly zero.
+
+No real 133-X diagnostic is authorized by this contract or by later source
+acceptance. It remains a separately protected one-attempt read-only invocation.
+
+### 133-X tests and source gate
+
+Tests are fake/temp only and must cover at least:
+
+- exact X/W/V/U/runtime/material bindings;
+- fresh-process import closure excluding W native/writer and all effect modules;
+- exact reviewed W-plan hash constant;
+- exact STAGE verification;
+- exact predecessor verification at ACTIVE and ARCHIVE;
+- PASS: W_ARCHIVE_RENAME_NOT_COMMITTED;
+- PASS: W_ARCHIVE_RENAME_COMMITTED;
+- reject ACTIVE+ARCHIVE both present or both absent;
+- reject missing/corrupt/mixed STAGE;
+- reject predecessor identity/hash/policy/security drift;
+- corrected T parent policy reuse and re-observation;
+- close/re-observation failures fail closed;
+- all fifteen effect counters remain zero;
+- source pins/inventory/registration/order/workflow drift fail closed.
+
+Register one new active source-only checkpoint immediately after 133-W:
+
+```text
+arch133-robinhood-reprovision-recovery-reconciliation
+remote_branch   = feature/robinhood-unattended-review-paper-133x
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority check must chain the complete accepted 133-W authority and pin the
+new X source/launcher/registration/workflow surface. Preserve B3/B4 source-gate
+hygiene and proactively update checkpoint topology/profile fixtures.
+
+Implementation model: **Sol High**. This is read-only source, but it is recovery
+reconciliation after a protected Windows-native mutation attempt.
+
+Do NOT run U, V, W plan/execute, a real X diagnostic, cleanup/repair/rename,
+scheduler/provider/OAuth/wake/paper/broker/live operations, or broad
+certification profiles during implementation.
+
+
 ## 2026-10-09 — Architecture 133-W SOURCE ACCEPTED
 
 Architecture 133-W sealed-predecessor recovery source is **SOURCE ACCEPTED**

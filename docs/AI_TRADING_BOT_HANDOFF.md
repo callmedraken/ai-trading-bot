@@ -1,5 +1,199 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-08 — Architecture 133-S parent-security diagnostic contract FROZEN
+
+The accepted corrected-topology 133-R diagnostic stopped at `PARENT_VOLUME`
+with all fifteen effect counters zero. Architecture 133-S is the source-only
+read-only successor used to identify the exact parent-security rejection without
+mutating or publishing anything.
+
+### Frozen source topology
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133s
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133s
+PARENT    3b9b885c56bce800939757b7e89a568989b73176
+```
+
+133-S must add a separate launcher/module/test surface. It MUST NOT alter the
+accepted 133-R diagnostic semantics, 133-Q reprovision operator, 133-G wake
+launcher, retained host files, ACLs, scheduler state, credentials, paper/state
+stores or broker/provider surfaces.
+
+Register one new active source-only checkpoint:
+
+```text
+arch133-robinhood-reprovision-parent-security-diagnostic
+```
+
+with:
+
+```text
+remote_branch   = feature/robinhood-unattended-review-paper-133s
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+immediately after
+`arch133-robinhood-reprovision-admission-diagnostic`.
+
+### Runtime and predecessor admission
+
+The checked-in 133-S launcher must require the production Python under
+`-I -B`, an absolute `--material-file`, the exact 133-S worktree, no
+preexisting `no-pycache`, and then set its isolated pycache prefix exactly as
+the accepted 133-R launcher does.
+
+The operator must admit its own clean named 133-S source checkout and tracking
+ref, the frozen production Python identity, and the existing accepted 133-G
+bound checkout. It may reuse the already accepted 133-R read-only predecessor
+observation/material helpers only when their source is pinned and their
+133-R runtime/source admission remains real. It must not monkeypatch or bypass
+any predecessor/material/namespace predicate in production.
+
+All already-passed 133-R stages through `NAMESPACE_VACANCY` remain real and
+fail closed. No 133-S PASS may be produced unless those predicates pass again
+on that invocation.
+
+### Parent-security stage vocabulary
+
+133-S output is a single canonical JSON object. It may report only fixed
+sanitized stages. No SID list, ACE list/mask, descriptor bytes/hash, native
+message, path-derived secret or exception text may be emitted.
+
+For `F:\`:
+
+```text
+PARENT_VOLUME_OPEN
+PARENT_VOLUME_OBSERVE
+PARENT_VOLUME_FILESYSTEM
+PARENT_VOLUME_REPARSE
+PARENT_VOLUME_OWNER
+PARENT_VOLUME_ACL
+PARENT_VOLUME_REOBSERVATION
+PARENT_VOLUME_CLOSE
+```
+
+For `F:\AITradingBot`:
+
+```text
+PARENT_HOST_OPEN
+PARENT_HOST_OBSERVE
+PARENT_HOST_FILESYSTEM
+PARENT_HOST_REPARSE
+PARENT_HOST_OWNER
+PARENT_HOST_ACL
+PARENT_HOST_REOBSERVATION
+PARENT_HOST_CLOSE
+```
+
+If both standalone parents pass, 133-S must reproduce the combined held-parent
+guard with fixed substages:
+
+```text
+PARENT_COMBINED_VOLUME_OPEN
+PARENT_COMBINED_VOLUME_OBSERVE
+PARENT_COMBINED_VOLUME_POLICY
+PARENT_COMBINED_HOST_OPEN
+PARENT_COMBINED_HOST_OBSERVE
+PARENT_COMBINED_HOST_POLICY
+PARENT_COMBINED_VOLUME_REOBSERVATION
+PARENT_COMBINED_HOST_REOBSERVATION
+PARENT_COMBINED_HOST_CLOSE
+PARENT_COMBINED_VOLUME_CLOSE
+ADMISSION_COMPLETE
+```
+
+The standalone policy is exactly the accepted 133-R predicate:
+
+- filesystem must be exactly `NTFS`;
+- `reparse` must be false;
+- owner SID must equal `S-1-5-32-544` / `BUILTIN\Administrators`;
+- every ACE whose SID is neither Administrators nor SYSTEM and whose flags do
+  not contain inherited-ACE bit `8` must have zero intersection with mask
+  `0xD0046`.
+
+Combined policy must be semantically identical to
+`arch133_reprovision.namespace.parent_guard()`, including held-handle
+re-observation. Handle cleanup must be exactly once on every partial/failure
+path. A close failure must fail closed at its fixed CLOSE stage and can never
+produce PASS.
+
+### Effect boundary
+
+133-S remains read-only and zero-effect. Its result must contain exactly the
+same fifteen zero-effect counters as 133-R, all equal to zero:
+
+```text
+credential_reads
+credential_writes
+provider_calls
+scheduler_reads
+scheduler_writes
+publication_writes
+archive_writes
+paper_mutations
+state_mutations
+acl_mutations
+wake_delegations
+execution_delegations
+consumed_wake_authority
+broker_effects
+manual_task_starts
+```
+
+The fresh import closure must structurally exclude:
+
+- `arch133_reprovision.native` and every writer/reprovision transition;
+- ACL apply/repair primitives;
+- Credential Manager reads or writes;
+- Robinhood provider/MCP SDK/network paths;
+- Task Scheduler observation or mutation;
+- unattended wake execution/delegation;
+- paper/state mutation;
+- broker/live execution.
+
+### Required tests
+
+Source tests must prove:
+
+1. every fixed parent substage fails closed with all fifteen counters zero;
+2. stage ordering stops at the first rejected substage;
+3. actual owner/ACE/native details never appear in stdout/stderr/logging;
+4. accepted parent observations pass each exact frozen predicate;
+5. disallowed filesystem, reparse, owner and ACE conditions map to their exact
+   sanitized stage;
+6. changed immediate re-observation maps to the exact re-observation stage;
+7. every acquired handle closes exactly once on success and partial failure;
+8. close failure maps to the fixed CLOSE stage and prevents PASS;
+9. the combined guard keeps both parents held and detects either changed
+   observation;
+10. predecessor/material/namespace admission remains real and cannot be skipped;
+11. fresh-process imports contain no forbidden effect surface;
+12. launcher/runtime/source/branch/origin/clean/tracking drift fails closed;
+13. checkpoint registration, complete source pins and active ordering fail
+    closed on mutation.
+
+Tests must use fake/temp inputs only. No real host ACL read, protected 133-R/133-S
+invocation, provider/OAuth operation, scheduler access or production mutation is
+part of implementation verification.
+
+### Certification and protected boundary
+
+Implementation uses focused tests first, then the registered push-triggered
+source gate to terminal state. ChatGPT performs exact-source review and selects
+any broader certification tier afterward.
+
+Source acceptance, CI success or docs closeout grants **no real 133-S host-read
+authority**. A real 133-S diagnostic remains a separate one-attempt protected
+read-only boundary requiring fresh explicit user authorization.
+
+The consumed second 133-R diagnostic MUST NOT be rerun. The consumed 133-Q plan
+MUST NOT be rerun. 133-Q `execute-once`, Q133-3, Q133-4, ACL mutation,
+provider/OAuth access, unattended wake and production/live broker effects remain
+unauthorized / NO-GO.
+
 ## 2026-10-08 — Corrected-topology 133-R diagnostic BLOCKED at PARENT_VOLUME; zero effects
 
 A second, separately authorized real Architecture 133-R read-only reprovision

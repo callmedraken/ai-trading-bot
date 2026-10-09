@@ -1,5 +1,116 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-09 — Architecture 133 pivot: supervised immutable releases
+
+The project is formally pivoting away from autonomous/self-updating publication.
+The supported end state is now **unattended trading from one immutable approved
+release plus separately initiated supervised deployment/rollback**.
+
+### New operating invariant
+
+```text
+UNATTENDED RUNTIME MODE
+  scheduler may run the approved immutable release
+  deployment/scheduler mutation is prohibited
+
+DEPLOYMENT / MAINTENANCE MODE
+  scheduler is disabled and no bot cycle/process is active
+  trading authority is prohibited
+  a reviewed immutable release may be installed/selected
+```
+
+The bot never installs, pulls, publishes, replaces, or rolls back its own code.
+There is no supported self-update, autonomous reprovision, continuous deployment,
+or runtime hot-reload path.
+
+### Immutable release model
+
+Normal deployment no longer depends on renaming a live installation
+`ACTIVE -> ARCHIVE` and `STAGE -> ACTIVE`.
+
+Instead:
+
+1. Build a new uniquely named immutable release directory beside existing
+   releases. Building/verifying that isolated directory may happen before the
+   maintenance window as long as it cannot be executed by the scheduler.
+2. Verify the complete release and its manifest.
+3. Enter maintenance mode: disable scheduled execution and verify no bot
+   process/cycle is active.
+4. Supervisedly rebind the scheduler action to the exact launcher inside the new
+   immutable release.
+5. Read back and verify the scheduler binding plus release/source identity.
+6. Perform only the separately reviewed startup/sanity checks appropriate to
+   that release.
+7. Re-enable scheduled unattended execution.
+8. Retain the previous immutable release for rollback. Rollback is the same
+   supervised process with the scheduler rebound to the prior release.
+
+A deployment that becomes ambiguous leaves the scheduler disabled until a
+read-only reconciliation establishes the exact bound release. It does not
+automatically retry or resume trading.
+
+### Strategy changes
+
+Strategy code and strategy parameters follow the same release path. A running
+release does not hot-reload strategy source/configuration.
+
+Each release manifest must eventually identify at least:
+
+```text
+release_id
+source_head / source_tree
+strategy_id
+strategy_version
+strategy_config_hash
+risk-policy/version identity
+runtime/dependency identity needed for reproducibility
+```
+
+Strategy-specific persistent state is versioned separately from immutable code.
+A strategy-version/state-schema change requires an explicitly compatible
+migration or a fresh strategy-state epoch. Account/paper ledger state is not
+discarded merely because strategy code changes.
+
+### Effect on the Architecture-133 investigation
+
+The consumed U/W/Y/Z rename experiments remain valuable historical evidence,
+but the real Z scratch reconciliation is no longer on the main delivery path.
+
+Architecture 133-AA is therefore **DEFERRED / NOT REQUIRED FOR MAINLINE**.
+Do not implement or run AA merely to unblock the bot. Preserve both the Y and Z
+scratch trees untouched as historical evidence. A future read-only diagnostic or
+cleanup may be designed only if we specifically decide the evidence is worth
+inspecting or removing.
+
+The successful first Z rename remains useful evidence that closing descendants
+changed the Windows behavior, but we no longer need to qualify the two-directory
+rename protocol for normal release deployment.
+
+No production filesystem rename, scheduler mutation, provider/OAuth access,
+paper execution, broker effect or live effect is authorized by this pivot.
+
+### New mainline next milestone
+
+The next milestone is a **read-only repository/design inventory for the
+supervised immutable-release model**, followed by a small source contract that
+reuses existing scheduler/host verification where sound and retires autonomous
+publication/reprovision paths from the active roadmap.
+
+The inventory must identify:
+
+- the current scheduler action/launcher binding surface;
+- current release/install directory assumptions;
+- runtime versus durable-state roots;
+- strategy/config selection and versioning surfaces;
+- the minimum code required to build/verify an immutable release;
+- the minimum supervised scheduler-rebind boundary;
+- which Architecture-133 publication/reprovision components become historical
+  rather than active dependencies;
+- rollback and ambiguous-deployment reconciliation requirements.
+
+Do not mutate the scheduler or any production namespace during that inventory.
+
+
 ## 2026-10-09 — Real 133-Z INDETERMINATE after first rename success; Architecture 133-AA reconciliation CONTRACT FROZEN
 
 The single separately authorized **real Architecture 133-Z scratch qualification** ran once from the accepted Z source/closeout state:

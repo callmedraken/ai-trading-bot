@@ -15,6 +15,40 @@ accepted. Paper trading remains the default operating mode.
 milestone, completed foundations, roadmap, and production status. Read it before
 starting a new milestone or preparing a broad implementation plan.
 
+## Supervised release and unattended-runtime invariant
+
+The supported productionization model deliberately separates unattended trading
+from code deployment.
+
+- The unattended trading runtime MUST execute an already-installed immutable
+  release. It MUST NOT pull Git, install/update code, publish a new generation,
+  mutate scheduler configuration, replace its own executable/source tree, or
+  autonomously roll back/reprovision itself.
+- Trading/runtime mode and deployment/maintenance mode are mutually exclusive.
+  Deployment may switch the scheduler to a new release only after scheduled
+  execution is disabled/quiesced and the absence of an active bot process/cycle
+  is verified. Trading authority must remain unavailable while deployment is in
+  progress.
+- Releases are immutable, uniquely versioned directories. A strategy code or
+  strategy-parameter change creates a new reviewed release; do not hot-reload
+  source or strategy configuration into a running release.
+- Promotion uses supervised scheduler rebinding to the verified launcher inside
+  the new immutable release. Do not require ACTIVE->ARCHIVE or STAGE->ACTIVE
+  directory renames for normal deployment. Retain the prior immutable release
+  for rollback; rollback is another supervised scheduler rebind.
+- Each release must bind an exact release manifest including source identity and
+  the active strategy/config identity. Durable trading/account/paper state lives
+  outside the immutable release tree and requires explicit compatibility or
+  migration handling when its schema changes.
+- If a supervised deployment becomes ambiguous, keep scheduled trading disabled
+  and reconcile the scheduler/release binding read-only before taking another
+  deployment action. Never let an ambiguous deployment fall through into
+  unattended trading.
+- Preserved Architecture-133 experimental scratch/evidence remains historical
+  evidence. It is not part of the normal release path and must not be inspected,
+  mutated, cleaned or reused without a separately reviewed housekeeping or
+  diagnostic boundary.
+
 ## Safety requirements
 
 - Never place real-money orders during tests or ordinary development.

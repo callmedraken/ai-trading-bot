@@ -161,6 +161,7 @@ _EXPECTED_RETAINED_CHECKPOINTS = (
 )
 
 _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
+    "arch133-robinhood-supervised-release-foundation",
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
     "arch131-robinhood-paper-cycle",

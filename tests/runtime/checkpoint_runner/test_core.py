@@ -130,6 +130,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        "arch133-robinhood-supervised-release-foundation",
         "arch128-parent-acl-repair",
         "arch128-r4",
         "arch128-r5-substrate",
@@ -288,6 +289,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-unattended-review-paper-133y"
         if spec.name == "arch133-robinhood-closed-descendant-rename-qualification":
             expected_branch = "feature/robinhood-unattended-review-paper-133z"
+        if spec.name == "arch133-robinhood-supervised-release-foundation":
+            expected_branch = "feature/robinhood-supervised-release-foundation"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1087,10 +1090,15 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             for path in spec.tests
             if path.startswith("tests/runtime/checkpoint_runner/")
         )
-        assert selected == (
-            *runner.COMMON_TESTS,
-            "tests/runtime/checkpoint_runner/" + module,
+        expected = (
+            runner.COMMON_TESTS
+            if name == ("arch133-robinhood-supervised-release-foundation")
+            else (
+                *runner.COMMON_TESTS,
+                "tests/runtime/checkpoint_runner/" + module,
+            )
         )
+        assert selected == expected
         assert set(selected) <= set(spec.ruff_paths)
         certification = tuple(
             path

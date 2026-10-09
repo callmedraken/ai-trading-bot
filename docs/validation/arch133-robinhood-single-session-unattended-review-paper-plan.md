@@ -1,5 +1,33 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-09 — Supervised immutable-release foundation validation
+
+Source checkpoint: `arch133-robinhood-supervised-release-foundation`.
+Fake material only; no installed release, production Python read, scheduler
+inspection/mutation, scratch access, provider/OAuth/paper/broker/live operation.
+
+Focused coverage in `tests/review_paper/test_supervised_release_foundation.py`:
+canonical round trip and JSON-byte independence; deterministic UUID5 identity;
+changed source/strategy version/config/risk/runtime/inventory material; exact
+nested/top-level fields; duplicate fields; malformed JSON; digests/versions;
+launcher consistency and escape attempts; Windows traversal/device/ADS/alias
+rejection; durable-data exclusion; exact Decimal config canonicalization across
+ambient contexts; fixed-root scheduler projection without filesystem access;
+source-only registration, preflight/execute refusal and profile ownership;
+pure module import/call boundaries without native/write/reload capabilities.
+
+Run focused pytest with a fresh external basetemp and `-p no:cacheprovider`;
+include strategy regression, changed checkpoint-runner tests and profile tests.
+Run exact changed-Python-file Ruff check and format check, and git diff check.
+The registered push source gate is the required terminal CI evidence. No broad
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification is part of this implementation.
+
+Source PASS cannot establish real manifest byte verification, installed-tree
+completeness, reparse/ACL containment, dependency closure, runtime compatibility,
+maintenance/trading interlock, scheduler rebinding or durable-state migration.
+Those require later separately scoped contracts and protected authorization
+where effects are involved. The existing fixed runtime binding remains intact.
+
 ## 2026-10-09 — Architecture 133 pivot: supervised immutable releases
 
 The project is formally pivoting away from autonomous/self-updating publication.

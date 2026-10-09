@@ -1,5 +1,32 @@
 # Project Status and Roadmap
 
+## 2026-10-09 — Supervised immutable-release foundation implemented; source review pending
+
+Checkpoint `arch133-robinhood-supervised-release-foundation`, branch
+`feature/robinhood-supervised-release-foundation`, starts from accepted
+`cdbce74af2d5e3d3ee743b8572203601ba76f01e` / tree
+`a412fdde5cd3d6fc0bb934d4db19455ec8eee33e`.
+
+The bounded repository inventory and pure `trading_bot.supervised_release`
+foundation define manifest v1, ordered source inventory, deterministic UUID5
+release identity, exact Moving Average config digest and an inert scheduler
+action projection under `F:\AITradingBot\releases\<release-id>`.
+`F:\AITradingBot\Arch133` remains separate durable account/wake/paper data.
+Existing scheduler/runtime bindings and all reprovision implementations remain
+unchanged. The projected launcher still needs a later reviewed runtime-binding
+change before it can operate from an immutable release.
+
+This is source implementation awaiting terminal push CI and ChatGPT exact GitHub
+review/source acceptance. It grants no release creation/installation, scheduler
+access/mutation, production/provider/paper/broker/live effects or scratch access.
+Focused checks plus the registered source batch are the gate; no broad profile
+certification is requested. See the newest Architecture 133 architecture and
+validation sections for exact schema, inventory scope and limitations.
+
+Immediate next owner: ChatGPT for exact commit/diff and terminal CI review. On
+acceptance, freeze the next source-only build/verification/runtime-binding
+contract, preserving the separate maintenance/trading authority boundary.
+
 ## 2026-10-09 — Architecture 133 pivot: supervised immutable releases
 
 The project is formally pivoting away from autonomous/self-updating publication.

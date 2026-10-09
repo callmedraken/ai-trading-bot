@@ -1,5 +1,118 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Supervised immutable-release foundation (source checkpoint)
+
+Checkpoint `arch133-robinhood-supervised-release-foundation` implements the pure
+contract in `trading_bot.supervised_release`. This is implementation awaiting
+exact GitHub source review, not installed-release or deployment acceptance.
+
+### Bounded repository inventory and preserved contracts
+
+- `review_paper/unattended_scheduler.py` and
+  `scripts/arch133_scheduler_definition.ps1` still describe the existing action:
+  protected `F:\AITradingBot\runtime\python.exe`, `-I -B`, and the 133-G worktree
+  launcher/working directory. Neither binding is changed.
+- `scripts/run_arch133_unattended_review_paper.py` derives imports from its own
+  source tree; `review_paper/unattended_host_identity.py` still admits the fixed
+  133-G source binding. Merely projecting a release action cannot make this
+  launcher operational from a release. A later reviewed runtime-binding change
+  is required before installation or scheduler rebinding.
+- Existing host/verifier bindings separate Python substrate from
+  `F:\AITradingBot\Arch133` host binding, activation, wake SQLite, paper SQLite,
+  operator evidence and no-pycache marker. That root is durable runtime/account/
+  wake/paper data, never executable release inventory.
+- `strategies/moving_average.py` and its public package expose only
+  `MovingAverageCrossoverStrategy` / `MovingAverageCrossoverConfig`. The three
+  config fields are short window, long window and desired Decimal quantity.
+  Evaluation, proposal identity and trading behavior remain unchanged.
+- Existing publication/reprovision, ACTIVE/STAGE/ARCHIVE, native rename and
+  scratch qualification components remain historical implementations, unchanged
+  and unimported by this foundation. No scratch or production tree was read.
+- Building/verifying release bytes is future work. Supervised rebinding must
+  eventually reuse sound scheduler/host readback checks under maintenance-mode
+  admission, with no active process/cycle and no trading authority. Rollback
+  selects a retained reviewed immutable release. Ambiguity keeps trading disabled
+  until separately reviewed read-only reconciliation resolves the binding.
+
+### Manifest v1
+
+`arch133-supervised-release/v1` has exactly these fields:
+
+```text
+schema, release_id, source_head, source_tree,
+production_python_version, production_python_sha256,
+launcher_relative_path, launcher_sha256,
+source_inventory, source_inventory_sha256,
+strategy_id, strategy_version, strategy_config, strategy_config_sha256,
+risk_policy_id, risk_policy_version, risk_policy_sha256
+```
+
+SHA values are lowercase exact-width hex (Git SHA-1: 40; SHA-256: 64). Versions
+are canonical `major.minor.patch`; production Python is Python 3.12 or newer
+within Python 3. Strategy ID is exactly `MovingAverageCrossoverStrategy`; the
+current declared strategy contract version is `1.0.0`. The version is release
+material, not a dynamic strategy selector. Risk identity/version/hash are explicit
+reviewed declarations, not an inferred policy or permission to trade.
+
+`source_inventory` is an ordered nonempty tuple of immutable entries, each with
+exact `relative_path` and `sha256` fields. Its logical scope is `src/`, `scripts/`
+source/schema files (`.py`, `.ps1`, `.json`, `.sql`) plus `pyproject.toml`.
+Windows case aliases/duplicates, traversal, absolute paths, ADS, reserved devices,
+trailing-dot aliases and embedded Arch133 data roots are rejected. The exact
+reviewed launcher `scripts/run_arch133_unattended_review_paper.py` must be in
+inventory with matching hash. Runtime binaries are separately bound. Generated
+reports, account/wake/paper databases and the manifest itself are excluded.
+This contract declares an exact inventory; it does not scan a tree or prove the
+inventory complete. Later packaging/verification must prove completeness,
+bytes, dependency closure and absence of junctions/symlinks under a separate
+reviewed boundary.
+
+The inventory hash is SHA-256 over canonical versioned logical inventory
+material (`arch133-release-source-inventory/v1`). Caller order is preserved.
+Configuration uses `moving-average-crossover-config/v1`, positive integer
+windows and exact Decimal coefficient/exponent text (e.g. `1e0`). Trailing zeros
+are removed using Decimal tuples with no ambient-context arithmetic. Equivalent
+quantities yield the same digest without rounding large values. The config
+schema and all config fields are hashed with SHA-256.
+
+Release identity is `release-<UUID5 hex>` in namespace
+`e00c6e04-069f-5fa4-bd9f-a339058b15e7`, over canonical versioned logical manifest
+material excluding only the derived release ID. Identity is independent of input
+JSON whitespace/key order, absolute host locations, clocks and filesystem reads.
+The manifest parser rejects unknown/missing/duplicate fields, invalid values,
+noncanonical config quantities and mismatched schema/derived digests/identity.
+It serializes to sorted compact JSON with no trailing newline.
+
+### Inert action projection and source-only boundary
+
+A release root is derived solely from `F:\AITradingBot\releases` plus the exact
+validated UUID5 release ID. An optional supplied root must have the exact derived
+spelling; alternate bases, aliases, traversal and a different release ID fail.
+Projection returns only:
+
+```text
+executable: F:\AITradingBot\runtime\python.exe
+arguments: (-I, -B, <release-root>\scripts\run_arch133_unattended_review_paper.py)
+working_directory: <release-root>
+```
+
+There is no task/principal/trigger selection, scheduler access or mutation,
+native access, filesystem read/write, installation, hot reload or self update.
+These are lexical values, not installed-byte/ACL/runtime/scheduler verification.
+Trading and deployment remain mutually exclusive architecture requirements;
+this pure foundation supplies no operational mode authority.
+
+Registration uses `preflight=None`, `execute=None`, `remote_head_env=None`.
+The checkpoint enters the existing push-triggered source batch, using the
+already admitted `feature/robinhood-*` branch family. Its test module enters
+FULL/Robinhood automatically through the existing `tests/review_paper` ownership;
+required 122/49 baseline tuples and certification lanes remain unchanged.
+
+Next: ChatGPT exact GitHub commit/diff review and source acceptance. Then freeze
+a bounded build/verification and runtime-binding contract before delegating
+implementation. No release creation, installation, scheduler/provider/broker/
+live effects or scratch inspection is authorized by this checkpoint.
+
 ## 2026-10-09 — Architecture 133 pivot: supervised immutable releases
 
 The project is formally pivoting away from autonomous/self-updating publication.

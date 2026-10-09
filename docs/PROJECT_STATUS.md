@@ -1,5 +1,217 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Real 133-U execute INDETERMINATE; Architecture 133-V reconciliation diagnostic FROZEN
+
+The separately authorized real Architecture 133-U read-only plan first PASSed
+from the exact accepted U source and produced a new reviewed U plan identity:
+
+```text
+U_SOURCE_HEAD     49686d7f61717b9ee7452cee633d23b0c7db873e
+U_SOURCE_TREE     12b430743786ba6650aa720fc27a6d9b0d95ea74
+MATERIAL_SHA256   7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+PLAN_SHA256       a223d8fa606da9cc129d5d095c6c94ec6be42f350da0bec7fe4825fe6ef8bb81
+PLAN_STATUS       PASS
+PLAN_DISPOSITION  PLANNED_ONLY
+PLAN_EXIT         0
+```
+
+All fifteen protected-effect counters were zero in both the canonical inner plan
+and outer plan result. The real U plan authorization is consumed and MUST NOT be
+rerun.
+
+A separate fresh write authorization was then granted for exactly one U
+`execute-once` attempt using that reviewed plan hash. The exact source-owned
+interactive phrase was entered once. The operator returned:
+
+```json
+{"acl_mutations":10,"archive_writes":1,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"disposition":"PRESERVE_RECONCILE_NO_RETRY","execution_delegations":0,"manual_task_starts":0,"paper_mutations":1,"provider_calls":0,"publication_writes":4,"scheduler_reads":0,"scheduler_writes":0,"schema":"arch133u-fresh-activation-reprovision/v1","state_mutations":1,"status":"INDETERMINATE","wake_delegations":0}
+```
+
+Wrapper exit:
+
+```text
+ARCH133U_EXECUTE_EXIT=4
+```
+
+The U execute authorization is consumed. **No retry, rollback, cleanup, repair,
+manual rename/delete, scheduler action, provider/OAuth access, unattended wake,
+paper execution, broker effect or live effect is authorized.**
+
+### Exact counter-window interpretation
+
+The source-owned U writer increments counters before each protected edge.
+Therefore the returned counters establish the following, without guessing the
+final filesystem state:
+
+- `publication_writes=4` means both fixed staging directories plus
+  `activation.json` and `host-binding.json` were created, and the later
+  STAGE -> ACTIVE publication rename was **not reached**.
+- `state_mutations=1` and `paper_mutations=1` mean both staged SQLite stores
+  were created/initialized.
+- `acl_mutations=10` means all five staged-generation policy operations and all
+  five predecessor-sealing policy operations completed.
+- `archive_writes=1` is incremented immediately before the ACTIVE -> ARCHIVE
+  rename.
+
+The only remaining write-boundary ambiguity is therefore intentionally narrow:
+
+1. ACTIVE -> ARCHIVE rename did **not** commit, leaving the sealed predecessor at
+   ACTIVE plus the complete staged generation; or
+2. ACTIVE -> ARCHIVE rename committed, after which independent archive
+   verification failed before publication.
+
+The counters cannot distinguish those two outcomes. Publication did not occur.
+
+### Architecture 133-V — fixed read-only indeterminate reconciliation
+
+Architecture 133-V is a new **source-only/read-only** diagnostic successor whose
+sole purpose is to distinguish the two frozen U archive-boundary outcomes
+without retrying or mutating anything.
+
+Frozen topology:
+
+```text
+BRANCH    feature/robinhood-unattended-review-paper-133v
+WORKTREE  F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133v
+PARENT    49686d7f61717b9ee7452cee633d23b0c7db873e
+```
+
+133-V MUST NOT alter the accepted/consumed U operator, the U material, or any
+production namespace.
+
+Suggested separate source surface:
+
+```text
+src/trading_bot/arch133_reprovision_reconciliation/__init__.py
+src/trading_bot/arch133_reprovision_reconciliation/operator.py
+scripts/run_arch133_reprovision_reconciliation.py
+tests/review_paper/test_arch133_reprovision_reconciliation.py
+```
+
+The diagnostic must source-bind to its own clean named 133-V tracking checkout,
+the exact accepted production Python identity, the exact consumed U source
+checkout at HEAD/TREE above, and this reviewed external material:
+
+```text
+MATERIAL_PATH
+F:\AI\temp\arch133q\fresh-material-2026-10-09.json
+
+MATERIAL_SHA256
+7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+
+REVIEWED_U_PLAN_SHA256
+a223d8fa606da9cc129d5d095c6c94ec6be42f350da0bec7fe4825fe6ef8bb81
+```
+
+It must import **no writer/native mutation surface**. In particular it must not
+import `arch133_reprovision.native.WindowsEdges`, ACL apply/repair helpers,
+scheduler mutation helpers, credential/provider/OAuth surfaces, wake execution,
+paper writers or broker/live execution.
+
+The only production paths it may observe are the fixed reviewed namespaces:
+
+```text
+ACTIVE         F:\AITradingBot\Arch133
+STAGING_PARENT F:\AITradingBot\Arch133Q-stage
+STAGE          F:\AITradingBot\Arch133Q-stage\generation
+ARCHIVE        F:\AITradingBot\Arch133Q-stale
+PARENTS        F:\
+               F:\AITradingBot
+```
+
+It must independently revalidate:
+
+- exact 133-V runtime/source identity and Administrator admission;
+- exact consumed U checkout identity;
+- exact reviewed material bytes/hash;
+- corrected 133-T role-aware parent policy and security re-observation;
+- staging parent policy and exact single child `generation`;
+- STAGE as the exact reviewed fresh generation using the accepted read-only
+  generation observer;
+- predecessor namespace identities and byte hashes from the reviewed U plan;
+- predecessor root identity
+  `[1855336320,1407374886183770]`;
+- predecessor file identities:
+  `activation.json=1407374886191165`,
+  `host-binding.json=562949956059198`,
+  `paper.sqlite=562949956054077`,
+  `wake.sqlite=1125899909477979`;
+- predecessor exact file SHA-256 values from the reviewed U plan;
+- predecessor archive-sealed file/root policy, without applying or repairing it.
+
+The diagnostic has exactly two PASS classifications:
+
+```text
+ARCHIVE_RENAME_NOT_COMMITTED
+  ACTIVE  = exact sealed predecessor
+  STAGE   = exact reviewed fresh generation
+  ARCHIVE = absent
+
+ARCHIVE_RENAME_COMMITTED
+  ACTIVE  = absent
+  STAGE   = exact reviewed fresh generation
+  ARCHIVE = exact sealed predecessor
+```
+
+Any other path combination, identity mismatch, byte mismatch, ACL/policy
+mismatch, parent drift, source/runtime drift, material drift, close failure or
+observation failure must return a sanitized fail-closed result:
+
+```text
+status      BLOCKED
+disposition RECONCILIATION_UNRESOLVED
+```
+
+133-V must emit explicit zero counters for credential reads/writes, provider
+calls, scheduler reads/writes, publication/archive writes, paper/state/ACL
+mutations, wake/execution delegation, consumed wake authority, broker effects
+and manual task starts.
+
+No real 133-V host diagnostic is authorized merely by this contract or by
+source acceptance. A real reconciliation invocation remains a separately
+reviewed read-only boundary after the source is accepted.
+
+### 133-V tests and source gate
+
+Tests must use fake/temp inputs only and cover at least:
+
+- exact source/runtime/U-checkout/material identity;
+- fresh-process import closure excluding native/writer/effect surfaces;
+- exact reviewed U plan/material constants;
+- exact STAGE verification;
+- exact predecessor identity/hash verification at ACTIVE and ARCHIVE;
+- both PASS classifications;
+- rejection of ACTIVE+ARCHIVE both present or both absent;
+- rejection of missing/corrupt/mixed STAGE;
+- rejection of predecessor identity/hash/policy drift;
+- corrected T parent policy reuse and re-observation;
+- close/re-observation failures fail closed;
+- all effect counters remain zero;
+- checkpoint pins, source inventory, registration, active order and workflow
+  drift fail closed.
+
+Register one new active source-only checkpoint immediately after 133-U:
+
+```text
+arch133-robinhood-reprovision-indeterminate-reconciliation
+```
+
+with:
+
+```text
+remote_branch   = feature/robinhood-unattended-review-paper-133v
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority check must chain the complete accepted 133-U authority and pin the
+new V source/launcher/registration. Preserve B3/B4 source-gate hygiene.
+
+Implementation model: **Sol High**. This is a Windows/security/recovery
+checkpoint even though the resulting operator is read-only.
+
+
 ## 2026-10-08 - Architecture 133-U SOURCE ACCEPTED
 
 Architecture 133-U corrected fresh-activation reprovision source is **SOURCE

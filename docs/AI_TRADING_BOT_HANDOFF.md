@@ -1,5 +1,49 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-09 — Architecture 133-Z SOURCE ACCEPTED
+
+Architecture 133-Z scratch-only closed-descendant Windows rename qualification source is **SOURCE ACCEPTED** after exact GitHub review of the complete 21-file delta and terminal push-triggered source gate. No source correction was required.
+
+Exact accepted source identity:
+
+```text
+BRANCH              feature/robinhood-unattended-review-paper-133z
+BASE HEAD            27043e68f8d89e16ec92fa4d15756c2377f5c4a8
+BASE TREE            b4679748141dcbd492b389c27365e1e42c3b2ceb
+IMPLEMENTATION HEAD  3a6570d9f6aba75e17d2e54ee7274bec772e07c2
+ACCEPTED TREE        a17f0438c448af140001c420c41346b7d7215aa5
+SOURCE-GATE          #367 / 37936541915 SUCCESS
+CHECKPOINT            arch133-robinhood-closed-descendant-rename-qualification
+SCHEMA                arch133z-windows-rename-qualification/v1
+```
+
+Exact-source review accepted the frozen Z contract:
+
+- Z uses a distinct native/operator/package/launcher surface and does not invoke consumed Y/U/W writers or V/X reconciliation operators.
+- The only mutable namespace is the fixed scratch root `F:\AI\temp\arch133z-rename-qualification`; no Architecture-133 production-root literal exists in the native module.
+- Synthetic directory/file identities and hashes are independently observed, child handles are successfully closed before each rename, and failed closes remain live/consumed and block later rename or cleanup.
+- Each rename boundary asserts zero live descendant handles. The fake Win32 model rejects the former held-descendant pattern with error 5 and verifies zero descendants at both successful rename entries.
+- There is one `SetFileInformationByHandle` call site using `FileRenameInfo=3`, `ReplaceIfExists=FALSE`, `RootDirectory=NULL`, an absolute UTF-16LE destination, DELETE-capable source access and share mode 7, with no retry/fallback/alternate target.
+- The fixed lifecycle is ACTIVE -> ARCHIVE, reopen/reverify/close, STAGE -> ACTIVE, reopen/reverify/close, runtime re-observation, successful remaining-handle closure and success-only bounded cleanup.
+- Ambiguous native failure preserves scratch and grants no reconciliation, second rename or cleanup. All fifteen production protected-effect counters remain explicit integer zeroes.
+- The runner registration is source-only with `preflight=None`, `execute=None` and `remote_head_env=None`; complete Y authority and the Z source/launcher/inventory/registration/workflow surface are pinned.
+- The remaining pre-existing test changes are topology-only adjustments for the appended checkpoint and profile inventory/count changes; consumed Y runtime behavior is unchanged.
+
+Implementation-focused verification reported 148 passing Z tests after final containment coverage, targeted runner/topology verification green, and exact-file Ruff/diff checks green. Independent GitHub source gate #367 completed successfully on the exact accepted HEAD/tree.
+
+Certification ownership is FULL 149, Robinhood 76, LEGACY 205 and EXHAUSTIVE 354. No additional broad certification is selected for this isolated scratch-only source checkpoint.
+
+No real Z qualification occurred during implementation/review. Source acceptance grants no production, provider, scheduler, broker/live or other protected effect authority.
+
+### Next protected boundary
+
+The next main-flow operation is one real Architecture 133-Z scratch qualification. It is a separately protected, one-attempt scratch write. Source acceptance and CI do not authorize it.
+
+Before requesting fresh authorization, fast-forward only the clean local Z worktree from implementation HEAD `3a6570d9f6aba75e17d2e54ee7274bec772e07c2` to this documentation-closeout commit, then prove exact branch/HEAD/tree/upstream/origin and clean tracked/index state. The distinct Z scratch root must be absent. The preserved Y scratch root must not be inspected, altered, removed or reused.
+
+Even a future real Z PASS would qualify only the synthetic rename primitive. It would not authorize production recovery; the close-to-rename TOCTOU window and production recovery design remain separate architecture work.
+
+
 ## 2026-10-09 — Real 133-Y INDETERMINATE; Architecture 133-Z scratch qualification CONTRACT FROZEN
 
 The single separately authorized **real 133-Y scratch qualification** was executed by the operator from the accepted Y source. The operator-reported result was:

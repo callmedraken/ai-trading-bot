@@ -1,5 +1,114 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-09 — Architecture 133-V SOURCE ACCEPTED
+
+Architecture 133-V indeterminate-reprovision reconciliation is **SOURCE
+ACCEPTED** after exact GitHub review of the two-commit implementation checkpoint
+and the terminal push-triggered source gate.
+
+Exact accepted executable/source identity:
+
+```text
+BRANCH              feature/robinhood-unattended-review-paper-133v
+CONTRACT HEAD       11d0edce953a83fe22247109526f567c6635fa7c
+IMPLEMENTATION HEAD daa233c6a725e4b24144947e02f1940294d1f2d6
+ACCEPTED HEAD       8439339c64341ef135da8141410b3683a8953425
+ACCEPTED TREE       14a3b0f628dd3baac26dbb03c9eae970d54297d4
+SOURCE-GATE         #349 / 37899496929 SUCCESS
+```
+
+The first implementation push reached the intended V source surface but source
+gate #348 exposed exactly three stale terminal-slice fixture assertions. The
+follow-up `8439339c64341ef135da8141410b3683a8953425` changes only those three
+assertions. It does not alter the V operator, launcher, workflow, authority
+chain or protected behavior.
+
+Exact-source review accepted the frozen V contract:
+
+- the operator binds its own clean named V tracking checkout, the exact
+  production Python path/version/hash, the exact consumed clean U checkout at
+  `49686d7f61717b9ee7452cee633d23b0c7db873e` /
+  `12b430743786ba6650aa720fc27a6d9b0d95ea74`, the exact reviewed material
+  path/hash and the reviewed U plan SHA-256;
+- the fresh-process import closure contains no U/Q writer/native mutation
+  operator, ACL apply/repair surface, credential/provider/OAuth surface,
+  scheduler mutation surface, wake/paper execution surface or broker/live
+  execution surface;
+- ACTIVE and ARCHIVE presence are classified only through fixed read-only,
+  no-follow opens. Only FILE_NOT_FOUND/PATH_NOT_FOUND are treated as absence;
+- STAGE is held and independently validated as the exact reviewed fresh
+  generation using the accepted read-only generation observer;
+- the sealed predecessor is independently verified at whichever one of ACTIVE
+  or ARCHIVE is present using the exact reviewed root identity, exact four-file
+  namespace identities, exact byte hashes and accepted archive-sealed
+  root/file policies;
+- the corrected 133-T role-aware `namespace.parent_guard()` is reused, staging
+  parent policy/child membership is checked, and runtime/material/root/file/
+  namespace/security observations are repeated before PASS;
+- PASS is constructed only after held handles close and the parent guard has
+  completed its final re-observation. Close/re-observation failure therefore
+  cannot produce PASS;
+- exactly two PASS dispositions exist:
+  `ARCHIVE_RENAME_NOT_COMMITTED` and `ARCHIVE_RENAME_COMMITTED`;
+  every other topology or observation returns sanitized
+  `BLOCKED / RECONCILIATION_UNRESOLVED`;
+- reconciliation intentionally does not re-admit the expired/future scheduler
+  time window. It observes durable evidence from the consumed U write rather
+  than granting new execution authority;
+- all fifteen protected-effect counters are explicit integer zeroes.
+
+The registered source-only checkpoint is:
+
+```text
+arch133-robinhood-reprovision-indeterminate-reconciliation
+remote_branch   = feature/robinhood-unattended-review-paper-133v
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+Its authority chain includes the complete accepted 133-U authority and pins the
+V source/launcher/inventory/registration/order/workflow surface. Final source
+gate #349 independently reported:
+
+```text
+CHECKPOINTS=45
+TEST_PATHS=56
+RUFF_PATHS=174
+PYTEST=0
+RUFF_CHECK=0
+RUFF_FORMAT=0
+GIT_DIFF_CHECK=0
+AUTHORITY[arch133-robinhood-reprovision-indeterminate-reconciliation]=PASS
+IDENTITY_STABLE=True
+OVERALL=PASS
+```
+
+Certification ownership is coherent at FULL 145, Robinhood 72, LEGACY 205 and
+EXHAUSTIVE 350. No additional FULL/ROBINHOOD/LEGACY/EXHAUSTIVE run is selected
+for this narrow source-only read-only diagnostic. Focused verification,
+registered source-gate CI and exact GitHub source review are the selected
+acceptance gate.
+
+No real V diagnostic or production-namespace observation occurred during source
+implementation/review. No U plan/execute retry, cleanup, repair, rename,
+publication/archive mutation, credential/provider access, scheduler operation,
+wake execution, paper execution, broker effect or live effect is authorized by
+this source acceptance.
+
+### Next protected boundary
+
+The next main-flow operation is one real Architecture 133-V reconciliation
+diagnostic. It is a separately protected **read-only** production-namespace
+observation. Source acceptance does not authorize that invocation.
+
+Before requesting that fresh authorization, fast-forward the local V worktree
+to this docs-closeout commit and prove exact branch/HEAD/tree/upstream/clean
+state while preserving the consumed U checkout at its exact frozen identity.
+The real V result must then be reviewed before any recovery/publication design
+is frozen. No cleanup, retry, repair or publication authority exists yet.
+
+
 ## 2026-10-08 — Real 133-U execute INDETERMINATE; Architecture 133-V reconciliation diagnostic FROZEN
 
 The separately authorized real Architecture 133-U read-only plan first PASSed

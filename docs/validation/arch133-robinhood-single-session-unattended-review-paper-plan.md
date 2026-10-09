@@ -1,5 +1,138 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-08 — Architecture 133-T SOURCE ACCEPTED; role-aware parent policy corrected
+
+Architecture 133-T is **SOURCE ACCEPTED**.
+
+Accepted source:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133t
+PARENT  dd27be350256047a1ee35575d356e4ff05b66459
+HEAD    c3b82bda5a9101dbccec7e4d65909ac8e848c106
+TREE    b5d202a606807790ae520bd3dce6de1d13c06c89
+CI      #339 / 37883282558 SUCCESS
+```
+
+The exact cumulative diff is one ordinary commit and exactly eighteen intended
+files. The only production policy change is
+`src/trading_bot/arch133_reprovision/namespace.py`; the remaining source
+changes add the separate 133-T diagnostic and its source-gate/registration/test
+surface.
+
+### Exact source review
+
+The corrected parent guard now distinguishes the two frozen roles.
+
+For `F:\`:
+
+- filesystem must remain exactly `NTFS`;
+- `reparse is False` is required;
+- owner remains exactly `BUILTIN\Administrators`;
+- all ACEs must be ALLOW ACEs with only the bounded flag set `0x1B`;
+- `INHERIT_ONLY_ACE` is correctly treated as flag `0x08`, and an inherit-only
+  template must also carry OBJECT_INHERIT or CONTAINER_INHERIT;
+- effective non-Administrator/non-SYSTEM rights must be a subset of concrete
+  mask `0x1301BF`;
+- therefore `FILE_DELETE_CHILD` (`0x40`), `WRITE_DAC` (`0x40000`),
+  `WRITE_OWNER` (`0x80000`), generic rights and unknown/out-of-contract
+  rights fail closed;
+- Administrators/SYSTEM remain exempt from the non-admin rights filter but not
+  from ACE type/flag-shape validation;
+- held-handle security re-observation and exactly-once cleanup remain intact.
+
+This matches the already accepted Architecture-103/124 volume-root security
+semantics for the reviewed synthetic matrix. Tests compare the production
+volume predicate against the accepted independent volume-role oracle for the
+required accepted and rejected masks and inheritance forms. The accepted oracle
+is test-only and is not imported by production Architecture 133.
+
+For `F:\AITradingBot`, exact review confirms the consumed 133-S
+Architecture-133 ACL predicate is preserved unchanged: effective non-admin
+entries still reject every component of `0xD0046`. Its existing metadata
+predicate is also preserved.
+
+The production combined `parent_guard()` holds both parent handles across the
+guarded interval, uses the role-appropriate policy for each object, re-observes
+both held security observations, and closes through `ExitStack` in reverse
+order.
+
+### 133-T diagnostic boundary
+
+The separate `arch133_parent_policy_diagnostic` source does not modify consumed
+133-S semantics. Its admission implementation is source-equivalent to accepted
+133-S admission except for the new 133-T source/worktree identity. It repeats
+the real predecessor runtime/Administrator/root/files/publication/state/paper
+admission, runtime re-observation, retained-material check, stale/fresh material
+checks and namespace vacancy before any parent observation.
+
+The diagnostic then uses the corrected production
+`namespace.require_parent_acl()` / `require_parent_policy()` implementation
+for the fixed volume, host and combined parent stages. It retains the fixed
+sanitized stage vocabulary and the same fifteen explicit zero-effect counters.
+
+Fresh-process import tests and source checks exclude reprovision writer/native
+mutation, ACL apply/repair, Credential Manager, provider/MCP/network, Task
+Scheduler effects, unattended wake execution/delegation, state/paper writers
+and broker/live execution.
+
+### Source-gate evidence
+
+Terminal source gate #339 reports:
+
+```text
+CHECKPOINTS       43
+TEST_PATHS        54
+RUFF_PATHS        165
+pytest cases      6,151
+passed            6,150
+skipped           1
+failed/errors     0
+pytest command    109.737131 s
+workflow elapsed  155 s
+AUTHORITY         43/43 PASS
+IDENTITY_STABLE   True
+OVERALL           PASS
+```
+
+Ruff check, Ruff format and git-diff check all exit zero. Every checkpoint
+authority failure list is empty. Production/provider/scheduler/broker-live
+effect categories are all `NOT_RUN`.
+
+Relative to accepted 133-S source gate #335, exactly one parameterized
+workflow-tail identity naming 133-S was replaced by the semantically equivalent
+133-T tail identity. All other prior identities remain and 551 identities are
+added. No logical regression invariant is removed.
+
+Routine CI hygiene remains healthy and R2-D parallelization remains deferred.
+
+### Certification-tier decision
+
+No ROBINHOOD, FULL, LEGACY or EXHAUSTIVE certification is selected for 133-T.
+Although one production security-policy module changes, the changed behavior is
+the bounded reprovision parent-admission policy and is directly exercised by
+the fresh-activation reprovision tests, consumed-diagnostic regression tests,
+the new independent equivalence/security matrix, the 133-T diagnostic tests,
+the complete active authority chain and certification-profile inventory in the
+registered source gate. Broader product profiles would primarily repeat
+unchanged domain/execution behavior and would not establish the real Windows
+parent-security observation.
+
+### Protected boundary
+
+Source acceptance and CI success authorize no real host read or effect.
+
+The next protected boundary is one separately authorized real **133-T
+read-only parent-policy diagnostic** using the exact accepted source and already
+reviewed fresh material. A real invocation may only repeat the accepted
+predecessor/material/namespace observations and read/open/reobserve/close the
+two parent security objects under the corrected role-aware predicate.
+
+The real 133-S and 133-R diagnostics are consumed and MUST NOT be rerun. The
+consumed 133-Q plan MUST NOT be rerun. 133-Q `execute-once`, Q133-3, Q133-4,
+ACL mutation/repair, provider/OAuth access, unattended wake execution and
+production/live broker effects remain unauthorized / NO-GO.
+
 ## 2026-10-08 — Real 133-S BLOCKED at PARENT_VOLUME_ACL; Architecture 133-T role-aware volume-policy correction FROZEN
 
 One separately authorized real Architecture 133-S read-only parent-security

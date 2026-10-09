@@ -23,7 +23,7 @@ def test_133l_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_L133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133l"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-10:-7] == (_K133_NAME, _L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-11:-8] == (_K133_NAME, _L133_NAME, _M133_NAME)
     assert (
         runner._arch133_verifier_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -113,7 +113,7 @@ def test_133m_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_M133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133m"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-9:-7] == (_L133_NAME, _M133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-10:-8] == (_L133_NAME, _M133_NAME)
     assert (
         runner._arch133_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -274,7 +274,7 @@ def test_133n_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_N133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133n"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-9:-6] == (_L133_NAME, _M133_NAME, _N133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-10:-7] == (_L133_NAME, _M133_NAME, _N133_NAME)
     assert (
         runner._arch133_publication_diagnostic_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -377,7 +377,7 @@ def test_133o_source_only_registration_no_host_callbacks(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_O133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133o"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (_N133_NAME, _O133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-6] == (_N133_NAME, _O133_NAME)
     assert (
         runner._arch133_publication_corrected_authority_check(
             Path(runner.__file__).resolve().parents[1]
@@ -567,7 +567,7 @@ def test_133s_real_chain_and_source_only_registration(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_S133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133s"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (_R133_NAME, _S133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (_R133_NAME, _S133_NAME)
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,
         "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
@@ -727,7 +727,7 @@ def test_133t_real_chain_and_source_only_registration(tmp_path, monkeypatch):
     spec = runner._checkpoint_specs()[_T133_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-unattended-review-paper-133t"
-    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (_S133_NAME, _T133_NAME)
+    assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (_S133_NAME, _T133_NAME)
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,
         "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
@@ -804,7 +804,10 @@ def test_133t_active_order_drift_fails_closed(tmp_path, monkeypatch, target, mut
     if target == "runner":
         line, prior = f'    "{_T133_NAME}",\n', f'    "{_S133_NAME}",\n'
     else:
-        line, prior = f"              {_T133_NAME}\n", f"              {_S133_NAME} `\n"
+        line, prior = (
+            f"              {_T133_NAME} `\n",
+            f"              {_S133_NAME} `\n",
+        )
     assert text.count(line) == 1
     if mutation == "order":
         text = text.replace(prior + line, line + prior)

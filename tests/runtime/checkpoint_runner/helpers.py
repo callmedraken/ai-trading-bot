@@ -204,6 +204,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-reprovision-admission-diagnostic",
     "arch133-robinhood-reprovision-parent-security-diagnostic",
     "arch133-robinhood-reprovision-parent-policy-diagnostic",
+    "arch133-robinhood-fresh-activation-reprovision-corrected",
 )
 
 

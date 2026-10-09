@@ -1,5 +1,147 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-08 — Architecture 133-S SOURCE ACCEPTED; real parent-security diagnostic remains protected
+
+Architecture 133-S is **SOURCE ACCEPTED** as the separate zero-effect
+parent-security diagnostic successor to the consumed corrected-topology 133-R
+read-only invocation.
+
+Accepted implementation:
+
+```text
+BRANCH  feature/robinhood-unattended-review-paper-133s
+BASE    4dca46f6a91830833bbbd4fab70d64eadc133d67
+IMPL    44604100c4f272917c082122e912814fe201decc
+HEAD    0458d6b07b01084ab733df5348439b2f1685f014
+TREE    5948c29c2c5d968cb0bdab38c035c762d8a3b8a2
+CI      #335 / 37870748600 SUCCESS
+```
+
+The cumulative diff contains exactly seventeen intended files: the source-gate
+workflow and checkpoint runner, one new launcher, three new
+`arch133_parent_security_diagnostic` package files, the new functional test,
+and bounded runner/profile/current-checkpoint expectation updates.
+
+The implementation commit is followed by one test-only correction commit. That
+correction changes only four stale expectations for the newly appended active
+checkpoint; the diagnostic source and source pins are unchanged.
+
+### Exact-source review
+
+The accepted diagnostic preserves the 133-R predecessor/material admission
+boundary while moving its own runtime/source identity to the clean named 133-S
+tracking checkout. The predecessor observation remains real: runtime,
+Administrator, retained root/files, publication/state/paper semantics, final
+re-observation, retained-material equivalence, stale/fresh material and
+namespace vacancy all execute before parent inspection.
+
+The source uses local copies of the accepted publication/path/parse/semantic and
+state-path helpers rather than importing private predecessor helpers. Exact
+review confirms those local helpers preserve the accepted predecessor
+predicates. Tests independently compare the retained predecessor observation
+and retained-material bodies against accepted 133-R source.
+
+Parent diagnosis uses only fixed sanitized stages. Standalone volume and host
+checks separately identify OPEN, OBSERVE, FILESYSTEM, REPARSE, OWNER, ACL,
+REOBSERVATION and CLOSE. The combined held-parent path separately identifies
+volume/host open, observe and policy, both held-object re-observations, and
+reverse-order closes.
+
+The frozen policy is preserved exactly:
+
+- filesystem must equal `NTFS`;
+- `reparse` must be false;
+- owner SID must equal Administrators;
+- every non-Administrators/non-SYSTEM ACE with inherited flag bit 8 absent must
+  have zero intersection with `0xD0046`.
+
+Every successfully acquired parent handle receives exactly one close attempt.
+Standalone close failure overrides an earlier stage failure. Combined cleanup
+attempts every remaining close in reverse order; the first cleanup failure is
+retained and prevents PASS.
+
+The launcher requires the exact 133-S worktree, absolute material path,
+isolated `-I -B` execution, no preexisting `no-pycache`, the frozen
+production-Python path/version/hash and Windows runtime before importing the
+operator. Runtime admission independently requires exact branch/origin/clean
+state, exact upstream/tracking identity and the already accepted 133-G bound
+checkout.
+
+The fresh import closure and source tests exclude reprovision writers, ACL
+apply/repair surfaces, credentials, provider/MCP/network clients, Task Scheduler
+effects, unattended wake execution, paper/state mutation and broker/live
+execution. Output contains only fixed stage names plus the same fifteen explicit
+zero-effect counters used by 133-R; actual ACL/SID/ACE/mask/descriptor/native
+exception details do not cross the JSON boundary.
+
+### Source-gate evidence
+
+Terminal source gate #335 reports:
+
+```text
+CHECKPOINTS       42
+TEST_PATHS        53
+RUFF_PATHS        160
+pytest cases      5,601
+passed            5,600
+skipped           1
+failed/errors     0
+pytest elapsed    203.59022 s
+workflow elapsed  270 s
+AUTHORITY         42/42 PASS
+IDENTITY_STABLE   True
+OVERALL           PASS
+```
+
+Ruff check, Ruff format and git-diff check all exit zero. Every participant has
+complete test/Ruff coverage. Production/provider/scheduler/broker/live effect
+evidence is `NOT_RUN`.
+
+Relative to accepted B4, one prior parameterized testcase identity whose literal
+mutation target named the old final workflow participant was intentionally
+replaced by the equivalent identity naming the new 133-S final participant.
+No logical invariant was removed. The final suite otherwise retains the B4
+inventory and adds the 133-S proof surface, for a net increase from 5,431 to
+5,601 cases.
+
+Routine CI hygiene remains acceptable:
+
+```text
+R2-B2 accepted    pytest 199.4257606 s / workflow 250 s
+B4                pytest 179.3632095 s / workflow 244 s
+133-S              pytest 203.5902200 s / workflow 270 s
+```
+
+The additional cost is proportionate to the new 133-S functional/authority
+coverage. R2-D deterministic parallelization therefore remains deferred.
+
+### Certification-tier decision
+
+No ROBINHOOD, FULL, LEGACY or EXHAUSTIVE certification is selected for 133-S.
+This is a bounded read-only diagnostic/source-authority checkpoint. The
+registered source gate already exercises every changed module, the complete
+active authority chain, workflow/registration/source pins, security-stage and
+cleanup semantics, and supported certification-profile inventory. A broad
+product profile would duplicate those tests without establishing anything about
+the real host parent-security observation.
+
+### Protected boundary
+
+No real 133-S diagnostic is authorized by source acceptance, CI success or this
+closeout.
+
+The next boundary is one separately authorized real **133-S read-only
+parent-security diagnostic** using the exact accepted source and the already
+reviewed fresh material. A real invocation may perform only the accepted
+read-only predecessor/material/namespace observations plus read-only parent
+security opens/inspections/closes. It grants no ACL mutation or reprovision
+authority.
+
+The second real 133-R authorization is consumed and MUST NOT be rerun. The
+consumed 133-Q plan MUST NOT be rerun. 133-Q `execute-once`, Q133-3, Q133-4,
+ACL mutation, provider/OAuth access, unattended wake execution and
+production/live broker effects remain unauthorized / NO-GO.
+
 ## 2026-10-08 — Architecture 133-S parent-security diagnostic contract FROZEN
 
 The accepted corrected-topology 133-R diagnostic stopped at `PARENT_VOLUME`

@@ -1,5 +1,94 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-08 — Corrected-topology 133-R diagnostic BLOCKED at PARENT_VOLUME; zero effects
+
+A second, separately authorized real Architecture 133-R read-only reprovision
+admission diagnostic was executed after correcting the operator checkout to its
+required named tracking branch.
+
+Exact invocation identity:
+
+```text
+PRINCIPAL        DESKTOP-I4DOKM7\John / Administrator
+R_BRANCH         feature/robinhood-unattended-review-paper-133r
+R_HEAD           d811bfefcf7b6dbb7f1e72d6c847aef1d3c573eb
+R_TREE           dc5dcc71a20e6b60b4a9bcecec08d623bec5030a
+G_BRANCH         feature/robinhood-unattended-review-paper-133g
+G_HEAD           65f0d40217f8ce129224531a5151f4acea889d89
+G_TREE           16cb734cbeaa9e97aaf9e2d521d922fbbc7b7ae2
+MATERIAL_SHA256  7b55cb89e94f09a8271a7c28fad9737c0ddb1ef94aba719968ea2820ea24a686
+PYTHON_SHA256    cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+```
+
+The diagnostic returned:
+
+```json
+{"acl_mutations":0,"archive_writes":0,"broker_effects":0,"consumed_wake_authority":0,"credential_reads":0,"credential_writes":0,"execution_delegations":0,"manual_task_starts":0,"paper_mutations":0,"provider_calls":0,"publication_writes":0,"reason":"REPROVISION_ADMISSION_DIAGNOSTIC_BLOCKED","scheduler_reads":0,"scheduler_writes":0,"schema":"arch133r-reprovision-admission-diagnostic/v1","stage":"PARENT_VOLUME","state_mutations":0,"status":"BLOCKED","wake_delegations":0}
+```
+
+Wrapper exit: `ARCH133R_DIAGNOSTIC_EXIT=3`.
+
+This second 133-R authorization is consumed. All fifteen effect counters are
+zero.
+
+Because the diagnostic reports the first rejected stage, this result positively
+establishes that every earlier admission stage completed successfully on this
+invocation:
+
+```text
+MATERIAL_READ
+PREDECESSOR_RUNTIME
+PREDECESSOR_ADMINISTRATOR
+PREDECESSOR_ROOT
+PREDECESSOR_NAMESPACE
+PREDECESSOR_FILES
+PREDECESSOR_PUBLICATION_PATH
+PREDECESSOR_PUBLICATION_PARSE
+PREDECESSOR_PUBLICATION_SEMANTICS
+PREDECESSOR_STATE_PATH
+PREDECESSOR_STATE
+PREDECESSOR_PAPER
+PREDECESSOR_FINAL_REOBSERVATION
+PREDECESSOR_RUNTIME_REOBSERVATION
+PREDECESSOR_ADMINISTRATOR_REOBSERVATION
+PREDECESSOR_MATERIAL
+PREDECESSOR_STALE
+FRESH_MATERIAL
+NAMESPACE_VACANCY
+```
+
+The first unresolved boundary is therefore the read-only security observation
+of `F:\`.
+
+Accepted 133-R source shows that `PARENT_VOLUME` can reject only while opening
+or inspecting `F:\`, or because the observation does not satisfy one of these
+frozen predicates:
+
+- filesystem is exactly `NTFS`;
+- the opened object is not a reparse point;
+- owner SID is exactly `BUILTIN\Administrators`;
+- no non-Administrator/non-SYSTEM, non-inherited ACE grants a mask intersecting
+  `0xD0046`; and
+- immediate security re-observation is byte/observation stable.
+
+The sanitized 133-R result does **not** establish which of those predicates
+rejected. Do not infer an ACL correction from `PARENT_VOLUME` alone.
+
+### Next safe checkpoint
+
+Do not rerun 133-R. Its second authorization is consumed.
+
+The next safe milestone is a source-only Architecture 133 successor that
+subdivides the parent-security boundary without adding any writer/effect
+capability. It should preserve all already-passed predecessor/material/namespace
+admission logic and report only fixed sanitized parent substages. The successor
+must remain read-only and zero-effect and must be source-accepted before any
+real host invocation is considered.
+
+No ACL mutation, reprovision, 133-Q plan retry or `execute-once`, scheduler
+operation, credential/provider access, wake execution or broker/live effect is
+authorized by this result.
+
 ## 2026-10-08 — Real 133-R diagnostic BLOCKED at PREDECESSOR_RUNTIME; zero effects; operator topology corrected
 
 One real Architecture 133-R read-only reprovision admission diagnostic was

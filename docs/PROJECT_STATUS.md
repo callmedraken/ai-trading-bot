@@ -1,5 +1,132 @@
 # Project Status and Roadmap
 
+## 2026-10-08 — Architecture 132-R2-B4 SOURCE ACCEPTED; CI hygiene restored; Architecture 133 resumes
+
+Architecture 132-R2-B4 is **SOURCE ACCEPTED** and the temporary CI-hygiene
+interlude is **CLOSED**.
+
+Accepted source:
+
+```text
+BRANCH  feature/test-suite-rationalization-132r2b4
+PARENT  49e2c0371998b632bee94947cc5028b919588ea3
+HEAD    e7365dc17e9c67799766fc1666172b55f0ce30bc
+TREE    433bbb826a34c0c03fd0265b57242f1c98a1b104
+CI      #327 / 37865395473 SUCCESS
+```
+
+The exact implementation diff changes only:
+
+```text
+tests/runtime/checkpoint_runner/helpers.py
+tests/runtime/checkpoint_runner/test_arch131.py
+tests/runtime/checkpoint_runner/test_arch133_a_g.py
+```
+
+No production `src/`, scripts, authority implementation, source/registration
+pin, protected callback, `ACTIVE_CI_CHECKPOINTS`, `RETAINED_CHECKPOINTS`,
+source-gate workflow, certification ownership, external-effect policy or
+certification profile topology changed.
+
+### Exact review
+
+B4 replaces repeated full `scripts/checkpoint_runner.py` fixture copies with a
+bounded original-source contract fixture. The helper parses the complete
+accepted runner text only to select the original source segments that own:
+
+- `ACTIVE_CI_CHECKPOINTS`;
+- `ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH`;
+- the complete `_checkpoint_specs` registry; and
+- every `CheckpointSpec` constructor, including constructors outside the
+  registry.
+
+The selected material is copied as original source text rather than
+`ast.unparse`, preserving registration hashes, literal spellings, mutation
+anchors and existing parameter identities. Extraction is cached only by the
+complete source text. No authority result, mutated fixture, runner AST parser
+or production authority function is cached or replaced.
+
+Every mutation still executes the real authority parser. Existing accepted-copy
+baseline cases now prove both compact and complete runner material. Existing
+exact-once predecessor PASS/rejection and complete-chain proofs remain, and B4
+adds explicit tests proving exact AST contract preservation, rejection of
+missing/duplicate contract owners, independence from unrelated later authority
+implementation growth, and full-runner real-chain accepted/pin/registration/
+workflow behavior.
+
+Independent JUnit comparison against accepted B3 source gate #325 proves all
+**5,419** B3 testcase identities remain with zero missing/renamed identities
+and exactly **12** additional proof cases.
+
+Terminal #327 evidence:
+
+```text
+CHECKPOINTS       41
+TEST_PATHS        52
+RUFF_PATHS        155
+pytest cases      5,431
+passed            5,430
+skipped           1
+failed/errors     0
+pytest elapsed    179.3632095 s
+workflow elapsed  244 s
+AUTHORITY         41/41 PASS
+IDENTITY_STABLE   True
+OVERALL           PASS
+```
+
+All production, provider, scheduler-mutation and broker/live effects are
+`NOT_RUN`.
+
+B4 reduces the two targeted unchanged runner modules from the accepted B3
+measurements:
+
+```text
+test_arch131       724 / 112.651 s  -> 736 / 19.163 s
+test_arch133_a_g   211 /  28.767 s  -> 211 /  4.443 s
+```
+
+while retaining every prior identity and adding coverage.
+
+### Certification-tier decision
+
+No ROBINHOOD, FULL, LEGACY or EXHAUSTIVE certification is selected for B4.
+This checkpoint changes test fixture/coverage mechanics only; no supported
+production behavior or certification topology changed. The registered source
+gate exercised every changed module and all 41 active authority checks.
+
+Routine serial source CI is restored to the accepted operating envelope:
+
+```text
+R2-B2 accepted    pytest 199.4257606 s / workflow 250 s
+B3                pytest 322.6453311 s / workflow 387 s
+B4                pytest 179.3632095 s / workflow 244 s
+```
+
+B4 is below both the accepted R2-B2 pytest and workflow measurements. Therefore
+the R2-D deterministic parallelization phase remains **DEFERRED**; adding CI
+parallelism now would add topology/maintenance complexity without a measured
+need.
+
+### Architecture 133 resumes
+
+The CI-hygiene interlude no longer blocks Architecture 133. Resume from the
+corrected Architecture 133-R operator topology and its separately protected
+read-only reprovision-admission diagnostic boundary.
+
+The previous real 133-R diagnostic authorization was consumed by the
+`PREDECESSOR_RUNTIME` fail-closed invocation performed from detached HEAD. The
+operator worktree was subsequently corrected to the expected named tracking
+branch, and the bound 133-G checkout was independently verified.
+
+A further real 133-R read-only diagnostic requires **new fresh explicit
+authorization**. The prior authorization does not transfer.
+
+The consumed Architecture 133-Q read-only plan MUST NOT be rerun.
+Architecture 133-Q `execute-once`, Q133-3, Q133-4, provider/OAuth access,
+unattended wake execution and production/live broker effects remain
+unauthorized / NO-GO.
+
 ## 2026-10-08 — Architecture 132-R2-B3 SOURCE ACCEPTED; hygiene continues before R2-D
 
 Architecture 132-R2-B3 is **SOURCE ACCEPTED** as a test-only routine source-gate

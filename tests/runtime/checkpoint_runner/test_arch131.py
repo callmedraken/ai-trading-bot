@@ -575,13 +575,10 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         (
             ".github/workflows/checkpoint-source-gates.yml",
             (
-                "arch133-robinhood-reprovision-sealed-predecessor-recovery\n"
+                "arch133-robinhood-reprovision-recovery-reconciliation\n"
                 "          exit $LASTEXITCODE"
             ),
-            (
-                "arch133-robinhood-reprovision-sealed-predecessor-recovery\n"
-                "          exit 0"
-            ),
+            ("arch133-robinhood-reprovision-recovery-reconciliation\n          exit 0"),
         ),
     ],
 )
@@ -2156,8 +2153,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.ACTIVE_CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 46
-    assert runner.ACTIVE_CI_CHECKPOINTS[-35:-21] == (
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 47
+    assert runner.ACTIVE_CI_CHECKPOINTS[-36:-22] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -2535,7 +2532,7 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 46
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 47
     assert runner.ACTIVE_CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.ACTIVE_CI_CHECKPOINTS.index(_T_NAME) == (
         runner.ACTIVE_CI_CHECKPOINTS.index(
@@ -2729,7 +2726,7 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 46
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 47
     assert runner.ACTIVE_CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.ACTIVE_CI_CHECKPOINTS.index(_U_NAME) == (
         runner.ACTIVE_CI_CHECKPOINTS.index(

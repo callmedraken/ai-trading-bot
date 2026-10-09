@@ -1,4 +1,4 @@
-"""133-V fake/temp reconciliation qualification; real namespaces are forbidden."""
+"""133-X fake/temp reconciliation qualification; real namespaces are forbidden."""
 
 import ast
 import ctypes
@@ -18,11 +18,12 @@ import pytest
 from scripts import checkpoint_runner as runner
 from trading_bot.arch133_acl import read_only
 from trading_bot.arch133_reprovision import generation, namespace, reads
-from trading_bot.arch133_reprovision_reconciliation import operator
+from trading_bot.arch133_reprovision_recovery import admission
+from trading_bot.arch133_reprovision_recovery_reconciliation import operator
 from trading_bot.arch133_verifier import binding, file_policy
 
 ROOT = Path(__file__).resolve().parents[2]
-NAME = "arch133-robinhood-reprovision-indeterminate-reconciliation"
+NAME = "arch133-robinhood-reprovision-recovery-reconciliation"
 EFFECTS = (
     "credential_reads",
     "credential_writes",
@@ -113,29 +114,43 @@ def fake(tmp_path, monkeypatch):
             read_only.ADMINISTRATORS_SID,
             True,
             read_only.ROOT_ACES if path == str(stage) else read_only.ADMIN_ACES,
-            operator.ROOT_IDENTITY
+            admission.ROOT_IDENTITY
             if predecessor
-            else (operator.ROOT_IDENTITY[0], Path(path).stat().st_ino),
+            else (
+                admission.STAGE_IDENTITY
+                if path == str(stage)
+                else admission.STAGING_PARENT_IDENTITY
+            ),
         )
-        return f.security.get(path, (obs, "e" * 64))
+        sha = (
+            admission.SEALED_SECURITY_SHA256
+            if predecessor
+            else admission.STAGE_SECURITY_SHA256
+            if path == str(stage)
+            else admission.STAGING_PARENT_SECURITY_SHA256
+        )
+        return f.security.get(path, (obs, sha))
 
     def names(handle):
         found = tuple(sorted(p.name for p in Path(handle).iterdir()))
         if found != reads.FINAL_NAMES:
             raise ValueError("invalid namespace")
-        return tuple(
-            (n, i + (100 if handle == str(stage) else 0))
-            for n, i in operator.PREDECESSOR_NAMESPACE
+        return (
+            tuple((n, admission.STAGE_FILES[n][0]) for n in reads.FINAL_NAMES)
+            if handle == str(stage)
+            else admission.PREDECESSOR_NAMESPACE
         )
 
     def snapshot(handle, root, name):
         index = dict(names(root))[name]
         sha = (
-            operator.FILE_HASHES[name]
+            admission.FILE_HASHES[name]
             if root != str(stage)
+            else admission.STAGE_FILES[name][1]
+            if Path(handle).read_bytes() == (stage.name + name).encode()
             else hashlib.sha256(Path(handle).read_bytes()).hexdigest()
         )
-        return (operator.ROOT_IDENTITY[0], index), sha
+        return (admission.ROOT_IDENTITY[0], index), sha
 
     def policy(handle):
         name = Path(handle).name
@@ -143,7 +158,7 @@ def fake(tmp_path, monkeypatch):
             0x120089
             if Path(handle).parent != stage
             or name in ("activation.json", "host-binding.json")
-            else 0x13019F
+            else 0x12019F
         )
         return f.policies.get(
             handle,
@@ -161,6 +176,11 @@ def fake(tmp_path, monkeypatch):
         return {
             "root_identity": list(security(root, root)[0].identity),
             "root_security_sha256": security(root, root)[1],
+            "state_sha256": admission.STAGE_STATE_SHA256,
+            "paper_predecessor_sha256": admission.STAGE_PAPER_SHA256,
+            "activation_id": admission.STAGE_ACTIVATION_ID,
+            "wake_id": admission.STAGE_WAKE_ID,
+            "wake_revision": 0,
             "files": {
                 n: {
                     "identity": list(snapshot(str(stage / n), root, n)[0]),
@@ -176,7 +196,7 @@ def fake(tmp_path, monkeypatch):
     monkeypatch.setattr(read_only, "inspect_directory_security", security)
     monkeypatch.setattr(reads, "namespace", names)
     monkeypatch.setattr(
-        reads, "open_generation_file", lambda root, n: str(Path(root) / n)
+        reads, "open_generation_file", lambda root, n, **kw: str(Path(root) / n)
     )
     monkeypatch.setattr(reads, "file_snapshot", snapshot)
     monkeypatch.setattr(file_policy, "observe_file_policy", policy)
@@ -201,12 +221,12 @@ def test_exact_two_pass_dispositions_hold_until_reobservation_and_close(
     code, evidence = operator.run()
     assert code == 0 and evidence["status"] == "PASS"
     assert evidence["disposition"] == (
-        "ARCHIVE_RENAME_COMMITTED" if committed else "ARCHIVE_RENAME_NOT_COMMITTED"
+        "W_ARCHIVE_RENAME_COMMITTED" if committed else "W_ARCHIVE_RENAME_NOT_COMMITTED"
     )
     assert evidence["predecessor_root"] == str(
         fake.archive if committed else fake.active
     )
-    assert evidence["predecessor_namespace"] == operator.PREDECESSOR_NAMESPACE
+    assert evidence["predecessor_namespace"] == admission.PREDECESSOR_NAMESPACE
     assert evidence["material_sha256"] == operator.MATERIAL_SHA256
     assert evidence["reviewed_u_plan_sha256"] == operator.REVIEWED_U_PLAN_SHA256
     assert all(type(evidence[k]) is int and evidence[k] == 0 for k in EFFECTS)
@@ -246,6 +266,7 @@ def test_rejects_missing_or_mixed_stage(fake, target):
         "namespace",
         "hash",
         "root_policy",
+        "security",
         "file_policy",
         "filesystem",
         "reparse",
@@ -267,6 +288,8 @@ def test_predecessor_identity_hash_and_sealed_policy_drift(
             "reparse": {"reparse": True},
         }
         fake.security[str(root)] = (replace(obs, **values[change]), digest)
+    elif change == "security":
+        fake.security[str(root)] = (obs, "drift")
     elif change == "namespace":
         original = reads.namespace
         monkeypatch.setattr(
@@ -358,6 +381,7 @@ def test_failures_are_sanitized_and_effect_free(fake, monkeypatch, phase):
         "runtime",
         "material",
         "stage",
+        "admin",
         "namespace",
         "security",
         "stage_security",
@@ -378,6 +402,8 @@ def test_final_reobservation_drift_fails_closed(fake, monkeypatch, change):
                 monkeypatch.setattr(
                     operator, "observe_runtime", lambda: {"drift": True}
                 )
+            elif change == "admin":
+                monkeypatch.setattr(operator, "administrator_sid", lambda: "changed")
             elif change == "material":
                 monkeypatch.setattr(
                     operator, "read_material", lambda p: SimpleNamespace(raw=b"changed")
@@ -464,9 +490,9 @@ def test_read_only_parent_guard_is_reused_and_reobserved(monkeypatch):
 
 def test_exact_frozen_bindings():
     assert operator.SOURCE_ROOT == Path(
-        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133v"
+        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133x"
     )
-    assert operator.SOURCE_BRANCH == "feature/robinhood-unattended-review-paper-133v"
+    assert operator.SOURCE_BRANCH == "feature/robinhood-unattended-review-paper-133x"
     assert operator.U_ROOT == Path(
         r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133u"
     )
@@ -484,12 +510,28 @@ def test_exact_frozen_bindings():
         operator.REVIEWED_U_PLAN_SHA256
         == "a223d8fa606da9cc129d5d095c6c94ec6be42f350da0bec7fe4825fe6ef8bb81"
     )
-    assert operator.ROOT_IDENTITY == (1855336320, 1407374886183770)
-    assert operator.PREDECESSOR_NAMESPACE == (
+    assert admission.ROOT_IDENTITY == (1855336320, 1407374886183770)
+    assert admission.PREDECESSOR_NAMESPACE == (
         ("activation.json", 1407374886191165),
         ("host-binding.json", 562949956059198),
         ("paper.sqlite", 562949956054077),
         ("wake.sqlite", 1125899909477979),
+    )
+    assert operator.W_ROOT == Path(
+        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133w"
+    )
+    assert operator.W_BRANCH == "feature/robinhood-unattended-review-paper-133w"
+    assert operator.W_HEAD == "ca550cc9310aa59b2e42369491980402b2adf2c2"
+    assert operator.W_TREE == "3bd825fdaba21037c3381b504f5b545b13702e2d"
+    assert operator.V_ROOT == Path(
+        r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133v"
+    )
+    assert operator.V_BRANCH == "feature/robinhood-unattended-review-paper-133v"
+    assert operator.V_HEAD == "432001e3dcae48e589adf8e60c7dac5ffc08d591"
+    assert operator.V_TREE == "96f2f41caa6d17a32fe729ae8786560252a0c9a8"
+    assert (
+        operator.REVIEWED_W_PLAN_SHA256
+        == "a9a88fb1b505c138cb50887e9e06aebbfc7805c5a0a19d48f7f1f14dbeec60a4"
     )
     assert tuple(operator.ZERO_EFFECTS) == EFFECTS
     assert binding.PRODUCTION_PYTHON == Path(r"F:\AITradingBot\runtime\python.exe")
@@ -563,7 +605,9 @@ def runtime(tmp_path, monkeypatch):
     executable.write_bytes(b"fake interpreter")
     monkeypatch.setattr(operator, "SOURCE_ROOT", ROOT)
     monkeypatch.setattr(
-        operator, "LAUNCHER", ROOT / "scripts/run_arch133_reprovision_reconciliation.py"
+        operator,
+        "LAUNCHER",
+        ROOT / "scripts/run_arch133_reprovision_recovery_reconciliation.py",
     )
     monkeypatch.setattr(operator, "NO_PYCACHE", tmp_path / "missing-cache")
     monkeypatch.setattr(binding, "PRODUCTION_PYTHON", executable)
@@ -581,11 +625,17 @@ def runtime(tmp_path, monkeypatch):
     monkeypatch.setattr(sys, "version_info", (3, 14, 3))
 
     def source(root, branch):
-        return (
-            (operator.U_HEAD, operator.U_TREE)
-            if root == operator.U_ROOT
-            else ("a" * 40, "b" * 40)
-        )
+        return {
+            operator.U_ROOT: (operator.U_HEAD, operator.U_TREE),
+            operator.V_ROOT: (operator.V_HEAD, operator.V_TREE),
+            operator.W_ROOT: (operator.W_HEAD, operator.W_TREE),
+            binding.SOURCE_ROOT: (
+                operator.predecessor.PUBLISHED_RUNTIME_HEAD,
+                operator.predecessor.PUBLISHED_RUNTIME_TREE,
+            ),
+        }.get(root, ("a" * 40, "b" * 40))
+
+    monkeypatch.setattr(Path, "read_bytes", lambda p: b"fake interpreter")
 
     monkeypatch.setattr(operator, "require_checkout", source)
     return executable
@@ -606,6 +656,12 @@ def runtime(tmp_path, monkeypatch):
         "hash",
         "u_head",
         "u_tree",
+        "v_head",
+        "v_tree",
+        "w_head",
+        "w_tree",
+        "published_head",
+        "published_tree",
         "source",
     ],
 )
@@ -627,24 +683,27 @@ def test_exact_runtime_and_consumed_u_checkout(runtime, monkeypatch, drift):
     elif drift == "version":
         monkeypatch.setattr(sys, "version_info", (3, 14, 2))
     elif drift == "hash":
-        runtime.write_bytes(b"changed")
+        monkeypatch.setattr(binding, "PRODUCTION_PYTHON_SHA256", "0" * 64)
     elif drift == "source":
         monkeypatch.setattr(operator, "SOURCE_ROOT", runtime.parent)
-    elif drift in ("u_head", "u_tree"):
+    elif drift and drift.endswith(("_head", "_tree")):
         original = operator.require_checkout
-        monkeypatch.setattr(
-            operator,
-            "require_checkout",
-            lambda root, branch: (
-                (
-                    ("0" * 40, operator.U_TREE)
-                    if drift == "u_head"
-                    else (operator.U_HEAD, "0" * 40)
-                )
-                if root == operator.U_ROOT
-                else original(root, branch)
-            ),
+        label, field = drift.split("_")
+        target = (
+            binding.SOURCE_ROOT
+            if label == "published"
+            else getattr(operator, label.upper() + "_ROOT")
         )
+
+        def changed(root, branch):
+            values = original(root, branch)
+            if root == target:
+                values = (
+                    ("0" * 40, values[1]) if field == "head" else (values[0], "0" * 40)
+                )
+            return values
+
+        monkeypatch.setattr(operator, "require_checkout", changed)
     if drift:
         with pytest.raises(ValueError):
             operator.observe_runtime()
@@ -657,7 +716,7 @@ def test_fresh_process_import_closure_excludes_effect_surfaces(tmp_path):
     probe.write_text(
         "import sys, json\n"
         f"sys.path.insert(0, {str(ROOT / 'src')!r})\n"
-        "import trading_bot.arch133_reprovision_reconciliation.operator\n"
+        "import trading_bot.arch133_reprovision_recovery_reconciliation.operator\n"
         "print(json.dumps(sorted(sys.modules)))\n",
         encoding="utf-8",
     )
@@ -669,6 +728,9 @@ def test_fresh_process_import_closure_excludes_effect_surfaces(tmp_path):
         cwd=tmp_path,
     )
     forbidden = (
+        "trading_bot.arch133_reprovision_recovery.native",
+        "trading_bot.arch133_reprovision_recovery.operator",
+        "trading_bot.arch133_reprovision_reconciliation.operator",
         "trading_bot.arch133_reprovision.native",
         "trading_bot.arch133_reprovision.operator",
         "trading_bot.arch133_reprovision_corrected",
@@ -690,13 +752,15 @@ def test_fresh_process_import_closure_excludes_effect_surfaces(tmp_path):
     assert "trading_bot.arch133_verifier.scheduler" in modules
 
 
-def test_authority_chains_u_and_has_exact_source_only_topology():
-    assert runner._arch133_reprovision_reconciliation_authority_check(ROOT) == ()
+def test_authority_chains_w_and_has_exact_source_only_topology():
+    assert (
+        runner._arch133_reprovision_recovery_reconciliation_authority_check(ROOT) == ()
+    )
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == operator.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-4:-2] == (
-        "arch133-robinhood-fresh-activation-reprovision-corrected",
+    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (
+        "arch133-robinhood-reprovision-sealed-predecessor-recovery",
         NAME,
     )
     assert len(runner.ACTIVE_CI_CHECKPOINTS) == 47
@@ -712,7 +776,7 @@ def test_authority_chains_u_and_has_exact_source_only_topology():
         "registration",
         "active",
         "workflow",
-        "u_chain",
+        "w_chain",
     ],
 )
 def test_source_inventory_registration_order_workflow_fail_closed(
@@ -721,10 +785,10 @@ def test_source_inventory_registration_order_workflow_fail_closed(
     # Local pin matrix uses a slim parsed runner fixture, never a complete runner copy.
     monkeypatch.setattr(
         runner,
-        "_arch133_reprovision_corrected_authority_check",
-        lambda r: ("U rejected",) if mutation == "u_chain" else (),
+        "_arch133_reprovision_recovery_authority_check",
+        lambda r: ("W rejected",) if mutation == "w_chain" else (),
     )
-    for relative in runner.ARCH133V_RECONCILIATION_SOURCES:
+    for relative in runner.ARCH133X_RECONCILIATION_SOURCES:
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / relative).read_bytes())
@@ -734,7 +798,7 @@ def test_source_inventory_registration_order_workflow_fail_closed(
         for n in parsed.body
         if isinstance(n, ast.AnnAssign)
         and isinstance(n.target, ast.Name)
-        and n.target.id in ("ARCH133V_RECONCILIATION_SOURCES", "ACTIVE_CI_CHECKPOINTS")
+        and n.target.id in ("ARCH133X_RECONCILIATION_SOURCES", "ACTIVE_CI_CHECKPOINTS")
     ]
     reg = next(
         n
@@ -761,14 +825,17 @@ def test_source_inventory_registration_order_workflow_fail_closed(
     workflow.write_bytes(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_bytes()
     )
-    if mutation != "u_chain":
+    if mutation != "w_chain":
         assert (
-            runner._arch133_reprovision_reconciliation_authority_check(tmp_path) == ()
+            runner._arch133_reprovision_recovery_reconciliation_authority_check(
+                tmp_path
+            )
+            == ()
         )
     if mutation in ("init", "operator", "launcher"):
         path = (
             tmp_path
-            / runner.ARCH133V_RECONCILIATION_SOURCES[
+            / runner.ARCH133X_RECONCILIATION_SOURCES[
                 ("init", "operator", "launcher").index(mutation)
             ]
         )
@@ -776,7 +843,7 @@ def test_source_inventory_registration_order_workflow_fail_closed(
     elif mutation == "inventory":
         script.write_text(
             script.read_text().replace(
-                "ARCH133V_RECONCILIATION_SOURCES", "MISSING_INVENTORY"
+                "ARCH133X_RECONCILIATION_SOURCES", "MISSING_INVENTORY"
             )
         )
     elif mutation == "registration":
@@ -789,7 +856,7 @@ def test_source_inventory_registration_order_workflow_fail_closed(
         )
     elif mutation == "workflow":
         workflow.write_text(workflow.read_text().replace(NAME, "missing-checkpoint"))
-    assert runner._arch133_reprovision_reconciliation_authority_check(tmp_path)
+    assert runner._arch133_reprovision_recovery_reconciliation_authority_check(tmp_path)
 
 
 def test_launcher_and_cli_reject_overrides_with_zero_counters(
@@ -805,7 +872,7 @@ def test_launcher_and_cli_reject_overrides_with_zero_counters(
             sys.executable,
             "-I",
             "-B",
-            str(ROOT / "scripts/run_arch133_reprovision_reconciliation.py"),
+            str(ROOT / "scripts/run_arch133_reprovision_recovery_reconciliation.py"),
             "--override",
         ],
         capture_output=True,
@@ -882,3 +949,75 @@ def test_reconciliation_does_not_readmit_a_scheduler_time_window(fake, monkeypat
     monkeypatch.setattr(material, "require_fresh", deny)
     monkeypatch.setattr(material, "require_stale", deny)
     assert operator.run()[0] == 0
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "root_identity",
+        "root_security_sha256",
+        "state_sha256",
+        "paper_predecessor_sha256",
+        "activation_id",
+        "wake_id",
+        "wake_revision",
+        "files",
+    ],
+)
+def test_exact_fixed_stage_evidence_rejects_drift(fake, monkeypatch, field):
+    original = generation.observe_generation
+
+    def changed(*args, **kwargs):
+        result = original(*args, **kwargs)
+        result[field] = (
+            {}
+            if field == "files"
+            else [1, 2]
+            if field == "root_identity"
+            else True
+            if field == "wake_revision"
+            else "drift"
+        )
+        return result
+
+    monkeypatch.setattr(generation, "observe_generation", changed)
+    blocked(operator.run())
+
+
+@pytest.mark.parametrize("field", ["identity", "sha256", "policy"])
+@pytest.mark.parametrize("name", reads.FINAL_NAMES)
+def test_every_fixed_stage_file_rejects_drift(fake, monkeypatch, field, name):
+    original = generation.observe_generation
+
+    def changed(*args, **kwargs):
+        result = original(*args, **kwargs)
+        found = result["files"][name]
+        if field == "policy":
+            found[field]["protected"] = False
+        else:
+            found[field] = [1, 2] if field == "identity" else "0" * 64
+        return result
+
+    monkeypatch.setattr(generation, "observe_generation", changed)
+    blocked(operator.run())
+
+
+@pytest.mark.parametrize(
+    "change", ["identity", "security", "policy", "filesystem", "reparse"]
+)
+def test_fixed_staging_parent_rejects_drift(fake, change):
+    obs, sha = read_only.inspect_directory_security(
+        str(fake.staging), str(fake.staging)
+    )
+    values = {
+        "identity": {"identity": (1, 2)},
+        "policy": {"aces": read_only.ROOT_ACES},
+        "filesystem": {"filesystem": "FAT"},
+        "reparse": {"reparse": True},
+        "security": {},
+    }
+    fake.security[str(fake.staging)] = (
+        replace(obs, **values[change]),
+        "drift" if change == "security" else sha,
+    )
+    blocked(operator.run())

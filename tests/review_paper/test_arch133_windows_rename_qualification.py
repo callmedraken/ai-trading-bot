@@ -832,7 +832,7 @@ def test_y_real_complete_authority_and_source_only_registration():
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == operator.SOURCE_BRANCH
     assert runner.ACTIVE_CI_CHECKPOINTS[-3:-1] == (X_NAME, NAME)
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 49
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 50
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,
         "tests/review_paper/test_arch133_windows_rename_qualification.py",

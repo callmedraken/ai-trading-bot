@@ -5,7 +5,11 @@ from __future__ import annotations
 import hashlib
 from pathlib import PureWindowsPath
 
-from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID
+from trading_bot.arch133_acl.read_only import (
+    ADMINISTRATORS_SID,
+    SYSTEM_SID,
+    TRADING_SID,
+)
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.bundle import (
     MAX_BUNDLE_BYTES,
@@ -121,15 +125,47 @@ def observe_parent(session: ReadSession) -> ObjectFacts:
             image_policy=index == len(ANCESTORS) - 1,
         )
         volume = fact.identity[0]
-        if index < len(ANCESTORS) - 1:
-            # Ancestors need not have the image ACL, but must not grant any
-            # non-admin principal write/delete/child-delete/owner/DACL rights.
+        if index == 0:
+            # F:\ is a volume-boundary observation, not an immutable-image
+            # policy object.  The accepted production-host contract permits
+            # unrelated create/metadata rights here; what matters for the
+            # protected child namespace is that an applicable non-admin ALLOW
+            # ACE cannot delete children or rewrite ownership/DACL.  Inherit-
+            # only ACEs do not apply to the volume object itself.
+            if (
+                type(fact.owner) is not str
+                or not fact.owner
+                or fact.owner == TRADING_SID
+            ):
+                raise ValueError("volume owner rejected")
+            for sid, mask, kind, flags in fact.aces:
+                if (
+                    type(sid) is not str
+                    or not sid
+                    or type(mask) is not int
+                    or type(kind) is not int
+                    or type(flags) is not int
+                    or kind not in {0, 1}
+                    or flags & ~0x1F
+                ):
+                    raise ValueError("volume ACL shape rejected")
+                if (
+                    kind == 0
+                    and not flags & 0x08
+                    and sid not in {ADMINISTRATORS_SID, SYSTEM_SID}
+                    and mask & (0x000C0040 | 0x10000000)
+                ):
+                    raise ValueError("volume namespace authority rejected")
+        elif index < len(ANCESTORS) - 1:
+            # The fixed F:\AITradingBot container is already a protected
+            # production boundary.  Keep the conservative no-mutation rule
+            # there while allowing the volume root's reviewed host policy.
             if fact.owner != ADMINISTRATORS_SID:
                 raise ValueError("ancestor owner rejected")
             for sid, mask, kind, flags in fact.aces:
                 if kind != 0 or flags & ~0x13:
                     raise ValueError("ancestor ACL shape rejected")
-                if sid not in {IMAGE_ACES[0][0], IMAGE_ACES[1][0]} and mask & ~0x1200A9:
+                if sid not in {ADMINISTRATORS_SID, SYSTEM_SID} and mask & ~0x1200A9:
                     raise ValueError("ancestor writable by runtime principal")
     return fact
 
@@ -248,7 +284,10 @@ def _observe_image(
         )
         for path in (runtime, PRODUCTION_PYTHON):
             facts = session.object(path, directory=path == runtime)
-            if facts is None or facts.owner != ADMINISTRATORS_SID:
+            if facts is None or facts.owner not in {
+                ADMINISTRATORS_SID,
+                SYSTEM_SID,
+            }:
                 raise ValueError("runtime owner rejected")
             for sid, mask, kind, flags in facts.aces:
                 if (

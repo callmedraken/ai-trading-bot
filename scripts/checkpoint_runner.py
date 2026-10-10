@@ -7835,7 +7835,7 @@ SUPERVISED_RELEASE_INSTALLATION_PINS: Final = {
         "ffff404ed16c7a476a0a3ecb622b8bdfbd701ef1"
     ),
     "src/trading_bot/supervised_release/observer.py": (
-        "7f3b58cd61aca874609ea21921b3e81a669205d1"
+        "7b08981a06b5df123355abef678c6d17a54339ec"
     ),
     "src/trading_bot/supervised_release/installer.py": (
         "de510dbec9c72fea2fd3178accf9e2a5742dabaa"

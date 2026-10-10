@@ -13,7 +13,11 @@ import pytest
 
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
-from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID, TRADING_SID
+from trading_bot.arch133_acl.read_only import (
+    ADMINISTRATORS_SID,
+    SYSTEM_SID,
+    TRADING_SID,
+)
 from trading_bot.strategies import MovingAverageCrossoverConfig
 from trading_bot.supervised_release import (
     LAUNCHER_RELATIVE_PATH,
@@ -508,6 +512,43 @@ def test_exact_security_and_read_execute_only_policy(environment, root, change):
     assert not IMAGE_ACES[2][1] & (
         0x2 | 0x4 | 0x10 | 0x40 | 0x10000 | 0x40000 | 0x80000
     )
+
+
+def test_volume_boundary_allows_unrelated_rights_but_not_namespace_authority(
+    environment,
+):
+    release, binding, native = environment
+    native.seed(release)
+    volume = ANCESTORS[0]
+    original = native.nodes[volume]
+    safe = (
+        ("S-1-5-11", 0x00000006, 0, 0),
+        ("S-1-3-0", 0x10000000, 0, 0x0B),
+    )
+    native.nodes[volume] = replace(
+        original,
+        owner=SYSTEM_SID,
+        protected=False,
+        aces=safe,
+    )
+    observer.observe_installed_release(release, binding, native=native)
+    native.nodes[volume] = replace(
+        native.nodes[volume],
+        aces=(("S-1-5-11", 0x000C0040, 0, 0),),
+    )
+    with pytest.raises(ValueError, match="volume namespace authority rejected"):
+        observer.observe_installed_release(release, binding, native=native)
+
+
+def test_runtime_host_observation_accepts_administrators_or_system_owner(environment):
+    release, binding, native = environment
+    native.seed(release)
+    runtime = r"F:\AITradingBot\runtime"
+    native.nodes[runtime] = replace(native.nodes[runtime], owner=SYSTEM_SID)
+    native.nodes[PRODUCTION_PYTHON] = replace(
+        native.nodes[PRODUCTION_PYTHON], owner=SYSTEM_SID
+    )
+    observer.observe_installed_release(release, binding, native=native)
 
 
 @pytest.mark.parametrize(

@@ -8503,10 +8503,10 @@ SUPERVISED_INSTALLATION_RUNNER_PINS: Final = {
         "c4584e649ea5a947fe26d7ebe7db41d5a47f3b7812c2b73fc8d01faac877f9ce"
     ),
     "preflight_checkpoint": (
-        "dcaeb12d9b611118d025d28e35efb0867be4a18c160d6ba6e6307c2062d0c5cb"
+        "e2710a03be2aeedfd79ba51bcdbec370c64c9f6ecb57a521f06606c260d686e5"
     ),
     "execute_checkpoint": (
-        "03f3e39ae8627127bba4d0b90138a12328a8f573931001a774c333d80ef2ce14"
+        "c8f5ee213bfa8c3f1bde50a0ae713eec53be6586630a96a71c27b8d43a8fa991"
     ),
     "main": ("7327e8425a2c6b9f65250bc004b694a6f39a4c79cd654df9425ce73df0efd810"),
 }
@@ -8621,7 +8621,7 @@ SUPERVISED_RELEASE_PARENT_NAME: Final = (
 SUPERVISED_RELEASE_PARENT_SOURCE: Final = (
     "src/trading_bot/supervised_release/release_parent_provisioning.py"
 )
-SUPERVISED_RELEASE_PARENT_PIN: Final = "f1f4d2d3a2d91cfa256498989e5b893977f17d50"
+SUPERVISED_RELEASE_PARENT_PIN: Final = "45cd28a98927ee64edd557d21b5230b573526e6a"
 SUPERVISED_RELEASE_PARENT_TESTS: Final = SUPERVISED_INSTALLATION_OPERATOR_TESTS
 SUPERVISED_RELEASE_PARENT_RUFF_PATHS: Final = (
     *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
@@ -8630,6 +8630,32 @@ SUPERVISED_RELEASE_PARENT_RUFF_PATHS: Final = (
 SUPERVISED_RELEASE_PARENT_ATTEMPT: Final = Path(
     r"F:\AI\temp\arch133-ah-release-parent-provisioning-attempt\attempt.json"
 )
+SUPERVISED_RELEASE_PARENT_ATTEMPT_PIN: Final = (
+    "55c331c847527fdbb312bed0147206f853400e53c6a6d7fc24bcbea892353290"
+)
+SUPERVISED_RELEASE_PARENT_REGISTRATION_PIN: Final = (
+    "a2ee4b44e3570c045e78bf495bb7cab7617669a1f3cc0ec3389a81684d2d7727"
+)
+SUPERVISED_RELEASE_PARENT_RUNNER_PINS: Final = {
+    "_supervised_release_parent_authority_check": (
+        "95ab89c00374c03656dfa60a21b6906bd8915045423fe0cbb11d280af749a12a"
+    ),
+    "_supervised_release_parent_admission": (
+        "10fa044e548f1eb7dc5a37d173843130151db45a2eb52b1aa7aa9ebb7fdd3444"
+    ),
+    "_supervised_release_parent_latch_consumed": (
+        "76d1963c84f1777d3f69a9aa2a1cd24735db85db90df9554b8fc42d2ad6731b0"
+    ),
+    "_consume_supervised_release_parent_attempt": (
+        "533d0da75f32df472911f27987feba8031c06726176a7606e19c571925e53541"
+    ),
+    "_supervised_release_parent_preflight": (
+        "78d2fdff7312fd1fe62622f732799ea5c5d325785a31153f46270ef1987e2f8a"
+    ),
+    "_supervised_release_parent_execute": (
+        "f8ac925e9e204962fedd04b6360b74654c2c55d4140f06c701c7d06e8e773d57"
+    ),
+}
 
 
 def _supervised_release_parent_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -8711,6 +8737,64 @@ def _supervised_release_parent_authority_check(repo_root: Path) -> tuple[str, ..
         ]
         if len(creates) != 1:
             failures.append("release parent create surface drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(runner_tree)
+        latch_declarations = [
+            node.value
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "SUPERVISED_RELEASE_PARENT_ATTEMPT"
+        ]
+        if (
+            len(latch_declarations) != 1
+            or hashlib.sha256(
+                ast.dump(latch_declarations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_RELEASE_PARENT_ATTEMPT_PIN
+        ):
+            failures.append("release parent attempt namespace source drift")
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                keyword.arg == "name"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value == SUPERVISED_RELEASE_PARENT_NAME
+                for keyword in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_RELEASE_PARENT_REGISTRATION_PIN
+        ):
+            failures.append("release parent source registration drift")
+        if set(SUPERVISED_RELEASE_PARENT_RUNNER_PINS) != {
+            "_supervised_release_parent_authority_check",
+            "_supervised_release_parent_admission",
+            "_supervised_release_parent_latch_consumed",
+            "_consume_supervised_release_parent_attempt",
+            "_supervised_release_parent_preflight",
+            "_supervised_release_parent_execute",
+        }:
+            failures.append("release parent runner pin inventory drift")
+        for name, pin in SUPERVISED_RELEASE_PARENT_RUNNER_PINS.items():
+            if (
+                name not in functions
+                or hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("release parent runner authority drift")
         if (
             operator.WORKTREE
             != Path(
@@ -8817,10 +8901,9 @@ def _supervised_release_parent_execute() -> dict[str, object]:
 
     state = _git_state(_REPOSITORY_ROOT)
     _supervised_release_parent_admission(_REPOSITORY_ROOT, state)
-    if (
-        _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]
-        or os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE
-    ):
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("release parent live remote authority rejected")
+    if os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE:
         raise RuntimeError("release parent authorization interlock rejected")
     if _supervised_release_parent_latch_consumed():
         return {
@@ -10901,7 +10984,9 @@ def execute_checkpoint(
                 "consumed installation attempt; MAY_HAVE_OCCURRED"
             )
     elif parent_provisioning:
-        from trading_bot.supervised_release import release_parent_provisioning as operator
+        from trading_bot.supervised_release import (
+            release_parent_provisioning as operator,
+        )
 
         _supervised_release_parent_admission(repo_root, state_before)
         if spec != _checkpoint_specs()[SUPERVISED_RELEASE_PARENT_NAME]:

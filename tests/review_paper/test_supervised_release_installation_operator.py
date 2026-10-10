@@ -728,6 +728,21 @@ def test_ah_preflight_ready_or_existing(monkeypatch):
         assert result["effect_disposition"] == "NOT_STARTED"
 
 
+def test_ah_preflight_conflict_blocks_without_detail_leak(monkeypatch):
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+
+    def reject():
+        raise ValueError("private conflict detail")
+
+    monkeypatch.setattr(parent_subject, "_readiness", reject)
+    result = parent_subject._preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert result["primary"]["disposition"] == "NO_PARENT_PROVISIONING_EFFECT"
+    assert "private conflict detail" not in repr(result)
+
+
 def test_ah_precreate_failure_has_exact_no_effect_disposition(monkeypatch):
     monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
     monkeypatch.setattr(
@@ -843,6 +858,15 @@ def test_ah_registration_and_capability_surface():
     assert spec.remote_head_env is None
     assert spec.tests == runner.SUPERVISED_RELEASE_PARENT_TESTS
     assert spec.ruff_paths == runner.SUPERVISED_RELEASE_PARENT_RUFF_PATHS
+    assert set(runner.SUPERVISED_RELEASE_PARENT_RUNNER_PINS) == {
+        "_supervised_release_parent_authority_check",
+        "_supervised_release_parent_admission",
+        "_supervised_release_parent_latch_consumed",
+        "_consume_supervised_release_parent_attempt",
+        "_supervised_release_parent_preflight",
+        "_supervised_release_parent_execute",
+    }
+    assert runner._supervised_release_parent_authority_check(ROOT) == ()
     source = inspect.getsource(parent_subject)
     assert source.count('"CreateDirectoryW"') == 1
     for forbidden in (
@@ -921,9 +945,7 @@ def test_ah_exact_runner_source_admission(tmp_path, monkeypatch, gate):
         )
 
 
-def test_ah_fixed_latch_is_exclusive_and_survives_flush_failure(
-    tmp_path, monkeypatch
-):
+def test_ah_fixed_latch_is_exclusive_and_survives_flush_failure(tmp_path, monkeypatch):
     state = {
         "head": "a" * 40,
         "tree": "b" * 40,
@@ -953,9 +975,7 @@ def test_ah_fixed_latch_is_exclusive_and_survives_flush_failure(
 
 
 @pytest.mark.parametrize("entrypoint", ["preflight", "execute"])
-def test_ah_runner_revalidates_live_remote_before_host_entry(
-    monkeypatch, entrypoint
-):
+def test_ah_runner_revalidates_live_remote_before_host_entry(monkeypatch, entrypoint):
     state = {
         "head": "a" * 40,
         "tree": "b" * 40,
@@ -987,9 +1007,7 @@ def test_ah_runner_revalidates_live_remote_before_host_entry(
         )
 
 
-def test_ah_execute_checkpoint_remote_race_is_no_parent_effect(
-    tmp_path, monkeypatch
-):
+def test_ah_execute_checkpoint_remote_race_is_no_parent_effect(tmp_path, monkeypatch):
     name = "arch133-robinhood-supervised-release-parent-provisioning"
     spec = runner._checkpoint_specs()[name]
     state = {
@@ -1026,6 +1044,29 @@ def test_ah_execute_checkpoint_remote_race_is_no_parent_effect(
         "type": "PARENT_PROVISIONING_STOPPED",
         "detail": "NO_PARENT_PROVISIONING_EFFECT",
     }
+
+
+def test_ah_execute_authorization_interlock_precedes_host_effect(monkeypatch):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda *args: state)
+    monkeypatch.setattr(
+        runner, "_supervised_release_parent_admission", lambda *args: None
+    )
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: state["head"])
+    monkeypatch.delenv(parent_subject.AUTH_ENV, raising=False)
+    monkeypatch.setattr(
+        parent_subject,
+        "_execute_once",
+        lambda consume: pytest.fail("host execute reached"),
+    )
+
+    with pytest.raises(RuntimeError, match="authorization interlock rejected"):
+        runner._supervised_release_parent_execute()
 
 
 def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):

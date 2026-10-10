@@ -319,7 +319,22 @@ def qualify_deployment(
         blocked = QualificationClass.BLOCKED_IDENTITY_DRIFT
         if _image(release, binding, installed, image_observer) != first_image:
             raise ValueError("selected image drift")
-        if selection_observer.observe_selection() != first_selection:
+        final_selection = selection_observer.observe_selection()
+        if (
+            type(final_selection) is not SelectionObservation
+            or final_selection.complete is not True
+            or final_selection.rollback_bound_or_active is not False
+            or not all(
+                _identifiers(value)
+                for value in (
+                    final_selection.selected_release_ids,
+                    final_selection.runtime_release_ids,
+                    final_selection.task_paths,
+                    final_selection.rollback_release_ids,
+                )
+            )
+            or final_selection != first_selection
+        ):
             raise ValueError("selection observation drift")
         blocked = QualificationClass.BLOCKED_SCHEDULER_STATE
         final_task = scheduler_observer.observe_fixed_task()

@@ -483,6 +483,32 @@ def test_repeated_observation_drift(setup, name, classification):
     blocked(qualify(setup), classification)
 
 
+@pytest.mark.parametrize(
+    "field",
+    [
+        None,
+        "selected_release_ids",
+        "runtime_release_ids",
+        "task_paths",
+        "rollback_release_ids",
+        "complete",
+        "rollback_bound_or_active",
+    ],
+)
+def test_repeated_selection_requires_exact_typed_observation(setup, field):
+    def drift(reads, name, count):
+        if name == "selection" and count == 2:
+            if field is None:
+                reads.selection = EqualityAlias()
+            else:
+                old = getattr(reads.selection, field)
+                value = (EqualityAlias(),) if type(old) is tuple else EqualityAlias()
+                reads.selection = replace(reads.selection, **{field: value})
+
+    setup.reads.hook = drift
+    blocked(qualify(setup), C.BLOCKED_IDENTITY_DRIFT)
+
+
 @pytest.mark.parametrize("which", ["process", "substrate"])
 @pytest.mark.parametrize("count", [2, 4])
 def test_runtime_drift_across_ae_and_final_observation(setup, which, count):

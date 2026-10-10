@@ -94,13 +94,26 @@ def _fact(path: Path, *, directory: bool) -> os.stat_result:
     return facts
 
 
+_PRESERVED_SCRATCH_ROOTS = (
+    PureWindowsPath(r"F:\AI\temp\arch133y-rename-qualification"),
+    PureWindowsPath(r"F:\AI\temp\arch133z-rename-qualification"),
+)
+
+
+def _within_windows_root(path: PureWindowsPath, root: PureWindowsPath) -> bool:
+    return path == root or root in path.parents
+
+
 def _checkout(checkout: Path) -> Path:
     root = Path(checkout).absolute()
     windows = PureWindowsPath(str(checkout))
-    if windows.drive.upper() in {"Y:", "Z:"} or any(
-        part.casefold() == "aitradingbot" for part in windows.parts
+    if (
+        ".." in windows.parts
+        or windows.drive.upper() in {"Y:", "Z:"}
+        or any(part.casefold() == "aitradingbot" for part in windows.parts)
+        or any(_within_windows_root(windows, protected) for protected in _PRESERVED_SCRATCH_ROOTS)
     ):
-        raise ValueError("production and scratch namespaces forbidden")
+        raise ValueError("production and preserved-scratch namespaces forbidden")
     # Check ancestors before resolving or invoking Git; never traverse links.
     for path in reversed((root, *root.parents)):
         _fact(path, directory=True)

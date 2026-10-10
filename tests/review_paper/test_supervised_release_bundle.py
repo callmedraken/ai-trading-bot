@@ -659,10 +659,14 @@ def test_no_production_or_scratch_access_before_admission(monkeypatch):
     for root in (
         "F:/AITradingBot/releases",
         "F:/AITradingBot/Arch133",
+        "F:/AI/temp/arch133y-rename-qualification",
+        "F:/AI/temp/arch133y-rename-qualification/child",
+        "F:/AI/temp/arch133z-rename-qualification",
+        "F:/AI/temp/arch133z-rename-qualification/child",
         "Y:/scratch",
         "Z:/scratch",
     ):
-        # PureWindowsPath recognizes drive-qualified spelling on either platform.
+        # Reject protected roots lexically before the first filesystem observation.
         with pytest.raises(ValueError):
             collector.collect_release_bundle(Path(root), declaration=declaration())
 

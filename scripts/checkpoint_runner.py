@@ -7724,7 +7724,7 @@ SUPERVISED_RELEASE_BUNDLE_PINS: Final = {
         "acdd2dfa17398afc822e770dd18166b747514cc1"
     ),
     "src/trading_bot/supervised_release/collector.py": (
-        "cafbf9d2455d9e4584a3229cd7b7fe4f575611f9"
+        "5766d9b43e5e186f358397af202707782d760fe1"
     ),
 }
 SUPERVISED_RELEASE_BUNDLE_TESTS: Final = (

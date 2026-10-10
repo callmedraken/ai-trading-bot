@@ -10,53 +10,36 @@ boundaries decide what may actually happen.
 
 ## Current status
 
-The active product line is the Robinhood review-paper path with deterministic
-risk/execution authority and the Architecture-133 supervised immutable-release
-productionization sequence. Architectures 133-AB through 133-AF are now
-source-accepted through the inert deployment/startup + rollback qualification
-model.
+The active product line is the Robinhood review-paper path using the
+Architecture-133 supervised immutable-release productionization model.
 
-The latest accepted implementation source before this documentation closeout is:
+Architecture 133-AF is FULL certified. Architecture **133-AG**, the reviewed
+protected immutable-release installation operator and read-only host preflight,
+is source-accepted on implementation HEAD
+141c5cb17d4183ee0f65a1b93c85d415ae2b8c14 / tree
+b1743eb5d954b34ff9bd14fdc7a7a105727b1bc7, with Checkpoint Source Gates
+#405 / 38043472442 successful.
 
-~~~text
-branch  feature/robinhood-supervised-deployment-qualification
-head    7e9935f383a5c718c3efba70a127c8c7e1d889c2
-tree    763de6563edd3115fa4fe8883102365ca82f40de
-CI      Checkpoint Source Gates #401 / 38038075147 SUCCESS
-~~~
+AG introduces the first reviewed production installation invocation surface but
+has not executed it. It derives all release policy internally, verifies the exact
+clean live branch, performs a read-only real-host readiness check, consumes a
+fixed no-retry durable attempt latch before entering the accepted one-shot AC
+installer, and grants no scheduler/provider/Paper-v2/wake/broker/live authority.
 
-The last accepted broad baseline is the Architecture 133-AD FULL certification.
-AE and AF deliberately accumulated the pending Architecture-132 FULL obligation
-while remaining source-only. The next gate is therefore one FULL
-current-supported-product certification on the exact final documentation
-closeout source before any consequential protected deployment/startup action.
+The next gate is the real **read-only AG preflight** on this final documentation
+closeout source. If that host readiness check passes, the same exact source must
+receive one FULL current-product certification before the single protected
+installation attempt is authorized. In particular, AG does not provision the
+required protected F:\AITradingBot\releases parent and does not repair or clean
+conflicting FINAL/STAGING state.
 
-The supervised-release path is fail-closed and immutable:
-
-~~~text
-reviewed source
--> VerifiedRelease
--> immutable installed release
--> independently observed InstalledEvidence
--> RuntimeBinding
--> supervised maintenance/scheduler binding
--> runtime-host admission
--> deployment qualification
--> unattended runtime
-~~~
-
-No real immutable release has been installed by AF, no Task Scheduler task has
-been rebound/enabled/started, no production runtime has been launched, no
-rollback has been activated, and no Robinhood/provider, Paper-v2, broker or live
-effect is authorized by source acceptance or FULL certification alone.
-Production/live trading remains **NO-GO** until its separately reviewed gates.
-
-Older C3/PD1-PD4 and D10/Windows operational work remains retained historical
-compatibility and evidence; it is no longer the current resume point.
+Production/live trading remains **NO-GO**. No immutable release has yet been
+installed through AG and no scheduler rebind/start, runtime wake, provider,
+Paper-v2, broker or live effect is authorized by source acceptance.
 
 See docs/PROJECT_STATUS.md and docs/AI_TRADING_BOT_HANDOFF.md for the canonical
-resume state, and the Architecture-133 authority/validation documents for the
-active productionization sequence.
+resume state and the Architecture-133 authority/validation documents for the
+active protected transition.
 
 ## Product direction
 

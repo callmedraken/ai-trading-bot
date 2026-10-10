@@ -1,5 +1,105 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-10 — Architecture 133-AG SOURCE ACCEPTED; real-host preflight then final FULL selected
+
+Architecture **133-AG is SOURCE ACCEPTED** on the exact reviewed implementation:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-installation-operator
+BASE    36a24bbcb9ee4ee5c41f1599306cd9d8ba5a19c4
+HEAD    141c5cb17d4183ee0f65a1b93c85d415ae2b8c14
+TREE    b1743eb5d954b34ff9bd14fdc7a7a105727b1bc7
+CI      Checkpoint Source Gates #405 / 38043472442 SUCCESS
+
+CHECKPOINTS 56
+TEST_PATHS  67
+RUFF_PATHS  216
+PYTEST      0
+RUFF_CHECK  0
+RUFF_FORMAT 0
+DIFF_CHECK  0
+~~~
+
+The implementation handoff reports 3,034 distinct focused passing cases across
+the new operator and affected AC/AD/AE/AF/runner/profile topology, with fresh
+external pytest basetemp roots and clean Ruff/diff checks. Exact GitHub review
+confirms one ordinary commit and exactly 20 changed files.
+
+Exact-source review accepts the protected installation bridge:
+
+- all production release declaration material is source-owned; callers cannot
+  provide HEAD/tree, release ID/root, launcher/Python identity, strategy/risk
+  declaration, destination, scheduler/account or trading material;
+- the fixed strategy declaration is MovingAverageCrossoverStrategy 1.0.0 with
+  MovingAverageCrossoverConfig(5, 20, Decimal("1"));
+- the fixed logical risk declaration is arch133-long-only-review-paper 1.0.0,
+  SHA-256 over the exact source-owned v1 declaration bytes. It is release
+  identity material only and does not select a runtime risk implementation or
+  authorize trading; complete executable source bytes remain independently
+  covered by the release inventory;
+- collection, VerifiedRelease replay and RuntimeBinding replay precede host
+  observation, and source HEAD/tree are the exact clean live branch source;
+- preflight is read-only, does not import the native writer, independently
+  verifies Administrator/Windows, protected parent/Python identity, exact
+  FINAL/STAGING classification and existing installed-image evidence, and emits
+  only bounded sanitized evidence;
+- protected execute re-derives/replays the release and binding, revalidates live
+  remote/source identity, requires the checkpoint-specific explicit
+  authorization interlock, consumes the fixed external exclusive-create latch,
+  then invokes the accepted AC install_release() engine exactly once;
+- the latch is independent of authorization token, evidence root, release ID and
+  source revision. Source contains no reset/remove/cleanup/retry path; partial
+  latch write/flush leaves the exclusive file present when creation succeeded;
+- before installer entry, failures remain NO_INSTALLATION_EFFECT; after entry the
+  AC mutation fence and AG wrapper preserve ambiguity as
+  PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED;
+- exact preexisting FINAL is independently replayed with zero installation
+  mutation; conflicting FINAL or any preexisting STAGING blocks;
+- there is no scheduler writer, credential/OAuth/provider path, Paper-v2 writer,
+  wake/runtime execution, rollback/repair/cleanup path or broker/live authority
+  in the AG operator.
+
+The real installation parent is deliberately **not provisioned by AG**.
+F:\AITradingBot\releases must already exist with the accepted protected host
+policy. The first real read-only AG preflight is therefore a required host
+readiness gate. Missing or malformed parent/Python/final/staging state is a
+BLOCKED result and must be reviewed separately; do not improvise provisioning
+or cleanup.
+
+Certification topology after AG is:
+
+~~~text
+FULL        156
+ROBINHOOD    83
+LEGACY      205
+EXHAUSTIVE  361
+~~~
+
+The last broad certification is the accepted AF FULL at executable source
+6912453331a10109a80c8fab0bd3454b15bccbcd. Because AG adds a new protected
+execution surface, AF's FULL cannot certify AG. The next safe order is:
+
+~~~text
+133-AG source accepted + this docs closeout
+  -> real AG read-only preflight on the exact final closeout source
+  -> if preflight PASS, one FULL certification on that same exact source
+  -> review both results and source identity
+  -> ONE explicitly authorized immutable-release installation execute
+  -> independently review resulting InstalledEvidence
+  -> separately authorize maintenance-mode scheduler rebind
+~~~
+
+Do not move the AG branch between the successful preflight/FULL review and the
+protected execute. Any executable source change invalidates the current
+authorization/certification decision and returns to source review. A blocked
+preflight does not authorize provisioning, cleanup or retry through another
+path.
+
+No real preflight, installation, scheduler, provider, paper, wake, broker or
+live effect occurred during AG implementation/review. Preserved Y/Z scratch
+remains untouched.
+
+
 ## 2026-10-10 — Architecture 133-AF FULL CERTIFIED; 133-AG protected installation operator frozen
 
 Architecture **133-AF is SOURCE ACCEPTED and FULL CERTIFIED** on the final

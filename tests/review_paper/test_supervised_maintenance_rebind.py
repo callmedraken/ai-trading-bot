@@ -111,8 +111,9 @@ def test_fixed_immutable_action_and_absence(setup):
     assert task.executable == PRODUCTION_PYTHON
     assert task.arguments == (
         "-I",
+        "-S",
         "-B",
-        root + r"\scripts\run_arch133_unattended_review_paper.py",
+        root + r"\scripts\run_arch133_supervised_release_review_paper.py",
     )
     assert task.principal_sid == "S-1-5-21-1397534616-3988210162-180023805-1009"
     assert task.run_level == "LeastPrivilege"
@@ -209,7 +210,7 @@ def test_bad_observation_fails_closed(setup, field, value):
     [
         ("<Priority>7", "<Priority>8"),
         ("LeastPrivilege", "HighestAvailable"),
-        ("-I -B", "-B"),
+        ("-I ", "-X "),
         ("python.exe", "other.exe"),
         ("-1009", "-1010"),
         ("<AllowStartOnDemand>false", "<AllowStartOnDemand>true"),
@@ -390,8 +391,8 @@ def test_source_registration_inventory_and_pins():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-maintenance-rebind"
-    assert runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 53
+    assert runner.ACTIVE_CI_CHECKPOINTS[1] == NAME
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 54
     assert spec.authority_check(ROOT) == ()
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -401,10 +402,10 @@ def test_source_registration_inventory_and_pins():
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 153,
-        "robinhood": 80,
+        "full": 154,
+        "robinhood": 81,
         "legacy": 205,
-        "exhaustive": 358,
+        "exhaustive": 359,
     }
 
 

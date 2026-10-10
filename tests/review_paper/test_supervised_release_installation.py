@@ -879,7 +879,7 @@ def test_capability_separation_and_no_other_effect_imports(which):
 def test_checkpoint_source_only_registration_pins_workflow_and_classifier():
     spec = runner._checkpoint_specs()[NAME]
     assert (
-        NAME in runner.ACTIVE_CI_CHECKPOINTS and len(runner.ACTIVE_CI_CHECKPOINTS) == 53
+        NAME in runner.ACTIVE_CI_CHECKPOINTS and len(runner.ACTIVE_CI_CHECKPOINTS) == 54
     )
     assert spec.remote_branch == "feature/robinhood-supervised-release-installation"
     assert spec.preflight is spec.execute is spec.remote_head_env is None

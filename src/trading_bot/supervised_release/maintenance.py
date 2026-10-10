@@ -54,7 +54,7 @@ TASK_TEMPLATE = r"""<Task version="1.2" xmlns="http://schemas.microsoft.com/wind
 <ExecutionTimeLimit>PT1H</ExecutionTimeLimit><Priority>7</Priority>
 </Settings>
 <Actions Context="Trading"><Exec><Command>F:\AITradingBot\runtime\python.exe</Command>
-<Arguments>-I -B {root}\scripts\run_arch133_unattended_review_paper.py</Arguments>
+<Arguments>{arguments}</Arguments>
 <WorkingDirectory>{root}</WorkingDirectory></Exec></Actions></Task>"""
 
 
@@ -118,7 +118,11 @@ class MaintenanceTask:
 
     @property
     def xml(self) -> str:
-        return TASK_TEMPLATE.format(root=self.working_directory, triggers="")
+        return TASK_TEMPLATE.format(
+            root=self.working_directory,
+            triggers="",
+            arguments=" ".join(self.arguments),
+        )
 
 
 class Classification(StrEnum):
@@ -230,6 +234,11 @@ def _predecessor(tree: ET.Element) -> bool:
     expected = TASK_TEMPLATE.format(
         root=PREDECESSOR_ROOT,
         triggers=f"<TimeTrigger><StartBoundary>{start}</StartBoundary><EndBoundary>{end}</EndBoundary><Enabled>true</Enabled></TimeTrigger>",
+        arguments=(
+            "-I -B "
+            + PREDECESSOR_ROOT
+            + r"\scripts\run_arch133_unattended_review_paper.py"
+        ),
     )
     return _material(tree) == _material(_tree(expected))
 

@@ -133,6 +133,7 @@ RETAINED_CHECKPOINTS: Final = (
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-runtime-host-admission",
     "arch133-robinhood-supervised-maintenance-rebind",
     "arch133-robinhood-supervised-release-installation",
     "arch133-robinhood-supervised-release-build-verification",
@@ -877,7 +878,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3596,7 +3597,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3694,7 +3695,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3792,7 +3793,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -3896,7 +3897,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -3995,7 +3996,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4110,7 +4111,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4220,7 +4221,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4318,7 +4319,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4420,7 +4421,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4519,7 +4520,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4618,7 +4619,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4714,7 +4715,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4810,7 +4811,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -4908,7 +4909,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5008,7 +5009,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5116,7 +5117,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "d7b581b8beb2f024760258813fbbb2df61ec59868fa104c13bc7db9e51b29c89"
+            != "f0b2f8850067ae2807dd1b581624a28ea6eed3f9eff4d5afe029c7babd378ffb"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -7971,7 +7972,7 @@ SUPERVISED_MAINTENANCE_SOURCES: Final = (
 )
 SUPERVISED_MAINTENANCE_PINS: Final = {
     "src/trading_bot/supervised_release/maintenance.py": (
-        "e012285effef861f38cdf52739bfbc7d43181e92"
+        "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
     ),
 }
 SUPERVISED_MAINTENANCE_TESTS: Final = (
@@ -8068,6 +8069,153 @@ def _supervised_maintenance_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("maintenance workflow drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("maintenance source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RUNTIME_ADMISSION_SOURCES: Final = (
+    "src/trading_bot/supervised_release/model.py",
+    "src/trading_bot/supervised_release/maintenance.py",
+    "src/trading_bot/supervised_release/runtime_admission.py",
+    "scripts/run_arch133_supervised_release_review_paper.py",
+)
+SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
+    "src/trading_bot/supervised_release/model.py": (
+        "be0d310802a8018036a7221006074feed79092f7"
+    ),
+    "src/trading_bot/supervised_release/maintenance.py": (
+        "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
+    ),
+    "src/trading_bot/supervised_release/runtime_admission.py": (
+        "01221b11086bb793b558c0cba4ed66d6700a7059"
+    ),
+    "scripts/run_arch133_supervised_release_review_paper.py": (
+        "f9a5e8924b19c23e57807cde0b812418e56f02c8"
+    ),
+}
+SUPERVISED_RUNTIME_ADMISSION_TESTS: Final = (
+    *SUPERVISED_MAINTENANCE_TESTS,
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+)
+SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS: Final = (
+    *SUPERVISED_MAINTENANCE_RUFF_PATHS,
+    "src/trading_bot/supervised_release/runtime_admission.py",
+    "scripts/run_arch133_supervised_release_review_paper.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+)
+
+
+def _supervised_runtime_admission_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """133-AE source-only runtime admission; no real-host observer is constructed."""
+    failures = list(_supervised_maintenance_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[
+            "arch133-robinhood-supervised-runtime-host-admission"
+        ]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-runtime-host-admission"
+            or spec.tests != SUPERVISED_RUNTIME_ADMISSION_TESTS
+            or spec.ruff_paths != SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_runtime_admission_authority_check
+        ):
+            failures.append("runtime admission source-only registration drift")
+        for relative, pin in SUPERVISED_RUNTIME_ADMISSION_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("runtime admission reviewed source drift")
+
+        relative = "src/trading_bot/supervised_release/runtime_admission.py"
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "pathlib",
+            "typing",
+            "trading_bot.arch133_acl.read_only",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "open",
+            "run",
+            "Popen",
+            "WinDLL",
+            "read_text",
+            "read_bytes",
+            "write_text",
+            "write_bytes",
+            "unlink",
+            "delete",
+            "remove",
+            "rename",
+            "rmtree",
+            "sleep",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "install_release",
+            "publish",
+            "enable",
+            "start",
+            "credential",
+            "provider",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("runtime admission import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("runtime admission import boundary drift")
+            if (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                in forbidden
+            ):
+                failures.append("runtime admission capability boundary drift")
+
+        launcher = ast.parse(
+            (
+                repo_root
+                / "scripts/run_arch133_supervised_release_review_paper.py"
+            ).read_text(encoding="utf-8")
+        )
+        launcher_imports = {
+            alias.name
+            for node in launcher.body
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        launcher_from = {
+            node.module
+            for node in launcher.body
+            if isinstance(node, ast.ImportFrom)
+        }
+        if launcher_imports != {"sys"} or launcher_from != {
+            "pathlib",
+            "trading_bot.review_paper.unattended_host",
+        }:
+            failures.append("runtime launcher import boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("runtime admission workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("runtime admission source unavailable")
     return tuple(failures)
 
 
@@ -8878,6 +9026,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_closed_descendant_rename_qualification_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133z",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-runtime-host-admission": CheckpointSpec(
+            name="arch133-robinhood-supervised-runtime-host-admission",
+            description="Architecture 133-AE inert immutable runtime-host admission",
+            tests=SUPERVISED_RUNTIME_ADMISSION_TESTS,
+            ruff_paths=SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS,
+            authority_check=_supervised_runtime_admission_authority_check,
+            remote_branch="feature/robinhood-supervised-runtime-host-admission",
             preflight=None,
             execute=None,
             remote_head_env=None,

@@ -60,9 +60,9 @@ def manifest(**changes):
 
 def test_canonical_round_trip_and_logical_material_identity():
     original = manifest()
-    assert original.release_id == "release-8376c2e5729a5942894ec389bca62dd6"
+    assert original.release_id == "release-ed0cca1bbc6152f4beeeaee4fe5e2b3a"
     assert original.source_inventory_sha256 == (
-        "d581ccf74b38ad372b62cdea97fa6c2c19b3d1863cf6cd69a345e52b87ddf62f"
+        "ed7069757a141cb02ee9d4678611800a1ba4f9b73e8cfcc46cdc6b6a7bd32511"
     )
     assert original.strategy_config_sha256 == (
         "f20af916c822820459636b43bcd475e7e458aa94ca01209d53dd618a7024ddfe"
@@ -326,8 +326,9 @@ def test_scheduler_projection_exact_action_without_access(monkeypatch):
     assert action.working_directory == expected
     assert action.arguments == (
         "-I",
+        "-S",
         "-B",
-        expected + r"\scripts\run_arch133_unattended_review_paper.py",
+        expected + r"\scripts\run_arch133_supervised_release_review_paper.py",
     )
     assert project_scheduler_action(original, root=expected) == action
     assert validate_release_root(expected, original.release_id) == expected
@@ -537,7 +538,7 @@ manifest = ReleaseManifest(
     'reviewed-policy', '1.0.0', 'e'*64,
 )
 assert ReleaseManifest.from_json(manifest.to_json()) == manifest
-assert project_scheduler_action(manifest).arguments[0:2] == ('-I', '-B')
+assert project_scheduler_action(manifest).arguments[0:3] == ('-I', '-S', '-B')
 effectful = (
     'trading_bot.review_paper', 'trading_bot.arch133_', 'trading_bot.robinhood'
 )

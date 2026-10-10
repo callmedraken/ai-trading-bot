@@ -20,7 +20,7 @@ from trading_bot.strategies import MovingAverageCrossoverConfig
 RELEASES_BASE = r"F:\AITradingBot\releases"
 DURABLE_DATA_ROOT = r"F:\AITradingBot\Arch133"
 PRODUCTION_PYTHON = r"F:\AITradingBot\runtime\python.exe"
-LAUNCHER_RELATIVE_PATH = "scripts/run_arch133_unattended_review_paper.py"
+LAUNCHER_RELATIVE_PATH = "scripts/run_arch133_supervised_release_review_paper.py"
 MANIFEST_SCHEMA = "arch133-supervised-release/v1"
 INVENTORY_SCHEMA = "arch133-release-source-inventory/v1"
 CONFIG_SCHEMA = "moving-average-crossover-config/v1"
@@ -347,7 +347,7 @@ class SchedulerActionProjection:
             PureWindowsPath(self.working_directory)
             / self.manifest.launcher_relative_path
         )
-        return ("-I", "-B", launcher)
+        return ("-I", "-S", "-B", launcher)
 
 
 def project_scheduler_action(

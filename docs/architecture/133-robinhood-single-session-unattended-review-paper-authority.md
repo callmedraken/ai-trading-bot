@@ -2,9 +2,9 @@
 
 ## 2026-10-10 — Architecture 133-AE runtime-host admission contract frozen
 
-Architecture **133-AE is CONTRACT FROZEN; SOURCE NOT YET IMPLEMENTED OR
-ACCEPTED; NO REAL HOST, SCHEDULER, CREDENTIAL, PROVIDER OR PRODUCTION EFFECT IS
-AUTHORIZED.**
+Architecture **133-AE is SOURCE IMPLEMENTED; EXACT GITHUB REVIEW AND
+ACCEPTANCE PENDING; NO REAL HOST, SCHEDULER, CREDENTIAL, PROVIDER OR PRODUCTION
+EFFECT IS AUTHORIZED.**
 
 ```text
 BRANCH      feature/robinhood-supervised-runtime-host-admission
@@ -229,6 +229,15 @@ installation/rebind/startup qualification boundary.
 
 Implementation owner/model remains **Sol High** because this checkpoint changes
 runtime startup isolation and security/authority semantics.
+
+Implementation now uses a distinct supervised-release launcher so the accepted
+historical 133-E/G launcher and pins remain byte-exact. The inert source model
+replays the accepted release/binding/installed image, requires exact immutable
+project-module origins and `-I -S -B` process facts, models protected runtime
+substrate/object/dependency observations through injected read-only seams, and
+keeps `dependency_closure=UNPROVEN`. The checkpoint remains source-only with
+`preflight=None`, `execute=None` and `remote_head_env=None`. Broad FULL
+certification remains deliberately deferred under the accepted batching rule.
 
 ## 2026-10-10 — Architecture 133-AD ACCEPTED; workflow audit closes two regressions
 

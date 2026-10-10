@@ -363,11 +363,24 @@ def test_r2a_workflow_scope_and_narrow_branch_trigger():
         assert not runner._batch_workflow_is_reviewed(modified)
 
 
+def test_runtime_admission_checkpoint_is_first_and_source_only():
+    repo = Path(runner.__file__).resolve().parent.parent
+    workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    name = "arch133-robinhood-supervised-runtime-host-admission"
+    assert runner.ACTIVE_CI_CHECKPOINTS[0] == name
+    assert workflow.count(name) == 1
+    assert runner._batch_workflow_is_reviewed(workflow)
+    spec = runner._checkpoint_specs()[name]
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert spec.tests == runner.SUPERVISED_RUNTIME_ADMISSION_TESTS
+    assert spec.authority_check is runner._supervised_runtime_admission_authority_check
+
+
 def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
-    assert runner.ACTIVE_CI_CHECKPOINTS[1] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[2] == name
     assert workflow.count("              " + name + " `") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]

@@ -245,7 +245,7 @@ def test_new_launcher_bootstraps_only_release_source_and_fixed_site_packages():
     assert imported_from == {"pathlib", "trading_bot.supervised_release"}
     assert "review_paper.unattended_host" not in source
     assert "runtime_admission as _runtime_admission" in source
-    assert 'raise SystemExit(3)' in source
+    assert "raise SystemExit(3)" in source
 
 
 @pytest.mark.parametrize(
@@ -353,7 +353,8 @@ def test_substrate_fact_drift_blocks(setup, field, value):
 
 
 @pytest.mark.parametrize(
-    "change", ["owner", "reparse", "mutation", "bool_mutation", "rename", "alias", "kind"]
+    "change",
+    ["owner", "reparse", "mutation", "bool_mutation", "rename", "alias", "kind"],
 )
 def test_substrate_object_security_and_identity_blocks(setup, change):
     rows = list(setup.runtime.substrate.objects)

@@ -387,9 +387,7 @@ def admit_runtime_host(
             or DEPENDENCY_CLOSURE != "UNPROVEN"
         ):
             raise ValueError
-        first_image = observe_installed_release(
-            release, binding, native=image_observer
-        )
+        first_image = observe_installed_release(release, binding, native=image_observer)
         if (
             first_image != installed
             or first_image.dependency_closure != DEPENDENCY_CLOSURE
@@ -398,9 +396,7 @@ def admit_runtime_host(
         root = release_root(release.manifest.release_id)
         source_root = root + r"\src"
         launcher = (
-            root
-            + "\\"
-            + release.manifest.launcher_relative_path.replace("/", "\\")
+            root + "\\" + release.manifest.launcher_relative_path.replace("/", "\\")
         )
         reason = RuntimeReason.SUBSTRATE
         first_substrate = runtime_observer.observe_substrate()

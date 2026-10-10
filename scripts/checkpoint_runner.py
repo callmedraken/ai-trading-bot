@@ -8086,7 +8086,7 @@ SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
         "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
     ),
     "src/trading_bot/supervised_release/runtime_admission.py": (
-        "5c9ab457f5e13cc264c8140d7e15f3353eb4a291"
+        "ef95b314c527d5f2e773b06c9d2a5f217ae8d09b"
     ),
     "scripts/run_arch133_supervised_release_review_paper.py": (
         "0425eaba53ea607512db338dbbc537aa9d28542a"
@@ -8121,8 +8121,7 @@ def _supervised_runtime_admission_authority_check(
             != "feature/robinhood-supervised-runtime-host-admission"
             or spec.tests != SUPERVISED_RUNTIME_ADMISSION_TESTS
             or spec.ruff_paths != SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS
-            or spec.authority_check
-            is not _supervised_runtime_admission_authority_check
+            or spec.authority_check is not _supervised_runtime_admission_authority_check
         ):
             failures.append("runtime admission source-only registration drift")
         for relative, pin in SUPERVISED_RUNTIME_ADMISSION_PINS.items():
@@ -8189,8 +8188,7 @@ def _supervised_runtime_admission_authority_check(
 
         launcher = ast.parse(
             (
-                repo_root
-                / "scripts/run_arch133_supervised_release_review_paper.py"
+                repo_root / "scripts/run_arch133_supervised_release_review_paper.py"
             ).read_text(encoding="utf-8")
         )
         launcher_imports = {

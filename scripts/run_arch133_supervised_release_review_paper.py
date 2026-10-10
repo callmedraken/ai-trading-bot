@@ -3,7 +3,9 @@
 Run only as production Python -I -S -B with zero semantic arguments.
 Automatic site processing remains disabled; this launcher explicitly adds the
 verified release source root and the fixed protected production site-packages
-root before importing project code.
+root before importing only the inert 133-AE admission model. Operational host
+wiring is deliberately deferred; this launcher fails closed until that later
+reviewed bridge exists.
 """
 
 import sys
@@ -43,7 +45,8 @@ if any(path.casefold() in {_source.casefold(), _site.casefold()} for path in sys
     raise SystemExit(3)
 sys.path[:0] = [_source, _site]
 
-from trading_bot.review_paper.unattended_host import main  # noqa: E402
+from trading_bot.supervised_release import runtime_admission as _runtime_admission  # noqa: E402,F401
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    print(_FAILURE, file=sys.stderr)
+    raise SystemExit(3)

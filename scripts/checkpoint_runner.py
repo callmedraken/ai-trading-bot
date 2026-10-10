@@ -8089,7 +8089,7 @@ SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
         "5c9ab457f5e13cc264c8140d7e15f3353eb4a291"
     ),
     "scripts/run_arch133_supervised_release_review_paper.py": (
-        "f9a5e8924b19c23e57807cde0b812418e56f02c8"
+        "0425eaba53ea607512db338dbbc537aa9d28542a"
     ),
 }
 SUPERVISED_RUNTIME_ADMISSION_TESTS: Final = (
@@ -8204,7 +8204,7 @@ def _supervised_runtime_admission_authority_check(
         }
         if launcher_imports != {"sys"} or launcher_from != {
             "pathlib",
-            "trading_bot.review_paper.unattended_host",
+            "trading_bot.supervised_release",
         }:
             failures.append("runtime launcher import boundary drift")
         workflow = (

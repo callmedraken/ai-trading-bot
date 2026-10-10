@@ -239,6 +239,13 @@ def test_new_launcher_bootstraps_only_release_source_and_fixed_site_packages():
     assert r"F:\AITradingBot\runtime\Lib\site-packages" in source
     assert "sys.path[:0] = [_source, _site]" in source
     assert "sys.flags.no_site" in source and "sys.flags.isolated" in source
+    imported_from = {
+        node.module for node in tree.body if isinstance(node, ast.ImportFrom)
+    }
+    assert imported_from == {"pathlib", "trading_bot.supervised_release"}
+    assert "review_paper.unattended_host" not in source
+    assert "runtime_admission as _runtime_admission" in source
+    assert 'raise SystemExit(3)' in source
 
 
 @pytest.mark.parametrize(

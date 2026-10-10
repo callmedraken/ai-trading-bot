@@ -239,8 +239,18 @@ replays the accepted release/binding/installed image, requires exact immutable
 project-module origins and `-I -S -B` process facts, models protected runtime
 substrate/object/dependency observations through injected read-only seams, and
 keeps `dependency_closure=UNPROVEN`. The checkpoint remains source-only with
-`preflight=None`, `execute=None` and `remote_head_env=None`. Broad FULL
-certification remains deliberately deferred under the accepted batching rule.
+`preflight=None`, `execute=None` and `remote_head_env=None`. Exact GitHub
+review found and corrected one boundary defect before acceptance: the first
+supervised launcher revision imported the historical
+`review_paper.unattended_host`, which would have re-entered mutable 133-G
+worktree admission and imported credential/provider/wake surfaces. The corrected
+133-AE launcher imports only the inert
+`trading_bot.supervised_release.runtime_admission` model after establishing the
+isolated release search path, then terminates with the fixed fail-closed host
+result. Operational/native observer wiring is deliberately deferred to a later
+reviewed checkpoint; the AE launcher itself grants no runtime execution,
+credential, provider, state, wake or broker authority. Broad FULL certification
+remains deliberately deferred under the accepted batching rule.
 
 ## 2026-10-10 — Architecture 133-AD ACCEPTED; workflow audit closes two regressions
 

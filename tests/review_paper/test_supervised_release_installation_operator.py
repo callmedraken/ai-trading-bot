@@ -520,7 +520,7 @@ def test_source_registration_pins_chaining_topology():
     assert spec.authority_check(ROOT) == ()
     assert (
         runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
-        and len(runner.ACTIVE_CI_CHECKPOINTS) == 56
+        and len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     )
     assert runner._batch_workflow_is_reviewed(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()

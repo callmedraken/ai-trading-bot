@@ -763,7 +763,7 @@ def test_authority_chains_w_and_has_exact_source_only_topology():
         "arch133-robinhood-reprovision-sealed-predecessor-recovery",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 54
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 55
 
 
 @pytest.mark.parametrize(

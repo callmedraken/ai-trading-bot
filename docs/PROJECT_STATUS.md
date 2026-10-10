@@ -42,8 +42,10 @@ may become runtime authority.
 
 ### Startup-isolation correction discovered during contract review
 
-The accepted AB/AD action currently uses `python.exe -I -B <launcher>`.
-That is insufficient for the intended immutable-runtime boundary because
+The accepted AB/AD action currently uses the historical launcher with `python.exe -I -B <launcher>`.
+That historical launcher is pinned by accepted 133-E/G authority and must remain byte-exact. AE therefore introduces a distinct supervised-release launcher `scripts\\run_arch133_supervised_release_review_paper.py`; it must not rewrite the historical launcher or its authority pins.
+
+The current `-I -B` startup shape is insufficient for the intended immutable-runtime boundary because
 ordinary Python `site` initialization remains enabled and may process the
 shared runtime's site-packages before the immutable release launcher executes.
 
@@ -54,7 +56,7 @@ F:\AITradingBot\runtime\python.exe
   -I
   -S
   -B
-  <FINAL>\scripts\run_arch133_unattended_review_paper.py
+  <FINAL>\scripts\run_arch133_supervised_release_review_paper.py
 ```
 
 The launcher must explicitly add, in this order and before importing any
@@ -77,9 +79,7 @@ F:\AITradingBot\Arch133\no-pycache
 and the process must run with isolated mode, no-site mode and bytecode writes
 disabled.
 
-This correction necessarily updates the inert scheduler-action projection and
-133-AD maintenance target used by future protected work. It does **not** mutate
-the real task and does not authorize a rebind.
+This correction necessarily updates the supervised-release manifest launcher constant, inert scheduler-action projection and 133-AD maintenance target used by future protected work. The historical 133-E/G launcher, old 133-P predecessor definition and their source pins remain unchanged. It does **not** mutate the real task and does not authorize a rebind.
 
 ### Dependency closure
 
@@ -141,7 +141,7 @@ isolated             true
 no_site              true
 dont_write_bytecode  true
 argv                  exactly launcher only; zero semantic args
-launcher             <FINAL>\scripts\run_arch133_unattended_review_paper.py
+launcher             <FINAL>\scripts\run_arch133_supervised_release_review_paper.py
 project source root  <FINAL>\src
 working directory    <FINAL>
 pycache prefix       F:\AITradingBot\Arch133\no-pycache

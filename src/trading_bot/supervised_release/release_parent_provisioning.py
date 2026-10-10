@@ -20,7 +20,6 @@ from trading_bot.arch133_acl.read_only import (
 )
 from trading_bot.supervised_release.installation_contract import (
     IMAGE_ACES,
-    ObjectFacts,
     ReleasePaths,
 )
 from trading_bot.supervised_release.model import RELEASES_BASE
@@ -64,7 +63,8 @@ def _observe_once(session: WindowsReadSession) -> ParentReadiness:
         image_policy=False,
     )
     if (
-        not volume.owner
+        type(volume.owner) is not str
+        or not volume.owner
         or volume.owner == TRADING_SID
         or any(
             type(sid) is not str

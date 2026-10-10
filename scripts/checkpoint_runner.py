@@ -287,9 +287,7 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze fast active routing plus the complete fail-closed batch fallback.
     checkpoint_block = (
         "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
-        + "".join(
-            f"              {name} `\n" for name in ACTIVE_CI_CHECKPOINTS[:-1]
-        )
+        + "".join(f"              {name} `\n" for name in ACTIVE_CI_CHECKPOINTS[:-1])
         + f"              {ACTIVE_CI_CHECKPOINTS[-1]}\n"
     )
     local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'

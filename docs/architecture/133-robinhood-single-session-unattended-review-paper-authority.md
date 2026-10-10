@@ -1,44 +1,56 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
-## 2026-10-09 — Future soak clarified; 133-AC installer/observer contract frozen
+## 2026-10-09 — Historical unattended evidence reconciled; 133-AC installation contract re-frozen
 
-The future supervised-release unattended-paper soak is **not a continuation or
-successful repeat of the historical D10 week**.
+The project has two distinct historical unattended-operation facts that must not
+be conflated.
+
+The earlier Architecture 112 / D5 capture-only warm-up **did** run naturally
+across multiple trading days and accumulated the required six consecutive
+selected production C3 sessions through completed session 2026-09-18. That is
+valid evidence of sustained unattended scheduler + provider + market-data
+capture behavior over approximately one trading week. It did **not** authorize
+decision publication, Paper-v2 settlement or the complete recurring unattended
+trading controller, so it is not the Architecture-122/D10 end-to-end Paper-v2
+soak.
 
 Historical D10 facts remain:
 
 - Architecture 122 defined a seven-calendar-day unattended simulated Paper-v2
-  soak.
+  soak using the recurring unattended trading controller.
 - The first D10 activation was halted before its first accepted natural wake
   after the durable wake-evidence defect was discovered.
 - Architecture 128 later performed a clean redeployment/reactivation with a new
   activation/soak identity.
 - On 2026-10-01 that clean soak reached its first natural wake, but the wake
   terminated `GUARD_TERMINAL / CHILD_OUTPUT_INVALID`; the scheduler was then
-  disabled and the soak was stopped. It did not produce an accepted full week of
-  unattended trading.
-- Those D10 deployments, leases, scheduler state and incident evidence are
-  historical compatibility/evidence only and must never be resumed.
+  disabled and the soak was stopped with zero accepted wakes.
+- Therefore D10 never completed the required end-to-end unattended week. Its
+  deployments, leases, scheduler state and incident evidence are historical
+  compatibility/evidence only and must never be resumed.
 
 The future soak belongs to the **current supervised immutable-release path**. It
 must use a separately verified immutable release, supervised scheduler binding,
-current host/runtime admission and the current unattended trading controller.
-It must receive a fresh soak identity/evidence boundary and must not reuse D10
+current host/runtime admission and the accepted recurring unattended controller.
+It receives a fresh soak identity/evidence boundary and must not reuse D10
 activation leases, scheduler tasks, deployment roots or evidence files.
 
-The intended qualification ladder after deployment is:
+The intended qualification ladder is:
 
-1. one supervised deployment/startup qualification;
-2. one unattended integration session/wake;
-3. a short bounded multi-session soak if the integration session is accepted;
-4. then a five-trading-session / approximately one-calendar-week unattended
-   paper soak under a separately frozen contract;
-5. explicit review before any indefinite unattended-paper operation.
+1. complete the supervised immutable-release installation, maintenance-mode /
+   scheduler-rebind and runtime-host-admission checkpoints;
+2. perform supervised deployment/startup and rollback qualification;
+3. perform exactly one unattended integration session/wake;
+4. if accepted, begin one **fresh seven-calendar-day unattended Paper-v2 soak**
+   using the Architecture-111/122 recurring-controller model and count only
+   accepted eligible trading sessions/wakes;
+5. perform explicit end-of-week review before normal recurring unattended-paper
+   operation.
 
-This staged ladder avoids treating elapsed time alone as evidence. A future soak
-must count accepted eligible trading sessions/wakes and stop on any ambiguity,
-missed-deadline/session-gap, unresolved prior state, source/release drift or
-scheduler/runtime-binding contradiction.
+There is no additional mandatory short multi-session soak between the integration
+wake and the fresh seven-day qualification window. A future soak must still stop
+on any ambiguity, missed-deadline/session-gap, unresolved prior state,
+source/release drift or scheduler/runtime-binding contradiction.
 
 ### Architecture 133-AC — immutable release installer and installed-image observer
 
@@ -48,7 +60,7 @@ AUTHORIZED.**
 ```text
 BRANCH      feature/robinhood-supervised-release-installation
 WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-release-installation
-BASE        this clarification/contract-closeout commit
+BASE        this reconciliation/contract-closeout commit
 CHECKPOINT  arch133-robinhood-supervised-release-installation
 ```
 
@@ -60,15 +72,18 @@ source development.
 
 #### Fixed production namespace
 
-Future real installation is limited to:
+Future real installation uses exactly one fixed releases parent and two
+release-derived child paths:
 
 ```text
-F:\AITradingBot\releases\<validated-release-id>
+PARENT   F:\AITradingBot\releases
+STAGING  F:\AITradingBot\releases\<validated-release-id>.installing
+FINAL    F:\AITradingBot\releases\<validated-release-id>
 ```
 
-where the release ID is derived from the accepted supervised-release manifest.
-The installer must never accept an arbitrary production root, alternate drive,
-caller-supplied destination or replacement target.
+The release ID is derived from the accepted supervised-release manifest. The
+`.installing` suffix is source-frozen; callers may not choose another staging
+name, destination, production root, alternate drive or replacement target.
 
 The fixed durable state root remains:
 
@@ -76,62 +91,89 @@ The fixed durable state root remains:
 F:\AITradingBot\Arch133
 ```
 
-and is never release content.
+and is never release content or installation scratch.
 
-The preserved historical evidence roots remain excluded before first
-observation:
+The preserved historical evidence roots remain lexically excluded **before the
+first filesystem observation**:
 
 ```text
 F:\AI\temp\arch133y-rename-qualification
 F:\AI\temp\arch133z-rename-qualification
 ```
 
-#### Installation model
+#### Installation state machine
 
-The installer consumes exactly one accepted `VerifiedRelease` plus the exact
-derived `RuntimeBinding`.
+The installer consumes exactly one accepted `VerifiedRelease` plus its exact
+derived `RuntimeBinding`. It must use one bounded one-shot Windows installation
+protocol:
 
-It must:
+1. verify Administrator authority, Windows host and the fixed local-NTFS releases
+   parent;
+2. independently verify the releases-parent identity, owner/DACL and
+   no-reparse/link policy;
+3. derive the exact FINAL and STAGING paths from the verified release identity;
+4. observe FINAL. If FINAL already exists, invoke the independent installed-image
+   observer. Return `ALREADY_INSTALLED_VERIFIED` only when that exact immutable
+   image independently verifies; otherwise fail closed as conflicting immutable
+   state without modifying it;
+5. require STAGING to be absent before the first mutation;
+6. materialize the exact accepted `VerifiedRelease` bytes into STAGING only,
+   creating directories/files with the frozen owner/DACL/reparse/link policy;
+7. flush and close every bounded write;
+8. independently reopen STAGING and replay exact namespace, bytes, manifest,
+   `VerifiedRelease` and `RuntimeBinding` verification;
+9. publish STAGING to FINAL through exactly one reviewed, same-parent,
+   no-replace native publication operation;
+10. independently reopen FINAL through the installed-image observer;
+11. return bounded sanitized installed-release evidence only after that final
+    observation succeeds.
 
-- prove the production releases parent is the fixed expected Windows/NTFS
-  namespace with the frozen security/ownership policy;
-- fail closed if the target release directory already exists in any form;
-- reject reparse points, symlinks/junctions, case aliases, unexpected object
-  types, volume drift or namespace ambiguity;
-- create one new release directory without overwriting any existing release;
-- materialize exactly the verified bundle namespace and exact bytes;
-- create files with bounded write/flush/close behavior and verify each object
-  independently after close;
-- write canonical `manifest.json` as part of the exact verified bundle, not as
-  mutable installation metadata;
-- never modify an installed release in place;
-- never delete/repair/replace another release as part of normal installation;
-- return sanitized bounded installation evidence only after an independent
-  installed-image verification pass succeeds.
+The installer never writes directly into FINAL before publication, never
+overwrites an existing FINAL, never modifies an installed release in place and
+never renames/archives/replaces another installed release.
 
-A failure before any production mutation reports BLOCKED. A failure after target
-creation or any file write begins reports INDETERMINATE and preserves the
-partial target exactly; no automatic retry, cleanup, overwrite or reuse is
-allowed until separately reviewed reconciliation establishes its state.
+Failure disposition is frozen:
+
+```text
+before first installation mutation
+  -> BLOCKED / NO_INSTALLATION_EFFECT
+
+after STAGING creation or any installation write begins, including a failed or
+ambiguous publication/final-observer result
+  -> INDETERMINATE / PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY
+```
+
+An INDETERMINATE result preserves every staging/final artifact exactly as
+observed. There is no automatic cleanup, rollback, repair, overwrite, recursive
+delete, retry or reuse. A separately reviewed read-only reconciliation must
+classify the state before any later action.
 
 #### Installed-image observer
 
-A distinct read-only observer must independently reopen the fixed derived target
-and prove:
+The read-only observer is independent of the installer's return object. It must
+reconstruct object facts and bytes from the supplied fixed FINAL path and prove:
 
-- exact target/root/parent identity and expected same-volume facts;
-- no reparse/symlink/junction or wrong object type;
-- exact case-sensitive canonical namespace with no extras/missing aliases;
+- exact parent/root/final-path identity and local-NTFS/same-volume facts;
+- exact owner/DACL policy;
+- runtime Trading principal has only the read/execute access actually required
+  and cannot write, delete or rename the immutable release;
+- deployment Administrator authority may create/install the release without
+  broadening runtime permissions beyond that requirement;
+- every expected directory/file is regular and no symlink, junction, reparse
+  point or disallowed hard-link ambiguity exists;
+- exact canonical case-sensitive namespace with no missing/extra/case-alias
+  entries;
 - exact bytes/SHA-256 for every bundle file;
-- canonical manifest bytes and exact `VerifiedRelease` replay;
-- exact `RuntimeBinding` replay;
-- fixed release root and durable-data-root separation;
-- declared production Python identity remains a declaration until separately
-  observed;
-- dependency closure remains `UNPROVEN` unless a later substrate checkpoint
-  supplies an accepted identity.
+- canonical manifest bytes and independent accepted `VerifiedRelease` replay;
+- exact `RuntimeBinding` replay against that verified release;
+- fixed release-root and durable-data-root separation;
+- the production Python host identity is observed and compared separately from
+  release contents rather than inferred from the bundle;
+- `dependency_closure=UNPROVEN` remains mandatory unless a separately reviewed
+  read-only runtime-substrate checkpoint proves more.
 
-The observer owns no mutation authority.
+The observer owns no mutation authority. 133-AC claims no durable-state
+compatibility migration and does not modify `F:\AITradingBot\Arch133`.
 
 #### Source checkpoint and tests
 
@@ -143,45 +185,64 @@ execute         = None
 remote_head_env = None
 ```
 
-Production execution/install registration is a later separately accepted
-protected boundary.
+There is no real installation/execute registration in the source checkpoint.
+Production installation remains a later separately accepted protected boundary.
 
-Focused fake/temp tests must cover at least:
+Focused disposable-root/fake-native tests must cover at least:
 
-- exact successful install and independent read-only replay;
-- preexisting target directory/file/reparse rejection;
-- parent/root reparse, wrong type, volume/security drift;
-- arbitrary destination/drive/path traversal/alias rejection;
-- missing/extra/case-collision material;
-- create/write/flush/close failures at every bounded step;
-- ambiguous post-create/post-write failures preserve partial evidence;
-- no retry, cleanup, overwrite, replacement or recursive delete;
-- immutable-success behavior and second-install rejection;
-- manifest/bundle/runtime-binding tamper;
-- installed-byte and namespace drift;
-- durable root and preserved Y/Z scratch exclusion before observation;
-- no scheduler/provider/credential/paper/broker/live capability;
-- source registration/workflow/profile drift.
+- fresh successful STAGING install, independent staging replay, no-replace
+  publication and independent FINAL replay;
+- exact preexisting FINAL returning `ALREADY_INSTALLED_VERIFIED`;
+- conflicting/malformed preexisting FINAL failing closed without mutation;
+- preexisting STAGING blocking before mutation;
+- missing/extra/case-collision, traversal/absolute-path and alias rejection;
+- byte/hash/manifest/`VerifiedRelease`/`RuntimeBinding` mismatch;
+- root/parent/staging/final reparse, wrong object type, wrong filesystem/volume,
+  disallowed hard-link ambiguity and owner/DACL mismatch;
+- frozen runtime-principal read/execute-only ACL behavior;
+- bounded create/write/flush/close interruption after mutation preserving
+  evidence and returning INDETERMINATE;
+- publication failure or ambiguous completion preserving evidence with no retry;
+- publication success followed by final-observer failure returning
+  INDETERMINATE and preserving the published image;
+- no overwrite, repair, delete, rollback, cleanup, retry or reuse path;
+- observer independence from installer return state and replay through the
+  accepted bundle verifier;
+- production Python identity treated as separate host observation and dependency
+  closure remaining UNPROVEN;
+- fixed durable-root separation and preserved Y/Z scratch lexical exclusion
+  before observation;
+- no scheduler/provider/OAuth/credential/paper/broker/live/durable-state
+  mutation capability;
+- source-registration/workflow/profile drift.
 
 Use focused pytest with fresh external basetemp, exact-file Ruff check/format and
 diff checks. Broad certification is deferred until exact source review unless
 the affected surface expands.
 
-### Automatic next-step ownership
+### Immediate roadmap after 133-AC
 
-Canonical workflow continuation is reaffirmed:
+If 133-AC source review passes, continue automatically through the next safe
+source/design checkpoints:
 
-- after each accepted checkpoint, ChatGPT closes canonical docs;
-- ChatGPT names the next milestone and owner/model;
-- ChatGPT automatically supplies the bounded implementation instructions;
-- source-only/read-only work continues without waiting for a separate prompt;
-- any real installation, scheduler mutation, provider/paper effect or other
-  protected boundary still stops for explicit authorization.
+```text
+133-AC immutable installer + installed-image observer
+133-AD supervised maintenance mode + scheduler rebind
+133-AE runtime host admission from verified RuntimeBinding
+deployment qualification / rollback proof
+ONE unattended integration wake
+fresh seven-calendar-day unattended Paper-v2 soak
+end-of-week review
+normal recurring unattended paper trading
+```
 
-For 133-AC, implementation should use **Sol High** because it defines the
-Windows production filesystem/security/ambiguity boundary even though the first
-checkpoint remains source-only.
+Any real installation, scheduler mutation, provider/OAuth/paper effect, preserved
+Y/Z scratch inspection, broker/live effect or other protected operation still
+stops for fresh explicit authorization.
 
+For 133-AC itself, implementation uses **Sol High** because it defines the
+Windows filesystem/security/publication/ambiguity boundary even though the first
+checkpoint is source-only.
 
 ## 2026-10-09 — Architecture 133-AB implementation (source review pending)
 

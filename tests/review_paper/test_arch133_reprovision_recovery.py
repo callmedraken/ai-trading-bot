@@ -695,7 +695,7 @@ def test_source_authority_and_source_only_registration():
         "arch133-robinhood-reprovision-indeterminate-reconciliation",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 52
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 53
 
 
 @pytest.mark.parametrize(

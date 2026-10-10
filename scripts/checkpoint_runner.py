@@ -285,9 +285,8 @@ def resolve_ci_checkpoint(
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze fast active routing plus the complete fail-closed batch fallback.
-    checkpoint_block = (
-        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
-        + "".join(f"    {name}\n" for name in ACTIVE_CI_CHECKPOINTS)
+    checkpoint_block = "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n" + "".join(
+        f"    {name}\n" for name in ACTIVE_CI_CHECKPOINTS
     )
     local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
     needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
@@ -10650,9 +10649,7 @@ def duration_balanced_test_shards(
         target = min(range(count), key=lambda index: (loads[index], index))
         shards[target].append(path)
         loads[target] += CI_TEST_DURATION_WEIGHTS.get(path, 1.0)
-    return tuple(
-        tuple(sorted(shard, key=positions.__getitem__)) for shard in shards
-    )
+    return tuple(tuple(sorted(shard, key=positions.__getitem__)) for shard in shards)
 
 
 def _source_gate_steps(
@@ -10790,9 +10787,7 @@ def verify_checkpoint(
             "NOT_RUN"
             if not authority_checked
             else (
-                "PASS"
-                if not authority_failures
-                else f"FAIL({len(authority_failures)})"
+                "PASS" if not authority_failures else f"FAIL({len(authority_failures)})"
             )
         )
     )
@@ -10964,11 +10959,7 @@ def verify_batch(
     for name, failures in authority_failures.items():
         print(
             f"AUTHORITY[{name}]="
-            + (
-                "NOT_RUN"
-                if not authority_checked
-                else ("FAIL" if failures else "PASS")
-            )
+            + ("NOT_RUN" if not authority_checked else ("FAIL" if failures else "PASS"))
         )
         for failure in failures:
             print(f"AUTHORITY_FAILURE[{name}]={failure}")

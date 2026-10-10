@@ -847,8 +847,7 @@ def test_duration_balanced_shards_are_deterministic_disjoint_and_complete():
     assert len({path for shard in first for path in shard}) == len(tests)
 
     loads = [
-        sum(runner.CI_TEST_DURATION_WEIGHTS[path] for path in shard)
-        for shard in first
+        sum(runner.CI_TEST_DURATION_WEIGHTS[path] for path in shard) for shard in first
     ]
     assert max(loads) - min(loads) < 0.1
     with pytest.raises(ValueError, match="test shard count rejected"):
@@ -882,7 +881,7 @@ def test_single_source_gate_phase_separates_static_authority_and_tests(
     monkeypatch.setattr(
         runner,
         "_execute_step",
-        lambda step, **kw: (calls.append(step) or _outcome(step.name, 0)),
+        lambda step, **kw: calls.append(step) or _outcome(step.name, 0),
     )
 
     passed, path = runner.verify_checkpoint(
@@ -911,7 +910,7 @@ def test_batch_tests_phase_shards_and_skips_authority(tmp_path, monkeypatch):
     monkeypatch.setattr(
         runner,
         "_execute_step",
-        lambda step, **kw: (calls.append(step) or _outcome(step.name, 0)),
+        lambda step, **kw: calls.append(step) or _outcome(step.name, 0),
     )
 
     passed, path = runner.verify_batch(

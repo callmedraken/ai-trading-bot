@@ -9,7 +9,6 @@ import pytest
 from scripts import checkpoint_runner as runner
 
 from .helpers import (
-    _EXPECTED_ACTIVE_CI_CHECKPOINTS,
     _EXPECTED_RETAINED_CHECKPOINTS,
     _clean_source,
     _event,

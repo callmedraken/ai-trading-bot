@@ -434,6 +434,14 @@ functionality, replacing the original Architecture 132 meaning. EXHAUSTIVE
 preserves that earlier all-repository behavior. Normal current-product
 certification does not require LEGACY or EXHAUSTIVE.
 
+A certification-topology change creates a pending FULL obligation. Adjacent
+source-only checkpoints may deliberately accumulate that obligation and run one
+FULL at the next coherent current-product/readiness boundary when every
+intermediate checkpoint has focused verification plus terminal-green source-gate
+CI and no protected effect, merge, major integration or release boundary occurs
+between them. This batching decision must be explicit; it is not permission to
+carry uncertified source across a protected or consequential boundary.
+
 ChatGPT chooses the appropriate tier after exact GitHub code review and source
 acceptance. The normal handoff remains:
 
@@ -449,6 +457,9 @@ implementation + focused checks
 At a declared certification boundary:
 
 - ChatGPT supplies exact local commands and frozen source identities;
+- every local certification attempt uses a fresh unique external evidence
+  directory (normally purpose + GUID suffix); an existing/ambiguous evidence
+  path is preserved and never deleted/reused merely to retry;
 - the user runs the selected profile and required source/artifact checks;
 - review-driven source corrections return to focused verification first;
 - if the environment invalidates the run, repair it before interpreting failures

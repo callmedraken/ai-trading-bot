@@ -1,5 +1,85 @@
 # Project Status and Roadmap
 
+## 2026-10-10 — Architecture 133-AD ACCEPTED; workflow audit closes two regressions
+
+Architecture **133-AD is SOURCE ACCEPTED and FULL CERTIFIED** on the exact
+reviewed source:
+
+```text
+BRANCH  feature/robinhood-supervised-maintenance-rebind
+HEAD    39dfc3bf54603ec3d372a58135f2492d7dd448cb
+TREE    a5b440d9f4baa1d1c1a15178a5fd91ba7f984e7c
+CI      Checkpoint Source Gates #389 / 38030087176 SUCCESS
+
+FULL
+modules   153
+cases     8,669
+passed    8,666
+skipped   3
+failed    0
+errors    0
+wall      290.009 s
+evidence  F:\AI\temp\certification\arch133ad-full-39dfc3b-a502fed964b04ea2b02c74731b7cc5d9
+```
+
+Exact GitHub review found no 133-AD source correction required. The accepted
+source remains source-only/inert: `preflight=None`, `execute=None`,
+`remote_head_env=None`; no Task Scheduler writer, credential surface,
+provider path or production-effect entrypoint is reachable.
+
+The post-review operator audit identified two **ChatGPT command-generation
+workflow regressions**, not repository/source failures:
+
+1. the first FULL wrapper compared Git's slash-normalized worktree text directly
+   with a backslash Windows literal even though the canonical workflow already
+   requires `Resolve-Path` normalization and case-insensitive identity
+   comparison;
+2. the second interactive wrapper allowed later detached commands, including a
+   PASS marker, to be entered after an earlier `throw`, even though the
+   canonical workflow already requires one invoked `& { ... }`/reviewed-script
+   scope with PASS emitted only after every prerequisite and child exit succeeds.
+
+A third avoidable operator issue reused a pre-existing certification evidence
+path. The valid FULL therefore used a fresh GUID-suffixed path and the earlier
+path is preserved rather than deleted/reused.
+
+### Certification cadence correction
+
+The Architecture-132 policy remains tiered. A certification-topology change
+creates a **pending FULL obligation**, but that obligation is not mechanically
+required immediately after every adjacent source-only checkpoint. When several
+source-only checkpoints are intentionally chained, each has focused verification
+and terminal-green source-gate CI, and no protected effect, major integration,
+merge or release boundary is crossed between them, ChatGPT may explicitly defer
+and batch the FULL run at the next coherent current-product/readiness boundary.
+
+Accordingly, the back-to-back 133-AC then 133-AD FULL runs were both valid, but
+they were more frequent than necessary for the actual transition path because no
+protected operation occurred between AC and AD. One broad certification after
+the adjacent source-only sequence would have been sufficient if that deferral
+had been declared in advance. Do not repeat FULL merely because the next
+source-only checkpoint adds another supported test module; re-evaluate the
+actual boundary and accumulate the obligation when safe.
+
+The accepted 133-AD FULL is now the latest broad baseline. No additional FULL is
+due until later source changes reach a coherent integration/readiness boundary.
+Before the first protected immutable installation/scheduler/rebind/startup path,
+the final exact source implementing all intervening source-only work must have
+the selected required broad certification.
+
+### Next milestone — Architecture 133-AE
+
+The next safe milestone is **133-AE runtime-host admission from the verified
+`RuntimeBinding`**. Begin with architecture/source design only. It must replace
+the old mutable-worktree runtime identity assumptions with immutable-release
+identity while preserving the accepted production Python substrate and fixed
+durable-state separation. It must not grant activation, OAuth/provider,
+scheduler enable/start, Paper-v2 mutation, wake, broker or live authority.
+
+No real release installation, Task Scheduler observation/mutation, credential
+access, provider access or production filesystem mutation is authorized by this
+closeout. Those remain later explicitly protected boundaries.
+
 ## 2026-10-10 — Architecture 133-AC ACCEPTED; 133-AD maintenance/rebind contract frozen
 
 Architecture **133-AC is SOURCE ACCEPTED and FULL CERTIFIED** on the exact
@@ -43,8 +123,8 @@ provider/OAuth access, Paper-v2 mutation, broker effect or live effect occurred.
 
 ### Architecture 133-AD — supervised maintenance mode + immutable scheduler rebind
 
-**SOURCE IMPLEMENTED; EXACT GITHUB REVIEW AND ACCEPTANCE PENDING; NO REAL
-SCHEDULER OR PRODUCTION-FILESYSTEM EFFECT AUTHORIZED.**
+**SOURCE ACCEPTED AND FULL CERTIFIED; REAL SCHEDULER OR
+PRODUCTION-FILESYSTEM EFFECTS REMAIN SEPARATELY PROTECTED AND UNAUTHORIZED.**
 
 The source-only implementation lives in `supervised_release/maintenance.py`.
 It independently replays accepted 133-AC image/binding evidence twice, observes

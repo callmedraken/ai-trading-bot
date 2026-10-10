@@ -118,6 +118,13 @@ baselines.
   supported shared-core changes, or when ChatGPT determines accumulated
   checkpoints warrant comprehensive current-product regression. FULL is not
   mechanically tied to every Architecture 131 letter/checkpoint.
+  A certification-topology change creates a pending FULL obligation, not
+  necessarily an immediate run after every adjacent source-only checkpoint.
+  ChatGPT may explicitly batch that obligation across a planned sequence of
+  focused/source-gate-green source-only checkpoints when no protected effect,
+  merge, major integration, release, or production-readiness boundary is crossed
+  between them. The final exact source must complete FULL before the next such
+  consequential boundary.
 - **LEGACY / EXHAUSTIVE:** only when explicitly relevant. LEGACY retains retired
   architecture; EXHAUSTIVE covers every discovered repository test and preserves
   the previous three-lane all-repository topology. Use for changes to legacy
@@ -219,6 +226,7 @@ boundary rather than presenting the effectful command as ordinary verification.
 - Routine exact-file staging/commit/ordinary-push operations may be delegated to Codex when the current task explicitly authorizes that checkpoint. This authorization never includes merge, rebase, amend, force-push, PR metadata/review-thread changes, branch switching, or unrelated files.
 - Before an authorized Codex commit, verify that the index was initially clean, stage only exact intended paths, verify the staged filename set, and run `git diff --cached --check`. Never use `git add .` or `git add -A` for a scoped checkpoint.
 - Before edits, certification, deployment, or operator work in an active worktree, verify the exact worktree path, branch, HEAD, tree, intended origin/remote ref, clean index, and expected worktree state. Any mismatch is a STOP condition; do not self-correct by switching, resetting, cleaning, rebasing, pulling across unexpected history, or deleting artifacts.
+- Every local certification attempt must use a fresh unique external evidence directory. Never delete, overwrite, or reuse an existing/ambiguous certification evidence path merely to make a retry proceed; prefer a purpose prefix plus GUID suffix.
 - A known ChatGPT-direct bounded-commit lag is a reviewed synchronization case, not an unexpected-state repair: when ChatGPT has directly advanced the exact remote branch through one or more explicitly reviewed, tightly scoped commits (including routine docs/status/handoff closeout or a tiny mechanical source/test/workflow correction), and admission proves the local worktree is on the exact expected branch, tracked/index-clean, at the exact known pre-direct-change HEAD, while the remote is at the exact reviewed direct-change HEAD and the local HEAD is its ancestor, fast-forward the local branch only (`git fetch` plus `git merge --ff-only`, or an equivalent `git pull --ff-only`) before any next local/Codex work. Any different local/remote state is a STOP. Afterward verify local HEAD/tree == remote expected HEAD/tree and tracked/index-clean, then continue automatically into the next safe checkpoint.
 - After an ordinary push or an approved merge, verify the exact remote/resulting HEAD and tree plus the expected clean local state before reporting success. A merge does not require rerunning an already-completed broad suite when the exact resulting source tree was previously certified; otherwise use the appropriate final certification gate.
 - Preserve unrelated generated/untracked artifacts and historical permission-warning test directories.

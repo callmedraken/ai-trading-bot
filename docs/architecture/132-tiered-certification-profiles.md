@@ -1321,9 +1321,15 @@ FOCUSED
 | PROTECTED | Always separate fresh authorization. |
 
 FULL is not mechanically tied to every accepted source checkpoint or
-Architecture 131 letter. Normal current-product certification does not require
-LEGACY or EXHAUSTIVE. ChatGPT owns exact source review, acceptance, and the
-certification-tier decision. The normal handoff remains:
+Architecture 131 letter. A certification-topology change creates a pending FULL
+obligation, but adjacent source-only checkpoints with focused verification and
+terminal-green source-gate CI may explicitly batch that obligation until the
+next coherent current-product/readiness boundary, provided no protected effect,
+merge, major integration or release boundary occurs in between. The final exact
+source must complete FULL before crossing such a consequential boundary.
+Normal current-product certification does not require LEGACY or EXHAUSTIVE.
+ChatGPT owns exact source review, acceptance, and the certification-tier
+decision. The normal handoff remains:
 
 ```text
 implementation + focused checks

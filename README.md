@@ -10,53 +10,53 @@ boundaries decide what may actually happen.
 
 ## Current status
 
-The contained C3 production market-data capture boundary is complete and
-certified. PD1 Paper-v2 authority, PD2 reliable supervised paper operation, PD3
-supervised crash/recovery validation, and the **PD4 unattended simulated-paper
-source foundation are complete and source-certified**.
+The active product line is the Robinhood review-paper path with deterministic
+risk/execution authority and the Architecture-133 supervised immutable-release
+productionization sequence. Architectures 133-AB through 133-AF are now
+source-accepted through the inert deployment/startup + rollback qualification
+model.
 
-The exact PD4 source tree certified before docs-only closeout is:
+The latest accepted implementation source before this documentation closeout is:
 
-```text
-commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
-tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
-```
+~~~text
+branch  feature/robinhood-supervised-deployment-qualification
+head    7e9935f383a5c718c3efba70a127c8c7e1d889c2
+tree    763de6563edd3115fa4fe8883102365ca82f40de
+CI      Checkpoint Source Gates #401 / 38038075147 SUCCESS
+~~~
 
-PD4 final certification passed:
+The last accepted broad baseline is the Architecture 133-AD FULL certification.
+AE and AF deliberately accumulated the pending Architecture-132 FULL obligation
+while remaining source-only. The next gate is therefore one FULL
+current-supported-product certification on the exact final documentation
+closeout source before any consequential protected deployment/startup action.
 
-```text
-5588 passed, 17 expected skips in 1519.25s
-Ruff check: PASS
-Ruff format --check: PASS (486 files)
-git diff --check: PASS
-git diff --cached --check: PASS
-worktree/index: clean
-```
+The supervised-release path is fail-closed and immutable:
 
-The final Trading-principal read-only qualification also passed under the
-intended dedicated non-admin account. The frozen unattended launcher reported
-`EFFECTS_CLOSED`; the genuine PD4 read-only harness returned `VALIDATED` with an
-underlying fail-closed `BLOCKED` qualification and recorded no invocation
-publication, execution, recovery, provider call, database mutation, or scheduler
-mutation.
+~~~text
+reviewed source
+-> VerifiedRelease
+-> immutable installed release
+-> independently observed InstalledEvidence
+-> RuntimeBinding
+-> supervised maintenance/scheduler binding
+-> runtime-host admission
+-> deployment qualification
+-> unattended runtime
+~~~
 
-All six Paper-v2 effect gates remain hard-coded `False`. The current safe target
-is the **PD4 unattended deployment acceptance design**: freeze the intended
-session/timing policy, scheduler deployment/verification sequence, invocation-
-storage provisioning checkpoint, first unattended Paper-v2 acceptance ordering,
-and the separate unattended C3/provider authority boundary.
+No real immutable release has been installed by AF, no Task Scheduler task has
+been rebound/enabled/started, no production runtime has been launched, no
+rollback has been activated, and no Robinhood/provider, Paper-v2, broker or live
+effect is authorized by source acceptance or FULL certification alone.
+Production/live trading remains **NO-GO** until its separately reviewed gates.
 
-**Production/live trading remains NO-GO.** Provider call #7, unattended provider
-capture, Task Scheduler installation/modification/enabling/running, unattended
-storage provisioning, the first real unattended Paper-v2 cycle, broker order
-submission, recovery mutation, and live trading remain unauthorized unless a
-later explicitly reviewed checkpoint grants that specific effect.
+Older C3/PD1-PD4 and D10/Windows operational work remains retained historical
+compatibility and evidence; it is no longer the current resume point.
 
-See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for canonical status,
-[`docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md`](docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md)
-for the current unattended authority contract, and
-[`docs/validation/pd4-unattended-personal-desktop-paper-completion.md`](docs/validation/pd4-unattended-personal-desktop-paper-completion.md)
-for the PD4 source-foundation completion evidence.
+See docs/PROJECT_STATUS.md and docs/AI_TRADING_BOT_HANDOFF.md for the canonical
+resume state, and the Architecture-133 authority/validation documents for the
+active productionization sequence.
 
 ## Product direction
 

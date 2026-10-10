@@ -1,5 +1,108 @@
 # Project Status and Roadmap
 
+## 2026-10-10 — Architecture 133-AF SOURCE ACCEPTED; final FULL certification selected
+
+Architecture **133-AF is SOURCE ACCEPTED** on the exact reviewed implementation source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-deployment-qualification
+BASE    6addb8a1498bbd0ad417230b2265c7c53daf68f2
+HEAD    7e9935f383a5c718c3efba70a127c8c7e1d889c2
+TREE    763de6563edd3115fa4fe8883102365ca82f40de
+CI      Checkpoint Source Gates #401 / 38038075147 SUCCESS
+
+CHECKPOINTS 55
+TEST_PATHS  66
+RUFF_PATHS  214
+PYTEST      0
+RUFF_CHECK  0
+RUFF_FORMAT 0
+DIFF_CHECK  0
+~~~
+
+The implementation handoff also recorded **2,077 distinct focused cases passed**,
+including 132 AF cases, with fresh external pytest basetemp roots and clean Ruff,
+diff and cached-diff verification. Exact GitHub comparison confirms the branch is
+two ordinary commits ahead of the frozen AF base and changes exactly 17 files.
+The reviewed implementation commit is
+17fc2b6620154ca664b27380ac247e31f3fe980b; the bounded correction commit is
+7e9935f383a5c718c3efba70a127c8c7e1d889c2.
+
+Exact-source review accepts the frozen AF contract:
+
+- qualification.py remains an inert source-only/read-only composition with no
+  native scheduler writer, process launcher, credential/provider path, Paper-v2
+  writer, wake execution, rollback action, cleanup/retry surface or broker/live
+  authority;
+- the selected VerifiedRelease + RuntimeBinding are replayed before trust, and
+  selected InstalledEvidence is independently reconstructed through the injected
+  installed-image observer rather than accepted from cached evidence;
+- the fixed task must independently classify as exactly ALREADY_BOUND_DISABLED
+  for the selected immutable release, while supervised maintenance mode must
+  remain quiescent with no process/cycle/runtime/trading/provider authority;
+- accepted 133-AE runtime evidence must be exact typed VERIFIED evidence and is
+  independently replayed through fresh process/substrate observations; AF also
+  joins the observed production-Python file identity to the independently
+  replayed installed-image Python identity;
+- the optional rollback release must be distinct, independently replay its own
+  accepted release/binding/installed image twice, share the admitted host/Python
+  identity while retaining a distinct immutable image identity, and remain
+  neither selected nor task-bound/active;
+- complete selection inventory is independently observed twice and admits exactly
+  one selected release, one selected runtime identity, the one fixed task path
+  and at most the one declared rollback candidate; scheduler, maintenance,
+  selected/rollback image and AE process/substrate observations all fail closed
+  on repeated-observation drift;
+- the second implementation commit correctly hardens the repeated selection
+  observation to require the exact SelectionObservation type and exact typed
+  tuple/bool fields before equality, preventing equality-alias objects from
+  forging stable evidence;
+- success remains evidence-only through SELECTED_READY_DISABLED,
+  SELECTED_RUNTIME_ADMITTED and optional ROLLBACK_CANDIDATE_VERIFIED; blocked
+  outcomes remain bounded to identity, scheduler, runtime or rollback state and
+  carry no partial evidence;
+- source-gate registration remains strictly source-only: preflight=None,
+  execute=None, remote_head_env=None, and the AF authority check chains the
+  unchanged accepted AC/AD/AE authority before accepting the pinned AF source.
+
+The added supported test module advances certification topology to:
+
+~~~text
+FULL        155
+ROBINHOOD    82
+LEGACY      205
+EXHAUSTIVE  360
+~~~
+
+The accumulated Architecture-132 broad-certification obligation now **matures at
+133-AF**. No further source-only milestone is inserted before deployment. After
+this atomic documentation closeout reaches terminal-green source-gate CI, the
+next safe gate is **one FULL current-product certification on the exact final
+closeout source tree**. FULL contains the Robinhood supported subset; no separate
+ROBINHOOD run is selected in addition to FULL.
+
+No protected effect occurred during AF implementation or review, and preserved
+Architecture-133 Y/Z scratch remains untouched. The next effectful step after a
+clean FULL is the **separately authorized real immutable-release installation**.
+FULL does not authorize that installation, scheduler rebind, runtime startup,
+wake, provider/Paper-v2 effect, broker submission or live trading.
+
+Protected ordering remains:
+
+~~~text
+133-AF accepted + docs closeout
+  -> FULL on the exact final closeout source
+  -> fresh explicit authorization for real immutable release installation
+  -> independently reviewed installed-image result
+  -> fresh explicit authorization for maintenance-mode scheduler rebind
+  -> separately reviewed real runtime/substrate admission
+  -> supervised deployment/startup + rollback qualification
+  -> exactly ONE unattended integration wake
+  -> fresh seven-calendar-day unattended Paper-v2 soak
+  -> end-of-week review
+~~~
+
+
 ## 2026-10-10 — Architecture 133-AE SOURCE ACCEPTED; 133-AF deployment qualification contract frozen
 
 Architecture **133-AE is SOURCE ACCEPTED** on the exact reviewed source:

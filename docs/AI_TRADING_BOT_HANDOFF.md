@@ -1,5 +1,161 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-10 — Architecture 133-AF FULL CERTIFIED; 133-AG protected installation operator frozen
+
+Architecture **133-AF is SOURCE ACCEPTED and FULL CERTIFIED** on the final
+reviewed executable/test source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-deployment-qualification
+HEAD    6912453331a10109a80c8fab0bd3454b15bccbcd
+TREE    15c103839e2efb31a1dad6c44a0232f95faaa406
+CI      Checkpoint Source Gates #403 / 38040042074 SUCCESS
+
+FULL
+modules   155
+cases     8,874
+passed    8,871
+skipped   3
+failed    0
+errors    0
+wall      312.361 s
+evidence  F:\AI\temp\certification\arch133af-full-6912453-909797de04ab44c29c9b6bd2fa220224
+~~~
+
+The first FULL attempt on the preceding docs-closeout tree executed all 8,874
+test cases cleanly but correctly failed the whole-repository static gate because
+the intentional late supervised-launcher import suppressed E402/F401 but omitted
+Ruff I001. That failure was preserved at:
+
+~~~text
+F:\AI\temp\certification\arch133af-full-e738eae-0437350a414446b6a2e84e2360e93079
+~~~
+
+ChatGPT applied the bounded two-file correction only:
+
+- add I001 to the intentional late-import noqa in
+  scripts/run_arch133_supervised_release_review_paper.py;
+- refresh only that launcher's reviewed Git-blob pin in checkpoint_runner.py.
+
+No launcher behavior, import target, authority, scheduler projection, runtime
+ordering or AF qualification semantics changed. Replacement source gate #403
+passed with 55 checkpoints / 66 test paths / 214 Ruff paths, all command and
+authority results zero/green, and stable identity. A cheap whole-repository
+preflight then independently passed Ruff check, Ruff format over 906 files and
+git diff check before the final FULL rerun.
+
+### Protected-boundary review result
+
+The immutable installer engine itself is accepted and fail-closed, but **real
+installation is NOT YET AUTHORIZED** despite the clean FULL because the current
+repository has no reviewed production invocation/authority bridge for it.
+
+The accepted AC registration deliberately remains:
+
+~~~text
+preflight       = None
+execute         = None
+remote_head_env = None
+~~~
+
+and collect_release_bundle() still requires a caller-supplied ReleaseManifest
+declaration. Therefore a chat-generated Python/PowerShell composition would have
+to choose or reconstruct release-policy material and directly invoke native
+installation outside the registered checkpoint runner. That would violate the
+canonical operator-transport rule requiring reusable/protected logic to live in
+reviewed source and would reintroduce caller-selected authority.
+
+This is a real boundary-discovery gap, not a defect in install_release().
+Do not work around it with python -c, a here-string installer, an unreviewed temp
+script, or direct native calls.
+
+### Architecture 133-AG — protected immutable-release installation operator
+
+The next safe source checkpoint is **133-AG: protected immutable-release
+installation operator + read-only preflight**.
+
+Target branch/worktree/checkpoint:
+
+~~~text
+BRANCH
+feature/robinhood-supervised-release-installation-operator
+
+WORKTREE
+F:\AI\worktrees\ai-trading-bot-supervised-release-installation-operator
+
+BASE HEAD
+this documentation-closeout commit
+
+CHECKPOINT
+arch133-robinhood-supervised-release-installation-operator
+~~~
+
+133-AG may add a source-owned operator and checkpoint-runner bindings, but source
+implementation and tests must perform **no real installation**.
+
+Frozen requirements:
+
+1. The operator must derive one complete production ReleaseManifest declaration
+   from reviewed source-owned constants/policy only. Callers may not supply
+   strategy/risk identity, hashes, release ID, source HEAD/tree, launcher hash,
+   production Python identity, destination, staging path, final path or alternate
+   root.
+2. It must collect the exact clean current checkout through
+   collect_release_bundle(), create the exact RuntimeBinding and expose the
+   derived release ID / manifest hash / binding hash / FINAL / STAGING only as
+   sanitized evidence.
+3. A registered read-only preflight must independently prove source identity,
+   Administrator/Windows admission as required, fixed production Python
+   version/hash, fixed releases-parent facts, and classify existing FINAL/STAGING
+   state without mutation. No Y/Z scratch, scheduler, credential, provider,
+   Paper-v2, wake, broker or live access.
+4. Registered protected execute must invoke install_release() exactly once from
+   the exact preflighted/re-derived release and binding. The checkpoint runner's
+   existing clean-source + live-remote-head interlock remains mandatory.
+5. Before the first native installation mutation, blocked results must be
+   NO_INSTALLATION_EFFECT. Once any install mutation may have started, every
+   failure/exception/ambiguity must surface as
+   PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED semantics with no
+   automatic retry, cleanup, repair, delete, overwrite, rollback or second
+   attempt.
+6. Success must expose only sanitized InstalledEvidence and must not bind,
+   enable/start or inspect Task Scheduler, launch the runtime, create a wake,
+   touch durable Paper-v2 state, access OAuth/provider credentials, or grant
+   broker/live authority.
+7. The protected operator must use the existing reviewed checkpoint runner /
+   ops.ps1 transport. Do not require JSON payloads or policy material on argv.
+   No alternate direct CLI/native backdoor is permitted.
+8. Source tests must fake every native effect and prove exact declaration
+   derivation, bundle/release/binding identity, read-only preflight, one-attempt
+   execute accounting, existing verified FINAL behavior, preexisting STAGING
+   blocking, mutation ambiguity preservation, no retry/cleanup, sanitized output,
+   source/live-remote interlocks, and absence of scheduler/provider/paper/broker
+   capabilities.
+9. Implementation verification is focused pytest + exact-file Ruff check/format
+   + diff check + terminal-green source gate. No real production effect during
+   implementation.
+10. Because 133-AG adds a protected execution surface after the accepted FULL,
+    the final exact 133-AG executable source must receive the required broad
+    certification selected by ChatGPT before the first real execute.
+
+Implementation owner/model: **Sol High**.
+
+The real ordering is now:
+
+~~~text
+133-AF FULL certified
+  -> 133-AG protected installation operator source acceptance
+  -> selected broad certification on exact 133-AG source
+  -> fresh explicit authorization for ONE real immutable-release installation
+  -> independently review InstalledEvidence
+  -> fresh explicit authorization for maintenance-mode scheduler rebind
+  -> real runtime/substrate admission
+  -> supervised deployment/startup + rollback qualification
+  -> exactly ONE unattended integration wake
+  -> fresh seven-calendar-day unattended Paper-v2 soak
+~~~
+
+
 ## 2026-10-10 — Architecture 133-AF SOURCE ACCEPTED; final FULL certification selected
 
 Architecture **133-AF is SOURCE ACCEPTED** on the exact reviewed implementation source:

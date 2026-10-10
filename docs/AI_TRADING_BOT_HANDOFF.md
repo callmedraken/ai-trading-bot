@@ -43,8 +43,27 @@ provider/OAuth access, Paper-v2 mutation, broker effect or live effect occurred.
 
 ### Architecture 133-AD — supervised maintenance mode + immutable scheduler rebind
 
-**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; NO REAL SCHEDULER OR
-PRODUCTION-FILESYSTEM EFFECT AUTHORIZED.**
+**SOURCE IMPLEMENTED; EXACT GITHUB REVIEW AND ACCEPTANCE PENDING; NO REAL
+SCHEDULER OR PRODUCTION-FILESYSTEM EFFECT AUTHORIZED.**
+
+The source-only implementation lives in `supervised_release/maintenance.py`.
+It independently replays accepted 133-AC image/binding evidence twice, observes
+the fixed scheduler task twice, and requires quiescent supervised maintenance
+before and after observation. The desired definition has no triggers, is
+disabled/non-demand-start, and derives its action only from the verified release.
+Complete task XML policy is compared, including every action, principal,
+setting and historical 133-P TIME-trigger field; historical boundary text is
+observation evidence only and is never projected into the maintenance target.
+No historical task existence is assumed.
+
+Future create/rebind accounting is an inert one-attempt model, with the attempt
+latch consumed before returning intent and ambiguous completion preserved as
+`INDETERMINATE / PRESERVE_SCHEDULER_EVIDENCE_NO_RETRY`. It grants no native
+mutation/credential capability or protected authorization. The registered
+checkpoint retains `preflight=None`, `execute=None` and
+`remote_head_env=None`. Exact GitHub review and certification selection remain
+with ChatGPT; this implementation does not perform a broad certification or
+any real installation, scheduler, provider, paper, broker or live effect.
 
 ```text
 BRANCH      feature/robinhood-supervised-maintenance-rebind

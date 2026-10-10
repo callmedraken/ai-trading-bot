@@ -133,6 +133,7 @@ RETAINED_CHECKPOINTS: Final = (
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-maintenance-rebind",
     "arch133-robinhood-supervised-release-installation",
     "arch133-robinhood-supervised-release-build-verification",
     "arch133-robinhood-supervised-release-foundation",
@@ -7965,6 +7966,111 @@ SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS: Final = {
 }
 
 
+SUPERVISED_MAINTENANCE_SOURCES: Final = (
+    "src/trading_bot/supervised_release/maintenance.py",
+)
+SUPERVISED_MAINTENANCE_PINS: Final = {
+    "src/trading_bot/supervised_release/maintenance.py": (
+        "e012285effef861f38cdf52739bfbc7d43181e92"
+    ),
+}
+SUPERVISED_MAINTENANCE_TESTS: Final = (
+    *SUPERVISED_RELEASE_INSTALLATION_TESTS,
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_arch133_scheduler_installation.py",
+)
+SUPERVISED_MAINTENANCE_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS,
+    *SUPERVISED_MAINTENANCE_SOURCES,
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+)
+
+
+def _supervised_maintenance_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """133-AD source-only closure; reuse the accepted AC pins unchanged."""
+    failures = list(_supervised_release_installation_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()["arch133-robinhood-supervised-maintenance-rebind"]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-supervised-maintenance-rebind"
+            or spec.tests != SUPERVISED_MAINTENANCE_TESTS
+            or spec.ruff_paths != SUPERVISED_MAINTENANCE_RUFF_PATHS
+            or spec.authority_check is not _supervised_maintenance_authority_check
+        ):
+            failures.append("maintenance source-only registration drift")
+        allowed = {
+            "__future__",
+            "re",
+            "dataclasses",
+            "datetime",
+            "enum",
+            "typing",
+            "xml.etree",
+            "trading_bot.arch133_acl.read_only",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "open",
+            "run",
+            "Popen",
+            "WinDLL",
+            "read_text",
+            "read_bytes",
+            "unlink",
+            "delete",
+            "remove",
+            "rename",
+            "rmtree",
+            "sleep",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "install_release",
+            "publish",
+            "enable",
+            "start",
+        }
+        for relative in SUPERVISED_MAINTENANCE_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_MAINTENANCE_PINS[relative]
+            ):
+                failures.append("maintenance reviewed source drift")
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("maintenance import boundary drift")
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module not in allowed or node.level
+                ):
+                    failures.append("maintenance import boundary drift")
+                if (
+                    isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    in forbidden
+                ):
+                    failures.append("maintenance capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("maintenance workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("maintenance source unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -8772,6 +8878,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_closed_descendant_rename_qualification_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133z",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-maintenance-rebind": CheckpointSpec(
+            name="arch133-robinhood-supervised-maintenance-rebind",
+            description="Architecture 133-AD inert maintenance and immutable rebind",
+            tests=SUPERVISED_MAINTENANCE_TESTS,
+            ruff_paths=SUPERVISED_MAINTENANCE_RUFF_PATHS,
+            authority_check=_supervised_maintenance_authority_check,
+            remote_branch="feature/robinhood-supervised-maintenance-rebind",
             preflight=None,
             execute=None,
             remote_head_env=None,

@@ -1,5 +1,235 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-10 — Architecture 133-AE runtime-host admission contract frozen
+
+Architecture **133-AE is CONTRACT FROZEN; SOURCE NOT YET IMPLEMENTED OR
+ACCEPTED; NO REAL HOST, SCHEDULER, CREDENTIAL, PROVIDER OR PRODUCTION EFFECT IS
+AUTHORIZED.**
+
+```text
+BRANCH      feature/robinhood-supervised-runtime-host-admission
+WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-runtime-host-admission
+BASE HEAD   8b7f2877c1f30db62ebef3741886fa6e728a0c57
+BASE TREE   e78e4548b8b04a263e545afe42941502b98e787a
+CHECKPOINT  arch133-robinhood-supervised-runtime-host-admission
+```
+
+133-AE closes the runtime-startup gap between the accepted immutable release
+model and the old Architecture-133 host, without reviving mutable-Git-worktree
+authority.
+
+### Frozen purpose
+
+The old 133-G host admission binds runtime authority to a named Git checkout,
+branch and source root. That model is historical only. 133-AE instead binds one
+runtime process to the exact accepted `VerifiedRelease`, its exact
+`RuntimeBinding`, and independently replayed 133-AC `InstalledEvidence`.
+The admitted project source root is only:
+
+```text
+<FINAL>\src
+```
+
+where:
+
+```text
+<FINAL> = F:\AITradingBot\releases\<validated-release-id>
+```
+
+No Git branch, worktree, repository status, `.git` state, checkout path,
+environment variable, current-directory choice or caller-supplied alternate path
+may become runtime authority.
+
+### Startup-isolation correction discovered during contract review
+
+The accepted AB/AD action currently uses `python.exe -I -B <launcher>`.
+That is insufficient for the intended immutable-runtime boundary because
+ordinary Python `site` initialization remains enabled and may process the
+shared runtime's site-packages before the immutable release launcher executes.
+
+133-AE therefore freezes a source correction to the future runtime action:
+
+```text
+F:\AITradingBot\runtime\python.exe
+  -I
+  -S
+  -B
+  <FINAL>\scripts\run_arch133_unattended_review_paper.py
+```
+
+The launcher must explicitly add, in this order and before importing any
+`trading_bot` module:
+
+```text
+<FINAL>\src
+F:\AITradingBot\runtime\Lib\site-packages
+```
+
+It must not call `site.main()`, process `.pth` files, execute
+`sitecustomize` / `usercustomize`, inspect a Git checkout, or accept any
+caller/environment path override. The existing fixed absent pycache namespace
+remains:
+
+```text
+F:\AITradingBot\Arch133\no-pycache
+```
+
+and the process must run with isolated mode, no-site mode and bytecode writes
+disabled.
+
+This correction necessarily updates the inert scheduler-action projection and
+133-AD maintenance target used by future protected work. It does **not** mutate
+the real task and does not authorize a rebind.
+
+### Dependency closure
+
+The accepted `RuntimeBinding` deliberately records
+`dependency_closure=UNPROVEN`. 133-AE must not convert that to proven merely by
+accepting whatever packages happen to be installed.
+
+The historical P124 substrate work supplies reusable **invariants**, not current
+authority:
+
+- fixed runtime root `F:\AITradingBot\runtime`;
+- fixed site-packages root
+  `F:\AITradingBot\runtime\Lib\site-packages`;
+- Administrator/SYSTEM-controlled runtime objects with Trading denied mutation;
+- no `pyvenv.cfg` / `._pth` startup redirection;
+- no automatic site, `.pth`, sitecustomize or usercustomize processing;
+- exact import-origin/final-path observation for runtime dependencies.
+
+133-AE source may model those observations through fake/read-only seams, but
+**dependency closure remains UNPROVEN until a later separately reviewed real
+runtime-substrate observation is collected and accepted against a source-owned
+policy**. A caller-built observation or current installed package set is not
+authority.
+
+### Source-only runtime admission model
+
+The first 133-AE implementation must remain fake/inert:
+
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+No source test may open the real production runtime, release directory, Task
+Scheduler, Credential Manager, provider endpoint, Paper-v2 store or Y/Z scratch.
+
+The source model must accept only exact typed inputs:
+
+- one accepted `VerifiedRelease`;
+- its exact `RuntimeBinding`;
+- exact 133-AC `InstalledEvidence`;
+- independent installed-image observer seam;
+- independent process/runtime observation;
+- independent runtime-substrate observation.
+
+It must replay the release/binding and installed image rather than trust cached
+evidence.
+
+### Exact runtime/process facts
+
+A source-owned runtime observation must fail closed unless it proves at minimum:
+
+```text
+platform             win32
+executable           F:\AITradingBot\runtime\python.exe
+Python version       3.14.3
+isolated             true
+no_site              true
+dont_write_bytecode  true
+argv                  exactly launcher only; zero semantic args
+launcher             <FINAL>\scripts\run_arch133_unattended_review_paper.py
+project source root  <FINAL>\src
+working directory    <FINAL>
+pycache prefix       F:\AITradingBot\Arch133\no-pycache
+pycache target       absent
+site-packages root   F:\AITradingBot\runtime\Lib\site-packages
+site.main            not called
+.pth                 not processed
+sitecustomize        not imported/executed
+usercustomize        not imported/executed
+```
+
+The imported `trading_bot` package and every project module used for admission
+must resolve under the exact immutable `<FINAL>\src\trading_bot` tree. Any
+project import from a development worktree, user profile, alternate release,
+current directory or unrelated path blocks.
+
+The runtime search path must contain only the release source root plus
+source-owned qualified production-runtime roots. Duplicate/case-alias roots,
+user-site/current-directory authority and path drift block.
+
+### Runtime-substrate observation
+
+The source model must represent, without opening the real host during tests:
+
+- exact fixed runtime/site-packages paths;
+- Windows/local-NTFS/no-reparse identity;
+- Administrator/SYSTEM ownership policy;
+- complete Trading mutation/rename/replace denial;
+- startup-configuration absence;
+- before/after stability;
+- complete imported dependency origin/final-path coverage;
+- no automatic site hooks;
+- a result that is sanitized and contains no handles, credentials, tokens,
+  reusable native capability or provider authority.
+
+Until later real evidence is accepted, the successful source-only result must
+continue to report dependency closure as `UNPROVEN`.
+
+### Explicit non-authority
+
+133-AE does **not**:
+
+- install a release;
+- observe or mutate the real Task Scheduler;
+- enable/start/arm a task;
+- create an activation/session/wake;
+- read Credential Manager or OAuth;
+- contact Robinhood/provider APIs;
+- open or mutate Paper-v2/durable trading state;
+- grant broker/live execution authority;
+- inspect or mutate preserved Y/Z scratch;
+- claim dependency closure from source tests.
+
+### Focused source tests
+
+At minimum cover:
+
+- exact release/binding/installed-image replay;
+- immutable release source/launcher/root derivation;
+- `-I -S -B` scheduler-action projection;
+- launcher explicit source + fixed site-packages bootstrap;
+- no `site.main` / `.pth` / sitecustomize / usercustomize;
+- exact process facts and zero semantic args;
+- worktree/current-directory/user-site/alternate-release rejection;
+- project-module-origin containment;
+- pycache-prefix and absence;
+- runtime/site-packages fixed path identity;
+- substrate mutation-denial and before/after drift;
+- dependency-origin completeness without claiming a frozen package set;
+- `dependency_closure=UNPROVEN` preservation;
+- source-only checkpoint registration and workflow/pin drift;
+- continued AC installed-image and AD maintenance regressions;
+- import closure excluding Task Scheduler writers, credentials, provider calls,
+  Paper/state writers, wake execution and broker/live paths.
+
+### Certification cadence
+
+133-AE may add supported test/source topology, creating a pending FULL
+obligation. Under the accepted batching rule, do **not** run FULL immediately
+during implementation if 133-AE remains source-only and no consequential
+boundary is crossed. Focused verification plus terminal-green source-gate CI are
+the required implementation gates. The final exact source must receive the
+selected broad certification before the first later protected
+installation/rebind/startup qualification boundary.
+
+Implementation owner/model remains **Sol High** because this checkpoint changes
+runtime startup isolation and security/authority semantics.
+
 ## 2026-10-10 — Architecture 133-AD ACCEPTED; workflow audit closes two regressions
 
 Architecture **133-AD is SOURCE ACCEPTED and FULL CERTIFIED** on the exact

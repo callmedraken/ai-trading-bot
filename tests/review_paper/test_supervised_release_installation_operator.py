@@ -708,6 +708,7 @@ for name in sys.modules:
     )
     assert result.returncode == 0, result.stderr
 
+
 def test_ah_preflight_ready_or_existing(monkeypatch):
     monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
     for exists, expected in (
@@ -854,7 +855,6 @@ def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):
     result = runner._supervised_release_parent_execute()
     assert result["status"] == "INDETERMINATE"
     assert result["primary"]["reason"] == "CONSUMED_ATTEMPT"
-
 
 
 def test_ah_observer_absent_exact_and_malformed_parent_policy():

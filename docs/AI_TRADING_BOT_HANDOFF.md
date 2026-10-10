@@ -1,5 +1,59 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-09 — Architecture 133-AB SOURCE ACCEPTED (review-hardened final)
+
+The exact-source review found one bounded safety-contract miss after the initial
+implementation gate: the collector rejected production roots and literal Y:/Z:
+drives, but the preserved Architecture-133 Y/Z scratch evidence actually lives
+under fixed F: paths. The source therefore needed to reject the real preserved
+scratch roots **before the first filesystem observation**.
+
+The bounded review correction adds lexical rejection of:
+
+```text
+F:\AI\temp\arch133y-rename-qualification
+F:\AI\temp\arch133z-rename-qualification
+```
+
+and all descendants, plus focused regression coverage and the corresponding exact
+collector blob pin. No preserved scratch tree was inspected while making or
+testing this correction.
+
+The first replacement push (#376) ran all pytest/source-authority checks
+successfully but failed Ruff formatting only. The follow-up commit changed only
+that formatting plus its exact source pin. Replacement push source gate #377 then
+completed SUCCESS.
+
+The final accepted 133-AB source identity is therefore:
+
+```text
+CHECKPOINT      arch133-robinhood-supervised-release-build-verification
+BRANCH          feature/robinhood-supervised-release-build-verification
+ORIGINAL IMPL   f9085542238e04943be04b7f98ff0ab11202507c
+FINAL HEAD      1da082a2eb1471940472a5c80990687bfdd46bc8
+FINAL TREE      73253b8772bf7be950b97404350c8fb75989caa2
+SOURCE GATE     #377 / 38008556314 SUCCESS
+```
+
+All substantive 133-AB guarantees from the prior acceptance section remain in
+force: complete bounded release collection, externally pinned bundle
+verification, pure VerifiedRelease-derived runtime binding, dependency closure
+explicitly UNPROVEN, unchanged production scheduler/runtime binding and no
+registered protected execution path.
+
+**Certification decision remains unchanged:** no additional
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification is selected at this source-only
+checkpoint. Current profile ownership remains FULL 151, ROBINHOOD 78, LEGACY
+205, EXHAUSTIVE 356; frozen required baselines remain 122/49.
+
+No real release installation, production filesystem observation, Y/Z scratch
+inspection, Task Scheduler access/mutation, provider/OAuth, credential-store,
+paper-state, broker or live effect was performed.
+
+The next milestone remains **Architecture 133-AC: immutable-release installer and
+installed-image observer**, source-reviewed before any real release creation.
+
+
 ## 2026-10-09 — Architecture 133-AB SOURCE ACCEPTED
 
 Checkpoint `arch133-robinhood-supervised-release-build-verification` is **SOURCE ACCEPTED** after exact GitHub review.

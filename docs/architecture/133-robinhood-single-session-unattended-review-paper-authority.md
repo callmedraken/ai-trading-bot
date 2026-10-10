@@ -1,5 +1,178 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-10 — Architecture 133-AC ACCEPTED; 133-AD maintenance/rebind contract frozen
+
+Architecture **133-AC is SOURCE ACCEPTED and FULL CERTIFIED** on the exact
+review-hardened source:
+
+```text
+BRANCH  feature/robinhood-supervised-release-installation
+HEAD    8cb0679136dc798e4716404139a9dfd12faa58e4
+TREE    24aceeec0e4b2b211c10ec344cd5747b595613d7
+CI      Checkpoint Source Gates #385 / 38027134353 SUCCESS
+
+FULL
+modules   152
+cases     8,547
+passed    8,544
+skipped   3
+failed    0
+errors    0
+wall      254.638 s
+evidence  F:\AI\temp\certification\arch133ac-full-8cb0679
+```
+
+The exact GitHub review retained the implementation and added two bounded
+source corrections before final acceptance:
+
+1. the installation lexical path gate now admits the already-supported
+   `src/trading_bot/runtime/...` release-source subtree instead of falsely
+   classifying it as embedded runtime substrate;
+2. the installed-image observer preserves the accepted Windows host policy:
+   `F:\` is a volume-boundary observation with dangerous namespace rights
+   denied rather than an immutable-image ACL object, while
+   `F:\AITradingBot`, `F:\AITradingBot\releases` and installed releases
+   retain the stricter protected policy. Separately observed production-runtime
+   objects admit the already-qualified Administrators-or-SYSTEM ownership rule.
+
+The final source gate exercised 52 source authorities, 63 pytest paths and 207
+Ruff paths with pytest/Ruff/diff status all zero. The FULL run then exercised
+the complete current-product inventory. No real release installation, Task
+Scheduler mutation, production-Python mutation, Y/Z scratch inspection,
+provider/OAuth access, Paper-v2 mutation, broker effect or live effect occurred.
+
+### Architecture 133-AD — supervised maintenance mode + immutable scheduler rebind
+
+**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; NO REAL SCHEDULER OR
+PRODUCTION-FILESYSTEM EFFECT AUTHORIZED.**
+
+```text
+BRANCH      feature/robinhood-supervised-maintenance-rebind
+WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-maintenance-rebind
+BASE        this 133-AC acceptance / 133-AD contract-closeout commit
+CHECKPOINT  arch133-robinhood-supervised-maintenance-rebind
+```
+
+133-AD exists to make the runtime/deployment-mode separation executable without
+reintroducing self-updating production behavior:
+
+```text
+UNATTENDED RUNTIME MODE
+  scheduler may run only the selected verified immutable release
+  installation/rebind/deployment mutation is prohibited
+
+SUPERVISED MAINTENANCE MODE
+  scheduler/task must be disabled and not running
+  no active bot cycle/process may hold runtime authority
+  trading/provider authority is prohibited
+  a verified immutable release may be selected/bound under supervision
+```
+
+The source checkpoint is fake/inert only. Its first implementation remains:
+
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+No source test may open Task Scheduler or `F:\AITradingBot`.
+
+The scheduler identity remains the already-reviewed Architecture-133 task:
+
+```text
+\AITradingBot-Arch133-SingleSessionReviewPaper-v1
+```
+
+133-AD does not reuse any D10 task, D10 lease, D10 deployment root or D10
+evidence identity.
+
+The desired maintenance binding is derived only from one accepted 133-AC
+`VerifiedRelease` plus its exact `RuntimeBinding` and independently verified
+installed-image evidence. It must project exactly:
+
+```text
+executable         F:\AITradingBot\runtime\python.exe
+arguments          -I -B <FINAL>\scripts\run_arch133_unattended_review_paper.py
+working_directory  <FINAL>
+principal          exact Trading SID / LeastPrivilege
+semantic args      none
+scheduler env      none
+task enabled       false
+demand start       false
+```
+
+where `<FINAL>` is the fixed
+`F:\AITradingBot\releases\<validated-release-id>` proven by the installed
+observer. Callers may not supply a task path, executable, release root,
+launcher, principal, environment, trigger, alternate drive or fallback target.
+
+A source-owned read-only plan must independently observe the one fixed task and
+classify only bounded states. At minimum:
+
+```text
+ABSENT
+ALREADY_BOUND_DISABLED
+EXACT_REVIEWED_133P_PREDECESSOR_DISABLED
+UNEXPECTED_EXISTING
+RUNNING_OR_ENABLED
+```
+
+Only the first three may ever be candidates for a later separately authorized
+maintenance mutation. An unexpected, enabled or running task is BLOCKED and
+must not be repaired or normalized automatically. The historical real 133-P
+plan reached `STALE_EXPIRED` before scheduler observation and performed zero
+scheduler reads/writes; therefore 133-AD must not assume whether the fixed task
+currently exists.
+
+Any future write surface must stay one-shot and fail closed:
+
+- `ABSENT` may create only the one fixed task in a disabled, non-demand-start
+  maintenance state;
+- `ALREADY_BOUND_DISABLED` is read-only/idempotent and performs no write;
+- an exact reviewed disabled 133-P predecessor may be rebound only to the exact
+  verified immutable-release action while remaining disabled;
+- any other existing task blocks before credential acquisition or mutation;
+- at most one reviewed Task Scheduler registration/update attempt is permitted;
+- after any possible scheduler mutation, failure/ambiguity is
+  `INDETERMINATE / PRESERVE_SCHEDULER_EVIDENCE_NO_RETRY`;
+- there is no automatic delete, recreate, enable, start, trigger arming,
+  credential retry, rollback or fallback;
+- a separately reviewed read-only reconciliation is required after ambiguity.
+
+133-AD does **not** enable the task, start it, grant wake authority, create an
+activation, choose a trading session, contact Robinhood/provider APIs, mutate
+Paper-v2/durable state, inspect preserved Y/Z scratch, install another release
+or alter the production Python substrate. Trigger/arming authority remains a
+later deployment/startup qualification boundary.
+
+Real protected ordering is unchanged:
+
+```text
+accepted source-only 133-AC
+  -> separately authorized real immutable release installation
+  -> independently reviewed installed-image result
+  -> separately authorized real 133-AD maintenance/rebind
+  -> 133-AE runtime-host admission
+  -> deployment/startup + rollback qualification
+  -> exactly ONE unattended integration wake
+  -> fresh seven-calendar-day unattended Paper-v2 soak
+  -> end-of-week review
+```
+
+Focused 133-AD source tests must cover mode exclusion, fixed task identity,
+exact immutable action projection, disabled/non-demand-start policy, no semantic
+arguments/environment, absent/already-bound/exact-predecessor/unexpected/running
+classification, repeated observation/drift detection, no credential read during
+plan, one-shot mutation accounting, post-attempt INDETERMINATE preservation,
+no cleanup/retry/start/enable/trigger/provider/paper/broker paths, source
+registration/workflow drift, and continued 133-AC installed-image replay.
+
+Because 133-AD defines a Windows Task Scheduler/security/credential transition
+boundary, implementation ownership remains **Sol High**. Exact GitHub review and
+certification selection remain with ChatGPT. A source/design PASS grants no
+protected scheduler or production effect.
+
 ## 2026-10-09 — Historical unattended evidence reconciled; 133-AC installation contract re-frozen
 
 The project has two distinct historical unattended-operation facts that must not
@@ -54,8 +227,8 @@ source/release drift or scheduler/runtime-binding contradiction.
 
 ### Architecture 133-AC — immutable release installer and installed-image observer
 
-**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; NO REAL INSTALLATION
-AUTHORIZED.**
+**SOURCE ACCEPTED AND FULL CERTIFIED; REAL INSTALLATION REMAINS SEPARATELY
+PROTECTED AND UNAUTHORIZED.**
 
 ```text
 BRANCH      feature/robinhood-supervised-release-installation

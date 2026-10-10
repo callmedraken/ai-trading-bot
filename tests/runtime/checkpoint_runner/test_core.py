@@ -1134,6 +1134,10 @@ def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
     monkeypatch.setattr(runner.time, "monotonic", lambda: next(ticks))
     step = runner.Step("pytest", ("python", "-m", "pytest"), ("diagnostic",))
     stdout = b"100 slowest durations\n12.00s call tests/example.py::test_example\n"
+    monkeypatch.setenv(runner.SOURCE_GATE_PHASE_ENV, "tests")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_INDEX_ENV, "2")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_COUNT_ENV, "4")
+    monkeypatch.setenv("CHECKPOINT_RUNNER_KEEP_ME", "present")
     calls = []
 
     def run(argv, **kwargs):
@@ -1152,12 +1156,17 @@ def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
     assert outcome.elapsed_seconds >= 0
     assert outcome.exit_code == 0
     assert Path(outcome.stdout_path).read_bytes() == stdout
-    assert calls == [
-        (
-            step.diagnostic_argv if diagnostic else step.argv,
-            {"cwd": tmp_path, "capture_output": True, "check": False},
-        )
-    ]
+    assert len(calls) == 1
+    call_argv, kwargs = calls[0]
+    assert call_argv == (step.diagnostic_argv if diagnostic else step.argv)
+    assert kwargs["cwd"] == tmp_path
+    assert kwargs["capture_output"] is True
+    assert kwargs["check"] is False
+    environment = kwargs["env"]
+    assert environment["CHECKPOINT_RUNNER_KEEP_ME"] == "present"
+    assert runner.SOURCE_GATE_PHASE_ENV not in environment
+    assert runner.SOURCE_GATE_SHARD_INDEX_ENV not in environment
+    assert runner.SOURCE_GATE_SHARD_COUNT_ENV not in environment
 
 
 @pytest.mark.parametrize("batch", [False, True])

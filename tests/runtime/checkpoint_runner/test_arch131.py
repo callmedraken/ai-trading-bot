@@ -574,14 +574,8 @@ def test_131i_authority_rejects_imports_calls_and_module_effects(tmp_path, addit
         ),
         (
             ".github/workflows/checkpoint-source-gates.yml",
-            (
-                "arch133-robinhood-closed-descendant-rename-qualification\n"
-                "          exit $LASTEXITCODE"
-            ),
-            (
-                "arch133-robinhood-closed-descendant-rename-qualification\n"
-                "          exit 0"
-            ),
+            "verify-batch @Checkpoints\n          exit $LASTEXITCODE",
+            "verify-batch @Checkpoints\n          exit 0",
         ),
     ],
 )

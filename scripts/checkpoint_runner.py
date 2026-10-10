@@ -285,8 +285,12 @@ def resolve_ci_checkpoint(
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze fast active routing plus the complete fail-closed batch fallback.
-    checkpoint_block = "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n" + "".join(
-        f"    {name}\n" for name in ACTIVE_CI_CHECKPOINTS
+    checkpoint_block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(
+            f"              {name} `\n" for name in ACTIVE_CI_CHECKPOINTS[:-1]
+        )
+        + f"              {ACTIVE_CI_CHECKPOINTS[-1]}\n"
     )
     local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
     needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
@@ -10545,12 +10549,23 @@ def _execute_step(
     if argv is None:
         raise ValueError("diagnostic command is unavailable")
 
+    environment = None
+    if step.name == "pytest":
+        environment = os.environ.copy()
+        for variable in (
+            SOURCE_GATE_PHASE_ENV,
+            SOURCE_GATE_SHARD_INDEX_ENV,
+            SOURCE_GATE_SHARD_COUNT_ENV,
+        ):
+            environment.pop(variable, None)
+
     started = time.monotonic()
     completed = subprocess.run(
         argv,
         cwd=repo_root,
         capture_output=True,
         check=False,
+        env=environment,
     )
     elapsed_seconds = time.monotonic() - started
     stdout = completed.stdout

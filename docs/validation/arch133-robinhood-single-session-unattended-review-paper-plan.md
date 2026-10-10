@@ -1,5 +1,152 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-10 — Real AG preflight BLOCKED only by missing release parent; 133-AH parent provisioning frozen
+
+The first real 133-AG read-only host preflight ran on exact source:
+
+~~~text
+HEAD  e462a4f666ae2b28dd0d9c0459f4efce154c3470
+TREE  7542e24a6e9ef842a1418593bc6936d7173eac5d
+
+PRIMARY_STATUS=BLOCKED
+PRIMARY_REASON=PARENT
+effect_disposition=NO_INSTALLATION_EFFECT
+identity_stable=True
+protected_execution=NOT_AUTHORIZED
+~~~
+
+A follow-up read-only native diagnostic established the exact cause:
+
+~~~text
+F:\                                  valid local NTFS object
+F:\AITradingBot                      present; Administrators owner; protected;
+                                     exact Administrators + SYSTEM full-control
+                                     parent policy
+F:\AITradingBot\releases             MISSING
+F:\AITradingBot\runtime              present and readable
+F:\AITradingBot\runtime\python.exe   SHA256 exactly
+cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b
+Python product version               exactly 3.14.3
+read-session close                   PASS
+~~~
+
+The derived AG release identity for that exact source is:
+
+~~~text
+release_id       release-e1d60b2d5f285635ae5f755378770c65
+manifest_sha256  7168fc2599a745b3ffebc1c161fbef12aea33b9c0d000c50930d16ea68365a87
+binding_sha256   85f0031662f0f45d375240c089c6e7d6d41d3973646f5be5ece6e1896a5346d1
+FINAL            F:\AITradingBot\releases\release-e1d60b2d5f285635ae5f755378770c65
+STAGING          F:\AITradingBot\releases\release-e1d60b2d5f285635ae5f755378770c65.installing
+~~~
+
+No FULL was run after this BLOCKED preflight. The AG durable installation-attempt
+latch was not consumed. No production mutation, ACL mutation, release
+materialization, scheduler/provider/Paper-v2/wake/broker/live effect or Y/Z
+scratch access occurred.
+
+The missing parent is an expected infrastructure boundary that AG deliberately
+does not provision. Repository review found no existing source-owned operator
+for this exact immutable-release parent. Historical Architecture-128 ACL-repair
+operators target different parents/states and MUST NOT be reused or generalized.
+
+### Architecture 133-AH — exact release-parent provisioning
+
+The next safe source checkpoint is **133-AH: one-shot protected creation of the
+fixed immutable releases parent**.
+
+~~~text
+BRANCH
+feature/robinhood-supervised-release-parent-provisioning
+
+WORKTREE
+F:\AI\worktrees\ai-trading-bot-supervised-release-parent-provisioning
+
+BASE
+this documentation-closeout commit
+
+CHECKPOINT
+arch133-robinhood-supervised-release-parent-provisioning
+
+TARGET
+F:\AITradingBot\releases
+~~~
+
+133-AH is source-first. Implementation/tests use fakes/disposable roots only and
+MUST NOT create the real target.
+
+Frozen contract:
+
+1. The only production target is exactly F:\AITradingBot\releases. No caller
+   path, root, SID, ACL, alternate drive, release ID or child name is accepted.
+2. Read-only preflight independently proves supported elevated Administrator
+   Windows, exact F:\ and F:\AITradingBot identity/security, and classifies the
+   target as exactly ABSENT or EXACT_PARENT_PRESENT. Any other object, reparse,
+   case/path alias, wrong filesystem/volume, owner, DACL or ambiguous namespace
+   is BLOCKED.
+3. Existing EXACT_PARENT_PRESENT is read-only/idempotent and performs zero
+   mutation. It is not a reason to rewrite ACLs.
+4. Protected execute may create the target only from exact ABSENT state using
+   one reviewed native CREATE_NEW-equivalent directory creation with an explicit
+   protected security descriptor at creation time. Target policy is exactly the
+   accepted immutable-image parent policy:
+   - owner Administrators (S-1-5-32-544);
+   - protected DACL;
+   - Administrators full control 0x1F01FF;
+   - SYSTEM full control 0x1F01FF;
+   - Trading SID S-1-5-21-1397534616-3988210162-180023805-1009 read/execute
+     0x1200A9;
+   - no additional ACEs and no inheritance dependence.
+5. Do not create children, FINAL/STAGING, runtime, durable state or evidence
+   beneath the target. This checkpoint provisions only the parent directory.
+6. Before the native create attempt, failures are
+   BLOCKED / NO_PARENT_PROVISIONING_EFFECT.
+   After the create call may have occurred, any failure/close/readback ambiguity
+   is INDETERMINATE / PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY.
+7. Independently reopen and verify exact path, object identity, same F: volume,
+   local NTFS/persistent ACL support, non-reparse, single-link, owner, protected
+   DACL and exact ACE tuple before success.
+8. No ACL repair/rewrite is allowed on an existing target. No delete, rename,
+   overwrite, cleanup, rollback, recursive traversal, child mutation or retry.
+9. Use one fixed external durable exclusive-create attempt latch, independent of
+   authorization token, source revision and evidence-root selection. Consume it
+   immediately before the sole possible production create. No reset/removal API.
+10. Register one read-only preflight and one protected execute through existing
+    checkpoint_runner / ops.ps1 transport. Protected execute requires a new
+    AH-specific exact authorization interlock. CI/source tests never call the
+    real host surfaces.
+11. Source authority must pin the new operator, registration, latch declaration,
+    runner bridge and import/capability closure. No scheduler, credential/OAuth,
+    provider, Paper-v2, wake/runtime execution, broker/live, historical
+    rename/reprovision or Y/Z scratch capability.
+12. Tests must prove absent/present/conflict classification, exact creation
+    descriptor, one create, latch-before-create, source/live-remote revalidation,
+    post-create independent readback, create/close/readback ambiguity
+    preservation, idempotent exact-present behavior, no ACL repair, no retry/
+    cleanup/delete/rename/child mutation, sanitized evidence and authority pins.
+13. Focused verification only during implementation: new AH tests + affected
+    AC/AG/runner/profile tests, exact-file Ruff check/format and diff check,
+    terminal-green source gate. No real protected effect and no broad FULL during
+    implementation unless ChatGPT selects it after exact review.
+
+After AH source acceptance:
+
+~~~text
+real AH read-only preflight
+  -> selected broad certification on exact AH source
+  -> ONE separately authorized real parent-create execute
+  -> independent AH read-only verification
+  -> return to AG read-only preflight
+  -> if AG READY, final AG/combined broad certification as selected
+  -> ONE immutable-release installation execute
+~~~
+
+Because AH changes protected native authority, any previous conditional
+installation authorization does not authorize the new parent-create effect by
+itself. ChatGPT must exact-review the final AH source and readiness evidence
+before the one create attempt.
+
+
 ## 2026-10-10 — Architecture 133-AG SOURCE ACCEPTED; real-host preflight then final FULL selected
 
 Architecture **133-AG is SOURCE ACCEPTED** on the exact reviewed implementation:

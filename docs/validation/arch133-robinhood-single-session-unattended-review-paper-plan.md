@@ -1,10 +1,171 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-10 — Architecture 133-AE SOURCE ACCEPTED; 133-AF deployment qualification contract frozen
+
+Architecture **133-AE is SOURCE ACCEPTED** on the exact reviewed source:
+
+```text
+BRANCH  feature/robinhood-supervised-runtime-host-admission
+HEAD    a3eb02a5d733a5317d374472b549e2626dcddd08
+TREE    ad1f1d10a52fad06e85e9569480911b5270b2fec
+CI      Checkpoint Source Gates #397 / 38035885064 SUCCESS
+
+CHECKPOINTS 54
+TEST_PATHS  65
+RUFF_PATHS  212
+PYTEST      0
+RUFF_CHECK  0
+RUFF_FORMAT 0
+DIFF_CHECK  0
+```
+
+Exact-source review accepts the v2 supervised immutable-release transition:
+
+- the manifest now explicitly identifies
+  `scripts/run_arch133_supervised_release_review_paper.py` and bumps the release
+  schema to `arch133-supervised-release/v2`, so the v1 launcher meaning is not
+  silently reinterpreted;
+- the future scheduler projection is exactly production Python with
+  `-I -S -B <FINAL>\scripts\run_arch133_supervised_release_review_paper.py`;
+- the historical 133-E/G launcher and 133-P predecessor definition remain
+  byte/semantic history and are not rewritten;
+- the supervised launcher establishes only the immutable release source root and
+  fixed protected production site-packages root before importing the inert AE
+  admission model; it does not import the historical unattended host,
+  credentials, provider, Paper-v2, wake execution or broker/live surfaces;
+- the runtime admission model independently replays the accepted release,
+  RuntimeBinding and installed-image evidence, requires exact immutable
+  project-module origins, exact isolated/no-site/no-bytecode process facts,
+  fixed runtime-substrate security/search-path/dependency observations and
+  before/after stability;
+- successful source-only evidence continues to report
+  `dependency_closure=UNPROVEN`; AE does not convert a caller-built dependency
+  transcript or installed package set into deployment authority;
+- the registered checkpoint remains source-only with `preflight=None`,
+  `execute=None` and `remote_head_env=None`.
+
+During review, the branch already contained implementation produced after the
+frozen AE contract. Earlier source gates #394-#396 were red while that source was
+being hardened. The final remaining #396 failure was formatter/lint-only:
+pytest and every authority check passed. ChatGPT applied one atomic three-file
+formatter correction plus the corresponding reviewed runtime-admission blob pin.
+Replacement source gate #397 is terminal SUCCESS on the exact accepted tree.
+No behavioral or authority broadening was introduced by that correction.
+
+Under the accepted certification-batching rule, **no additional FULL is selected
+at 133-AE**. The last broad baseline remains the accepted 133-AD FULL. AE creates
+a pending broad-certification obligation that may continue through adjacent
+source-only work, but the final exact source must receive the selected broad
+certification before the first consequential protected deployment/startup
+qualification boundary.
+
+### Architecture 133-AF — supervised deployment/startup + rollback qualification
+
+**CONTRACT FROZEN; SOURCE NOT IMPLEMENTED OR ACCEPTED; NO REAL INSTALLATION,
+SCHEDULER MUTATION, PROCESS LAUNCH OR TRADING EFFECT AUTHORIZED.**
+
+```text
+BRANCH      feature/robinhood-supervised-deployment-qualification
+WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-deployment-qualification
+BASE        this 133-AE acceptance / 133-AF contract-closeout commit
+CHECKPOINT  arch133-robinhood-supervised-deployment-qualification
+```
+
+133-AF is a source-only qualification model for the state that must exist after
+separately authorized installation/rebind/startup work. It does not perform that
+work. It composes accepted immutable-release evidence rather than reviving the
+old mutable-worktree deployment model.
+
+The first implementation remains:
+
+```text
+preflight       = None
+execute         = None
+remote_head_env = None
+```
+
+It must accept only fixed typed evidence for:
+
+- one **selected** accepted `VerifiedRelease` + exact `RuntimeBinding`;
+- independently replayed exact installed-image evidence for that selected release;
+- exact disabled fixed-task observation bound to that selected immutable release;
+- accepted AE runtime-host admission evidence for the selected release;
+- one optional **rollback** accepted `VerifiedRelease` + RuntimeBinding +
+  independently replayed installed-image evidence, distinct from the selected
+  release and retained immutable/unmodified;
+- read-only evidence that no other release/task/runtime identity is being treated
+  as selected authority.
+
+The source-only qualification must fail closed unless all identities agree:
+release ID, manifest/binding hashes, installed image/Python identities, launcher,
+working directory, scheduler action projection, runtime source root and fixed
+durable root. A selected release may not equal its rollback candidate. A rollback
+candidate is evidence only; AF must not bind or activate it.
+
+AF must model these bounded classifications at minimum:
+
+```text
+SELECTED_READY_DISABLED
+SELECTED_RUNTIME_ADMITTED
+ROLLBACK_CANDIDATE_VERIFIED
+BLOCKED_IDENTITY_DRIFT
+BLOCKED_SCHEDULER_STATE
+BLOCKED_RUNTIME_STATE
+BLOCKED_ROLLBACK_STATE
+```
+
+No PASS classification grants wake/trading authority. In particular AF does
+**not**:
+
+- install or delete a release;
+- create/remove/rebind/enable/start a Task Scheduler task;
+- launch or terminate the bot process;
+- read scheduler credentials;
+- read Credential Manager/OAuth;
+- contact Robinhood/provider APIs;
+- create an activation/session/wake;
+- open or mutate Paper-v2/durable trading state;
+- automatically roll back, retry, repair or clean up;
+- inspect or mutate preserved Y/Z scratch;
+- grant broker/live authority.
+
+Rollback qualification is deliberately asymmetric: AF may prove that a retained
+prior immutable release is still independently install-image-valid and eligible
+for a *future separately supervised* maintenance rebind. It may not infer that
+rollback is safe merely because the directory exists, and it may not perform the
+rebind.
+
+Focused source tests must cover selected/rollback identity propagation,
+selected-vs-rollback distinctness, exact disabled scheduler binding,
+AE runtime-evidence agreement, installed-image replay, no alternate/caller paths,
+drift between repeated observations, no automatic mutation/retry/cleanup,
+rollback ambiguity, source-only registration/workflow drift and continued
+AC/AD/AE authority chaining.
+
+Because AF remains source-only, implementation uses **Sol High** for authority
+semantics but runs focused verification and terminal source-gate CI only. FULL
+remains deferred and accumulated until the final exact source approaches the
+first protected deployment/startup qualification boundary.
+
+The protected ordering remains:
+
+```text
+accepted source-only AC/AD/AE/AF
+  -> selected required broad certification on final exact source
+  -> separately authorized real immutable release installation
+  -> independently reviewed installed-image result
+  -> separately authorized real maintenance-mode scheduler rebind
+  -> separately reviewed real runtime/substrate admission
+  -> supervised deployment/startup + rollback qualification
+  -> exactly ONE unattended integration wake
+  -> fresh seven-calendar-day unattended Paper-v2 soak
+  -> end-of-week review
+```
+
 ## 2026-10-10 — Architecture 133-AE runtime-host admission contract frozen
 
-Architecture **133-AE is SOURCE IMPLEMENTED; EXACT GITHUB REVIEW AND
-ACCEPTANCE PENDING; NO REAL HOST, SCHEDULER, CREDENTIAL, PROVIDER OR PRODUCTION
-EFFECT IS AUTHORIZED.**
+Architecture **133-AE is SOURCE ACCEPTED; NO REAL HOST, SCHEDULER,
+CREDENTIAL, PROVIDER OR PRODUCTION EFFECT IS AUTHORIZED.**
 
 ```text
 BRANCH      feature/robinhood-supervised-runtime-host-admission
@@ -239,8 +400,7 @@ replays the accepted release/binding/installed image, requires exact immutable
 project-module origins and `-I -S -B` process facts, models protected runtime
 substrate/object/dependency observations through injected read-only seams, and
 keeps `dependency_closure=UNPROVEN`. The checkpoint remains source-only with
-`preflight=None`, `execute=None` and `remote_head_env=None`. Exact GitHub
-review found and corrected one boundary defect before acceptance: the first
+`preflight=None`, `execute=None` and `remote_head_env=None`. Implementation review identified and corrected one boundary defect before final acceptance: the first
 supervised launcher revision imported the historical
 `review_paper.unattended_host`, which would have re-entered mutable 133-G
 worktree admission and imported credential/provider/wake surfaces. The corrected

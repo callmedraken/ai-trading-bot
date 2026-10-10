@@ -712,8 +712,8 @@ for name in sys.modules:
 def test_ah_preflight_ready_or_existing(monkeypatch):
     monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
     for exists, expected, target_state in (
-        (False, "READY_TO_PROVISION", "ABSENT"),
-        (True, "ALREADY_PROVISIONED_VERIFIED", "EXACT_PARENT_PRESENT"),
+        (False, "READY_TO_CREATE", "ABSENT"),
+        (True, "ALREADY_PROVISIONED", "EXACT_PARENT_PRESENT"),
     ):
         readiness = parent_subject.ParentReadiness(
             exists,
@@ -853,6 +853,179 @@ def test_ah_registration_and_capability_surface():
         "RegisterTask",
     ):
         assert forbidden not in source
+
+
+def test_ah_runner_preflight_creates_no_files(tmp_path, monkeypatch, capsys):
+    name = "arch133-robinhood-supervised-release-parent-provisioning"
+    spec = runner._checkpoint_specs()[name]
+    spec = replace(
+        spec,
+        preflight=lambda: {
+            "status": "PASS",
+            "effect_disposition": "NOT_STARTED",
+            "primary": {"status": "READY_TO_CREATE", "target_state": "ABSENT"},
+        },
+    )
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda *args: state)
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: state["head"])
+    before = tuple(tmp_path.iterdir())
+
+    assert runner.preflight_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "unused",
+    ) == (True, None)
+    assert tuple(tmp_path.iterdir()) == before
+    assert "EVIDENCE=STDOUT" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "gate", ["path", "branch", "origin", "ancestor", "dirty", "pins"]
+)
+def test_ah_exact_runner_source_admission(tmp_path, monkeypatch, gate):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(parent_subject, "WORKTREE", tmp_path)
+    monkeypatch.setattr(runner, "_REPOSITORY_ROOT", tmp_path)
+
+    def output(root, *args):
+        if args == ("remote", "get-url", "origin"):
+            return "wrong" if gate == "origin" else parent_subject.ORIGIN
+        return "f" * 40 if gate == "ancestor" else parent_subject.BASE_HEAD
+
+    monkeypatch.setattr(runner, "_git_output", output)
+    monkeypatch.setattr(
+        runner,
+        "_supervised_release_parent_authority_check",
+        lambda *args: ("drift",) if gate == "pins" else (),
+    )
+    if gate == "branch":
+        state["branch"] = "feature/caller"
+    if gate == "dirty":
+        state["porcelain"] = "changed index"
+
+    with pytest.raises(RuntimeError, match="source authority rejected"):
+        runner._supervised_release_parent_admission(
+            tmp_path / "wrong" if gate == "path" else tmp_path,
+            state,
+        )
+
+
+def test_ah_fixed_latch_is_exclusive_and_survives_flush_failure(
+    tmp_path, monkeypatch
+):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    latch = tmp_path / "latch" / "attempt.json"
+    monkeypatch.setattr(runner, "SUPERVISED_RELEASE_PARENT_ATTEMPT", latch)
+    monkeypatch.setattr(runner, "_git_state", lambda *args: state)
+    monkeypatch.setattr(
+        runner, "_supervised_release_parent_admission", lambda *args: None
+    )
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: state["head"])
+    monkeypatch.setattr(
+        runner.os,
+        "fsync",
+        lambda *args: (_ for _ in ()).throw(OSError("fake flush failure")),
+    )
+
+    with pytest.raises(OSError, match="fake flush failure"):
+        runner._consume_supervised_release_parent_attempt()
+    assert latch.exists()
+    original = latch.read_bytes()
+    with pytest.raises(FileExistsError):
+        runner._consume_supervised_release_parent_attempt()
+    assert latch.read_bytes() == original
+
+
+@pytest.mark.parametrize("entrypoint", ["preflight", "execute"])
+def test_ah_runner_revalidates_live_remote_before_host_entry(
+    monkeypatch, entrypoint
+):
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda *args: state)
+    monkeypatch.setattr(
+        runner, "_supervised_release_parent_admission", lambda *args: None
+    )
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: "f" * 40)
+    monkeypatch.setattr(
+        parent_subject,
+        "_preflight",
+        lambda: pytest.fail("host preflight reached"),
+    )
+    monkeypatch.setattr(
+        parent_subject,
+        "_execute_once",
+        lambda consume: pytest.fail("host execute reached"),
+    )
+    monkeypatch.setenv(parent_subject.AUTH_ENV, parent_subject.AUTH_VALUE)
+
+    with pytest.raises(RuntimeError, match="live remote authority rejected"):
+        (
+            runner._supervised_release_parent_preflight()
+            if entrypoint == "preflight"
+            else runner._supervised_release_parent_execute()
+        )
+
+
+def test_ah_execute_checkpoint_remote_race_is_no_parent_effect(
+    tmp_path, monkeypatch
+):
+    name = "arch133-robinhood-supervised-release-parent-provisioning"
+    spec = runner._checkpoint_specs()[name]
+    state = {
+        "head": "a" * 40,
+        "tree": "b" * 40,
+        "branch": parent_subject.BRANCH,
+        "porcelain": "",
+    }
+    calls = 0
+
+    def remote(*args):
+        nonlocal calls
+        calls += 1
+        return state["head"] if calls == 1 else "f" * 40
+
+    monkeypatch.setattr(runner, "_git_state", lambda *args: state)
+    monkeypatch.setattr(
+        runner, "_supervised_release_parent_admission", lambda *args: None
+    )
+    monkeypatch.setattr(runner, "_remote_branch_head", remote)
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: {name: spec})
+    monkeypatch.setenv(parent_subject.AUTH_ENV, parent_subject.AUTH_VALUE)
+
+    passed, report_path = runner.execute_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "evidence",
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert passed is False
+    assert report["status"] == "STOPPED"
+    assert report["effect_disposition"] == "NOT_STARTED"
+    assert report["runner_error"] == {
+        "type": "PARENT_PROVISIONING_STOPPED",
+        "detail": "NO_PARENT_PROVISIONING_EFFECT",
+    }
 
 
 def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):

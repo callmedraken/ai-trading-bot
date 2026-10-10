@@ -8621,7 +8621,7 @@ SUPERVISED_RELEASE_PARENT_NAME: Final = (
 SUPERVISED_RELEASE_PARENT_SOURCE: Final = (
     "src/trading_bot/supervised_release/release_parent_provisioning.py"
 )
-SUPERVISED_RELEASE_PARENT_PIN: Final = "8b664c67c35ca52f3f1954aa045e0bcc14505dd8"
+SUPERVISED_RELEASE_PARENT_PIN: Final = "f1f4d2d3a2d91cfa256498989e5b893977f17d50"
 SUPERVISED_RELEASE_PARENT_TESTS: Final = SUPERVISED_INSTALLATION_OPERATOR_TESTS
 SUPERVISED_RELEASE_PARENT_RUFF_PATHS: Final = (
     *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
@@ -8797,7 +8797,7 @@ def _supervised_release_parent_preflight() -> dict[str, object]:
     result = operator._preflight()
     if (
         _supervised_release_parent_latch_consumed()
-        and result.get("primary", {}).get("status") != "ALREADY_PROVISIONED_VERIFIED"
+        and result.get("primary", {}).get("status") != "ALREADY_PROVISIONED"
     ):
         return {
             "status": "BLOCKED",
@@ -10803,8 +10803,9 @@ def preflight_checkpoint(
         )
 
     installation = spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME
+    parent_provisioning = spec.name == SUPERVISED_RELEASE_PARENT_NAME
     evidence_dir = None
-    if not installation:
+    if not installation and not parent_provisioning:
         evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
         evidence_dir.mkdir(parents=True, exist_ok=False)
 
@@ -10885,6 +10886,7 @@ def execute_checkpoint(
         )
 
     installation = spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME
+    parent_provisioning = spec.name == SUPERVISED_RELEASE_PARENT_NAME
     if installation:
         from trading_bot.supervised_release import installation_operator as operator
 
@@ -10898,6 +10900,14 @@ def execute_checkpoint(
                 "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY: "
                 "consumed installation attempt; MAY_HAVE_OCCURRED"
             )
+    elif parent_provisioning:
+        from trading_bot.supervised_release import release_parent_provisioning as operator
+
+        _supervised_release_parent_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_RELEASE_PARENT_NAME]:
+            raise RuntimeError("release parent registration rejected")
+        if os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE:
+            raise RuntimeError("release parent authorization interlock rejected")
 
     local_branch = str(state_before["branch"])
     remote_branch = spec.remote_branch
@@ -10972,12 +10982,28 @@ def execute_checkpoint(
                 "identity_stable": identity_stable,
             },
             "runner_error": {
-                "type": "INSTALLATION_STOPPED" if installation else type(exc).__name__,
-                "detail": "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
-                if installation
-                else str(exc),
+                "type": (
+                    "INSTALLATION_STOPPED"
+                    if installation
+                    else (
+                        "PARENT_PROVISIONING_STOPPED"
+                        if parent_provisioning
+                        else type(exc).__name__
+                    )
+                ),
+                "detail": (
+                    "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
+                    if installation
+                    else (
+                        "NO_PARENT_PROVISIONING_EFFECT"
+                        if parent_provisioning
+                        else str(exc)
+                    )
+                ),
             },
-            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "effect_disposition": (
+                "NOT_STARTED" if parent_provisioning else "MAY_HAVE_OCCURRED"
+            ),
             "protected_execution": "ATTEMPTED",
             "automatic_retry": "NOT_AUTHORIZED",
         }
@@ -10986,6 +11012,11 @@ def execute_checkpoint(
         if installation:
             print(
                 "RUNNER_EXECUTION_ERROR=INSTALLATION_STOPPED:PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY",
+                file=sys.stderr,
+            )
+        elif parent_provisioning:
+            print(
+                "RUNNER_EXECUTION_ERROR=PARENT_PROVISIONING_STOPPED:NO_PARENT_PROVISIONING_EFFECT",
                 file=sys.stderr,
             )
         else:

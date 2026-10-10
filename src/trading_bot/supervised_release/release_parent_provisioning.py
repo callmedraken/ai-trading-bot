@@ -160,9 +160,9 @@ def _preflight() -> dict[str, object]:
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
             "primary": _primary(
-                "ALREADY_PROVISIONED_VERIFIED"
+                "ALREADY_PROVISIONED"
                 if readiness.exists
-                else "READY_TO_PROVISION",
+                else "READY_TO_CREATE",
                 readiness,
             ),
         }

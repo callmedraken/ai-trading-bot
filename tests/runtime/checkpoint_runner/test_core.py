@@ -130,6 +130,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        "arch133-robinhood-supervised-release-installation",
         "arch133-robinhood-supervised-release-build-verification",
         "arch133-robinhood-supervised-release-foundation",
         "arch128-parent-acl-repair",
@@ -294,6 +295,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-supervised-release-foundation"
         if spec.name == "arch133-robinhood-supervised-release-build-verification":
             expected_branch = "feature/robinhood-supervised-release-build-verification"
+        if spec.name == "arch133-robinhood-supervised-release-installation":
+            expected_branch = "feature/robinhood-supervised-release-installation"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1098,6 +1101,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             if name
             in {
                 "arch133-robinhood-supervised-release-foundation",
+                "arch133-robinhood-supervised-release-installation",
                 "arch133-robinhood-supervised-release-build-verification",
             }
             else (

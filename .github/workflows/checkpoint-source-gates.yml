@@ -71,6 +71,7 @@ jobs:
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
             verify-batch `
+              arch133-robinhood-supervised-release-installation `
               arch133-robinhood-supervised-release-build-verification `
               arch133-robinhood-supervised-release-foundation `
               arch131-robinhood-review-paper `

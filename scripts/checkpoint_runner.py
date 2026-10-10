@@ -133,6 +133,7 @@ RETAINED_CHECKPOINTS: Final = (
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-release-installation",
     "arch133-robinhood-supervised-release-build-verification",
     "arch133-robinhood-supervised-release-foundation",
     "arch131-robinhood-review-paper",
@@ -7822,6 +7823,148 @@ def _supervised_release_bundle_authority_check(repo_root: Path) -> tuple[str, ..
     return tuple(failures)
 
 
+SUPERVISED_RELEASE_INSTALLATION_SOURCES: Final = (
+    "src/trading_bot/supervised_release/installation_contract.py",
+    "src/trading_bot/supervised_release/observer.py",
+    "src/trading_bot/supervised_release/installer.py",
+    "src/trading_bot/supervised_release/native_read.py",
+    "src/trading_bot/supervised_release/native_write.py",
+)
+SUPERVISED_RELEASE_INSTALLATION_PINS: Final = {
+    "src/trading_bot/supervised_release/installation_contract.py": (
+        "57f61b16202d23e7e36b07b376d39e011b0d9bfa"
+    ),
+    "src/trading_bot/supervised_release/observer.py": (
+        "7f3b58cd61aca874609ea21921b3e81a669205d1"
+    ),
+    "src/trading_bot/supervised_release/installer.py": (
+        "de510dbec9c72fea2fd3178accf9e2a5742dabaa"
+    ),
+    "src/trading_bot/supervised_release/native_read.py": (
+        "bcbfd75043d6c31cad725425278dd7c80baff642"
+    ),
+    "src/trading_bot/supervised_release/native_write.py": (
+        "fd059cd6363583d3923d073b8be78f8d3a1519ea"
+    ),
+}
+SUPERVISED_RELEASE_INSTALLATION_TESTS: Final = (
+    *SUPERVISED_RELEASE_BUNDLE_TESTS,
+    "tests/review_paper/test_supervised_release_installation.py",
+)
+SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS,
+    *SUPERVISED_RELEASE_INSTALLATION_SOURCES,
+    "tests/review_paper/test_supervised_release_installation.py",
+)
+
+
+def _supervised_release_installation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Source-only 133-AC admission; never instantiate a native backend."""
+    failures = list(_supervised_release_bundle_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()["arch133-robinhood-supervised-release-installation"]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-supervised-release-installation"
+            or spec.tests != SUPERVISED_RELEASE_INSTALLATION_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_release_installation_authority_check
+        ):
+            failures.append("release installation source-only registration drift")
+        common = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "pathlib",
+            "typing",
+            "contextlib",
+            "collections.abc",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.arch133_acl.read_only",
+        }
+        allowed_by_file = {
+            "installation_contract.py": common,
+            "observer.py": common
+            | {"hashlib", "trading_bot.supervised_release.native_read"},
+            "installer.py": common
+            | {
+                "trading_bot.supervised_release.observer",
+                "trading_bot.supervised_release.native_write",
+            },
+            "native_read.py": common | {"ctypes", "sys"},
+            "native_write.py": common
+            | {
+                "ctypes",
+                "trading_bot.arch133_acl.administrator",
+                "trading_bot.supervised_release.native_read",
+                "trading_bot.supervised_release.observer",
+            },
+        }
+        forbidden = {
+            "unlink",
+            "rmtree",
+            "rename",
+            "remove",
+            "sleep",
+            "run",
+            "Popen",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+        }
+        for relative in SUPERVISED_RELEASE_INSTALLATION_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_RELEASE_INSTALLATION_PINS[relative]
+            ):
+                failures.append("release installation reviewed source drift")
+            allowed = allowed_by_file[Path(relative).name]
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("release installation import boundary drift")
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module not in allowed or node.level
+                ):
+                    failures.append("release installation import boundary drift")
+                if isinstance(node, ast.Call):
+                    name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    if name in forbidden:
+                        failures.append(
+                            "release installation capability boundary drift"
+                        )
+        # The two reused native read/token primitives remain pinned too; no
+        # mutation-capable historical deployment module is admitted through them.
+        for relative, pin in SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("release installation native primitive source drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("release installation source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS: Final = {
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "09bdfb69953b155a1a75a9f2235456815f179b31"
+    ),
+    "src/trading_bot/arch133_acl/administrator.py": (
+        "d3498b3fc9771e0cdccee76653e20a2ecf34b4d5"
+    ),
+}
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -8629,6 +8772,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_closed_descendant_rename_qualification_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133z",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-installation": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-installation",
+            description="Architecture 133-AC immutable installation and observation",
+            tests=SUPERVISED_RELEASE_INSTALLATION_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS,
+            authority_check=_supervised_release_installation_authority_check,
+            remote_branch="feature/robinhood-supervised-release-installation",
             preflight=None,
             execute=None,
             remote_head_env=None,

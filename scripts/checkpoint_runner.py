@@ -8090,7 +8090,7 @@ SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
         "ef95b314c527d5f2e773b06c9d2a5f217ae8d09b"
     ),
     "scripts/run_arch133_supervised_release_review_paper.py": (
-        "0425eaba53ea607512db338dbbc537aa9d28542a"
+        "89178cd8f7dd3341a4016d005f388df4c85a55dc"
     ),
 }
 SUPERVISED_RUNTIME_ADMISSION_TESTS: Final = (

@@ -45,7 +45,7 @@ if any(path.casefold() in {_source.casefold(), _site.casefold()} for path in sys
     raise SystemExit(3)
 sys.path[:0] = [_source, _site]
 
-from trading_bot.supervised_release import runtime_admission as _runtime_admission  # noqa: E402,F401
+from trading_bot.supervised_release import runtime_admission as _runtime_admission  # noqa: E402, F401, I001
 
 if __name__ == "__main__":
     print(_FAILURE, file=sys.stderr)

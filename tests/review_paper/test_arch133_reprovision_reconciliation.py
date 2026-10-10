@@ -699,7 +699,7 @@ def test_authority_chains_u_and_has_exact_source_only_topology():
         "arch133-robinhood-fresh-activation-reprovision-corrected",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 51
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 52
 
 
 @pytest.mark.parametrize(

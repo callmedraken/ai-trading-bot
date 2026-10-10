@@ -1,5 +1,70 @@
 # Project Status and Roadmap
 
+## 2026-10-09 — Architecture 133-AB SOURCE ACCEPTED
+
+Checkpoint `arch133-robinhood-supervised-release-build-verification` is **SOURCE ACCEPTED** after exact GitHub review.
+
+```text
+BRANCH              feature/robinhood-supervised-release-build-verification
+BASE HEAD           e684deac5ef3c736dff3b792c63505a2dee35096
+BASE TREE           96952aa00d06f7fe7fe0f4dd35b828b0e65f982f
+ACCEPTED HEAD       f9085542238e04943be04b7f98ff0ab11202507c
+ACCEPTED TREE       9f1c23bc66d2425d057e3bedbd3e31736452ac45
+SOURCE GATE         #374 / 38007209888 SUCCESS
+REGISTERED BATCH    51 source checkpoints
+```
+
+Exact review confirms the frozen 133-AB contract:
+
+- `bundle.py`, `binding.py` and `collector.py` are pinned by exact Git blob identities in the source authority callback.
+- The collector reads only an explicitly supplied development checkout plus local Git metadata. It requires the declared HEAD/tree, clean tracked/index/untracked state, no hidden index flags, no partial/promisor source, no external Git filter/working-tree encoding, canonical complete runtime namespace, regular non-reparse files and stable bytes/Git state before and after collection.
+- The complete release image is canonical `manifest.json`, `pyproject.toml`, all supported `.py/.json/.sql` files below `src/trading_bot`, and exactly `scripts/run_arch133_unattended_review_paper.py`. Unsupported or unexpected source material fails closed.
+- Standard Git `core.autocrlf=true` checkout conversion is explicitly admitted, while the manifest hashes the exact checkout bytes that would enter the release.
+- `ReleaseBundle` is bounded and canonical. `VerifiedRelease` requires independently supplied manifest SHA-256, source HEAD/tree and complete source-path pins; missing/extra/case-alias material, byte/hash drift, source mismatch, launcher mismatch and unsafe object facts are rejected.
+- `RuntimeBinding` can only be constructed from an exact `VerifiedRelease` and canonically binds release/manifest/source/Python/launcher/strategy/config/risk identities plus the fixed release and durable-data roots.
+- Dependency closure is explicitly `UNPROVEN`; Python version/SHA remain declarations until a later host observation. No durable-state migration/compatibility claim is made.
+- Current production `unattended_host_identity`, scheduler binding and 133-G runtime are unchanged.
+- The checkpoint remains source-only: `preflight=None`, `execute=None`, `remote_head_env=None`. No production installer, installed-image observer or scheduler mutation path is registered.
+
+Focused implementation evidence covered 2,466 cases across the new bundle/verifier, foundation/profile ownership, checkpoint runner and retained topology assertions. Exact-file Ruff and diff checks passed, all 51 registered source-authority callbacks passed, and terminal push source gate #374 completed SUCCESS on the exact accepted HEAD.
+
+### Certification tier
+
+No additional FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification is selected at this checkpoint.
+
+Reason: 133-AB changes only source-side release collection/verification/evidence and checkpoint/profile registration. It does not alter strategy evaluation, risk, paper execution, provider behavior, production host admission, scheduler execution or any protected effect path. The focused suites plus complete registered source-gate batch cover the affected surface. A broader certification becomes appropriate when the new release binding is actually wired into the production runtime/host admission or before a real supervised deployment qualification.
+
+Current profile ownership:
+
+```text
+FULL        151
+ROBINHOOD    78
+LEGACY      205
+EXHAUSTIVE  356
+```
+
+Frozen required FULL/Robinhood baselines remain 122/49.
+
+No real release was installed. No production filesystem, Y/Z scratch, Task Scheduler, provider/OAuth, credential store, paper state, broker or live effect was accessed or mutated.
+
+### Next milestone — Architecture 133-AC
+
+The next boundary is the separately reviewed **immutable-release installer and installed-image observer**.
+
+133-AC should remain source-first and must preserve the supervised-release invariant:
+
+1. prepare one exact verified `VerifiedRelease`;
+2. install it into its unique derived `F:\AITradingBot\releases\<release-id>` directory without changing the scheduler;
+3. independently observe the installed image read-only and replay it against the accepted manifest/bundle/runtime binding;
+4. fail closed on preexisting/conflicting release roots, reparse/symlink/type/ACL/namespace/byte drift, partial installation or ambiguous writes;
+5. never mutate `F:\AITradingBot\Arch133`, Y/Z scratch, scheduler configuration, provider/OAuth, paper/broker/live state;
+6. preserve an installed immutable release after success; ordinary strategy/code updates create another release rather than modifying an existing one.
+
+The installer writer, native Windows containment/ACL policy, one-shot ambiguity handling and installed-image observer must be source-reviewed before any real release creation is authorized.
+
+After an installed immutable release is independently verified, the following protected steps remain: supervised maintenance-mode scheduler rebind, host-admission migration from the 133-G worktree to the verified release binding, deployment/rollback qualification, then bounded unattended review-paper operation.
+
+
 ## 2026-10-09 — Architecture 133-AB implemented; exact source review pending
 
 Checkpoint `arch133-robinhood-supervised-release-build-verification` on

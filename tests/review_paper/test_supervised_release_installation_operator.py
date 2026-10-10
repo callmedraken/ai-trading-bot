@@ -709,7 +709,6 @@ for name in sys.modules:
     assert result.returncode == 0, result.stderr
 
 
-
 def test_ah_preflight_ready_or_existing(monkeypatch):
     monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
     for exists, expected in (
@@ -856,3 +855,26 @@ def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):
     result = runner._supervised_release_parent_execute()
     assert result["status"] == "INDETERMINATE"
     assert result["primary"]["reason"] == "CONSUMED_ATTEMPT"
+
+
+
+def test_ah_observer_absent_exact_and_malformed_parent_policy():
+    release = accepted()
+    native = FakeNative(release)
+    native.nodes.pop(RELEASES_BASE)
+
+    absent = parent_subject._observe_once(native)
+    assert absent.exists is False
+    assert absent.parent_identity is None
+
+    native.add(RELEASES_BASE, directory=True)
+    exact = parent_subject._observe_once(native)
+    assert exact.exists is True
+    assert exact.parent_identity == native.nodes[RELEASES_BASE].identity
+
+    native.nodes[RELEASES_BASE] = replace(
+        native.nodes[RELEASES_BASE],
+        protected=False,
+    )
+    with pytest.raises(ValueError, match="object identity/security rejected"):
+        parent_subject._observe_once(native)

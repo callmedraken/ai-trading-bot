@@ -8332,7 +8332,6 @@ def _supervised_deployment_qualification_authority_check(
     return tuple(failures)
 
 
-
 SUPERVISED_INSTALLATION_OPERATOR_NAME: Final = (
     "arch133-robinhood-supervised-release-installation-operator"
 )
@@ -8706,7 +8705,8 @@ def _supervised_release_parent_authority_check(repo_root: Path) -> tuple[str, ..
                         "release parent provisioning capability boundary drift"
                     )
         creates = [
-            node for node in ast.walk(tree)
+            node
+            for node in ast.walk(tree)
             if isinstance(node, ast.Constant) and node.value == "CreateDirectoryW"
         ]
         if len(creates) != 1:
@@ -8797,8 +8797,7 @@ def _supervised_release_parent_preflight() -> dict[str, object]:
     result = operator._preflight()
     if (
         _supervised_release_parent_latch_consumed()
-        and result.get("primary", {}).get("status")
-        != "ALREADY_PROVISIONED_VERIFIED"
+        and result.get("primary", {}).get("status") != "ALREADY_PROVISIONED_VERIFIED"
     ):
         return {
             "status": "BLOCKED",
@@ -8835,7 +8834,6 @@ def _supervised_release_parent_execute() -> dict[str, object]:
             },
         }
     return operator._execute_once(_consume_supervised_release_parent_attempt)
-
 
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:

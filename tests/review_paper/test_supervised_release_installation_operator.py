@@ -24,8 +24,8 @@ from test_supervised_release_installation import (
 
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
-from trading_bot.supervised_release import installer, observer
 from trading_bot.supervised_release import installation_operator as subject
+from trading_bot.supervised_release import installer, observer
 from trading_bot.supervised_release import release_parent_provisioning as parent_subject
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.installation_contract import (

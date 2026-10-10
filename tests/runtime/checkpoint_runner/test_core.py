@@ -313,9 +313,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
                 "feature/robinhood-supervised-release-installation-operator"
             )
         if spec.name == "arch133-robinhood-supervised-release-parent-provisioning":
-            expected_branch = (
-                "feature/robinhood-supervised-release-parent-provisioning"
-            )
+            expected_branch = "feature/robinhood-supervised-release-parent-provisioning"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None

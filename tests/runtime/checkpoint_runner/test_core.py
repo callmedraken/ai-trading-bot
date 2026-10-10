@@ -131,6 +131,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
 
     assert set(specs) == {
         "arch133-robinhood-supervised-release-installation-operator",
+        "arch133-robinhood-supervised-release-parent-provisioning",
         "arch133-robinhood-supervised-deployment-qualification",
         "arch133-robinhood-supervised-runtime-host-admission",
         "arch133-robinhood-supervised-maintenance-rebind",
@@ -310,6 +311,10 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         if spec.name == "arch133-robinhood-supervised-release-installation-operator":
             expected_branch = (
                 "feature/robinhood-supervised-release-installation-operator"
+            )
+        if spec.name == "arch133-robinhood-supervised-release-parent-provisioning":
+            expected_branch = (
+                "feature/robinhood-supervised-release-parent-provisioning"
             )
         assert spec.remote_branch == expected_branch
 

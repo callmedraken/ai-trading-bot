@@ -25,6 +25,7 @@ from test_supervised_release_installation import (
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
 from trading_bot.supervised_release import installation_operator as subject
+from trading_bot.supervised_release import release_parent_provisioning as parent_subject
 from trading_bot.supervised_release import installer, observer
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.installation_contract import (
@@ -706,3 +707,152 @@ for name in sys.modules:
         env={**os.environ, "PYTHONPATH": str(ROOT / "src")},
     )
     assert result.returncode == 0, result.stderr
+
+
+
+def test_ah_preflight_ready_or_existing(monkeypatch):
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+    for exists, expected in (
+        (False, "READY_TO_PROVISION"),
+        (True, "ALREADY_PROVISIONED_VERIFIED"),
+    ):
+        readiness = parent_subject.ParentReadiness(
+            exists,
+            (7, 11),
+            (7, 12) if exists else None,
+        )
+        monkeypatch.setattr(parent_subject, "_readiness", lambda value=readiness: value)
+        result = parent_subject._preflight()
+        assert result["status"] == "PASS"
+        assert result["primary"]["status"] == expected
+        assert result["effect_disposition"] == "NOT_STARTED"
+
+
+def test_ah_execute_consumes_once_before_single_create(monkeypatch):
+    events = []
+    states = iter(
+        (
+            parent_subject.ParentReadiness(False, (7, 11), None),
+            parent_subject.ParentReadiness(True, (7, 11), (7, 12)),
+        )
+    )
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+    monkeypatch.setattr(parent_subject, "_readiness", lambda: next(states))
+    monkeypatch.setattr(
+        parent_subject,
+        "_create_parent",
+        lambda: events.append("create") or True,
+    )
+
+    result = parent_subject._execute_once(lambda: events.append("consume"))
+
+    assert result["status"] == "PASS"
+    assert result["primary"]["status"] == "PROVISIONED_VERIFIED"
+    assert result["effect_disposition"] == "CONFIRMED"
+    assert events == ["consume", "create"]
+
+
+def test_ah_existing_parent_is_zero_effect(monkeypatch):
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+    monkeypatch.setattr(
+        parent_subject,
+        "_readiness",
+        lambda: parent_subject.ParentReadiness(True, (7, 11), (7, 12)),
+    )
+    monkeypatch.setattr(
+        parent_subject,
+        "_create_parent",
+        lambda: pytest.fail("create must not run"),
+    )
+
+    result = parent_subject._execute_once(
+        lambda: pytest.fail("latch must not be consumed")
+    )
+
+    assert result["status"] == "PASS"
+    assert result["primary"]["status"] == "ALREADY_PROVISIONED_VERIFIED"
+    assert result["effect_disposition"] == "NOT_STARTED"
+
+
+@pytest.mark.parametrize("mode", ["create_false", "post_observation"])
+def test_ah_possible_effect_is_indeterminate_without_retry(monkeypatch, mode):
+    events = []
+    first = parent_subject.ParentReadiness(False, (7, 11), None)
+    calls = 0
+
+    def readiness():
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return first
+        if mode == "post_observation":
+            raise RuntimeError("private detail")
+        return parent_subject.ParentReadiness(True, (7, 11), (7, 12))
+
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+    monkeypatch.setattr(parent_subject, "_readiness", readiness)
+    monkeypatch.setattr(
+        parent_subject,
+        "_create_parent",
+        lambda: events.append("create") or False,
+    )
+
+    result = parent_subject._execute_once(lambda: events.append("consume"))
+
+    assert result["status"] == "INDETERMINATE"
+    assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+    assert result["primary"]["disposition"] == "PRESERVE_PARENT_EVIDENCE_NO_RETRY"
+    assert events == ["consume", "create"]
+    assert "private" not in repr(result)
+
+
+def test_ah_registration_and_capability_surface():
+    name = "arch133-robinhood-supervised-release-parent-provisioning"
+    spec = runner._checkpoint_specs()[name]
+    assert runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
+    assert runner.ACTIVE_CI_CHECKPOINTS[1] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[2] == (
+        "arch133-robinhood-supervised-deployment-qualification"
+    )
+    assert spec.preflight is runner._supervised_release_parent_preflight
+    assert spec.execute is runner._supervised_release_parent_execute
+    assert spec.remote_branch == parent_subject.BRANCH
+    assert spec.remote_head_env is None
+    assert spec.tests == runner.SUPERVISED_RELEASE_PARENT_TESTS
+    assert spec.ruff_paths == runner.SUPERVISED_RELEASE_PARENT_RUFF_PATHS
+    source = inspect.getsource(parent_subject)
+    assert source.count('"CreateDirectoryW"') == 1
+    for forbidden in (
+        "install_release(",
+        ".unlink(",
+        ".remove(",
+        "rmtree(",
+        "RegisterTask",
+    ):
+        assert forbidden not in source
+
+
+def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):
+    monkeypatch.setattr(
+        runner,
+        "_supervised_release_parent_admission",
+        lambda repo_root, state: None,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_git_state",
+        lambda root: {
+            "head": "a",
+            "tree": "b",
+            "branch": parent_subject.BRANCH,
+            "porcelain": "",
+        },
+    )
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda root, branch: "a")
+    monkeypatch.setattr(
+        runner, "_supervised_release_parent_latch_consumed", lambda: True
+    )
+    monkeypatch.setenv(parent_subject.AUTH_ENV, parent_subject.AUTH_VALUE)
+    result = runner._supervised_release_parent_execute()
+    assert result["status"] == "INDETERMINATE"
+    assert result["primary"]["reason"] == "CONSUMED_ATTEMPT"

@@ -1,5 +1,61 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-10 — Architecture 133-AH release-parent provisioning contract
+
+The first real 133-AG read-only host preflight on accepted closeout source
+`e462a4f666ae2b28dd0d9c0459f4efce154c3470` blocked cleanly with
+`BLOCKED / PARENT / NO_INSTALLATION_EFFECT`. Read-only diagnosis proved the
+accepted F: volume boundary, protected `F:\AITradingBot` container and exact
+production Python 3.14.3/hash are all correct. The sole demonstrated blocker is
+that `F:\AITradingBot\releases` does not exist.
+
+133-AH is a separate one-directory provisioning boundary. Source implementation
+and tests must not touch the real host.
+
+Fixed target:
+
+~~~text
+F:\AITradingBot\releases
+~~~
+
+The parent must be created with exactly the already-frozen immutable-image ACL:
+
+~~~text
+Administrators  FULL
+SYSTEM          FULL
+Trading         READ/EXECUTE only
+protected DACL
+~~~
+
+AH may issue exactly one `CreateDirectoryW` for that fixed path, with the
+accepted creation-time security descriptor, only after independently validating
+Administrator authority plus the existing F: / F:\AITradingBot chain. It must
+consume a separate fixed durable no-retry latch before the native create. It may
+not create a release ID, FINAL/STAGING image, runtime directory, scheduler task,
+credential, provider state, Paper-v2 state, wake, broker or live effect.
+
+If the parent already exists and independently matches the exact policy, AH is
+read-only and returns ALREADY_PROVISIONED_VERIFIED. A malformed or conflicting
+parent blocks without repair. Any failure or ambiguity after the create attempt
+is PRESERVE_PARENT_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED; no delete, ACL repair,
+cleanup, overwrite or second create is allowed. Later reconciliation is
+read-only.
+
+Branch/checkpoint:
+
+~~~text
+BRANCH      feature/robinhood-supervised-release-parent-provisioning
+WORKTREE    F:\AI\worktrees\ai-trading-bot-supervised-release-parent-provisioning
+BASE        e462a4f666ae2b28dd0d9c0459f4efce154c3470
+CHECKPOINT  arch133-robinhood-supervised-release-parent-provisioning
+~~~
+
+After source acceptance and selected broad certification, real AH preflight must
+show READY_TO_PROVISION before one separately authorized execute. After a
+successful independent parent readback, rerun the unchanged AG read-only
+preflight. Only then may AG FULL/installation readiness continue.
+
+
 ## 2026-10-10 — Architecture 133-AG SOURCE ACCEPTED; real-host preflight then final FULL selected
 
 Architecture **133-AG is SOURCE ACCEPTED** on the exact reviewed implementation:

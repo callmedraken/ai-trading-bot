@@ -1,5 +1,32 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 2026-10-10 — Architecture 133-AH release-parent provisioning validation
+
+Real 133-AG preflight established a clean, source-stable host block:
+`F:\AITradingBot\releases` is absent while the volume/container and production
+Python substrate are accepted. AH therefore qualifies only one missing-parent
+provisioning operation.
+
+Source validation must prove:
+- exact fixed target `F:\AITradingBot\releases`;
+- exact creation-time IMAGE_ACES policy;
+- elevated Administrator and accepted ancestor checks before any create;
+- READY_TO_PROVISION when absent and ALREADY_PROVISIONED_VERIFIED when exact;
+- exactly one native `CreateDirectoryW` after a separate durable latch;
+- no delete, repair, chmod/ACL normalization, retry, overwrite or second create;
+- post-create independent observation of the exact parent;
+- failure after possible create => MAY_HAVE_OCCURRED /
+  PRESERVE_PARENT_EVIDENCE_NO_RETRY;
+- no release FINAL/STAGING, scheduler, credential, provider, Paper-v2, wake,
+  broker or live capability;
+- exact runner registration, fixed feature branch, source/live-remote admission,
+  authorization interlock and workflow source-batch topology.
+
+Implementation tests use monkeypatched/fake seams only. They never invoke the
+real preflight or execute and never inspect or mutate production/Y/Z scratch.
+After exact source review, select broad certification before any real AH execute.
+
+
 ## 2026-10-10 — Architecture 133-AG SOURCE ACCEPTED; real-host preflight then final FULL selected
 
 Architecture **133-AG is SOURCE ACCEPTED** on the exact reviewed implementation:

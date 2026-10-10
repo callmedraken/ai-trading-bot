@@ -135,6 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation-operator",
+    "arch133-robinhood-supervised-release-parent-provisioning",
     "arch133-robinhood-supervised-deployment-qualification",
     "arch133-robinhood-supervised-runtime-host-admission",
     "arch133-robinhood-supervised-maintenance-rebind",
@@ -8253,7 +8254,7 @@ def _supervised_deployment_qualification_authority_check(
             or spec.ruff_paths != SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS
             or spec.authority_check
             is not _supervised_deployment_qualification_authority_check
-            or ACTIVE_CI_CHECKPOINTS[1] != name
+            or ACTIVE_CI_CHECKPOINTS[2] != name
         ):
             failures.append("deployment qualification source-only registration drift")
         path = repo_root / SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE
@@ -8329,6 +8330,226 @@ def _supervised_deployment_qualification_authority_check(
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("deployment qualification source unavailable")
     return tuple(failures)
+
+
+
+SUPERVISED_RELEASE_PARENT_NAME: Final = (
+    "arch133-robinhood-supervised-release-parent-provisioning"
+)
+SUPERVISED_RELEASE_PARENT_SOURCE: Final = (
+    "src/trading_bot/supervised_release/release_parent_provisioning.py"
+)
+SUPERVISED_RELEASE_PARENT_PIN: Final = "47e178bc97c74c045b6a7c5e344b6a9634443d2c"
+SUPERVISED_RELEASE_PARENT_TESTS: Final = SUPERVISED_INSTALLATION_OPERATOR_TESTS
+SUPERVISED_RELEASE_PARENT_RUFF_PATHS: Final = (
+    *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
+    SUPERVISED_RELEASE_PARENT_SOURCE,
+)
+SUPERVISED_RELEASE_PARENT_ATTEMPT: Final = Path(
+    r"F:\AI\temp\arch133-ah-release-parent-provisioning-attempt\attempt.json"
+)
+
+
+def _supervised_release_parent_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze the AH one-directory provisioning bridge and unchanged AG chain."""
+    failures = list(_supervised_installation_operator_authority_check(repo_root))
+    try:
+        from trading_bot.supervised_release import release_parent_provisioning as operator
+
+        spec = _checkpoint_specs()[SUPERVISED_RELEASE_PARENT_NAME]
+        if (
+            spec.preflight is not _supervised_release_parent_preflight
+            or spec.execute is not _supervised_release_parent_execute
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-parent-provisioning"
+            or spec.tests != SUPERVISED_RELEASE_PARENT_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_PARENT_RUFF_PATHS
+            or spec.authority_check is not _supervised_release_parent_authority_check
+            or ACTIVE_CI_CHECKPOINTS[1] != SUPERVISED_RELEASE_PARENT_NAME
+            or SUPERVISED_RELEASE_PARENT_ATTEMPT
+            != Path(
+                r"F:\AI\temp\arch133-ah-release-parent-provisioning-attempt\attempt.json"
+            )
+        ):
+            failures.append("release parent provisioning registration drift")
+        path = repo_root / SUPERVISED_RELEASE_PARENT_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_RELEASE_PARENT_PIN:
+            failures.append("release parent provisioning reviewed source drift")
+        allowed = {
+            "__future__",
+            "ctypes",
+            "collections.abc",
+            "dataclasses",
+            "pathlib",
+            "trading_bot.arch133_acl.administrator",
+            "trading_bot.arch133_acl.read_only",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.native_write",
+            "trading_bot.supervised_release.observer",
+        }
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("release parent provisioning import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("release parent provisioning import boundary drift")
+            if isinstance(node, ast.Call):
+                call = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                if call in {
+                    "unlink",
+                    "remove",
+                    "rmtree",
+                    "rename",
+                    "replace",
+                    "install_release",
+                    "publish",
+                    "start",
+                    "enable",
+                    "credential",
+                    "provider",
+                    "activate",
+                    "rebind",
+                }:
+                    failures.append(
+                        "release parent provisioning capability boundary drift"
+                    )
+        creates = [
+            node for node in ast.walk(tree)
+            if isinstance(node, ast.Constant) and node.value == "CreateDirectoryW"
+        ]
+        if len(creates) != 1:
+            failures.append("release parent create surface drift")
+        if (
+            operator.WORKTREE
+            != Path(
+                r"F:\AI\worktrees\ai-trading-bot-supervised-release-parent-provisioning"
+            )
+            or operator.BRANCH
+            != "feature/robinhood-supervised-release-parent-provisioning"
+            or operator.BASE_HEAD != "e462a4f666ae2b28dd0d9c0459f4efce154c3470"
+            or operator.ORIGIN != "https://github.com/callmedraken/ai-trading-bot.git"
+        ):
+            failures.append("release parent fixed source admission drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("release parent provisioning source unavailable")
+    return tuple(failures)
+
+
+def _supervised_release_parent_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import release_parent_provisioning as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.BASE_HEAD, "HEAD")
+        != operator.BASE_HEAD
+        or _supervised_release_parent_authority_check(repo_root)
+    ):
+        raise RuntimeError("release parent source authority rejected")
+
+
+def _supervised_release_parent_latch_consumed() -> bool:
+    for path in reversed(
+        (SUPERVISED_RELEASE_PARENT_ATTEMPT, *SUPERVISED_RELEASE_PARENT_ATTEMPT.parents)
+    ):
+        try:
+            facts = path.lstat()
+        except FileNotFoundError:
+            return False
+        if (
+            stat.S_ISLNK(facts.st_mode)
+            or getattr(facts, "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            or (
+                path != SUPERVISED_RELEASE_PARENT_ATTEMPT
+                and not stat.S_ISDIR(facts.st_mode)
+            )
+        ):
+            raise RuntimeError("release parent attempt namespace rejected")
+    return True
+
+
+def _consume_supervised_release_parent_attempt() -> None:
+    from trading_bot.supervised_release import release_parent_provisioning as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_release_parent_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("release parent live remote authority rejected")
+    if _supervised_release_parent_latch_consumed():
+        raise FileExistsError("release parent provisioning attempt consumed")
+    SUPERVISED_RELEASE_PARENT_ATTEMPT.parent.mkdir(parents=True, exist_ok=True)
+    if _supervised_release_parent_latch_consumed():
+        raise FileExistsError("release parent provisioning attempt consumed")
+    with SUPERVISED_RELEASE_PARENT_ATTEMPT.open("x", encoding="utf-8") as handle:
+        handle.write(
+            '{"schema":"arch133-ah-release-parent-attempt/v1",'
+            '"status":"CONSUMED","automatic_retry":"NOT_AUTHORIZED"}\n'
+        )
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _supervised_release_parent_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import release_parent_provisioning as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_release_parent_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("release parent live remote authority rejected")
+    result = operator._preflight()
+    if (
+        _supervised_release_parent_latch_consumed()
+        and result.get("primary", {}).get("status")
+        != "ALREADY_PROVISIONED_VERIFIED"
+    ):
+        return {
+            "status": "BLOCKED",
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "automatic_retry": "NOT_AUTHORIZED",
+            "primary": {
+                "status": "INDETERMINATE",
+                "disposition": "PRESERVE_PARENT_EVIDENCE_NO_RETRY",
+                "reason": "CONSUMED_ATTEMPT",
+            },
+        }
+    return result
+
+
+def _supervised_release_parent_execute() -> dict[str, object]:
+    from trading_bot.supervised_release import release_parent_provisioning as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_release_parent_admission(_REPOSITORY_ROOT, state)
+    if (
+        _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]
+        or os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE
+    ):
+        raise RuntimeError("release parent authorization interlock rejected")
+    if _supervised_release_parent_latch_consumed():
+        return {
+            "status": "INDETERMINATE",
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "automatic_retry": "NOT_AUTHORIZED",
+            "primary": {
+                "status": "INDETERMINATE",
+                "disposition": "PRESERVE_PARENT_EVIDENCE_NO_RETRY",
+                "reason": "CONSUMED_ATTEMPT",
+            },
+        }
+    return operator._execute_once(_consume_supervised_release_parent_attempt)
 
 
 SUPERVISED_INSTALLATION_OPERATOR_NAME: Final = (
@@ -9437,6 +9658,20 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             preflight=_supervised_installation_preflight,
             execute=_supervised_installation_execute,
             remote_branch="feature/robinhood-supervised-release-installation-operator",
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-parent-provisioning": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-parent-provisioning",
+            description=(
+                "133-AH one-shot fixed releases-parent provisioning; "
+                "protected execution requires fresh authorization"
+            ),
+            tests=SUPERVISED_RELEASE_PARENT_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_PARENT_RUFF_PATHS,
+            authority_check=_supervised_release_parent_authority_check,
+            preflight=_supervised_release_parent_preflight,
+            execute=_supervised_release_parent_execute,
+            remote_branch="feature/robinhood-supervised-release-parent-provisioning",
             remote_head_env=None,
         ),
         "arch133-robinhood-supervised-deployment-qualification": CheckpointSpec(

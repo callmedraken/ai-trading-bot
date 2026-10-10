@@ -8621,7 +8621,7 @@ SUPERVISED_RELEASE_PARENT_NAME: Final = (
 SUPERVISED_RELEASE_PARENT_SOURCE: Final = (
     "src/trading_bot/supervised_release/release_parent_provisioning.py"
 )
-SUPERVISED_RELEASE_PARENT_PIN: Final = "9c518346a6777fc00a766076b7995d1795e34c41"
+SUPERVISED_RELEASE_PARENT_PIN: Final = "ea08070847ed222e39f990ee01eee07725a06896"
 SUPERVISED_RELEASE_PARENT_TESTS: Final = SUPERVISED_INSTALLATION_OPERATOR_TESTS
 SUPERVISED_RELEASE_PARENT_RUFF_PATHS: Final = (
     *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
@@ -8805,7 +8805,7 @@ def _supervised_release_parent_preflight() -> dict[str, object]:
             "automatic_retry": "NOT_AUTHORIZED",
             "primary": {
                 "status": "INDETERMINATE",
-                "disposition": "PRESERVE_PARENT_EVIDENCE_NO_RETRY",
+                "disposition": "PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY",
                 "reason": "CONSUMED_ATTEMPT",
             },
         }
@@ -8829,7 +8829,7 @@ def _supervised_release_parent_execute() -> dict[str, object]:
             "automatic_retry": "NOT_AUTHORIZED",
             "primary": {
                 "status": "INDETERMINATE",
-                "disposition": "PRESERVE_PARENT_EVIDENCE_NO_RETRY",
+                "disposition": "PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY",
                 "reason": "CONSUMED_ATTEMPT",
             },
         }

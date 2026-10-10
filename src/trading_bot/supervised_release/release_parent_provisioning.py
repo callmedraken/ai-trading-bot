@@ -41,6 +41,10 @@ AUTH_ENV = "AI_TRADING_BOT_ARCH133_AH_PARENT_AUTHORIZATION"
 AUTH_VALUE = "ARCH133_AH_ONE_RELEASE_PARENT_PROVISION_AUTHORIZED"
 # Valid UUID5-shaped lexical probe only. It is never created or selected.
 PROBE_RELEASE_ID = "release-00000000000050008000000000000000"
+CONTAINER_ACES = (
+    (ADMINISTRATORS_SID, 0x1F01FF, 0, 0),
+    (SYSTEM_SID, 0x1F01FF, 0, 0),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,11 +97,10 @@ def _observe_once(session: WindowsReadSession) -> ParentReadiness:
         volume=volume.identity[0],
         image_policy=False,
     )
-    if container.owner != ADMINISTRATORS_SID or any(
-        kind != 0
-        or flags & ~0x13
-        or (sid not in {ADMINISTRATORS_SID, SYSTEM_SID} and mask & ~0x1200A9)
-        for sid, mask, kind, flags in container.aces
+    if (
+        container.owner != ADMINISTRATORS_SID
+        or container.protected is not True
+        or container.aces != CONTAINER_ACES
     ):
         raise ValueError("release container security rejected")
 
@@ -126,13 +129,21 @@ def _readiness() -> ParentReadiness:
 
 
 def _primary(
-    status: str, readiness: ParentReadiness | None = None
+    status: str,
+    readiness: ParentReadiness | None = None,
+    *,
+    disposition: str | None = None,
 ) -> dict[str, object]:
     result: dict[str, object] = {
         "status": status,
         "release_parent": RELEASES_BASE,
     }
+    if disposition is not None:
+        result["disposition"] = disposition
     if readiness is not None:
+        result["target_state"] = (
+            "EXACT_PARENT_PRESENT" if readiness.exists else "ABSENT"
+        )
         result["container_identity"] = readiness.container_identity
         if readiness.parent_identity is not None:
             result["parent_identity"] = readiness.parent_identity
@@ -160,7 +171,9 @@ def _preflight() -> dict[str, object]:
             "status": "BLOCKED",
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
-            "primary": _primary("BLOCKED"),
+            "primary": _primary(
+                "BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"
+            ),
         }
 
 
@@ -185,7 +198,9 @@ def _execute_once(consume_attempt: Callable[[], None]) -> dict[str, object]:
             "status": "BLOCKED",
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
-            "primary": _primary("BLOCKED"),
+            "primary": _primary(
+                "BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"
+            ),
         }
 
     if before.exists:
@@ -203,7 +218,11 @@ def _execute_once(consume_attempt: Callable[[], None]) -> dict[str, object]:
             "status": "BLOCKED",
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
-            "primary": _primary("BLOCKED", before),
+            "primary": _primary(
+                "BLOCKED",
+                before,
+                disposition="NO_PARENT_PROVISIONING_EFFECT",
+            ),
         }
 
     try:
@@ -224,6 +243,6 @@ def _execute_once(consume_attempt: Callable[[], None]) -> dict[str, object]:
             "automatic_retry": "NOT_AUTHORIZED",
             "primary": {
                 **_primary("INDETERMINATE"),
-                "disposition": "PRESERVE_PARENT_EVIDENCE_NO_RETRY",
+                "disposition": "PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY",
             },
         }

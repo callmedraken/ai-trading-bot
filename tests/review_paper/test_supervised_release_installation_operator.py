@@ -711,9 +711,9 @@ for name in sys.modules:
 
 def test_ah_preflight_ready_or_existing(monkeypatch):
     monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
-    for exists, expected in (
-        (False, "READY_TO_PROVISION"),
-        (True, "ALREADY_PROVISIONED_VERIFIED"),
+    for exists, expected, target_state in (
+        (False, "READY_TO_PROVISION", "ABSENT"),
+        (True, "ALREADY_PROVISIONED_VERIFIED", "EXACT_PARENT_PRESENT"),
     ):
         readiness = parent_subject.ParentReadiness(
             exists,
@@ -724,7 +724,28 @@ def test_ah_preflight_ready_or_existing(monkeypatch):
         result = parent_subject._preflight()
         assert result["status"] == "PASS"
         assert result["primary"]["status"] == expected
+        assert result["primary"]["target_state"] == target_state
         assert result["effect_disposition"] == "NOT_STARTED"
+
+
+def test_ah_precreate_failure_has_exact_no_effect_disposition(monkeypatch):
+    monkeypatch.setattr(parent_subject, "_administrator_host", lambda: None)
+    monkeypatch.setattr(
+        parent_subject,
+        "_readiness",
+        lambda: parent_subject.ParentReadiness(False, (7, 11), None),
+    )
+
+    def reject():
+        raise RuntimeError("private detail")
+
+    result = parent_subject._execute_once(reject)
+
+    assert result["status"] == "BLOCKED"
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert result["primary"]["disposition"] == "NO_PARENT_PROVISIONING_EFFECT"
+    assert result["primary"]["target_state"] == "ABSENT"
+    assert "private" not in repr(result)
 
 
 def test_ah_execute_consumes_once_before_single_create(monkeypatch):
@@ -800,7 +821,10 @@ def test_ah_possible_effect_is_indeterminate_without_retry(monkeypatch, mode):
 
     assert result["status"] == "INDETERMINATE"
     assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
-    assert result["primary"]["disposition"] == "PRESERVE_PARENT_EVIDENCE_NO_RETRY"
+    assert (
+        result["primary"]["disposition"]
+        == "PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY"
+    )
     assert events == ["consume", "create"]
     assert "private" not in repr(result)
 
@@ -855,11 +879,21 @@ def test_ah_runner_consumed_latch_blocks_new_effect(monkeypatch):
     result = runner._supervised_release_parent_execute()
     assert result["status"] == "INDETERMINATE"
     assert result["primary"]["reason"] == "CONSUMED_ATTEMPT"
+    assert (
+        result["primary"]["disposition"]
+        == "PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY"
+    )
 
 
 def test_ah_observer_absent_exact_and_malformed_parent_policy():
     release = accepted()
     native = FakeNative(release)
+    container_path = r"F:\AITradingBot"
+    native.nodes[container_path] = replace(
+        native.nodes[container_path],
+        aces=parent_subject.CONTAINER_ACES,
+    )
+    exact_container = native.nodes[container_path]
     native.nodes.pop(RELEASES_BASE)
 
     absent = parent_subject._observe_once(native)
@@ -870,6 +904,22 @@ def test_ah_observer_absent_exact_and_malformed_parent_policy():
     exact = parent_subject._observe_once(native)
     assert exact.exists is True
     assert exact.parent_identity == native.nodes[RELEASES_BASE].identity
+
+    for malformed_container in (
+        replace(exact_container, protected=False),
+        replace(
+            exact_container,
+            aces=tuple(reversed(parent_subject.CONTAINER_ACES)),
+        ),
+        replace(
+            exact_container,
+            aces=(*parent_subject.CONTAINER_ACES, IMAGE_ACES[2]),
+        ),
+    ):
+        native.nodes[container_path] = malformed_container
+        with pytest.raises(ValueError, match="release container security rejected"):
+            parent_subject._observe_once(native)
+    native.nodes[container_path] = exact_container
 
     native.nodes[RELEASES_BASE] = replace(
         native.nodes[RELEASES_BASE],

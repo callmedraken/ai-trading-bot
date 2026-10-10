@@ -882,7 +882,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3601,7 +3601,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3699,7 +3699,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3797,7 +3797,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -3901,7 +3901,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -4000,7 +4000,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4115,7 +4115,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4225,7 +4225,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4323,7 +4323,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4425,7 +4425,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4524,7 +4524,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4623,7 +4623,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4719,7 +4719,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4815,7 +4815,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -4913,7 +4913,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5013,7 +5013,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5121,7 +5121,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
+            != "3ace750ce21662c48dedbed1591d30386ea8fed943af183b97c11e71e2a6be19"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(

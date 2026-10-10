@@ -111,7 +111,10 @@ def _checkout(checkout: Path) -> Path:
         ".." in windows.parts
         or windows.drive.upper() in {"Y:", "Z:"}
         or any(part.casefold() == "aitradingbot" for part in windows.parts)
-        or any(_within_windows_root(windows, protected) for protected in _PRESERVED_SCRATCH_ROOTS)
+        or any(
+            _within_windows_root(windows, protected)
+            for protected in _PRESERVED_SCRATCH_ROOTS
+        )
     ):
         raise ValueError("production and preserved-scratch namespaces forbidden")
     # Check ancestors before resolving or invoking Git; never traverse links.

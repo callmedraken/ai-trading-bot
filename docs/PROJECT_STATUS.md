@@ -1,5 +1,81 @@
 # Project Status and Roadmap
 
+## 2026-10-10 — Source-gate iteration latency tooling SOURCE ACCEPTED; full fallback certified
+
+The dedicated source-gate latency/tooling checkpoint is **SOURCE ACCEPTED** on the
+exact reviewed executable/test source below. It is based directly on the accepted
+Architecture 133-AH source boundary and changes only CI/source-gate orchestration,
+runner behavior, and its tests.
+
+~~~text
+BRANCH  feature/test-suite-source-gate-iteration-latency
+BASE    f3f87614413aad00d05dd5230590a37276f1a0e9
+HEAD    6f4e35be6598347a73f0cb8a36e865fb20042e18
+TREE    4bd809c0cb4950f3857a13a05f367dc356169cea
+CI      Checkpoint Source Gates #428 / 38093869755 SUCCESS
+~~~
+
+Run #428 exercised the deliberately fail-closed **FULL fallback** because the
+tooling branch is not itself a registered checkpoint branch. Cheap/static checks
+and all 57 active checkpoint authorities completed before pytest; the 67 test
+paths were then partitioned into four deterministic duration-balanced shards:
+
+| Lane | Test paths | Cases | Passed | Skipped | Pytest elapsed |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| shard 0 | 12 | 1,537 | 1,537 | 0 | 76.96 s |
+| shard 1 | 18 | 1,866 | 1,865 | 1 | 54.79 s |
+| shard 2 | 19 | 1,858 | 1,858 | 0 | 85.46 s |
+| shard 3 | 18 | 2,455 | 2,455 | 0 | 82.00 s |
+| **Total** | **67** | **7,716** | **7,715** | **1** | **all shards PASS** |
+
+The static lane also passed whole selected-source Ruff/check-format and
+`git diff --check` across 217 Ruff paths, with all 57 checkpoint authority
+checks green. The complete workflow took about **3:24 wall clock**, down from
+about **7:05** for source gate #422 on the pre-tooling topology: a **221-second /
+52% wall-clock reduction** even on the intentionally broad fallback path.
+
+The accepted source-gate behavior is:
+
+- on a push, exactly one registered `CheckpointSpec.remote_branch` match selects
+  that active checkpoint's inherited tests/Ruff paths/authority; zero, multiple,
+  inactive or otherwise ambiguous matches fail broad to the complete active batch;
+- pull requests and unregistered tooling/integration branches use the complete
+  active batch;
+- `git diff --check`, Ruff lint, Ruff format and authority run before expensive
+  pytest, and a static/authority failure suppresses pytest rather than failing
+  late;
+- the complete fallback retains all 57 active checkpoint authorities and all 67
+  deduplicated test paths, but pytest is split into four deterministic
+  duration-balanced shards so failed shards are independently rerunnable;
+- same-branch superseded runs are cancelled through GitHub Actions concurrency;
+- the stable aggregate job remains named `source-gates`, preserving one final
+  required-check surface while the static and pytest work is independently
+  observable;
+- source-gate phase/shard control variables are stripped from pytest child
+  environments so runner self-tests cannot accidentally inherit the outer shard;
+- the workflow retains the historical checkpoint-list text shape required by
+  frozen authority-drift tests while keeping the active list single-sourced.
+
+Runs #424–#427 were correction-loop evidence for the new fail-fast topology:
+static lint/format defects stopped before pytest, and later sharded failures were
+isolated to the affected shard. Run #428 is the terminal green certification for
+the accepted source.
+
+No production/provider, installation, scheduler, credential, paper, wake,
+broker, or live-trading effect occurred. The failed direct local invocation of
+`./ops.ps1` / `.\\ops.ps1` was an execution-policy host-shell failure; the
+133-AH real-host preflight did not start and its protected attempt latch remains
+untouched.
+
+This tooling branch has **not** been merged or fast-forwarded into
+`feature/robinhood-supervised-release-parent-provisioning`. Repository
+integration is the next explicit approval boundary. After an approved
+tree-preserving integration, the AH branch push should exercise the new
+branch-resolved fast path. Only after that terminal-green source gate should the
+real-host AH read-only preflight resume, using an execution-policy-bypassing
+launcher rather than direct script invocation.
+
+
 ## 2026-10-10 — Architecture 133-AG SOURCE ACCEPTED; real-host preflight then final FULL selected
 
 Architecture **133-AG is SOURCE ACCEPTED** on the exact reviewed implementation:

@@ -391,8 +391,8 @@ def test_source_registration_inventory_and_pins():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-maintenance-rebind"
-    assert runner.ACTIVE_CI_CHECKPOINTS[3] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 56
+    assert runner.ACTIVE_CI_CHECKPOINTS[4] == NAME
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     assert spec.authority_check(ROOT) == ()
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert runner._batch_workflow_is_reviewed(workflow)

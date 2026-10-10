@@ -125,7 +125,9 @@ def _readiness() -> ParentReadiness:
         session.close()
 
 
-def _primary(status: str, readiness: ParentReadiness | None = None) -> dict[str, object]:
+def _primary(
+    status: str, readiness: ParentReadiness | None = None
+) -> dict[str, object]:
     result: dict[str, object] = {
         "status": status,
         "release_parent": RELEASES_BASE,

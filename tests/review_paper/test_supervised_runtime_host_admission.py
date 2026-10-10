@@ -531,8 +531,8 @@ def test_source_registration_profiles_and_authority():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-runtime-host-admission"
-    assert runner.ACTIVE_CI_CHECKPOINTS[2] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 56
+    assert runner.ACTIVE_CI_CHECKPOINTS[3] == NAME
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     assert spec.authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
     profiles = {

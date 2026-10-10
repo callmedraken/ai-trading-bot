@@ -8637,7 +8637,9 @@ def _supervised_release_parent_authority_check(repo_root: Path) -> tuple[str, ..
     """Freeze the AH one-directory provisioning bridge and unchanged AG chain."""
     failures = list(_supervised_installation_operator_authority_check(repo_root))
     try:
-        from trading_bot.supervised_release import release_parent_provisioning as operator
+        from trading_bot.supervised_release import (
+            release_parent_provisioning as operator,
+        )
 
         spec = _checkpoint_specs()[SUPERVISED_RELEASE_PARENT_NAME]
         if (

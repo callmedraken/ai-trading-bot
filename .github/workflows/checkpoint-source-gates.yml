@@ -10,14 +10,83 @@ on:
       - "feature/robinhood-*"
       - "feature/test-suite-*"
   pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
+env:
+  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
+    arch133-robinhood-supervised-release-installation-operator
+    arch133-robinhood-supervised-release-parent-provisioning
+    arch133-robinhood-supervised-deployment-qualification
+    arch133-robinhood-supervised-runtime-host-admission
+    arch133-robinhood-supervised-maintenance-rebind
+    arch133-robinhood-supervised-release-installation
+    arch133-robinhood-supervised-release-build-verification
+    arch133-robinhood-supervised-release-foundation
+    arch131-robinhood-review-paper
+    arch131-robinhood-mcp-schema
+    arch131-robinhood-paper-cycle
+    arch131-robinhood-performance
+    arch131-robinhood-direct-mcp
+    arch131-robinhood-oauth-windows
+    arch131-robinhood-agentic-account
+    arch131-robinhood-paper-operator
+    arch131-robinhood-paper-intent-bridge
+    arch131-robinhood-deterministic-paper-pipeline
+    arch131-robinhood-virtual-risk-context
+    arch131-robinhood-forward-paper-cycle
+    arch131-robinhood-live-qualification-verifier
+    arch131-robinhood-session-admission
+    arch131-robinhood-risk-price-snapshot
+    arch131-robinhood-forward-paper-preview
+    arch131-robinhood-risk-price-acquisition
+    arch131-robinhood-supervised-forward-paper
+    arch131-robinhood-supervised-prepare-qualification
+    arch131-robinhood-supervised-prepare-verifier
+    arch131-nyse-published-regular-session-authority
+    arch131-robinhood-published-session-prepare
+    arch131-robinhood-published-prepare-operator
+    arch131-robinhood-supervised-qualification
+    arch133-robinhood-unattended-activation-core
+    arch133-robinhood-unattended-state-store
+    arch133-robinhood-unattended-one-wake-composition
+    arch133-robinhood-unattended-review-paper-execution
+    arch133-robinhood-unattended-host-scheduler-surface
+    arch133-robinhood-unattended-host-bootstrap
+    arch133-robinhood-unattended-host-publication
+    arch133-robinhood-scratch-root-acl-qualification
+    arch133-robinhood-retained-root-diagnostic
+    arch133-robinhood-retained-root-acl-recovery
+    arch133-robinhood-post-publication-verifier
+    arch133-robinhood-post-publication-stage-diagnostic
+    arch133-robinhood-publication-state-paper-diagnostic
+    arch133-robinhood-publication-state-paper-corrected
+    arch133-robinhood-single-session-scheduler-installation
+    arch133-robinhood-fresh-activation-reprovision
+    arch133-robinhood-reprovision-admission-diagnostic
+    arch133-robinhood-reprovision-parent-security-diagnostic
+    arch133-robinhood-reprovision-parent-policy-diagnostic
+    arch133-robinhood-fresh-activation-reprovision-corrected
+    arch133-robinhood-reprovision-indeterminate-reconciliation
+    arch133-robinhood-reprovision-sealed-predecessor-recovery
+    arch133-robinhood-reprovision-recovery-reconciliation
+    arch133-robinhood-windows-rename-qualification
+    arch133-robinhood-closed-descendant-rename-qualification
+
 jobs:
-  source-gates:
+  source-static:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.changes.outputs.mode }}
+      route: ${{ steps.route.outputs.route }}
+      checkpoint: ${{ steps.route.outputs.checkpoint }}
 
     steps:
       - name: Check out repository
@@ -37,6 +106,27 @@ jobs:
         shell: powershell
         run: |
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 classify-ci
+          exit $LASTEXITCODE
+
+      - name: Resolve source gate route
+        id: route
+        shell: powershell
+        run: |
+          $Code = @'
+          import os
+          from scripts import checkpoint_runner as runner
+
+          checkpoint = runner.resolve_ci_checkpoint(
+              runner._checkpoint_specs(),
+              os.environ.get("GITHUB_REF_NAME", ""),
+              os.environ.get("GITHUB_EVENT_NAME", ""),
+          )
+          route = "ACTIVE" if checkpoint is not None else "FULL"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"route={route}\n")
+              handle.write(f"checkpoint={checkpoint or ''}\n")
+          '@
+          $Code | python -B -
           exit $LASTEXITCODE
 
       - name: Validate docs-only range
@@ -63,78 +153,80 @@ jobs:
         run: |
           powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
 
-      - name: Verify batch source checkpoints
-        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+      - name: Verify active checkpoint static authority
+        if: steps.changes.outputs.mode != 'DOCS_ONLY' && steps.route.outputs.route == 'ACTIVE'
         env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: static
           AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
         shell: powershell
         run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify-batch `
-              arch133-robinhood-supervised-release-installation-operator `
-              arch133-robinhood-supervised-release-parent-provisioning `
-              arch133-robinhood-supervised-deployment-qualification `
-              arch133-robinhood-supervised-runtime-host-admission `
-              arch133-robinhood-supervised-maintenance-rebind `
-              arch133-robinhood-supervised-release-installation `
-              arch133-robinhood-supervised-release-build-verification `
-              arch133-robinhood-supervised-release-foundation `
-              arch131-robinhood-review-paper `
-              arch131-robinhood-mcp-schema `
-              arch131-robinhood-paper-cycle `
-              arch131-robinhood-performance `
-              arch131-robinhood-direct-mcp `
-              arch131-robinhood-oauth-windows `
-              arch131-robinhood-agentic-account `
-              arch131-robinhood-paper-operator `
-              arch131-robinhood-paper-intent-bridge `
-              arch131-robinhood-deterministic-paper-pipeline `
-              arch131-robinhood-virtual-risk-context `
-              arch131-robinhood-forward-paper-cycle `
-              arch131-robinhood-live-qualification-verifier `
-              arch131-robinhood-session-admission `
-              arch131-robinhood-risk-price-snapshot `
-              arch131-robinhood-forward-paper-preview `
-              arch131-robinhood-risk-price-acquisition `
-              arch131-robinhood-supervised-forward-paper `
-              arch131-robinhood-supervised-prepare-qualification `
-              arch131-robinhood-supervised-prepare-verifier `
-              arch131-nyse-published-regular-session-authority `
-              arch131-robinhood-published-session-prepare `
-              arch131-robinhood-published-prepare-operator `
-              arch131-robinhood-supervised-qualification `
-              arch133-robinhood-unattended-activation-core `
-              arch133-robinhood-unattended-state-store `
-              arch133-robinhood-unattended-one-wake-composition `
-              arch133-robinhood-unattended-review-paper-execution `
-              arch133-robinhood-unattended-host-scheduler-surface `
-              arch133-robinhood-unattended-host-bootstrap `
-              arch133-robinhood-unattended-host-publication `
-              arch133-robinhood-scratch-root-acl-qualification `
-              arch133-robinhood-retained-root-diagnostic `
-              arch133-robinhood-retained-root-acl-recovery `
-              arch133-robinhood-post-publication-verifier `
-              arch133-robinhood-post-publication-stage-diagnostic `
-              arch133-robinhood-publication-state-paper-diagnostic `
-              arch133-robinhood-publication-state-paper-corrected `
-              arch133-robinhood-single-session-scheduler-installation `
-              arch133-robinhood-fresh-activation-reprovision `
-              arch133-robinhood-reprovision-admission-diagnostic `
-              arch133-robinhood-reprovision-parent-security-diagnostic `
-              arch133-robinhood-reprovision-parent-policy-diagnostic `
-              arch133-robinhood-fresh-activation-reprovision-corrected `
-              arch133-robinhood-reprovision-indeterminate-reconciliation `
-              arch133-robinhood-reprovision-sealed-predecessor-recovery `
-              arch133-robinhood-reprovision-recovery-reconciliation `
-              arch133-robinhood-windows-rename-qualification `
-              arch133-robinhood-closed-descendant-rename-qualification
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify "${{ steps.route.outputs.checkpoint }}"
           exit $LASTEXITCODE
 
-      - name: Upload checkpoint evidence
+      - name: Verify full batch static authority
+        if: steps.changes.outputs.mode != 'DOCS_ONLY' && steps.route.outputs.route == 'FULL'
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: static
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          $Checkpoints = @(
+            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\s+' |
+              Where-Object { $_ }
+          )
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-batch @Checkpoints
+          exit $LASTEXITCODE
+
+      - name: Upload source-static evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkpoint-source-gate-evidence
+          name: checkpoint-source-gate-static
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+          if-no-files-found: ignore
+
+  active-tests:
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.route == 'ACTIVE'
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Verify active checkpoint tests
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify "${{ needs.source-static.outputs.checkpoint }}"
+          exit $LASTEXITCODE
+
+      - name: Upload active test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-active-tests
           path: |
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest-results.xml
@@ -142,3 +234,90 @@ jobs:
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
             !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
           if-no-files-found: ignore
+
+  full-tests:
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.route == 'FULL'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Verify full batch test shard
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests
+          AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX: ${{ matrix.shard }}
+          AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT: 4
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          $Checkpoints = @(
+            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\s+' |
+              Where-Object { $_ }
+          )
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-batch @Checkpoints
+          exit $LASTEXITCODE
+
+      - name: Upload full test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-full-tests-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest-results.xml
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+            !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
+          if-no-files-found: ignore
+
+  source-gates:
+    needs: [source-static, active-tests, full-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Require source gate success
+        shell: bash
+        env:
+          STATIC_RESULT: ${{ needs.source-static.result }}
+          ACTIVE_RESULT: ${{ needs.active-tests.result }}
+          FULL_RESULT: ${{ needs.full-tests.result }}
+          MODE: ${{ needs.source-static.outputs.mode }}
+          ROUTE: ${{ needs.source-static.outputs.route }}
+        run: |
+          set -euo pipefail
+          test "$STATIC_RESULT" = "success"
+
+          if [ "$MODE" = "DOCS_ONLY" ]; then
+            test "$ACTIVE_RESULT" = "skipped"
+            test "$FULL_RESULT" = "skipped"
+          elif [ "$ROUTE" = "ACTIVE" ]; then
+            test "$ACTIVE_RESULT" = "success"
+            test "$FULL_RESULT" = "skipped"
+          else
+            test "$ACTIVE_RESULT" = "skipped"
+            test "$FULL_RESULT" = "success"
+          fi

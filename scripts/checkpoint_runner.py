@@ -194,23 +194,127 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 )
 
 
+CI_TEST_DURATION_WEIGHTS: Final = {
+    # Frozen from successful source gate #422 (2026-10-10); unknown tests use 1s.
+    "tests/execution/test_execution_models.py": 0.002,
+    "tests/execution/test_order_engine.py": 0.019,
+    "tests/ledger/test_ledger.py": 0.004,
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": 12.464,
+    "tests/review_paper/test_arch133_fresh_activation_reprovision.py": 7.501,
+    "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py": 8.189,
+    "tests/review_paper/test_arch133_parent_policy_diagnostic.py": 1.474,
+    "tests/review_paper/test_arch133_parent_security_diagnostic.py": 1.054,
+    "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py": 0.295,
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": 6.222,
+    "tests/review_paper/test_arch133_reprovision_recovery.py": 9.650,
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": 6.140,
+    "tests/review_paper/test_arch133_scheduler_installation.py": 25.803,
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": 10.021,
+    "tests/review_paper/test_forward_preview.py": 0.405,
+    "tests/review_paper/test_intent_bridge.py": 0.034,
+    "tests/review_paper/test_nyse_published_regular_sessions.py": 0.065,
+    "tests/review_paper/test_performance.py": 0.106,
+    "tests/review_paper/test_post_publication_stage_diagnostic.py": 2.494,
+    "tests/review_paper/test_post_publication_verifier.py": 1.479,
+    "tests/review_paper/test_prepare_qualification.py": 0.356,
+    "tests/review_paper/test_publication_state_paper_corrected.py": 2.944,
+    "tests/review_paper/test_publication_state_paper_diagnostic.py": 2.726,
+    "tests/review_paper/test_published_session_prepare.py": 0.265,
+    "tests/review_paper/test_retained_root_acl_recovery.py": 0.281,
+    "tests/review_paper/test_retained_root_diagnostic.py": 0.220,
+    "tests/review_paper/test_risk_context.py": 0.267,
+    "tests/review_paper/test_risk_price_acquisition.py": 0.209,
+    "tests/review_paper/test_risk_prices.py": 0.145,
+    "tests/review_paper/test_scratch_root_acl.py": 0.309,
+    "tests/review_paper/test_session_admission.py": 0.111,
+    "tests/review_paper/test_store.py": 0.077,
+    "tests/review_paper/test_supervised_deployment_qualification.py": 8.361,
+    "tests/review_paper/test_supervised_forward_paper.py": 0.438,
+    "tests/review_paper/test_supervised_maintenance_rebind.py": 3.949,
+    "tests/review_paper/test_supervised_release_bundle.py": 20.551,
+    "tests/review_paper/test_supervised_release_foundation.py": 0.538,
+    "tests/review_paper/test_supervised_release_installation.py": 1.782,
+    "tests/review_paper/test_supervised_release_installation_operator.py": 13.822,
+    "tests/review_paper/test_supervised_runtime_host_admission.py": 2.087,
+    "tests/review_paper/test_unattended_activation.py": 0.240,
+    "tests/review_paper/test_unattended_execution.py": 2.264,
+    "tests/review_paper/test_unattended_host.py": 1.256,
+    "tests/review_paper/test_unattended_one_wake.py": 1.923,
+    "tests/review_paper/test_unattended_publication.py": 1.204,
+    "tests/review_paper/test_unattended_state_store.py": 1.437,
+    "tests/risk/test_manager.py": 0.013,
+    "tests/risk/test_risk_models.py": 0.012,
+    "tests/robinhood_mcp/test_account_resolution.py": 0.027,
+    "tests/robinhood_mcp/test_adapter.py": 0.004,
+    "tests/robinhood_mcp/test_sdk_transport.py": 0.010,
+    "tests/robinhood_mcp/test_windows_oauth.py": 0.575,
+    "tests/runtime/checkpoint_runner/test_arch131.py": 25.801,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py": 5.962,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 34.414,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 72.117,
+    "tests/runtime/checkpoint_runner/test_ci.py": 6.567,
+    "tests/runtime/checkpoint_runner/test_core.py": 0.113,
+    "tests/scripts/certification_runner/test_profiles.py": 1.662,
+    "tests/test_robinhood_forward_paper_cycle.py": 0.173,
+    "tests/test_robinhood_live_qualification_verifier.py": 0.360,
+    "tests/test_robinhood_paper_cycle.py": 0.145,
+    "tests/test_robinhood_paper_operator.py": 0.404,
+    "tests/test_robinhood_paper_pipeline.py": 0.047,
+    "tests/test_robinhood_prepare_operator.py": 0.102,
+    "tests/test_robinhood_prepare_qualification_verifier.py": 1.121,
+    "tests/test_robinhood_supervised_qualification.py": 3.394,
+}
+SOURCE_GATE_PHASE_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_PHASE"
+SOURCE_GATE_SHARD_INDEX_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX"
+SOURCE_GATE_SHARD_COUNT_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT"
+
+
+def resolve_ci_checkpoint(
+    specs: Mapping[str, CheckpointSpec],
+    branch: str,
+    event_name: str,
+) -> str | None:
+    """Use exactly one registered active branch on push; otherwise fail broad."""
+    if event_name != "push" or type(branch) is not str or not branch:
+        return None
+    matches = [spec.name for spec in specs.values() if spec.remote_branch == branch]
+    if len(matches) != 1 or matches[0] not in ACTIVE_CI_CHECKPOINTS:
+        return None
+    return matches[0]
+
+
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable active batch command, its participants and their order,
-    # and exit propagation. Comments, duplicates and missing phases must drift.
-    invocation = (
-        "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
-        "-File .\\ops.ps1 `\n"
-        "            verify-batch `\n"
-        + "".join(
-            f"              {name}"
-            + (" `\n" if index < len(ACTIVE_CI_CHECKPOINTS) - 1 else "\n")
-            for index, name in enumerate(ACTIVE_CI_CHECKPOINTS)
-        )
-        + "          exit $LASTEXITCODE\n"
+    # Freeze fast active routing plus the complete fail-closed batch fallback.
+    checkpoint_block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(f"    {name}\n" for name in ACTIVE_CI_CHECKPOINTS)
     )
+    local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
+    needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
+    batch = "verify-batch @Checkpoints"
     return (
-        workflow.count("verify-batch") == 1
-        and workflow.count(invocation) == 1
+        workflow.count(checkpoint_block) == 1
+        and workflow.count(batch) == 2
+        and workflow.count(batch + "\n          exit $LASTEXITCODE") == 2
+        and workflow.count(local_active) == 1
+        and workflow.count(local_active + "\n          exit $LASTEXITCODE") == 1
+        and workflow.count(needs_active) == 1
+        and workflow.count(needs_active + "\n          exit $LASTEXITCODE") == 1
+        and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: static") == 2
+        and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: tests") == 2
+        and "resolve_ci_checkpoint(" in workflow
+        and "shard: [0, 1, 2, 3]" in workflow
+        and "group: ${{ github.workflow }}-${{ github.ref }}" in workflow
+        and "cancel-in-progress: true" in workflow
+        and "workflow_dispatch:" in workflow
+        and workflow.count(
+            "  source-gates:\n"
+            "    needs: [source-static, active-tests, full-tests]\n"
+            "    if: always()\n"
+        )
+        == 1
+        and workflow.count("  source-static:\n") == 1
+        and workflow.count("- name: Require source gate success") == 1
         and "verify arch" not in workflow
     )
 
@@ -10361,23 +10465,11 @@ def build_verification_steps(
     *,
     python_executable: str,
     basetemp: Path,
+    tests: Sequence[str] | None = None,
 ) -> tuple[Step, ...]:
+    test_paths = spec.tests if tests is None else tuple(tests)
     return (
-        Step(
-            "pytest",
-            (
-                python_executable,
-                "-m",
-                "pytest",
-                *spec.tests,
-                f"--basetemp={basetemp}",
-                "-p",
-                "no:cacheprovider",
-                "--durations=100",
-                "--durations-min=0.0",
-                f"--junitxml={basetemp.parent / 'pytest-results.xml'}",
-            ),
-        ),
+        Step("git_diff_check", ("git", "diff", "--check")),
         Step(
             "ruff_check",
             (
@@ -10419,7 +10511,21 @@ def build_verification_steps(
                 *spec.ruff_paths,
             ),
         ),
-        Step("git_diff_check", ("git", "diff", "--check")),
+        Step(
+            "pytest",
+            (
+                python_executable,
+                "-m",
+                "pytest",
+                *test_paths,
+                f"--basetemp={basetemp}",
+                "-p",
+                "no:cacheprovider",
+                "--durations=100",
+                "--durations-min=0.0",
+                f"--junitxml={basetemp.parent / 'pytest-results.xml'}",
+            ),
+        ),
     )
 
 
@@ -10501,6 +10607,67 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
+def _source_gate_phase() -> str:
+    phase = os.environ.get(SOURCE_GATE_PHASE_ENV, "all")
+    if phase not in {"all", "static", "tests"}:
+        raise RuntimeError("source gate phase rejected")
+    return phase
+
+
+def _source_gate_shard() -> tuple[int, int] | None:
+    raw_index = os.environ.get(SOURCE_GATE_SHARD_INDEX_ENV)
+    raw_count = os.environ.get(SOURCE_GATE_SHARD_COUNT_ENV)
+    if raw_index is None and raw_count is None:
+        return None
+    if raw_index is None or raw_count is None:
+        raise RuntimeError("source gate shard configuration incomplete")
+    try:
+        index, count = int(raw_index), int(raw_count)
+    except ValueError as exc:
+        raise RuntimeError("source gate shard configuration rejected") from exc
+    if not 1 <= count <= 16 or not 0 <= index < count:
+        raise RuntimeError("source gate shard configuration rejected")
+    return index, count
+
+
+def duration_balanced_test_shards(
+    tests: Sequence[str],
+    count: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Deterministic LPT balance using the latest accepted CI duration evidence."""
+    if not tests or len(set(tests)) != len(tests):
+        raise ValueError("test sharding requires distinct nonempty paths")
+    if type(count) is not int or not 1 <= count <= min(16, len(tests)):
+        raise ValueError("test shard count rejected")
+    positions = {path: index for index, path in enumerate(tests)}
+    loads = [0.0] * count
+    shards: list[list[str]] = [[] for _ in range(count)]
+    ordered = sorted(
+        tests,
+        key=lambda path: (-CI_TEST_DURATION_WEIGHTS.get(path, 1.0), path),
+    )
+    for path in ordered:
+        target = min(range(count), key=lambda index: (loads[index], index))
+        shards[target].append(path)
+        loads[target] += CI_TEST_DURATION_WEIGHTS.get(path, 1.0)
+    return tuple(
+        tuple(sorted(shard, key=positions.__getitem__)) for shard in shards
+    )
+
+
+def _source_gate_steps(
+    steps: Sequence[Step],
+    phase: str,
+) -> tuple[tuple[Step, ...], tuple[Step, ...]]:
+    static = tuple(step for step in steps if step.name != "pytest")
+    tests = tuple(step for step in steps if step.name == "pytest")
+    if phase == "static":
+        return static, ()
+    if phase == "tests":
+        return (), tests
+    return static, tests
+
+
 def verify_checkpoint(
     spec: CheckpointSpec,
     *,
@@ -10517,12 +10684,21 @@ def verify_checkpoint(
     command_dir = evidence_dir / "commands"
     command_dir.mkdir(parents=True, exist_ok=False)
     basetemp = evidence_dir / "pytest"
+    phase = _source_gate_phase()
+    shard = _source_gate_shard()
+    if phase != "tests" and shard is not None:
+        raise RuntimeError("test shard is valid only for tests phase")
+    selected_tests = spec.tests
+    if phase == "tests" and shard is not None:
+        selected_tests = duration_balanced_test_shards(spec.tests, shard[1])[shard[0]]
 
     steps = build_verification_steps(
         spec,
         python_executable=sys.executable,
         basetemp=basetemp,
+        tests=selected_tests,
     )
+    static_steps, test_steps = _source_gate_steps(steps, phase)
     counter = 0
 
     def execute(step: Step, diagnostic: bool) -> CommandOutcome:
@@ -10536,8 +10712,22 @@ def verify_checkpoint(
             diagnostic=diagnostic,
         )
 
-    outcomes = run_verification_steps(steps, execute)
-    authority_failures = spec.authority_check(repo_root)
+    outcomes: list[CommandOutcome] = []
+    authority_requested = phase in {"all", "static"}
+    authority_checked = False
+    authority_failures: tuple[str, ...] = ()
+    if static_steps:
+        outcomes.extend(run_verification_steps(static_steps, execute))
+    static_pass = all(
+        outcome.exit_code == 0
+        for outcome in outcomes
+        if not outcome.name.endswith("_diagnostic")
+    )
+    if authority_requested and static_pass:
+        authority_checked = True
+        authority_failures = spec.authority_check(repo_root)
+    if test_steps and (phase == "tests" or (static_pass and not authority_failures)):
+        outcomes.extend(run_verification_steps(test_steps, execute))
     state_after = _git_state(repo_root)
 
     primary = {
@@ -10545,16 +10735,22 @@ def verify_checkpoint(
         for outcome in outcomes
         if not outcome.name.endswith("_diagnostic")
     }
-    commands_pass = all(
-        primary.get(name) == 0
-        for name in ("pytest", "ruff_check", "ruff_format", "git_diff_check")
-    )
+    required = {
+        "all": ("git_diff_check", "ruff_check", "ruff_format", "pytest"),
+        "static": ("git_diff_check", "ruff_check", "ruff_format"),
+        "tests": ("pytest",),
+    }[phase]
+    commands_pass = all(primary.get(name) == 0 for name in required)
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]
         and not state_after["porcelain"]
     )
-    passed = commands_pass and not authority_failures and identity_stable
+    passed = (
+        commands_pass
+        and (not authority_checked or not authority_failures)
+        and identity_stable
+    )
 
     report = {
         "schema": SCHEMA,
@@ -10562,6 +10758,10 @@ def verify_checkpoint(
         "checkpoint": spec.name,
         "description": spec.description,
         "status": "PASS" if passed else "FAIL",
+        "phase": phase,
+        "test_shard": None if shard is None else {"index": shard[0], "count": shard[1]},
+        "executed_tests": list(selected_tests) if "pytest" in primary else [],
+        "authority_checked": authority_checked,
         "started_from": state_before,
         "finished_at": state_after,
         "identity_stable": identity_stable,
@@ -10575,14 +10775,26 @@ def verify_checkpoint(
     report_path = evidence_dir / "report.json"
     _write_json(report_path, report)
 
-    print(f"CHECKPOINT={spec.name}")
-    for name in ("pytest", "ruff_check", "ruff_format", "git_diff_check"):
+    print(f"CHECKPOINT={spec.name} PHASE={phase}")
+    for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest"):
         exit_code = primary.get(name)
-        status = "PASS" if exit_code == 0 else f"FAIL({exit_code})"
+        status = (
+            "SKIP"
+            if exit_code is None
+            else ("PASS" if exit_code == 0 else f"FAIL({exit_code})")
+        )
         print(f"{name.upper()}={status}")
     print(
         "AUTHORITY="
-        + ("PASS" if not authority_failures else f"FAIL({len(authority_failures)})")
+        + (
+            "NOT_RUN"
+            if not authority_checked
+            else (
+                "PASS"
+                if not authority_failures
+                else f"FAIL({len(authority_failures)})"
+            )
+        )
     )
     for failure in authority_failures:
         print(f"AUTHORITY_FAILURE={failure}")
@@ -10625,9 +10837,20 @@ def verify_batch(
         ruff_paths=ruff_paths,
         authority_check=lambda repo: (),
     )
+    phase = _source_gate_phase()
+    shard = _source_gate_shard()
+    if phase != "tests" and shard is not None:
+        raise RuntimeError("test shard is valid only for tests phase")
+    selected_tests = tests
+    if phase == "tests" and shard is not None:
+        selected_tests = duration_balanced_test_shards(tests, shard[1])[shard[0]]
     steps = build_verification_steps(
-        shared, python_executable=sys.executable, basetemp=evidence_dir / "pytest"
+        shared,
+        python_executable=sys.executable,
+        basetemp=evidence_dir / "pytest",
+        tests=selected_tests,
     )
+    static_steps, test_steps = _source_gate_steps(steps, phase)
     counter = 0
 
     def execute(step: Step, diagnostic: bool) -> CommandOutcome:
@@ -10641,26 +10864,50 @@ def verify_batch(
             diagnostic=diagnostic,
         )
 
-    outcomes = run_verification_steps(steps, execute)
-    authority_failures: dict[str, tuple[str, ...]] = {}
-    for spec in specs:
-        try:
-            authority_failures[spec.name] = spec.authority_check(repo_root)
-        except Exception as exc:
-            # One unavailable authority must fail closed without hiding others.
-            authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
-    state_after = _git_state(repo_root)
-    commands_pass = all(
+    outcomes: list[CommandOutcome] = []
+    authority_requested = phase in {"all", "static"}
+    authority_checked = False
+    authority_failures: dict[str, tuple[str, ...]] = {spec.name: () for spec in specs}
+    if static_steps:
+        outcomes.extend(run_verification_steps(static_steps, execute))
+    static_pass = all(
         outcome.exit_code == 0
         for outcome in outcomes
         if not outcome.name.endswith("_diagnostic")
     )
+    if authority_requested and static_pass:
+        authority_checked = True
+        for spec in specs:
+            try:
+                authority_failures[spec.name] = spec.authority_check(repo_root)
+            except Exception as exc:
+                authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
+    if test_steps and (
+        phase == "tests" or (static_pass and not any(authority_failures.values()))
+    ):
+        outcomes.extend(run_verification_steps(test_steps, execute))
+    state_after = _git_state(repo_root)
+    primary = {
+        outcome.name: outcome.exit_code
+        for outcome in outcomes
+        if not outcome.name.endswith("_diagnostic")
+    }
+    required = {
+        "all": ("git_diff_check", "ruff_check", "ruff_format", "pytest"),
+        "static": ("git_diff_check", "ruff_check", "ruff_format"),
+        "tests": ("pytest",),
+    }[phase]
+    commands_pass = all(primary.get(name) == 0 for name in required)
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]
         and not state_after["porcelain"]
     )
-    passed = commands_pass and identity_stable and not any(authority_failures.values())
+    passed = (
+        commands_pass
+        and identity_stable
+        and (not authority_checked or not any(authority_failures.values()))
+    )
     report_path = evidence_dir / "report.json"
     participants = {}
     for spec in specs:
@@ -10672,7 +10919,11 @@ def verify_batch(
             "tests_covered": all(path in tests for path in spec.tests),
             "ruff_paths_covered": all(path in ruff_paths for path in spec.ruff_paths),
             "authority_failures": list(authority_failures[spec.name]),
-            "authority_status": "FAIL" if authority_failures[spec.name] else "PASS",
+            "authority_status": (
+                "NOT_RUN"
+                if not authority_checked
+                else ("FAIL" if authority_failures[spec.name] else "PASS")
+            ),
             "source_before": state_before,
             "source_after": state_after,
             "status": "PASS"
@@ -10695,16 +10946,30 @@ def verify_batch(
         "scheduler_mutation": "NOT_RUN",
         "provider_effects": "NOT_RUN",
         "broker_live_effects": "NOT_RUN",
+        "phase": phase,
+        "test_shard": None if shard is None else {"index": shard[0], "count": shard[1]},
+        "executed_tests": list(selected_tests) if "pytest" in primary else [],
+        "authority_checked": authority_checked,
         "status": "PASS" if passed else "FAIL",
     }
     _write_json(report_path, report)
     print(
-        f"CHECKPOINTS={len(specs)} TEST_PATHS={len(tests)} RUFF_PATHS={len(ruff_paths)}"
+        f"CHECKPOINTS={len(specs)} TEST_PATHS={len(tests)} "
+        f"EXECUTED_TEST_PATHS={len(selected_tests) if 'pytest' in primary else 0} "
+        f"RUFF_PATHS={len(ruff_paths)} PHASE={phase}"
     )
-    for outcome in outcomes:
-        print(f"{outcome.name.upper()}={outcome.exit_code}")
+    for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest"):
+        exit_code = primary.get(name)
+        print(f"{name.upper()}={'SKIP' if exit_code is None else exit_code}")
     for name, failures in authority_failures.items():
-        print(f"AUTHORITY[{name}]={'FAIL' if failures else 'PASS'}")
+        print(
+            f"AUTHORITY[{name}]="
+            + (
+                "NOT_RUN"
+                if not authority_checked
+                else ("FAIL" if failures else "PASS")
+            )
+        )
         for failure in failures:
             print(f"AUTHORITY_FAILURE[{name}]={failure}")
     print(f"IDENTITY_STABLE={identity_stable}")

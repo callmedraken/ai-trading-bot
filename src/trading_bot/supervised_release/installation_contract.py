@@ -70,7 +70,19 @@ class ReleasePaths:
                 # directory names and manifest.json are not source inventory files.
                 from trading_bot.supervised_release.model import ReleaseInventoryEntry
 
-                ReleaseInventoryEntry("src/" + name + "/probe.py", "0" * 64)
+                # Preserve the foundation's one intentional runtime-source
+                # exception.  The synthetic extra "src/" used for generic
+                # lexical probing would otherwise turn
+                # src/trading_bot/runtime/... into src/src/.../runtime/... and
+                # falsely classify valid collected source as embedded runtime
+                # substrate.
+                probe = (
+                    name + "/probe.py"
+                    if name == "src/trading_bot/runtime"
+                    or name.startswith("src/trading_bot/runtime/")
+                    else "src/" + name + "/probe.py"
+                )
+                ReleaseInventoryEntry(probe, "0" * 64)
                 return path
         raise ValueError("outside fixed release namespace")
 

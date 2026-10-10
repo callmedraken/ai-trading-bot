@@ -7832,7 +7832,7 @@ SUPERVISED_RELEASE_INSTALLATION_SOURCES: Final = (
 )
 SUPERVISED_RELEASE_INSTALLATION_PINS: Final = {
     "src/trading_bot/supervised_release/installation_contract.py": (
-        "57f61b16202d23e7e36b07b376d39e011b0d9bfa"
+        "ffff404ed16c7a476a0a3ecb622b8bdfbd701ef1"
     ),
     "src/trading_bot/supervised_release/observer.py": (
         "7f3b58cd61aca874609ea21921b3e81a669205d1"

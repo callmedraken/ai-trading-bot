@@ -59,6 +59,7 @@ def accepted():
         LAUNCHER_RELATIVE_PATH: b"# inert launcher\n",
         "src/trading_bot/__init__.py": b"# inert package\n",
         "src/trading_bot/nested/model.py": b"# inert model\n",
+        "src/trading_bot/runtime/example.py": b"# inert runtime source\n",
     }
     manifest = ReleaseManifest(
         source_head="a" * 40,
@@ -662,6 +663,18 @@ def test_child_alias_attempts_rejected(environment, name):
     _, _, native = environment
     with pytest.raises(ValueError):
         native.paths.child(native.paths.final, name)
+    assert not native.events
+
+
+def test_child_admits_supported_runtime_source_subtree(environment):
+    _, _, native = environment
+    root = native.paths.final
+    assert native.paths.child(root, "src/trading_bot/runtime") == (
+        root + r"\src\trading_bot\runtime"
+    )
+    assert native.paths.child(root, "src/trading_bot/runtime/example.py") == (
+        root + r"\src\trading_bot\runtime\example.py"
+    )
     assert not native.events
 
 

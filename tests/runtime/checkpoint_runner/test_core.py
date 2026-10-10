@@ -1024,6 +1024,7 @@ def test_batch_authority_failure_attribution_and_continuation(
     assert report["authority_failures"]["first"] == []
     assert report["authority_failures"]["second"]
     assert report["authority_failures"]["third"] == []
+    assert all(command["name"] != "pytest" for command in report["commands"])
     assert report["participants"]["first"]["status"] == "PASS"
     assert report["participants"]["second"]["status"] == "FAIL"
     assert report["status"] == "FAIL"

@@ -10751,6 +10751,13 @@ def verify_checkpoint(
         "tests": ("pytest",),
     }[phase]
     commands_pass = all(primary.get(name) == 0 for name in required)
+    if (
+        phase == "all"
+        and static_pass
+        and authority_failures
+        and "pytest" not in primary
+    ):
+        commands_pass = True
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]
@@ -10906,6 +10913,13 @@ def verify_batch(
         "tests": ("pytest",),
     }[phase]
     commands_pass = all(primary.get(name) == 0 for name in required)
+    if (
+        phase == "all"
+        and static_pass
+        and any(authority_failures.values())
+        and "pytest" not in primary
+    ):
+        commands_pass = True
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]

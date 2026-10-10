@@ -389,7 +389,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
     assert runner.ACTIVE_CI_CHECKPOINTS[5] == name
-    assert workflow.count("    " + name) == 1
+    assert workflow.count(f"              {name} `\n") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None

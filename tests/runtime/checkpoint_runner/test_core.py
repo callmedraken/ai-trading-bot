@@ -1120,6 +1120,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             if name
             in {
                 "arch133-robinhood-supervised-release-installation-operator",
+                "arch133-robinhood-supervised-release-parent-provisioning",
                 "arch133-robinhood-supervised-deployment-qualification",
                 "arch133-robinhood-supervised-release-foundation",
                 "arch133-robinhood-supervised-runtime-host-admission",

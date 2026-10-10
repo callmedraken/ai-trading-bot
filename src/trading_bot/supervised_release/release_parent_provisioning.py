@@ -171,9 +171,7 @@ def _preflight() -> dict[str, object]:
             "status": "BLOCKED",
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
-            "primary": _primary(
-                "BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"
-            ),
+            "primary": _primary("BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"),
         }
 
 
@@ -198,9 +196,7 @@ def _execute_once(consume_attempt: Callable[[], None]) -> dict[str, object]:
             "status": "BLOCKED",
             "effect_disposition": "NOT_STARTED",
             "automatic_retry": "NOT_AUTHORIZED",
-            "primary": _primary(
-                "BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"
-            ),
+            "primary": _primary("BLOCKED", disposition="NO_PARENT_PROVISIONING_EFFECT"),
         }
 
     if before.exists:

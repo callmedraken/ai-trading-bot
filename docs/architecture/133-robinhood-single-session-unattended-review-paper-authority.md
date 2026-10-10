@@ -1,5 +1,50 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-09 — Architecture 133-AB implementation (source review pending)
+
+The accepted manifest v1 is unchanged. New modules keep capabilities separated:
+`supervised_release.bundle` contains immutable ReleaseFile/ReleaseBundle and
+VerifiedRelease verification; `supervised_release.binding` contains pure
+RuntimeBinding v1; `supervised_release.collector` alone reads an explicitly
+supplied development checkout and its local Git metadata.
+
+`collect_release_bundle(checkout, declaration=...)` requires the declaration's
+exact HEAD/tree and launcher digest. It reconstructs inventory instead of trusting
+the declaration's inventory completeness. Git source blobs, clean tracked/index/
+untracked state, canonical namespace, object facts and byte reads are admitted
+before and after collection. Hidden index flags and active external Git filters/
+encoding are rejected. Standard Git autocrlf checkout conversion is admitted;
+exact checkout bytes, including CRLF, are hashed. It performs no bundle installation.
+
+Frozen content is canonical manifest.json, pyproject.toml, all regular .py/.json/
+.sql source beneath src/trading_bot, and exactly the reviewed launcher. Caches are
+excluded; unsupported files, durable state and namespace drift fail closed.
+Limits are 10,000 source files, 8 MiB per file and 64 MiB aggregate image bytes.
+The canonical bundle transport is versioned JSON with base64 file bytes and
+explicit regular/non-symlink/non-reparse facts; it preserves all exact file bytes.
+
+`verify_release_bundle` requires independent expected manifest SHA-256, source
+HEAD/tree and complete sorted source paths. It checks canonical manifest bytes,
+exact namespace and ordering, every inventory byte/hash and derived manifest
+identity/digest. These pins are reviewed source authority, never values inferred
+from the untrusted image. Supplied object facts are verified declarations, not
+proof of native host ACLs or race-proof production containment.
+
+RuntimeBinding v1 derives schema, release ID, manifest/source/inventory hashes,
+Python version/hash, launcher name/hash, strategy/version/config hash,
+risk-policy/version/hash, fixed release root and fixed durable root from one
+VerifiedRelease. Canonical parsing replays every field against that verified
+release. Its SHA-256 is an artifact integrity digest, not a new domain identity.
+`dependency_closure=UNPROVEN` is mandatory; pyproject version ranges do not prove
+installed packages. Python identity is declarative until separately observed.
+No durable-state compatibility/migration is claimed and current unattended host
+identity is not wired to this record.
+
+This registration is source-only with preflight=None, execute=None and
+remote_head_env=None. No native/scheduler/provider/credential/paper/broker/live
+capability is added. Source PASS cannot authorize installed-image observation,
+installation, maintenance/trading exclusion or scheduler rebinding.
+
 ## 2026-10-09 — Supervised immutable-release foundation SOURCE ACCEPTED; Architecture 133-AB CONTRACT FROZEN
 
 The first source checkpoint under the simplified supervised-release architecture is **SOURCE ACCEPTED** after exact GitHub review.

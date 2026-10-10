@@ -133,6 +133,7 @@ RETAINED_CHECKPOINTS: Final = (
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-release-build-verification",
     "arch133-robinhood-supervised-release-foundation",
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
@@ -874,7 +875,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3593,7 +3594,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3691,7 +3692,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3789,7 +3790,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -3893,7 +3894,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -3992,7 +3993,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4107,7 +4108,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4217,7 +4218,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4315,7 +4316,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4417,7 +4418,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4516,7 +4517,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4615,7 +4616,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4711,7 +4712,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4807,7 +4808,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -4905,7 +4906,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5005,7 +5006,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5113,7 +5114,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4cf4a5a3b124b459881b741bc9f93915b4dad10fbd5d55b77a0470912f3f60ef"
+            != "3f57da83da063a465d472534a61239b8430e857c90229702c28e8d2896f4f202"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -7710,6 +7711,117 @@ def _supervised_release_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+SUPERVISED_RELEASE_BUNDLE_SOURCES: Final = (
+    "src/trading_bot/supervised_release/bundle.py",
+    "src/trading_bot/supervised_release/binding.py",
+    "src/trading_bot/supervised_release/collector.py",
+)
+SUPERVISED_RELEASE_BUNDLE_PINS: Final = {
+    "src/trading_bot/supervised_release/bundle.py": (
+        "1a3edc3186da17851106810c7f34c43c17b56b7c"
+    ),
+    "src/trading_bot/supervised_release/binding.py": (
+        "acdd2dfa17398afc822e770dd18166b747514cc1"
+    ),
+    "src/trading_bot/supervised_release/collector.py": (
+        "cafbf9d2455d9e4584a3229cd7b7fe4f575611f9"
+    ),
+}
+SUPERVISED_RELEASE_BUNDLE_TESTS: Final = (
+    *SUPERVISED_RELEASE_TESTS,
+    "tests/review_paper/test_supervised_release_bundle.py",
+)
+SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_RUFF_PATHS,
+    *SUPERVISED_RELEASE_BUNDLE_SOURCES,
+    "tests/review_paper/test_supervised_release_bundle.py",
+)
+
+
+def _supervised_release_bundle_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Read source only; never invoke the collector or a production observer."""
+    failures = list(_supervised_release_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[
+            "arch133-robinhood-supervised-release-build-verification"
+        ]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-build-verification"
+            or spec.tests != SUPERVISED_RELEASE_BUNDLE_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS
+            or spec.authority_check is not _supervised_release_bundle_authority_check
+        ):
+            failures.append("release bundle source-only registration drift")
+        pure = {
+            "__future__",
+            "base64",
+            "hashlib",
+            "json",
+            "dataclasses",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.bundle",
+        }
+        forbidden = {
+            "write_text",
+            "write_bytes",
+            "mkdir",
+            "unlink",
+            "rename",
+            "system",
+            "Popen",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+        }
+        for relative in SUPERVISED_RELEASE_BUNDLE_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_RELEASE_BUNDLE_PINS[relative]
+            ):
+                failures.append("release bundle reviewed source drift")
+            collector = relative.endswith("/collector.py")
+            allowed = pure | (
+                {"os", "stat", "subprocess", "pathlib"} if collector else set()
+            )
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("release bundle import boundary drift")
+                if isinstance(node, ast.ImportFrom) and node.module not in allowed:
+                    failures.append("release bundle import boundary drift")
+                if isinstance(node, ast.Call):
+                    name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    if name in forbidden or (
+                        not collector
+                        and name
+                        in {
+                            "open",
+                            "run",
+                            "read_bytes",
+                            "read_text",
+                            "lstat",
+                            "resolve",
+                        }
+                    ):
+                        failures.append("release bundle capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("release bundle workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("release bundle source unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -8517,6 +8629,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             authority_check=_arch133_closed_descendant_rename_qualification_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133z",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-build-verification": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-build-verification",
+            description="Architecture 133-AB source bundle and runtime binding",
+            tests=SUPERVISED_RELEASE_BUNDLE_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS,
+            authority_check=_supervised_release_bundle_authority_check,
+            remote_branch="feature/robinhood-supervised-release-build-verification",
             preflight=None,
             execute=None,
             remote_head_env=None,

@@ -1,5 +1,32 @@
 # Project Status and Roadmap
 
+## 2026-10-09 — Architecture 133-AB implemented; exact source review pending
+
+Checkpoint `arch133-robinhood-supervised-release-build-verification` on
+`feature/robinhood-supervised-release-build-verification` starts at
+`e684deac5ef3c736dff3b792c63505a2dee35096` / tree
+`96952aa00d06f7fe7fe0f4dd35b828b0e65f982f`.
+
+The read-only development collector builds a bounded in-memory image containing
+canonical manifest v1, pyproject.toml, all supported source files under
+src/trading_bot, and exactly the reviewed unattended launcher. Pure verification
+requires separately admitted manifest, HEAD/tree and complete namespace pins.
+The pure runtime binding v1 carries the requested source, Python, launcher,
+strategy/config/risk and fixed-root identities, with dependency closure explicitly
+UNPROVEN. Python identity remains declarative; no durable migration is asserted.
+
+The source-only runner registration has no preflight, execute or remote-head-env
+surface. FULL/Robinhood ownership automatically admits the new review-paper test
+module (151/78); LEGACY stays 205, EXHAUSTIVE becomes 356. Required baselines
+remain 122/49. Current production host identity and scheduler binding are unchanged.
+
+This is implementation awaiting terminal push CI and ChatGPT exact GitHub source
+review, not source acceptance or deployment authority. No real release is
+installed and no production filesystem, Y/Z scratch, scheduler, provider/OAuth,
+paper/broker/live effect is accessed. After source review, ChatGPT selects any
+appropriate certification and closes the canonical docs; the next architecture
+boundary is the separately reviewed installer/installed-image observer contract.
+
 ## 2026-10-09 — Supervised immutable-release foundation SOURCE ACCEPTED; Architecture 133-AB CONTRACT FROZEN
 
 The first source checkpoint under the simplified supervised-release architecture is **SOURCE ACCEPTED** after exact GitHub review.

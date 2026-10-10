@@ -12,6 +12,7 @@ import ast
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -133,6 +134,7 @@ RETAINED_CHECKPOINTS: Final = (
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-release-installation-operator",
     "arch133-robinhood-supervised-deployment-qualification",
     "arch133-robinhood-supervised-runtime-host-admission",
     "arch133-robinhood-supervised-maintenance-rebind",
@@ -519,10 +521,10 @@ R8_HALT_RUNNER_PINS: Final = {
         "f0a9c6388f63b1184426f6b7072213e3e7af4bb16f27435d81f98ad0566c97ef"
     ),
     "execute_checkpoint": (
-        "031c22f037b6704ca50d68fc4445330edc0e38f1cd575f85e8dd9b3d81250eda"
+        "03f3e39ae8627127bba4d0b90138a12328a8f573931001a774c333d80ef2ce14"
     ),
     "preflight_checkpoint": (
-        "686c25f4de2d3c01cbb146efc181c6ca295de766b19d8436bd427431cbc930ca"
+        "dcaeb12d9b611118d025d28e35efb0867be4a18c160d6ba6e6307c2062d0c5cb"
     ),
     "_remote_branch_head": (
         "46ea1a2afa1e52622b257c9d635bb115529ae99b1c09aa6bb18ede99a5c2d27e"
@@ -879,7 +881,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3598,7 +3600,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3696,7 +3698,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3794,7 +3796,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -3898,7 +3900,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -3997,7 +3999,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4112,7 +4114,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4222,7 +4224,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4320,7 +4322,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4422,7 +4424,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4521,7 +4523,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4620,7 +4622,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4716,7 +4718,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4812,7 +4814,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -4910,7 +4912,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5010,7 +5012,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5118,7 +5120,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "4de169d5ab45f57919dedc03cdf2ef08751e0cd98bdf017a22d27660018d2830"
+            != "45a3ba4dfcd525ac01c4f6a5b3cb59fea02ae51022a3e647f8b7a5e5c45dee6e"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -8251,7 +8253,7 @@ def _supervised_deployment_qualification_authority_check(
             or spec.ruff_paths != SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS
             or spec.authority_check
             is not _supervised_deployment_qualification_authority_check
-            or ACTIVE_CI_CHECKPOINTS[0] != name
+            or ACTIVE_CI_CHECKPOINTS[1] != name
         ):
             failures.append("deployment qualification source-only registration drift")
         path = repo_root / SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE
@@ -8327,6 +8329,289 @@ def _supervised_deployment_qualification_authority_check(
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("deployment qualification source unavailable")
     return tuple(failures)
+
+
+SUPERVISED_INSTALLATION_OPERATOR_NAME: Final = (
+    "arch133-robinhood-supervised-release-installation-operator"
+)
+SUPERVISED_INSTALLATION_OPERATOR_SOURCE: Final = (
+    "src/trading_bot/supervised_release/installation_operator.py"
+)
+SUPERVISED_INSTALLATION_OPERATOR_PIN: Final = "91d3fa845825f02b525b3f578a9f1a011c422ba6"
+SUPERVISED_INSTALLATION_REGISTRATION_PIN: Final = (
+    "d771a020f19aea6a13e39cfc78316b9037cfd8fa4d9e1c668cd732a8aebb96ce"
+)
+SUPERVISED_INSTALLATION_OPERATOR_TESTS: Final = (
+    *SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS,
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+)
+SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS: Final = (
+    *SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS,
+    SUPERVISED_INSTALLATION_OPERATOR_SOURCE,
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+)
+# This fixed external latch is independent of per-invocation evidence roots,
+# release IDs, authorization tokens and source revisions. Never remove/reset it.
+SUPERVISED_INSTALLATION_ATTEMPT: Final = Path(
+    r"F:\AI\temp\arch133-ag-installation-attempt\attempt.json"
+)
+SUPERVISED_INSTALLATION_ATTEMPT_PIN: Final = (
+    "7644631afa639683c4fa1c9f87773d631373901edd3d1db63d1950406a0b47fb"
+)
+_installation_execution_admitted = False
+_installation_execution_source: tuple[str, str] | None = None
+
+
+def _supervised_installation_operator_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Read source only; chain accepted AC/AD/AE/AF and freeze the AG bridge."""
+    failures = list(_supervised_deployment_qualification_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]
+        if (
+            spec.preflight is not _supervised_installation_preflight
+            or spec.execute is not _supervised_installation_execute
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-installation-operator"
+            or spec.tests != SUPERVISED_INSTALLATION_OPERATOR_TESTS
+            or spec.ruff_paths != SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_installation_operator_authority_check
+            or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
+        ):
+            failures.append("installation operator registration drift")
+        path = repo_root / SUPERVISED_INSTALLATION_OPERATOR_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_OPERATOR_PIN:
+            failures.append("installation operator reviewed source drift")
+        allowed = {
+            "__future__",
+            "hashlib",
+            "os",
+            "re",
+            "stat",
+            "subprocess",
+            "collections.abc",
+            "dataclasses",
+            "decimal",
+            "pathlib",
+            "trading_bot.arch133_acl.administrator",
+            "trading_bot.strategies",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.collector",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.observer",
+            "trading_bot.supervised_release.installer",
+        }
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("installation operator import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("installation operator import boundary drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(runner_tree)
+        latch_declarations = [
+            node.value
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "SUPERVISED_INSTALLATION_ATTEMPT"
+        ]
+        if (
+            len(latch_declarations) != 1
+            or hashlib.sha256(
+                ast.dump(latch_declarations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_INSTALLATION_ATTEMPT_PIN
+        ):
+            failures.append("installation attempt namespace source drift")
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                keyword.arg == "name"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value == SUPERVISED_INSTALLATION_OPERATOR_NAME
+                for keyword in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_INSTALLATION_REGISTRATION_PIN
+        ):
+            failures.append("installation operator source registration drift")
+        if set(SUPERVISED_INSTALLATION_RUNNER_PINS) != {
+            "_supervised_installation_operator_authority_check",
+            "_supervised_installation_admission",
+            "_supervised_installation_preflight",
+            "_supervised_installation_latch_consumed",
+            "_consume_supervised_installation_attempt",
+            "_supervised_installation_execute",
+            "preflight_checkpoint",
+            "execute_checkpoint",
+            "main",
+        }:
+            failures.append("installation runner pin inventory drift")
+        for name, pin in SUPERVISED_INSTALLATION_RUNNER_PINS.items():
+            if (
+                name not in functions
+                or hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("installation runner authority drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("installation operator source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_INSTALLATION_RUNNER_PINS: Final = {
+    "_supervised_installation_operator_authority_check": (
+        "d8538e6574915327f19929256da57f94a99de33109629b38132c445bf45cac5b"
+    ),
+    "_supervised_installation_admission": (
+        "decdbd5c7afbd951a005c536ad479a63e8144d3be4e47cf46ff078e4a682dc7a"
+    ),
+    "_supervised_installation_preflight": (
+        "eb7ef3df4a4344e57b36a3507bafdbbdc481f0b2dbd4857678d915fbba304e1b"
+    ),
+    "_supervised_installation_latch_consumed": (
+        "03b801f9bd4213246b06cec716a6b95e60da5f33fa7c98c90a877a5a5d5a0376"
+    ),
+    "_consume_supervised_installation_attempt": (
+        "fb58adf0e5d0c9ee78d16995abb49b1b654050099088aab00bfa050d1286358f"
+    ),
+    "_supervised_installation_execute": (
+        "c4584e649ea5a947fe26d7ebe7db41d5a47f3b7812c2b73fc8d01faac877f9ce"
+    ),
+    "preflight_checkpoint": (
+        "dcaeb12d9b611118d025d28e35efb0867be4a18c160d6ba6e6307c2062d0c5cb"
+    ),
+    "execute_checkpoint": (
+        "03f3e39ae8627127bba4d0b90138a12328a8f573931001a774c333d80ef2ce14"
+    ),
+    "main": ("7327e8425a2c6b9f65250bc004b694a6f39a4c79cd654df9425ce73df0efd810"),
+}
+
+
+def _supervised_installation_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.BASE_HEAD, "HEAD")
+        != operator.BASE_HEAD
+        or _supervised_installation_operator_authority_check(repo_root)
+    ):
+        raise RuntimeError("installation source authority rejected")
+
+
+def _supervised_installation_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("installation live remote authority rejected")
+    result = operator._preflight()
+    if (
+        _supervised_installation_latch_consumed()
+        and result.get("primary", {}).get("status") != "ALREADY_INSTALLED_VERIFIED"
+    ):
+        return {
+            "status": "BLOCKED",
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "primary": {
+                "status": "INDETERMINATE",
+                "disposition": "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY",
+                "reason": "CONSUMED_ATTEMPT",
+            },
+        }
+    return result
+
+
+def _supervised_installation_latch_consumed() -> bool:
+    for path in reversed(
+        (SUPERVISED_INSTALLATION_ATTEMPT, *SUPERVISED_INSTALLATION_ATTEMPT.parents)
+    ):
+        try:
+            facts = path.lstat()
+        except FileNotFoundError:
+            return False
+        if (
+            stat.S_ISLNK(facts.st_mode)
+            or getattr(facts, "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            or (
+                path != SUPERVISED_INSTALLATION_ATTEMPT
+                and not stat.S_ISDIR(facts.st_mode)
+            )
+        ):
+            raise RuntimeError("installation attempt namespace rejected")
+    return True
+
+
+def _consume_supervised_installation_attempt() -> None:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if not _installation_execution_admitted:
+        raise RuntimeError("installation runner admission required")
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_admission(_REPOSITORY_ROOT, state)
+    if (
+        state["head"],
+        state["tree"],
+    ) != _installation_execution_source or _remote_branch_head(
+        _REPOSITORY_ROOT, operator.BRANCH
+    ) != state["head"]:
+        raise RuntimeError("installation source changed before attempt fence")
+    # Exclusive creation is the cross-process one-attempt fence. A failed write
+    # or flush leaves the latch consumed; no cleanup or reset is permitted.
+    if _supervised_installation_latch_consumed():
+        raise FileExistsError("installation attempt consumed")
+    SUPERVISED_INSTALLATION_ATTEMPT.parent.mkdir(parents=True, exist_ok=True)
+    if _supervised_installation_latch_consumed():
+        raise FileExistsError("installation attempt consumed")
+    with SUPERVISED_INSTALLATION_ATTEMPT.open("x", encoding="utf-8") as handle:
+        handle.write(
+            '{"schema":"arch133-ag-installation-attempt/v1","status":"CONSUMED","automatic_retry":"NOT_AUTHORIZED"}\n'
+        )
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _supervised_installation_execute() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if (
+        not _installation_execution_admitted
+        or os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE
+    ):
+        raise RuntimeError("installation authorization interlock rejected")
+    return operator._execute_once(_consume_supervised_installation_attempt)
 
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
@@ -9138,6 +9423,20 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             remote_branch="feature/robinhood-unattended-review-paper-133z",
             preflight=None,
             execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-installation-operator": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-installation-operator",
+            description=(
+                "133-AG installation-only operator; "
+                "protected execution requires fresh authorization"
+            ),
+            tests=SUPERVISED_INSTALLATION_OPERATOR_TESTS,
+            ruff_paths=SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
+            authority_check=_supervised_installation_operator_authority_check,
+            preflight=_supervised_installation_preflight,
+            execute=_supervised_installation_execute,
+            remote_branch="feature/robinhood-supervised-release-installation-operator",
             remote_head_env=None,
         ),
         "arch133-robinhood-supervised-deployment-qualification": CheckpointSpec(
@@ -10230,7 +10529,7 @@ def preflight_checkpoint(
     *,
     repo_root: Path,
     evidence_root: Path,
-) -> tuple[bool, Path]:
+) -> tuple[bool, Path | None]:
     if spec.preflight is None:
         raise RuntimeError(f"checkpoint has no read-only preflight: {spec.name}")
 
@@ -10239,6 +10538,10 @@ def preflight_checkpoint(
         raise RuntimeError(
             f"preflight requires a clean worktree; found: {state_before['porcelain']}"
         )
+    if spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME:
+        _supervised_installation_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]:
+            raise RuntimeError("installation registration rejected")
 
     local_branch = str(state_before["branch"])
     remote_branch = spec.remote_branch
@@ -10263,8 +10566,11 @@ def preflight_checkpoint(
             f"remote={remote_head} branch={remote_branch}"
         )
 
-    evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
-    evidence_dir.mkdir(parents=True, exist_ok=False)
+    installation = spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME
+    evidence_dir = None
+    if not installation:
+        evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
+        evidence_dir.mkdir(parents=True, exist_ok=False)
 
     result = spec.preflight()
     state_after = _git_state(repo_root)
@@ -10294,8 +10600,11 @@ def preflight_checkpoint(
         "production_effects": "NOT_RUN",
         "protected_execution": "NOT_AUTHORIZED",
     }
-    report_path = evidence_dir / "report.json"
-    _write_json(report_path, report)
+    report_path = None if evidence_dir is None else evidence_dir / "report.json"
+    if report_path is None:
+        print("PREFLIGHT_EVIDENCE=" + json.dumps(report, sort_keys=True))
+    else:
+        _write_json(report_path, report)
 
     primary = result.get("primary")
     if isinstance(primary, dict):
@@ -10317,7 +10626,7 @@ def preflight_checkpoint(
                     print(f"DIAGNOSTIC_DETAIL={diagnostic.get('detail')}")
 
     print(f"IDENTITY_STABLE={identity_stable}")
-    print(f"EVIDENCE={report_path}")
+    print(f"EVIDENCE={report_path if report_path is not None else 'STDOUT'}")
     print(f"OVERALL={'PASS' if passed else 'BLOCKED'}")
     return passed, report_path
 
@@ -10328,6 +10637,7 @@ def execute_checkpoint(
     repo_root: Path,
     evidence_root: Path,
 ) -> tuple[bool, Path]:
+    global _installation_execution_admitted, _installation_execution_source
     if spec.execute is None:
         raise RuntimeError(f"checkpoint has no protected execution: {spec.name}")
 
@@ -10337,6 +10647,21 @@ def execute_checkpoint(
             f"protected execution requires a clean worktree; "
             f"found: {state_before['porcelain']}"
         )
+
+    installation = spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME
+    if installation:
+        from trading_bot.supervised_release import installation_operator as operator
+
+        _supervised_installation_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]:
+            raise RuntimeError("installation registration rejected")
+        if os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE:
+            raise RuntimeError("installation authorization interlock rejected")
+        if _supervised_installation_latch_consumed():
+            raise RuntimeError(
+                "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY: "
+                "consumed installation attempt; MAY_HAVE_OCCURRED"
+            )
 
     local_branch = str(state_before["branch"])
     remote_branch = spec.remote_branch
@@ -10377,7 +10702,18 @@ def execute_checkpoint(
     )
 
     try:
-        result = spec.execute()
+        if installation:
+            _installation_execution_admitted = True
+            _installation_execution_source = (
+                str(state_before["head"]),
+                str(state_before["tree"]),
+            )
+        try:
+            result = spec.execute()
+        finally:
+            if installation:
+                _installation_execution_admitted = False
+                _installation_execution_source = None
     except Exception as exc:
         state_after = _git_state(repo_root)
         identity_stable = (
@@ -10400,8 +10736,10 @@ def execute_checkpoint(
                 "identity_stable": identity_stable,
             },
             "runner_error": {
-                "type": type(exc).__name__,
-                "detail": str(exc),
+                "type": "INSTALLATION_STOPPED" if installation else type(exc).__name__,
+                "detail": "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
+                if installation
+                else str(exc),
             },
             "effect_disposition": "MAY_HAVE_OCCURRED",
             "protected_execution": "ATTEMPTED",
@@ -10409,7 +10747,13 @@ def execute_checkpoint(
         }
         report_path = evidence_dir / "report.json"
         _write_json(report_path, report)
-        print(f"RUNNER_EXECUTION_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
+        if installation:
+            print(
+                "RUNNER_EXECUTION_ERROR=INSTALLATION_STOPPED:PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY",
+                file=sys.stderr,
+            )
+        else:
+            print(f"RUNNER_EXECUTION_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         print(f"IDENTITY_STABLE={identity_stable}")
         print(f"EVIDENCE={report_path}")
         print("OVERALL=STOPPED")
@@ -10594,7 +10938,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 evidence_root=evidence_root,
             )
     except Exception as exc:
-        print(f"RUNNER_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
+        if getattr(
+            args, "checkpoint", None
+        ) == SUPERVISED_INSTALLATION_OPERATOR_NAME and args.command in {
+            "preflight",
+            "execute",
+        }:
+            print(
+                "RUNNER_ERROR=INSTALLATION_AUTHORITY_REJECTED_OR_CONSUMED:NO_RETRY",
+                file=sys.stderr,
+            )
+        else:
+            print(f"RUNNER_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         return 2
 
     return 0 if passed else 1

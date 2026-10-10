@@ -1,5 +1,68 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 133-AG implementation — pending exact source review and broad certification
+
+`supervised_release/installation_operator.py` supplies the installation-only
+composition. The registered checkpoint is
+`arch133-robinhood-supervised-release-installation-operator`, on the fixed
+`feature/robinhood-supervised-release-installation-operator` branch and
+`F:\AI\worktrees\ai-trading-bot-supervised-release-installation-operator`
+checkout. The reviewed base is `36a24bbcb9ee4ee5c41f1599306cd9d8ba5a19c4`.
+The exact clean live branch HEAD/tree are observed internally, never arguments;
+the base must remain an ancestor. Origin, worktree, branch and source pins must
+agree before either registered host surface is admitted.
+
+The complete declaration binds the collected sorted source inventory and exact
+checkout launcher bytes to the accepted v2 manifest. Python path/version/hash,
+release base and durable root reuse the pinned AA/AB/AC constants. Strategy
+identity/version reuse `MovingAverageCrossoverStrategy` / `1.0.0`; the new fixed
+installation declaration config is `(5, 20, Decimal("1"))`. Risk declaration is
+`arch133-long-only-review-paper` / `1.0.0`, hashing the source-owned
+`arch133-installation-risk-declaration/v1` material: paper mode, US stocks/ETFs,
+long-only, deterministic risk required, and no margin/leverage/options/shorts/
+crypto. These are inert release declarations, not an activation, a dynamically
+selected risk implementation, or permission to trade. Exact source review must
+accept these constants before any production installation.
+
+Collection and RuntimeBinding replay independently precede host observation.
+Readiness requires a supported elevated Administrator Windows host, accepted
+fixed parent security, independently observed production Python bytes/version/
+identity, absent STAGING, and an unambiguous canonical releases namespace.
+Other canonical retained release names do not select another image. Existing
+exact FINAL is independently reconstructed; malformed/conflicting FINAL,
+case aliases, orphan staging or unknown sibling names block without mutation.
+Dependency closure remains `UNPROVEN`.
+
+The runner's `preflight` emits bounded sanitized evidence on stdout only
+(`EVIDENCE=STDOUT`); it creates no evidence file or directory. It neither calls
+the installer nor imports the native writer. The runner's `execute` is the
+sole registered installation transport. It requires its own exact live-remote
+admission and the checkpoint-specific authorization interlock; a preflight PASS
+does not satisfy either. Execute collects/replays again and calls the accepted
+`install_release()` once, with no alternate mutation backend.
+
+In addition to the normal external per-invocation attempt/report, a fixed
+external exclusive-create latch lives at
+`F:\AI\temp\arch133-ag-installation-attempt\attempt.json`. The runner rechecks
+the admitted HEAD/tree and live remote immediately before creating/flushing the
+latch, before entering the installer. It is independent of release identity,
+token, source revision and caller-selected evidence root. Partial write/flush
+failure leaves it consumed; no code removes, repairs, resets or replaces it.
+A subsequent execute stops regardless of a new token or evidence root.
+Read-only preflight may still independently verify an exact installed FINAL;
+it cannot grant a fresh installation attempt.
+
+Before installer entry, failure is BLOCKED / NO_INSTALLATION_EFFECT. The AC
+engine owns its mutation fence before the first native create. Thereafter every
+failure or ambiguity is INDETERMINATE /
+PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED. An escaped or malformed
+installer acknowledgement is conservatively indeterminate. Only enum values,
+exact release/manifest/binding digests and bounded InstalledEvidence are exposed.
+No retry, deletion, cleanup, overwrite, rollback, repair or second publication
+is introduced. No scheduler, credential/OAuth, provider, Paper-v2, wake/runtime,
+broker or live authority is added. Production installation and Y/Z scratch
+qualification are not run by this source checkpoint.
+
 ## 2026-10-10 — Architecture 133-AF FULL CERTIFIED; 133-AG protected installation operator frozen
 
 Architecture **133-AF is SOURCE ACCEPTED and FULL CERTIFIED** on the final

@@ -367,7 +367,7 @@ def test_runtime_admission_checkpoint_is_first_and_source_only():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-runtime-host-admission"
-    assert runner.ACTIVE_CI_CHECKPOINTS[1] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[2] == name
     assert workflow.count(name) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
@@ -380,7 +380,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
-    assert runner.ACTIVE_CI_CHECKPOINTS[3] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[4] == name
     assert workflow.count("              " + name + " `") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]

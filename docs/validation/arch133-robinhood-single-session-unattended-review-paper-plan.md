@@ -1,5 +1,46 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## 133-AG source validation — pending exact review
+
+The new `test_supervised_release_installation_operator.py` uses disposable Git
+repositories and the AC fake native implementation only. It covers complete
+source-owned declaration construction, exact HEAD/tree and launcher binding,
+Python/strategy/risk declaration, release/binding replay and tamper rejection,
+worktree/branch/origin/ancestor admission, stdout-only preflight, host/Python/ACL
+rejection, absent and conflicting namespaces, exact independently verified FINAL,
+preexisting STAGING, one installer call, latch-before-entry, mutation/publication/
+final-observer ambiguity, sanitized output and capability closure.
+
+Runner tests substitute inert callbacks; they never call the registered real
+preflight or execute. A disposable fixed latch proves exclusive creation,
+preservation after failed flush, source/live-remote revalidation, and refusal of
+a second invocation despite a new authorization/evidence root. The AG authority
+check chains unchanged AC/AD/AE/AF source admission and pins both the operator
+and the new runner bridge. The workflow adds only AG to the existing reviewed
+`feature/robinhood-*` source-only batch, now 56 checkpoints. Registration fixes
+the remote branch and has no environment-selected remote-head handoff.
+
+Focused verification includes the new tests, affected AA/AB/AC/AD/AE/AF
+regressions, runner authority/registration tests, the changed historical topology
+assertions, certification-profile topology, both non-mutating Ruff checks and
+diff checks. Inventory is FULL 156 / ROBINHOOD 83 / LEGACY 205 / EXHAUSTIVE 361;
+the existing required baselines and legacy ownership remain unchanged.
+
+Focused results: 59 operator cases, 2,970 affected regression cases and five
+historical topology cases (3,034 distinct). The initial regression pass found
+38 stale batch/registration/runner-composition assertions; those were corrected
+and passed in the 102-case affected rerun, without rerunning the whole suite.
+The final latch/source-pin correction additionally passed its eight affected
+cases. Ruff check/format passed all 17 changed Python files, diff check passed,
+and all 56 source-only authorities passed. The registered CI batch has 67 test
+paths and 216 Ruff paths. CI/source acceptance remains a separate final gate.
+
+Implementation must not run FULL or any real registered host surface. CI must
+run `verify-batch` only. Exact GitHub source acceptance and ChatGPT-selected broad
+certification precede fresh approval of one real installation. No test accesses
+production `F:\AITradingBot`, retained Y/Z scratch, Task Scheduler, credential/
+OAuth stores, provider APIs, Paper-v2, wake/runtime, broker or live surfaces.
+
 ## 2026-10-10 — Architecture 133-AF FULL CERTIFIED; 133-AG protected installation operator frozen
 
 Architecture **133-AF is SOURCE ACCEPTED and FULL CERTIFIED** on the final

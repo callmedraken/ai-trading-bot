@@ -345,7 +345,9 @@ def test_substrate_fact_drift_blocks(setup, field, value):
     assert result.reason is subject.RuntimeReason.SUBSTRATE
 
 
-@pytest.mark.parametrize("change", ["owner", "reparse", "mutation", "rename", "alias"])
+@pytest.mark.parametrize(
+    "change", ["owner", "reparse", "mutation", "bool_mutation", "rename", "alias", "kind"]
+)
 def test_substrate_object_security_and_identity_blocks(setup, change):
     rows = list(setup.runtime.substrate.objects)
     row = rows[1]
@@ -355,12 +357,25 @@ def test_substrate_object_security_and_identity_blocks(setup, change):
         row = replace(row, reparse=True)
     elif change == "mutation":
         row = replace(row, trading_mutation_granted=1)
+    elif change == "bool_mutation":
+        row = replace(row, trading_mutation_granted=False)
     elif change == "rename":
         row = replace(row, rename_replace_denied=False)
+    elif change == "kind":
+        row = replace(row, kind="directory")
     else:
         row = replace(row, identity=rows[0].identity)
     rows[1] = row
     setup.runtime.substrate = replace(setup.runtime.substrate, objects=tuple(rows))
+    assert admit(setup).status is subject.RuntimeStatus.BLOCKED
+
+
+def test_absent_search_root_cannot_also_be_present(setup):
+    rows = (
+        *setup.runtime.substrate.objects,
+        _row(subject.DLLS_ROOT, subject.RuntimeObjectKind.DIRECTORY, 99),
+    )
+    setup.runtime.substrate = replace(setup.runtime.substrate, objects=rows)
     assert admit(setup).status is subject.RuntimeStatus.BLOCKED
 
 
@@ -385,9 +400,7 @@ def test_dependency_origin_coverage_blocks(setup, kind):
         assert admit(setup).status is subject.RuntimeStatus.BLOCKED
         return
     deps[1] = dep
-    setup.runtime.substrate = replace(
-        setup.runtime.substrate, dependencies=tuple(deps)
-    )
+    setup.runtime.substrate = replace(setup.runtime.substrate, dependencies=tuple(deps))
     assert admit(setup).status is subject.RuntimeStatus.BLOCKED
 
 

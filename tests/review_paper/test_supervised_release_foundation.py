@@ -60,7 +60,8 @@ def manifest(**changes):
 
 def test_canonical_round_trip_and_logical_material_identity():
     original = manifest()
-    assert original.release_id == "release-ed0cca1bbc6152f4beeeaee4fe5e2b3a"
+    assert original.release_id == "release-d62e82edd5e55b6996e2c00823d8e3e4"
+    assert json.loads(original.to_json())["schema"] == "arch133-supervised-release/v2"
     assert original.source_inventory_sha256 == (
         "ed7069757a141cb02ee9d4678611800a1ba4f9b73e8cfcc46cdc6b6a7bd32511"
     )

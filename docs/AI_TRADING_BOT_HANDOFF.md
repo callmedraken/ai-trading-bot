@@ -231,7 +231,10 @@ Implementation owner/model remains **Sol High** because this checkpoint changes
 runtime startup isolation and security/authority semantics.
 
 Implementation now uses a distinct supervised-release launcher so the accepted
-historical 133-E/G launcher and pins remain byte-exact. The inert source model
+historical 133-E/G launcher and pins remain byte-exact. Because changing the
+only accepted launcher changes release-manifest semantics, AE explicitly bumps
+`arch133-supervised-release/v1` to `arch133-supervised-release/v2` rather than
+silently reinterpreting v1. The inert source model
 replays the accepted release/binding/installed image, requires exact immutable
 project-module origins and `-I -S -B` process facts, models protected runtime
 substrate/object/dependency observations through injected read-only seams, and

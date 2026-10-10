@@ -8080,13 +8080,13 @@ SUPERVISED_RUNTIME_ADMISSION_SOURCES: Final = (
 )
 SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
     "src/trading_bot/supervised_release/model.py": (
-        "be0d310802a8018036a7221006074feed79092f7"
+        "1619bf29a3c0c8b262912dfaf517ae44e4b77708"
     ),
     "src/trading_bot/supervised_release/maintenance.py": (
         "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
     ),
     "src/trading_bot/supervised_release/runtime_admission.py": (
-        "01221b11086bb793b558c0cba4ed66d6700a7059"
+        "5c9ab457f5e13cc264c8140d7e15f3353eb4a291"
     ),
     "scripts/run_arch133_supervised_release_review_paper.py": (
         "f9a5e8924b19c23e57807cde0b812418e56f02c8"
@@ -8200,9 +8200,7 @@ def _supervised_runtime_admission_authority_check(
             for alias in node.names
         }
         launcher_from = {
-            node.module
-            for node in launcher.body
-            if isinstance(node, ast.ImportFrom)
+            node.module for node in launcher.body if isinstance(node, ast.ImportFrom)
         }
         if launcher_imports != {"sys"} or launcher_from != {
             "pathlib",

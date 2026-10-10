@@ -295,7 +295,10 @@ def _validate_substrate(value: RuntimeSubstrateObservation) -> None:
     by_path: dict[str, RuntimeObjectObservation] = {}
     identities: set[tuple[int, int]] = set()
     for item in objects:
-        if type(item) is not RuntimeObjectObservation:
+        if (
+            type(item) is not RuntimeObjectObservation
+            or type(item.kind) is not RuntimeObjectKind
+        ):
             raise ValueError("runtime object row invalid")
         if (
             not _canonical(item.path)
@@ -312,6 +315,7 @@ def _validate_substrate(value: RuntimeSubstrateObservation) -> None:
             or type(item.links) is not int
             or item.links < 1
             or (item.kind is RuntimeObjectKind.FILE and item.links != 1)
+            or type(item.trading_mutation_granted) is not int
             or item.trading_mutation_granted != 0
             or item.rename_replace_denied is not True
             or (item.path != RUNTIME_PARENT and not _under(item.path, RUNTIME_ROOT))
@@ -319,6 +323,9 @@ def _validate_substrate(value: RuntimeSubstrateObservation) -> None:
             raise ValueError("runtime object policy differs")
         identities.add(item.identity)
         by_path[item.path.casefold()] = item
+    for path in absent:
+        if path.casefold() in by_path:
+            raise ValueError("absent search root is present")
     required = {
         RUNTIME_PARENT: RuntimeObjectKind.DIRECTORY,
         RUNTIME_ROOT: RuntimeObjectKind.DIRECTORY,
@@ -380,12 +387,21 @@ def admit_runtime_host(
             or DEPENDENCY_CLOSURE != "UNPROVEN"
         ):
             raise ValueError
-        first_image = observe_installed_release(release, binding, native=image_observer)
-        if first_image != installed or first_image.dependency_closure != DEPENDENCY_CLOSURE:
+        first_image = observe_installed_release(
+            release, binding, native=image_observer
+        )
+        if (
+            first_image != installed
+            or first_image.dependency_closure != DEPENDENCY_CLOSURE
+        ):
             raise ValueError
         root = release_root(release.manifest.release_id)
         source_root = root + r"\src"
-        launcher = root + "\\" + release.manifest.launcher_relative_path.replace("/", "\\")
+        launcher = (
+            root
+            + "\\"
+            + release.manifest.launcher_relative_path.replace("/", "\\")
+        )
         reason = RuntimeReason.SUBSTRATE
         first_substrate = runtime_observer.observe_substrate()
         _validate_substrate(first_substrate)
@@ -413,7 +429,9 @@ def admit_runtime_host(
             launcher=launcher,
             substrate=second_substrate,
         )
-        second_image = observe_installed_release(release, binding, native=image_observer)
+        second_image = observe_installed_release(
+            release, binding, native=image_observer
+        )
         if second_image != first_image:
             raise ValueError
         evidence = RuntimeAdmissionEvidence(

@@ -54,6 +54,34 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Manual-deployment pivot — 133-AK source contract superseded
+
+The earlier 133-AK read-only source design was frozen after AJ became
+INDETERMINATE, but it is superseded before implementation. No AK executable
+source or registry/profile change is authorized.
+
+For the one remaining incident question, use the already accepted 133-AI
+read-only reconciler at:
+
+~~~text
+feature/robinhood-supervised-release-installation-reconciliation
+HEAD 6456e2921643ed6427f118cbf6e9a7d57e0186ce
+TREE f1a64188078bc361a8a66564a3573f973bcfa4d1
+CI   #446 / 38112977533 SUCCESS
+~~~
+
+That operator may only observe and classify the existing FINAL/STAGING state. It
+has no publication or cleanup authority. The consumed AJ latch and exact failed
+AJ evidence remain preserved and non-retryable regardless of the result.
+
+After the state is known, new deployment work should target a small manual
+maintenance/update operator rather than self-publication or automatic recovery.
+A manual update must still prove stopped runtime, exact source/release identity,
+successful installation/update, exact post-update verification and an explicit
+manual restart/admission boundary.
+
+No automatic publication/retry/recovery requirement survives this pivot.
+
 ## Architecture 133-AK contract — AJ publication ambiguity reconciliation
 
 The AJ protected attempt is frozen as a consumed, non-retryable publication

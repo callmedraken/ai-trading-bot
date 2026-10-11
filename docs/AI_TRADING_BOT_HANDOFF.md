@@ -1,5 +1,90 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Manual deployment pivot; unimplemented 133-AK source contract superseded
+
+The previously frozen Architecture 133-AK source implementation contract is
+**superseded before implementation**. No AK source, test, runner registration,
+active-checkpoint entry, profile-inventory increment, host preflight or protected
+effect was created from that contract.
+
+The product direction is simplified: future bot updates are **manually
+supervised** rather than self-published. The bot no longer needs a new automatic
+STAGING->FINAL recovery subsystem, publication retry path, self-update flow or
+automatic deployment recovery framework.
+
+The failed 133-AJ incident remains authoritative and preserved:
+
+~~~text
+AJ HEAD    cc56197e664459420bd8bc2a52f263c64cee2160
+AJ TREE    55dc1abb9c659619f5ce7f044e87a64eaaa6e3ba
+RESULT     INDETERMINATE / PUBLICATION_AMBIGUITY
+EFFECT     MAY_HAVE_OCCURRED
+AJ LATCH   CONSUMED / NOT_AUTHORIZED_FOR_RETRY
+~~~
+
+No AJ retry, latch reset/delete, manual rename, STAGING/FINAL cleanup, ACL repair
+or alternate automated publication path is authorized by this pivot.
+
+### One-time post-AJ state probe
+
+Before any manual deployment/update work, determine the current release namespace
+once using the already-reviewed **133-AI read-only reconciliation operator**.
+No new reconciliation source is required.
+
+Reusable accepted AI branch:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-installation-reconciliation
+HEAD    6456e2921643ed6427f118cbf6e9a7d57e0186ce
+TREE    f1a64188078bc361a8a66564a3573f973bcfa4d1
+CI      #446 / 38112977533 SUCCESS
+~~~
+
+The AI operator is read-only and already classifies the live frozen release as:
+
+- exact FINAL only -> FINAL_INSTALLED_VERIFIED / EXACT_FINAL_ONLY /
+  RECONCILED_INSTALLED / CONFIRMED;
+- exact STAGING only -> STAGING_VERIFIED_PRESERVED / EXACT_STAGING_ONLY /
+  PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED;
+- both/neither/drift -> reconciliation blocked and preserve/no-retry.
+
+Reusing AI here does not retry AG or AJ and does not restore either consumed
+one-shot authority. It is only a current-state observation after the AJ incident.
+
+### Simplified deployment direction
+
+After the one-time state probe is reviewed, future updates should use a
+human-supervised maintenance procedure instead of autonomous publication:
+
+1. stop/disable bot execution for maintenance and prove no trading process is
+   active;
+2. choose an exact reviewed/certified source revision;
+3. manually update/install the runtime from that exact revision through a small,
+   explicit operator procedure;
+4. verify the deployed source/files/runtime identity before startup;
+5. manually start/re-enable the bot;
+6. run a read-only health/admission check before unattended operation resumes.
+
+The future manual-update procedure should prefer one straightforward
+source-owned script or short documented operator sequence. It should not rebuild
+AG/AJ-style one-shot publication recovery, self-publishing, automatic cleanup or
+automatic retry semantics.
+
+This pivot intentionally trades unattended deployment convenience for lower
+complexity and easier operator reasoning. Existing safety boundaries around
+trading, credentials, scheduler mutation and runtime startup remain separately
+controlled.
+
+Current inventories therefore remain unchanged at **57 active checkpoints**,
+FULL **158**, ROBINHOOD **85**, LEGACY **205**, EXHAUSTIVE **363**. The cancelled
+AK contract's proposed 58 / 159 / 86 / 205 / 364 counts never became source
+truth.
+
+Immediate next action: run exactly one read-only 133-AI post-AJ state probe.
+After that output is reviewed, define the smallest manual-update procedure
+appropriate to the observed FINAL/STAGING state. Do not implement the superseded
+AK source contract.
+
 ## 2026-10-11 — Architecture 133-AJ publication INDETERMINATE; 133-AK read-only reconciliation frozen
 
 The single authorized real Architecture **133-AJ** preserved-release publication

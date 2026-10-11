@@ -54,6 +54,25 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Simplified validation direction after AJ ambiguity
+
+Do not implement the previously frozen 133-AK test/source/runner expansion.
+
+Validation now proceeds in two bounded stages:
+
+1. reuse the accepted 133-AI **read-only** preflight once to classify current
+   FINAL/STAGING state after AJ;
+2. after that result is reviewed, design and validate only the minimal
+   human-supervised manual-update procedure.
+
+The one-time AI probe must remain read-only and must not set AJ authorization,
+execute AJ, reset/remove either latch, rename/delete release objects, repair
+ACLs, touch provider/Paper-v2 state, mutate scheduler/runtime, wake the bot or
+submit broker/live effects.
+
+No source inventory changes are required for this pivot. Current expected counts
+remain active 57 / FULL 158 / ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 363.
+
 ## Architecture 133-AK validation contract
 
 Implementation must cover, with disposable/fake/read-only surfaces only:

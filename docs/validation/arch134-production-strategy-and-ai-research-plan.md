@@ -389,3 +389,88 @@ persistence authority for the snapshot/history evidence consumed by 134-B2.
 It must not revive Paper-v2/C1/C3/D10 operational dependencies. Provider/OAuth
 effects, if required for qualification, remain separately protected and are not
 authorized by this source acceptance.
+
+## 134-B3 — Current Robinhood market-history evidence (implemented, review pending)
+
+The current source checkpoint remains `arch134-production-strategy-live-paper`
+on `feature/robinhood-production-strategy-live-paper`, with no preflight/execute
+registration. B3 adds two owned test modules to that existing source gate;
+active count stays 60. FULL/ROBINHOOD/LEGACY/EXHAUSTIVE inventory is now
+165/90/205/370. Frozen required baselines remain 122/49.
+
+`RobinhoodDailyHistoryRequest` derives exactly `long_window + 1` consecutive
+sessions through the exact bound XNYS calendar, checks them against the existing
+NYSE published regular-session authority, and admits only completed sessions.
+Published coverage remains 2026-2028; requests requiring earlier history fail
+closed. The MCP range runs from the first regular open through the last regular
+close. The only request is `get_equity_historicals` with one exact contract
+symbol, explicit UTC bounds, `interval=day`, `bounds=regular`, and
+`adjustment_type=none`. No interval/adjustment defaults, pagination, retries,
+interpolation, alternate provider, CSV, quotes-as-history or inferred bars.
+
+The strict parser requires the documented structured `data/results/bars` and
+`guide` shape, one exact result, exact symbol/daily/regular semantics, all
+required bar fields, explicit `session=reg` and `interpolated=false`, positive
+integer traded volume and bounded positive decimal OHLC. Unknown fields,
+missing/unresolved symbols, malformed/non-UTC timestamps, unknown/midnight
+labels, duplicate/missing/out-of-order/nonconsecutive sessions, extra bars,
+invalid OHLCV, split/dividend adjustment echoes or insufficient history fail
+closed. Optional adjustment echo must be `none` if present. Bars must have
+left-edge labels equal to the published regular opens; DST and early closes
+are calendar-bound. No transformation or invented daily aggregation occurs.
+
+`materialize_production_strategy_history` replays retained canonical structured
+response bytes and checks exact contract symbol/config/session and capture time.
+The prior completed session goes through existing snapshot acceptance,
+serialization and `verify_daily_snapshot` to obtain
+`DailySnapshotVerificationResult`. The snapshot audit hashes the canonical
+structured response (not purported raw HTTP bytes). The preceding configured
+consecutive bars go through `create_strategy_history_seed`, canonical
+serialization and `verify_strategy_history_seed` to obtain
+`VerifiedStrategyHistorySeed`. Existing history-seed schema, IDs, verifier,
+`OFFLINE_SEED` classification and `authoritative=false` remain unchanged.
+Provider provenance belongs to an outer `robinhood-strategy-history-evidence/v1`
+envelope retaining request, structured response, XNYS session sequence and times.
+Hashes are audit evidence only, never deterministic semantic identity material.
+Canonical snapshot, seed and outer bytes are returned in memory; this checkpoint
+adds no filesystem persistence or paper-store mutation boundary.
+
+`acquire_production_strategy_history` permits exactly one adapter historical
+read and one caller-injected capture-time observation. Production invocation
+is separately protected; source tests inject fakes. The pure
+`build_production_strategy_decision_from_history` replays all evidence and
+delegates exactly once to accepted 134-B2. No legacy Paper-v2/D10/C1/C3/Alpaca
+authority, `VerifiedPriorCheckpoint`, new evaluator, research promotion,
+SHADOW PREPARE or paper execution is introduced.
+
+The exact application read/review allowlist is now four public tools:
+`review_equity_order`, `get_equity_quotes`, `get_equity_orders`, and
+`get_equity_historicals`; `get_accounts` is private/internal. Capability
+enumeration requires all four; extra advertised broker tools never become
+application capabilities. Placement/cancel/options/crypto remain excluded.
+
+Real-server qualification remains outstanding. The published tool metadata
+documents raw `none` request semantics but no required response adjustment echo;
+request honoring must be qualified. Daily regular-open left-edge labels and
+explicit false interpolation/regular-session flags must also be qualified.
+`close_price` means the last trade in the regular daily bar, not an official
+settled close. Any mismatch blocks materialization rather than weakening the
+parser. Later persistence/operator wiring and real-server qualification require
+their own reviewed boundary; source acceptance grants no provider/OAuth effect.
+
+Focused B3 validation covers malformed/missing/unknown schema fields, wrong
+symbols/sessions, non-daily/non-regular/adjusted semantics, absent interpolation
+flags, gap fills, duplicate/missing/nonconsecutive/extra/future bars,
+insufficient long-window history, DST/holiday/early-close boundaries, invalid
+prices/volumes, evidence tampering, Decimal-context independence, unchanged
+inner identities/classification, exactly one historical read, no fallback,
+exact four-tool capability admission and preserved mutation exclusion. B2
+composition tests require one strategy evaluation and byte-stable paper state.
+Strict source pins and authority-mutation tests reject capability/import drift.
+
+Only affected pytest modules, cheap authority/static/diff gates and non-mutating
+Ruff checks are run locally with a fresh external Windows basetemp. Source CI
+must reach terminal green before handoff. No ROBINHOOD/FULL/LEGACY/EXHAUSTIVE,
+real provider/OAuth, SHADOW PREPARE, paper execution or protected effect is part
+of this implementation checkpoint. ChatGPT exact-source review and later
+certification/real-server qualification remain separate.

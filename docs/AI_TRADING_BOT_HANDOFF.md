@@ -1,5 +1,45 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Architecture 134-B3 implemented; source review pending
+
+The B3 checkpoint extends the current application read/review surface to exactly
+four tools: `review_equity_order`, `get_equity_quotes`, `get_equity_orders`, and
+`get_equity_historicals`. `get_accounts` remains private/internal. No generic
+tool-call API, placement/cancel/options/crypto or provider fallback is added.
+
+One bounded historical read supplies exactly the preceding configured
+long-window XNYS sessions plus the prior completed session. The current bar
+passes existing daily-snapshot acceptance, canonical serialization and offline
+verification; preceding bars become canonical `StrategyHistorySeed` bytes and
+pass the unchanged strict verifier. The inner source remains `OFFLINE_SEED`
+and non-authoritative. Outer canonical evidence retains exact request arguments,
+response content, capture times and selected calendar sessions. Materialization
+returns bytes for later separately reviewed persistence; it owns no filesystem
+or durable-store write. Composition delegates once to accepted 134-B2.
+
+Current inventories are active **60**, FULL **165**, ROBINHOOD **90**,
+LEGACY **205**, EXHAUSTIVE **370**; required baselines stay **122/49**.
+Earlier dated inventories and three-tool qualification records below are
+historical/superseded for the current B3 surface.
+
+Source tests use fakes and external temporary stores only. No real Robinhood,
+OAuth, provider, SHADOW PREPARE, paper execution, scheduler or broker effect is
+authorized or performed. No broad certification is part of B3 implementation.
+
+Next owner: ChatGPT reviews the exact B3 GitHub commit/diff and terminal source
+gate. Acceptance remains pending. After acceptance, select the already batched
+ROBINHOOD certification before considering separately authorized real-server
+schema qualification and SHADOW PREPARE. Do not run FULL merely for confidence.
+
+Real-server assumptions still need qualification: explicit raw `none` requests
+are honored (the documented result has no required adjustment echo), every daily
+bar carries `session=reg` and `interpolated=false`, left-edge timestamps equal
+published regular-session openings, and the explicit range returns the complete
+series. Unknown/midnight labels, missing flags, incompatible adjustment echoes,
+insufficient/gapped/duplicate series or schema drift fail closed. `close_price`
+is the last regular-session trade, not an official settled close.
+
+
 ## 2026-10-11 — Architecture 134-C CERTIFIED/CLOSED
 
 Architecture **134-C — Human-started production live-paper cycle** is
@@ -18290,7 +18330,7 @@ get_equity_orders
 
 It intentionally exposes no generic MCP tool call method and no
 place/cancel/options/crypto mutation method. Before an allowlisted call it
-enumerates the server tool inventory, requires all three reviewed tools,
+[Historical/superseded by 134-B3] enumerates the server tool inventory, requires all three reviewed tools,
 requires a successful MCP result, and requires structured mapping output.
 
 OAuth is standard MCP OAuth discovery using the fixed Robinhood Trading MCP
@@ -18348,7 +18388,7 @@ Architecture 131-F adds the reviewed Windows OAuth host boundary needed by the
   which validates state and issuer;
 - per-flow generation ownership so a completed/failed/stale flow cannot release,
   cancel, or clean resources belonging to another flow;
-- no change to the three-method Robinhood review/read transport allowlist;
+- [Historical/superseded by 134-B3] no change to the three-method Robinhood review/read transport allowlist;
 - no source-gate preflight or execute capability.
 
 The first published source at `23291e909efb9cf6c4b2cb8f690288707d8cf64d`
@@ -18559,7 +18599,7 @@ Add a source-owned internal account-resolution boundary that:
    errors, or missing structured content;
 7. feeds that canonical identifier to the existing typed review/order-read adapter.
 
-The public application-facing MCP contract remains exactly three methods:
+[Historical/superseded by 134-B3] The public application-facing MCP contract remains exactly three methods:
 `review_equity_order`, `get_equity_quotes`, and `get_equity_orders`.
 
 Next milestone should be a source-only checkpoint for this canonical Agentic-account
@@ -18710,7 +18750,7 @@ Frozen direction:
    durable `ReviewPaperStore`;
 2. accept only an already risk-approved `ReviewPaperIntent`/equivalent
    deterministic input — do not move AI/risk authority into the operator;
-3. preserve the exact three-method public application MCP surface;
+3. [Historical/superseded by 134-B3] preserve the exact three-method public application MCP surface;
 4. forbid browser/interactive reauthorization during normal operation;
 5. keep account numbers, OAuth material, and raw MCP payloads out of logs/evidence;
 6. emit a bounded sanitized machine-readable evidence/result record;

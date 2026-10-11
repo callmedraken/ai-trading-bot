@@ -468,7 +468,12 @@ def test_git_failure_suppresses_raw_stderr(monkeypatch, tmp_path):
 
 
 def test_public_mcp_surface_exact_and_mutation_methods_absent():
-    expected = {"review_equity_order", "get_equity_quotes", "get_equity_orders"}
+    expected = {
+        "review_equity_order",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "get_equity_historicals",
+    }
     assert {
         name
         for name in RobinhoodReviewReadTransport.__dict__

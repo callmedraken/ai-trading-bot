@@ -1,5 +1,45 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134-B3 implemented; source review pending
+
+The B3 checkpoint extends the current application read/review surface to exactly
+four tools: `review_equity_order`, `get_equity_quotes`, `get_equity_orders`, and
+`get_equity_historicals`. `get_accounts` remains private/internal. No generic
+tool-call API, placement/cancel/options/crypto or provider fallback is added.
+
+One bounded historical read supplies exactly the preceding configured
+long-window XNYS sessions plus the prior completed session. The current bar
+passes existing daily-snapshot acceptance, canonical serialization and offline
+verification; preceding bars become canonical `StrategyHistorySeed` bytes and
+pass the unchanged strict verifier. The inner source remains `OFFLINE_SEED`
+and non-authoritative. Outer canonical evidence retains exact request arguments,
+response content, capture times and selected calendar sessions. Materialization
+returns bytes for later separately reviewed persistence; it owns no filesystem
+or durable-store write. Composition delegates once to accepted 134-B2.
+
+Current inventories are active **60**, FULL **165**, ROBINHOOD **90**,
+LEGACY **205**, EXHAUSTIVE **370**; required baselines stay **122/49**.
+Earlier dated inventories and three-tool qualification records below are
+historical/superseded for the current B3 surface.
+
+Source tests use fakes and external temporary stores only. No real Robinhood,
+OAuth, provider, SHADOW PREPARE, paper execution, scheduler or broker effect is
+authorized or performed. No broad certification is part of B3 implementation.
+
+Next owner: ChatGPT reviews the exact B3 GitHub commit/diff and terminal source
+gate. Acceptance remains pending. After acceptance, select the already batched
+ROBINHOOD certification before considering separately authorized real-server
+schema qualification and SHADOW PREPARE. Do not run FULL merely for confidence.
+
+Real-server assumptions still need qualification: explicit raw `none` requests
+are honored (the documented result has no required adjustment echo), every daily
+bar carries `session=reg` and `interpolated=false`, left-edge timestamps equal
+published regular-session openings, and the explicit range returns the complete
+series. Unknown/midnight labels, missing flags, incompatible adjustment echoes,
+insufficient/gapped/duplicate series or schema drift fail closed. `close_price`
+is the last regular-session trade, not an official settled close.
+
+
 ## 2026-10-11 — Architecture 134-C CERTIFIED/CLOSED
 
 Architecture **134-C — Human-started production live-paper cycle** is
@@ -18063,7 +18103,7 @@ Implemented under `trading_bot.robinhood_mcp`:
 - valuation quote batches capped at 20 so official-close lookup remains in the
   expected schema path.
 
-The transport protocol is an exact three-method allowlist:
+[Historical/superseded by 134-B3] The transport protocol is an exact three-method allowlist:
 
 ```text
 review_equity_order
@@ -18189,7 +18229,7 @@ review invocation, placement, cancellation, broker, or live effect boundary.
 
 Next: Architecture 131-E direct Robinhood MCP client transport using the official
 MCP Python SDK over Streamable HTTP and standard MCP OAuth discovery. The
-application-facing transport must remain exactly the three-method allowlist
+[Historical/superseded by 134-B3] application-facing transport must remain exactly the three-method allowlist
 (`review_equity_order`, `get_equity_quotes`, `get_equity_orders`); no
 place/cancel/options/crypto tool method may be reachable.
 
@@ -18235,7 +18275,7 @@ Architecture 131-E adds:
 - injected OAuth token/client-registration storage;
 - strict loopback HTTP redirect-URI validation;
 - exhaustive bounded MCP tool inventory verification before every call;
-- exact three-tool application allowlist:
+- [Historical/superseded by 134-B3] exact three-tool application allowlist:
   `review_equity_order`, `get_equity_quotes`, `get_equity_orders`;
 - structured-result / tool-error / malformed-inventory fail-closed handling;
 - no generic public `call_tool` surface;
@@ -18691,7 +18731,7 @@ Next milestone: Architecture 131-H — source-owned Robinhood paper operator.
 Move the reviewed one-cycle procedure out of temporary qualification scripts and
 into a deterministic source-owned operator with sanitized evidence, explicit
 source identity checks, no interactive OAuth fallback, and the same immutable
-three-method application surface. 131-H remains paper/review only and must not
+[Historical/superseded by 134-B3] three-method application surface. 131-H remains paper/review only and must not
 introduce any real-order mutation capability.
 
 ## 2026-10-02 — Architecture 131-H source-owned Robinhood paper operator ACCEPTED

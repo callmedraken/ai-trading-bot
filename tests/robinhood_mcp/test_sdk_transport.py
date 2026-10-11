@@ -32,12 +32,16 @@ def test_test_transport_calls_only_exact_public_tool_names() -> None:
 
     transport = RobinhoodMcpStreamableHttpTransport.for_test(caller)
 
+    assert transport.get_equity_historicals({"symbols": ["SPY"]})["data"] == {
+        "ok": True
+    }
     assert transport.review_equity_order({"symbol": "SPY"})["data"] == {"ok": True}
     assert transport.get_equity_quotes({"symbols": ["SPY"]})["data"] == {"ok": True}
     assert transport.get_equity_orders({"account_number": "agent"})["data"] == {
         "ok": True
     }
     assert [name for name, _ in calls] == [
+        "get_equity_historicals",
         "review_equity_order",
         "get_equity_quotes",
         "get_equity_orders",
@@ -82,7 +86,7 @@ def test_structured_result_requires_success_and_mapping() -> None:
         )
 
 
-def test_tool_inventory_requires_all_three_tools_and_bounded_pagination() -> None:
+def test_tool_inventory_requires_all_four_tools_and_bounded_pagination() -> None:
     class Client:
         def __init__(self) -> None:
             self.calls: list[str | None] = []
@@ -92,6 +96,7 @@ def test_tool_inventory_requires_all_three_tools_and_bounded_pagination() -> Non
             if cursor is None:
                 return SimpleNamespace(
                     tools=[
+                        SimpleNamespace(name="get_equity_historicals"),
                         SimpleNamespace(name="review_equity_order"),
                         SimpleNamespace(name="get_equity_quotes"),
                     ],
@@ -205,8 +210,14 @@ def test_oauth_factory_rejects_non_token_storage() -> None:
 def test_public_facade_and_allowlist_remain_exact() -> None:
     from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadTransport
 
-    expected = {"review_equity_order", "get_equity_quotes", "get_equity_orders"}
+    expected = {
+        "review_equity_order",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "get_equity_historicals",
+    }
     assert _ALLOWED_TOOL_NAMES == (
+        "get_equity_historicals",
         "get_equity_orders",
         "get_equity_quotes",
         "review_equity_order",
@@ -248,3 +259,48 @@ def test_internal_account_resolution_requires_account_inventory(advertised) -> N
     else:
         with pytest.raises(RobinhoodMcpToolUnavailableError):
             asyncio.run(_require_review_read_tools(Client(), require_accounts=True))
+
+
+@pytest.mark.parametrize("missing", _ALLOWED_TOOL_NAMES)
+def test_inventory_missing_any_of_four_required_tools_fails(missing):
+    class Client:
+        async def list_tools(self, *, cursor=None):
+            return SimpleNamespace(
+                tools=[
+                    SimpleNamespace(name=name)
+                    for name in _ALLOWED_TOOL_NAMES
+                    if name != missing
+                ],
+                next_cursor=None,
+            )
+
+    with pytest.raises(RobinhoodMcpToolUnavailableError, match="unavailable"):
+        asyncio.run(_require_review_read_tools(Client()))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "call_tool",
+        "get_accounts",
+        "get_option_historicals",
+        "get_crypto_quotes",
+        "place_equity_order",
+        "cancel_equity_order",
+        "place_option_order",
+        "cancel_option_order",
+        "exercise_option",
+        "place_crypto_order",
+        "cancel_crypto_order",
+    ],
+)
+def test_forbidden_capabilities_never_reach_caller(name):
+    async def caller(tool_name, arguments):
+        raise AssertionError("forbidden capability reached provider")
+
+    transport = RobinhoodMcpStreamableHttpTransport.for_test(caller)
+    with pytest.raises(RobinhoodMcpToolUnavailableError):
+        transport._invoke(name, {})
+    with pytest.raises(RobinhoodMcpToolUnavailableError):
+        asyncio.run(transport._call_tool_once(name, {}))
+    assert not hasattr(transport, name)

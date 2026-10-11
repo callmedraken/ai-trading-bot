@@ -11,6 +11,7 @@ from trading_bot.robinhood_mcp.account_resolution import RobinhoodAgenticAccount
 
 ROBINHOOD_TRADING_MCP_URL: Final = "https://agent.robinhood.com/mcp/trading"
 _ALLOWED_TOOL_NAMES: Final = (
+    "get_equity_historicals",
     "get_equity_orders",
     "get_equity_quotes",
     "review_equity_order",
@@ -90,6 +91,12 @@ class RobinhoodMcpStreamableHttpTransport:
         arguments: Mapping[str, object],
     ) -> Mapping[str, object]:
         return self._invoke("get_equity_orders", arguments)
+
+    def get_equity_historicals(
+        self,
+        arguments: Mapping[str, object],
+    ) -> Mapping[str, object]:
+        return self._invoke("get_equity_historicals", arguments)
 
     def _invoke(
         self,

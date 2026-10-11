@@ -19,20 +19,27 @@ cancel, approve, decline, exercise, or otherwise mutate a brokerage order.
 ## Application allowlist
 
 The direct transport implements the already accepted synchronous
-`RobinhoodReviewReadTransport` contract and has exactly three public MCP
-operations:
+`RobinhoodReviewReadTransport` contract and has exactly four public MCP
+operations after 134-B3:
 
 ```text
 review_equity_order
 get_equity_quotes
 get_equity_orders
+get_equity_historicals
 ```
 
-There is no generic public `call_tool` method.
+There is no generic public `call_tool` method. `get_accounts` remains private
+internal account-resolution capability and is excluded from this public surface.
+
+134-B3 historical reads freeze one symbol, an explicit range, `interval=day`,
+`bounds=regular`, and `adjustment_type=none`; no auto interval or split-adjusted
+default is admitted. See Architecture 134 for strict response/materialization
+semantics and outstanding real-server schema qualification.
 
 The server may advertise many more Robinhood tools. The application deliberately
 does not surface them. Before every allowed tool call, the transport enumerates
-the MCP tool inventory and proves all three required tools are currently
+the MCP tool inventory and proves all four required tools are currently
 advertised.
 
 ## Connection and authentication
@@ -80,14 +87,14 @@ interactive grant on every connection.
 
 The blocking transport refuses to run inside an already-running event loop.
 A future optimization may add a persistent async session without changing the
-three-tool application contract.
+four-tool application contract.
 
 ## Tool-call result policy
 
 For every call:
 
 1. enumerate MCP tools to exhaustion with bounded pagination;
-2. require all three expected raw Robinhood tool names;
+2. require all four expected raw Robinhood tool names;
 3. call only the exact method selected by the public wrapper;
 4. require `is_error is False`;
 5. require `structured_content` to be a mapping;
@@ -132,7 +139,7 @@ arch131-robinhood-direct-mcp
 
 The gate proves:
 
-- the three raw tool names are the exact allowlist;
+- the four raw tool names are the exact allowlist;
 - the concrete source contains the expected official SDK/Streamable-HTTP
   bindings;
 - no placement/cancellation/options/crypto order tool name appears in the
@@ -140,7 +147,7 @@ The gate proves:
 - no preflight or protected execute profile is registered;
 - source-only tests use an injected test caller and never access the network.
 
-## Next step
+## Historical next step (131-E; superseded by later qualification and 134-B3)
 
 After source acceptance:
 

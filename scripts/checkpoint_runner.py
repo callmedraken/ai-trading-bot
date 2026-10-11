@@ -5822,6 +5822,7 @@ def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
         }
         expected_tools = (
+            "get_equity_historicals",
             "get_equity_orders",
             "get_equity_quotes",
             "review_equity_order",
@@ -5855,6 +5856,7 @@ def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
                 and not node.name.startswith("_")
             }
             expected_public = {
+                "get_equity_historicals",
                 "for_test",
                 "review_equity_order",
                 "get_equity_quotes",
@@ -5999,6 +6001,7 @@ def _arch131_mcp_schema_authority_check(repo_root: Path) -> tuple[str, ...]:
                 node.name for node in protocol.body if isinstance(node, ast.FunctionDef)
             }
             expected = {
+                "get_equity_historicals",
                 "review_equity_order",
                 "get_equity_quotes",
                 "get_equity_orders",
@@ -9496,7 +9499,137 @@ def _arch134_current_decision_authority_check(repo_root: Path) -> tuple[str, ...
     return tuple(failures)
 
 
+ARCH134_MARKET_HISTORY_SOURCE_PINS: Final = {
+    "src/trading_bot/robinhood_mcp/historical.py": (
+        "fda1a7fb47139a3d7e60baf76bf94126326d220f"
+    ),
+    "src/trading_bot/review_paper/strategy_market_history.py": (
+        "86d821e38e84ca0146f5808585bb33de1f8a0e4c"
+    ),
+}
+
+
+def _arch134_market_history_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze B3 read/materialization authority without granting protected effects."""
+    failures = list(_arch131_direct_mcp_authority_check(repo_root))
+    failures.extend(_arch131_mcp_schema_authority_check(repo_root))
+    allowed_imports = {
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "json",
+        "re",
+        "uuid",
+        "zoneinfo",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.market_data.daily_snapshot_identity",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.store",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.historical",
+        "trading_bot.robinhood_mcp.models",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+    }
+    forbidden = {
+        "get_accounts",
+        "_get_accounts",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "review_equity_order",
+        "review_market_order",
+        "call_tool",
+        "_invoke",
+        "_request_once",
+        "record_market_review",
+        "ReviewPaperStore",
+        "connect",
+        "execute",
+        "now",
+        "utcnow",
+        "sleep",
+        "eval",
+        "exec",
+        "__import__",
+        "open",
+        "write_text",
+        "write_bytes",
+        "run",
+        "Popen",
+        "chmod",
+    }
+    try:
+        for relative, pin in ARCH134_MARKET_HISTORY_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B3 source drift: " + relative)
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B3 import surface expanded: " + relative)
+            calls = {
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            }
+            if calls & forbidden:
+                failures.append("134-B3 effect surface expanded: " + relative)
+            if relative.endswith("strategy_market_history.py"):
+                required = {
+                    "adapter.equity_daily_history",
+                    "parse_equity_historicals_response",
+                    "accept_daily_provider_response",
+                    "serialize_daily_snapshot",
+                    "verify_daily_snapshot",
+                    "create_strategy_history_seed",
+                    "serialize_strategy_history_seed",
+                    "verify_strategy_history_seed",
+                    "build_current_production_strategy_decision",
+                }
+                if not required <= _qualified_names(tree):
+                    failures.append(
+                        "134-B3 reviewed evidence/decision bindings missing"
+                    )
+                for name in (
+                    "equity_daily_history",
+                    "build_current_production_strategy_decision",
+                ):
+                    count = sum(
+                        getattr(node.func, "attr", getattr(node.func, "id", "")) == name
+                        for node in ast.walk(tree)
+                        if isinstance(node, ast.Call)
+                    )
+                    if count != 1:
+                        failures.append("134-B3 composition call is not exact: " + name)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError):
+        failures.append("134-B3 market-history boundary unavailable")
+    return tuple(failures)
+
+
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
+    "tests/robinhood_mcp/test_historical.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/test_robinhood_paper_operator.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
     *COMMON_TESTS,
     "tests/strategies/test_production_strategy_contract.py",
     "tests/strategies/test_production_strategy_decision.py",
@@ -9508,6 +9641,16 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     "tests/runtime/test_strategy_history_seed.py",
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
+    *ARCH134_MARKET_HISTORY_SOURCE_PINS,
+    "src/trading_bot/robinhood_mcp/adapter.py",
+    "src/trading_bot/robinhood_mcp/sdk_transport.py",
+    "tests/robinhood_mcp/test_historical.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/test_robinhood_paper_operator.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
     *COMMON_RUFF_PATHS,
     ARCH134_PRODUCTION_STRATEGY_SOURCE,
     ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
@@ -9531,6 +9674,7 @@ def _arch134_production_strategy_live_paper_authority_check(
     """Freeze the 134-C composition onto the accepted 131 PREPARE/EXECUTE path."""
     failures = list(_arch134_production_strategy_decision_authority_check(repo_root))
     failures.extend(_arch134_current_decision_authority_check(repo_root))
+    failures.extend(_arch134_market_history_authority_check(repo_root))
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
         if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:

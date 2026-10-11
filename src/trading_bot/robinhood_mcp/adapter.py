@@ -10,6 +10,11 @@ from typing import Protocol
 from trading_bot.domain import OrderSide, OrderType, Symbol, TimeInForce
 from trading_bot.domain._validation import normalize_utc
 from trading_bot.review_paper import ReviewPaperIntent, RobinhoodEquityOrderReview
+from trading_bot.robinhood_mcp.historical import (
+    RobinhoodDailyHistory,
+    RobinhoodDailyHistoryRequest,
+    parse_equity_historicals_response,
+)
 from trading_bot.robinhood_mcp.models import (
     RobinhoodEquityOrdersPage,
     RobinhoodEquityQuotesResponse,
@@ -39,9 +44,14 @@ class RobinhoodReviewReadTransport(Protocol):
         arguments: Mapping[str, object],
     ) -> Mapping[str, object]: ...
 
+    def get_equity_historicals(
+        self,
+        arguments: Mapping[str, object],
+    ) -> Mapping[str, object]: ...
+
 
 class RobinhoodReviewReadAdapter:
-    """Typed facade over the three reviewed Robinhood MCP operations."""
+    """Typed facade over the four reviewed Robinhood MCP operations."""
 
     def __init__(self, transport: RobinhoodReviewReadTransport) -> None:
         self._transport = transport
@@ -104,6 +114,16 @@ class RobinhoodReviewReadAdapter:
             normalized.append(str(symbol))
         response = self._transport.get_equity_quotes({"symbols": normalized})
         return parse_equity_quotes_response(response)
+
+    def equity_daily_history(
+        self,
+        request: RobinhoodDailyHistoryRequest,
+    ) -> RobinhoodDailyHistory:
+        """Read exactly one explicitly raw daily regular-session series."""
+        if type(request) is not RobinhoodDailyHistoryRequest:
+            raise TypeError("request must be exact RobinhoodDailyHistoryRequest")
+        response = self._transport.get_equity_historicals(request.arguments())
+        return parse_equity_historicals_response(response, request)
 
     def agentic_equity_orders(
         self,

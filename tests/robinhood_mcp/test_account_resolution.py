@@ -163,6 +163,7 @@ def _fake_sdk(monkeypatch, result, *, names=None, failure=None):
                         names
                         if names is not None
                         else [
+                            "get_equity_historicals",
                             "get_equity_orders",
                             "get_equity_quotes",
                             "review_equity_order",
@@ -227,7 +228,12 @@ def test_missing_account_tool_prevents_call(monkeypatch):
     resolver, calls = _fake_sdk(
         monkeypatch,
         object(),
-        names=["get_equity_orders", "get_equity_quotes", "review_equity_order"],
+        names=[
+            "get_equity_historicals",
+            "get_equity_orders",
+            "get_equity_quotes",
+            "review_equity_order",
+        ],
     )
     with pytest.raises(RobinhoodAgenticAccountResolutionError):
         resolver.resolve()

@@ -7,8 +7,12 @@ OAuth factory. Construction does not read credentials, open a browser, bind a
 listener, authenticate, contact Robinhood, or call an MCP tool. No real OAuth
 grant or brokerage request is authorized by this source checkpoint.
 
-The application transport remains the three existing review/read methods.
-Neither `sdk_transport.py` nor the package initializer changes. The composition
+The current application transport has exactly four review/read methods after
+134-B3: `review_equity_order`, `get_equity_quotes`, `get_equity_orders`, and
+`get_equity_historicals`. `get_accounts` remains private/internal. OAuth
+persistence is unchanged by that read-only extension.
+At the historical 131-F checkpoint, neither `sdk_transport.py` nor the package
+initializer changed. B3 later extends only the transport read surface. The composition
 function imports the existing factory inside the function, avoiding a new
 package import cycle.
 

@@ -1,5 +1,87 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## Architecture 133-AJ implementation — pending exact source review
+
+The new checkpoint is
+`arch133-robinhood-supervised-release-publication-recovery`, fixed to
+`feature/robinhood-supervised-release-publication-recovery` and
+`F:\AI\worktrees\ai-trading-bot-supervised-release-publication-recovery`.
+Its reviewed starting parent is HEAD
+`6456e2921643ed6427f118cbf6e9a7d57e0186ce`, TREE
+`f1a64188078bc361a8a66564a3573f973bcfa4d1`. The runner requires the clean
+fixed checkout, origin, base ancestry, source pins, and exact live remote HEAD;
+repeated source observations must preserve HEAD and TREE.
+
+AJ recovers only the frozen failed AG source HEAD
+`513b60029f459ad6ecb4938f8fea2d54209a29d1`, TREE
+`14e8d161ac95e57982c576ebd19681bb204b22fd`. It independently reconstructs
+that release twice, requires the consumed AG latch's original CRLF bytes and
+original failure semantics, and pins the exact AG failure report SHA-256 to
+`ac1c51bc7dc30dde655efe64570f1ed301586e742dfe0bd0e47f2bc12c1d8560`.
+The accepted AI report is fixed to the previously documented
+`preflight-20261011T043729.349823Z\report.json` and SHA-256
+`f620f13a9d9cac6caeda36205b47b68f849fe1c4ac7c337df18fc795d56d6e45`.
+Evidence is bounded, regular, non-reparse, and repeatedly read without writes.
+The accepted report binds `STAGING_VERIFIED_PRESERVED / EXACT_STAGING_ONLY`,
+AI HEAD `90f9366f4251f062985ce335bea62e1c747aa1d4`, TREE
+`9875c09142f28e86145d9101c4cbd7c64dc9b51d`, and preserved image identity
+`(1855336320, 281474980566367)`.
+
+Read-only preflight requires Administrator Windows admission, FINAL absent,
+STAGING alone present, canonical stable parent namespace, and two fresh
+independent STAGING image replays. Those replays prove the exact release ID,
+manifest, RuntimeBinding, original source, parent identity, image identity,
+and production Python identity/version/hash. The result is READY with
+NOT_STARTED / NO_PUBLICATION_EFFECT; runner evidence is stdout only.
+Preflight creates no evidence directory, latch, or production object.
+Dependency closure remains UNPROVEN.
+
+Protected execution owns one operation: no-replace, same-parent,
+handle-relative publication of the existing STAGING object to FINAL. It does
+not invoke an installer. The native publication session inherits only the
+read observer and provides no materialization, file write, create, ACL repair,
+delete, replace, rollback, cleanup, or alternate-path interface. Its in-memory
+request guard forbids a second request even after failure. Administrator,
+parent security/identity, exact STAGING identity, and absent FINAL are rechecked
+on held native handles immediately before its sole FileRenameInfo call;
+ReplaceIfExists is FALSE.
+
+The separate durable AJ latch is
+`F:\AI\temp\arch133-aj-publication-recovery-attempt.json`, independent of the
+AG latch and all invocation evidence roots, source revisions, release IDs, and
+authorization values. Its schema is `arch133-aj-publication-recovery-attempt/v1`.
+Exclusive binary creation consumes authority before write/flush/fsync/close;
+exact latch readback precedes publication. No function resets or removes it.
+A creation race or ambiguous consumption is preserve/no-retry. Before
+consumption, failure is BLOCKED / NO_PUBLICATION_EFFECT / NOT_STARTED. After
+consumption, any failure, interruption, native return/close ambiguity,
+evidence drift, or verification ambiguity is INDETERMINATE /
+PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED.
+
+The fresh execution interlock is
+`AI_TRADING_BOT_ARCH133_AJ_PUBLICATION_AUTHORIZATION` equal to
+`ARCH133_AJ_ONE_PRESERVED_RELEASE_PUBLICATION_AUTHORIZED`. Runner source
+admission is required independently of this value. This source checkpoint does
+not authorize setting the interlock or running protected execution.
+
+Success is FINAL_PUBLISHED_VERIFIED / EXACT_FINAL_ONLY / VERIFIED / CONFIRMED
+only after two independent FINAL replays prove the same immutable image and
+STAGING is absent, with repeated namespace, incident, AG-source and live
+AJ-source reproof. Only the expected STAGING-to-FINAL namespace change is
+admitted; a native TRUE return alone cannot establish success. Any later runner
+source drift invalidates success as preserve/no-retry. A consumed AJ latch
+never grants another attempt, including after successful publication.
+
+AG installation and its consumed latch remain untouched. No scheduler read,
+mutation/rebind, runtime launch, credentials/OAuth/provider access, Paper-v2,
+wake, broker submission, or live-trading capability is introduced. No protected
+host preflight or real publication is performed by source verification.
+
+AJ is registered once in the active inventory. Its exact branch's push routes
+to the single-checkpoint source-static/active-tests path. The existing four
+fallback shards and terminal source-gates aggregator are retained verbatim;
+the monolithic gate is not restored. Explicit inventory/runner pins and focused
+historical assertions are updated for the one added owned test module.
 ## 2026-10-10 — 133-AI reconciled AG publication as exact preserved STAGING; fast source gate restored
 
 Architecture **133-AI** completed its real-host read-only reconciliation of the

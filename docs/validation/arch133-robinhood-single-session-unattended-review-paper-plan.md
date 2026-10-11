@@ -1,5 +1,42 @@
 # Architecture 133 — Single-Session Unattended Review-Paper Validation Plan
 
+## Architecture 133-AJ source validation — pending exact review
+
+AJ's focused test module uses disposable evidence/latch files and fake native
+sessions only. It covers exact AG latch admission and accepted AI evidence pins,
+STAGING-only readiness, FINAL conflict, missing STAGING, namespace aliases/drift,
+original source drift, image/manifest/binding/parent/Python drift, repeated stable
+observations, Administrator failure, and exact checkout/origin/branch/ancestry/
+clean-index/live-remote admission.
+
+Execution tests require latch-before-publication ordering, durable exclusive
+creation, flush preservation, creation-race classification, exact latch readback,
+refusal of missing authorization or fence acknowledgement, one publication call,
+and no second attempt under a consumed AJ latch. Every post-fence rename/close/
+flush/return/FINAL/evidence/source/interruption ambiguity preserves evidence.
+Native TRUE without an exact FINAL image cannot succeed. Two independent FINAL
+replays, STAGING absence, and only the expected parent namespace change are
+required. Native fake-handle tests inspect FileRenameInfo's no-replace flag,
+parent handle, exact release name, and exactly one native request.
+
+The runner tests verify its scoped source context, context clearing, late source
+drift reclassification, exact registration, stdout-only preflight with no
+evidence-directory creation, the single AJ push route, and preservation of the
+audited split workflow. Source pin/import/capability checks reject installer,
+native writer, arbitrary imports, deletion, creation, cleanup, retry, dynamic
+execution, scheduler/runtime/provider/broker and other excluded capabilities.
+Original AG/AI tests and the affected shared runner/topology tests remain the
+focused regression surface. Supported ownership automatically admits the new
+module: FULL 158 / ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 363. These are inventory
+counts, not certification results; frozen required baselines are unchanged.
+
+Implementation verification is focused pytest, focused non-mutating Ruff
+check/format, git diff checks, one atomic implementation commit and ordinary
+push, then the exact push-triggered source gate through terminal completion.
+Do not run FULL/ROBINHOOD/LEGACY/EXHAUSTIVE or a real AJ host surface during this
+checkpoint. Source/CI success is not native Windows acceptance or authorization
+for publication. Exact GitHub review and ChatGPT's certification decision precede
+any separately authorized host preflight or protected recovery.
 ## 2026-10-10 — 133-AI reconciled AG publication as exact preserved STAGING; fast source gate restored
 
 Architecture **133-AI** completed its real-host read-only reconciliation of the

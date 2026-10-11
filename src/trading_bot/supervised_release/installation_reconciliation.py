@@ -14,8 +14,17 @@ from pathlib import Path
 from typing import Final
 
 import trading_bot.supervised_release.installation_operator as ag
-from trading_bot.supervised_release.installation_contract import InstalledEvidence
-from trading_bot.supervised_release.native_read import WindowsObserver
+from trading_bot.arch133_acl.administrator import administrator_sid
+from trading_bot.supervised_release.binding import RuntimeBinding
+from trading_bot.supervised_release.bundle import VerifiedRelease
+from trading_bot.supervised_release.installation_contract import (
+    InstalledEvidence,
+    ReleasePaths,
+)
+from trading_bot.supervised_release.native_read import (
+    WindowsObserver,
+    windows_libraries,
+)
 from trading_bot.supervised_release.observer import (
     observe_installed_release,
     observe_staging_release,
@@ -258,3 +267,44 @@ def _preflight() -> dict[str, object]:
         return _blocked("FINAL_AND_STAGING_BOTH_ABSENT")
     except (Exception, KeyboardInterrupt):
         return _blocked("RECONCILIATION_OBSERVATION_REJECTED")
+
+
+def read_incident_record(path: Path, limit: int) -> bytes:
+    """Bounded read-only evidence transport shared with incident recovery."""
+    for ancestor in reversed(path.parents):
+        facts = ancestor.lstat()
+        if (
+            not stat.S_ISDIR(facts.st_mode)
+            or stat.S_ISLNK(facts.st_mode)
+            or getattr(facts, "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+        ):
+            raise ValueError("incident record ancestor rejected")
+    return _read_record(path, limit)
+
+
+def admit_failed_installation() -> None:
+    """Reprove the fixed consumed AG latch and failed execution semantics."""
+    if read_incident_record(ATTEMPT_PATH, 4096) != ATTEMPT_BYTES:
+        raise ValueError("consumed AG latch rejected")
+    _attempt_context()
+
+
+def reconstruct_failed_release() -> tuple[
+    VerifiedRelease, RuntimeBinding, ReleasePaths
+]:
+    """Reconstruct only the original frozen AG source, never recovery source."""
+    return _frozen_inputs()
+
+
+def require_administrator_host() -> None:
+    """Use the accepted native observer's Administrator host boundary."""
+    windows_libraries()
+    administrator_sid()
+
+
+def validate_incident_image(
+    evidence: InstalledEvidence, *, image_identity: tuple[int, int]
+) -> None:
+    """Validate the incident's exact immutable-image and Python identities."""
+    _validate_evidence(evidence, image_identity=image_identity)

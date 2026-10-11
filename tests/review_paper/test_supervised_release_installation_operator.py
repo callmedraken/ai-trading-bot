@@ -519,7 +519,7 @@ def test_source_registration_pins_chaining_topology():
     assert spec.authority_check(ROOT) == ()
     assert (
         runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
-        and len(runner.ACTIVE_CI_CHECKPOINTS) == 56
+        and len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     )
     assert runner._batch_workflow_is_reviewed(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
@@ -528,7 +528,7 @@ def test_source_registration_pins_chaining_topology():
     assert {
         name: len(certification.select_inventory(inventory, name))
         for name in certification.PROFILES
-    } == {"full": 157, "robinhood": 84, "legacy": 205, "exhaustive": 362}
+    } == {"full": 158, "robinhood": 85, "legacy": 205, "exhaustive": 363}
 
 
 @pytest.mark.parametrize(

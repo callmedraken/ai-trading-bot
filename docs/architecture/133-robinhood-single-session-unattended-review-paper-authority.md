@@ -54,6 +54,38 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## 133-AJ FULL certification — ACCEPTED
+
+The corrected AJ source is FULL certified on the exact final executable/test
+identity:
+
+~~~text
+HEAD  4c143c4ad43d6866a93afb5188fede66e1cdacc4
+TREE  32a96ad54f86e3ca84d1bfd1aa71b90ccbd21505
+
+FULL
+modules   158
+cases     9,022
+passed    9,022
+skipped   0
+failed    0
+errors    0
+wall      383.554 s
+evidence  F:\AI\temp\pytest\arch133aj-full-4c143c4-68b5e23156a54883a2fc7d7039c92564
+~~~
+
+Protected publication authorization was absent throughout certification. The
+next safe gate is the registered read-only AJ real-host preflight. It creates no
+AJ latch or publication effect and must return
+`READY / NOT_STARTED / NO_PUBLICATION_EFFECT` before any later protected
+publication can even be considered. Dependency closure remains UNPROVEN.
+
+Certification and preflight remain separate from protected execution. A preflight
+PASS must be reviewed before requesting fresh explicit authorization for the
+single AJ no-replace, handle-relative STAGING->FINAL publication. No AG retry,
+cleanup, namespace repair, scheduler/runtime/provider/Paper-v2, wake, broker or
+live authority is implied.
+
 ## 133-AJ certification correction — SOURCE ACCEPTED
 
 The first selected AJ FULL certification exposed only stale test inventory

@@ -1,5 +1,54 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Architecture 133-AJ FULL CERTIFIED; read-only real-host preflight next
+
+Architecture **133-AJ — preserved immutable-release publication recovery** is now
+**SOURCE ACCEPTED and FULL CERTIFIED** on the exact final executable/test source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-publication-recovery
+HEAD    4c143c4ad43d6866a93afb5188fede66e1cdacc4
+TREE    32a96ad54f86e3ca84d1bfd1aa71b90ccbd21505
+
+FULL
+modules   158
+cases     9,022
+passed    9,022
+skipped   0
+failed    0
+errors    0
+wall      383.554 s
+evidence  F:\AI\temp\pytest\arch133aj-full-4c143c4-68b5e23156a54883a2fc7d7039c92564
+~~~
+
+The certification ran with protected publication authorization removed and
+completed with `ARCH133_AJ_FULL_EXIT=0` plus
+`ARCH133_AJ_FULL_COMMAND_COMPLETED`. The earlier failed FULL evidence at
+`F:\AI\temp\pytest\arch133aj-full-fe949ff-0db9e6f157dc415293243168a3180bfc`
+remains preserved as historical failure evidence and must not be reused.
+
+The accepted test-only correction source remains commit
+`2c4d77cdafed17d8d2437568114cf4db8b9028da`, TREE
+`fb3c5d6db65928ae635aa80d9675da69fd636343`; the later
+`4c143c4...` commit is documentation-only closeout before certification.
+No implementation, workflow, publication/latch semantics, or Architecture-133
+safety behavior changed after the accepted correction.
+
+The next safe checkpoint is the **AJ read-only real-host preflight**. It must
+reprove Administrator admission, exact live source, consumed AG incident
+evidence, preserved STAGING-only namespace, stable parent security/identity, and
+two fresh independent STAGING image replays. Its accepted result is
+`READY / NOT_STARTED / NO_PUBLICATION_EFFECT`. Preflight is stdout-only and
+creates no evidence directory, AJ latch, production object or publication
+effect. Dependency closure remains UNPROVEN.
+
+A successful preflight does **not** authorize publication. After its exact output
+is independently reviewed, stop for fresh explicit authorization before the one
+AJ STAGING->FINAL publication attempt. The AJ latch must remain unconsumed until
+that separately authorized execute; AG remains consumed and non-retryable. No
+cleanup/delete/manual rename/ACL repair, scheduler/runtime/provider/Paper-v2,
+wake, broker or live effect is authorized.
+
 ## 2026-10-10 — Architecture 133-AJ certification correction SOURCE ACCEPTED; FULL reselected
 
 The test-only correction required by the first Architecture 133-AJ FULL attempt is

@@ -54,6 +54,32 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Architecture 133-AJ FULL certification — ACCEPTED
+
+The corrected FULL certification passed on exact source:
+
+~~~text
+HEAD  4c143c4ad43d6866a93afb5188fede66e1cdacc4
+TREE  32a96ad54f86e3ca84d1bfd1aa71b90ccbd21505
+
+broad-1  79 modules / 4,871 passed
+broad-2  79 modules / 4,151 passed
+TOTAL    158 modules / 9,022 passed / 0 skipped / 0 failed / 0 errors
+wall     383.554 s
+evidence F:\AI\temp\pytest\arch133aj-full-4c143c4-68b5e23156a54883a2fc7d7039c92564
+~~~
+
+The run completed with `ARCH133_AJ_FULL_EXIT=0` and
+`ARCH133_AJ_FULL_COMMAND_COMPLETED`, with protected publication authorization
+removed. The prior failed evidence directory remains preserved and non-reusable.
+
+The next validation step is one **read-only real-host AJ preflight** through the
+registered checkpoint runner. It must perform live source/host admission and the
+two independent preserved-STAGING replays without creating an evidence directory,
+AJ latch, production object or publication effect. Expected disposition is
+`READY / NOT_STARTED / NO_PUBLICATION_EFFECT`; any other disposition is STOP.
+A PASS does not authorize execute and must be independently reviewed first.
+
 ## Architecture 133-AJ certification correction — SOURCE ACCEPTED
 
 The first AJ FULL attempt on HEAD

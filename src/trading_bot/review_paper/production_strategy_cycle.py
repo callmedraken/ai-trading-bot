@@ -84,8 +84,7 @@ class ProductionStrategyPaperPreparation:
             return
 
         if (
-            self.decision.status
-            is not ProductionStrategyDecisionStatus.TRADE_PROPOSAL
+            self.decision.status is not ProductionStrategyDecisionStatus.TRADE_PROPOSAL
             or self.decision.proposal is None
             or type(self.supervised) is not ReviewPaperSupervisedPreparation
             or self.supervised.proposal is not self.decision.proposal
@@ -111,8 +110,7 @@ class ProductionStrategyPaperExecutionResult:
         if (
             self.preparation.status
             is not ProductionStrategyPaperPreparationStatus.READY_TO_PROCEED
-            or type(self.preparation.supervised)
-            is not ReviewPaperSupervisedPreparation
+            or type(self.preparation.supervised) is not ReviewPaperSupervisedPreparation
         ):
             raise ValueError("execution result requires READY_TO_PROCEED preparation")
         if type(self.execution) is not ReviewPaperSupervisedExecutionResult:

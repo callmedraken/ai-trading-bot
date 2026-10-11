@@ -16,8 +16,8 @@ from tests.runtime.test_manual_paper_strategy_plan import (
 
 from scripts import checkpoint_runner
 from scripts import run_test_certification as certification
-from trading_bot.execution.models import ExecutionInstruction
 from trading_bot.domain import OrderType, TimeInForce
+from trading_bot.execution.models import ExecutionInstruction
 from trading_bot.review_paper import production_strategy_cycle as subject
 from trading_bot.review_paper.session_admission import ReviewPaperSessionSchedule
 from trading_bot.review_paper.store import ReviewPaperStore
@@ -41,9 +41,7 @@ AGE = timedelta(minutes=1)
 
 def _decision(*, no_signal: bool = False):
     request = (
-        _decision_request(
-            _request(closes=("10", "11", "12"), selected_close="13")
-        )
+        _decision_request(_request(closes=("10", "11", "12"), selected_close="13"))
         if no_signal
         else _decision_request(_request())
     )
@@ -220,7 +218,9 @@ def test_execute_requires_ready_and_exact_contract_source_before_delegate(
 
     monkeypatch.setattr(subject, "execute_review_paper_supervised_cycle", forbidden)
     execute_kwargs = {
-        "instruction": ExecutionInstruction(OrderType.MARKET, TimeInForce.DAY, datetime.now(UTC)),
+        "instruction": ExecutionInstruction(
+            OrderType.MARKET, TimeInForce.DAY, datetime.now(UTC)
+        ),
         "order_id": UUID(int=7),
         "expected_branch": "feature/example",
         "expected_head": "a" * 40,
@@ -244,9 +244,7 @@ def test_execute_requires_ready_and_exact_contract_source_before_delegate(
         bad = dict(execute_kwargs)
         bad[field] = wrong
         with pytest.raises(ValueError, match="source"):
-            subject.execute_production_strategy_paper_cycle(
-                preparation=ready, **bad
-            )
+            subject.execute_production_strategy_paper_cycle(preparation=ready, **bad)
     assert calls == 0
 
 
@@ -391,6 +389,5 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
     }
     assert "tests/review_paper/test_production_strategy_cycle.py" in profiles["full"]
     assert (
-        "tests/review_paper/test_production_strategy_cycle.py"
-        in profiles["robinhood"]
+        "tests/review_paper/test_production_strategy_cycle.py" in profiles["robinhood"]
     )

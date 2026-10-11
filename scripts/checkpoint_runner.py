@@ -9369,7 +9369,6 @@ def _arch134_production_strategy_decision_authority_check(
     return tuple(failures)
 
 
-
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: Final = (
     "arch134-production-strategy-live-paper"
 )
@@ -9377,7 +9376,7 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE: Final = (
     "src/trading_bot/review_paper/production_strategy_cycle.py"
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN: Final = (
-    "469b6a0f1899b64308349ebe80b511f1ec8e6c98"
+    "3636889acaddf0de0a27e4dc4de0687839c59ee8"
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     *COMMON_TESTS,
@@ -9466,8 +9465,7 @@ def _arch134_production_strategy_live_paper_authority_check(
             spec.preflight is not None
             or spec.execute is not None
             or spec.remote_head_env is not None
-            or spec.remote_branch
-            != "feature/robinhood-production-strategy-live-paper"
+            or spec.remote_branch != "feature/robinhood-production-strategy-live-paper"
             or spec.authority_check
             is not _arch134_production_strategy_live_paper_authority_check
             or spec.tests != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS
@@ -9481,9 +9479,7 @@ def _arch134_production_strategy_live_paper_authority_check(
                 ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
                 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
             )
-            or ACTIVE_CI_CHECKPOINTS.count(
-                ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME
-            )
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME)
             != 1
         ):
             failures.append("134-C checkpoint ordering drift")
@@ -9620,7 +9616,9 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     return {
         ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: CheckpointSpec(
             name=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
-            description="Architecture 134-C human-started production live-paper composition",
+            description=(
+                "Architecture 134-C human-started production live-paper composition"
+            ),
             tests=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS,
             ruff_paths=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS,
             authority_check=_arch134_production_strategy_live_paper_authority_check,

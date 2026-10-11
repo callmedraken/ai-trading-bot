@@ -123,6 +123,41 @@ candidate writes cannot reach production selection, paper account, scheduler or
 provider execution surfaces.
 
 
+## 134-C validation contract
+
+Focused source tests must prove:
+
+- exact 134-B decision type required;
+- `NO_SIGNAL` returns without invoking Architecture-131 PREPARE or touching
+  store/adapter/risk surfaces;
+- target-session mismatch blocks before PREPARE;
+- TRADE_PROPOSAL retains and forwards the exact proposal by identity;
+- Architecture-131 PREPARE is invoked exactly once;
+- every existing supervised preparation status maps exactly to the closed 134-C
+  status without inventing execution authority;
+- wrapper retains the exact supervised preparation by identity;
+- execute rejects anything except exact `READY_TO_PROCEED`;
+- expected HEAD/TREE must exactly equal the production contract's source
+  HEAD/TREE before Architecture-131 EXECUTE is called;
+- Architecture-131 EXECUTE is invoked exactly once and its exact result is
+  retained;
+- no retry/reacquisition loop or alternate provider/paper implementation;
+- no broker placement/cancel/options/crypto capability;
+- no scheduler/arming/wait/sleep or AI/research promotion capability;
+- checkpoint registration is source-only and exact branch routing preserves the
+  audited split/sharded workflow;
+- exact inventories become active 60 / FULL 161 / ROBINHOOD 86 / LEGACY 205 /
+  EXHAUSTIVE 366.
+
+Run focused tests, non-mutating Ruff check/format and diff check only. Do not
+perform a real provider PREPARE, OAuth interaction, paper mutation or broad
+certification during implementation.
+
+After exact GitHub source acceptance, the first real 134-C qualification is a
+separately authorized human-started **shadow PREPARE**. A paper EXECUTE is a
+second separately authorized step and is permitted only if the retained PREPARE
+remains `READY_TO_PROCEED` and all Architecture-131 revalidation passes.
+
 ## 134-B validation contract
 
 Focused tests must prove:

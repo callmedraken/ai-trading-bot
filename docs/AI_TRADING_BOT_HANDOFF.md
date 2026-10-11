@@ -1,5 +1,78 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Architecture 134-C Human-started production live-paper cycle frozen
+
+134-C is the first production-strategy composition with the already accepted
+Robinhood live-data review-paper machinery. Source implementation and CI remain
+effect-free; any later real provider PREPARE or paper EXECUTE is separately
+authorized.
+
+~~~text
+BRANCH      feature/robinhood-production-strategy-live-paper
+BASE HEAD   dd5d21764c6de68bc800ed928d1bb5e1fba73cd9
+BASE TREE   dbca981e69d0a9a9e356cdf8df011785bf7aba2d
+CHECKPOINT  arch134-production-strategy-live-paper
+~~~
+
+### Composition
+
+`ProductionStrategyDecision` from 134-B is the sole strategy input.
+
+For `NO_SIGNAL`, PREPARE returns `NO_SIGNAL` without calling the Robinhood
+adapter, reading/mutating the review-paper store, or evaluating risk.
+
+For `TRADE_PROPOSAL`, require the supplied `ReviewPaperSessionSchedule` to name
+the production contract's exact target session, then call the existing
+`prepare_review_paper_supervised_cycle(...)` exactly once with the exact retained
+proposal. This existing Architecture-131 PREPARE performs current session
+admission, one Robinhood quote acquisition, deterministic risk preview and
+durable-history stability checking. It performs no paper fill or broker order.
+
+134-C therefore treats a successful PREPARE as the **shadow/live-data preview**.
+Closed preparation statuses are:
+
+~~~text
+NO_SIGNAL
+SESSION_NOT_ADMITTED
+SESSION_EXPIRED_DURING_ACQUISITION
+RISK_REJECTED
+READY_TO_PROCEED
+~~~
+
+A separate explicit `execute_production_strategy_paper_cycle(...)` accepts only
+`READY_TO_PROCEED`. Before delegating, it requires caller-supplied expected
+HEAD/TREE to equal the production contract's exact source HEAD/TREE. It then
+calls the already accepted `execute_review_paper_supervised_cycle(...)` exactly
+once and retains that exact result. Architecture 131 revalidates session, quote
+freshness, risk and durable history, calls Robinhood `review_equity_order`, and
+records at most one **local synthetic paper fill**.
+
+134-C does not add another quote/review/order/paper engine, does not retry, and
+does not expose broker placement/cancel/options/crypto authority.
+
+### Source-only checkpoint boundary
+
+Expected new primary surfaces:
+
+~~~text
+src/trading_bot/review_paper/production_strategy_cycle.py
+tests/review_paper/test_production_strategy_cycle.py
+scripts/checkpoint_runner.py
+.github/workflows/checkpoint-source-gates.yml
+~~~
+
+The checkpoint itself has `preflight=None` and `execute=None`; CI uses fakes,
+monkeypatching and temporary stores only. No real Robinhood/OAuth access occurs.
+
+Because this adds one `tests/review_paper` module, expected post-implementation
+inventories are active **60**, FULL **161**, ROBINHOOD **86**, LEGACY **205**,
+EXHAUSTIVE **366**. Exact-equality/order/partition assertions remain strict.
+
+Source acceptance authorizes only separately reviewed 134-C qualification.
+Recommended qualification sequence is shadow PREPARE first, inspect the live
+quote/risk result, then separately authorize one paper EXECUTE if PREPARE is
+`READY_TO_PROCEED`. It does not authorize 134-D arming/scheduling.
+
 ## 2026-10-11 — Architecture 134-B SOURCE ACCEPTED
 
 Architecture **134-B — Production Strategy Decision Bridge** is source accepted.

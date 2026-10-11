@@ -154,7 +154,25 @@ surface. It is source-only and gains no protected runtime capability.
 
 ## Subsequent production lane
 
-### 134-B — Production Strategy Decision Bridge
+### 134-C — Human-started production live-paper cycle
+
+134-C composes the accepted 134-B decision with Architecture-131 supervised
+review-paper PREPARE/EXECUTE. It does not reimplement strategy, quote, risk or
+paper accounting logic.
+
+`NO_SIGNAL` is a true zero-provider/zero-paper outcome. A trade proposal must
+match the exact 134-B retained proposal and target session before PREPARE can
+reach Architecture 131.
+
+PREPARE is the shadow boundary: at most one quote acquisition and risk preview,
+with no review order and no synthetic fill. EXECUTE is a distinct explicit
+call allowed only from exact `READY_TO_PROCEED` preparation; it additionally
+binds expected source HEAD/TREE to the production strategy contract and delegates
+once to Architecture-131 execution.
+
+Real broker order placement remains impossible and out of scope.
+
+## 134-B — Production Strategy Decision Bridge
 
 Consume an exact 134-A contract plus verified daily history/current bar and
 authoritative paper-account state. Reuse existing strategy evaluation exactly

@@ -54,6 +54,30 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Manual deployment validation direction
+
+The AJ ambiguity is closed read-only as exact STAGING preserved / FINAL absent.
+No new publication-recovery validation is required.
+
+For the selected fixed-worktree deployment model, validation should focus only
+on maintenance and source identity:
+
+- scheduler disabled/not running and no active bot process/cycle;
+- exact fixed 133g worktree path and branch;
+- clean current checkout;
+- target commit explicitly reviewed and a fast-forward descendant;
+- post-update HEAD/TREE exactly equal the selected target;
+- launcher hash and production Python identity exact;
+- no automatic host-binding/activation reuse across source changes;
+- read-only host preflight required after the new binding/activation is
+  separately prepared;
+- no reset/rebase/force, release publication, latch reset, cleanup, automatic
+  scheduler enable/start or broker/live effect.
+
+A tiny helper may automate these checks later, but the deployment remains
+operator-driven. Broad certification remains tied to the selected source release
+boundary, not to the existence of a deployment helper.
+
 ## Simplified validation direction after AJ ambiguity
 
 Do not implement the previously frozen 133-AK test/source/runner expansion.

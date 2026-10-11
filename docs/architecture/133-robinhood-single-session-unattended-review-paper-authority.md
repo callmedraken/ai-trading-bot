@@ -54,6 +54,27 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Manual worktree deployment model — selected
+
+The post-AJ AI probe returned STAGING_VERIFIED_PRESERVED / EXACT_STAGING_ONLY.
+AJ did not complete publication and remains consumed/non-retryable.
+
+Future releases no longer require supervised-release STAGING/FINAL publication.
+The fixed operational source remains the 133g worktree and branch already used
+by the functional unattended launcher. Manual maintenance may fast-forward that
+local checkout to a separately reviewed exact descendant commit while execution
+is disabled. Any non-fast-forward update is a STOP.
+
+After the checkout moves, the previous host binding/activation must not be
+treated as authority for the new source. Runtime remains disabled/fail-closed
+until a separately reviewed host binding and activation name the new exact
+HEAD/TREE/deployment identity and a read-only host preflight passes.
+
+No manual-update helper may reset/rebase/force the checkout, publish release
+directories, reset AG/AJ latches, clean incident evidence, auto-enable the
+scheduler, auto-start runtime, access provider credentials, or submit broker
+effects.
+
 ## Manual-deployment pivot — 133-AK source contract superseded
 
 The earlier 133-AK read-only source design was frozen after AJ became

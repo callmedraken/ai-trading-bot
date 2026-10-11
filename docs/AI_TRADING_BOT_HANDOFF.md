@@ -1,5 +1,79 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Post-AJ probe confirms STAGING preserved; manual worktree deployment selected
+
+The one-time post-AJ read-only state probe completed successfully using the
+already-accepted 133-AI reconciliation operator:
+
+~~~text
+SOURCE HEAD  6456e2921643ed6427f118cbf6e9a7d57e0186ce
+SOURCE TREE  f1a64188078bc361a8a66564a3573f973bcfa4d1
+
+PRIMARY_STATUS  STAGING_VERIFIED_PRESERVED
+PRIMARY_REASON  EXACT_STAGING_ONLY
+IDENTITY_STABLE True
+OVERALL         PASS
+
+evidence
+F:\AI\temp\arch133-manual-pivot-state-probe-9cbce20635dc44dd9860c54b7497fb8b\arch133-robinhood-supervised-release-installation-reconciliation\preflight-20261011T080513.165560Z\report.json
+~~~
+
+This independently resolves the AJ ambiguity: the exact immutable image remains
+at STAGING and FINAL is absent. The AJ latch remains consumed and non-retryable.
+The preserved STAGING object and AJ/AG evidence are historical incident evidence;
+they are not the future deployment mechanism.
+
+### Selected simplified deployment model
+
+Future software updates will use the existing fixed production worktree instead
+of versioned STAGING/FINAL self-publication.
+
+Fixed operational source already used by the functional unattended launcher:
+
+~~~text
+BRANCH   feature/robinhood-unattended-review-paper-133g
+WORKTREE F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133g
+LAUNCHER scripts\run_arch133_unattended_review_paper.py
+PYTHON   F:\AITradingBot\runtime\python.exe
+~~~
+
+The scheduler and host identity already target that fixed worktree/branch. Source
+admission requires the local checkout to remain on that branch, at the exact
+HEAD/TREE bound by the current host material, and clean. It does not require a
+new immutable release directory for every update.
+
+For each future update, the manually supervised sequence is:
+
+1. enter maintenance: scheduler disabled/not running and no active bot process
+   or cycle;
+2. choose one reviewed/certified target commit that is a descendant of the
+   currently deployed production-worktree commit;
+3. fetch that exact target and fast-forward only the local fixed 133g production
+   worktree with `git merge --ff-only <target-sha>`; no reset/rebase/force;
+4. verify exact target HEAD/TREE, clean checkout, launcher hash and production
+   Python identity;
+5. keep execution disabled while the old host binding/activation still names
+   the predecessor source — that mismatch is intentionally fail-closed;
+6. separately create/review the next session's host binding and activation so
+   their source HEAD/TREE/deployment identity match the new checkout;
+7. perform a read-only host preflight;
+8. only then explicitly enable/start the scheduler for the intended session.
+
+This keeps deployment simple: one fixed production checkout plus exact source
+binding. It eliminates future release STAGING/FINAL promotion, publication
+latches, self-update recovery and automatic deployment retries.
+
+The remote 133g branch does not need to be advanced merely to update the local
+production checkout; repository-control mutations remain separately reviewed.
+If a future target is not a fast-forward descendant, stop and deliberately plan
+the transition rather than reset or force the production worktree.
+
+No production checkout, scheduler, binding, activation, STAGING or FINAL mutation
+is authorized by this documentation checkpoint. The next implementation work,
+if useful, should be limited to a small **manual-update verifier/helper** that
+checks maintenance state and exact source identity; it must not perform
+self-publication or automatic recovery.
+
 ## 2026-10-11 — Manual deployment pivot; unimplemented 133-AK source contract superseded
 
 The previously frozen Architecture 133-AK source implementation contract is

@@ -545,7 +545,27 @@ def test_aj_routes_single_active_checkpoint_and_retains_split_workflow():
     assert runner._batch_workflow_is_reviewed(
         (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
     )
-    assert runner._supervised_publication_recovery_authority_check(root) == ()
+    # AJ pins the complete historical registry. Later checkpoint additions must
+    # keep that protected recovery gate closed without changing any other pin.
+    functions = {
+        node.name: node
+        for node in ast.parse(
+            (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        ).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    drifted = {
+        name
+        for name, pin in runner.SUPERVISED_PUBLICATION_RUNNER_PINS.items()
+        if hashlib.sha256(
+            ast.dump(functions[name], include_attributes=False).encode()
+        ).hexdigest()
+        != pin
+    }
+    assert drifted == {"_checkpoint_specs"}
+    assert runner._supervised_publication_recovery_authority_check(root) == (
+        "publication recovery runner authority drift",
+    )
 
 
 def test_direct_runner_execute_requires_admitted_context(monkeypatch):

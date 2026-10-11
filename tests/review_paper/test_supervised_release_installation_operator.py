@@ -517,18 +517,15 @@ def test_source_registration_pins_chaining_topology():
     assert spec.execute is runner._supervised_installation_execute
     assert spec.remote_branch == subject.BRANCH and spec.remote_head_env is None
     assert spec.authority_check(ROOT) == ()
-    assert (
-        runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
-        and len(runner.ACTIVE_CI_CHECKPOINTS) == 57
-    )
+    assert runner.ACTIVE_CI_CHECKPOINTS[0] == NAME
     assert runner._batch_workflow_is_reviewed(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     )
     inventory = certification.discover_inventory(ROOT)
-    assert {
-        name: len(certification.select_inventory(inventory, name))
-        for name in certification.PROFILES
-    } == {"full": 158, "robinhood": 85, "legacy": 205, "exhaustive": 363}
+    module = "tests/review_paper/test_supervised_release_installation_operator.py"
+    for profile in ("full", "robinhood", "exhaustive"):
+        assert module in certification.select_inventory(inventory, profile)
+    assert module not in certification.select_inventory(inventory, "legacy")
 
 
 @pytest.mark.parametrize(

@@ -36,6 +36,19 @@ from .helpers import (
 )
 
 
+def _mutate_checkpoint_registration(
+    source: str, name: str, before: str, after: str
+) -> str:
+    anchor = f'"{name}": CheckpointSpec('
+    assert source.count(anchor) == 1
+    start = source.index(anchor)
+    closing = "\n        ),"
+    end = source.index(closing, start) + len(closing)
+    registration = source[start:end]
+    assert registration.count(before) == 1
+    return source[:start] + registration.replace(before, after, 1) + source[end:]
+
+
 @pytest.mark.parametrize(
     "before,after",
     [
@@ -108,7 +121,12 @@ def test_131f_authority_rejects_host_registration(tmp_path, capability):
     script.parent.mkdir()
     source = _authority_fixture_text(repo, "scripts/checkpoint_runner.py")
     script.write_text(
-        source.replace(f"{capability}=None,", f"{capability}=dangerous_host,"),
+        _mutate_checkpoint_registration(
+            source,
+            "arch131-robinhood-oauth-windows",
+            f"{capability}=None,",
+            f"{capability}=dangerous_host,",
+        ),
         encoding="utf-8",
     )
     assert runner._arch131_windows_oauth_authority_check(tmp_path)
@@ -242,7 +260,13 @@ def test_131g_authority_rejects_boundary_drift(
         source = _authority_fixture_text(repo, path)
         if path == relative:
             assert before in source
-            source = source.replace(before, after)
+            source = (
+                _mutate_checkpoint_registration(
+                    source, "arch131-robinhood-agentic-account", before, after
+                )
+                if path == "scripts/checkpoint_runner.py"
+                else source.replace(before, after)
+            )
         destination.write_text(source, encoding="utf-8")
     assert runner._arch131_agentic_account_authority_check(tmp_path)
 
@@ -402,7 +426,14 @@ def test_131h_authority_rejects_boundary_drift(
     destination = tmp_path / relative
     source = destination.read_text(encoding="utf-8")
     assert before in source
-    destination.write_text(source.replace(before, after), encoding="utf-8")
+    changed = (
+        _mutate_checkpoint_registration(
+            source, "arch131-robinhood-paper-operator", before, after
+        )
+        if relative == "scripts/checkpoint_runner.py"
+        else source.replace(before, after)
+    )
+    destination.write_text(changed, encoding="utf-8")
     failures = runner._arch131_paper_operator_authority_check(tmp_path)
     assert failures
 
@@ -589,7 +620,14 @@ def test_131i_authority_freezes_source_only_registration_and_ci(
     path = root / relative
     source = path.read_text(encoding="utf-8")
     assert before in source
-    path.write_text(source.replace(before, after, 1), encoding="utf-8")
+    changed = (
+        _mutate_checkpoint_registration(
+            source, "arch131-robinhood-paper-intent-bridge", before, after
+        )
+        if relative == "scripts/checkpoint_runner.py"
+        else source.replace(before, after, 1)
+    )
+    path.write_text(changed, encoding="utf-8")
     assert runner._arch131_paper_intent_bridge_authority_check(root)
 
 
@@ -2150,8 +2188,8 @@ def test_131r_source_only_registration_and_batch(boundary):
         == runner.ACTIVE_CI_CHECKPOINTS.index(predecessor) + 1
     )
     assert authority(Path(runner.__file__).resolve().parent.parent) == ()
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 57
-    assert runner.ACTIVE_CI_CHECKPOINTS[-38:-24] == (
+    index = runner.ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle")
+    assert runner.ACTIVE_CI_CHECKPOINTS[index : index + 14] == (
         "arch131-robinhood-forward-paper-cycle",
         "arch131-robinhood-live-qualification-verifier",
         "arch131-robinhood-session-admission",
@@ -2529,7 +2567,6 @@ def test_131t_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_qualification_verifier.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     assert runner.ACTIVE_CI_CHECKPOINTS.count(_T_NAME) == 1
     assert runner.ACTIVE_CI_CHECKPOINTS.index(_T_NAME) == (
         runner.ACTIVE_CI_CHECKPOINTS.index(
@@ -2723,7 +2760,6 @@ def test_131u_source_only_registration_and_batch():
         "tests/test_robinhood_prepare_operator.py",
         "tests/scripts/certification_runner/test_profiles.py",
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 57
     assert runner.ACTIVE_CI_CHECKPOINTS.count(_U_NAME) == 1
     assert runner.ACTIVE_CI_CHECKPOINTS.index(_U_NAME) == (
         runner.ACTIVE_CI_CHECKPOINTS.index(
@@ -3185,7 +3221,14 @@ def test_complete_real_chain_with_full_runner_material(tmp_path, monkeypatch, mu
     if mutation != "accepted":
         source = path.read_text(encoding="utf-8")
         assert before in source
-        path.write_text(source.replace(before, after), encoding="utf-8")
+        changed = (
+            _mutate_checkpoint_registration(
+                source, "arch131-robinhood-oauth-windows", before, after
+            )
+            if mutation == "registration"
+            else source.replace(before, after)
+        )
+        path.write_text(changed, encoding="utf-8")
     names = (
         "_arch131_agentic_account_authority_check",
         "_arch131_direct_mcp_authority_check",

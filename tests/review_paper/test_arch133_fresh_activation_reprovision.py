@@ -591,7 +591,8 @@ def test_consumed_sources_unchanged_and_new_topology_admitted():
     assert runner._arch133_reprovision_authority_check(ROOT) == ()
     spec = runner._checkpoint_specs()["arch133-robinhood-fresh-activation-reprovision"]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
-    assert runner.ACTIVE_CI_CHECKPOINTS[-10:-8] == (
+    index = runner.ACTIVE_CI_CHECKPOINTS.index(spec.name)
+    assert runner.ACTIVE_CI_CHECKPOINTS[index : index + 2] == (
         spec.name,
         "arch133-robinhood-reprovision-admission-diagnostic",
     )

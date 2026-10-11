@@ -1,5 +1,69 @@
 # Project Status and Roadmap
 
+## 2026-10-10 - Architecture 133-AH protected release-parent provisioning EXECUTED and VERIFIED
+
+Architecture **133-AH has crossed its one authorized production provisioning
+boundary successfully**. The reviewed checkpoint runner executed exactly one
+protected attempt from the frozen documentation-closeout source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-parent-provisioning
+HEAD    d4d28937c9d7acacc3925884f53ae95e434a6c2b
+TREE    036d2a2a4ea5f91fec10bfd0a8a28cf5c487b924
+
+PROTECTED EXECUTE
+PRIMARY_STATUS        PROVISIONED_VERIFIED
+EFFECT_DISPOSITION    CONFIRMED
+IDENTITY_STABLE       True
+OVERALL               PASS
+EXIT                  0
+
+EVIDENCE
+F:\AI\temp\arch133ah-protected-execute\arch133-robinhood-supervised-release-parent-provisioning\execute-20261011T010709.977237Z\report.json
+~~~
+
+The effect was limited to the fixed Architecture-133 immutable-release parent
+`F:\AITradingBot\releases`. The runner consumed the durable AH one-shot attempt
+latch, issued the single reviewed creation path, and independently read back the
+exact protected parent before reporting `PROVISIONED_VERIFIED`.
+
+This is a terminal AH effect transition. Automatic retry remains
+`NOT_AUTHORIZED`; do not remove/reset the latch, recreate the parent, repair or
+rewrite its ACL through another path, or perform a second AH execute. Any future
+question about the AH effect is reconciliation/readback only.
+
+No immutable release image, FINAL/STAGING directory, scheduler task, credential,
+provider/OAuth state, Paper-v2 state, wake, broker order or live-trading effect
+was authorized or produced by this AH transition.
+
+The earlier PowerShell parser error while setting the dynamic environment
+variable occurred before script execution and therefore did not invoke the
+checkpoint runner or consume the AH attempt. The successful invocation above is
+the single protected AH attempt.
+
+### Next safe action - unchanged 133-AG read-only preflight
+
+Resume Architecture 133-AG on its own frozen branch:
+
+~~~text
+BRANCH
+feature/robinhood-supervised-release-installation-operator
+
+REMOTE HEAD
+513b60029f459ad6ecb4938f8fea2d54209a29d1
+~~~
+
+That AG remote advance is documentation-only relative to its previously reviewed
+source. Synchronize the AG worktree to the exact live branch head, prove the
+worktree clean and remote identity exact, and rerun the registered **read-only AG
+preflight**. The preflight may observe the now-provisioned release parent but may
+not install a release or mutate scheduler/provider/paper/runtime state.
+
+A PASS from that unchanged AG preflight must be reviewed before any immutable
+release installation. AG protected installation remains a separate fresh explicit
+authorization boundary and is **not authorized by the AH success**.
+
+
 ## 2026-10-10 - Architecture 133-AH real-host preflight + FULL ACCEPTED; protected create remains separately authorized
 
 Architecture **133-AH has completed its real-host read-only preflight and selected

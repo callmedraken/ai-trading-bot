@@ -9130,7 +9130,6 @@ def _supervised_publication_execute() -> dict[str, object]:
     return operator.execute_once(admit_source)
 
 
-
 ARCH134_PRODUCTION_STRATEGY_NAME: Final = "arch134-production-strategy-contract"
 ARCH134_PRODUCTION_STRATEGY_SOURCE: Final = "src/trading_bot/strategies/production.py"
 ARCH134_PRODUCTION_STRATEGY_SOURCE_PIN: Final = (

@@ -26,14 +26,14 @@ def _contract(
     target_session_date: date = date(2026, 10, 13),
     source_head: str = "a" * 40,
     source_tree: str = "b" * 40,
-    symbol: Symbol = Symbol("SPY"),
+    symbol: Symbol | None = None,
     config: MovingAverageCrossoverConfig | None = None,
 ) -> subject.ProductionStrategyContract:
     return subject.ProductionStrategyContract(
         target_session_date,
         source_head,
         source_tree,
-        symbol,
+        symbol if symbol is not None else Symbol("SPY"),
         config
         if config is not None
         else MovingAverageCrossoverConfig(5, 20, Decimal("1.000")),
@@ -264,7 +264,10 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
     spec = checkpoint_runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-production-strategy-contract"
-    assert spec.authority_check is checkpoint_runner._arch134_production_strategy_authority_check
+    assert (
+        spec.authority_check
+        is checkpoint_runner._arch134_production_strategy_authority_check
+    )
     assert checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-1] == NAME
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 58
 

@@ -8656,8 +8656,7 @@ def _supervised_installation_reconciliation_authority_check(
             or spec.authority_check
             is not _supervised_installation_reconciliation_authority_check
             or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
-            or SUPERVISED_INSTALLATION_RECONCILIATION_NAME
-            in ACTIVE_CI_CHECKPOINTS
+            or SUPERVISED_INSTALLATION_RECONCILIATION_NAME in ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("installation reconciliation registration drift")
 

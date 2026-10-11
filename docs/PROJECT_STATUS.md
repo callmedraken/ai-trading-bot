@@ -1,5 +1,130 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134 product direction; 134-A Production Strategy Contract frozen
+
+The active product target is now explicit:
+
+~~~text
+operator starts/arms bot before the NYSE session
+        |
+        +--> PRODUCTION LANE
+        |      one session-locked approved strategy
+        |      waits until the admitted market window
+        |      evaluates -> deterministic risk -> Robinhood review-paper
+        |      synthetic paper fill only; no broker placement
+        |
+        +--> RESEARCH LANE
+               develops candidate strategies/configurations
+               backtests / walk-forward / robustness / shadow evaluation
+               cannot mutate production strategy, risk, account or authority
+               candidates require explicit human promotion for a future session
+~~~
+
+The central invariant is **stable production, experimental research**. AI may
+propose and evaluate candidates, but it may not replace the strategy currently
+controlling the paper account, change production risk limits, or grant itself
+execution authority.
+
+Architecture 131 already proved the live Robinhood review-paper path through a
+real provider-backed PREPARE/EXECUTE qualification with zero placement/cancel/
+options/crypto mutation. Architecture 94 already provides deterministic
+`MovingAverageCrossoverStrategy` evaluation from verified daily strategy
+history. Architecture 134 connects those accepted halves without rebuilding
+either engine.
+
+### 134 roadmap
+
+Production lane:
+
+1. **134-A Production Strategy Contract** — current checkpoint. Pure/session-
+   scoped selection model only; no effects.
+2. **134-B Production Strategy Decision Bridge** — bind the accepted production
+   contract to verified daily history/account state and produce exactly one
+   `TradeProposal` or `NO_SIGNAL` using existing strategy logic.
+3. **134-C Human-started live-paper cycle** — shadow mode first, then one
+   reviewed strategy-driven Robinhood review-paper cycle using the accepted
+   Architecture-131 execution path.
+4. **134-D Armed session mode** — operator arms before market; source-owned
+   session/calendar logic waits until the admitted NYSE window and invokes at
+   most one production cycle for the session.
+5. **134-E One unattended integration session** — start before sleep, allow the
+   next admitted session to run without intervention, then reconcile.
+6. **134-F Multi-session paper soak** — fresh bounded unattended soak and
+   operational review before normal recurring paper operation.
+
+Research lane may begin after 134-C and proceed independently of unattended
+qualification:
+
+- candidate strategy/config artifacts are isolated from production state;
+- existing backtest, analytics, optimization and walk-forward infrastructure is
+  reused;
+- candidate evaluation may consume copied/read-only production observations but
+  cannot write production strategy/account/risk/authority material;
+- optional shadow evaluation can record what a candidate *would* have done;
+- promotion to production is a distinct human action for a future session;
+- research yields CPU/resources to the production lane if there is contention.
+
+### 134-A frozen source checkpoint
+
+~~~text
+BRANCH
+feature/robinhood-production-strategy-contract
+
+BASE HEAD
+081c9a5188bdb9a153f042bab20a5265acc3222b
+
+BASE TREE
+589d8f88fdf184723fac99620204124115c47dae
+
+CHECKPOINT
+arch134-production-strategy-contract
+~~~
+
+134-A adds one pure canonical `ProductionStrategyContract` boundary. The first
+supported strategy remains `MovingAverageCrossoverStrategy` / version `1.0.0`,
+but its validated `(short_window, long_window, desired_quantity)` configuration
+is contract data rather than a deployment hard-code. V1 is exactly one symbol
+and one explicit target NYSE session date.
+
+The contract also binds exact reviewed source HEAD/TREE. It has a deterministic
+semantic contract ID and strict canonical serialization/replay. It may construct
+the existing pure `MovingAverageCrossoverStrategy`, but it may not evaluate
+market data, read a clock, inspect files, call a provider, open a paper store,
+evaluate risk, schedule/wait/sleep, mutate state, or execute/review/place an
+order.
+
+`ProductionStrategyContract` is **not itself trading authority**. Later arming
+must separately prove the exact selected contract and session. There is no
+candidate-to-production promotion API in 134-A and no import dependency from
+research/optimization/AI modules into this production boundary.
+
+Expected implementation surfaces:
+
+~~~text
+src/trading_bot/strategies/production.py
+tests/strategies/test_production_strategy_contract.py
+scripts/checkpoint_runner.py
+.github/workflows/checkpoint-source-gates.yml
+~~~
+
+The new active checkpoint is appended once to the audited active registry and
+must preserve the split source-static / active-tests / four fallback shards /
+terminal source-gates topology. With exactly one new `tests/strategies` module,
+expected post-implementation inventory is:
+
+~~~text
+active checkpoints  58
+FULL               159
+ROBINHOOD            85
+LEGACY              205
+EXHAUSTIVE          364
+~~~
+
+134-A implementation uses focused tests only. No FULL/ROBINHOOD/LEGACY/
+EXHAUSTIVE certification is selected until a coherent later integration
+boundary. No production worktree, scheduler, provider/OAuth, paper database,
+AJ/AG evidence, STAGING/FINAL object, broker or live effect is authorized.
+
 ## 2026-10-11 — Post-AJ probe confirms STAGING preserved; manual worktree deployment selected
 
 The one-time post-AJ read-only state probe completed successfully using the

@@ -135,6 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation-operator",
+    "arch133-robinhood-supervised-release-installation-reconciliation",
     "arch133-robinhood-supervised-deployment-qualification",
     "arch133-robinhood-supervised-runtime-host-admission",
     "arch133-robinhood-supervised-maintenance-rebind",
@@ -8614,6 +8615,151 @@ def _supervised_installation_execute() -> dict[str, object]:
     return operator._execute_once(_consume_supervised_installation_attempt)
 
 
+SUPERVISED_INSTALLATION_RECONCILIATION_NAME: Final = (
+    "arch133-robinhood-supervised-release-installation-reconciliation"
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE: Final = (
+    "src/trading_bot/supervised_release/installation_reconciliation.py"
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_PIN: Final = "1c346c3286a4bc57763652f51749be0873d42a24"
+SUPERVISED_INSTALLATION_RECONCILIATION_TESTS: Final = (
+    *SUPERVISED_INSTALLATION_OPERATOR_TESTS,
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS: Final = (
+    *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
+    SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE,
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+)
+
+
+def _supervised_installation_reconciliation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the read-only 133-AI incident reconciliation boundary."""
+    failures = list(_supervised_installation_operator_authority_check(repo_root))
+    try:
+        from trading_bot.supervised_release import (
+            installation_reconciliation as operator,
+        )
+
+        spec = _checkpoint_specs()[SUPERVISED_INSTALLATION_RECONCILIATION_NAME]
+        if (
+            spec.preflight is not _supervised_installation_reconciliation_preflight
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-installation-reconciliation"
+            or spec.tests != SUPERVISED_INSTALLATION_RECONCILIATION_TESTS
+            or spec.ruff_paths != SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_installation_reconciliation_authority_check
+            or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
+            or ACTIVE_CI_CHECKPOINTS[1]
+            != SUPERVISED_INSTALLATION_RECONCILIATION_NAME
+        ):
+            failures.append("installation reconciliation registration drift")
+
+        path = repo_root / SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_RECONCILIATION_PIN:
+            failures.append("installation reconciliation reviewed source drift")
+
+        allowed = {
+            "__future__",
+            "json",
+            "stat",
+            "dataclasses",
+            "pathlib",
+            "typing",
+            "trading_bot.supervised_release.installation_operator",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "install_release",
+            "create_directory",
+            "write_file",
+            "seal_staging",
+            "publish",
+            "mkdir",
+            "unlink",
+            "write_text",
+            "write_bytes",
+            "rename",
+            "replace",
+            "rmtree",
+            "remove",
+            "chmod",
+        }
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("installation reconciliation import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("installation reconciliation import boundary drift")
+            if (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                in forbidden
+            ):
+                failures.append(
+                    "installation reconciliation capability boundary drift"
+                )
+
+        if (
+            operator.WORKTREE
+            != Path(
+                r"F:\AI\worktrees\ai-trading-bot-supervised-release-installation-reconciliation"
+            )
+            or operator.BRANCH
+            != "feature/robinhood-supervised-release-installation-reconciliation"
+            or operator.ORIGIN != "https://github.com/callmedraken/ai-trading-bot.git"
+            or operator.FAILED_AG_HEAD
+            != "513b60029f459ad6ecb4938f8fea2d54209a29d1"
+            or operator.FAILED_AG_TREE
+            != "14e8d161ac95e57982c576ebd19681bb204b22fd"
+            or operator.EXPECTED_RELEASE_ID
+            != "release-03c42597246752319956ab96e01ed61c"
+        ):
+            failures.append("installation reconciliation fixed incident drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("installation reconciliation source unavailable")
+    return tuple(failures)
+
+
+def _supervised_installation_reconciliation_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import installation_reconciliation as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.FAILED_AG_HEAD, "HEAD")
+        != operator.FAILED_AG_HEAD
+        or _supervised_installation_reconciliation_authority_check(repo_root)
+    ):
+        raise RuntimeError("installation reconciliation source authority rejected")
+
+
+def _supervised_installation_reconciliation_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_reconciliation as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_reconciliation_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("installation reconciliation live remote authority rejected")
+    return operator._preflight()
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -9437,6 +9583,22 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             preflight=_supervised_installation_preflight,
             execute=_supervised_installation_execute,
             remote_branch="feature/robinhood-supervised-release-installation-operator",
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-installation-reconciliation": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-installation-reconciliation",
+            description=(
+                "133-AI read-only reconciliation of the consumed AG "
+                "publication ambiguity"
+            ),
+            tests=SUPERVISED_INSTALLATION_RECONCILIATION_TESTS,
+            ruff_paths=SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS,
+            authority_check=_supervised_installation_reconciliation_authority_check,
+            preflight=_supervised_installation_reconciliation_preflight,
+            execute=None,
+            remote_branch=(
+                "feature/robinhood-supervised-release-installation-reconciliation"
+            ),
             remote_head_env=None,
         ),
         "arch133-robinhood-supervised-deployment-qualification": CheckpointSpec(

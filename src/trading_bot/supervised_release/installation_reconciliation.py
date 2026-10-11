@@ -81,10 +81,14 @@ def _read_record(path: Path, limit: int) -> bytes:
 
 
 def _attempt_context() -> None:
-    if _read_record(ATTEMPT_PATH, 4096) != ATTEMPT_BYTES:
+    attempt = _read_record(ATTEMPT_PATH, 4096)
+    if attempt != ATTEMPT_BYTES or _read_record(ATTEMPT_PATH, 4096) != attempt:
         raise ValueError("installation attempt latch rejected")
 
-    report = json.loads(_read_record(REPORT_PATH, MAX_RECORD_BYTES).decode("utf-8"))
+    report_bytes = _read_record(REPORT_PATH, MAX_RECORD_BYTES)
+    if _read_record(REPORT_PATH, MAX_RECORD_BYTES) != report_bytes:
+        raise ValueError("installation attempt report drift")
+    report = json.loads(report_bytes.decode("utf-8"))
     if type(report) is not dict:
         raise ValueError("installation attempt report rejected")
 
@@ -212,6 +216,8 @@ def _preflight() -> dict[str, object]:
             if first_evidence != second_evidence:
                 return _blocked("FINAL_OBSERVATION_DRIFT")
             _validate_evidence(first_evidence, image_identity=final.identity)
+            if _presence(paths) != first:
+                return _blocked("PRESERVED_NAMESPACE_DRIFT")
             return {
                 "status": "PASS",
                 "effect_disposition": "CONFIRMED",
@@ -234,6 +240,8 @@ def _preflight() -> dict[str, object]:
             if first_evidence != second_evidence:
                 return _blocked("STAGING_OBSERVATION_DRIFT")
             _validate_evidence(first_evidence, image_identity=staging.identity)
+            if _presence(paths) != first:
+                return _blocked("PRESERVED_NAMESPACE_DRIFT")
             return {
                 "status": "PASS",
                 "effect_disposition": "MAY_HAVE_OCCURRED",

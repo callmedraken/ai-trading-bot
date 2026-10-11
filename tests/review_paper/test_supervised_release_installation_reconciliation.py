@@ -264,3 +264,29 @@ def test_checkpoint_registration_is_read_only():
         spec.remote_branch
         == "feature/robinhood-supervised-release-installation-reconciliation"
     )
+
+
+def test_incident_record_drift_is_rejected(monkeypatch):
+    reads = iter((subject.ATTEMPT_BYTES, b"changed"))
+    monkeypatch.setattr(subject, "_read_record", lambda path, limit: next(reads))
+
+    with pytest.raises(ValueError):
+        subject._attempt_context()
+
+
+def test_late_namespace_drift_blocks_after_exact_final_replays(monkeypatch):
+    _frozen(monkeypatch)
+    final = SimpleNamespace(identity=(1855336320, 9001))
+    evidence = _evidence(final.identity)
+    observations = iter(((final, None), (final, None), (None, None)))
+    monkeypatch.setattr(subject, "_presence", lambda paths: next(observations))
+    monkeypatch.setattr(
+        subject,
+        "observe_installed_release",
+        lambda r, b, native: evidence,
+    )
+
+    result = subject._preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["reason"] == "PRESERVED_NAMESPACE_DRIFT"

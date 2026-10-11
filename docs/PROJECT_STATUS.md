@@ -1,5 +1,57 @@
 # Project Status and Roadmap
 
+## 2026-10-10 — Architecture 133-AJ certification correction SOURCE ACCEPTED; FULL reselected
+
+The test-only correction required by the first Architecture 133-AJ FULL attempt is
+**SOURCE ACCEPTED** on the exact reviewed source:
+
+~~~text
+HEAD  2c4d77cdafed17d8d2437568114cf4db8b9028da
+TREE  fb3c5d6db65928ae635aa80d9675da69fd636343
+CI    #449 / 38119594207 SUCCESS
+~~~
+
+The first FULL attempt on docs-notary HEAD
+`fe949ff884c0dbe6939009277d24005393a73f14`, TREE
+`e2420b067596ce894498e548a5629c0151fa3e9a`, failed 11 of 9,022 collected
+cases with zero errors. Preserved evidence remains at:
+
+~~~text
+F:\AI\temp\pytest\arch133aj-full-fe949ff-0db9e6f157dc415293243168a3180bfc
+~~~
+
+Exact failure review found one stale-inventory synchronization omission caused by
+AJ's accepted addition: nine tests still expected 56 active checkpoints instead
+of 57, and two exact certification-profile inventory tests omitted
+`test_supervised_release_publication_recovery.py`. Three of the checkpoint tests
+also carried the corresponding stale profile totals.
+
+The correction changes only ten test files, with 24 insertions and 22 deletions.
+It updates the active-checkpoint total to 57 and the already-canonical supported
+inventory totals to FULL 158 / ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 363.
+Exact equality, ordering, authority, frozen-baseline, subset/disjointness,
+exhaustive-inventory and partition assertions remain intact. No implementation,
+workflow, architecture behavior, publication/latch semantics or protected-effect
+authority changed.
+
+Focused correction verification passed the exact eleven failures (11 passed) and
+the ten changed modules plus AJ source-routing regression surface (1,513 passed),
+with focused non-mutating Ruff check/format and git diff checks also clean.
+Push-triggered source gate #449 ran on the exact correction HEAD: `source-static`
+SUCCESS, `active-tests` SUCCESS, fallback `full-tests` SKIPPED, terminal
+`source-gates` SUCCESS.
+
+The selected next gate remains exactly one optimized **FULL** current-product
+certification on the final atomic documentation-closeout source descended from
+this accepted correction. No separate ROBINHOOD/LEGACY/EXHAUSTIVE run is
+selected unless FULL exposes a new scope-specific reason.
+
+FULL remains certification only. AJ real-host preflight remains read-only and is
+blocked until FULL succeeds. AJ publication remains separately and freshly
+authorized; no AJ latch consumption, STAGING/FINAL mutation, AG retry, scheduler,
+runtime, provider/Paper-v2, wake, broker or live effect is authorized by this
+correction or its certification.
+
 ## 2026-10-10 — Architecture 133-AJ SOURCE ACCEPTED; FULL selected next
 
 Architecture **133-AJ — preserved immutable-release publication recovery** is

@@ -54,6 +54,39 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Architecture 133-AJ certification correction — SOURCE ACCEPTED
+
+The first AJ FULL attempt on HEAD
+`fe949ff884c0dbe6939009277d24005393a73f14`, TREE
+`e2420b067596ce894498e548a5629c0151fa3e9a`, collected 9,022 cases and failed
+11 with zero errors. All eleven failures were stale test expectations from AJ's
+accepted inventory addition: nine active-checkpoint counts still expected 56,
+while two exact profile inventories omitted
+`tests/review_paper/test_supervised_release_publication_recovery.py`; three of
+the nine also carried stale profile totals.
+
+The exact correction is test-only and SOURCE ACCEPTED:
+
+~~~text
+HEAD  2c4d77cdafed17d8d2437568114cf4db8b9028da
+TREE  fb3c5d6db65928ae635aa80d9675da69fd636343
+CI    #449 / 38119594207 SUCCESS
+~~~
+
+Focused verification passed the exact 11 failures and then 1,513 cases covering
+the ten changed modules plus AJ's source-routing regression test. Ruff
+check/format and diff checks passed. The correction preserves exact inventory,
+ordering, authority, frozen-baseline and partition assertions while synchronizing
+57 active checkpoints and FULL 158 / ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 363.
+No Architecture-133 behavior or safety contract changed.
+
+Preserve the failed evidence directory:
+`F:\AI\temp\pytest\arch133aj-full-fe949ff-0db9e6f157dc415293243168a3180bfc`.
+Do not reuse it. After the atomic docs closeout is terminal-green, run exactly
+one fresh FULL certification on that final source identity. Do not run a real AJ
+host surface before FULL succeeds, and do not infer publication authorization
+from source/CI/FULL success.
+
 ## Architecture 133-AJ source validation — SOURCE ACCEPTED
 
 Accepted exact source:

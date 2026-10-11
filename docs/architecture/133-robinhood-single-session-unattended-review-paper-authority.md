@@ -54,6 +54,33 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## 133-AJ certification correction — SOURCE ACCEPTED
+
+The first selected AJ FULL certification exposed only stale test inventory
+expectations, not an AJ behavioral or authority defect. The exact test-only
+correction is SOURCE ACCEPTED:
+
+~~~text
+HEAD  2c4d77cdafed17d8d2437568114cf4db8b9028da
+TREE  fb3c5d6db65928ae635aa80d9675da69fd636343
+CI    #449 / 38119594207 SUCCESS
+~~~
+
+The correction updates 56 -> 57 active-checkpoint expectations and admits
+`test_supervised_release_publication_recovery.py` into the exact current FULL
+and Robinhood expected inventories. Supported inventory totals remain the
+already-reviewed FULL 158 / ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 363.
+No production implementation, native publication behavior, latch ordering,
+no-retry disposition, namespace authority, scheduler/runtime/provider capability
+or other Architecture-133 safety contract changed.
+
+The failed FULL evidence at
+`F:\AI\temp\pytest\arch133aj-full-fe949ff-0db9e6f157dc415293243168a3180bfc`
+is preserved and must not be reused. The next gate is one fresh FULL
+current-product certification on the final atomic docs-closeout source. Real AJ
+preflight remains blocked until that FULL passes; protected publication remains a
+later separate explicit authorization.
+
 ## Architecture 133-AJ implementation — SOURCE ACCEPTED
 
 Accepted exact implementation and source gate:

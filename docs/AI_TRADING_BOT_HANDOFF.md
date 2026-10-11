@@ -1,5 +1,62 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-10 — 133-AI reconciled AG publication as exact preserved STAGING; fast source gate restored
+
+Architecture **133-AI** completed its real-host read-only reconciliation of the
+consumed 133-AG publication ambiguity.  The corrected reconciliation source ran
+with no protected execution authority and returned:
+
+~~~text
+SOURCE HEAD  90f9366f4251f062985ce335bea62e1c747aa1d4
+SOURCE TREE  9875c09142f28e86145d9101c4cbd7c64dc9b51d
+
+PRIMARY_STATUS  STAGING_VERIFIED_PRESERVED
+PRIMARY_REASON  EXACT_STAGING_ONLY
+IDENTITY_STABLE True
+OVERALL         PASS
+~~~
+
+Evidence is preserved at:
+
+~~~text
+F:\AI\temp\arch133ai-reconciliation-corrected-6a5d4f6a8ee641a1a4c44a41bbd152f0\arch133-robinhood-supervised-release-installation-reconciliation\preflight-20261011T043729.349823Z\report.json
+~~~
+
+This closes the original 133-AG publication ambiguity as **publication did not
+complete**: the exact verified immutable image remains at the fixed STAGING
+namespace and FINAL was not accepted as present.  The consumed AG installation
+latch remains authoritative.  No AG retry, STAGING cleanup/delete, manual rename,
+FINAL creation/replacement, ACL repair or promotion is authorized.
+
+During 133-AI review the branch was found to have regressed to the pre-R2-D
+monolithic source gate.  The already-audited split/sharded source-gate topology
+was restored without importing AH-only authority.  The accepted compatibility
+correction is:
+
+~~~text
+HEAD  165bae500ca8f486298d4ede8b6ba7ec5237fe89
+TREE  17f82b819c2bca19e2dd04f4a91be1fb92f969d7
+CI    #445 / 38112755149 SUCCESS
+wall  3m 07s
+~~~
+
+The workflow again uses source-static plus active-test routing or four
+duration-balanced full-test shards, with the terminal source-gates aggregator.
+The prior ~7-minute monolithic gate is not the accepted workflow.
+
+### Next checkpoint — Architecture 133-AJ
+
+The next safe milestone is a new **source-only publication-recovery operator** for
+the already verified preserved STAGING image.  It must not retry installation or
+reuse/reset the AG latch.  It must first reprove the exact 133-AI incident
+evidence, exact preserved STAGING-only namespace and exact release/binding/image
+identity; expose a read-only preflight with zero production effects; and place
+any later STAGING->FINAL publication behind a new independent one-shot recovery
+latch plus fresh explicit authorization.  No cleanup, overwrite, scheduler
+rebind, runtime start, provider/Paper-v2, wake, broker or live-trading authority
+belongs in 133-AJ.  Any post-fence ambiguity remains preserve/no-retry.
+
+
 
 ## 2026-10-10 — 133-AG publication became INDETERMINATE; 133-AI read-only reconciliation frozen
 

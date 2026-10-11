@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from scripts import checkpoint_runner as runner
 from trading_bot.supervised_release import installation_reconciliation as subject
 from trading_bot.supervised_release.installation_contract import InstalledEvidence
 
@@ -246,3 +247,20 @@ def test_fixed_paths_are_incident_specific():
     )
     assert subject.REPORT_PATH.name == "report.json"
     assert "execute-20261011T034428.605950Z" in str(subject.REPORT_PATH)
+
+
+def test_checkpoint_registration_is_read_only():
+    name = "arch133-robinhood-supervised-release-installation-reconciliation"
+    spec = runner._checkpoint_specs()[name]
+
+    assert runner.ACTIVE_CI_CHECKPOINTS[:2] == (
+        "arch133-robinhood-supervised-release-installation-operator",
+        name,
+    )
+    assert spec.preflight is runner._supervised_installation_reconciliation_preflight
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert (
+        spec.remote_branch
+        == "feature/robinhood-supervised-release-installation-reconciliation"
+    )

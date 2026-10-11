@@ -345,82 +345,40 @@ deployment or self-modification.
 
 ## 134-B — Production Strategy Decision Bridge
 
-134-B binds the session-scoped production selection to the repository's existing
-verified daily strategy-decision path. It deliberately does **not** create a
-second strategy-history/account reconstruction implementation.
+134-B's original source-accepted entry point remains a **legacy compatibility
+adapter** for Architecture-94 callers. It still accepts an exact
+`ManualPaperStrategyDecisionRequest`, requires a genuine construction-protected
+`VerifiedPriorCheckpoint`, and returns the same closed
+`ProductionStrategyDecision` outcomes. That compatibility path is retained so
+historical Architecture-94 plan/replay behavior does not regress.
 
-### Inputs
+It is **not** the current Robinhood production materialization path.
 
-Exactly:
-
-- one `ProductionStrategyContract` from 134-A;
-- one `ManualPaperStrategyDecisionRequest` from Architecture 94;
-- one `IdentifiedMarketCalendar` accepted by the Architecture-94 builder.
-
-Before invoking strategy evaluation, require:
-
-- request `strategy_config == contract.strategy_config`;
-- verified history-seed `strategy_config == contract.strategy_config`;
-- verified history-seed symbol exactly equals `contract.symbol`.
-
-Then call `build_manual_paper_strategy_decision(request, calendar)` exactly once.
-That accepted builder independently replays the verified daily snapshot, seed,
-prior paper checkpoint/account state and calendar and evaluates the existing
+The accepted current-product path is Architecture 134-B2 below. Both the
+historical adapter and the current Robinhood adapter enter the same extracted
+pure daily-decision core, which evaluates the existing
 `MovingAverageCrossoverStrategy` exactly once.
 
-After that single call require:
-
-- prepared `strategy_config == contract.strategy_config`;
-- prepared `symbol == contract.symbol`;
-- prepared `intended_execution_session.session_date ==
-  contract.target_session_date`;
-- prepared signal/proposal combination remains exactly consistent with the
-  existing `ManualPaperStrategySignalStatus` contract.
-
-### Closed output
-
-`ProductionStrategyDecisionStatus` has exactly:
+The closed production output remains exactly:
 
 ~~~text
 NO_SIGNAL
 TRADE_PROPOSAL
 ~~~
 
-`ProductionStrategyDecision` retains:
-
-- the exact `ProductionStrategyContract` object;
-- the exact `PreparedManualPaperStrategyDecision` returned by Architecture 94;
-- the matching closed status;
-- `proposal=None` for `NO_SIGNAL`, otherwise the exact retained `TradeProposal`
-  object by identity.
-
-The bridge does not generate a new proposal, order ID, risk decision, strategy
-identity or source identity. It cannot substitute a research candidate.
-
-### Capability boundary
-
-Allowed direct dependencies are limited to the production contract, existing
-Architecture-94 strategy-decision model/builder, domain proposal types and
-market-calendar typing needed for the pure composition.
-
-Forbidden capabilities include Robinhood/MCP/OAuth, network, filesystem/Git/
-environment, SQLite/paper store, risk evaluation, review/execution/order engine,
-scheduler, clock/sleep, runtime/native host code, experiments/optimization/AI,
-candidate selection or promotion.
-
-134-B has no registered preflight or execute callback. Source acceptance grants
-only the right to proceed to 134-C design.
-
+No adapter may substitute a research candidate, create broker authority, or
+perform provider/OAuth/network/scheduler execution.
 
 ## 134-B2 — Current-product production-decision materialization
 
-134-B's pure bridge intentionally accepts an Architecture-94
-`ManualPaperStrategyDecisionRequest`; that type reuse does **not** make the
-historical personal-desktop Paper-v2/C3 runtime part of Architecture 134
-production authority.
+The original 134-B compatibility adapter accepts an Architecture-94
+`ManualPaperStrategyDecisionRequest`; Architecture 134-B2 does **not** require
+that legacy request or its protected prior authority. Retaining the compatibility
+adapter does not make the historical personal-desktop Paper-v2/C3 runtime part
+of Architecture 134 production authority.
 
-The current Robinhood lane requires a dedicated materialization boundary using
-current-product evidence:
+Architecture 134-B2 is source accepted on the production live-paper branch. The
+current Robinhood lane now materializes decisions from current-product evidence:
 
 - exact 134-A production contract;
 - verified daily snapshot/history evidence for the contract symbol/session;
@@ -432,22 +390,46 @@ Architecture-94's `VerifiedPriorCheckpoint` is construction-protected authority
 from the historical checkpoint-lineage system. The Robinhood adapter must
 **never fabricate or synthesize that capability** from ReviewPaperStore.
 
-Instead, 134-B2 must extract/reuse the already-reviewed pure strategy-decision
-core beneath the Architecture-94 request adapter. The existing Architecture-94
-entry point continues to validate/translate its legacy `VerifiedPriorCheckpoint`;
-the new Robinhood entry point validates/translates independently verified
-ReviewPaperStore state into a current-product prior model. Both paths then call
-the same pure decision core, which performs exactly one existing strategy
-evaluation. The accepted 134-B closed `NO_SIGNAL` / `TRADE_PROPOSAL` contract
+134-B2 extracted/reuses the already-reviewed pure strategy-decision core beneath
+the Architecture-94 request adapter. The existing Architecture-94 entry point
+continues to validate/translate its legacy `VerifiedPriorCheckpoint`; the new
+Robinhood entry point validates/translates independently verified
+`ReviewPaperStore` state into a construction-protected current-product prior.
+Both paths call the same pure decision core, which performs exactly one existing
+strategy evaluation. The accepted 134-B closed `NO_SIGNAL` / `TRADE_PROPOSAL` contract
 remains the production output boundary. It must not read
 or repair D10/Windows/Paper-v2/C1/C3 personal-desktop state, use historical
 Alpaca operational authority, or infer missing market history.
 
-The materializer itself is source/provider-free. Any later live market-history
-acquisition or persistence boundary is separately reviewed and cannot be
-silently folded into SHADOW PREPARE.
+The materializer itself is source/provider-free. Real current market-history
+acquisition/persistence remains the next source checkpoint and is separately
+reviewed; it cannot be silently folded into SHADOW PREPARE.
 
 A 2026-10-11 read-only diagnostic found a DACL mismatch only on
 `F:\AITradingBot\Paper-v2` while its relevant descendants remained exact.
 That legacy drift is not an Architecture-134 blocker and grants no ACL-repair
 authority.
+
+
+### 134-B2 accepted source
+
+~~~text
+BRANCH feature/robinhood-production-strategy-live-paper
+HEAD   1e3c74649aeb6f0f90881b1495fec0350c22ae5e
+TREE   b9ac7a11a39d07252ab85fd7b197b31590a825b9
+CI     #478 / 38175971808 SUCCESS
+~~~
+
+The accepted implementation adds a current-product
+`build_current_production_strategy_decision(...)` adapter, a read-only
+`ReviewPaperStrategyPrior`, shared pure `daily_decision` logic, and provider-
+free strategy-history primitives. The historical runtime history module is now
+a compatibility export rather than the owner of the reusable history model.
+
+Current profile inventory at this source is FULL **163**, ROBINHOOD **88**,
+LEGACY **205**, EXHAUSTIVE **368**.
+
+No separate broad certification is run at 134-B2. The pending ROBINHOOD
+certification obligation is deliberately batched with the next current-history
+acquisition/materialization checkpoint so that one coherent current-decision
+source is certified exactly once before any protected SHADOW PREPARE.

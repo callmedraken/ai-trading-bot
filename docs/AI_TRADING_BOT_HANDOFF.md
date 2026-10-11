@@ -21545,7 +21545,82 @@ The exact market-history acquisition/persistence authority for live production
 must be explicit and separately reviewed; source implementation must not invent
 or silently substitute current bars.
 
-The already accepted 134-C SHADOW-PREPARE operator and its ROBINHOOD
+The already accepted 134-C SHADOW-PREPARE operator and its prior source
 certification remain valid for their exact source tree, but the real protected
 PREPARE is blocked until an exact 134-B2-produced `ProductionStrategyDecision`
 exists. The previously granted PREPARE authorization remains unconsumed.
+
+
+## 2026-10-11 — Architecture 134-B2 current-product decision materialization SOURCE ACCEPTED
+
+Architecture **134-B2** is source accepted on the existing production
+live-paper branch:
+
+~~~text
+BRANCH feature/robinhood-production-strategy-live-paper
+HEAD   1e3c74649aeb6f0f90881b1495fec0350c22ae5e
+TREE   b9ac7a11a39d07252ab85fd7b197b31590a825b9
+CI     #478 / 38175971808 SUCCESS
+PARENT 82e33c62abc3853a188bdea47641ff14b27d9ddb
+~~~
+
+The GitHub diff is exactly one implementation commit. Source gate #478 passed
+`source-static`, the registered active checkpoint tests, and terminal
+`source-gates`; broad/full CI shards were correctly skipped.
+
+Accepted behavior:
+
+- current Robinhood decisions consume explicit verified daily snapshot/history
+  evidence and an exact `ReviewPaperStore`;
+- `ReviewPaperStore` prior reconstruction is read-only and preserves durable
+  cash/positions/average cost/realized P&L;
+- no current path fabricates Architecture-94's protected
+  `VerifiedPriorCheckpoint`;
+- the legacy Architecture-94 adapter remains exact compatibility authority;
+- legacy and current adapters enter the same extracted pure daily-decision core;
+- exactly one existing `MovingAverageCrossoverStrategy.evaluate(...)` occurs;
+- closed production outcomes remain `NO_SIGNAL` / `TRADE_PROPOSAL`;
+- no provider/OAuth/Paper-v2/scheduler/broker effect occurred.
+
+The source change also moved reusable strategy-history primitives out of the
+historical runtime owner into `trading_bot.strategies.history_seed`; the old
+runtime module is now a compatibility export. A new current-product test suite
+and the affected legacy/cycle/profile tests were updated in the same feature
+change. Normative Architecture-134 docs are updated in this closeout so they do
+not continue to describe the superseded Paper-v2/Architecture-94 request route
+as the current production path.
+
+Current exact profile inventory is FULL **163**, ROBINHOOD **88**,
+LEGACY **205**, EXHAUSTIVE **368**.
+
+### Certification decision
+
+Do **not** run ROBINHOOD or FULL at 134-B2. This is an intermediate source-only
+materialization checkpoint and real current-history acquisition is still
+missing. A certification now would be superseded before any protected PREPARE.
+
+The pending **ROBINHOOD** obligation is explicitly batched to the next coherent
+current-decision boundary after **134-B3 current market-history acquisition and
+verified evidence materialization** is source accepted. That one ROBINHOOD
+profile must pass before the first real protected SHADOW PREPARE. FULL remains
+reserved for a later consequential boundary if its independent trigger becomes
+true.
+
+### Workflow clarification accepted
+
+One logical accepted checkpoint should normally produce **one planned push and
+one push-triggered CI run**. Foreseeable docs/status/cleanup changes must be
+consolidated before that push rather than split into duplicate CI runs. A second
+push is only for a real correction, incomplete source, remote movement, or a new
+logical checkpoint.
+
+When behavior is changed or removed, the same logical checkpoint must **remove
+or update any tests and docs that referenced the old behavior**. Historical
+provenance may remain only when explicitly labeled historical/superseded;
+current/normative docs and tests must describe the accepted behavior.
+
+The next source milestone is **134-B3**. It owns current market-history
+acquisition/materialization needed to supply 134-B2's explicit verified
+snapshot/history inputs. It must not revive Paper-v2/D10/C1/C3 operational
+authority. No protected provider/OAuth read is authorized by this source
+acceptance.

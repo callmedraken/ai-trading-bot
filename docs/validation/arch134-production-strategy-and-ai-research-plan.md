@@ -268,12 +268,16 @@ Run focused tests, non-mutating Ruff check/format and diff check only. Do not
 perform a real provider PREPARE, OAuth interaction, paper mutation or broad
 certification during implementation.
 
-After exact GitHub source acceptance, the first real 134-C qualification is a
-separately authorized human-started **shadow PREPARE**. A paper EXECUTE is a
-second separately authorized step and is permitted only if the retained PREPARE
-remains `READY_TO_PROCEED` and all Architecture-131 revalidation passes.
+This original 134-C statement is **superseded by 134-B2/134-B3** for the
+current product path. Before the first real 134-C qualification, 134-B3 must
+source-accept current market-history acquisition/materialization and the pending
+ROBINHOOD certification must pass on that coherent current-decision source.
+Only then may a separately authorized human-started **shadow PREPARE** be
+considered. A paper EXECUTE remains a second separately authorized step and is
+permitted only if the retained PREPARE remains `READY_TO_PROCEED` and all
+Architecture-131 revalidation passes.
 
-## 134-B validation contract
+## Historical 134-B compatibility validation contract
 
 Focused tests must prove:
 
@@ -315,11 +319,25 @@ FULL/ROBINHOOD/LEGACY/EXHAUSTIVE during implementation.
 134-B source acceptance does not authorize 134-C live shadow/provider access or
 paper mutation.
 
+This section records the original Architecture-94-facing 134-B compatibility
+contract. It is retained as historical regression provenance; it is no longer
+the normative current-product materialization path after accepted 134-B2.
 
-## 2026-10-11 — 134-B2 corrective validation checkpoint
 
-Before the first real 134-C SHADOW PREPARE, add and source-accept a
-current-product decision materializer.
+## 2026-10-11 — 134-B2 SOURCE ACCEPTED
+
+Architecture 134-B2 current-product decision materialization is source accepted:
+
+~~~text
+BRANCH feature/robinhood-production-strategy-live-paper
+HEAD   1e3c74649aeb6f0f90881b1495fec0350c22ae5e
+TREE   b9ac7a11a39d07252ab85fd7b197b31590a825b9
+CI     #478 / 38175971808 SUCCESS
+~~~
+
+The accepted current-product decision materializer is provider-free and uses
+explicit verified snapshot/history evidence plus read-only `ReviewPaperStore`
+state.
 
 Focused validation must prove:
 
@@ -350,3 +368,24 @@ abandoned.
 After exact GitHub review and terminal-green source-gate CI, select only the
 smallest distinct certification required by the changed current-product
 surface. Do not rerun FULL merely for confidence.
+
+Exact current inventory is FULL **163**, ROBINHOOD **88**, LEGACY **205**,
+EXHAUSTIVE **368**.
+
+ChatGPT source review accepted the exact commit above. No ROBINHOOD/FULL run is
+required at this intermediate source-only checkpoint: real current-history
+acquisition/materialization remains a separate source checkpoint before any
+protected PREPARE is possible. The pending **ROBINHOOD** certification is
+batched to that coherent current-decision boundary and must pass before the
+first real protected SHADOW PREPARE. FULL remains unnecessary unless later
+source breadth creates a separate consequential current-product obligation.
+
+This 134-B2 acceptance supersedes the earlier dated 134-C closeout statement
+that called SHADOW PREPARE the immediate next boundary.
+
+The next source milestone is **134-B3 — current market-history acquisition and
+verified evidence materialization**. It must define the exact current provider/
+persistence authority for the snapshot/history evidence consumed by 134-B2.
+It must not revive Paper-v2/C1/C3/D10 operational dependencies. Provider/OAuth
+effects, if required for qualification, remain separately protected and are not
+authorized by this source acceptance.

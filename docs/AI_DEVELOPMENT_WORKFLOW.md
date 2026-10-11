@@ -499,6 +499,52 @@ a distinct required gate not already covered. Independent required coverage
 is not duplicate execution. A docs-only closeout does not change already
 certified executable/test source and must not manufacture a repeat test event.
 
+#### 2a. One accepted checkpoint push means one planned CI run
+
+For one logical accepted checkpoint, consolidate all foreseeable source, test,
+documentation, status/handoff, and cleanup edits before the ordinary push.
+The normal path is **one commit/push -> one push-triggered source-gate CI run**.
+Do not split a docs closeout, wording correction, or foreseeable stale-reference
+cleanup into another push that merely causes a second CI run for the same
+checkpoint.
+
+A second push/CI run is justified only when the first pushed source is actually
+incorrect or incomplete, CI exposes a defect, the remote ref changed, or a new
+logical checkpoint begins. Preserve the first run as evidence; do not rerun an
+unchanged successful workflow merely for confidence.
+
+When a certification result must be recorded after source acceptance, prefer
+batching the status/handoff/workflow documentation into the single planned
+post-certification docs closeout rather than creating multiple docs-only pushes.
+
+#### 2b. Behavior-change cleanup is part of the feature change
+
+Whenever a feature, contract, capability, status, path, or behavior is changed
+or removed, the same logical checkpoint must also **remove or update any tests
+and docs that referenced the old behavior**.
+
+Before source acceptance, explicitly search the affected names/terms and review:
+
+- focused and regression tests, fixtures, mocks, snapshots, expected counts and
+  authority/checkpoint assertions;
+- current/normative architecture, validation, workflow, status/handoff and
+  operator/runbook documentation;
+- examples, comments and compatibility exports when they describe callable
+  behavior or authority.
+
+Do not keep a stale test by weakening its assertion until it passes. Update it
+to assert the replacement contract, or delete it when the covered behavior is
+intentionally removed and replacement coverage makes it obsolete.
+
+Historical chronology may be retained when it is useful provenance, but it must
+be explicitly labeled historical/superseded and must not read as the current
+normative path. Current/normative documentation must not contradict the accepted
+implementation.
+
+This stale-reference cleanup is part of the feature checkpoint, not a later
+cosmetic follow-up, so it should normally be included before the checkpoint's
+single planned push/CI run.
+
 #### 3. FULL is rare and is not an iteration loop
 
 FULL is a consequential/current-product certification boundary, not a debugging

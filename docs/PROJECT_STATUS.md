@@ -1,5 +1,46 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134-B SOURCE ACCEPTED
+
+Architecture **134-B — Production Strategy Decision Bridge** is source accepted.
+
+~~~text
+BRANCH  feature/robinhood-production-strategy-decision
+HEAD    695fa6195b2d8cc1437ba87f5d48c527afa28da7
+TREE    00871d80bc9ae0a3f60906d23c92b30e42c670c4
+CI      #465 / 38128865894 SUCCESS
+~~~
+
+The accepted bridge consumes the exact 134-A production contract plus the
+existing Architecture-94 verified strategy-decision request/calendar boundary.
+It checks contract config and verified seed symbol/config before the builder,
+invokes `build_manual_paper_strategy_decision(...)` exactly once, then requires
+the prepared config/symbol/intended session to remain inside the production
+contract.
+
+Closed outcomes are exactly `NO_SIGNAL` or `TRADE_PROPOSAL`; a proposal is the
+exact Architecture-94 proposal object by identity, not a newly generated or
+research-selected proposal.
+
+Source gate #465 passed static diff/Ruff/format/authority, focused pytest, stable
+identity and terminal source-gates. The earlier #462/#464 failures were
+mechanical Ruff formatting only and are superseded.
+
+Current exact inventories are active **59**, FULL **160**, ROBINHOOD **85**,
+LEGACY **205**, EXHAUSTIVE **365**. Broad certification remains deferred until
+the first coherent live-paper integration boundary.
+
+134-B owns no Robinhood/provider/OAuth, paper-store mutation, risk execution,
+scheduler, clock/sleep, research/AI promotion or broker placement authority.
+
+Next milestone is **134-C — Human-started production live-paper cycle**.
+`PREPARE` will serve as the shadow/live-data preview: for a `TRADE_PROPOSAL`,
+reuse the accepted Architecture-131 supervised PREPARE path to obtain one live
+Robinhood quote, session admission and deterministic risk preview with no paper
+mutation. `NO_SIGNAL` performs no provider call. A separate explicit EXECUTE
+may then reuse the accepted Architecture-131 review-paper execution path to
+record one synthetic local paper fill; real broker placement remains impossible.
+
 ## 2026-10-11 — Architecture 134-A SOURCE ACCEPTED; 134-B decision bridge frozen
 
 Architecture **134-A — Production Strategy Contract** is SOURCE ACCEPTED.

@@ -121,8 +121,7 @@ def _attempt_context() -> None:
         or result.get("automatic_retry") != "NOT_AUTHORIZED"
         or type(primary) is not dict
         or primary.get("status") != "INDETERMINATE"
-        or primary.get("disposition")
-        != "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
+        or primary.get("disposition") != "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
         or primary.get("reason") != "PUBLICATION"
     ):
         raise ValueError("installation attempt report semantics rejected")

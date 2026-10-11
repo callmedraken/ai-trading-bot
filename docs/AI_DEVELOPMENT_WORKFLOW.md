@@ -452,6 +452,124 @@ pull/repair mechanism.
 
 ## Testing and certification
 
+### Normative verification and certification rules — 2026-10-11
+
+Verification is fail-fast before longer pytest/certification execution.
+These rules are normative and preserve Architecture 132's reviewed profile
+ownership, required baselines, lane topology and protected boundaries.
+
+#### 1. Cheap deterministic gates first
+
+Before longer pytest/certification execution, complete applicable source/
+admission/topology checks, `git diff --check`, Ruff check, Ruff format check and
+cheap static/authority checks. If a cheap gate fails, STOP before the longer
+test scope. Retain the combined Ruff diagnostic rule: both non-mutating Ruff
+phases run and failed phases emit `--diff` diagnostics before the Ruff gate
+stops. Required final/post-test identity and static checks remain required;
+this ordering rule does not remove them or modify the runner.
+
+#### 2. Do not run the same tests twice
+
+For the same exact HEAD/tree and unchanged environment/evidence validity, do
+not ask the human operator to rerun a scope already satisfactorily covered by
+Codex and/or terminal-green GitHub Actions. Codex normally performs focused
+verification during implementation; reviewed source-gate CI follows its
+bounded commit/push. The human operator must not repeat those tests merely for
+confidence.
+
+A separate user-run test is justified only when it supplies materially
+different required coverage/certification evidence, the source changed after
+prior evidence, prior evidence was invalid/incomplete, or ChatGPT identifies
+a distinct required gate not already covered. Independent required coverage
+is not duplicate execution. A docs-only closeout does not change already
+certified executable/test source and must not manufacture a repeat test event.
+
+#### 3. FULL is rare and is not an iteration loop
+
+FULL is a consequential/current-product certification boundary, not a debugging
+suite or a routine post-checkpoint confidence run. Preserve a failed FULL as
+diagnostic evidence; do not immediately rerun it. Diagnose from that evidence,
+make the bounded correction, pass cheap gates before focused tests, and run
+only affected focused tests while iterating. Then exact-file commit/push,
+obtain terminal-green source-gate CI, and obtain ChatGPT exact GitHub review/
+source acceptance. Only then run one fresh FULL if the consequential boundary
+still requires it.
+
+After a passing FULL, do not rerun it on unchanged executable/test source while
+its environment/evidence validity remains intact. Adjacent source-only
+checkpoints may explicitly batch a pending FULL obligation until the next
+genuine consequential boundary under the existing Architecture-132 conditions.
+This does not permit crossing a protected effect, merge, major integration,
+release or readiness boundary with an unsatisfied certification obligation.
+
+#### 4. Select certification tiers; do not stack them blindly
+
+FOCUSED -> SOURCE-GATE CI is routine. ChatGPT selects ROBINHOOD or FULL according
+to the required boundary; they are not cumulative confidence runs. When FULL
+is selected for unchanged source at a boundary where ROBINHOOD would otherwise
+also apply, FULL's strict superset coverage satisfies that narrower Robinhood
+source-certification obligation. Do not run ROBINHOOD and then FULL merely
+because both trigger descriptions apply. LEGACY/EXHAUSTIVE remain exceptional
+compatibility gates. PROTECTED always requires separate fresh authorization;
+no source certification grants it.
+
+#### 5. Audited three-lane human broad-suite topology
+
+When ChatGPT asks the human operator for a broad local/manual repository suite,
+use the previously audited faster two-broad-plus-one-serial safety topology,
+never a raw monolithic repository-wide `python -m pytest` invocation:
+
+- `broad-1` and `broad-2` run concurrently as deterministic whole-file partitions;
+- `serial` is exactly the five-module Windows/global-state-sensitive safety lane;
+- every module belongs to exactly one lane, with complete/disjoint coverage;
+- each lane has its own external basetemp, log and JUnit evidence;
+- aggregate only after all lanes complete;
+- retain clean source/admission/final identity proof and static gates.
+
+The exact serial lane is:
+
+~~~text
+tests/runtime/test_windows_transactional_capture_authority.py
+tests/runtime/test_windows_authority_schema.py
+tests/runtime/test_windows_authority.py
+tests/runtime/test_windows_effectful_capture_native_acceptance.py
+tests/acceptance/test_windows_authority_provisioning_acceptance.py
+~~~
+
+Focused tests remain focused; do not split one/few-module focused scopes merely
+to create three lanes. Profile-specific FULL/ROBINHOOD certification retains the
+currently reviewed Architecture-132 selected-profile topology: exactly two
+nonempty balanced lanes and no serial lane. LEGACY/EXHAUSTIVE retain their
+reviewed compatibility topology. Changing a selected profile's topology requires
+a separate reviewed certification-topology checkpoint. The three-lane rule
+applies to a broad manual repository suite, not to an unchanged selected-profile
+certification contract, and grants no protected opt-in.
+
+#### 6. Bounded Codex commit/push and direct ChatGPT GitHub review
+
+For an authorized bounded implementation/correction, Codex stages only the
+exact intended files after proving the index is clean, verifies the staged
+filename set and `git diff --cached --check`, creates one normal commit, and
+ordinary-pushes only the existing feature branch. That authority includes no
+merge, rebase, amend, force-push or PR metadata change. ChatGPT retrieves the
+exact GitHub commit/diff/CI directly; do not require pasted GitHub diffs when
+retrieval tools can obtain them.
+
+#### 7. Docs-only closeout preserves accepted test evidence
+
+Keep a docs-only closeout strictly under `docs/**` so the existing classifier
+uses its cheap validation path. Do not modify `AGENTS.md` merely to mirror
+these details and thereby trigger a redundant non-docs test run. It was reviewed
+for this closeout and remains compatible: it already forbids repeatedly
+rerunning expensive full suites and delegates detailed certification behavior
+to Architecture 132/workflow docs. A future naturally necessary non-docs
+workflow checkpoint may mirror this wording without a standalone duplicate-test
+event. Docs-only verification uses appropriate source/docs checks, including
+exact admission, exact changed-file review, `git diff --check` and staged diff
+check; it does not rerun pytest, FULL/ROBINHOOD or Ruff over unchanged Python.
+
+### Tier selection and evidence contract
+
 During iteration:
 
 - Codex runs focused tests/checks for changed behavior;
@@ -462,15 +580,14 @@ During iteration:
   tests after the bounded fix.
 
 Architecture 132-R1 separates current-supported certification from legacy
-compatibility. The normal tier sequence is:
+compatibility. The routine flow and selected certification gates are:
 
 ```text
-FOCUSED
--> SOURCE-GATE CI
--> ROBINHOOD when appropriate
--> FULL at coherent current-product boundaries
--> LEGACY/EXHAUSTIVE only when explicitly relevant
--> PROTECTED separately authorized
+FOCUSED -> SOURCE-GATE CI
+-> ChatGPT selects ROBINHOOD or FULL for the required boundary
+   (FULL covers the narrower ROBINHOOD source obligation)
+-> LEGACY/EXHAUSTIVE only for explicitly relevant compatibility
+PROTECTED always separately authorized
 ```
 
 | Level | Trigger and responsibility |
@@ -518,8 +635,8 @@ At a declared certification boundary:
 - review-driven source corrections return to focused verification first;
 - if the environment invalidates the run, repair it before interpreting failures
   as source defects;
-- after clean certification, do not repeat it without a new source change or
-  explicit gate decision;
+- after clean certification, do not repeat covered scope without changed
+  source, invalid/incomplete evidence, or materially different required coverage;
 - a merge needs no second run when its resulting tree exactly equals the
   already-certified tree.
 
@@ -548,7 +665,8 @@ is legacy because it uses the retired operational artifact/runtime model. GUI
 remains a future product goal; a Robinhood-integrated GUI milestone must
 explicitly reclassify or replace it.
 
-Only LEGACY and EXHAUSTIVE retain the historical serial safety lane:
+Among selected profiles, only LEGACY and EXHAUSTIVE retain the historical
+serial safety lane. Broad manual repository suites use that same audited lane:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py

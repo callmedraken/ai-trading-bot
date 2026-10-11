@@ -1,18 +1,88 @@
 # Project Status and Roadmap
 
-## 2026-10-11 — Architecture 134-C Human-started production live-paper cycle frozen
+## 2026-10-11 — Architecture 134-C CERTIFIED/CLOSED
 
-134-C is the first production-strategy composition with the already accepted
-Robinhood live-data review-paper machinery. Source implementation and CI remain
-effect-free; any later real provider PREPARE or paper EXECUTE is separately
-authorized.
+Architecture **134-C — Human-started production live-paper cycle** is
+**CERTIFIED/CLOSED** at this exact source-certification boundary:
 
 ~~~text
 BRANCH      feature/robinhood-production-strategy-live-paper
-BASE HEAD   dd5d21764c6de68bc800ed928d1bb5e1fba73cd9
-BASE TREE   dbca981e69d0a9a9e356cdf8df011785bf7aba2d
+HEAD        bcda794f8b371b097143a331d678009143cb91b1
+TREE        96a36cf38133ae3547175fe75547a4e16f1deb48
+CI          #471 / 38133206242 SUCCESS
 CHECKPOINT  arch134-production-strategy-live-paper
+CORRECTION  bcda794f8b371b097143a331d678009143cb91b1
+SUBJECT     test: stabilize checkpoint topology assertions
 ~~~
+
+### Preserved failed FULL and bounded source correction
+
+The first FULL attempt on prior source
+`144a66928d9f3fb3d7ff5396059c998839e17a99` /
+`04f7ade45d5fdf1e4e6969db8a9b1db5484fa8b2` found 22 stale historical
+test-topology assertions after the active inventory grew to 60 checkpoints.
+Its failed evidence is preserved and must not be overwritten or reused:
+
+~~~text
+F:\AI\temp\certification\arch134c-full-e210ffcf373748d593a2df83f7b39512
+~~~
+
+The bounded test-only correction:
+
+- replaced fragile end-relative checkpoint slices with named/local adjacency;
+- removed historical tests' unowned repository-wide eventual-count assumptions;
+- confined generic registration mutations to their intended `CheckpointSpec`;
+- preserved the dedicated canonical full-topology expectation;
+- preserved production behavior, authority, registration, workflow and source
+  pins.
+
+The separately approved publication-recovery test expectation proves that only
+the historical whole-registry pin differs after later registrations and that
+the unchanged protected authority rejects that drift exactly. It does not
+refresh a pin or reopen historical recovery authority.
+
+Source gate [#471](https://github.com/callmedraken/ai-trading-bot/actions/runs/38133206242)
+is terminal green:
+
+| Job | Conclusion |
+| --- | --- |
+| source-static | SUCCESS |
+| active-tests | SUCCESS |
+| full-tests | SKIPPED, correct active-branch behavior |
+| source-gates | SUCCESS |
+
+### Final cheap gates before FULL
+
+Exact source/FULL topology plan, `git diff --check`, Ruff check and Ruff
+format check all passed before the expensive suite. Ruff format check reported
+919 files already formatted. The plan evidence is:
+
+~~~text
+F:\AI\temp\certification\arch134c-final-full-plan-ae24aee5c593433683993fbccafa70d7
+~~~
+
+### Final FULL certification
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| broad-1 | 80 | 4,764 | 4,764 | 0 | 0 | 0 |
+| broad-2 | 81 | 4,320 | 4,320 | 0 | 0 | 0 |
+| Total | 161 | 9,084 | 9,084 | 0 | 0 | 0 |
+
+~~~text
+profile full PASS
+wall 446.814 s
+evidence F:\AI\temp\certification\arch134c-final-full-e971d0c5bfda496ebde97a6fc04d1afb
+~~~
+
+No separate ROBINHOOD run was required: ROBINHOOD is a strict subset of FULL,
+and this selected FULL certification satisfies the narrower source-certification
+obligation on the same source. No LEGACY/EXHAUSTIVE run was required. No
+provider/OAuth/paper/scheduler/broker/protected effect occurred.
+
+Current exact inventories are active **60**, FULL **161**, ROBINHOOD **86**,
+LEGACY **205**, EXHAUSTIVE **366**. The executable/test source is unchanged by
+this six-file docs-only closeout. **Do not rerun FULL on that unchanged source.**
 
 ### Composition
 
@@ -50,9 +120,9 @@ records at most one **local synthetic paper fill**.
 134-C does not add another quote/review/order/paper engine, does not retry, and
 does not expose broker placement/cancel/options/crypto authority.
 
-### Source-only checkpoint boundary
+### Accepted source-only checkpoint
 
-Expected new primary surfaces:
+The accepted primary surfaces are:
 
 ~~~text
 src/trading_bot/review_paper/production_strategy_cycle.py
@@ -61,17 +131,41 @@ scripts/checkpoint_runner.py
 .github/workflows/checkpoint-source-gates.yml
 ~~~
 
-The checkpoint itself has `preflight=None` and `execute=None`; CI uses fakes,
-monkeypatching and temporary stores only. No real Robinhood/OAuth access occurs.
+The checkpoint has `preflight=None` and `execute=None`; source tests/CI use
+fakes, monkeypatching and temporary stores only. No real Robinhood/OAuth access
+is part of source certification. Exact topology/order/partition assertions
+remain strict.
 
-Because this adds one `tests/review_paper` module, expected post-implementation
-inventories are active **60**, FULL **161**, ROBINHOOD **86**, LEGACY **205**,
-EXHAUSTIVE **366**. Exact-equality/order/partition assertions remain strict.
+### Immediate next boundary: separately authorized SHADOW PREPARE
 
-Source acceptance authorizes only separately reviewed 134-C qualification.
-Recommended qualification sequence is shadow PREPARE first, inspect the live
-quote/risk result, then separately authorize one paper EXECUTE if PREPARE is
-`READY_TO_PROCEED`. It does not authorize 134-D arming/scheduling.
+The next step is a **human-started 134-C SHADOW PREPARE**, using the already
+accepted Architecture-131 provider-read path. It requires fresh explicit
+authorization because a trade proposal performs real Robinhood/provider/OAuth
+read activity. No effectful command is ordinary verification, and this closeout
+stops at that protected authorization boundary.
+
+PREPARE is shadow/live-data preview only; it performs no paper fill.
+`NO_SIGNAL` has zero provider/paper effects. **`READY_TO_PROCEED` is evidence,
+not execution authorization.** Only after a separately authorized PREPARE
+returns and ChatGPT reviews its evidence may a separate paper EXECUTE
+authorization be considered if the retained result is `READY_TO_PROCEED` and
+Architecture-131 revalidation still passes. Real broker placement remains
+impossible. 134-C certification does not authorize 134-D scheduling/arming;
+134-D remains later.
+
+### Docs-only closeout and repository rules
+
+This atomic checkpoint changes exactly the six approved `docs/**` files and
+uses the existing docs-only classifier's cheap validation path. It changes no
+Python, tests, scripts, workflow YAML, checkpoint registration or runtime
+behavior and manufactures no test rerun.
+
+`AGENTS.md` was reviewed and remains compatible: it already forbids repeated
+expensive full-suite runs and delegates detailed certification behavior to
+Architecture 132 and the workflow document. It remains unchanged because it is
+outside `docs/**`. A future naturally necessary non-docs workflow checkpoint
+may mirror the detailed wording there without creating a standalone duplicate-
+test event.
 
 ## 2026-10-11 — Architecture 134-B SOURCE ACCEPTED
 

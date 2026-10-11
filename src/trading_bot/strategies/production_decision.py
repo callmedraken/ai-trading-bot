@@ -9,17 +9,52 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import TYPE_CHECKING
 
 from trading_bot.domain import TradeProposal
 from trading_bot.market_data import IdentifiedMarketCalendar
-from trading_bot.runtime.manual_paper_strategy_plan import (
-    ManualPaperStrategyDecisionRequest,
-    ManualPaperStrategySignalStatus,
-    PreparedManualPaperStrategyDecision,
-    build_manual_paper_strategy_decision,
-)
-from trading_bot.runtime.strategy_history_seed import VerifiedStrategyHistorySeed
+from trading_bot.strategies.daily_decision import PreparedCurrentStrategyDecision
+from trading_bot.strategies.history_seed import VerifiedStrategyHistorySeed
 from trading_bot.strategies.production import ProductionStrategyContract
+
+if TYPE_CHECKING:
+    from trading_bot.runtime.manual_paper_strategy_plan import (
+        ManualPaperStrategyDecisionRequest,
+        PreparedManualPaperStrategyDecision,
+    )
+
+
+def build_manual_paper_strategy_decision(
+    request: ManualPaperStrategyDecisionRequest,
+    calendar: IdentifiedMarketCalendar,
+) -> PreparedManualPaperStrategyDecision:
+    """Retain the legacy builder seam, loading historical code only for legacy use."""
+    from trading_bot.runtime.manual_paper_strategy_plan import (
+        build_manual_paper_strategy_decision as legacy_builder,
+    )
+
+    return legacy_builder(request, calendar)
+
+
+def _legacy_prepared_type():
+    from trading_bot.runtime.manual_paper_strategy_plan import (
+        PreparedManualPaperStrategyDecision,
+    )
+
+    return PreparedManualPaperStrategyDecision
+
+
+def _legacy_signal_matches(prepared, proposal_present: bool) -> bool:
+    from trading_bot.runtime.manual_paper_strategy_plan import (
+        ManualPaperStrategySignalStatus,
+    )
+
+    expected = (
+        ManualPaperStrategySignalStatus.TRADE_PROPOSAL
+        if proposal_present
+        else ManualPaperStrategySignalStatus.NO_SIGNAL
+    )
+    return prepared.signal_status is expected
 
 
 class ProductionStrategyDecisionStatus(StrEnum):
@@ -34,14 +69,15 @@ class ProductionStrategyDecision:
     """Exact retained production contract plus one verified strategy decision."""
 
     contract: ProductionStrategyContract
-    prepared: PreparedManualPaperStrategyDecision
+    prepared: PreparedManualPaperStrategyDecision | PreparedCurrentStrategyDecision
     status: ProductionStrategyDecisionStatus
     proposal: TradeProposal | None
 
     def __post_init__(self) -> None:
         if type(self.contract) is not ProductionStrategyContract:
             raise TypeError("contract must be exactly ProductionStrategyContract")
-        if type(self.prepared) is not PreparedManualPaperStrategyDecision:
+        current = type(self.prepared) is PreparedCurrentStrategyDecision
+        if not current and type(self.prepared) is not _legacy_prepared_type():
             raise TypeError(
                 "prepared must be exactly PreparedManualPaperStrategyDecision"
             )
@@ -57,8 +93,7 @@ class ProductionStrategyDecision:
 
         if self.status is ProductionStrategyDecisionStatus.NO_SIGNAL:
             if (
-                self.prepared.signal_status
-                is not ManualPaperStrategySignalStatus.NO_SIGNAL
+                (not current and not _legacy_signal_matches(self.prepared, False))
                 or self.prepared.strategy_proposal is not None
                 or self.proposal is not None
             ):
@@ -66,8 +101,7 @@ class ProductionStrategyDecision:
             return
 
         if (
-            self.prepared.signal_status
-            is not ManualPaperStrategySignalStatus.TRADE_PROPOSAL
+            (not current and not _legacy_signal_matches(self.prepared, True))
             or type(self.prepared.strategy_proposal) is not TradeProposal
             or self.proposal is not self.prepared.strategy_proposal
             or self.proposal.symbol != self.contract.symbol
@@ -81,6 +115,12 @@ def build_production_strategy_decision(
     calendar: IdentifiedMarketCalendar,
 ) -> ProductionStrategyDecision:
     """Evaluate the existing verified daily strategy path exactly once."""
+    from trading_bot.runtime.manual_paper_strategy_plan import (
+        ManualPaperStrategyDecisionRequest,
+        ManualPaperStrategySignalStatus,
+        PreparedManualPaperStrategyDecision,
+    )
+
     if type(contract) is not ProductionStrategyContract:
         raise TypeError("contract must be exactly ProductionStrategyContract")
     if type(request) is not ManualPaperStrategyDecisionRequest:

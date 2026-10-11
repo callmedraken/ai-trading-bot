@@ -259,6 +259,9 @@ def test_bridge_import_and_call_surface_has_no_effect_or_research_authority() ->
         "__future__",
         "dataclasses",
         "enum",
+        "typing",
+        "trading_bot.strategies.daily_decision",
+        "trading_bot.strategies.history_seed",
         "trading_bot.domain",
         "trading_bot.market_data",
         "trading_bot.runtime.manual_paper_strategy_plan",
@@ -330,10 +333,10 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 162,
-        "robinhood": 87,
+        "full": 163,
+        "robinhood": 88,
         "legacy": 205,
-        "exhaustive": 367,
+        "exhaustive": 368,
     }
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]
     assert (

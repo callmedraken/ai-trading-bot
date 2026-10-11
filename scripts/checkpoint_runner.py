@@ -9254,7 +9254,7 @@ ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE: Final = (
     "src/trading_bot/strategies/production_decision.py"
 )
 ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE_PIN: Final = (
-    "9afe01bf0db68715a732abfc05a75b4a85e60946"
+    "3bbd352495cd2b50b9e2557089a0b1b70a0dfce8"
 )
 ARCH134_PRODUCTION_STRATEGY_DECISION_TESTS: Final = (
     *COMMON_TESTS,
@@ -9297,6 +9297,9 @@ def _arch134_production_strategy_decision_authority_check(
             "__future__",
             "dataclasses",
             "enum",
+            "typing",
+            "trading_bot.strategies.daily_decision",
+            "trading_bot.strategies.history_seed",
             "trading_bot.domain",
             "trading_bot.market_data",
             "trading_bot.runtime.manual_paper_strategy_plan",
@@ -9384,6 +9387,115 @@ ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE: Final = (
 ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN: Final = (
     "6e13a8f1f45acd458dc0002d5cf338460b3b1d5b"
 )
+ARCH134_CURRENT_DECISION_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/production_strategy_decision.py": (
+        "3b2d0c6301d35c4800e05e5b4309b2f6d2a0d247"
+    ),
+    "src/trading_bot/review_paper/strategy_prior.py": (
+        "d358aad1cd11f4e5f8c820f08c5a7619f7960df0"
+    ),
+    "src/trading_bot/strategies/daily_decision.py": (
+        "8df232b80047d913d43814e193d7a2788fc27116"
+    ),
+    "src/trading_bot/strategies/history_seed.py": (
+        "b20e41206c3d6d2e8eca6cbbd0dfef2e701b3177"
+    ),
+    "src/trading_bot/runtime/manual_paper_strategy_plan.py": (
+        "9692d39ece0d15d3da6ca83dd8a5f4b994510b12"
+    ),
+    "src/trading_bot/runtime/strategy_history_seed.py": (
+        "6cc0670b169ed9afa430a8de87f36f2dd79fc695"
+    ),
+}
+
+
+def _arch134_current_decision_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the shared pure core and reject new current-product effect capabilities."""
+    failures: list[str] = []
+    allowed_imports = {
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "enum",
+        "hashlib",
+        "json",
+        "re",
+        "types",
+        "typing",
+        "uuid",
+        "zoneinfo",
+        "trading_bot.backtesting",
+        "trading_bot.domain",
+        "trading_bot.ledger",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.market_data.daily_snapshot_identity",
+        "trading_bot.review_paper.store",
+        "trading_bot.review_paper.strategy_prior",
+        "trading_bot.strategies",
+        "trading_bot.strategies.daily_decision",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+    }
+    forbidden = {
+        "VerifiedPriorCheckpoint",
+        "_VERIFIED_PRIOR_AUTHORITY",
+        "record_market_review",
+        "ReviewPaperStore",
+        "_initialize",
+        "review_equity_order",
+        "place_order",
+        "execute",
+        "connect",
+        "sleep",
+        "now",
+        "utcnow",
+        "eval",
+        "exec",
+        "__import__",
+        "run",
+        "Popen",
+        "chmod",
+        "write_text",
+        "write_bytes",
+    }
+    try:
+        for relative, pin in ARCH134_CURRENT_DECISION_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B2 source drift: " + relative)
+            # Historical adapters retain separately validated compatibility.
+            if relative.startswith("src/trading_bot/runtime/"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B2 import surface expanded: " + relative)
+            calls = {
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            }
+            if calls & forbidden or "_VERIFIED_PRIOR_AUTHORITY" in _qualified_names(
+                tree
+            ):
+                failures.append("134-B2 authority/effect surface expanded: " + relative)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError):
+        failures.append("134-B2 current decision boundary unavailable")
+    return tuple(failures)
+
+
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     *COMMON_TESTS,
     "tests/strategies/test_production_strategy_contract.py",
@@ -9391,6 +9503,9 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     "tests/review_paper/test_production_strategy_cycle.py",
     "tests/review_paper/test_production_strategy_prepare_operator.py",
     "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/runtime/test_manual_paper_strategy_plan.py",
+    "tests/runtime/test_strategy_history_seed.py",
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
     *COMMON_RUFF_PATHS,
@@ -9398,11 +9513,15 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
     ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
     ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE,
     ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE,
+    *ARCH134_CURRENT_DECISION_SOURCE_PINS,
     "tests/strategies/test_production_strategy_contract.py",
     "tests/strategies/test_production_strategy_decision.py",
     "tests/review_paper/test_production_strategy_cycle.py",
     "tests/review_paper/test_production_strategy_prepare_operator.py",
     "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/runtime/test_manual_paper_strategy_plan.py",
+    "tests/runtime/test_strategy_history_seed.py",
 )
 
 
@@ -9411,6 +9530,7 @@ def _arch134_production_strategy_live_paper_authority_check(
 ) -> tuple[str, ...]:
     """Freeze the 134-C composition onto the accepted 131 PREPARE/EXECUTE path."""
     failures = list(_arch134_production_strategy_decision_authority_check(repo_root))
+    failures.extend(_arch134_current_decision_authority_check(repo_root))
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
         if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:

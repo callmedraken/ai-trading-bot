@@ -528,7 +528,7 @@ def test_source_registration_pins_chaining_topology():
     assert {
         name: len(certification.select_inventory(inventory, name))
         for name in certification.PROFILES
-    } == {"full": 156, "robinhood": 83, "legacy": 205, "exhaustive": 361}
+    } == {"full": 157, "robinhood": 84, "legacy": 205, "exhaustive": 362}
 
 
 @pytest.mark.parametrize(

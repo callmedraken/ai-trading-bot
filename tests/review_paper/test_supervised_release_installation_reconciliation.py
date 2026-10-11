@@ -161,10 +161,7 @@ def test_exact_staging_only_is_preserved_and_never_promoted(monkeypatch):
     assert result["status"] == "PASS"
     assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
     assert result["primary"]["status"] == "STAGING_VERIFIED_PRESERVED"
-    assert (
-        result["primary"]["disposition"]
-        == "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
-    )
+    assert result["primary"]["disposition"] == "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
 
 
 @pytest.mark.parametrize(
@@ -253,10 +250,10 @@ def test_checkpoint_registration_is_read_only():
     name = "arch133-robinhood-supervised-release-installation-reconciliation"
     spec = runner._checkpoint_specs()[name]
 
-    assert runner.ACTIVE_CI_CHECKPOINTS[:2] == (
-        "arch133-robinhood-supervised-release-installation-operator",
-        name,
+    assert runner.ACTIVE_CI_CHECKPOINTS[0] == (
+        "arch133-robinhood-supervised-release-installation-operator"
     )
+    assert name not in runner.ACTIVE_CI_CHECKPOINTS
     assert spec.preflight is runner._supervised_installation_reconciliation_preflight
     assert spec.execute is None
     assert spec.remote_head_env is None
@@ -264,6 +261,8 @@ def test_checkpoint_registration_is_read_only():
         spec.remote_branch
         == "feature/robinhood-supervised-release-installation-reconciliation"
     )
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._supervised_installation_reconciliation_authority_check(root) == ()
 
 
 def test_incident_record_drift_is_rejected(monkeypatch):

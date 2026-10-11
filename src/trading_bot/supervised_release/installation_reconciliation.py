@@ -47,9 +47,7 @@ EXPECTED_STAGING: Final = (
     r"F:\AITradingBot\releases\release-03c42597246752319956ab96e01ed61c.installing"
 )
 
-ATTEMPT_PATH: Final = Path(
-    r"F:\AI\temp\arch133-ag-installation-attempt\attempt.json"
-)
+ATTEMPT_PATH: Final = Path(r"F:\AI\temp\arch133-ag-installation-attempt\attempt.json")
 ATTEMPT_BYTES: Final = (
     b'{"schema":"arch133-ag-installation-attempt/v1","status":"CONSUMED",'
     b'"automatic_retry":"NOT_AUTHORIZED"}\n'

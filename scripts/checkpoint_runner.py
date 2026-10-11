@@ -135,7 +135,6 @@ RETAINED_CHECKPOINTS: Final = (
 
 ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation-operator",
-    "arch133-robinhood-supervised-release-installation-reconciliation",
     "arch133-robinhood-supervised-deployment-qualification",
     "arch133-robinhood-supervised-runtime-host-admission",
     "arch133-robinhood-supervised-maintenance-rebind",
@@ -8345,11 +8344,14 @@ SUPERVISED_INSTALLATION_REGISTRATION_PIN: Final = (
 SUPERVISED_INSTALLATION_OPERATOR_TESTS: Final = (
     *SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS,
     "tests/review_paper/test_supervised_release_installation_operator.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
 )
 SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS: Final = (
     *SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS,
     SUPERVISED_INSTALLATION_OPERATOR_SOURCE,
     "tests/review_paper/test_supervised_release_installation_operator.py",
+    "src/trading_bot/supervised_release/installation_reconciliation.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
 )
 # This fixed external latch is independent of per-invocation evidence roots,
 # release IDs, authorization tokens and source revisions. Never remove/reset it.
@@ -8621,15 +8623,14 @@ SUPERVISED_INSTALLATION_RECONCILIATION_NAME: Final = (
 SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE: Final = (
     "src/trading_bot/supervised_release/installation_reconciliation.py"
 )
-SUPERVISED_INSTALLATION_RECONCILIATION_PIN: Final = "73891badfc2afc18f436e1326f418b5bbd780f07"
+SUPERVISED_INSTALLATION_RECONCILIATION_PIN: Final = (
+    "f57adcb5a6480c07ab4c43a31e41866608644653"
+)
 SUPERVISED_INSTALLATION_RECONCILIATION_TESTS: Final = (
-    *SUPERVISED_INSTALLATION_OPERATOR_TESTS,
-    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+    SUPERVISED_INSTALLATION_OPERATOR_TESTS
 )
 SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS: Final = (
-    *SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
-    SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE,
-    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+    SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS
 )
 
 
@@ -8655,8 +8656,8 @@ def _supervised_installation_reconciliation_authority_check(
             or spec.authority_check
             is not _supervised_installation_reconciliation_authority_check
             or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
-            or ACTIVE_CI_CHECKPOINTS[1]
-            != SUPERVISED_INSTALLATION_RECONCILIATION_NAME
+            or SUPERVISED_INSTALLATION_RECONCILIATION_NAME
+            in ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("installation reconciliation registration drift")
 
@@ -8707,9 +8708,7 @@ def _supervised_installation_reconciliation_authority_check(
                 and getattr(node.func, "attr", getattr(node.func, "id", ""))
                 in forbidden
             ):
-                failures.append(
-                    "installation reconciliation capability boundary drift"
-                )
+                failures.append("installation reconciliation capability boundary drift")
 
         if (
             operator.WORKTREE
@@ -8719,10 +8718,8 @@ def _supervised_installation_reconciliation_authority_check(
             or operator.BRANCH
             != "feature/robinhood-supervised-release-installation-reconciliation"
             or operator.ORIGIN != "https://github.com/callmedraken/ai-trading-bot.git"
-            or operator.FAILED_AG_HEAD
-            != "513b60029f459ad6ecb4938f8fea2d54209a29d1"
-            or operator.FAILED_AG_TREE
-            != "14e8d161ac95e57982c576ebd19681bb204b22fd"
+            or operator.FAILED_AG_HEAD != "513b60029f459ad6ecb4938f8fea2d54209a29d1"
+            or operator.FAILED_AG_TREE != "14e8d161ac95e57982c576ebd19681bb204b22fd"
             or operator.EXPECTED_RELEASE_ID
             != "release-03c42597246752319956ab96e01ed61c"
         ):
@@ -9585,8 +9582,8 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             remote_branch="feature/robinhood-supervised-release-installation-operator",
             remote_head_env=None,
         ),
-        "arch133-robinhood-supervised-release-installation-reconciliation": CheckpointSpec(
-            name="arch133-robinhood-supervised-release-installation-reconciliation",
+        SUPERVISED_INSTALLATION_RECONCILIATION_NAME: CheckpointSpec(
+            name=SUPERVISED_INSTALLATION_RECONCILIATION_NAME,
             description=(
                 "133-AI read-only reconciliation of the consumed AG "
                 "publication ambiguity"

@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 from tests.runtime.test_manual_paper_strategy_plan import (
-    QQQ,
-    SPY,
     _DEFAULT_CONFIG,
     _NEXT_SESSION,
+    QQQ,
+    SPY,
     _decision_request,
     _request,
     calendar,
@@ -58,7 +58,10 @@ def test_real_arch94_bridge_returns_exact_trade_proposal() -> None:
 
     assert result.contract == _contract()
     assert result.status is subject.ProductionStrategyDecisionStatus.TRADE_PROPOSAL
-    assert result.prepared.signal_status is ManualPaperStrategySignalStatus.TRADE_PROPOSAL
+    assert (
+        result.prepared.signal_status
+        is ManualPaperStrategySignalStatus.TRADE_PROPOSAL
+    )
     assert result.proposal is result.prepared.strategy_proposal
     assert result.proposal is not None
     assert result.proposal.symbol == SPY

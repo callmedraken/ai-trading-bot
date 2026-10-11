@@ -9246,7 +9246,6 @@ def _arch134_production_strategy_authority_check(
     return tuple(failures)
 
 
-
 ARCH134_PRODUCTION_STRATEGY_DECISION_NAME: Final = (
     "arch134-production-strategy-decision"
 )

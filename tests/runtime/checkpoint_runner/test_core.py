@@ -29,10 +29,10 @@ def test_build_verification_steps_runs_both_nonmutating_ruff_gates(
     )
 
     assert tuple(step.name for step in steps) == (
-        "pytest",
+        "git_diff_check",
         "ruff_check",
         "ruff_format",
-        "git_diff_check",
+        "pytest",
     )
 
     lint = steps[1]
@@ -79,18 +79,18 @@ def test_run_verification_steps_continues_after_lint_failure(
     outcomes = runner.run_verification_steps(steps, execute)
 
     assert calls == [
-        ("pytest", False),
+        ("git_diff_check", False),
         ("ruff_check", False),
         ("ruff_check", True),
         ("ruff_format", False),
-        ("git_diff_check", False),
+        ("pytest", False),
     ]
     assert tuple(outcome.name for outcome in outcomes) == (
-        "pytest",
+        "git_diff_check",
         "ruff_check",
         "ruff_check_diagnostic",
         "ruff_format",
-        "git_diff_check",
+        "pytest",
     )
 
 
@@ -117,12 +117,12 @@ def test_run_verification_steps_collects_both_ruff_diagnostics(
     runner.run_verification_steps(steps, execute)
 
     assert calls == [
-        ("pytest", False),
+        ("git_diff_check", False),
         ("ruff_check", False),
         ("ruff_check", True),
         ("ruff_format", False),
         ("ruff_format", True),
-        ("git_diff_check", False),
+        ("pytest", False),
     ]
 
 
@@ -826,6 +826,112 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
     assert runner.ACTIVE_CI_CHECKPOINTS == _EXPECTED_ACTIVE_CI_CHECKPOINTS
 
 
+def test_ci_checkpoint_resolution_is_exact_and_fails_broad():
+    specs = runner._checkpoint_specs()
+    name = "arch133-robinhood-supervised-release-installation-operator"
+    branch = specs[name].remote_branch
+    assert runner.resolve_ci_checkpoint(specs, branch, "push") == name
+    assert runner.resolve_ci_checkpoint(specs, branch, "pull_request") is None
+    assert runner.resolve_ci_checkpoint(specs, "feature/unknown", "push") is None
+
+    duplicate = dict(specs)
+    duplicate["duplicate"] = replace(specs[name], name="duplicate")
+    assert runner.resolve_ci_checkpoint(duplicate, branch, "push") is None
+
+    inactive = {"inactive": replace(specs[name], name="inactive")}
+    assert runner.resolve_ci_checkpoint(inactive, branch, "push") is None
+
+
+def test_duration_balanced_shards_are_deterministic_disjoint_and_complete():
+    tests = tuple(runner.CI_TEST_DURATION_WEIGHTS)
+    first = runner.duration_balanced_test_shards(tests, 4)
+    second = runner.duration_balanced_test_shards(tests, 4)
+    assert first == second
+    assert sorted(path for shard in first for path in shard) == sorted(tests)
+    assert sum(len(shard) for shard in first) == len(tests)
+    assert len({path for shard in first for path in shard}) == len(tests)
+
+    loads = [
+        sum(runner.CI_TEST_DURATION_WEIGHTS[path] for path in shard) for shard in first
+    ]
+    assert max(loads) - min(loads) < 0.1
+    with pytest.raises(ValueError, match="test shard count rejected"):
+        runner.duration_balanced_test_shards(("tests/one.py",), 2)
+
+
+@pytest.mark.parametrize(
+    ("phase", "expected_steps", "authority_calls"),
+    [
+        ("static", ["git_diff_check", "ruff_check", "ruff_format"], 1),
+        ("tests", ["pytest"], 0),
+    ],
+)
+def test_single_source_gate_phase_separates_static_authority_and_tests(
+    tmp_path,
+    monkeypatch,
+    phase,
+    expected_steps,
+    authority_calls,
+):
+    calls = []
+    authorities = []
+
+    def authority(repo):
+        authorities.append(repo)
+        return ()
+
+    spec = replace(_spec(), authority_check=authority)
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    monkeypatch.setenv(runner.SOURCE_GATE_PHASE_ENV, phase)
+    monkeypatch.setattr(
+        runner,
+        "_execute_step",
+        lambda step, **kw: calls.append(step) or _outcome(step.name, 0),
+    )
+
+    passed, path = runner.verify_checkpoint(
+        spec,
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "evidence",
+    )
+
+    assert passed
+    assert [step.name for step in calls] == expected_steps
+    assert len(authorities) == authority_calls
+    report = json.loads(path.read_text())
+    assert report["phase"] == phase
+    assert report["authority_checked"] is (phase == "static")
+    assert bool(report["executed_tests"]) is (phase == "tests")
+
+
+def test_batch_tests_phase_shards_and_skips_authority(tmp_path, monkeypatch):
+    authorities = []
+    specs = _batch_specs(authorities)
+    monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
+    monkeypatch.setenv(runner.SOURCE_GATE_PHASE_ENV, "tests")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_INDEX_ENV, "0")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_COUNT_ENV, "2")
+    calls = []
+    monkeypatch.setattr(
+        runner,
+        "_execute_step",
+        lambda step, **kw: calls.append(step) or _outcome(step.name, 0),
+    )
+
+    passed, path = runner.verify_batch(
+        specs, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+
+    assert passed
+    assert authorities == []
+    assert [step.name for step in calls] == ["pytest"]
+    report = json.loads(path.read_text())
+    assert report["phase"] == "tests"
+    assert report["authority_checked"] is False
+    assert report["test_shard"] == {"index": 0, "count": 2}
+    assert report["executed_tests"]
+
+
 @pytest.mark.parametrize(
     "failure", [None, "pytest", "ruff_check", "ruff_format", "git_diff_check"]
 )
@@ -852,28 +958,37 @@ def test_batch_shares_commands_preserves_order_and_collects_authorities(
         specs, repo_root=tmp_path, evidence_root=tmp_path / "evidence"
     )
     assert passed == (failure is None)
-    assert [step.name for step, diagnostic in calls if not diagnostic] == [
-        "pytest",
-        "ruff_check",
-        "ruff_format",
-        "git_diff_check",
-    ]
+    primary = [step.name for step, diagnostic in calls if not diagnostic]
+    expected = ["git_diff_check", "ruff_check", "ruff_format"]
+    if failure not in {"git_diff_check", "ruff_check", "ruff_format"}:
+        expected.append("pytest")
+    assert primary == expected
     assert [step.name for step, diagnostic in calls if diagnostic] == (
         [failure] if failure in {"ruff_check", "ruff_format"} else []
     )
-    assert calls[0][0].argv[3:6] == (
-        "tests/shared.py",
-        "tests/first.py",
-        "tests/second.py",
+    pytest_call = next(
+        (step for step, diagnostic in calls if step.name == "pytest"),
+        None,
     )
-    assert calls[1][0].argv[5:] == ("shared.py", "first.py", "second.py", "third.py")
-    assert authorities == ["first", "second", "third"]
+    if "pytest" in expected:
+        assert pytest_call is not None
+        assert pytest_call.argv[3:6] == (
+            "tests/shared.py",
+            "tests/first.py",
+            "tests/second.py",
+        )
+    ruff_call = next(step for step, diagnostic in calls if step.name == "ruff_check")
+    assert ruff_call.argv[5:] == ("shared.py", "first.py", "second.py", "third.py")
+    names = ["first", "second", "third"]
+    static_failed = failure in {"git_diff_check", "ruff_check", "ruff_format"}
+    assert authorities == ([] if static_failed else names)
     report = json.loads(report_path.read_text())
     assert report["kind"] == "source_gate_batch"
-    assert report["checkpoints"] == authorities
+    assert report["checkpoints"] == names
+    assert report["phase"] == "all"
     assert report["source_before"] == report["source_after"] == _clean_source()
     assert report["identity_stable"] is True
-    assert report["authority_failures"] == dict.fromkeys(authorities, [])
+    assert report["authority_failures"] == dict.fromkeys(names, [])
     for spec in specs:
         participant = report["participants"][spec.name]
         assert participant["checkpoint"] == spec.name
@@ -881,7 +996,9 @@ def test_batch_shares_commands_preserves_order_and_collects_authorities(
         assert participant["tests"] == list(spec.tests)
         assert participant["ruff_paths"] == list(spec.ruff_paths)
         assert participant["tests_covered"] and participant["ruff_paths_covered"]
-        assert participant["authority_status"] == "PASS"
+        assert participant["authority_status"] == (
+            "NOT_RUN" if static_failed else "PASS"
+        )
         assert participant["status"] == ("PASS" if passed else "FAIL")
     for field in (
         "production_effects",
@@ -912,6 +1029,7 @@ def test_batch_authority_failure_attribution_and_continuation(
     assert report["authority_failures"]["first"] == []
     assert report["authority_failures"]["second"]
     assert report["authority_failures"]["third"] == []
+    assert all(command["name"] != "pytest" for command in report["commands"])
     assert report["participants"]["first"]["status"] == "PASS"
     assert report["participants"]["second"]["status"] == "FAIL"
     assert report["status"] == "FAIL"
@@ -1003,12 +1121,13 @@ def test_single_verify_report_and_command_selection_unchanged(tmp_path, monkeypa
     assert report["kind"] == "source_gate" and report["checkpoint"] == "example"
     assert report["started_from"] == report["finished_at"] == _clean_source()
     assert "participants" not in report
-    assert calls[0].argv[3] == _spec().tests[0]
+    pytest_call = next(step for step in calls if step.name == "pytest")
+    assert pytest_call.argv[3] == _spec().tests[0]
     assert [step.name for step in calls] == [
-        "pytest",
+        "git_diff_check",
         "ruff_check",
         "ruff_format",
-        "git_diff_check",
+        "pytest",
     ]
 
 
@@ -1021,6 +1140,10 @@ def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
     monkeypatch.setattr(runner.time, "monotonic", lambda: next(ticks))
     step = runner.Step("pytest", ("python", "-m", "pytest"), ("diagnostic",))
     stdout = b"100 slowest durations\n12.00s call tests/example.py::test_example\n"
+    monkeypatch.setenv(runner.SOURCE_GATE_PHASE_ENV, "tests")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_INDEX_ENV, "2")
+    monkeypatch.setenv(runner.SOURCE_GATE_SHARD_COUNT_ENV, "4")
+    monkeypatch.setenv("CHECKPOINT_RUNNER_KEEP_ME", "present")
     calls = []
 
     def run(argv, **kwargs):
@@ -1039,12 +1162,17 @@ def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
     assert outcome.elapsed_seconds >= 0
     assert outcome.exit_code == 0
     assert Path(outcome.stdout_path).read_bytes() == stdout
-    assert calls == [
-        (
-            step.diagnostic_argv if diagnostic else step.argv,
-            {"cwd": tmp_path, "capture_output": True, "check": False},
-        )
-    ]
+    assert len(calls) == 1
+    call_argv, kwargs = calls[0]
+    assert call_argv == (step.diagnostic_argv if diagnostic else step.argv)
+    assert kwargs["cwd"] == tmp_path
+    assert kwargs["capture_output"] is True
+    assert kwargs["check"] is False
+    environment = kwargs["env"]
+    assert environment["CHECKPOINT_RUNNER_KEEP_ME"] == "present"
+    assert runner.SOURCE_GATE_PHASE_ENV not in environment
+    assert runner.SOURCE_GATE_SHARD_INDEX_ENV not in environment
+    assert runner.SOURCE_GATE_SHARD_COUNT_ENV not in environment
 
 
 @pytest.mark.parametrize("batch", [False, True])
@@ -1081,15 +1209,17 @@ def test_r2a_pytest_top_100_duration_flags_are_exact_and_diagnostic_only(tmp_pat
     steps = runner.build_verification_steps(
         _spec(), python_executable="python", basetemp=tmp_path
     )
-    argv = steps[0].argv
+    pytest_step = next(step for step in steps if step.name == "pytest")
+    argv = pytest_step.argv
     assert tuple(arg for arg in argv if arg.startswith("--durations")) == (
         "--durations=100",
         "--durations-min=0.0",
     )
-    assert steps[0].diagnostic_argv is None
+    assert pytest_step.diagnostic_argv is None
     assert all(
         not any(arg.startswith("--durations") for arg in step.argv)
-        for step in steps[1:]
+        for step in steps
+        if step.name != "pytest"
     )
 
 
@@ -1162,9 +1292,13 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
 
 def test_source_junit_evidence_is_external_and_additive(tmp_path):
     basetemp = tmp_path / "pytest"
-    step = runner.build_verification_steps(
-        _spec(), python_executable="python", basetemp=basetemp
-    )[0]
+    step = next(
+        step
+        for step in runner.build_verification_steps(
+            _spec(), python_executable="python", basetemp=basetemp
+        )
+        if step.name == "pytest"
+    )
     assert f"--junitxml={tmp_path / 'pytest-results.xml'}" in step.argv
     assert "--durations=100" in step.argv
     assert "--durations-min=0.0" in step.argv

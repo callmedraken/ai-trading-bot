@@ -9,7 +9,6 @@ import pytest
 from scripts import checkpoint_runner as runner
 
 from .helpers import (
-    _EXPECTED_ACTIVE_CI_CHECKPOINTS,
     _EXPECTED_RETAINED_CHECKPOINTS,
     _clean_source,
     _event,
@@ -199,83 +198,92 @@ def test_docs_gate_rejects_dirty_source(tmp_path, monkeypatch):
         )
 
 
-def test_ci_workflow_batch_order_conditions_and_slim_artifacts():
+def test_ci_workflow_fast_route_full_fallback_and_slim_artifacts():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    # runner context is allowed in step env, but unavailable in job env.
-    job_settings = workflow.split("    steps:", 1)[0]
-    assert "runner.temp" not in job_settings
-    assert (
-        workflow.count(
-            "        env:\n"
-            "          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: "
-            "${{ runner.temp }}/ai-trading-bot-checkpoints"
-        )
-        == 3
-    )
     assert runner._batch_workflow_is_reviewed(workflow)
-    assert workflow.count("verify-batch") == 1
-    assert "verify arch" not in workflow and "$Failures" not in workflow
-    command = workflow.split("            verify-batch `\n", 1)[1].split(
-        "          exit $LASTEXITCODE", 1
-    )[0]
+    assert "workflow_dispatch:" in workflow
+    assert "group: ${{ github.workflow }}-${{ github.ref }}" in workflow
+    assert "cancel-in-progress: true" in workflow
+    assert workflow.count("verify-batch @Checkpoints") == 2
+    assert workflow.count('verify "${{ steps.route.outputs.checkpoint }}"') == 1
+    assert workflow.count('verify "${{ needs.source-static.outputs.checkpoint }}"') == 1
+    assert workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: static") == 2
+    assert workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: tests") == 2
+    assert "shard: [0, 1, 2, 3]" in workflow
+    assert "resolve_ci_checkpoint(" in workflow
     assert (
-        tuple(line.strip().removesuffix(" `") for line in command.splitlines())
-        == _EXPECTED_ACTIVE_CI_CHECKPOINTS
+        "  source-gates:\n"
+        "    needs: [source-static, active-tests, full-tests]\n"
+        "    if: always()\n" in workflow
     )
+    assert "- name: Require source gate success" in workflow
     assert workflow.index("classify-ci") < workflow.index(
-        "Install source-gate dependencies"
+        "Verify active checkpoint static authority"
     )
-    for name in (
-        "Install source-gate dependencies",
-        "Show checkpoint status",
-        "Verify batch source checkpoints",
-    ):
-        assert (
-            f"- name: {name}\n        if: steps.changes.outputs.mode != 'DOCS_ONLY'"
-            in workflow
-        )
     assert (
         "- name: Validate docs-only range\n"
         "        if: steps.changes.outputs.mode == 'DOCS_ONLY'" in workflow
     )
     assert "-File .\\ops.ps1 verify-docs" in workflow
-    upload = workflow.split("- name: Upload checkpoint evidence", 1)[1]
-    assert (
-        "/**/report.json" in upload
-        and "/**/commands/*.stdout.txt" in upload
-        and "/**/commands/*.stderr.txt" in upload
-        and "/**/pytest-results.xml" in upload
-    )
-    assert "!${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**" in upload
-    assert "path: ${{ runner.temp }}/ai-trading-bot-checkpoints\n" not in upload
+    assert workflow.count("/**/pytest-results.xml") == 2
+    assert "!${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**" in workflow
 
 
 @pytest.mark.parametrize(
-    "mutation", ["duplicate", "comment", "exit", "rename", "reverse"]
+    "mutation",
+    [
+        "duplicate",
+        "comment",
+        "exit",
+        "rename",
+        "reverse",
+        "concurrency",
+        "aggregator",
+        "shards",
+    ],
 )
 def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mutation):
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     if mutation == "duplicate":
-        workflow += "\nverify-batch arch131-robinhood-review-paper\n"
+        workflow += "\nverify-batch @Checkpoints\n"
     elif mutation == "comment":
         workflow = workflow.replace(
-            "              arch131-robinhood-review-paper",
-            "              # arch131-robinhood-review-paper",
+            "    arch131-robinhood-review-paper",
+            "    # arch131-robinhood-review-paper",
         )
     elif mutation == "exit":
-        workflow = workflow.replace("exit $LASTEXITCODE", "exit 0")
+        workflow = workflow.replace(
+            "verify-batch @Checkpoints\n          exit $LASTEXITCODE",
+            "verify-batch @Checkpoints\n          exit 0",
+            1,
+        )
     elif mutation == "rename":
         workflow = workflow.replace(
             "arch131-robinhood-review-paper", "missing-checkpoint"
         )
-    else:
+    elif mutation == "reverse":
         workflow = (
             workflow.replace("arch131-robinhood-review-paper", "TEMP")
             .replace("arch131-robinhood-mcp-schema", "arch131-robinhood-review-paper")
             .replace("TEMP", "arch131-robinhood-mcp-schema")
         )
+    elif mutation == "concurrency":
+        workflow = workflow.replace(
+            "cancel-in-progress: true", "cancel-in-progress: false"
+        )
+    elif mutation == "aggregator":
+        workflow = workflow.replace(
+            "  source-gates:\n"
+            "    needs: [source-static, active-tests, full-tests]\n"
+            "    if: always()\n",
+            "  source-gates:\n"
+            "    needs: [source-static, active-tests, full-tests]\n"
+            "    if: success()\n",
+        )
+    else:
+        workflow = workflow.replace("shard: [0, 1, 2, 3]", "shard: [0, 1]")
     assert not runner._batch_workflow_is_reviewed(workflow)
 
 
@@ -357,8 +365,8 @@ def test_r2a_workflow_scope_and_narrow_branch_trigger():
     for name in _EXPECTED_RETAINED_CHECKPOINTS:
         assert name not in workflow
         modified = workflow.replace(
-            "            verify-batch `\n",
-            f"            verify-batch `\n              {name} `\n",
+            "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n",
+            f"  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n    {name}\n",
         )
         assert not runner._batch_workflow_is_reviewed(modified)
 
@@ -381,7 +389,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
     assert runner.ACTIVE_CI_CHECKPOINTS[4] == name
-    assert workflow.count("              " + name + " `") == 1
+    assert workflow.count(f"              {name} `\n") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None

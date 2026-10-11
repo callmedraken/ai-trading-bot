@@ -1,5 +1,137 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 133-AJ publication INDETERMINATE; 133-AK read-only reconciliation frozen
+
+The single authorized real Architecture **133-AJ** preserved-release publication
+attempt ran from the exact preflighted source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-publication-recovery
+HEAD    cc56197e664459420bd8bc2a52f263c64cee2160
+TREE    55dc1abb9c659619f5ce7f044e87a64eaaa6e3ba
+
+PRIMARY_STATUS       INDETERMINATE
+PRIMARY_REASON       PUBLICATION_AMBIGUITY
+EFFECT_DISPOSITION   MAY_HAVE_OCCURRED
+IDENTITY_STABLE      True
+OVERALL              STOPPED
+~~~
+
+The AJ one-shot authority is consumed and **must never be retried or reset**.
+The failed AJ branch is intentionally frozen at the exact source above. Do not
+delete/edit the AJ latch, clean up STAGING or FINAL, manually rename a release,
+repair ACLs, retry AG/AJ through another path, or perform scheduler/runtime/
+provider/Paper-v2/wake/broker/live effects.
+
+Preserved AJ incident evidence is fixed as follows:
+
+~~~text
+AJ RUNNER REPORT
+F:\AI\temp\arch133aj-publication-7db840004cf74144b744e3f25afb5d2b\arch133-robinhood-supervised-release-publication-recovery\execute-20261011T074328.981251Z\report.json
+length 1379
+sha256 5d8d26fc11ad244ea0e52e663b0ae637b13da86e8913bd4f145895f708c9266f
+
+AJ RUNNER ATTEMPT
+F:\AI\temp\arch133aj-publication-7db840004cf74144b744e3f25afb5d2b\arch133-robinhood-supervised-release-publication-recovery\execute-20261011T074328.981251Z\attempt.json
+length 741
+sha256 1f406669007a032201005b0e9e83944a26de5d972d4eae820f9c711a40bb0e73
+
+AJ DURABLE LATCH
+F:\AI\temp\arch133-aj-publication-recovery-attempt.json
+length 111
+sha256 c2f965884a9d865d5d04955b597bdfd6b50cb1506c9ed30b3044cd9d8549e016
+bytes  {"schema":"arch133-aj-publication-recovery-attempt/v1","status":"CONSUMED","automatic_retry":"NOT_AUTHORIZED"}\n
+~~~
+
+The report independently records the same failed AJ HEAD/TREE before and after,
+the same live remote HEAD, clean source identity, protected execution ATTEMPTED,
+automatic retry NOT_AUTHORIZED, and
+`INDETERMINATE / PUBLICATION_AMBIGUITY /
+PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED`. The runner attempt
+record binds the same source and remote identity with status STARTED. All three
+objects are regular, non-reparse files and must be preserved byte-for-byte.
+
+### Next checkpoint — Architecture 133-AK
+
+Architecture **133-AK — AJ publication ambiguity reconciliation** is now the next
+safe milestone. It is strictly **read-only** and owns no publication, cleanup,
+repair or retry authority.
+
+Frozen target:
+
+~~~text
+BRANCH
+feature/robinhood-supervised-release-publication-reconciliation
+
+WORKTREE
+F:\AI\worktrees\ai-trading-bot-supervised-release-publication-reconciliation
+
+CHECKPOINT
+arch133-robinhood-supervised-release-publication-reconciliation
+
+STARTING PARENT
+cc56197e664459420bd8bc2a52f263c64cee2160
+55dc1abb9c659619f5ce7f044e87a64eaaa6e3ba
+~~~
+
+AK must first reprove the exact AJ latch, runner-attempt record and runner report
+above with bounded repeated reads, exact hashes, exact lengths and exact semantic
+content. It must independently require the failed AJ worktree to remain clean on
+the frozen AJ branch/HEAD/TREE/origin and require the live failed-AJ remote branch
+to remain exactly `cc56197...`. It must also reprove the original consumed AG
+incident and accepted AI reconciliation chain rather than trusting AJ's summary.
+
+AK then performs only native **read** observations of the frozen release. It must
+observe the target namespace twice and classify exactly:
+
+- **FINAL only**: replay FINAL independently twice, prove the exact immutable
+  image identity `(1855336320, 281474980566367)`, release/manifest/binding,
+  parent identity and production Python identity/version/hash, prove STAGING is
+  absent and namespace remains stable, then return
+  `PASS / FINAL_PUBLISHED_VERIFIED / EXACT_FINAL_ONLY /
+  RECONCILED_PUBLISHED / CONFIRMED`.
+- **STAGING only**: replay STAGING independently twice with the same exact image
+  and runtime evidence, prove FINAL is absent and namespace remains stable, then
+  return `PASS / STAGING_VERIFIED_PRESERVED / EXACT_STAGING_ONLY /
+  PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED`. This closes the
+  AJ ambiguity as publication not completed, but does **not** restore AJ retry
+  authority.
+- **both, neither, evidence/source/identity drift, unstable observations, or any
+  other state**: return
+  `BLOCKED / RECONCILIATION_UNRESOLVED /
+  PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED`.
+
+Every AK result keeps `automatic_retry=NOT_AUTHORIZED`. AK has no execute
+callback, no authorization interlock, and no capability to create/delete/rename/
+replace/chmod/write release objects, latches or incident evidence. It may not
+invoke AJ execute/publication code.
+
+AK should expose one registered Administrator-only read-only preflight. The
+runner must use stdout-only evidence for the protected-release family, with no
+checkpoint evidence directory or production object creation. Source-gate tests
+must preserve the audited split workflow and exact branch routing.
+
+Register AK in the active checkpoint inventory immediately after AJ. The expected
+post-implementation active count is **58**. Because the new owned test module is
+under `tests/review_paper`, expected current certification inventories become
+FULL **159**, ROBINHOOD **86**, LEGACY **205**, EXHAUSTIVE **364**. Update every
+exact historical/current inventory expectation affected by that one legitimate
+addition while preserving exact-equality, ordering, frozen-baseline,
+subset/disjointness and partition assertions.
+
+Implementation owner/model: **Sol High**, because AK interprets a consumed
+one-shot native Windows publication incident and must preserve crash/recovery and
+authority semantics. Implementation verification is focused only: exact AK/AI/AJ
+tests, all directly affected exact-inventory/topology tests, non-mutating Ruff
+check/format and diff checks. Do not run FULL/ROBINHOOD/LEGACY/EXHAUSTIVE and do
+not perform any real host reconciliation during implementation.
+
+After one atomic implementation commit and ordinary push, wait for the exact
+push-triggered source gate to reach terminal green, then ChatGPT performs the
+exact GitHub review. Only after source acceptance will ChatGPT decide whether to
+run the real read-only AK preflight. No mutation or retry authority is implied by
+source acceptance.
+
 ## 2026-10-11 — Architecture 133-AJ FULL CERTIFIED; read-only real-host preflight next
 
 Architecture **133-AJ — preserved immutable-release publication recovery** is now

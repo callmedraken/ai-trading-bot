@@ -54,6 +54,36 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Architecture 133-AK validation contract
+
+Implementation must cover, with disposable/fake/read-only surfaces only:
+
+- exact regular/non-reparse AJ report, attempt and latch objects;
+- exact lengths, SHA-256 hashes, latch bytes and repeated-read stability;
+- exact AJ report and runner-attempt semantics including failed source before/
+  after/live-remote identity and INDETERMINATE publication ambiguity;
+- frozen failed AJ worktree branch/HEAD/TREE/origin and exact live AJ remote;
+- original AG consumed-latch and accepted AI reconciliation chain;
+- Administrator admission and source drift rejection;
+- exact FINAL-only classification with two independent FINAL replays;
+- exact STAGING-only classification with two independent STAGING replays;
+- both-present, both-absent, identity drift, replay drift and namespace drift;
+- immutable release/manifest/binding/parent/image/Python identity checks;
+- no publication/write/delete/rename/replace/cleanup/repair/chmod/runtime/
+  scheduler/provider/Paper-v2/wake/broker/live capabilities;
+- `execute=None`, no authorization environment variable and no retry path;
+- stdout-only real-preflight evidence with no evidence-directory creation;
+- one exact AK active branch route while preserving split source-static /
+  active-tests / four fallback shards / terminal source-gates topology.
+
+Expected post-implementation inventories are active checkpoints **58**, FULL
+**159**, ROBINHOOD **86**, LEGACY **205**, EXHAUSTIVE **364**. Update all exact
+expectations made stale by this single new owned test module without weakening
+the existing exact inventory, ordering, authority, baseline or partition checks.
+
+Focused verification only during implementation. No broad certification and no
+real AK host preflight until exact GitHub review and source acceptance.
+
 ## Architecture 133-AJ FULL certification — ACCEPTED
 
 The corrected FULL certification passed on exact source:

@@ -54,6 +54,65 @@ does not replace that enforcement; both the canonical rule and executable
 authority must remain aligned.
 
 
+## Architecture 133-AK contract — AJ publication ambiguity reconciliation
+
+The AJ protected attempt is frozen as a consumed, non-retryable publication
+ambiguity. Failed AJ source:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-publication-recovery
+HEAD    cc56197e664459420bd8bc2a52f263c64cee2160
+TREE    55dc1abb9c659619f5ce7f044e87a64eaaa6e3ba
+~~~
+
+Fixed incident objects:
+
+~~~text
+report.json   length 1379
+sha256        5d8d26fc11ad244ea0e52e663b0ae637b13da86e8913bd4f145895f708c9266f
+
+attempt.json  length 741
+sha256        1f406669007a032201005b0e9e83944a26de5d972d4eae820f9c711a40bb0e73
+
+AJ latch      length 111
+sha256        c2f965884a9d865d5d04955b597bdfd6b50cb1506c9ed30b3044cd9d8549e016
+~~~
+
+The latch bytes are exactly
+`{"schema":"arch133-aj-publication-recovery-attempt/v1","status":"CONSUMED","automatic_retry":"NOT_AUTHORIZED"}\n`.
+No reset/remove/retry function is authorized.
+
+AK is fixed to branch
+`feature/robinhood-supervised-release-publication-reconciliation`, worktree
+`F:\AI\worktrees\ai-trading-bot-supervised-release-publication-reconciliation`
+and checkpoint
+`arch133-robinhood-supervised-release-publication-reconciliation`, descended
+from the failed AJ source above.
+
+AK owns read-only incident reconciliation only. It must verify the fixed AJ
+evidence bytes/semantics twice, the frozen failed AJ worktree and live remote
+identity, and the original AG/AI evidence chain before any namespace conclusion.
+It then independently observes FINAL/STAGING twice and accepts only an exact
+FINAL-only or exact STAGING-only target state with the immutable image identity
+`(1855336320, 281474980566367)` and the already-frozen release, manifest,
+binding, parent and Python identities.
+
+FINAL-only success is
+`PASS / FINAL_PUBLISHED_VERIFIED / EXACT_FINAL_ONLY /
+RECONCILED_PUBLISHED / CONFIRMED`. STAGING-only reconciliation is
+`PASS / STAGING_VERIFIED_PRESERVED / EXACT_STAGING_ONLY /
+PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED`. All mixed,
+missing, drifting or unverifiable states are
+`BLOCKED / RECONCILIATION_UNRESOLVED /
+PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY / MAY_HAVE_OCCURRED`.
+`automatic_retry` is always `NOT_AUTHORIZED`.
+
+AK must have `execute=None`. It cannot publish, rename, replace, delete, clean,
+repair, chmod, install, create a latch, start/rebind runtime/scheduler, access
+provider credentials or Paper-v2, wake, submit broker orders, or trade live.
+The real preflight is separately reviewed and authorized only after source
+acceptance.
+
 ## 133-AJ FULL certification — ACCEPTED
 
 The corrected AJ source is FULL certified on the exact final executable/test

@@ -1,5 +1,85 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134-A SOURCE ACCEPTED; 134-B decision bridge frozen
+
+Architecture **134-A — Production Strategy Contract** is SOURCE ACCEPTED.
+
+~~~text
+BRANCH  feature/robinhood-production-strategy-contract
+HEAD    d49f6e718b27207acad39ad323c76db196b6d7a9
+TREE    239513ff3063610b675213a124208edb933846ac
+CI      #459 / 38125675113 SUCCESS
+~~~
+
+Exact review covered the two-commit implementation delta from the frozen
+contract. The first push failed only non-mutating Ruff lint/format checks;
+the bounded second commit changed only runner/test formatting and a test-helper
+default. Final source-static passed diff/Ruff/format and the 134-A authority
+check; active-tests passed; fallback full-tests correctly skipped.
+
+The accepted 134-A model is inert. It binds one explicit target session date,
+exact reviewed source HEAD/TREE, one symbol, fixed
+`MovingAverageCrossoverStrategy` / `1.0.0`, and its exact validated
+`MovingAverageCrossoverConfig` into one deterministic canonical contract ID.
+It exposes no provider, market-data evaluation, paper-store, risk, scheduler,
+clock, research/AI or execution capability.
+
+Broad certification remains intentionally deferred. Current product inventories
+after 134-A are active **58**, FULL **159**, ROBINHOOD **85**, LEGACY **205**,
+EXHAUSTIVE **364**.
+
+### Next checkpoint — 134-B Production Strategy Decision Bridge
+
+~~~text
+BRANCH
+feature/robinhood-production-strategy-decision
+
+BASE HEAD
+d49f6e718b27207acad39ad323c76db196b6d7a9
+
+BASE TREE
+239513ff3063610b675213a124208edb933846ac
+
+CHECKPOINT
+arch134-production-strategy-decision
+~~~
+
+134-B is provider-free/source-only. It reuses the accepted Architecture-94
+`ManualPaperStrategyDecisionRequest` and
+`build_manual_paper_strategy_decision()` rather than duplicating verified
+daily-history/account reconstruction.
+
+Frozen sequence:
+
+~~~text
+exact ProductionStrategyContract
++ exact ManualPaperStrategyDecisionRequest
++ exact IdentifiedMarketCalendar
+-> reject strategy config / history-seed symbol mismatch before evaluation
+-> build_manual_paper_strategy_decision(...) exactly once
+-> require prepared symbol == production symbol
+-> require prepared config == production config
+-> require intended_execution_session.session_date == contract target date
+-> return closed NO_SIGNAL or exact TradeProposal
+~~~
+
+The result retains the exact 134-A contract plus the exact verified/prepared
+Architecture-94 decision object and exposes the proposal only when the retained
+signal status is `TRADE_PROPOSAL`. A `NO_SIGNAL` result exposes no proposal.
+
+134-B may not call Robinhood/MCP/OAuth, acquire a live quote, build a risk
+preview, open/write a `ReviewPaperStore`, schedule/wait/sleep, read a clock,
+access Git/filesystem/environment, promote research candidates, or invoke any
+execution/review/order path. It does not persist or arm a production strategy.
+
+Implementation is expected to add one `tests/strategies` module and one active
+checkpoint. Post-implementation expected inventories become active **59**,
+FULL **160**, ROBINHOOD **85**, LEGACY **205**, EXHAUSTIVE **365**. Preserve
+all exact inventory/order/partition checks rather than weakening them.
+
+Focused verification only. No broad certification and no protected host/provider/
+paper/scheduler effect is selected for 134-B.
+
 ## 2026-10-11 — Architecture 134 product direction; 134-A Production Strategy Contract frozen
 
 The active product target is now explicit:

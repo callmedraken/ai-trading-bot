@@ -80,3 +80,46 @@ must come from published exchange-session authority.
 Research lane: historical/backtest/walk-forward tests plus explicit proof that
 candidate writes cannot reach production selection, paper account, scheduler or
 provider execution surfaces.
+
+
+## 134-B validation contract
+
+Focused tests must prove:
+
+- exact 134-A contract type required;
+- exact Architecture-94 request type and calendar boundary required;
+- contract/request strategy-config mismatch blocks before the Architecture-94
+  builder is called;
+- contract/history-seed symbol mismatch blocks before the builder is called;
+- Architecture-94 builder is invoked exactly once on success;
+- returned prepared object is retained by identity, never serialized/rebuilt;
+- intended execution session must equal the production contract target date;
+- prepared config/symbol drift blocks;
+- `NO_SIGNAL` returns no proposal;
+- `TRADE_PROPOSAL` returns the exact prepared proposal object by identity;
+- malformed/inconsistent builder results fail closed;
+- no second strategy evaluation is introduced in the bridge;
+- import/call surface excludes provider/OAuth/network, paper/SQLite, risk,
+  execution/review/order, scheduler/clock/sleep, filesystem/Git/environment,
+  runtime/native and research/AI/optimization capabilities;
+- no candidate/promotion API;
+- checkpoint registration is exactly source-only with the exact 134-B branch;
+- active route is unique and audited split/sharded source-gate topology remains
+  reviewed;
+- all exact inventory expectations are updated to active 59 / FULL 160 /
+  ROBINHOOD 85 / LEGACY 205 / EXHAUSTIVE 365 without weakening invariants.
+
+Expected primary implementation surfaces:
+
+~~~text
+src/trading_bot/strategies/production_decision.py
+tests/strategies/test_production_strategy_decision.py
+scripts/checkpoint_runner.py
+.github/workflows/checkpoint-source-gates.yml
+~~~
+
+Use focused tests plus non-mutating Ruff check/format and diff check. Do not run
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE during implementation.
+
+134-B source acceptance does not authorize 134-C live shadow/provider access or
+paper mutation.

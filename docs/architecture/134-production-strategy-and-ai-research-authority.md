@@ -165,3 +165,72 @@ reviewed boundary.
 The simplified fixed-worktree deployment model remains in force. Architecture
 134 does not revive STAGING/FINAL publication, AG/AJ retry, automatic code
 deployment or self-modification.
+
+
+## 134-B — Production Strategy Decision Bridge
+
+134-B binds the session-scoped production selection to the repository's existing
+verified daily strategy-decision path. It deliberately does **not** create a
+second strategy-history/account reconstruction implementation.
+
+### Inputs
+
+Exactly:
+
+- one `ProductionStrategyContract` from 134-A;
+- one `ManualPaperStrategyDecisionRequest` from Architecture 94;
+- one `IdentifiedMarketCalendar` accepted by the Architecture-94 builder.
+
+Before invoking strategy evaluation, require:
+
+- request `strategy_config == contract.strategy_config`;
+- verified history-seed `strategy_config == contract.strategy_config`;
+- verified history-seed symbol exactly equals `contract.symbol`.
+
+Then call `build_manual_paper_strategy_decision(request, calendar)` exactly once.
+That accepted builder independently replays the verified daily snapshot, seed,
+prior paper checkpoint/account state and calendar and evaluates the existing
+`MovingAverageCrossoverStrategy` exactly once.
+
+After that single call require:
+
+- prepared `strategy_config == contract.strategy_config`;
+- prepared `symbol == contract.symbol`;
+- prepared `intended_execution_session.session_date ==
+  contract.target_session_date`;
+- prepared signal/proposal combination remains exactly consistent with the
+  existing `ManualPaperStrategySignalStatus` contract.
+
+### Closed output
+
+`ProductionStrategyDecisionStatus` has exactly:
+
+~~~text
+NO_SIGNAL
+TRADE_PROPOSAL
+~~~
+
+`ProductionStrategyDecision` retains:
+
+- the exact `ProductionStrategyContract` object;
+- the exact `PreparedManualPaperStrategyDecision` returned by Architecture 94;
+- the matching closed status;
+- `proposal=None` for `NO_SIGNAL`, otherwise the exact retained `TradeProposal`
+  object by identity.
+
+The bridge does not generate a new proposal, order ID, risk decision, strategy
+identity or source identity. It cannot substitute a research candidate.
+
+### Capability boundary
+
+Allowed direct dependencies are limited to the production contract, existing
+Architecture-94 strategy-decision model/builder, domain proposal types and
+market-calendar typing needed for the pure composition.
+
+Forbidden capabilities include Robinhood/MCP/OAuth, network, filesystem/Git/
+environment, SQLite/paper store, risk evaluation, review/execution/order engine,
+scheduler, clock/sleep, runtime/native host code, experiments/optimization/AI,
+candidate selection or promotion.
+
+134-B has no registered preflight or execute callback. Source acceptance grants
+only the right to proceed to 134-C design.

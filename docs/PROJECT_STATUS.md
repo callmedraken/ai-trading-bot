@@ -21537,10 +21537,14 @@ production-decision materialization**:
 - consume current-product verified daily snapshot/history evidence;
 - derive current synthetic-paper prior/account state from the accepted
   `ReviewPaperStore`, not Paper-v2;
-- materialize exactly the Architecture-94-shaped decision inputs needed by the
-  already accepted 134-B pure bridge;
-- invoke the accepted 134-B decision bridge without a second strategy
-  implementation;
+- **do not fabricate** Architecture-94's construction-protected
+  `VerifiedPriorCheckpoint` or otherwise mint legacy authority from
+  `ReviewPaperStore`;
+- factor/reuse the already-reviewed pure Architecture-94 strategy-decision core
+  so the legacy adapter and the Robinhood current-product adapter can supply
+  their own independently verified prior/account evidence;
+- preserve exactly one existing strategy evaluation and feed its result into the
+  accepted 134-B closed decision contract;
 - perform no Robinhood/OAuth/provider effect while constructing or testing the
   source boundary;
 - introduce no dependency on D10, Windows C1/C3, Paper-v2, legacy scheduler,

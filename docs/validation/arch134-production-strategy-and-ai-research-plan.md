@@ -327,9 +327,15 @@ Focused validation must prove:
 - current verified snapshot/history symbol/config/session match the contract;
 - current synthetic-paper prior derives from `ReviewPaperStore` evidence, not
   Paper-v2;
-- the resulting request is an exact `ManualPaperStrategyDecisionRequest`;
-- accepted 134-B decision construction is called exactly once;
-- no second strategy evaluation or proposal synthesis exists;
+- no code path constructs or forges Architecture-94's protected
+  `VerifiedPriorCheckpoint` from ReviewPaperStore;
+- the pure Architecture-94 strategy-decision core is shared by the legacy and
+  current-product adapters;
+- the existing Architecture-94 entry point retains its exact behavior and
+  authority validation;
+- the Robinhood adapter calls the shared pure decision core exactly once and
+  returns through the accepted 134-B closed decision contract;
+- exactly one strategy evaluation occurs; no second proposal synthesis exists;
 - no D10/Windows/C1/C3/Paper-v2/personal-desktop unattended imports or calls;
 - no Robinhood/OAuth/provider/network effect in the materializer;
 - no scheduler, broker, live-order, research-promotion or filesystem-repair

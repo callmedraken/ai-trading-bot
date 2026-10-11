@@ -419,8 +419,8 @@ only the right to proceed to 134-C design.
 historical personal-desktop Paper-v2/C3 runtime part of Architecture 134
 production authority.
 
-The current Robinhood lane requires a dedicated materialization boundary that
-constructs the exact 134-B request from current-product evidence:
+The current Robinhood lane requires a dedicated materialization boundary using
+current-product evidence:
 
 - exact 134-A production contract;
 - verified daily snapshot/history evidence for the contract symbol/session;
@@ -428,8 +428,18 @@ constructs the exact 134-B request from current-product evidence:
   `ReviewPaperStore`;
 - explicit deterministic planning/idempotency/policy inputs.
 
-It must preserve Architecture-94 verification semantics and call the accepted
-134-B bridge rather than reimplementing strategy evaluation. It must not read
+Architecture-94's `VerifiedPriorCheckpoint` is construction-protected authority
+from the historical checkpoint-lineage system. The Robinhood adapter must
+**never fabricate or synthesize that capability** from ReviewPaperStore.
+
+Instead, 134-B2 must extract/reuse the already-reviewed pure strategy-decision
+core beneath the Architecture-94 request adapter. The existing Architecture-94
+entry point continues to validate/translate its legacy `VerifiedPriorCheckpoint`;
+the new Robinhood entry point validates/translates independently verified
+ReviewPaperStore state into a current-product prior model. Both paths then call
+the same pure decision core, which performs exactly one existing strategy
+evaluation. The accepted 134-B closed `NO_SIGNAL` / `TRADE_PROPOSAL` contract
+remains the production output boundary. It must not read
 or repair D10/Windows/Paper-v2/C1/C3 personal-desktop state, use historical
 Alpaca operational authority, or infer missing market history.
 

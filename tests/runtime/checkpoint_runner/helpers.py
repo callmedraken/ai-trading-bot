@@ -220,6 +220,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch134-production-strategy-contract",
     "arch134-production-strategy-decision",
+    "arch134-production-strategy-live-paper",
 )
 
 

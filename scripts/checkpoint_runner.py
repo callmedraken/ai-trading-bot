@@ -193,6 +193,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch134-production-strategy-contract",
     "arch134-production-strategy-decision",
+    "arch134-production-strategy-live-paper",
 )
 
 
@@ -989,7 +990,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3708,7 +3709,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3806,7 +3807,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3904,7 +3905,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -4008,7 +4009,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -4107,7 +4108,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4222,7 +4223,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4332,7 +4333,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4430,7 +4431,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4532,7 +4533,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4631,7 +4632,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4730,7 +4731,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4826,7 +4827,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4922,7 +4923,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -5020,7 +5021,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5120,7 +5121,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5228,7 +5229,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "336e4fd81cf93637b4dd11172171375435ec4d2de9b4d8ca7e80c9646bd1f961"
+            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -9368,6 +9369,142 @@ def _arch134_production_strategy_decision_authority_check(
     return tuple(failures)
 
 
+
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: Final = (
+    "arch134-production-strategy-live-paper"
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE: Final = (
+    "src/trading_bot/review_paper/production_strategy_cycle.py"
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN: Final = (
+    "469b6a0f1899b64308349ebe80b511f1ec8e6c98"
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    ARCH134_PRODUCTION_STRATEGY_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+
+
+def _arch134_production_strategy_live_paper_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the 134-C composition onto the accepted 131 PREPARE/EXECUTE path."""
+    failures = list(_arch134_production_strategy_decision_authority_check(repo_root))
+    try:
+        path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
+        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:
+            failures.append("134-C production live-paper source drift")
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imported = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        } | {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "datetime",
+            "decimal",
+            "enum",
+            "pathlib",
+            "uuid",
+            "trading_bot.execution.models",
+            "trading_bot.review_paper.session_admission",
+            "trading_bot.review_paper.store",
+            "trading_bot.review_paper.supervised_forward_paper",
+            "trading_bot.risk.models",
+            "trading_bot.robinhood_mcp.adapter",
+            "trading_bot.strategies.production_decision",
+        }
+        if not imported <= allowed:
+            failures.append(
+                "134-C production live-paper import surface expanded: "
+                + repr(sorted(imported - allowed))
+            )
+        names = _qualified_names(tree)
+        forbidden = {
+            "run_robinhood_forward_paper_cycle",
+            "record_market_review",
+            "acquire_review_paper_risk_price_snapshot",
+            "review_equity_order",
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "place_crypto_order",
+            "time.sleep",
+            "subprocess.run",
+            "subprocess.Popen",
+            "os.environ",
+        }
+        if names & forbidden:
+            failures.append(
+                "134-C bypass/effect surface expanded: "
+                + repr(sorted(names & forbidden))
+            )
+
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-production-strategy-live-paper"
+            or spec.authority_check
+            is not _arch134_production_strategy_live_paper_authority_check
+            or spec.tests != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS
+        ):
+            failures.append("134-C source-only registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[-3:]
+            != (
+                ARCH134_PRODUCTION_STRATEGY_NAME,
+                ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
+                ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(
+                ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME
+            )
+            != 1
+        ):
+            failures.append("134-C checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-C workflow route/topology drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("134-C production live-paper boundary unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -9481,6 +9618,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
+            description="Architecture 134-C human-started production live-paper composition",
+            tests=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS,
+            authority_check=_arch134_production_strategy_live_paper_authority_check,
+            remote_branch="feature/robinhood-production-strategy-live-paper",
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_PRODUCTION_STRATEGY_DECISION_NAME: CheckpointSpec(
             name=ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
             description="Architecture 134-B pure production strategy decision bridge",

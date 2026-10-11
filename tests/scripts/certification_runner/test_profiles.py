@@ -135,6 +135,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/review_paper/test_supervised_release_installation_operator.py",
                 "tests/review_paper/test_supervised_release_installation_reconciliation.py",
                 "tests/review_paper/test_supervised_release_publication_recovery.py",
+                "tests/strategies/test_production_strategy_contract.py",
             )
         )
     )
@@ -148,10 +149,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 158,
+        "full": 159,
         "robinhood": 85,
         "legacy": 205,
-        "exhaustive": 363,
+        "exhaustive": 364,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

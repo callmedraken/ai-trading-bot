@@ -197,6 +197,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch133-robinhood-reprovision-recovery-reconciliation",
         "arch133-robinhood-windows-rename-qualification",
         "arch133-robinhood-closed-descendant-rename-qualification",
+        "arch134-production-strategy-contract",
     }
     for spec in specs.values():
         assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
@@ -324,6 +325,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = (
                 "feature/robinhood-supervised-release-installation-reconciliation"
             )
+        if spec.name == "arch134-production-strategy-contract":
+            expected_branch = "feature/robinhood-production-strategy-contract"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1266,6 +1269,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch133-robinhood-supervised-maintenance-rebind",
                 "arch133-robinhood-supervised-release-installation",
                 "arch133-robinhood-supervised-release-build-verification",
+                "arch134-production-strategy-contract",
             }
             else (
                 *runner.COMMON_TESTS,

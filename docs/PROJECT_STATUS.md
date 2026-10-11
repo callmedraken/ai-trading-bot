@@ -1,5 +1,98 @@
 # Project Status and Roadmap
 
+## 2026-10-10 — Architecture 133-AJ SOURCE ACCEPTED; FULL selected next
+
+Architecture **133-AJ — preserved immutable-release publication recovery** is
+**SOURCE ACCEPTED** on the exact executable/test source:
+
+~~~text
+HEAD  9e37d5bf38bc0383e9f84008f8961321771d7254
+TREE  1c898f48d6c4e09c19596946e12c676d359de6d4
+CI    #447 / 38115827585 SUCCESS
+~~~
+
+Exact-commit review found no source correction requirement. The protected path
+owns only one no-replace, handle-relative publication of the already verified
+preserved STAGING image to FINAL. It cannot install/materialize, retry AG,
+reset either latch, delete/replace namespaces, repair ACLs, rebind the
+scheduler, start runtime, access provider credentials, write Paper-v2, wake,
+submit broker orders, or trade live.
+
+The independent AJ latch is consumed before publication. Any post-fence native
+return, close, FINAL replay, incident-evidence, or source ambiguity is
+`INDETERMINATE / PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY`. Success requires
+independent FINAL replay with STAGING absent and the exact immutable image
+identity preserved.
+
+Focused implementation verification reported 262 distinct tests and 57 source
+authority checks, plus focused Ruff check/format and diff checks. Source gate
+#447 independently passed `source-static` and `active-tests`; fallback
+`full-tests` were correctly skipped.
+
+The selected next certification is exactly one optimized **FULL** current-product
+certification on the final AJ source identity after this docs-only notarization
+commit is green. No ROBINHOOD/LEGACY/EXHAUSTIVE duplicate is selected unless
+FULL exposes a scope-specific reason. FULL is certification only and grants no
+publication authority.
+
+Protected AJ preflight remains read-only and protected AJ publication remains
+separately authorized. No protected publication is authorized by this source
+acceptance or by FULL certification.
+
+## Canonical source-gate topology non-regression notary — normative
+
+This rule is **normative**, not merely historical. The accepted source-gate
+topology is the audited split/sharded workflow. A return to the older monolithic
+single-job gate is a workflow regression and is a **STOP** condition.
+
+The incident being notarized is:
+
+~~~text
+REGRESSED SOURCE  90f9366f4251f062985ce335bea62e1c747aa1d4
+REGRESSED CI      #443 / 38111685698 SUCCESS
+REGRESSED WALL    7m 04s
+REGRESSED SHAPE   one monolithic source-gates job
+
+RESTORED SOURCE   165bae500ca8f486298d4ede8b6ba7ec5237fe89
+RESTORED CI       #445 / 38112755149 SUCCESS
+RESTORED WALL     3m 07s
+RESTORED SHAPE    source-static + four full-test shards + source-gates
+
+CURRENT AJ SOURCE 9e37d5bf38bc0383e9f84008f8961321771d7254
+CURRENT AJ CI     #447 / 38115827585 SUCCESS
+CURRENT AJ ROUTE  source-static + active-tests; full-tests skipped
+~~~
+
+The accepted workflow contract is:
+
+- `source-static` always owns classification, static checks, and authority;
+- an exact registered feature-branch push routes to `active-tests`;
+- broad/fallback source changes route to four duration-balanced
+  `full-tests` shards `[0, 1, 2, 3]`;
+- `source-gates` is only the terminal aggregator and must depend on
+  `source-static`, `active-tests`, and `full-tests`;
+- exact route resolution, source-gate phase controls, concurrency cancellation,
+  exit-code propagation, and the terminal aggregator remain fail closed;
+- docs-only changes may skip test jobs only through the reviewed docs-only
+  classifier; and
+- the old single monolithic `source-gates` execution path is not accepted.
+
+The regression occurred because a later checkpoint branch inherited an older
+pre-latency lineage. Therefore, before implementation on any branch whose
+ancestry predates the restored split gate, the current workflow **and** matching
+runner phase/shard support must be reconciled first. Do not copy only the YAML.
+If the workflow topology or runner support differs from the current accepted
+contract, stop before the implementation push.
+
+This is also machine-enforced. `scripts/checkpoint_runner.py` function
+`_batch_workflow_is_reviewed()` freezes the split topology, active/fallback
+routing, four-shard matrix, concurrency rule, and aggregator. Source authority
+must fail if that contract drifts. Checkpoint-specific tests must continue to
+assert `_batch_workflow_is_reviewed()` before source acceptance. Documentation
+does not replace that enforcement; both the canonical rule and executable
+authority must remain aligned.
+
+
 ## 2026-10-10 — 133-AI reconciled AG publication as exact preserved STAGING; fast source gate restored
 
 Architecture **133-AI** completed its real-host read-only reconciliation of the

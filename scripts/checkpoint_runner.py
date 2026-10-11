@@ -9378,11 +9378,18 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE: Final = (
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN: Final = (
     "3636889acaddf0de0a27e4dc4de0687839c59ee8"
 )
+ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE: Final = (
+    "src/trading_bot/production_strategy_prepare_operator.py"
+)
+ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN: Final = (
+    "6e13a8f1f45acd458dc0002d5cf338460b3b1d5b"
+)
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     *COMMON_TESTS,
     "tests/strategies/test_production_strategy_contract.py",
     "tests/strategies/test_production_strategy_decision.py",
     "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_production_strategy_prepare_operator.py",
     "tests/scripts/certification_runner/test_profiles.py",
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
@@ -9390,9 +9397,11 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
     ARCH134_PRODUCTION_STRATEGY_SOURCE,
     ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
     ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE,
     "tests/strategies/test_production_strategy_contract.py",
     "tests/strategies/test_production_strategy_decision.py",
     "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_production_strategy_prepare_operator.py",
     "tests/scripts/certification_runner/test_profiles.py",
 )
 
@@ -9406,6 +9415,12 @@ def _arch134_production_strategy_live_paper_authority_check(
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
         if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:
             failures.append("134-C production live-paper source drift")
+        operator_path = repo_root / ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE
+        if (
+            _git_blob_sha1(operator_path)
+            != ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN
+        ):
+            failures.append("134-C production shadow PREPARE operator drift")
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
         imported = {

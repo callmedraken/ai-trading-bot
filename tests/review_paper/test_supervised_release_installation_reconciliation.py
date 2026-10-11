@@ -82,6 +82,14 @@ def test_attempt_context_requires_exact_consumed_latch_and_failed_report(
 
     subject._attempt_context()
 
+    # checkpoint_runner writes the durable AG latch through Windows text mode,
+    # therefore the exact persisted incident record terminates with CRLF.
+    assert subject.ATTEMPT_BYTES.endswith(b"\r\n")
+    attempt.write_bytes(subject.ATTEMPT_BYTES[:-2] + b"\n")
+    with pytest.raises(ValueError):
+        subject._attempt_context()
+    attempt.write_bytes(subject.ATTEMPT_BYTES)
+
     payload["result"]["primary"]["reason"] = "FINAL_VERIFICATION"
     report.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError):

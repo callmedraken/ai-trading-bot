@@ -48,9 +48,11 @@ EXPECTED_STAGING: Final = (
 )
 
 ATTEMPT_PATH: Final = Path(r"F:\AI\temp\arch133-ag-installation-attempt\attempt.json")
+# The AG latch is written in text mode by checkpoint_runner on Windows, so the
+# persisted line terminator is CRLF. Freeze the actual on-disk incident bytes.
 ATTEMPT_BYTES: Final = (
     b'{"schema":"arch133-ag-installation-attempt/v1","status":"CONSUMED",'
-    b'"automatic_retry":"NOT_AUTHORIZED"}\n'
+    b'"automatic_retry":"NOT_AUTHORIZED"}\r\n'
 )
 REPORT_PATH: Final = Path(
     r"F:\AI\temp\arch133ag-protected-execute"

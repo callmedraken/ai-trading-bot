@@ -1,5 +1,79 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-10 - Architecture 133-AH real-host preflight + FULL ACCEPTED; protected create remains separately authorized
+
+Architecture **133-AH has completed its real-host read-only preflight and selected
+FULL current-product certification** on the exact executable/test source below:
+
+~~~text
+BRANCH  feature/robinhood-supervised-release-parent-provisioning
+HEAD    60d5af2b4435acade07cf61d98eb499dcddbb913
+TREE    32a0aa683d2ae5f6202494b97cdec51e744522e1
+
+REAL-HOST PREFLIGHT
+status               PASS
+primary              READY_TO_CREATE
+target_state         ABSENT
+effect_disposition   NOT_STARTED
+automatic_retry      NOT_AUTHORIZED
+protected_execution  NOT_AUTHORIZED
+identity_stable      True
+
+FULL
+modules   156
+cases     8,963
+passed    8,960
+skipped   3
+failed    0
+errors    0
+wall      329.586 s
+evidence  F:\AI\temp\pytest\arch133ah-full-60d5af2-00b7ffef70944318950e4174aba66f7d
+~~~
+
+The real preflight proved the fixed `F:\AITradingBot\releases` target is absent,
+the admitted protected container/security facts are healthy, source identity
+remained exact before/after, and the AH durable one-shot attempt latch remains
+unconsumed. No parent creation, installation, scheduler mutation, provider/OAuth
+access, Paper-v2 mutation, wake, broker or live-trading effect occurred.
+
+The accepted executable spelling for the healthy absent-parent state is
+`READY_TO_CREATE`. Earlier Architecture-133 prose below that says
+`READY_TO_PROVISION` is historical terminology for the same readiness concept;
+do not treat the wording difference as a separate state or authority.
+
+The FULL run used the same exact HEAD/tree as the accepted preflight and completed
+both supported lanes with whole-repository static/source checks green. This
+documentation closeout changes no executable/test source, so it does not require
+another broad certification.
+
+A later fetch observed
+`feature/robinhood-supervised-release-installation-operator` advance from
+`e462a4f666ae2b28dd0d9c0459f4efce154c3470` to
+`513b60029f459ad6ecb4938f8fea2d54209a29d1`; that one-commit delta is
+documentation-only and does not alter the accepted AG executable source. Account
+for that docs closeout when AG resumes after AH.
+
+### Current protected boundary
+
+AH protected execution is **NOT AUTHORIZED by preflight or FULL**. The next
+effectful operation is exactly one separately authorized creation attempt for
+`F:\AITradingBot\releases` through the reviewed checkpoint runner. Before that
+attempt, synchronize the local AH worktree to this documentation closeout and
+re-prove exact branch/HEAD/tree/clean/live-remote identity.
+
+If execute is later explicitly authorized, the runner must consume the fixed
+durable AH no-retry latch before the single native `CreateDirectoryW`. A
+successful result must independently read back the exact protected parent and
+report `PROVISIONED_VERIFIED`. Any post-latch/create ambiguity is
+`MAY_HAVE_OCCURRED / PRESERVE_PARENT_PROVISIONING_EVIDENCE_NO_RETRY`; do not
+delete, repair, clean up or retry.
+
+After a confirmed parent readback, resume 133-AG by synchronizing its worktree to
+the accepted docs-only head and rerunning the unchanged AG read-only preflight.
+Only a reviewed AG PASS may advance to its separately protected immutable-release
+installation boundary.
+
+
 ## 2026-10-10 — Architecture 133-AH release-parent provisioning contract
 
 The first real 133-AG read-only host preflight on accepted closeout source

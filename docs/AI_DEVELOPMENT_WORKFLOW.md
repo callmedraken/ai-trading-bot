@@ -157,6 +157,13 @@ Direct ChatGPT changes follow the same repository discipline as delegated work:
 prove exact startup identity, edit only the intended files, run the focused
 checks appropriate to the change, exact-file stage/commit/push only when
 authorized, and leave broad/final certification to the established gate.
+
+After a ChatGPT-direct commit/push that triggers GitHub Actions, ChatGPT must
+poll the relevant push-triggered workflow/source gate to a **terminal** state
+before reporting the checkpoint complete, accepting the closeout, or advancing
+to the next checkpoint. `queued` and `in_progress` are not completion. On
+failure, inspect the exact job/log evidence and correct or stop; on success,
+verify the run belongs to the exact pushed HEAD.
 Delegate to Luna/Astra/Sol High only when implementation size, discovery,
 isolation, or architecture/security sensitivity makes delegation materially
 useful.
@@ -191,6 +198,13 @@ ChatGPT may directly perform small, tightly scoped, low-risk mechanical source,
 test, documentation, status, handoff, and workflow changes when delegation
 would add overhead without useful isolation. Codex should not receive every
 implementation task automatically.
+
+This is a routing invariant, not a preference. Routine docs/status/handoff
+closeouts and similarly small known-surface low-risk corrections are ChatGPT-
+direct by default when the available repository tools can perform the atomic
+change safely. Do not delegate such a closeout to Codex merely to create a
+handoff; delegate only when discovery, isolation, implementation scale, or
+safety sensitivity provides a material benefit.
 
 ### Codex
 
@@ -305,6 +319,7 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> normal checkpoint commit is created when authorized
 -> isolated feature branch is ordinary-pushed when authorized
 -> exact remote branch HEAD/tree are verified
+-> relevant push-triggered CI/source gate is polled to terminal
 -> ChatGPT reviews the exact GitHub commit/diff
 -> ChatGPT accepts the reviewed source checkpoint
 -> user runs the appropriate certification tier when ChatGPT declares its gate
@@ -513,37 +528,54 @@ because both trigger descriptions apply. LEGACY/EXHAUSTIVE remain exceptional
 compatibility gates. PROTECTED always requires separate fresh authorization;
 no source certification grants it.
 
-#### 5. Audited three-lane human broad-suite topology
+#### 5. Latest audited current-product certification topology
 
-When ChatGPT asks the human operator for a broad local/manual repository suite,
-use the previously audited faster two-broad-plus-one-serial safety topology,
-never a raw monolithic repository-wide `python -m pytest` invocation:
+Do not resurrect the older all-repository three-lane FULL layout for routine
+current-product testing. That topology predates the Architecture-132 current/
+legacy ownership split.
 
-- `broad-1` and `broad-2` run concurrently as deterministic whole-file partitions;
-- `serial` is exactly the five-module Windows/global-state-sensitive safety lane;
-- every module belongs to exactly one lane, with complete/disjoint coverage;
-- each lane has its own external basetemp, log and JUnit evidence;
-- aggregate only after all lanes complete;
-- retain clean source/admission/final identity proof and static gates.
+The latest reviewed current-product certification contract is the
+Architecture-132-R2 selected-profile topology implemented by
+`scripts/run_test_certification.py`:
 
-The exact serial lane is:
+- `--profile full` selects all CURRENTLY SUPPORTED modules and runs exactly
+  `broad-1` and `broad-2`, two deterministic nonempty balanced whole-file
+  lanes, with **no serial lane**;
+- `--profile robinhood` selects the reviewed Robinhood/current-product subset
+  and runs exactly `robinhood-1` and `robinhood-2`, also with **no serial
+  lane**;
+- the historical five-module Windows/global-state-sensitive `serial` lane is
+  retained only by `LEGACY` and `EXHAUSTIVE`, which are exceptional
+  compatibility/repository-archaeology profiles rather than normal
+  current-product verification.
 
-~~~text
-tests/runtime/test_windows_transactional_capture_authority.py
-tests/runtime/test_windows_authority_schema.py
-tests/runtime/test_windows_authority.py
-tests/runtime/test_windows_effectful_capture_native_acceptance.py
-tests/acceptance/test_windows_authority_provisioning_acceptance.py
-~~~
+When the human operator must run broad current-product certification, use the
+reviewed selected-profile runner rather than a raw monolithic
+`python -m pytest` command and rather than reconstructing the pre-R1
+three-lane suite manually. Focused one/few-module verification remains focused.
 
-Focused tests remain focused; do not split one/few-module focused scopes merely
-to create three lanes. Profile-specific FULL/ROBINHOOD certification retains the
-currently reviewed Architecture-132 selected-profile topology: exactly two
-nonempty balanced lanes and no serial lane. LEGACY/EXHAUSTIVE retain their
-reviewed compatibility topology. Changing a selected profile's topology requires
-a separate reviewed certification-topology checkpoint. The three-lane rule
-applies to a broad manual repository suite, not to an unchanged selected-profile
-certification contract, and grants no protected opt-in.
+Audit chronology is normative provenance, not a timing threshold:
+
+- the earlier all-repository Architecture-132 topology used two broad lanes plus
+  the five-module serial safety lane;
+- Architecture 132-R1 moved current-supported FULL and ROBINHOOD to their
+  selected two-lane profiles; its accepted 113-module FULL completed in
+  **201.655 s**;
+- Architecture 132-R2 retained that selected-profile topology while
+  rationalizing ownership and collection; its accepted 136-module FULL completed
+  in **259.314 s**, while the corresponding routine source-gate workflow was
+  restored to roughly **250 s**;
+- later R2-B3/R2-B4 optimized routine source CI further and explicitly did
+  **not** change certification-profile topology.
+
+The current 134-C FULL contains more supported modules/cases than the R2 audit,
+so a larger observed wall time does not by itself authorize falling back to an
+older topology. If performance again becomes materially problematic, open a
+separate measured Architecture-132 performance/topology checkpoint; do not
+silently change lane semantics.
+
+Changing FULL/ROBINHOOD ownership or lane topology requires a separately
+reviewed certification-topology checkpoint.
 
 #### 6. Bounded Codex commit/push and direct ChatGPT GitHub review
 
@@ -665,8 +697,9 @@ is legacy because it uses the retired operational artifact/runtime model. GUI
 remains a future product goal; a Robinhood-integrated GUI milestone must
 explicitly reclassify or replace it.
 
-Among selected profiles, only LEGACY and EXHAUSTIVE retain the historical
-serial safety lane. Broad manual repository suites use that same audited lane:
+Only LEGACY and EXHAUSTIVE retain the historical five-module serial safety
+lane. Current-product FULL/ROBINHOOD never add that serial lane; operator-run
+broad current-product certification uses the reviewed selected profile instead:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py

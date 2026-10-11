@@ -61,37 +61,41 @@ because both trigger descriptions apply. LEGACY/EXHAUSTIVE remain exceptional
 compatibility gates. PROTECTED always requires separate fresh authorization;
 no source certification grants it.
 
-### 5. Audited three-lane human broad-suite topology
+### 5. Latest audited current-product certification topology
 
-When ChatGPT asks the human operator for a broad local/manual repository suite,
-use the previously audited faster two-broad-plus-one-serial safety topology,
-never a raw monolithic repository-wide `python -m pytest` invocation:
+The older two-broad-plus-one-serial all-repository FULL layout is historical
+provenance. It predates the current/legacy ownership split and must not be
+reintroduced for routine current-product verification.
 
-- `broad-1` and `broad-2` run concurrently as deterministic whole-file partitions;
-- `serial` is exactly the five-module Windows/global-state-sensitive safety lane;
-- every module belongs to exactly one lane, with complete/disjoint coverage;
-- each lane has its own external basetemp, log and JUnit evidence;
-- aggregate only after all lanes complete;
-- retain clean source/admission/final identity proof and static gates.
+The latest reviewed certification topology is Architecture 132-R2:
 
-The exact serial lane is:
+- FULL runs exactly two nonempty balanced lanes, `broad-1` and `broad-2`,
+  with no serial lane;
+- ROBINHOOD runs exactly two nonempty balanced lanes, `robinhood-1` and
+  `robinhood-2`, with no serial lane;
+- LEGACY and EXHAUSTIVE alone retain the exact five-module serial safety lane.
 
-~~~text
-tests/runtime/test_windows_transactional_capture_authority.py
-tests/runtime/test_windows_authority_schema.py
-tests/runtime/test_windows_authority.py
-tests/runtime/test_windows_effectful_capture_native_acceptance.py
-tests/acceptance/test_windows_authority_provisioning_acceptance.py
-~~~
+A human broad current-product run therefore uses
+`scripts/run_test_certification.py --profile full` (or the selected
+`--profile robinhood` when that narrower gate is the one ChatGPT chose), not a
+manually reconstructed three-lane repository suite and not raw monolithic
+pytest. Focused tests remain focused.
 
-Focused tests remain focused; do not split one/few-module focused scopes merely
-to create three lanes. Profile-specific FULL/ROBINHOOD certification retains the
-currently reviewed Architecture-132 selected-profile topology: exactly two
-nonempty balanced lanes and no serial lane. LEGACY/EXHAUSTIVE retain their
-reviewed compatibility topology. Changing a selected profile's topology requires
-a separate reviewed certification-topology checkpoint. The three-lane rule
-applies to a broad manual repository suite, not to an unchanged selected-profile
-certification contract, and grants no protected opt-in.
+Audit chronology:
+
+- the pre-R1 all-repository suite used two broad lanes plus serial;
+- 132-R1 separated supported/legacy ownership and moved current FULL/ROBINHOOD
+  to two-lane selected profiles; accepted FULL wall time was **201.655 s**;
+- 132-R2 retained those profile lane semantics while rationalizing test
+  ownership/collection; accepted 136-module FULL wall time was **259.314 s**,
+  and accepted routine source CI was approximately **250 s**;
+- R2-B3/R2-B4 later reduced routine source-CI cost but explicitly left
+  certification topology unchanged.
+
+The 134-C FULL is larger than the R2 certified inventory. Its higher wall time
+is evidence to monitor, not permission to regress to an older lane model. Any
+future performance/topology change requires a separately reviewed,
+measurement-driven Architecture-132 checkpoint.
 
 ### 6. Bounded Codex commit/push and direct ChatGPT GitHub review
 

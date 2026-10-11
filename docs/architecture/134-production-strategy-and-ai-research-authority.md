@@ -410,3 +410,34 @@ candidate selection or promotion.
 
 134-B has no registered preflight or execute callback. Source acceptance grants
 only the right to proceed to 134-C design.
+
+
+## 134-B2 — Current-product production-decision materialization
+
+134-B's pure bridge intentionally accepts an Architecture-94
+`ManualPaperStrategyDecisionRequest`; that type reuse does **not** make the
+historical personal-desktop Paper-v2/C3 runtime part of Architecture 134
+production authority.
+
+The current Robinhood lane requires a dedicated materialization boundary that
+constructs the exact 134-B request from current-product evidence:
+
+- exact 134-A production contract;
+- verified daily snapshot/history evidence for the contract symbol/session;
+- current synthetic-paper prior/account state derived from
+  `ReviewPaperStore`;
+- explicit deterministic planning/idempotency/policy inputs.
+
+It must preserve Architecture-94 verification semantics and call the accepted
+134-B bridge rather than reimplementing strategy evaluation. It must not read
+or repair D10/Windows/Paper-v2/C1/C3 personal-desktop state, use historical
+Alpaca operational authority, or infer missing market history.
+
+The materializer itself is source/provider-free. Any later live market-history
+acquisition or persistence boundary is separately reviewed and cannot be
+silently folded into SHADOW PREPARE.
+
+A 2026-10-11 read-only diagnostic found a DACL mismatch only on
+`F:\AITradingBot\Paper-v2` while its relevant descendants remained exact.
+That legacy drift is not an Architecture-134 blocker and grants no ACL-repair
+authority.

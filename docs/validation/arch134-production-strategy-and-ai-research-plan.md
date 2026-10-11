@@ -314,3 +314,33 @@ FULL/ROBINHOOD/LEGACY/EXHAUSTIVE during implementation.
 
 134-B source acceptance does not authorize 134-C live shadow/provider access or
 paper mutation.
+
+
+## 2026-10-11 — 134-B2 corrective validation checkpoint
+
+Before the first real 134-C SHADOW PREPARE, add and source-accept a
+current-product decision materializer.
+
+Focused validation must prove:
+
+- exact 134-A contract is required;
+- current verified snapshot/history symbol/config/session match the contract;
+- current synthetic-paper prior derives from `ReviewPaperStore` evidence, not
+  Paper-v2;
+- the resulting request is an exact `ManualPaperStrategyDecisionRequest`;
+- accepted 134-B decision construction is called exactly once;
+- no second strategy evaluation or proposal synthesis exists;
+- no D10/Windows/C1/C3/Paper-v2/personal-desktop unattended imports or calls;
+- no Robinhood/OAuth/provider/network effect in the materializer;
+- no scheduler, broker, live-order, research-promotion or filesystem-repair
+  authority;
+- missing/insufficient current history fails closed instead of inventing bars;
+- source-gate/profile inventory changes remain exact.
+
+Do not repair the observed legacy Paper-v2 root ACL as part of 134-B2. That
+diagnostic is preserved only to explain why the legacy observability route was
+abandoned.
+
+After exact GitHub review and terminal-green source-gate CI, select only the
+smallest distinct certification required by the changed current-product
+surface. Do not rerun FULL merely for confidence.

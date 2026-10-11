@@ -21505,3 +21505,52 @@ Q133-4 unattended provider wake, Q133-5 reconciliation, and Q133-6 closeout do
 not inherit authority from this PASS.
 
 Production/live real-money placement remains **NO-GO**.
+
+
+## 2026-10-11 — Architecture 134 current-product decision-input correction
+
+Protected SHADOW-PREPARE readiness diagnostics exposed a dependency-direction
+regression before any Robinhood/provider effect occurred.
+
+The attempted read-only operator-observability route entered the historical
+personal-desktop Paper-v2/C3 runtime. Production C1 admission passed, all effect
+gates remained closed, and the failure was isolated to an ACL mismatch on only
+the fixed legacy `F:\AITradingBot\Paper-v2` root. The runtime directory,
+paper-operations directory, both durable receipt directories and both receipt
+artifacts still matched their exact role policies. No ACL repair, provider call,
+OAuth use, paper mutation, scheduler action or broker effect occurred.
+
+This ACL drift is preserved diagnostic evidence only. **Do not repair Paper-v2
+to advance Architecture 134.** The canonical workflow classifies
+D10/Windows/Paper-v2/Alpaca operational paths as historical compatibility, not
+current Robinhood product requirements.
+
+Architecture 134-B may continue to reuse the pure Architecture-94
+`ManualPaperStrategyDecisionRequest` / decision-builder semantics, but the
+current Robinhood production lane must not obtain those inputs by reacquiring
+legacy Paper-v2/C3 operational authority.
+
+The required corrective source checkpoint is **134-B2 — current-product
+production-decision materialization**:
+
+- consume the exact 134-A `ProductionStrategyContract`;
+- consume current-product verified daily snapshot/history evidence;
+- derive current synthetic-paper prior/account state from the accepted
+  `ReviewPaperStore`, not Paper-v2;
+- materialize exactly the Architecture-94-shaped decision inputs needed by the
+  already accepted 134-B pure bridge;
+- invoke the accepted 134-B decision bridge without a second strategy
+  implementation;
+- perform no Robinhood/OAuth/provider effect while constructing or testing the
+  source boundary;
+- introduce no dependency on D10, Windows C1/C3, Paper-v2, legacy scheduler,
+  Alpaca operational authority or personal-desktop unattended state.
+
+The exact market-history acquisition/persistence authority for live production
+must be explicit and separately reviewed; source implementation must not invent
+or silently substitute current bars.
+
+The already accepted 134-C SHADOW-PREPARE operator and its ROBINHOOD
+certification remain valid for their exact source tree, but the real protected
+PREPARE is blocked until an exact 134-B2-produced `ProductionStrategyDecision`
+exists. The previously granted PREPARE authorization remains unconsumed.

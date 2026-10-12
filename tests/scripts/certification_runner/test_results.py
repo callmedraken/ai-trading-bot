@@ -313,4 +313,3 @@ def test_github_actions_temp_root_outside_runner_temp_is_rejected(
 
     with pytest.raises(runner.CertificationError, match="RUNNER_TEMP"):
         runner.run(args)
-

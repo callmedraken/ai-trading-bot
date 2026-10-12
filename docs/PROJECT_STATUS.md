@@ -1,5 +1,65 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134-B3Q live qualification AMBIGUOUS; NO RETRY
+
+The single authorized real-server **134-B3Q** historical qualification was
+consumed on the exact certified source and did **not** produce a classified
+provider response.
+
+~~~text
+SOURCE HEAD  5f2728bb409ef479475619100cba3fb1fdac18f5
+SOURCE TREE  a51c7aed8a1697b88dbdbc732b863eb5932c4ef9
+TOOL         get_equity_historicals
+SYMBOL       SPY
+WINDOW       long_window=3
+REQUEST      day / regular / adjustment_type=none
+RESULT       AMBIGUOUS_PROVIDER_EFFECT
+REASON       CALL_RESULT_UNCLASSIFIED
+ATTEMPTS     1 transport-boundary attempt
+RETRY        FORBIDDEN
+~~~
+
+Provider-free preflight had passed immediately beforehand on the same exact
+source, selecting completed XNYS sessions 2026-10-06 through 2026-10-09 with
+zero provider/OAuth calls.
+
+Preserved live evidence:
+
+~~~text
+F:\AI\temp\qualification\arch134b3q-history-19c8c572a3d8447f9488cb5d3a11f4db.jsonl
+~~~
+
+The journal contains the expected durable sequence:
+
+1. `RESERVED / BLOCKED / historical_attempts=0`;
+2. `CALL_STARTED / AMBIGUOUS_PROVIDER_EFFECT / historical_attempts=1`;
+3. `TERMINAL / AMBIGUOUS_PROVIDER_EFFECT / CALL_RESULT_UNCLASSIFIED`.
+
+The terminal record has `captured_at=null`, `response=null`,
+`canonical_response_sha256=null` and `historical_data_sha256=null`.
+Therefore the underlying Robinhood transport did not return a structured mapping
+to the B3Q wrapper. This excludes the strict B3 historical parser/materializer as
+the observed failure point, but it does **not** prove whether the MCP server
+received an application request. The failure could have occurred during
+dependency loading, persisted OAuth/session use, connection/session setup,
+capability enumeration, the tool call itself before a response was returned, or
+another transport-layer step. Provider error text was intentionally not retained.
+
+The one-read authorization is **consumed**. Do not rerun B3Q, create a replacement
+evidence path for another historical read, weaken the parser, or treat the
+ambiguous result as a failed schema qualification.
+
+The immediate safe next checkpoint is a **provider-free/read-only B3Q
+reconciliation diagnostic** that can classify local dependency/OAuth-readiness
+state and the preserved journal without invoking any Robinhood application tool.
+Any credential-access portion remains separately protected if needed. In
+parallel, source/design work for **134-D Armed Session Mode** may proceed on a
+separate branch/worktree because it does not require another B3Q provider call.
+
+No SHADOW PREPARE, paper execution, scheduler mutation, broker placement, or
+real-money authority follows from this incident.
+
+
 ## 2026-10-11 — Architecture 134-B3Q ROBINHOOD CERTIFIED; protected qualification ready
 
 Architecture **134-B3Q — Source-owned historical qualification operator** is

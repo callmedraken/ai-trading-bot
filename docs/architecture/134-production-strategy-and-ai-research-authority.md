@@ -655,3 +655,31 @@ existing one-read authorization without another approval round because the
 reviewed effect scope is unchanged. Any preflight failure, live FAIL or
 AMBIGUOUS_PROVIDER_EFFECT is a STOP with no automatic retry and no later SHADOW
 PREPARE, paper execution, scheduler mutation or broker authority.
+
+### B3Q real-server qualification result — AMBIGUOUS / NO RETRY
+
+The single authorized live qualification was consumed on
+`5f2728bb409ef479475619100cba3fb1fdac18f5` /
+`a51c7aed8a1697b88dbdbc732b863eb5932c4ef9` after provider-free preflight
+PASS. Preserved evidence:
+
+~~~text
+F:\AI\temp\qualification\arch134b3q-history-19c8c572a3d8447f9488cb5d3a11f4db.jsonl
+~~~
+
+The journal reached the durable `CALL_STARTED` fence and then terminated
+`AMBIGUOUS_PROVIDER_EFFECT / CALL_RESULT_UNCLASSIFIED` with one
+transport-boundary attempt. No structured response returned to the B3Q wrapper:
+`captured_at`, retained response and both response/data digests are null.
+Accordingly, the observed failure is below the strict B3 parser/materializer
+boundary. It remains impossible from this evidence to prove whether an MCP
+application request was actually sent or received.
+
+The authorization is consumed and no retry is permitted. Do not manufacture a
+new evidence destination, repeat `get_equity_historicals`, downgrade the
+ambiguity to FAIL, or weaken accepted parsing semantics. The next safe source
+checkpoint is a provider-free/read-only reconciliation diagnostic for preserved
+evidence plus local dependency/OAuth readiness. Any actual credential access or
+provider call remains outside that source-only checkpoint and must use its own
+reviewed authority. 134-D Armed Session Mode design/source work may proceed
+independently on a separate branch.

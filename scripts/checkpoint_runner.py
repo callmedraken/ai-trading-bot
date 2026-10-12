@@ -10356,11 +10356,22 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
     "src/trading_bot/robinhood_paper_pipeline.py": (
         "4ab15822bded9c6e76e7badb78b9e7fe0db63b40"
     ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "987bda9d794ec8f993d3665ab1d5375ebc951951"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "bfb41308cfdcae6206c9dfb2bcf20c54efaba3ee"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "8ce3b9377ecb29284bfa8679d5761addd304f496"
+    ),
 }
 ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (
     "tests/review_paper/test_production_paper_runtime.py",
     "tests/review_paper/test_store.py",
     "tests/review_paper/test_post_publication_verifier.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
     *ARCH134_ARMED_PAPER_TESTS,
 )
 ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS: Final = (

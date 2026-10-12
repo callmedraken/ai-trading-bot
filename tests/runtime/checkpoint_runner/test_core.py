@@ -201,6 +201,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-production-strategy-decision",
         "arch134-production-strategy-live-paper",
         "arch134-armed-paper-mvp",
+        "arch134-production-paper-runtime",
     }
     for spec in specs.values():
         assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
@@ -336,6 +337,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-production-strategy-live-paper"
         if spec.name == "arch134-armed-paper-mvp":
             expected_branch = "feature/robinhood-production-paper-mvp"
+        if spec.name == "arch134-production-paper-runtime":
+            expected_branch = "feature/robinhood-production-paper-runtime"
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1282,6 +1285,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-strategy-decision",
                 "arch134-production-strategy-live-paper",
                 "arch134-armed-paper-mvp",
+                "arch134-production-paper-runtime",
             }
             else (
                 *runner.COMMON_TESTS,

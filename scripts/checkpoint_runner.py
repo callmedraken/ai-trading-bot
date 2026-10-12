@@ -3829,7 +3829,7 @@ ARCH133_PUBLICATION_PINS: Final = {
         "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"
     ),
     "src/trading_bot/review_paper/store.py": (
-        "826ee5c73d461b6579d435203846bc41d4268819aeba977ae82ee278c933720b"
+        "02c546abd42849bee94b5c08e00c54cfb726d6ffddf235fa844d21471ce965c9"
     ),
     "src/trading_bot/review_paper/unattended_state_store.py": (
         "93ffd82253c22803ff318721779e892f5f20dd9f996c8a2cdf3ba8f154ced822"

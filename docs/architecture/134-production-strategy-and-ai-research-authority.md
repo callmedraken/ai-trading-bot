@@ -687,6 +687,10 @@ independently on a separate branch.
 
 ## 134-D1 - Current-product Alpaca bridge and manually armed paper session
 
+This section records the historical D1 source contract. D1Q below supersedes
+its deliberate credential-binding stop, host branch and next-step sequence;
+the preserved D1-only descriptions are historical provenance.
+
 This is the current MVP source direction and supersedes the product dependency
 on B3 historical acquisition, without changing retained B3/B3Q authority or
 retrying its ambiguous incident. Historical docs remain historical. Source

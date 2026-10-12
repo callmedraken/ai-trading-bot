@@ -13,6 +13,14 @@ CI-owned ROBINHOOD certification and real Windows qualification remain separate.
 No real credential, provider, OAuth, production paper/runtime, scheduler or
 broker effect is performed by implementation or fake-only verification.
 
+Current source inventory is ACTIVE 62, FULL 168, ROBINHOOD 93, LEGACY 205 and
+EXHAUSTIVE 373. The behavioral replacement/removal non-regression invariant is
+now normative in AGENTS.md and AI_DEVELOPMENT_WORKFLOW.md, including the exact
+implementation-prompt ending and ChatGPT exact-diff stale-reference review.
+Earlier dated checkpoint entries below are historical chronology; their old
+binding stops, inventory counts and operator next steps are superseded by this
+D1Q entry and the current architecture/workflow authority.
+
 After exact GitHub source review and terminal mapped CI, the next boundary is
 separately authorized D1Q runtime/credential qualification. It creates/validates
 only the fixed stores, reads two Alpaca records and two existing persisted OAuth

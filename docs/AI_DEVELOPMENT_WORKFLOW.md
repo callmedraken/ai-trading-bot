@@ -566,31 +566,34 @@ post-certification docs closeout rather than creating multiple docs-only pushes.
 
 #### 2b. Behavior-change cleanup is part of the feature change
 
-Whenever a feature, contract, capability, status, path, or behavior is changed
-or removed, the same logical checkpoint must also **remove or update any tests
-and docs that referenced the old behavior**.
+**Behavioral replacement/removal non-regression:** When a feature, behavior,
+API, workflow, or supported path is changed, replaced, retired, or removed,
+update or remove every current test, fixture, fake, validation assertion,
+operator instruction, and documentation reference that depends on the old
+behavior. This includes README/help text and checkpoint inventory or expected
+test topology. Do not preserve stale current-product assertions merely for
+backward compatibility unless the old behavior is intentionally retained as a
+reviewed LEGACY contract. Historical architecture/evidence documents should
+remain historical rather than being rewritten, but they must not be presented
+as current authority. Before closing the checkpoint, search the affected
+source/tests/docs surface for stale references to the retired behavior.
 
-Before source acceptance, explicitly search the affected names/terms and review:
+When a task changes, replaces, retires, or removes existing behavior, end the
+implementation instructions with exactly:
 
-- focused and regression tests, fixtures, mocks, snapshots, expected counts and
-  authority/checkpoint assertions;
-- current/normative architecture, validation, workflow, status/handoff and
-  operator/runbook documentation;
-- examples, comments and compatibility exports when they describe callable
-  behavior or authority.
+> Also remove or update any tests and docs that referenced the old behavior.
+
+ChatGPT's exact-diff review must verify that behavioral removals/replacements
+did not leave stale current-product tests or documentation behind.
 
 Do not keep a stale test by weakening its assertion until it passes. Update it
 to assert the replacement contract, or delete it when the covered behavior is
-intentionally removed and replacement coverage makes it obsolete.
-
-Historical chronology may be retained when it is useful provenance, but it must
-be explicitly labeled historical/superseded and must not read as the current
-normative path. Current/normative documentation must not contradict the accepted
-implementation.
+intentionally removed and replacement coverage makes it obsolete. Search also
+examples, comments, snapshots, mocks and compatibility exports when they
+describe callable behavior or authority.
 
 This stale-reference cleanup is part of the feature checkpoint, not a later
-cosmetic follow-up, so it should normally be included before the checkpoint's
-single planned push/CI run.
+cosmetic follow-up, so include it before the checkpoint's planned push/CI run.
 
 #### 3. FULL is rare and is not an iteration loop
 

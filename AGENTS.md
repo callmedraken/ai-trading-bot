@@ -91,6 +91,28 @@ from code deployment.
 - Do not treat missing market data as zero.
 - Prefer clear and testable code over complicated abstractions.
 
+### Behavioral replacement/removal non-regression
+
+**Behavioral replacement/removal non-regression:** When a feature, behavior,
+API, workflow, or supported path is changed, replaced, retired, or removed,
+update or remove every current test, fixture, fake, validation assertion,
+operator instruction, and documentation reference that depends on the old
+behavior. This includes README/help text and checkpoint inventory or expected
+test topology. Do not preserve stale current-product assertions merely for
+backward compatibility unless the old behavior is intentionally retained as a
+reviewed LEGACY contract. Historical architecture/evidence documents should
+remain historical rather than being rewritten, but they must not be presented
+as current authority. Before closing the checkpoint, search the affected
+source/tests/docs surface for stale references to the retired behavior.
+
+When a task changes, replaces, retires, or removes existing behavior, end the
+implementation instructions with exactly:
+
+> Also remove or update any tests and docs that referenced the old behavior.
+
+ChatGPT's exact-diff review must verify that behavioral removals/replacements
+did not leave stale current-product tests or documentation behind.
+
 ## Tiered certification policy
 
 Architecture 132-R2 retains the R1 current/legacy ownership model while applying

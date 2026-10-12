@@ -538,7 +538,7 @@ effect; persistence/operator wiring, SHADOW PREPARE, paper execution, scheduler
 mutation and broker placement remain outside this closure.
 
 
-## 134-B3Q — Source-owned historical qualification operator (awaiting exact source review)
+## 134-B3Q — Source-owned historical qualification operator (SOURCE ACCEPTED)
 
 B3's accepted parser, request, four-tool transport allowlist and materializer
 remain unchanged. B3Q prepares the already scoped single read-only qualification;
@@ -629,8 +629,20 @@ needed. Active inventory stays **60**; FULL/ROBINHOOD/LEGACY/EXHAUSTIVE now
 **166/91/205/371**, required baselines unchanged **122/49**. Implementation runs
 focused checks only; no broad profile certification or real call is performed.
 
-The immediate handoff is ChatGPT exact GitHub review after terminal-green
-push-triggered source gate. Only then may ChatGPT consume the previously granted
-one-read authorization if this reviewed scope is unchanged. A failed or ambiguous
-qualification stops before any later SHADOW PREPARE/paper effect. Source review
-or preflight PASS alone is not authorization for any wider effect.
+Exact GitHub review accepts B3Q source at
+`2a11a2597a2edad8351e50a25d9454420318089f` /
+`80b16dd877c0c5a56f5572922d3fa4c77e940f4d`; push-triggered source gate
+#484 / 38190487015 is terminal SUCCESS. No source correction is required.
+
+The previously granted user authorization for exactly one read-only
+`get_equity_historicals` qualification remains valid but unconsumed. Under the
+canonical certification ladder, a protected Robinhood qualification requires a
+fresh ROBINHOOD source-certification gate first. Select exactly one ROBINHOOD
+certification on the final docs-only closeout source; do not stack FULL,
+LEGACY or EXHAUSTIVE merely for confidence. A certification failure stops before
+provider access.
+
+After a clean ROBINHOOD result, ChatGPT may consume the existing one-read
+authorization without asking again if this reviewed scope is unchanged. A live
+FAIL or AMBIGUOUS_PROVIDER_EFFECT remains a STOP with no automatic retry and no
+later SHADOW PREPARE, paper execution, scheduler mutation or broker authority.

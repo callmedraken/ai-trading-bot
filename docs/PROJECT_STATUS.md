@@ -1,5 +1,55 @@
 # Project Status and Roadmap
 
+## 2026-10-11 — Architecture 134-B3Q SOURCE ACCEPTED; ROBINHOOD gate selected
+
+Architecture **134-B3Q — Source-owned historical qualification operator** is
+**SOURCE ACCEPTED** on the exact executable/test source:
+
+~~~text
+BRANCH  feature/robinhood-production-strategy-live-paper
+HEAD    2a11a2597a2edad8351e50a25d9454420318089f
+TREE    80b16dd877c0c5a56f5572922d3fa4c77e940f4d
+SUBJECT feat: add Robinhood historical qualification operator
+CI      #484 / 38190487015 SUCCESS
+~~~
+
+Exact review confirms one source-owned protected CLI for the already-scoped
+single read-only `get_equity_historicals` qualification. Frozen live semantics
+are SPY, `long_window=3`, four completed XNYS sessions, exact
+`interval=day`, `bounds=regular`, `adjustment_type=none`, no provider
+fallback and no retry. The accepted B3 parser/materializer and the exact
+four-tool MCP allowlist remain unchanged.
+
+The operator admits exact clean local/remote/live source identity before OAuth,
+rejects mixed import roots, reserves a fresh evidence file outside every
+repository worktree, forbids interactive OAuth renewal, and re-admits source
+after the response. A durable `CALL_STARTED` ambiguity fence is fsynced before
+transport control; transport uncertainty remains
+`AMBIGUOUS_PROVIDER_EFFECT`. Returned structured data must pass the unchanged
+strict B3 parser and materializer or the qualification fails. Evidence is bounded
+canonical JSONL and omits free-form guide text and credential/provider error
+material. Offline replay cannot call the provider and cannot reconstruct or
+claim verification of the omitted guide bytes.
+
+Current inventory is active **60**, FULL **166**, ROBINHOOD **91**, LEGACY
+**205**, EXHAUSTIVE **371**. Focused implementation verification reported 602
+distinct passing cases, including 68 new B3Q cases. No real provider/OAuth call
+or other protected effect occurred.
+
+The previously granted user authorization for exactly one read-only
+`get_equity_historicals` qualification remains valid but **has not been
+consumed**. The canonical workflow requires one ROBINHOOD certification before a
+protected Robinhood qualification. Therefore the next gate is exactly one fresh
+ROBINHOOD certification on the final docs-only closeout source. No FULL,
+LEGACY or EXHAUSTIVE run is selected. If that certification passes, ChatGPT may
+consume the already-granted one-read authorization without asking again, provided
+the reviewed effect scope remains unchanged.
+
+A failed certification stops before provider access. A later live qualification
+result of FAIL or AMBIGUOUS_PROVIDER_EFFECT is also a STOP and grants no retry,
+SHADOW PREPARE, paper execution, scheduler mutation or broker effect.
+
+
 ## 2026-10-11 — Architecture 134-B3 CERTIFIED/CLOSED
 
 Architecture **134-B3 — Current Robinhood market-history evidence** is

@@ -230,6 +230,8 @@ def test_static_checks_remain_whole_repository(
 def test_all_profiles_retain_temp_root_requirement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
 ) -> None:
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.delenv("RUNNER_TEMP", raising=False)
     monkeypatch.setattr(
         runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
     )

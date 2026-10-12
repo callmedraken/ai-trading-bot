@@ -627,7 +627,7 @@ def test_registration_workflow_profiles_and_authority_chain():
     )
     assert spec.authority_check(ROOT) == ()
     assert runner.ACTIVE_CI_CHECKPOINTS[1] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 63
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(NAME) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -640,10 +640,10 @@ def test_registration_workflow_profiles_and_authority_chain():
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 168,
-        "robinhood": 93,
+        "full": 169,
+        "robinhood": 94,
         "legacy": 205,
-        "exhaustive": 373,
+        "exhaustive": 374,
     }
     assert set(profiles["robinhood"]) <= set(profiles["full"])
     assert set(profiles["full"]).isdisjoint(profiles["legacy"])

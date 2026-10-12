@@ -1,5 +1,42 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-12 - D1Q-R2 CI #503 topology correction source checkpoint
+
+The one authorized normal commit/push published the isolated ACL checkpoint:
+
+```text
+branch feature/robinhood-production-paper-runtime-acl
+HEAD   f4961160e3e4f47c3bc44b79d76b914975505343
+TREE   290af91db25997ca52aaf61350e21ba514e7fa1b
+CI     #503 / 38304072126 FAILED
+```
+
+Source-static and active checkpoint tests passed. Canonical ROBINHOOD on the
+94-module source discovered 12 stale topology assertions: 8631 passed,
+1 skipped, 12 failed, 0 errors; wall 264.718 seconds. ACL operator tests passed.
+R2 is NOT source-accepted or qualified; this failure does not grant any effects.
+
+The bounded local correction updates dependent 133/134 active counts/tail slices,
+current FULL/ROBINHOOD/EXHAUSTIVE counts, exact registry/branch expectations and
+their changed test pins. The R2 source gate now includes the reviewed COMMON_TESTS
+and the two affected strategy inventory modules. Operator/security/R1 executable
+behavior is unchanged. Fourteen directly affected topology cases passed locally,
+and both exact R1/R2 authority checks passed after final pin refresh (16-case
+selection across the necessary reruns). Cumulative distinct focused coverage is
+736 cases. Focused Ruff check/format and git diff --check passed. No local
+ROBINHOOD/FULL was rerun.
+
+The user explicitly authorized publication of the reviewable correction as one
+additional normal exact-file commit and ordinary push on this same branch, with
+no amend/rebase/force-push/merge or PR changes. This distinct correction checkpoint
+supersedes the failed source's stale topology assertions; it does not change ACL
+operator behavior. Next: terminal fresh mapped CI-owned canonical ROBINHOOD on
+the exact corrected source, followed by ChatGPT exact GitHub review.
+Do not proceed to production diagnosis/provisioning, qualification or ARM before
+source acceptance. The accepted R1 branch remains unchanged at 6bf8753/ce3feb2;
+all production/native/provider/credential/scheduler/broker boundaries remain
+separately protected and real-money placement remains NO-GO.
+
 ## 2026-10-12 - Architecture 134-D1Q-R2 runtime-principal ACL source checkpoint
 
 R2 is implemented for exact-source review on the new isolated branch

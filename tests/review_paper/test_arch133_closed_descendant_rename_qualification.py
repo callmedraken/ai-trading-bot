@@ -862,8 +862,8 @@ def test_z_real_complete_authority_and_source_only_registration():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == operator.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-7:-5] == (Y_NAME, NAME)
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert runner.ACTIVE_CI_CHECKPOINTS[-8:-6] == (Y_NAME, NAME)
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 63
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,
         "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",

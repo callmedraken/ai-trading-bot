@@ -368,12 +368,12 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         spec.authority_check
         is checkpoint_runner._arch134_production_strategy_live_paper_authority_check
     )
-    assert checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-4:-1] == (
+    assert checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-5:-2] == (
         "arch134-production-strategy-contract",
         "arch134-production-strategy-decision",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 63
 
     root = Path(certification.__file__).resolve().parents[1]
     inventory = certification.discover_inventory(root)
@@ -382,10 +382,10 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 168,
-        "robinhood": 93,
+        "full": 169,
+        "robinhood": 94,
         "legacy": 205,
-        "exhaustive": 373,
+        "exhaustive": 374,
     }
     assert "tests/review_paper/test_production_strategy_cycle.py" in profiles["full"]
     assert (

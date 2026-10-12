@@ -10359,13 +10359,13 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "4ab15822bded9c6e76e7badb78b9e7fe0db63b40"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "987bda9d794ec8f993d3665ab1d5375ebc951951"
+        "352aa2cb29219ad3fedbbf79d4fe4996636ecc88"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "bfb41308cfdcae6206c9dfb2bcf20c54efaba3ee"
+        "8281b217ec3bebf5d8d1e5240464ccc385e7ed48"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
-        "8ce3b9377ecb29284bfa8679d5761addd304f496"
+        "75d4b33d929a4a8a72f86708908090c619c071e1"
     ),
 }
 ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (
@@ -10876,10 +10876,12 @@ ARCH134_RUNTIME_ACL_AST_PINS: Final = {
     ),
 }
 ARCH134_RUNTIME_ACL_TESTS: Final = (
+    *COMMON_TESTS,
     "tests/review_paper/test_production_paper_runtime_acl.py",
     "tests/review_paper/test_production_paper_runtime.py",
-    "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/scripts/certification_runner/test_profiles.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
 )
 ARCH134_RUNTIME_ACL_RUFF_PATHS: Final = (
     *ARCH134_RUNTIME_ACL_SOURCE_PINS,

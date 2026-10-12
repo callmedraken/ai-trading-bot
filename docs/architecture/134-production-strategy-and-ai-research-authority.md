@@ -1017,3 +1017,15 @@ authorized non-elevated R1 qualification, then separately authorized manual
 session. This checkpoint performs none of those production effects, qualification,
 ARM, scheduler installation, source deployment or broker placement. Native fixed
 root/elevated acceptance and non-elevated real SQLite readiness remain pending.
+
+
+R2 CI #503 at f496116 / 290af91 passed source-static/active tests but failed
+canonical ROBINHOOD on twelve stale topology assertions. The bounded local
+correction adds COMMON_TESTS and affected strategy inventory modules to the
+dedicated source-only test selection and updates exact current count/order/branch
+test assertions and test pins. ACL policy, token binding, native mutation and
+R1 executable authority are unchanged. R2 has no source acceptance yet. Another
+normal correction commit/push received fresh explicit user authorization after
+the task's one-commit/push allowance was consumed. Require terminal fresh mapped
+CI and exact GitHub review on the corrected source before any protected operator
+acceptance; source publication never grants that protected effect authority.

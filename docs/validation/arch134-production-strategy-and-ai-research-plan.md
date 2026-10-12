@@ -842,3 +842,31 @@ qualification from the unchanged accepted runtime branch/worktree; both stores
 must show WRITE_READY before a separately authorized manual session. This R2
 checkpoint never qualifies, ARMs, schedules, deploys, accesses credentials or
 providers, changes paper/session rows or places broker orders. Real-money NO-GO.
+
+
+### R2 CI #503 failure and bounded local topology correction
+
+The pushed f4961160e3e4f47c3bc44b79d76b914975505343 /
+290af91db25997ca52aaf61350e21ba514e7fa1b source passed source-static and active
+tests. Canonical ROBINHOOD produced 8631 passed, 1 skipped, 12 failed, 0 errors
+across 94 modules in 264.718 seconds. All twelve failures were stale
+active-count/tail/registry assertions; the ACL operator cases passed. This is
+failed certification, not source acceptance. Evidence was retrieved directly
+from CI into external arch134d1qr2-ci503-failure storage.
+
+The local correction updates the twelve failing cases and two related strategy
+inventory cases, count/branch/order expectations and changed test source pins.
+R2 source-gate coverage now includes COMMON_TESTS and the two strategy inventory
+modules so the ordinary active gate covers those dependencies. Those fourteen
+cases passed; final R1/R2 authority checks passed after refreshing the final
+test-core pin. Cumulative focused verification covers 736 distinct cases across
+overlapping runs. Focused Ruff check/format and git diff --check passed. Native
+operator and accepted R1 executable code are unchanged. Only the affected tests
+were rerun; no local broad profile was run.
+
+The original one normal commit/push was consumed. The user then explicitly
+authorized one additional normal exact-file correction commit/push, never
+amend/rebase/force-push/merge. Wait for fresh mapped canonical ROBINHOOD CI and
+exact GitHub source review on the corrected source. Do not invoke production diagnosis/provisioning,
+qualification or ARM while certification remains failed/pending. Return only the
+correction commit/CI identity or a failing source-gate summary for review.

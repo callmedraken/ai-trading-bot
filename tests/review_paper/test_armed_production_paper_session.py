@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -483,12 +484,22 @@ def test_concurrent_reservation_is_atomic_without_second_attempt(harness, tmp_pa
     def claim():
         try:
             return new_store.reserve("same-session", result) is None
-        except Exception:
+        except sqlite3.OperationalError as exc:
+            assert "locked" in str(exc).lower()
             return False
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         winners = list(pool.map(lambda _: claim(), range(2)))
-    assert sum(winners) == 1
+
+    # timeout=0 is deliberately fail-closed: simultaneous contenders may both
+    # observe lock contention, but they must never create a second reservation.
+    assert sum(winners) <= 1
+    with sqlite3.connect(new_store.path) as connection:
+        persisted = connection.execute(
+            "SELECT COUNT(*) FROM armed_session_v1 WHERE session_key=?",
+            ("same-session",),
+        ).fetchone()[0]
+    assert persisted == sum(winners)
     assert len(evidence_bytes(result)) < 32768
 
 

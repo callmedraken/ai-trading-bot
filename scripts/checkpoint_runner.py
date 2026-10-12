@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "b0a403304ed0603897faf443c03a63b5bdccf40f9b71ef909ef1e6b4823d39d2"
+    "3f9bcfa1cd562fa48949c46dab68a31609880d0a4f05bc67246894301e8ac1d9"
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
@@ -200,6 +200,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch134-production-strategy-contract",
     "arch134-production-strategy-decision",
     "arch134-production-strategy-live-paper",
+    "arch134-production-paper-runtime",
 )
 
 
@@ -207,6 +208,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
     "arch134-armed-paper-mvp": "robinhood",
+    "arch134-production-paper-runtime": "robinhood",
 }
 CI_CERTIFICATION_PROFILE_VALUES: Final = frozenset({"robinhood", "full"})
 
@@ -3827,7 +3829,7 @@ ARCH133_PUBLICATION_PINS: Final = {
         "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"
     ),
     "src/trading_bot/review_paper/store.py": (
-        "880c295e03c9fd3b9cc2e187b4f5e23714e0477a543211479702bd6c5cebce76"
+        "826ee5c73d461b6579d435203846bc41d4268819aeba977ae82ee278c933720b"
     ),
     "src/trading_bot/review_paper/unattended_state_store.py": (
         "93ffd82253c22803ff318721779e892f5f20dd9f996c8a2cdf3ba8f154ced822"
@@ -10054,7 +10056,7 @@ def _arch134_production_strategy_live_paper_authority_check(
         ):
             failures.append("134-C source-only registration drift")
         if (
-            ACTIVE_CI_CHECKPOINTS[-3:]
+            ACTIVE_CI_CHECKPOINTS[-4:-1]
             != (
                 ARCH134_PRODUCTION_STRATEGY_NAME,
                 ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
@@ -10091,10 +10093,10 @@ ARCH134_ARMED_PAPER_SOURCE_PINS: Final = {
         "5c395cf692dd387b53688ebb25d2a9007a3a535c"
     ),
     "src/trading_bot/review_paper/armed_session_store.py": (
-        "35ac53d1d09970df860a9df7e3cd843cde8e886f"
+        "94288880c8899ddee7e5d5505c69d6ad093ec559"
     ),
     "src/trading_bot/review_paper/armed_session_host.py": (
-        "c5b0f15662df438cde7137527bfaa428f774bd23"
+        "391b6cd2f4c15931e87d7dd2c71927578d0a866c"
     ),
     "scripts/run_production_paper_session.py": (
         "b2c99d36bfc8ee80f04a6e3a0be06e36feee547b"
@@ -10187,9 +10189,12 @@ ARCH134_ARMED_PAPER_IMPORTS: Final = {
         "time",
         "trading_bot.domain",
         "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
         "trading_bot.review_paper.armed_session",
         "trading_bot.review_paper.armed_session_store",
         "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
         "trading_bot.review_paper.store",
         "trading_bot.risk.models",
         "trading_bot.robinhood_mcp.adapter",
@@ -10296,6 +10301,196 @@ def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("134-D1 source-gate workflow drift")
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         failures.append("134-D1 authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: Final = "arch134-production-paper-runtime"
+ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
+    **ARCH134_ARMED_PAPER_SOURCE_PINS,
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "2554a8e0d5b86d68db6a277e530005e6dae87745"
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime.py": (
+        "5636e94d539355f47eb504e00972387750108fbc"
+    ),
+    "scripts/qualify_production_paper_runtime.py": (
+        "7772ab5495b38d87ac50d2ad54b9633115b3d5de"
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "c9875c20ec6d6b1fc788dd6649fe419aeae8fed8"
+    ),
+    "src/trading_bot/arch133_verifier/credentials.py": (
+        "a334b1bf1097477b1ff0807a07c81ffc7f7fcffb"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "ba7401fa9ab825986a06daca27d2d2c76b0ba59b"
+    ),
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "82cbf0785399afd95e0065160d2a3e43245faaae"
+    ),
+    "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "92417098a5ec220f061c3c37fe05f9b394758ff5"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a406ff2cd5ca3f68f32aa34f0a26a57aff8f5d53"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "7e7be025349267863ac5f31e5ec31d8942a9f27e"
+    ),
+    "src/trading_bot/review_paper/production_strategy_cycle.py": (
+        "3636889acaddf0de0a27e4dc4de0687839c59ee8"
+    ),
+    "src/trading_bot/review_paper/production_strategy_decision.py": (
+        "3b2d0c6301d35c4800e05e5b4309b2f6d2a0d247"
+    ),
+    "src/trading_bot/review_paper/supervised_forward_paper.py": (
+        "150926efd7b909a53ea897a23d2e76d37ff8c32d"
+    ),
+    "src/trading_bot/review_paper/risk_price_acquisition.py": (
+        "28d37020f26d26cc58a842eefc4e2bbe5d46fb91"
+    ),
+    "src/trading_bot/robinhood_paper_operator.py": (
+        "ebed3361c1c9d0fbfc63aab3e308c7e54b0e4d2e"
+    ),
+    "src/trading_bot/robinhood_paper_pipeline.py": (
+        "4ab15822bded9c6e76e7badb78b9e7fe0db63b40"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/review_paper/test_store.py",
+    "tests/review_paper/test_post_publication_verifier.py",
+    *ARCH134_ARMED_PAPER_TESTS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS,
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime.py": (
+        "__future__",
+        "argparse",
+        "contextlib",
+        "decimal",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "sqlite3",
+        "stat",
+        "sys",
+        "trading_bot.arch133_verifier.credentials",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_session_host",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.store",
+    ),
+    "scripts/qualify_production_paper_runtime.py": (
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.production_paper_runtime",
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "__future__",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "pathlib",
+        "sqlite3",
+        "trading_bot.domain",
+        "trading_bot.domain._validation",
+        "trading_bot.ledger",
+        "trading_bot.review_paper.models",
+        "trading_bot.risk",
+        "uuid",
+    ),
+    "src/trading_bot/arch133_verifier/credentials.py": (
+        "__future__",
+        "ctypes",
+        "dataclasses",
+        "json",
+        "os",
+        "urllib.parse",
+    ),
+}
+
+
+def _arch134_production_paper_runtime_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """D1Q exact fixed-source closure; qualification remains separately protected."""
+    failures = list(_arch134_armed_paper_authority_check(repo_root))
+    forbidden = {
+        "CredWriteW",
+        "CredDeleteW",
+        "getenv",
+        "getenvb",
+        "call_tool",
+        "_invoke",
+        "get_equity_historicals",
+        "equity_daily_history",
+        "place_equity_order",
+        "cancel_equity_order",
+        "place_options_order",
+        "place_crypto_order",
+        "register_task",
+        "schtasks",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+    }
+    try:
+        for relative, pin in ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-D1Q source drift: " + relative)
+            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if imports != set(ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS[relative]):
+                failures.append("134-D1Q import closure drift: " + relative)
+            names = {
+                node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+            } | {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+            if names & (forbidden | {"environ", "environb"}):
+                failures.append("134-D1Q forbidden authority: " + relative)
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
+        if (
+            spec.tests != ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS
+            or spec.remote_branch != "feature/robinhood-production-paper-runtime"
+            or spec.authority_check
+            is not _arch134_production_paper_runtime_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS[-1] != ARCH134_PRODUCTION_PAPER_RUNTIME_NAME
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME)
+            != "robinhood"
+        ):
+            failures.append("134-D1Q registration authority drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1Q authority unavailable")
     return tuple(failures)
 
 
@@ -10412,6 +10607,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
+            description="Architecture 134-D1Q fixed runtime and credential readiness",
+            tests=ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS,
+            authority_check=_arch134_production_paper_runtime_authority_check,
+            remote_branch="feature/robinhood-production-paper-runtime",
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_ARMED_PAPER_NAME: CheckpointSpec(
             name=ARCH134_ARMED_PAPER_NAME,
             description=(

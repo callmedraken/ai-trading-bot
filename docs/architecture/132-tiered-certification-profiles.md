@@ -1,5 +1,14 @@
 # Architecture 132 — Tiered certification profiles
 
+## Current D1Q inventory and certification route
+
+Architecture 134-D1Q appends `arch134-production-paper-runtime` once, preserving
+prior relative ordering. Source-discovered inventory is ACTIVE 62, FULL 168,
+ROBINHOOD 93, LEGACY 205, EXHAUSTIVE 373. Earlier inventories are historical;
+frozen required baselines and lane rules are unchanged. The explicit mapping
+is CI-owned robinhood certification. Terminal-green CI satisfies the profile
+obligation without another local profile run.
+
 ## 2026-10-11 — Architecture 132-R3 CI-owned selected certification
 
 R3 serializes the expedited verification path without changing profile ownership

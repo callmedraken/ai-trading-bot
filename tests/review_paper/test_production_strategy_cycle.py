@@ -368,7 +368,7 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         spec.authority_check
         is checkpoint_runner._arch134_production_strategy_live_paper_authority_check
     )
-    assert checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-3:] == (
+    assert checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-4:-1] == (
         "arch134-production-strategy-contract",
         "arch134-production-strategy-decision",
         NAME,

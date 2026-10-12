@@ -80,7 +80,7 @@ and this selected FULL certification satisfies the narrower source-certification
 obligation on the same source. No LEGACY/EXHAUSTIVE run was required. No
 provider/OAuth/paper/scheduler/broker/protected effect occurred.
 
-Current exact inventories are active **60**, FULL **161**, ROBINHOOD **86**,
+At the historical 134-C closeout, inventories were active **60**, FULL **161**, ROBINHOOD **86**,
 LEGACY **205**, EXHAUSTIVE **366**. The executable/test source is unchanged by
 this six-file docs-only closeout. **Do not rerun FULL on that unchanged source.**
 
@@ -788,3 +788,71 @@ assertions. The existing reviewed feature/robinhood-* trigger provides first-pus
 bootstrap. The next planned source checkpoint is 134-D2 Task Scheduler wiring
 with unchanged semantic inputs, not scheduler installation in D1. Protected
 credential/runtime/manual-session acceptance precedes any scheduled effect.
+
+
+## 134-D1Q - Fixed current-product runtime and credential qualification
+
+D1Q supersedes D1's deliberate Alpaca binding stop, preserving SPY, MA 2/3,
+10000 synthetic starting cash and the existing four historical reads,
+reservation-before-composition fence, quote-only PREPARE and local synthetic
+EXECUTE. The controller is unchanged. The host pins
+`feature/robinhood-production-paper-runtime`.
+
+The standalone `review_paper/alpaca_windows_credentials.py` uses only
+CredReadW/CredFree for two fixed generic/local-machine records:
+
+- `AITradingBot/MarketData/Alpaca/ApiKeyId/v2`
+- `AITradingBot/MarketData/Alpaca/ApiSecretKey/v2`
+
+Strict nonempty UTF-8 is bounded to 1024 bytes with no surrounding whitespace,
+CR/LF/NUL. Native memory is zeroed before freeing within the validated Windows
+2560-byte range; temporary bytearrays are cleared on all pair paths. Cleanup
+failure blocks. Errors and scope repr/str are redacted. Immutable Python strings
+cannot be guaranteed zeroized; scope references are dropped on exit and only
+the existing provider retains credentials for its short-lived history use.
+The existing factory's `environment` parameter receives only the two validated
+in-process values; no process environment is consulted. No legacy C1/C3 import,
+arbitrary target, alternative HTTP client or fallback is admitted.
+
+`production_paper_runtime.py` owns exactly `F:\AITradingBot\Arch134D1` and
+`paper.sqlite` / `armed-sessions.sqlite`. Preflight validates nonsecret metadata
+and read-only SQLite schema/integrity, schema version 2, exact cash 10000,
+canonical paper reconstruction and canonical session evidence. It reports
+ABSENT / PRESENT_COMPATIBLE / BLOCKED without writes. Symlink/reparse metadata,
+hardlinked stores, extra files including SQLite sidecars, incomplete stores and
+incompatible state block. Fresh provisioning exclusively creates the root and
+stores, with full SQLite synchronous durability and writable-handle file flush.
+The parent `F:\AITradingBot` must already exist; no parent provisioning or
+fallback is introduced. Failed/partial material is preserved and blocks repeat
+attempts until separately reviewed. Compatible nonempty stores are preserved
+and report bounded paper/reservation counts. No fake reservation is inserted.
+ReviewPaperStore adds read-only opening with unchanged default behavior;
+ArmedSessionStore exposes initialize/qualify without reserving.
+
+`scripts/qualify_production_paper_runtime.py` accepts only exact HEAD/TREE and
+`--preflight`, or `--qualify` with the exact interlock
+`QUALIFY_ARCH134_D1Q_RUNTIME_AND_FIXED_CREDENTIAL_READINESS` plus a fresh external
+`--evidence`. Exact source/import/origin/cached and live remote admission precede
+runtime/credential effects. Preflight has zero credential/provider/paper/runtime
+write/scheduler/broker effects and writes no evidence. Protected qualification
+exclusively reserves bounded sanitized evidence, provisions/validates stores,
+reads exactly two Alpaca records, and reuses the reviewed Architecture-133
+`persisted_oauth_availability()` (two fixed read-only records, no SDK/client,
+refresh/browser/MCP composition). Success reports READY_FOR_MANUAL_PAPER_SESSION,
+two Alpaca and two OAuth reads, and zero HTTP/application/fill/scheduler/broker
+calls. Read failures retain uncertain counts as null with incomplete evidence.
+Qualification is evidence only and grants no manual-session authority.
+
+Registration is `arch134-production-paper-runtime`, appended once with
+preflight=None and execute=None. Its exact source/import closure includes
+credentials, runtime, CLI, host/controller/stores, existing Alpaca provider/HTTP,
+OAuth verifier, strategy/PREPARE/EXECUTE dependencies and focused tests.
+Forbidden environment/credential mutations, legacy/research imports, provider
+expansion, historical Robinhood/MCP calls, broker and scheduler expansion fail
+closed. The explicit CI mapping is robinhood; feature/robinhood-* supplies
+first-push bootstrap. Source-discovered normative inventory is ACTIVE 62, FULL
+168, ROBINHOOD 93, LEGACY 205, EXHAUSTIVE 373. The active tuple AST digest is
+refrozen deliberately. CI owns canonical ROBINHOOD; full-tests and local profile
+reruns are excluded on this mapped path. Real qualification and the subsequent
+manual session each require fresh authorization. D2 follows only after manual
+session acceptance; B3Q remains consumed/no-retry.

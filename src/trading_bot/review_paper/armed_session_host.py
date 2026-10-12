@@ -14,7 +14,14 @@ from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from trading_bot.domain import Symbol
-from trading_bot.market_data import AlpacaDailySnapshotProvider
+from trading_bot.market_data import (
+    AlpacaDailySnapshotProvider,
+    create_alpaca_daily_snapshot_provider,
+)
+from trading_bot.market_data.alpaca_http import StdlibAlpacaHistoricalBarsTransport
+from trading_bot.review_paper.alpaca_windows_credentials import (
+    read_current_product_alpaca_secrets,
+)
 from trading_bot.review_paper.armed_session import (
     ARM_INTERLOCK,
     ArmedSessionPolicy,
@@ -24,6 +31,7 @@ from trading_bot.review_paper.armed_session_store import ArmedSessionStore
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
+from trading_bot.review_paper.production_paper_runtime import preflight_runtime
 from trading_bot.review_paper.store import ReviewPaperStore
 from trading_bot.risk.models import RiskLimits
 from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter
@@ -35,7 +43,7 @@ from trading_bot.robinhood_paper_operator import admit_robinhood_paper_source
 from trading_bot.strategies import MovingAverageCrossoverConfig
 from trading_bot.strategies.production import ProductionStrategyContract
 
-BRANCH = "feature/robinhood-production-paper-mvp"
+BRANCH = "feature/robinhood-production-paper-runtime"
 ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 RUNTIME_ROOT = Path(r"F:\AITradingBot\Arch134D1")
 PAPER_PATH = RUNTIME_ROOT / "paper.sqlite"
@@ -58,14 +66,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def create_current_product_alpaca_provider() -> AlpacaDailySnapshotProvider:
-    """Narrow frozen credential-binding seam, intentionally fail closed.
-
-    The retained native reader imports C1/C3 operational authority. D1 must not
-    revive that graph, read environment credentials, or invent an unreviewed
-    secret-store reader. A later protected qualification must bind this exact
-    source-owned seam to the existing HTTPS/daily provider. No CLI plugin input.
-    """
-    raise RuntimeError("ALPACA_CREDENTIAL_BINDING_NOT_QUALIFIED")
+    """Fixed Windows credentials -> existing HTTPS/daily provider; no fallback."""
+    with read_current_product_alpaca_secrets() as secrets:
+        return secrets.use(
+            lambda key, secret: create_alpaca_daily_snapshot_provider(
+                transport=StdlibAlpacaHistoricalBarsTransport(),
+                clock=lambda: datetime.now(UTC),
+                environment={"APCA_API_KEY_ID": key, "APCA_API_SECRET_KEY": secret},
+            )
+        )
 
 
 def _forbid_interactive(_url: str) -> None:
@@ -178,19 +187,25 @@ def main(argv: list[str] | None = None) -> int:
             MovingAverageCrossoverConfig(2, 3, Decimal("1")),
         )
         if args.preflight:
+            state = preflight_runtime()
             print(
                 json.dumps(
                     {
                         "schema": "armed-paper-preflight/v1",
-                        "status": "BLOCKED",
-                        "reason": "ALPACA_CREDENTIAL_BINDING_NOT_QUALIFIED",
+                        "status": "RUNTIME_COMPATIBLE"
+                        if state["status"] == "PRESENT_COMPATIBLE"
+                        else "BLOCKED",
+                        "runtime_status": state["status"],
+                        "credential_readiness": "NOT_CHECKED",
                         "provider_calls": 0,
                         "paper_mutations": 0,
                     },
                     sort_keys=True,
                 )
             )
-            return 3
+            return 0 if state["status"] == "PRESENT_COMPATIBLE" else 3
+        if preflight_runtime()["status"] != "PRESENT_COMPATIBLE":
+            raise ValueError("qualified runtime required")
         result = run_armed_production_paper_session(
             contract=contract,
             store=ReviewPaperStore(PAPER_PATH, starting_cash=Decimal("10000")),

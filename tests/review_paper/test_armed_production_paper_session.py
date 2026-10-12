@@ -447,8 +447,12 @@ def test_cli_rejects_every_semantic_trading_input_without_effects():
             parser.parse_args(args + ["--" + name, "secret-value"])
 
 
-def test_native_credentials_seam_fails_closed_without_legacy_imports():
-    with pytest.raises(RuntimeError, match="NOT_QUALIFIED"):
+def test_native_credentials_seam_fails_closed_without_legacy_imports(monkeypatch):
+    def missing():
+        raise RuntimeError("credential readiness failed")
+
+    monkeypatch.setattr(host, "read_current_product_alpaca_secrets", missing)
+    with pytest.raises(RuntimeError, match="readiness failed"):
         host.create_current_product_alpaca_provider()
 
 
@@ -614,7 +618,9 @@ def test_authority_registration_and_real_chain():
     spec = runner._checkpoint_specs()[runner.ARCH134_ARMED_PAPER_NAME]
     assert spec.preflight is spec.execute is None
     assert (
-        runner.resolve_ci_checkpoint(runner._checkpoint_specs(), host.BRANCH, "push")
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), "feature/robinhood-production-paper-mvp", "push"
+        )
         == runner.ARCH134_ARMED_PAPER_NAME
     )
 

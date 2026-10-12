@@ -1,5 +1,26 @@
 # Project Status and Roadmap
 
+## 2026-10-12 - Architecture 134-D1Q runtime enablement implementation
+
+D1Q is implemented for source review on
+`feature/robinhood-production-paper-runtime`, based exactly on
+`c8c783114bb1d8c1d16942eec37e704072da5950` /
+`88f150ef9ee572595125fc7d534d04a2ec135573`.
+
+The fixed current-product Alpaca credential binding and fixed D1 store
+qualification replace the deliberate D1 binding stop. Source acceptance,
+CI-owned ROBINHOOD certification and real Windows qualification remain separate.
+No real credential, provider, OAuth, production paper/runtime, scheduler or
+broker effect is performed by implementation or fake-only verification.
+
+After exact GitHub source review and terminal mapped CI, the next boundary is
+separately authorized D1Q runtime/credential qualification. It creates/validates
+only the fixed stores, reads two Alpaca records and two existing persisted OAuth
+availability records, and makes zero provider/application/trading/scheduler calls.
+`READY_FOR_MANUAL_PAPER_SESSION` is evidence only. The manual armed session
+requires its own authorization after qualification evidence review. Do not retry
+B3Q or work on Task Scheduler yet. No local ROBINHOOD/FULL rerun is required.
+
 ## 2026-10-12 — Architecture 132-R3 expedited certification serialization ACCEPTED / CLOSED
 
 The expedited certification workflow is **ACCEPTED and CLOSED** on the exact

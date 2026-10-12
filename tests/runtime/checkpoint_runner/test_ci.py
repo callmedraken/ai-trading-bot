@@ -480,7 +480,10 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
-    assert runner.CI_CERTIFICATION_PROFILES == {"arch134-armed-paper-mvp": "robinhood"}
+    assert runner.CI_CERTIFICATION_PROFILES == {
+        "arch134-armed-paper-mvp": "robinhood",
+        "arch134-production-paper-runtime": "robinhood",
+    }
     assert (
         runner.resolve_ci_certification_profile("arch134-armed-paper-mvp")
         == "robinhood"
@@ -505,8 +508,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 61
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 61
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 62
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")

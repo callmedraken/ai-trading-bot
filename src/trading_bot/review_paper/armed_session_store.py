@@ -191,6 +191,57 @@ class ArmedSessionStore:
         )
         return connection
 
+    def initialize(self) -> None:
+        """Create the reviewed table without manufacturing a reservation."""
+        if self.path.exists():
+            self.qualify()
+            return
+        with self.path.open("xb"):
+            pass
+        with closing(self._connect()):
+            pass
+        self.qualify()
+
+    def qualify(self) -> int:
+        """Read-only exact table/evidence validation; return reservation count."""
+        with closing(
+            sqlite3.connect(
+                self.path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
+            )
+        ) as connection:
+            schema = connection.execute(
+                "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY name"
+            ).fetchall()
+            if schema != [
+                (
+                    "table",
+                    "armed_session_v1",
+                    "armed_session_v1",
+                    "CREATE TABLE armed_session_v1 "
+                    "(session_key TEXT PRIMARY KEY, evidence BLOB NOT NULL)",
+                ),
+                (
+                    "index",
+                    "sqlite_autoindex_armed_session_v1_1",
+                    "armed_session_v1",
+                    None,
+                ),
+            ] or connection.execute("PRAGMA integrity_check").fetchall() != [("ok",)]:
+                raise ValueError("invalid session schema")
+            count = 0
+            for key, raw in connection.execute(
+                "SELECT session_key,evidence FROM armed_session_v1"
+            ):
+                if type(raw) is not bytes or len(raw) > MAX_SESSION_EVIDENCE_BYTES:
+                    raise ValueError("invalid session evidence")
+                value = json.loads(raw)
+                if evidence_bytes(value) != raw or key != (
+                    "armed-paper-session/v1:SPY:" + value["target_session"]
+                ):
+                    raise ValueError("invalid session reservation")
+                count += 1
+            return count
+
     def reserve(self, key: str, evidence: dict[str, object]) -> dict | None:
         payload = evidence_bytes(evidence)
         with closing(self._connect()) as connection:

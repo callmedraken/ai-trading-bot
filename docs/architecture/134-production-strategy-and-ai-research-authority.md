@@ -683,3 +683,108 @@ evidence plus local dependency/OAuth readiness. Any actual credential access or
 provider call remains outside that source-only checkpoint and must use its own
 reviewed authority. 134-D Armed Session Mode design/source work may proceed
 independently on a separate branch.
+
+
+## 134-D1 - Current-product Alpaca bridge and manually armed paper session
+
+This is the current MVP source direction and supersedes the product dependency
+on B3 historical acquisition, without changing retained B3/B3Q authority or
+retrying its ambiguous incident. Historical docs remain historical. Source
+acceptance, broad certification and protected native qualification are separate.
+
+Historical authority is the existing immutable Alpaca raw/USD/SIP/1Day/no-asof
+provider and one-attempt HTTPS/strict JSON implementation, composed by
+`review_paper/alpaca_strategy_history.py`. Derive exactly `long_window + 1`
+predecessors from the exact ProductionStrategyContract and source-owned XNYS
+calendar, and require every date plus the target date to exist in the published
+NYSE manifest. The MVP bounds long_window to 252. Fetch each predecessor exactly
+once in caller-visible chronological order. Each request has exactly the
+contract symbol, one session, limit=1, adjustment=raw and no pagination follow-up.
+Older request timestamps are explicit calendar-selector anchors (midnight on the
+following local calendar date); they are not actual acquisition observations.
+Every retained audit captured_at is the real post-response provider observation,
+nondecreasing and within the armed target date. The final request uses actual
+acquisition requested_at. No verification object or legacy prior capability is
+fabricated: all bars pass acceptance, canonical serialization/offline verification
+and the unchanged strict history-seed verifier. The seed remains OFFLINE_SEED and
+non-authoritative; provenance belongs to the verified Alpaca snapshots.
+
+The lifecycle is closed: ADMITTED, HISTORY_STARTED, HISTORY_READY, NO_SIGNAL,
+WAITING_FOR_MARKET, PREPARING, READY_TO_PROCEED, EXECUTE_STARTED, PAPER_EXECUTED,
+RISK_REJECTED, SESSION_NOT_ADMITTED, SESSION_EXPIRED, BLOCKED, ALREADY_COMPLETED.
+The initial atomic reservation precedes history. Every read gets a durable
+HISTORY_STARTED fence; PREPARING precedes quote composition/control and
+EXECUTE_STARTED precedes execution control. SQLite uses synchronous=FULL,
+timeout=0 and compare-and-swap publication. No persistence conflict is retried.
+There is no ownership lease, expiration/reclaim or automatically resumed attempt.
+
+A new ARM interlock authorizes one combined session under its exact contract and
+source; it is not inferred from READY_TO_PROCEED. It consumes its in-memory ARM
+before one EXECUTE attempt. The durable symbol/session key prevents another ARM,
+including another contract/source version, from executing that same session.
+The result/order UUID5 uses versioned length-framed contract semantic material;
+filesystem identities/artifact bytes/clocks are not result-identity material.
+An interrupted fence remains blocked, even when the process failed before a
+provider request was proven sent. A matching NO_SIGNAL/PAPER_EXECUTED may report
+ALREADY_COMPLETED; the latter also requires its exact durable order/fill.
+An existing symbol fill on the target session date blocks a new reservation's
+provider path. No multi-session catch-up or historical-ID reconstruction exists.
+
+The clock/sleeper and inert provider factories are injected/testable seams owned
+by the host. There is one sleep to published open plus buffer, no busy loop, no
+CLI semantic time and no second sleep if the wake is early. Source drift blocks;
+wrong-date/late wake expires. PREPARE's non-READY outcomes never call EXECUTE.
+The unchanged Architecture-131 path retains quote freshness, source/session/risk/
+predecessor revalidation, review echo, bounded account/order-history reads and
+local synthetic ReviewPaperStore fill. D1 owns no second order/risk engine and
+no additional quote after PREPARE. No broker placement/cancel/options/crypto,
+margin/short/live, research-selected strategy or historical operational authority
+is admitted.
+
+Budgets per fresh admitted attempt: Alpaca exactly long_window+1 on a successful
+history path (stop at first rejected/ambiguous read), one B2 evaluation, one
+SHADOW PREPARE with at most one quote read, at most one paper EXECUTE. EXECUTE
+retains the accepted account resolution budget of one, one review, and at most
+100 successful pages on each side of review (the accepted 101st-page stop can
+consume a failing attempt; conservative total attempt bound is 202). Paper fill
+budget is one. Robinhood historical and broker-mutation budgets are zero.
+Counts are attempted boundary invocations, not proof an application request was
+sent. Incomplete execution counts remain marked unknown, never inferred zero.
+
+The source-owned `scripts/run_production_paper_session.py` accepts only expected
+HEAD/TREE, a fresh external evidence destination, --preflight or the exact ARM
+interlock. The operator selects no symbol/window/provider/endpoint/price/side/
+quantity/session/time. V1 host configuration is SPY, crossover 2/3, quantity 1,
+$10,000 synthetic starting cash, existing RiskLimits defaults, five-minute
+opening/closing buffers and one-minute quote freshness. Its fixed runtime root
+is `F:\AITradingBot\Arch134D1`; existing qualified paper.sqlite is required.
+Source admission requires exact clean source/import roots/origin/cached and live
+remote identity. It never repairs source. An absent dedicated bytecode namespace
+prevents reading ignored cached trading code. Preflight is provider/credential/
+paper-write free and cannot grant runtime authority.
+
+The retained native Alpaca credential reader cannot be reused without importing
+C1/C3 operational authority. Therefore `create_current_product_alpaca_provider`
+is deliberately a narrow fail-closed seam for later reviewed native binding;
+it currently raises ALPACA_CREDENTIAL_BINDING_NOT_QUALIFIED. No generic plugin,
+environment credential reader, filesystem history substitution or alternate
+provider is supplied. D1 source does not represent a qualified production launch.
+Do not work around this stop with legacy credentials/authority. Native secret
+binding and existing runtime/store qualification remain explicit later boundaries.
+
+The 32-KiB canonical terminal export and full-synchronous durable state use a
+closed field set: source/contract/session, exact historical dates/provider,
+strategy/proposal, wait/admission, PREPARE/EXECUTE, operation/order/fill identities and canonical snapshot/seed digests,
+provider/tool attempt counts, mutation count and terminal classification. Unknown
+fields/free-form text, credentials/OAuth URLs, arbitrary exceptions and reusable
+capabilities are rejected. Interrupted publication preserves the last pre-effect
+state. Exports are exclusively created and fsynced; state is authoritative if an
+export cannot be published.
+
+Registration is arch134-armed-paper-mvp on
+feature/robinhood-production-paper-mvp; preflight/execute remain None. D1 is
+inserted before the frozen final 134-A/B/C batch tail, preserving those exact
+assertions. The existing reviewed feature/robinhood-* trigger provides first-push
+bootstrap. The next planned source checkpoint is 134-D2 Task Scheduler wiring
+with unchanged semantic inputs, not scheduler installation in D1. Protected
+credential/runtime/manual-session acceptance precedes any scheduled effect.

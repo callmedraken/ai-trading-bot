@@ -1,5 +1,66 @@
 # Project Status and Roadmap
 
+## 2026-10-11 - Architecture 134-D1 armed paper MVP SOURCE IMPLEMENTED / REVIEW PENDING
+
+Current work proceeds on `feature/robinhood-production-paper-mvp`, in
+`F:\AI\worktrees\ai-trading-bot-production-paper-mvp`, directly from
+`0f8c7390ddbac4c8750874587aa1a15250e8fedf` /
+`d573738c00d95bb821bc979720e407d017922bd0`.
+The branch matches the integration workflow's already-reviewed
+`feature/robinhood-*` family. The frozen B3Q worktree remains unchanged.
+
+The current-product historical path is the new 134-D1 Alpaca bridge. Robinhood
+historicals are removed from the paper MVP critical path. B3/B3Q code, tests and
+incident evidence remain retained; the ambiguous B3Q authorization is consumed
+and MUST NOT be retried. Robinhood remains only at the unchanged 134-C quote and
+Architecture-131 account/order-history/review-paper boundaries.
+
+The manually armed controller owns one production contract, target published
+XNYS session, source HEAD/TREE, strategy/risk policy and ReviewPaperStore. It
+reserves a durable unique symbol/session attempt before any provider read,
+acquires exactly `long_window + 1` raw Alpaca daily snapshots, verifies them
+through existing acceptance/canonical replay, verifies the preceding
+`long_window` bars as StrategyHistorySeed, and evaluates accepted B2 once.
+NO_SIGNAL leaves the paper store unchanged and calls Robinhood zero times.
+A proposal waits once for published open plus the opening buffer, re-admits
+source/session, calls unchanged 134-C SHADOW PREPARE once, and permits at most
+one unchanged synthetic-paper EXECUTE through a consumed one-session ARM.
+
+D1 adds SQLite full-synchronous pre-effect fences and a closed sanitized
+32-KiB result schema. Completed matching attempts replay without provider or
+paper effects. Any other reserved/interrupted/ambiguous attempt is blocked:
+no reclaim, automatic retry, new IDs, alternate provider or catch-up. An existing
+paper fill in the target session also blocks before historical acquisition.
+Evidence records uncertain paper mutation counts as null with
+`effect_counts_complete=false`; an ambiguous effect must not be reported as zero.
+
+**Production launch remains BLOCKED pending current-product Alpaca credential
+binding and protected host/runtime qualification.** The existing native Alpaca
+reader imports legacy C1/C3 operational authority, so D1 deliberately uses the
+explicit fail-closed credential-composition seam permitted by the implementation
+contract. It neither imports that graph nor reads environment credentials.
+The source program is fake-qualified, not a claim of a presently runnable
+credential-backed production session. No production runtime/store is provisioned.
+
+Checkpoint `arch134-armed-paper-mvp` is source-only (`preflight=None`,
+`execute=None`). Critical controller/store/history/host/launcher and existing
+Alpaca parser/HTTPS bytes are pinned. AST checks reject historical Robinhood,
+generic MCP, broker placement/cancel/options/crypto, alternate evaluation,
+research/legacy imports, fallback and scheduler mutation. The existing exact
+134-A/B/C authority/order assertions remain unchanged. Current inventories are
+active 61, FULL 167, ROBINHOOD 92, LEGACY 205, EXHAUSTIVE 372; frozen required
+baselines are unchanged. Only focused fake tests, Ruff and diff checks belong
+to this implementation; no broad certification is represented as completed.
+
+Next owner: ChatGPT for exact pushed-source review and certification selection.
+The next planned product source checkpoint is 134-D2 Task Scheduler wiring
+around the same zero-semantic-input program. Credential binding (Sol High),
+existing-store/runtime qualification and a manually armed integration session
+must be accepted before a scheduled provider/paper effect is enabled. Scheduler
+installation/update/run, real provider/OAuth, production paper-store mutation and
+broker effects remain separately protected. No real-money authority is added.
+
+
 ## 2026-10-11 — Architecture 134-B3Q live qualification AMBIGUOUS; NO RETRY
 
 The single authorized real-server **134-B3Q** historical qualification was

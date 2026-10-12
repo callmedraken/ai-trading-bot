@@ -656,3 +656,65 @@ evidence plus local dependency/OAuth readiness. Any actual credential access or
 provider call remains outside that source-only checkpoint and must use its own
 reviewed authority. 134-D Armed Session Mode design/source work may proceed
 independently on a separate branch.
+
+
+## 134-D1 - Armed paper MVP source validation and remaining protected boundary
+
+134-D1 source tests use the concrete Alpaca daily provider/strict parser with a
+fake HTTPS transport, real B2 strategy/prior/snapshot/seed validation and real
+134-C/Architecture-131 PREPARE/EXECUTE cores. The only execution effect is a
+fake paper operator against fresh test-only stores. No actual credentials,
+Alpaca/Robinhood/OAuth, production store, scheduler or broker effects are used.
+
+Focused coverage includes exact ordered completed sessions, holiday/weekend/DST,
+accepted raw history and canonical verification, missing/duplicate/reordered/
+wrong-symbol/pagination rejection, stop-at-first-failure/no retry, exactly one
+strategy evaluation, NO_SIGNAL with unchanged paper bytes and zero Robinhood,
+pre-open waiting, immediate admission, early/double/late/wrong-date wakes, source
+drift, single PREPARE, risk/expiry stops, single accepted EXECUTE, duplicate
+launch/reopen/different contract, existing session fill, atomic concurrent claim,
+crash before history/after EXECUTE fence, ambiguous fill, terminal publication
+failure, bounded sanitized/tampered evidence, semantic CLI exclusion, inert
+credential seam, isolated actual import closure and exact-pin/AST mutation tests.
+
+The regression selection includes affected B2/B3/B3Q/134-C, Alpaca parser/HTTPS,
+131 risk acquisition/supervised PREPARE/EXECUTE, runner/CI and inventory tests.
+Only mechanical current inventory assertions change: active 61, FULL 167,
+ROBINHOOD 92, LEGACY 205, EXHAUSTIVE 372. Existing B3/B3Q tests and source are
+untouched. Required frozen baselines and prior source pins remain unchanged.
+Implementation focused verification passed 967 distinct selected cases, including
+59 D1 cases, across the regression run and affected-only repairs. Ruff check
+and format passed all 11 changed Python files; diff and exact authority passed.
+Every pytest invocation uses -B, -p no:cacheprovider and a fresh explicit
+F:\AI\temp\pytest\arch134d1-* basetemp. Both non-mutating Ruff phases and
+non-mutating failure diffs precede a combined PASS/STOP, plus git diff --check.
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE are not implementation verification.
+
+`arch134-armed-paper-mvp` registers the relevant focused tests and critical
+source/AST pins, with no ops.ps1 protected preflight/execute. The first push is
+already admitted by the integration workflow's feature/robinhood-* family;
+source CI must reach terminal success on the exact pushed HEAD/TREE. A missing
+run is not PASS. Exact ChatGPT review/certification selection remains next.
+
+The default host credential seam explicitly blocks production until a later
+current-product native Alpaca binding is reviewed/qualified. The retained
+Windows reader imports C1/C3 authority and is not a D1 dependency. Preflight
+cannot claim READY while the binding is absent. No protected CLI invocation,
+runtime/store provisioning or scheduler installation is ordinary source testing.
+The next planned source checkpoint is 134-D2 Task Scheduler wiring around the
+same manually armed program, with credential/runtime/manual-session acceptance
+required before any scheduled provider/paper wake. The B3Q ambiguity remains
+consumed/no-retry throughout. Real-money placement remains NO-GO.
+
+Optional local source gate after exact review (CI normally owns this):
+
+~~~powershell
+Set-Location 'F:\AI\worktrees\ai-trading-bot-production-paper-mvp'
+.\ops.ps1 verify arch134-armed-paper-mvp
+~~~
+
+Expected evidence: terminal exact-source CI success; focused tests with zero
+real effects; both Ruff phases, git diff and authority checks PASS. Stop on
+source/identity drift, missing CI, any rejected/ambiguous provider/paper result,
+missing credential/runtime qualification, or any request to retry B3Q. Return
+only CI/commit identity or a failing source-gate summary for another review turn.

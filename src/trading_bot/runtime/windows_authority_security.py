@@ -83,6 +83,11 @@ ACL_REVISION = 2
 ACCESS_ALLOWED_ACE_TYPE = 0
 ACCESS_DENIED_ACE_TYPE = 1
 NO_INHERITANCE = 0
+OBJECT_INHERIT_ACE = 0x01
+CONTAINER_INHERIT_ACE = 0x02
+INHERIT_ONLY_ACE = 0x08
+INHERITED_ACE = 0x10
+FILE_DELETE_CHILD = 0x0040
 _SID_PATTERN = re.compile(r"^S-(?:0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*))+$")
 _LOCAL_DOS_PATH_PATTERN = re.compile(r"^[A-Za-z]:\\")
 
@@ -346,6 +351,41 @@ def open_authority_object(
     _require_fixed_open_path(path)
     if type(kind) is not AuthorityObjectKind:
         raise AuthorityObjectError("authority object kind must be explicit")
+    return _open_security_object(path, kind, for_update=for_update, share=7)
+
+
+ARCH134_RUNTIME_TARGETS = (
+    r"F:\AITradingBot\Arch134D1",
+    r"F:\AITradingBot\Arch134D1\paper.sqlite",
+    r"F:\AITradingBot\Arch134D1\armed-sessions.sqlite",
+)
+
+
+def open_arch134_runtime_object(
+    path: str, kind: AuthorityObjectKind, *, for_update: bool = False
+) -> WindowsHandle:
+    """Pin only the three D1 objects; deny deletion and database writers."""
+    if path not in ARCH134_RUNTIME_TARGETS or kind is not (
+        AuthorityObjectKind.DIRECTORY
+        if path == ARCH134_RUNTIME_TARGETS[0]
+        else AuthorityObjectKind.FILE
+    ):
+        raise AuthorityPathError("D1 security target rejected")
+    return _open_security_object(
+        path,
+        kind,
+        for_update=for_update,
+        share=3 if kind is AuthorityObjectKind.DIRECTORY else 1,
+    )
+
+
+def _open_security_object(
+    path: str | PureWindowsPath,
+    kind: AuthorityObjectKind,
+    *,
+    for_update: bool,
+    share: int,
+) -> WindowsHandle:
     require_windows_platform()
     expected = str(path)
     if not expected.startswith("F:\\") or expected.startswith("\\\\"):
@@ -368,7 +408,7 @@ def open_authority_object(
         | READ_CONTROL
         | FILE_READ_ATTRIBUTES
         | (WRITE_DAC | WRITE_OWNER if for_update else 0),
-        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        share,
         None,
         OPEN_EXISTING,
         FILE_FLAG_OPEN_REPARSE_POINT
@@ -379,6 +419,46 @@ def open_authority_object(
     if handle_value in (0, INVALID_HANDLE_VALUE):
         raise _last_error("CreateFileW(authority object)")
     return WindowsHandle(handle_value)
+
+
+def close_security_object_checked(handle: WindowsHandle) -> None:
+    """Close once, reporting ambiguity instead of silently accepting failure."""
+    require_windows_platform()
+    value = handle.value
+    handle.value = 0  # An ambiguous close must never be retried.
+    close = _kernel32().CloseHandle
+    close.argtypes = [wintypes.HANDLE]
+    close.restype = wintypes.BOOL
+    if not value or not close(value):
+        raise AuthorityObjectError("security handle close is ambiguous")
+
+
+def inspect_security_object_identity(handle: WindowsHandle) -> tuple[int, int, int]:
+    """Return volume serial, file index and link count from the pinned handle."""
+    require_windows_platform()
+
+    class FileInformation(ctypes.Structure):
+        _fields_ = [
+            ("attributes", wintypes.DWORD),
+            ("times", wintypes.DWORD * 6),
+            ("volume", wintypes.DWORD),
+            ("size_high", wintypes.DWORD),
+            ("size_low", wintypes.DWORD),
+            ("links", wintypes.DWORD),
+            ("index_high", wintypes.DWORD),
+            ("index_low", wintypes.DWORD),
+        ]
+
+    info = FileInformation()
+    query = _kernel32().GetFileInformationByHandle
+    query.argtypes = [wintypes.HANDLE, ctypes.c_void_p]
+    query.restype = wintypes.BOOL
+    drive = _kernel32().GetDriveTypeW
+    drive.argtypes = [ctypes.c_wchar_p]
+    drive.restype = wintypes.DWORD
+    if drive("F:\\") != 3 or not query(handle.value, ctypes.byref(info)):
+        raise AuthorityObjectError("security object identity/volume unavailable")
+    return info.volume, (info.index_high << 32) | info.index_low, info.links
 
 
 def create_authority_directory(
@@ -1249,9 +1329,9 @@ def build_security_attributes(policy: SecurityPolicy) -> SecurityAttributesBundl
         ]
         add_allow.restype = wintypes.BOOL
         for sid, ace in zip(sid_buffers[1:], policy.aces, strict=True):
-            if (
-                ace.ace_type != ACCESS_ALLOWED_ACE_TYPE
-                or ace.ace_flags != NO_INHERITANCE
+            if ace.ace_type != ACCESS_ALLOWED_ACE_TYPE or ace.ace_flags not in (
+                NO_INHERITANCE,
+                OBJECT_INHERIT_ACE | INHERIT_ONLY_ACE,
             ):
                 raise AuthoritySecurityError(
                     "security attribute policy contains unsupported ACE"

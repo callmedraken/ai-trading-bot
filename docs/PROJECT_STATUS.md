@@ -1,5 +1,58 @@
 # Project Status and Roadmap
 
+## 2026-10-12 - Architecture 134-D1Q-R2 runtime-principal ACL source checkpoint
+
+R2 is implemented for exact-source review on the new isolated branch
+`feature/robinhood-production-paper-runtime-acl`, in
+`F:\AI\worktrees\ai-trading-bot-production-paper-runtime-acl`.
+The frozen accepted D1Q-R1 parent remains unchanged:
+
+```text
+branch feature/robinhood-production-paper-runtime
+HEAD   6bf8753b0cc8950ae27b32b6858b64d454c512f0
+TREE   ce3feb2ac48e7aebc23970142aafed5059c447e7
+CI     #502 / 38235080721 SUCCESS
+ROBINHOOD 8532 passed / 1 skipped / 0 failed / 0 errors
+```
+
+R1 rollback-only write probes remain mandatory and unchanged. The diagnosed
+runtime is readable but not writable; zero paper/session rows or provider
+effects occurred. R2 adds only a separately protected native ACL operator for
+the existing fixed D1 root and two databases. It binds the caller-supplied SID
+to the same elevated administrator-authorized token's user SID, accepts only
+the exact diagnosed three-ACE logon-session class or the exact provisioned
+policy, and blocks partial/ambiguous state. It never selects a display name.
+
+The two protected database DACLs exclude runtime DELETE/WRITE_DAC/WRITE_OWNER.
+The root permits journal file creation but no subdirectory creation or
+FILE_DELETE_CHILD. Its separate OBJECT_INHERIT + INHERIT_ONLY file ACE permits
+journal deletion. Apply order is paper database, session database, root last;
+same-handle checks precede fresh reopen verification. Failure/close ambiguity
+after an apply attempt is STOPPED_AFTER_APPLY with no retry or rollback.
+Evidence contains a versioned SID digest, fixed classifications and bounded
+counts, never raw SID/usernames/ACLs/native exception text.
+
+No production ACL was changed by implementation/testing. The parent
+`F:\AITradingBot` remains untouched. R2 does not qualify runtime write readiness,
+ARM a session, install a scheduler, read/mutate credentials, contact providers,
+write semantic paper/session records, deploy source or place broker orders.
+Only test directories/files and mocks are used for verification, including
+disposable native inheritance coverage. Current inventory is ACTIVE 63,
+FULL 169, ROBINHOOD 94, LEGACY 205, EXHAUSTIVE 374.
+
+Next owner/action: ChatGPT exact GitHub commit/diff review after terminal mapped
+CI-owned ROBINHOOD for `arch134-production-paper-runtime-acl`. No duplicate local
+ROBINHOOD/FULL run. Source acceptance grants only the operator's separately
+protected ACL provisioning scope. After acceptance: read-only current-state
+diagnostic -> separately authorized elevated ACL provisioning under the SAME
+runtime user account -> separately authorized non-elevated D1Q-R1 write-readiness
+qualification from its accepted source -> separately authorized manual session.
+Any drift, partial state, incomplete evidence or STOPPED_AFTER_APPLY requires
+reconciliation, never automatic repair/retry. D2 remains after manual-session
+acceptance, B3Q remains consumed/no-retry and real-money placement remains NO-GO.
+The earlier R1 entries below retain historical implementation provenance;
+their pending operator-design next step is superseded by this R2 checkpoint.
+
 ## 2026-10-12 - Architecture 134-D1Q-R1 write-readiness implementation
 
 D1Q-R1 is implemented for source review on the existing

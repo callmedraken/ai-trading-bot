@@ -762,3 +762,83 @@ Both focused Ruff phases and git diff --check passed. Tests used fresh external
 arch134d1qr1-focused-* roots with -B and -p no:cacheprovider. Native read-only
 file-attribute coverage passed on Windows against test-only databases. Final
 canonical profile evidence belongs to the mapped CI run on the pushed source.
+
+
+## 134-D1Q-R2 - Fixed native runtime-principal ACL source validation
+
+Implementation verification: 722 distinct focused cases passed across overlapping
+selections (111 R2 operator, 116 preserved R1 runtime, 488 CI routing/profile,
+four shared native-helper and three source-gate core cases). Final operator/R1
+run: 227 passed; targeted shared-helper run: four passed; affected CI core/authority
+repair: four passed (one overlaps the R2 module). Disposable native inheritance
+passed on this Windows host. Focused Ruff check/format across all nine changed
+Python files, git diff --check and exact R1/R2 authority checks passed. External
+arch134d1qr2-* test roots and JUnit evidence retain no production effects.
+The canonical ROBINHOOD result belongs to GitHub CI on the one pushed commit;
+no local ROBINHOOD/FULL was run.
+
+R1 source acceptance remains the frozen parent 6bf8753 / ce3feb2, source gate
+#502 / 38235080721 SUCCESS, mapped ROBINHOOD 8532 passed/1 skipped. Its rollback
+probes and qualification/host security-mutation prohibition are unchanged. The
+earlier pending operator-design step is now the R2 source checkpoint, with
+production effects still separately protected.
+
+Ordinary source tests redirect native work entirely to mocks or disposable test
+directories/files. They cover exact masks/flags, administrator/current-token SID
+binding, wrong expected SID/no elevation before target opens, exact diagnosed
+logon-session class, arbitrary/extra/inherited/deny ACEs, wrong owner/path/reparse/
+volume/type/link, mixed state, sidecars, before-state drift, all targets pinned,
+paper/session/root mutation order, same-handle verification, fresh reopen and
+identity drift, terminal apply/close ambiguity without retry/rollback, exact-state
+idempotency, fresh/redirection-safe evidence, no parent/recursive or non-ACL
+effects, and bounded sanitized publication. Structural mutation tests refresh
+blob pins then prove token/elevation/path/mask/authority expansion still fails.
+Isolated import tests prohibit WinDLL access and prove the exact tracked closure.
+
+Disposable native Windows coverage creates only a test-owned directory, journal
+file and protected test database. It verifies OBJECT_INHERIT + INHERIT_ONLY becomes
+an effective inherited file ACE with DELETE, and a protected database descriptor
+does not inherit that authority. Test parent ownership/delete rights are only for
+cleanup, not the production target policy. No F:\AITradingBot access is attempted.
+This source coverage does not establish actual elevated same-account operation,
+the deliberately inaccessible-parent final-path behavior, actual before-state
+admission or runtime SQLite readiness; those remain real Windows acceptance.
+
+Run focused tests and both focused non-mutating Ruff phases, git diff --check
+and exact checkpoint authority validation. Refresh the reviewed shared-helper
+133-H AST pin only for the narrow fixed opener/identity/checked-close/0x09 builder
+generalization; retain all R1 executable pins and forbidden-effect checks.
+Current topology assertions become ACTIVE 63, FULL 169, ROBINHOOD 94, LEGACY 205,
+EXHAUSTIVE 374; no baseline module is removed or reclassified. One normal
+exact-file commit/push selects the dedicated source gate and canonical robinhood
+CI. Ordinary CI never invokes the protected ACL operator; full-tests is skipped
+on this mapped path and no duplicate local ROBINHOOD/FULL is run.
+
+After terminal mapped CI and ChatGPT exact GitHub review/source acceptance,
+the next read-only observation uses the new branch worktree and reviewed CLI:
+
+~~~powershell
+Set-Location 'F:\AI\worktrees\ai-trading-bot-production-paper-runtime-acl'
+python -B .\scripts\provision_production_paper_runtime_acl.py `
+  --expected-head (git rev-parse HEAD) `
+  --expected-tree (git rev-parse 'HEAD^{tree}') --diagnose
+~~~
+
+Expected evidence is NEEDS_PROVISIONING/PASS or ALREADY_PROVISIONED/PASS,
+zero apply attempts, sanitized SID digest and zero other effects. BLOCKED is a
+STOP requiring read-only reconciliation, not permission to repair. Do not run
+protected execute as ordinary verification: it requires fresh explicit approval,
+already-elevated administrator authorization, expected runtime SID obtained under
+the ordinary runtime account, exact equality to the elevated caller's token SID,
+and a fresh external evidence file. Elevation under another account blocks.
+Return only sanitized diagnostic output for that authorization/review boundary.
+
+After protected acceptance require PROVISIONED/PASS with exactly three verified
+applies, or ALREADY_PROVISIONED/PASS with zero applies, independently verified
+fixed identities/policies, no parent/non-ACL effects. STOPPED_AFTER_APPLY,
+incomplete evidence or partial state means preserve all objects and STOP; never
+rerun or roll back automatically. Then separately authorize non-elevated D1Q-R1
+qualification from the unchanged accepted runtime branch/worktree; both stores
+must show WRITE_READY before a separately authorized manual session. This R2
+checkpoint never qualifies, ARMs, schedules, deploys, accesses credentials or
+providers, changes paper/session rows or places broker orders. Real-money NO-GO.

@@ -911,3 +911,109 @@ establish that authority. No existing production ACL, ownership or file attribut
 is changed by this checkpoint. Real qualification and ARM remain separately
 authorized; source tests use only isolated temporary stores and fake credentials
 and providers. Canonical ROBINHOOD runs once through the existing mapped CI path.
+
+
+### 134-D1Q-R2 - Fixed current-product runtime-principal ACL provisioning
+
+The accepted R1 source is HEAD 6bf8753b0cc8950ae27b32b6858b64d454c512f0,
+TREE ce3feb2ac48e7aebc23970142aafed5059c447e7, on the unchanged runtime branch.
+R2 is a new isolated branch/checkpoint, not a qualifier/host security-mutation
+extension. R1 rollback-only native probes and their authority prohibitions remain
+unchanged. `production_paper_runtime_acl.py` and its standalone source-owned CLI
+are inert on import; diagnosis performs only source/token/object observations.
+
+Exactly three security targets are admitted:
+`F:\AITradingBot\Arch134D1`, its `paper.sqlite` and `armed-sessions.sqlite`.
+The native helper's old fixed-authority opener retains its prior allowlist and
+sharing behavior. A separate fixed-three-target opener reuses the same native
+CreateFileW implementation with OPEN_EXISTING, OPEN_REPARSE_POINT and directory
+BACKUP_SEMANTICS. Root handles deny delete sharing; database handles deny write
+and delete sharing. All three are pinned before admission/mutation. Inspection
+reuses final-path/reparse/kind/NTFS/security primitives and adds local-fixed-drive,
+same-volume serial/file-index identity and single-link database checks.
+Only a bounded nonrecursive inventory of the root is observed; extra children,
+sidecars or inventory ambiguity block. No parent/sibling/ancestor is opened for
+security mutation or enumerated. The deliberately inaccessible parent remains
+untouched; no traverse permission is provisioned there.
+
+Owner must be Administrators. Diagnosed state is unprotected with exactly the
+ordered explicit allow ACEs Administrators FILE_ALL_ACCESS, SYSTEM
+FILE_ALL_ACCESS, and a structural S-1-5-5-X-Y logon-session SID with exactly
+0x001200A9 RX/synchronize and zero ACE flags. All three objects must share that
+diagnosed class/logon SID, or all must match the exact target policy for the
+current token user SID. Additional ACEs, inherited flags, a different owner,
+wrong path/kind/volume/link state, duplicate identity, or a mixed/partial state
+block without reconciliation/repair. No ephemeral logon SID or machine-specific
+user SID is embedded in source.
+
+Both database target policies are Administrators-owned, DACL-protected, with
+exact ordered explicit allow ACEs Administrators/SYSTEM FILE_ALL_ACCESS and
+runtime user `sqlite_trading_file_rights()` (0x0012019F), zero flags. Runtime
+DELETE/WRITE_DAC/WRITE_OWNER are absent. Each protected file excludes the root's
+journal-delete inheritance.
+
+Root policy is Administrators-owned and DACL-protected, with Administrators and
+SYSTEM FILE_ALL_ACCESS. Its runtime-effective ACE is exactly 0x001200AB:
+FILE_TRAVERSE, FILE_LIST_DIRECTORY, FILE_ADD_FILE, FILE_READ_EA,
+FILE_READ_ATTRIBUTES, READ_CONTROL, SYNCHRONIZE. It contains no DELETE,
+FILE_DELETE_CHILD, FILE_ADD_SUBDIRECTORY, WRITE_DAC or WRITE_OWNER.
+A distinct runtime ACE has sqlite file rights | DELETE (0x0013019F), flags
+OBJECT_INHERIT_ACE (0x01) | INHERIT_ONLY_ACE (0x08). No CONTAINER_INHERIT_ACE
+is granted. It is ineffective on the root and becomes effective on new child
+files. The shared descriptor builder admits only its prior zero flags or this
+specific 0x09 combination; deny/other inheritance flag combinations still block.
+Constants and behavior use the reviewed AddAccessAllowedAceEx/GetAce helpers and
+[Microsoft ACE inheritance rules](https://learn.microsoft.com/en-us/windows/win32/secauthz/ace-inheritance-rules).
+Protected child files prevent SetSecurityInfo's inheritable-ACE propagation from
+adding journal DELETE rights to existing databases.
+
+CLI accepts exact expected source HEAD/TREE and either `--diagnose` (no elevation,
+no evidence, no expected SID argument) or `--execute` with exact interlock
+`PROVISION_ARCH134_D1_RUNTIME_ACL_FOR_CURRENT_TOKEN`, fresh external `--evidence`
+and explicit `--expected-runtime-sid`. Protected execution first requires an
+already elevated administrator-authorized token and equality with the reviewed
+`resolve_current_token_sid()`. Alternate-administrator elevation blocks. User
+SIDs must have the Windows account SID class S-1-5-21-...; no display-name lookup,
+impersonation, arbitrary-principal grant or self-elevation is supplied.
+Source admission proves exact clean branch/head/tree/origin/cached and live
+remote plus tracked imports from one source root, with no Git optional-lock
+index refresh. The standalone launcher uses the existing absent no-pycache
+namespace and disables bytecode writes/reads from normal ignored caches.
+
+After immediate repeated before-state observation, the only apply order is
+paper.sqlite -> armed-sessions.sqlite -> root LAST. A policy is applied once,
+then checked on the SAME pinned handle with unchanged identity. Before root
+apply, both database DACLs are already protected. Failure before root completion
+therefore leaves the runtime without newly granted journal-create authority.
+After all applies, every handle is deterministically closed once, all three
+targets are freshly reopened, and exact policies/identities are independently
+verified. Already-exact state returns ALREADY_PROVISIONED/PASS with zero applies.
+Any failure after even the first attempted native apply is conservatively
+STOPPED_AFTER_APPLY. Close ambiguity is terminal. No rollback, retry, second
+SetSecurityInfo on a target, deletion, schema write or repair is attempted.
+
+Evidence is exclusively reserved outside source worktrees and F:\AITradingBot,
+validated against redirection, flushed before native work, and fsynced with a
+conservative STOPPED_AFTER_APPLY marker before each attempt. A crash/interrupted
+or missing final publication is incomplete evidence and requires reconciliation.
+Only fixed statuses/result, versioned bounded SHA256 runtime SID digest, apply
+attempt/verified counts and zero non-ACL-effect counters are retained. No raw
+SID, username, ACL dump, arbitrary path or raw native error reaches evidence.
+
+`arch134-production-paper-runtime-acl` is source-only (runner preflight/execute
+None), mapped explicitly to canonical robinhood CI and bootstrapped by the
+existing feature/robinhood-* push family. Exact source/import closure includes
+the native helper's inert reviewed transitive imports, fixed CLI/operator and
+test module; independent AST pins protect target restrictions, token binding,
+masks/order/flags and effect confinement even when a blob pin is refreshed.
+Security mutation remains prohibited in production_paper_runtime.py and
+armed_session_host.py; no provider/network/credential/scheduler/broker or SQLite
+semantic-write authority is added. Current active/profile inventory is
+63/169/94/205/374 (ACTIVE/FULL/ROBINHOOD/LEGACY/EXHAUSTIVE).
+
+After source acceptance the protected operator sequence is diagnosis, separately
+authorized elevated ACL provisioning under the same account, separately
+authorized non-elevated R1 qualification, then separately authorized manual
+session. This checkpoint performs none of those production effects, qualification,
+ARM, scheduler installation, source deployment or broker placement. Native fixed
+root/elevated acceptance and non-elevated real SQLite readiness remain pending.

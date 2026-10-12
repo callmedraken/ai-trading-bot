@@ -866,7 +866,10 @@ def test_registration_source_only_and_authority():
     assert runner._arch134_production_paper_runtime_authority_check(root) == ()
     spec = runner._checkpoint_specs()[runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
     assert spec.preflight is spec.execute is None
-    assert runner.ACTIVE_CI_CHECKPOINTS[-1] == spec.name
+    assert runner.ACTIVE_CI_CHECKPOINTS[-2:] == (
+        spec.name,
+        runner.ARCH134_RUNTIME_ACL_NAME,
+    )
     assert (
         runner.resolve_ci_checkpoint(runner._checkpoint_specs(), host.BRANCH, "push")
         == spec.name

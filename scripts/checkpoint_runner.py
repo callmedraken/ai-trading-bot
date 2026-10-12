@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "3f9bcfa1cd562fa48949c46dab68a31609880d0a4f05bc67246894301e8ac1d9"
+    "9be10678e014f0a7db34338409f89f82be1ec9b05933120e24f3f2d8b25289ff"
 )
 
 ACTIVE_CI_CHECKPOINTS: Final = (
@@ -201,6 +201,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch134-production-strategy-decision",
     "arch134-production-strategy-live-paper",
     "arch134-production-paper-runtime",
+    "arch134-production-paper-runtime-acl",
 )
 
 
@@ -209,6 +210,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 CI_CERTIFICATION_PROFILES: Final = {
     "arch134-armed-paper-mvp": "robinhood",
     "arch134-production-paper-runtime": "robinhood",
+    "arch134-production-paper-runtime-acl": "robinhood",
 }
 CI_CERTIFICATION_PROFILE_VALUES: Final = frozenset({"robinhood", "full"})
 
@@ -3811,7 +3813,7 @@ ARCH133_PUBLICATION_PINS: Final = {
         "5b5bb84080d916d18383657d8d6c2f96e7fa3a47d4e74b137cbe42b5ff7df5d1"
     ),
     "src/trading_bot/runtime/windows_authority_security.py": (
-        "4412b3691d6c7f596ffab6e74d71aef438a653a9c03a21ff5cb6110190c80734"
+        "1b034fc0ca0e066a0a9c8baf67c30415059141744ac0f981b1f35f1366f63f22"
     ),
     "src/trading_bot/runtime/personal_desktop_paper_account_security.py": (
         "8e81affbb85f98f6a6b11e65e9a97f6e66b9113a5aca22080d3fb4183748d95d"
@@ -10056,7 +10058,7 @@ def _arch134_production_strategy_live_paper_authority_check(
         ):
             failures.append("134-C source-only registration drift")
         if (
-            ACTIVE_CI_CHECKPOINTS[-4:-1]
+            ACTIVE_CI_CHECKPOINTS[-5:-2]
             != (
                 ARCH134_PRODUCTION_STRATEGY_NAME,
                 ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
@@ -10323,20 +10325,20 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "a334b1bf1097477b1ff0807a07c81ffc7f7fcffb"
     ),
     "tests/review_paper/test_production_paper_runtime.py": (
-        "ce754781f6bdca68609579b62f35c00a4da4720a"
+        "863f172f271ac87a13d610fce7753b186b699c1d"
     ),
     "tests/review_paper/test_armed_production_paper_session.py": (
         "82cbf0785399afd95e0065160d2a3e43245faaae"
     ),
     "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "92417098a5ec220f061c3c37fe05f9b394758ff5"
+        "43379a9c45810a3fa8832e57aa2a498371217b45"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "a406ff2cd5ca3f68f32aa34f0a26a57aff8f5d53"
+        "45b50d0330553719b59b66aaca94f5c7bbb7eb8d"
     ),
     "tests/runtime/checkpoint_runner/helpers.py": (
-        "7e7be025349267863ac5f31e5ec31d8942a9f27e"
+        "f231582f3912ec619ed78ae1df23c829de69d4c6"
     ),
     "src/trading_bot/review_paper/production_strategy_cycle.py": (
         "3636889acaddf0de0a27e4dc4de0687839c59ee8"
@@ -10501,7 +10503,8 @@ def _arch134_production_paper_runtime_authority_check(
             is not _arch134_production_paper_runtime_authority_check
             or spec.preflight is not None
             or spec.execute is not None
-            or ACTIVE_CI_CHECKPOINTS[-1] != ARCH134_PRODUCTION_PAPER_RUNTIME_NAME
+            or ACTIVE_CI_CHECKPOINTS[-2:]
+            != (ARCH134_PRODUCTION_PAPER_RUNTIME_NAME, ARCH134_RUNTIME_ACL_NAME)
             or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME) != 1
             or CI_CERTIFICATION_PROFILES.get(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME)
             != "robinhood"
@@ -10509,6 +10512,467 @@ def _arch134_production_paper_runtime_authority_check(
             failures.append("134-D1Q registration authority drift")
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         failures.append("134-D1Q authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_RUNTIME_ACL_NAME: Final = "arch134-production-paper-runtime-acl"
+ARCH134_RUNTIME_ACL_SOURCE_PINS: Final = {
+    "src/trading_bot/__init__.py": ("844df369681914646c4bb522bfc2c3fda615cf87"),
+    "src/trading_bot/backtesting/__init__.py": (
+        "8dee77f6ba26af8ee3ef06bf63981fcf3547882c"
+    ),
+    "src/trading_bot/backtesting/engine.py": (
+        "f20a8fa25701f192ee6922c825281c1233f1d722"
+    ),
+    "src/trading_bot/backtesting/exceptions.py": (
+        "439824b66042a5b48e9b6843409dbac8de03716f"
+    ),
+    "src/trading_bot/backtesting/models.py": (
+        "78c5df9ee7d4181974516209962f8655695af26b"
+    ),
+    "src/trading_bot/backtesting/strategy.py": (
+        "686ffe9b0eb0898cf49f0a8e471e2cfba9b85af5"
+    ),
+    "src/trading_bot/config.py": ("2e20646923701f402cd42d71e2b64aeef804f800"),
+    "src/trading_bot/domain/__init__.py": ("646cc3901b3c83af2fbe528ca9b71d9582ad9592"),
+    "src/trading_bot/domain/_validation.py": (
+        "e6949f366e64f8c859b9bb75334f5534adf28aa3"
+    ),
+    "src/trading_bot/domain/enums.py": ("fd15367ec77cb9ac080ee1f40f9397e000b93f7b"),
+    "src/trading_bot/domain/market.py": ("d5e059b78a5a876cf36dd2e9501a1f0321bcc35d"),
+    "src/trading_bot/domain/orders.py": ("4029e1c8d2180b3a35673648339bed84aa2386f7"),
+    "src/trading_bot/domain/positions.py": ("eb992456bfb6da38fd9026ce5d74f9f366397421"),
+    "src/trading_bot/domain/proposals.py": ("4c221e2a9d4f887107cfa15e44fe1b3470eca64a"),
+    "src/trading_bot/execution/__init__.py": (
+        "143f8b481ff01e91f21f242a798ffed19a502183"
+    ),
+    "src/trading_bot/execution/engine.py": ("5c7a916901a4d2e2a35d6b9605995542b6fe004a"),
+    "src/trading_bot/execution/exceptions.py": (
+        "3f3d2836074589da6a6c66af087e9d4e1a35d2e4"
+    ),
+    "src/trading_bot/execution/models.py": ("388895fa3c193f8f7353f4ffa569b4e584f28e27"),
+    "src/trading_bot/execution/paper_fill_application.py": (
+        "1ad41675a1390a6b188620f3ad501a1134d0f47e"
+    ),
+    "src/trading_bot/execution/paper_fills.py": (
+        "f55f1a401411bb35f866e6bdaeed282bc07b642d"
+    ),
+    "src/trading_bot/execution/paper_submission.py": (
+        "f742fa1ccced5eb3a854e8a4566576eacfac16db"
+    ),
+    "src/trading_bot/execution/portfolio_orders.py": (
+        "9ceb187ff61ee902ed4c9f86deed3b96e23eb7bb"
+    ),
+    "src/trading_bot/execution/state_fingerprints.py": (
+        "1570e92c63c14e1c3c1ca7f11283a61720e45af3"
+    ),
+    "src/trading_bot/ledger/__init__.py": ("493bca4924ff88887997b8181042217c28231302"),
+    "src/trading_bot/ledger/checkpoint_state.py": (
+        "ada513596a1d30f68e45be56e2bf47b6bf8ca3c5"
+    ),
+    "src/trading_bot/ledger/exceptions.py": (
+        "5f3d2e439747a6abf22eae473b38173f15fa9dc6"
+    ),
+    "src/trading_bot/ledger/initialization.py": (
+        "e16d146e47a2c3bb7c80311aa0522259a986b50b"
+    ),
+    "src/trading_bot/ledger/ledger.py": ("ba2062cfcc87da65d90a4085bb0597eddfabd145"),
+    "src/trading_bot/ledger/models.py": ("69ee12ba4c73698c5fe6f62f17cc97261941122d"),
+    "src/trading_bot/market_calendar/__init__.py": (
+        "be7457147506cf3bb7cf3719b97546c1f5c3e9b0"
+    ),
+    "src/trading_bot/market_calendar/calendar.py": (
+        "0a9fbf47448eb3e7ae985b35f99f2c3f7568220b"
+    ),
+    "src/trading_bot/market_calendar/exceptions.py": (
+        "7d8950c729ce6bf886bd4aad115d704dc83fa4a9"
+    ),
+    "src/trading_bot/market_calendar/models.py": (
+        "1f09e0015d25651a09c8bc89dcd83d6ad0138d05"
+    ),
+    "src/trading_bot/market_calendar/nyse.py": (
+        "b93a54bb2bb7ecac36cf5a116886c7fdfb2a2038"
+    ),
+    "src/trading_bot/market_data/__init__.py": (
+        "3b5237e5f7a6bbfa34213f48db9aa8dc3f52fe66"
+    ),
+    "src/trading_bot/market_data/alpaca_daily_snapshot.py": (
+        "82e30b6b486915acadb85c95faf538ee9d828451"
+    ),
+    "src/trading_bot/market_data/alpaca_http.py": (
+        "a45037d821460d5fa0bab937f7085250890225d7"
+    ),
+    "src/trading_bot/market_data/csv_provider.py": (
+        "b636804c53a631c2e308b89b15c5dbb51090aa57"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_acceptance.py": (
+        "0c8cbc498a84c90776ccc0bac19877f721921399"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_identity.py": (
+        "80618f77b5ce8e54b817ae8ccc665d717f199425"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_models.py": (
+        "5a194695a558668baef4cc8d4c4b0062d088c580"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_provider.py": (
+        "397de9c14be6297754e49703df117a07222d2f84"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_serialization.py": (
+        "16a707c515179a1c83a6e264912ea25066a41ecf"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_verification.py": (
+        "a913ab3c2fd35a2d111f691b571f28d4d37550cd"
+    ),
+    "src/trading_bot/market_data/exceptions.py": (
+        "ce264675c48e5259cefdd58a319a0858dcef8d4d"
+    ),
+    "src/trading_bot/market_data/fingerprints.py": (
+        "677f8a46910ff8c1892ba0929b0d8fab02b0698d"
+    ),
+    "src/trading_bot/market_data/models.py": (
+        "b7eb7559eed7215e0cc3d917fc0857777093e273"
+    ),
+    "src/trading_bot/market_data/multi_provider.py": (
+        "4357ac2742791e5893a682d77bbcb453e45938bc"
+    ),
+    "src/trading_bot/market_data/provider.py": (
+        "3437be6a4a12e4641b9e75f983bd5e50385767a2"
+    ),
+    "src/trading_bot/portfolio/__init__.py": (
+        "8d0b391158b7837f0d1d4b0f4f1211d5bd11e52d"
+    ),
+    "src/trading_bot/portfolio/exceptions.py": (
+        "ca6743753b2dd7943f15953516068632fe5a7f38"
+    ),
+    "src/trading_bot/portfolio/historical_scenarios.py": (
+        "3a1120f0c0647104a0515dbb85122ada9259039a"
+    ),
+    "src/trading_bot/portfolio/mean_cvar.py": (
+        "4b97df92574797f49a454ee5196ddae29fab1d9d"
+    ),
+    "src/trading_bot/portfolio/models.py": ("3fcf379824ae4b727452aab5966da4363d463a12"),
+    "src/trading_bot/portfolio/optimized_targets.py": (
+        "4c8d617ba8d673ae04d0be70877f7e2d216e0a81"
+    ),
+    "src/trading_bot/portfolio/optimizer.py": (
+        "936ed13a8f42581b46b84ecb252e9e67a6368ad5"
+    ),
+    "src/trading_bot/portfolio/scenarios.py": (
+        "f29c94d5b2714379bca3a3765535d9a7360f03f6"
+    ),
+    "src/trading_bot/rebalancing/__init__.py": (
+        "f504b1e6a076119f05ed6ce7ecd6985004531d17"
+    ),
+    "src/trading_bot/rebalancing/exceptions.py": (
+        "124fd80fb06c477492f7b8126689899d39c890a6"
+    ),
+    "src/trading_bot/rebalancing/models.py": (
+        "b1db577d886f83670e258e3ed5d3624b5b6a4865"
+    ),
+    "src/trading_bot/rebalancing/planner.py": (
+        "659e3ab58cae4c74893660c715fd4e068ea34916"
+    ),
+    "src/trading_bot/rebalancing/proposals.py": (
+        "72c3f5aacbab25c117528e5f16ed25613dc564a6"
+    ),
+    "src/trading_bot/review_paper/__init__.py": (
+        "729418b848745fa32e43e8ed5dff108ecf545e2b"
+    ),
+    "src/trading_bot/review_paper/intent_bridge.py": (
+        "ad732415540c6cba376e1ebfacefc4cf5d724eb2"
+    ),
+    "src/trading_bot/review_paper/models.py": (
+        "e7d725c601b8a5ff16b0fffda4c31bace77f1e0a"
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "a3e47fba3edff57c027181e985d72a17219393d3"
+    ),
+    "src/trading_bot/review_paper/risk_context.py": (
+        "05cce6037f8550a688474697a779a3655a323aa7"
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "c9875c20ec6d6b1fc788dd6649fe419aeae8fed8"
+    ),
+    "src/trading_bot/risk/__init__.py": ("2b38b6c92b0b7e2604340d56e63f91656da10f5a"),
+    "src/trading_bot/risk/exceptions.py": ("e96140eb7c16c5164d36ee35efab600ef07db68e"),
+    "src/trading_bot/risk/manager.py": ("0a13fcd15de2d46b7f76172f0f2ab541c2aa1e06"),
+    "src/trading_bot/risk/models.py": ("29f3a0294e3d29029d62d8722db18fb315be64cc"),
+    "src/trading_bot/risk/orchestration.py": (
+        "f8aefdfbcbce09c50b687d0fcd7757fd51e5258c"
+    ),
+    "src/trading_bot/runtime/__init__.py": ("cbe6afa3bc006f1dc609985ef2dccf0198bbbfab"),
+    "src/trading_bot/runtime/checkpointed_paper_cycle_report.py": (
+        "01b37772312548d6859db99b5642701e1d8a9b37"
+    ),
+    "src/trading_bot/runtime/checkpointed_verified_snapshot_execution.py": (
+        "55cad09ab18c08e37b6d5fc47d0ca4cb04afdc7e"
+    ),
+    "src/trading_bot/runtime/exceptions.py": (
+        "403c827c38e2449fd8e1c17ee6a64bfef3a80dc9"
+    ),
+    "src/trading_bot/runtime/manual_paper_selected_c3_snapshot.py": (
+        "4354c9cc0c6ec11f86e9894b8aeeb4c635a7b519"
+    ),
+    "src/trading_bot/runtime/manual_paper_strategy_plan.py": (
+        "9692d39ece0d15d3da6ca83dd8a5f4b994510b12"
+    ),
+    "src/trading_bot/runtime/paper_account_checkpoint.py": (
+        "5d6e383b4afa29945027e745ff14803c52ba653b"
+    ),
+    "src/trading_bot/runtime/paper_account_lineage_verification.py": (
+        "f05aff9cea8da0cec7c517b938fc3be40f423ac1"
+    ),
+    "src/trading_bot/runtime/paper_account_successor_checkpoint.py": (
+        "28822688addcf3346ebaafd31cc69038fffdd7ca"
+    ),
+    "src/trading_bot/runtime/paper_operation.py": (
+        "616132888c03838ff0cd751a929b952c3c43043a"
+    ),
+    "src/trading_bot/runtime/paper_operation_execution_inputs.py": (
+        "8f924181ca2725618c00b5dd72c11db8f9393abb"
+    ),
+    "src/trading_bot/runtime/paper_portfolio.py": (
+        "da21260d8c5956f94bf3e86ab994005603cd4e16"
+    ),
+    "src/trading_bot/runtime/personal_desktop_paper_account_security.py": (
+        "5604b89bf038e772518ab757ceec683c92f54711"
+    ),
+    "src/trading_bot/runtime/personal_desktop_paper_account_token.py": (
+        "bbcb246e65065978e3bbdacb6f504aed8eebe21a"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_c3_history.py": (
+        "c217ae6ea4bb7b5a748cb992cb0b69fb0a0dc301"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_daily_cycle_timing.py": (
+        "797a33afd451cb06f403af7d7d5c8d405084d2c9"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_market_data_capture.py": (
+        "48102d1ff82daf8a126d3cf49ac320bec7bdc6f4"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_paper_decision_intent.py": (
+        "c22a069a286ed86b1dbb58e4060c00a0c6af983c"
+    ),
+    (
+        "src/trading_bot/runtime/"
+        "personal_desktop_unattended_paper_decision_publication.py"
+    ): ("3d6ac4267dfe797322ec912891bee1d501808dd3"),
+    ("src/trading_bot/runtime/personal_desktop_unattended_paper_decision_storage.py"): (
+        "e74c1e389ab29aecf2208ba0fbad65941b91bf54"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_paper_invocation.py": (
+        "7c4d8ebc51e906821e52e84028ec37f9cfb5453d"
+    ),
+    (
+        "src/trading_bot/runtime/"
+        "personal_desktop_unattended_paper_invocation_storage.py"
+    ): ("a184158bcdde09ce0ea0f7aa9cdc5a31693535b5"),
+    "src/trading_bot/runtime/personal_desktop_unattended_scheduler_contract.py": (
+        "292b6abab453167f9803b70d7c9f0af86cbc5876"
+    ),
+    "src/trading_bot/runtime/schema/__init__.py": (
+        "0aa21da6aa4ae5b8c6d1be2a3387a3f10a9711ed"
+    ),
+    "src/trading_bot/runtime/strategy_history_seed.py": (
+        "6cc0670b169ed9afa430a8de87f36f2dd79fc695"
+    ),
+    "src/trading_bot/runtime/verified_c3_daily_bar_open.py": (
+        "13653e1664e2213a124a43253508080b8a9b06ef"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_execution.py": (
+        "278e136c99823b542de4dc36a92fcfc1e62a4447"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_preparation.py": (
+        "663ab5b16fe67f9c118f73c07286f5f52d168946"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_serialization.py": (
+        "8243342acaedf9fa5d96ef1f897b31bf4e166b2d"
+    ),
+    "src/trading_bot/runtime/windows_authority.py": (
+        "ad2b219ec4953013617c2411e6ae736e9683e898"
+    ),
+    "src/trading_bot/runtime/windows_authority_mutex.py": (
+        "aa60edd9d19a0c31038fd27ffd618366f637402d"
+    ),
+    "src/trading_bot/runtime/windows_authority_schema.py": (
+        "c28ab9ba03964d9183153fee3d8523ce882ca4d1"
+    ),
+    "src/trading_bot/runtime/windows_authority_security.py": (
+        "8bb65aaee828314f3f4dc07b5d61f38c5bdea58e"
+    ),
+    "src/trading_bot/runtime/windows_authority_sqlite.py": (
+        "6f557dbfb609288d16c74925dff5cd10220ffcdb"
+    ),
+    "src/trading_bot/runtime/windows_authority_validation.py": (
+        "c4b72121b838f49749d623c8e2c2e37bce81e825"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture.py": (
+        "637145e8bb2e1b763f3852cd819a1cd7e1880ef4"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_native.py": (
+        "f4d2ea972f60f4d39f059e6d6103965cc21b72d1"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_protocol.py": (
+        "29a973aab22afeddae45454d66e8a25347b91951"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_service.py": (
+        "44a09790af565f434f7325e9015b208aa0267a07"
+    ),
+    "src/trading_bot/runtime/windows_transactional_authority.py": (
+        "a7aa0bdf441466702ad7ef26fcb00bd904b2d35c"
+    ),
+    "src/trading_bot/strategies/__init__.py": (
+        "ce050824fd1e7dfb86a08f4ad15a607016d1afe2"
+    ),
+    "src/trading_bot/strategies/daily_decision.py": (
+        "8df232b80047d913d43814e193d7a2788fc27116"
+    ),
+    "src/trading_bot/strategies/exceptions.py": (
+        "180194bf44df19563f9586e314c437f60206241c"
+    ),
+    "src/trading_bot/strategies/history_seed.py": (
+        "b20e41206c3d6d2e8eca6cbbd0dfef2e701b3177"
+    ),
+    "src/trading_bot/strategies/moving_average.py": (
+        "2ce246a1305bf4514ee26bcb5113207e56f95cf8"
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "9a890b523f4c330b5284271a51bcca34331bdf56"
+    ),
+    "tests/review_paper/test_production_paper_runtime_acl.py": (
+        "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+    ),
+}
+ARCH134_RUNTIME_ACL_IMPORTS: Final = {
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "re",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.runtime.windows_authority_security",
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.production_paper_runtime_acl",
+    ),
+}
+ARCH134_RUNTIME_ACL_AST_PINS: Final = {
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "39c5c8cd080d3328ee1ede03ec114893ff5acfa58f08e649ae2c9ae001225c0f"
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "6d645af95e4500c581b5b42d3f7fc9ab680dd6d8645590b7b2fb4c8cfe5d8073"
+    ),
+    "src/trading_bot/runtime/windows_authority_security.py": (
+        "1b034fc0ca0e066a0a9c8baf67c30415059141744ac0f981b1f35f1366f63f22"
+    ),
+}
+ARCH134_RUNTIME_ACL_TESTS: Final = (
+    "tests/review_paper/test_production_paper_runtime_acl.py",
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+ARCH134_RUNTIME_ACL_RUFF_PATHS: Final = (
+    *ARCH134_RUNTIME_ACL_SOURCE_PINS,
+    *ARCH134_RUNTIME_ACL_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_runtime_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """R2 is isolated: exact closure plus independent structural policy pins."""
+    failures: list[str] = []
+    forbidden = {
+        "icacls",
+        "takeown",
+        "wmic",
+        "chmod",
+        "chown",
+        "walk",
+        "rglob",
+        "SetNamedSecurityInfoW",
+        "SetFileSecurityW",
+        "register_task",
+        "schtasks",
+        "CredWriteW",
+        "CredDeleteW",
+        "call_tool",
+        "place_equity_order",
+        "cancel_equity_order",
+        "connect",
+        "urlopen",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+        "environ",
+        "getenv",
+    }
+    try:
+        for relative, pin in ARCH134_RUNTIME_ACL_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-D1Q-R2 source drift: " + relative)
+            if relative not in ARCH134_RUNTIME_ACL_IMPORTS:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(ARCH134_RUNTIME_ACL_IMPORTS[relative]):
+                failures.append("134-D1Q-R2 import closure drift: " + relative)
+            names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} | {
+                n.id for n in ast.walk(tree) if isinstance(n, ast.Name)
+            }
+            if names & forbidden:
+                failures.append("134-D1Q-R2 forbidden authority: " + relative)
+        for relative, pin in ARCH134_RUNTIME_ACL_AST_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("134-D1Q-R2 structural authority drift: " + relative)
+        # Keep R1 security mutation prohibitions and accepted executable pins intact.
+        failures.extend(_arch134_production_paper_runtime_authority_check(repo_root))
+        spec = _checkpoint_specs()[ARCH134_RUNTIME_ACL_NAME]
+        if (
+            spec.tests != ARCH134_RUNTIME_ACL_TESTS
+            or spec.ruff_paths != ARCH134_RUNTIME_ACL_RUFF_PATHS
+            or spec.remote_branch != "feature/robinhood-production-paper-runtime-acl"
+            or spec.authority_check is not _arch134_runtime_acl_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS[-1] != ARCH134_RUNTIME_ACL_NAME
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_RUNTIME_ACL_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_RUNTIME_ACL_NAME) != "robinhood"
+        ):
+            failures.append("134-D1Q-R2 registration authority drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-D1Q-R2 workflow drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1Q-R2 authority unavailable")
     return tuple(failures)
 
 
@@ -10625,6 +11089,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_RUNTIME_ACL_NAME: CheckpointSpec(
+            name=ARCH134_RUNTIME_ACL_NAME,
+            description=(
+                "Architecture 134-D1Q-R2 fixed runtime principal ACL source only"
+            ),
+            tests=ARCH134_RUNTIME_ACL_TESTS,
+            ruff_paths=ARCH134_RUNTIME_ACL_RUFF_PATHS,
+            authority_check=_arch134_runtime_acl_authority_check,
+            remote_branch="feature/robinhood-production-paper-runtime-acl",
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: CheckpointSpec(
             name=ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
             description="Architecture 134-D1Q fixed runtime and credential readiness",

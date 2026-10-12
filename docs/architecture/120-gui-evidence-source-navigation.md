@@ -1,5 +1,12 @@
 # Architecture 120 — GUI-A13 Read-Only Evidence -> Source Page Navigation
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A13 architecture contract.
@@ -38,6 +45,7 @@ EvidenceTimelineSource.PAPER_OPERATION -> paper
 EvidenceTimelineSource.PAPER_ACCOUNT   -> paper-account
 EvidenceTimelineSource.MARKET_DATA     -> market-data
 EvidenceTimelineSource.OPERATIONS      -> operations
+EvidenceTimelineSource.RUNTIME         -> runtime
 ```
 
 No fuzzy inference or fallback destination is permitted.
@@ -52,7 +60,7 @@ EvidenceSourcePageTarget:
   page_id: EvidenceSourcePage
 ```
 
-where `EvidenceSourcePage` is a closed enum whose values are the five page IDs
+where `EvidenceSourcePage` is a closed enum whose values are the six page IDs
 above.
 
 Requirements:
@@ -134,7 +142,7 @@ Focused tests must prove:
 4. each rendered evidence card has one source-navigation control;
 5. clicking Research evidence selects the Research page;
 6. clicking Market Data evidence selects the Market Data page;
-7. service call count remains exactly six;
+7. service call count remains exactly seven;
 8. existing A11 filtering remains intact;
 9. existing A12 System -> Evidence exact targeting remains intact;
 10. navigation introduces no runtime I/O/effect control;

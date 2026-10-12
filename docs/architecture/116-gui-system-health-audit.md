@@ -1,5 +1,12 @@
 # Architecture 116 — GUI-A9 Read-Only System Health and Audit
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A9 architecture contract.
@@ -18,7 +25,7 @@ Give the operator one consolidated read-only view of:
 
 - the local GUI environment/mode;
 - the presentation availability of Research, Paper Operation, Paper Account,
-  Market Data, and Operations;
+  Market Data, Operations, and Runtime;
 - bounded audit identities already present in those page states;
 - whether any presented component is explicitly blocked.
 
@@ -52,6 +59,7 @@ PaperPageState
 PaperAccountPageState
 MarketDataPageState
 OperatorOperationsPageState
+RuntimePageState
 ```
 
 It must not accept:
@@ -144,6 +152,10 @@ Operations:
 The adapter must not reinterpret domain/runtime state that is not already
 present in the GUI models.
 
+Runtime: UNAVAILABLE -> UNAVAILABLE (neutral); AVAILABLE -> AVAILABLE;
+ATTENTION -> BLOCKED and overall ATTENTION. Only bounded HEAD/tree, principal
+digest and session contract/operation IDs may be copied.
+
 ## Audit entries
 
 GUI-A9 may copy only identities/evidence already exposed by existing
@@ -207,6 +219,8 @@ paper
 paper-account
 market-data
 operations
+runtime
+evidence
 system
 ```
 

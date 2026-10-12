@@ -1,5 +1,27 @@
 # AI Development and Review Workflow
 
+## Standing authorization for reviewed next steps — current normative rule
+
+Reviewed next-step actions are implicitly authorized by default within their
+exact described scope. ChatGPT must not insert an authorization-only turn to
+obtain a one-word approval for a bounded action it already reviewed and presented.
+For a supplied local command, the user's decision to execute it constitutes
+authorization for exactly its described effects and bounds. The user withholds
+authorization by not executing it and calling it out for manual review.
+
+This does not broaden a command, authorize unexpected effects or ambiguous/
+partial-state repair, permit automatic retry after ambiguity/partially consumed
+effects, override real-money NO-GO, or turn source/commit authority into merge,
+rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
+Protected source/effect separation, prerequisite checks and reviewed interlocks
+remain mandatory. Source or preflight PASS alone grants no effect authority.
+
+After a successful checkpoint, automatically include and proceed to the next
+reviewed safe step within scope. A separate new authorization message is not
+universally required for reviewed bounded operator actions. Historical accounts
+of separate authorization remain historical and do not override this current rule.
+
 ## CI-owned selected certification — normative expedited path
 
 For reviewed coherent integration checkpoints, the source gate may own the
@@ -140,8 +162,9 @@ should state, when applicable:
 The user should not need a follow-up merely to ask what to do next, which model
 to use, what command to run, what output to send back, or whether the checkpoint
 is ready to advance. If the next action crosses a protected effect boundary,
-provide the safe preflight/readiness material and stop at the authorization
-boundary rather than presenting the effectful command as ordinary verification.
+provide safe preflight/readiness material and state exact reviewed effect
+bounds. The user's execution authorizes only those bounds under the standing
+rule; never present a protected effect as ordinary verification.
 
 ## Supervised release and unattended-runtime invariant
 
@@ -231,10 +254,13 @@ After every accepted checkpoint, ChatGPT must automatically:
 5. continue automatically into the next safe docs-only, source-only,
    design-only, or read-only checkpoint when no protected approval boundary is
    crossed; and
-6. stop at the exact approval boundary for production/provider effects,
+6. enforce the exact reviewed approval boundary for production/provider effects,
    provisioning, scheduler mutation, merge/rebase/amend/force-push, PR metadata
    or review-thread changes, broker/live effects, or another explicitly
-   protected action.
+   protected action. For a reviewed bounded local command, the user's decision
+   to execute it supplies approval for that exact boundary under the standing
+   rule above; no additional authorization-only message is required. Keep all
+   prerequisites, interlocks and STOP/reconciliation conditions intact.
 
 If one of the two canonical status/handoff documents requires no material edit,
 ChatGPT should explicitly report that it was reviewed and remains current.
@@ -621,7 +647,7 @@ is selected for unchanged source at a boundary where ROBINHOOD would otherwise
 also apply, FULL's strict superset coverage satisfies that narrower Robinhood
 source-certification obligation. Do not run ROBINHOOD and then FULL merely
 because both trigger descriptions apply. LEGACY/EXHAUSTIVE remain exceptional
-compatibility gates. PROTECTED always requires separate fresh authorization;
+compatibility gates. PROTECTED requires reviewed bounded authorization under the standing rule;
 no source certification grants it.
 
 #### 5. Latest audited current-product certification topology
@@ -715,7 +741,7 @@ FOCUSED -> SOURCE-GATE CI
 -> ChatGPT selects ROBINHOOD or FULL for the required boundary
    (FULL covers the narrower ROBINHOOD source obligation)
 -> LEGACY/EXHAUSTIVE only for explicitly relevant compatibility
-PROTECTED always separately authorized
+PROTECTED authorized within the exact reviewed bounds under the standing rule
 ```
 
 | Level | Trigger and responsibility |
@@ -725,7 +751,7 @@ PROTECTED always separately authorized
 | ROBINHOOD | ChatGPT-declared coherent Architecture 131 integration boundary; before protected Robinhood qualification; after material changes to shared domain/execution/ledger/risk foundations used by Architecture 131. |
 | FULL | Comprehensive CURRENTLY SUPPORTED product certification: after certification-topology changes; at coherent current-product boundaries; before major develop/release integration or consequential production/live-readiness transitions; after sufficiently broad supported shared-core changes; or when ChatGPT determines accumulated checkpoints warrant current-product regression. |
 | LEGACY / EXHAUSTIVE | Only when explicitly relevant: legacy architecture changes, interpreter/dependency migrations spanning both eras, broad repository restructuring, deliberate legacy removal, or explicit backward compatibility investigation. |
-| PROTECTED | Always separate fresh authorization at the exact effect boundary. |
+| PROTECTED | Fresh approval at the exact reviewed effect boundary; user execution of the reviewed bounded command supplies that approval under the standing rule. All interlocks and STOP conditions remain mandatory. |
 
 FULL remains the default and is not mechanically tied to every accepted source
 checkpoint or Architecture 131 letter. FULL now means all CURRENTLY SUPPORTED
@@ -820,7 +846,7 @@ launching pytest or static checks for any profile.
 
 No profile grants native Windows acceptance opt-ins, provider access, Robinhood
 calls, OAuth interaction, broker effects, or production effects. PROTECTED
-remains separate and always needs fresh authorization. Architecture 132-R1
+remains separate and needs reviewed bounded authorization under the standing rule. Architecture 132-R1
 implementation runs only focused checks; actual certification requires the
 subsequent exact GitHub review and ChatGPT's gate decision.
 
@@ -1153,8 +1179,10 @@ operations use the runner's registered `preflight` layer and, only where
 separately source-reviewed, checkpoint-specific protected `execute` dispatches.
 The current protected dispatches are limited to
 `arch128-parent-acl-repair` and `arch128-r4`. A source or preflight PASS never
-grants protected production authority; a fresh explicit approval and the exact
-reviewed authorization interlock remain mandatory.
+grants protected production authority; fresh approval within the exact reviewed
+bounds under the standing rule and the exact reviewed authorization interlock
+remain mandatory. For a reviewed bounded local command, the user's decision to
+execute supplies that approval; all effect gates and STOP conditions remain.
 
 Checkpoint evidence is external to the repository. The preferred development
 host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner

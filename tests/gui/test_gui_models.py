@@ -26,6 +26,7 @@ def test_mock_service_returns_deterministic_overview() -> None:
         "market-data",
         "operations",
         "evidence",
+        "runtime",
         "system",
     )
     assert first.components[2].status is PresentationStatus.UNAVAILABLE

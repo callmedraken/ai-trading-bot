@@ -1,5 +1,12 @@
 # GUI-A9 Read-Only System Health and Audit Validation Plan
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## 1. Purpose
 
 Validate Architecture 116,
@@ -46,6 +53,10 @@ Operations UNAVAILABLE                UNAVAILABLE
 Operations AVAILABLE + all gates shut AVAILABLE
 Operations blocked preview            BLOCKED
 Operations any displayed gate open    BLOCKED
+
+Runtime UNAVAILABLE                   UNAVAILABLE
+Runtime AVAILABLE                     AVAILABLE
+Runtime ATTENTION                     BLOCKED
 ```
 
 Overall status is `ATTENTION` only when at least one component is BLOCKED.

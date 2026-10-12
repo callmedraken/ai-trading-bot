@@ -1,5 +1,12 @@
 # Architecture 119 — GUI-A12 Read-Only System / Evidence Cross-Navigation
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A12 architecture contract.
@@ -24,14 +31,14 @@ authority, readiness, settlement status, or execution permission.
 ## Existing inputs
 
 A12 may use only the already-built objects that `MainWindow` constructs from
-its existing six service reads:
+its existing seven service reads:
 
 ```text
 SystemHealthPageState
 EvidenceTimelinePageState
 ```
 
-No seventh service read is permitted.
+No eighth service read is permitted.
 
 ## Closed source mapping
 
@@ -43,6 +50,7 @@ Paper Operation -> EvidenceTimelineSource.PAPER_OPERATION
 Paper Account   -> EvidenceTimelineSource.PAPER_ACCOUNT
 Market Data     -> EvidenceTimelineSource.MARKET_DATA
 Operations      -> EvidenceTimelineSource.OPERATIONS
+Runtime         -> EvidenceTimelineSource.RUNTIME
 ```
 
 No fuzzy source inference is permitted.

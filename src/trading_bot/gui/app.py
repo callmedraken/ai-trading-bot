@@ -51,10 +51,16 @@ def _parse_startup_arguments(
     parser.add_argument("--paper-account-successor", type=Path)
     parser.add_argument("--paper-account-successor-sha256")
     parser.add_argument("--paper-account-successor-byte-length", type=int)
+    parser.add_argument("--runtime-acl-evidence", type=Path)
+    parser.add_argument("--runtime-qualification-evidence", type=Path)
+    parser.add_argument("--runtime-session-evidence", type=Path)
 
     arguments, qt_arguments = parser.parse_known_args(argv)
     try:
         config = GuiStartupConfiguration(
+            runtime_acl_evidence=arguments.runtime_acl_evidence,
+            runtime_qualification_evidence=arguments.runtime_qualification_evidence,
+            runtime_session_evidence=arguments.runtime_session_evidence,
             research_report=arguments.research_report,
             market_data_snapshot=arguments.market_data_snapshot,
             market_data_expected_sha256=arguments.market_data_sha256,

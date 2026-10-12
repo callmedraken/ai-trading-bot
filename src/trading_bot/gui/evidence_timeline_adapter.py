@@ -21,6 +21,7 @@ from trading_bot.gui.paper_account_models import (
     PaperAccountPageStatus,
 )
 from trading_bot.gui.paper_models import PaperPageState, PaperPageStatus
+from trading_bot.gui.runtime_models import RuntimePageState
 
 
 def build_evidence_timeline_state(
@@ -29,6 +30,7 @@ def build_evidence_timeline_state(
     paper_account: PaperAccountPageState,
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
+    runtime: RuntimePageState,
 ) -> EvidenceTimelinePageState:
     """Build a deterministic timeline without I/O, discovery, or service rereads."""
     expected = (
@@ -37,6 +39,7 @@ def build_evidence_timeline_state(
         (paper_account, PaperAccountPageState, "paper_account"),
         (market_data, MarketDataPageState, "market_data"),
         (operations, OperatorOperationsPageState, "operations"),
+        (runtime, RuntimePageState, "runtime"),
     )
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
@@ -48,6 +51,7 @@ def build_evidence_timeline_state(
         *_paper_account_entries(paper_account),
         *_market_data_entries(market_data),
         *_operations_entries(operations),
+        *_runtime_entries(runtime),
     )
     timed = [entry for entry in entries if entry.occurred_at is not None]
     untimed = [entry for entry in entries if entry.occurred_at is None]
@@ -210,6 +214,52 @@ def _operations_entries(
                     f"Paper account {state.account.paper_account_id}; sequence "
                     f"{state.account.sequence}; bounded Operations presentation."
                 ),
+            )
+        )
+    return tuple(entries)
+
+
+def _runtime_entries(state: RuntimePageState) -> tuple[EvidenceTimelineEntry, ...]:
+    entries: list[EvidenceTimelineEntry] = []
+    if state.acl is not None:
+        acl = state.acl
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "Runtime ACL evidence",
+                acl.runtime_sid_digest or "production-paper-runtime-acl/v1",
+                None,
+                None,
+                f"Recorded {acl.status.value} / {acl.result.value}. {state.message}",
+            )
+        )
+    if state.qualification is not None:
+        qualification = state.qualification
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "Runtime qualification evidence",
+                qualification.source_head,
+                None,
+                None,
+                f"Recorded {qualification.status.value}; "
+                f"TREE {qualification.source_tree}. "
+                f"Not fresh production authority. {state.message}",
+            )
+        )
+    if state.session is not None:
+        session = state.session
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "D1 session evidence",
+                str(session.operation_id),
+                session.admitted_at or session.wait_started_at,
+                None,
+                f"Recorded {session.status.value}; "
+                f"target {session.target_session.isoformat()}; "
+                f"HEAD {session.source_head}; TREE {session.source_tree}; "
+                f"contract {session.contract_id}. {state.message}",
             )
         )
     return tuple(entries)

@@ -1,5 +1,12 @@
 # GUI-A13 Read-Only Evidence -> Source Page Navigation Validation Plan
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Purpose
 
 Validate Architecture 120,
@@ -14,7 +21,7 @@ Add the Qt-free closed source-page enum/target and mapper.
 Verify:
 
 - exact enum validation;
-- exact closed mapping for all five Evidence sources;
+- exact closed mapping for all six Evidence sources;
 - mismatched source/page pairs fail explicitly;
 - target retains no identifier/hash/path/runtime object;
 - mapper performs no I/O.
@@ -42,7 +49,8 @@ Verify:
 - Paper Account target selects `paper-account`;
 - Market Data target selects `market-data`;
 - Operations target selects `operations`;
-- service call count remains exactly six.
+- Runtime target selects `runtime` without any evidence reread;
+- service call count remains exactly seven.
 
 Do not add destination-page rereads or exact-row-selection claims.
 

@@ -1,5 +1,12 @@
 # Architecture 118 — GUI-A11 Read-Only Evidence Explorer
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A11 architecture contract.
@@ -32,7 +39,7 @@ mutate, settle, recover, execute, or authorize anything.
 The allowed flow is:
 
 ```text
-existing six GuiApplicationService reads
+existing seven GuiApplicationService reads
   -> existing EvidenceTimelinePageState
   -> EvidenceTimelineFilter
   -> filter_evidence_timeline_entries(...)

@@ -1,5 +1,12 @@
 # Architecture 117 — GUI-A10 Read-Only Evidence Timeline
 
+Current GUI-A14 extension: Runtime is an already-acquired presentation
+source. MainWindow now performs seven service reads once, including
+get_runtime_state(); System/Evidence/navigation add zero reads. Runtime
+maps to the closed RUNTIME evidence source and runtime source page.
+See Architecture 135 for the explicit evidence-only boundary. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A10 architecture contract.
@@ -29,7 +36,7 @@ The allowed flow is:
 
 ```text
 existing GuiApplicationService
-  -> MainWindow performs the existing six state reads once
+  -> MainWindow performs the existing seven state reads once
   -> build_evidence_timeline_state(...)
   -> immutable EvidenceTimelinePageState
   -> EvidenceTimelinePage
@@ -49,6 +56,7 @@ PaperPageState
 PaperAccountPageState
 MarketDataPageState
 OperatorOperationsPageState
+RuntimePageState
 ```
 
 It must not accept paths, credentials, runtime authority objects, provider
@@ -65,6 +73,7 @@ EvidenceTimelineSource:
   PAPER_ACCOUNT
   MARKET_DATA
   OPERATIONS
+  RUNTIME
 
 EvidenceTimelineEntry:
   source

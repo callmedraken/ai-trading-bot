@@ -1,5 +1,87 @@
 # Architecture 134 — Production strategy and AI-research authority
 
+## 2026-10-12 — Current D1Q-R2 operational state / GUI-A14 checkpoint
+
+This current entry supersedes pending/failed R2 wording in the dated historical
+entries below. Architecture 134-D1Q-R2 source is accepted on
+`feature/robinhood-production-paper-runtime-acl`:
+
+```text
+HEAD 2f122958366d1db282fea51abbd461b83fa893d9
+TREE c3fb82add37bdbea12ebad9836ca10000b924fe1
+CI #504 / 38305872664 SUCCESS
+ROBINHOOD 8644 cases / 8643 passed / 1 skipped / 0 failed / 0 errors
+wall 222.459 s
+```
+
+The accepted protected ACL operation recorded PROVISIONED / PASS, three apply
+attempts and three verified applies. Parent, recursive, credential, provider,
+paper, session, scheduler and broker mutation/call counts were all zero.
+Independent non-elevated postcheck recorded ALREADY_PROVISIONED / PASS.
+
+Hardened D1Q-R1 qualification remains bound to the unchanged runtime source:
+HEAD `6bf8753b0cc8950ae27b32b6858b64d454c512f0`, TREE
+`ce3feb2ac48e7aebc23970142aafed5059c447e7`. Read-only preflight recorded
+PRESENT_COMPATIBLE, paper_records=0 and session_reservations=0. Protected
+qualification recorded READY_FOR_MANUAL_PAPER_SESSION,
+runtime_status=ALREADY_PROVISIONED, both paper/session-store write readiness
+WRITE_READY, alpaca_credential_reads=2, robinhood_credential_reads=2 and
+persisted_oauth_available=true. Alpaca HTTP calls, Robinhood application calls,
+paper trade mutations, scheduler mutations and broker mutations were all zero.
+
+Current operator authorization follows the standing reviewed-bounds rule in
+AGENTS.md and AI_DEVELOPMENT_WORKFLOW.md, with all prerequisite/interlock and
+STOP/reconciliation conditions retained. Older separate-message narratives do
+not impose another authorization-only turn for a reviewed bounded command.
+
+These are accepted recorded operational facts supplied for serialization, not
+new qualification performed by GUI-A14. No real evidence is read by source
+tests. The first D1 manual production-paper session remains the next operational
+proving step and has not been accepted. B3Q remains consumed/no-retry.
+Real-money broker placement remains **NO-GO**.
+
+GUI-A14 is implemented on `feature/gui-production-runtime-status` from the
+exact R2 parent above, in
+`F:\AI\worktrees\ai-trading-bot-gui-production-runtime-status`. It presents only
+explicit ACL/qualification/session JSON through bounded immutable GUI models.
+Runtime, System and Evidence navigation add zero reads. Complete real-PySide6
+offscreen GUI verification passes; exact results are in
+`docs/validation/gui-a14-production-runtime-status.md`. Accepted R1/R2 execution
+source, source pins and branches are unchanged. GUI source acceptance is pending.
+
+The user selected a local-only checkpoint because the required pre-push CI
+bootstrap is unresolved. One normal local commit is authorized; no push or
+R1/R2 authority change is authorized by that choice. ChatGPT owns the next
+bounded bootstrap decision and exact source review. A missing workflow run is
+not PASS. Do not duplicate local ROBINHOOD/FULL certification for this GUI.
+
+### Current D2 end-state — ON/OFF, arbitrary-time startup
+
+This standing design supersedes any current D2 requirement to wake a sleeping
+PC. The PC is either ON or OFF and is never intentionally asleep while bot
+operation is expected. D2 must not require WakeToRun, wake timers, sleep-resume
+state or wake-from-sleep qualification. This is a design serialization only;
+GUI-A14 adds no D2 executable behavior.
+
+PC OFF: the bot is not running. PC ON: a runtime supervisor runs/reconciles,
+deriving legal state from current authoritative time, published market-session
+authority and durable state. Arbitrary-time startup is required. Conceptual
+trading states are RECONCILE, PREMARKET_WAIT, TRADING, NEXT_SESSION_WAIT and
+BLOCKED; exact names can be frozen later.
+
+Startup during an admitted session qualifies/reconciles and trades only if
+otherwise permitted. Startup before a published session waits for admission;
+startup after today's session, on weekends or holidays resolves the next
+published session and waits instead of terminating on an expired date. Restart
+recomputes current reality from time/durable state and never trusts an old sleep
+duration. Task Scheduler, if retained, supplies only automatic start/restart
+while the PC is ON, never wake authority or trading-session authority.
+
+The AI research/strategy-testing plane remains operational while the overall
+process runs, independently of trading-plane waiting/admission. Research
+candidates never silently replace the production strategy. Promotion remains
+versioned, reviewed and certified. Manual D1 proving still precedes D2 effects.
+
 ## 2026-10-11 — Architecture 134-C CERTIFIED/CLOSED
 
 Architecture **134-C — Human-started production live-paper cycle** is
@@ -789,8 +871,8 @@ Registration is arch134-armed-paper-mvp on
 feature/robinhood-production-paper-mvp; preflight/execute remain None. D1 is
 inserted before the frozen final 134-A/B/C batch tail, preserving those exact
 assertions. The existing reviewed feature/robinhood-* trigger provides first-push
-bootstrap. The next planned source checkpoint is 134-D2 Task Scheduler wiring
-with unchanged semantic inputs, not scheduler installation in D1. Protected
+bootstrap. D2 now follows the ON/OFF supervisor end-state frozen above, with
+arbitrary-time startup and no wake-from-sleep requirement. Protected
 credential/runtime/manual-session acceptance precedes any scheduled effect.
 
 

@@ -1,5 +1,27 @@
 # AI Trading Bot Development Rules
 
+## Standing authorization for reviewed next steps — current normative rule
+
+Reviewed next-step actions are implicitly authorized by default within their
+exact described scope. ChatGPT must not insert an authorization-only turn to
+obtain a one-word approval for a bounded action it already reviewed and presented.
+For a supplied local command, the user's decision to execute it constitutes
+authorization for exactly its described effects and bounds. The user withholds
+authorization by not executing it and calling it out for manual review.
+
+This does not broaden a command, authorize unexpected effects or ambiguous/
+partial-state repair, permit automatic retry after ambiguity/partially consumed
+effects, override real-money NO-GO, or turn source/commit authority into merge,
+rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
+Protected source/effect separation, prerequisite checks and reviewed interlocks
+remain mandatory. Source or preflight PASS alone grants no effect authority.
+
+After a successful checkpoint, automatically include and proceed to the next
+reviewed safe step within scope. A separate new authorization message is not
+universally required for reviewed bounded operator actions. Historical accounts
+of separate authorization remain historical and do not override this current rule.
+
 ## Project purpose
 
 Build a conservative algorithmic trading platform that progresses through
@@ -154,7 +176,7 @@ baselines.
   repository restructuring, deliberate legacy removal, or explicit backward
   compatibility investigation. Both retain the exact historical five-module
   serial lane. Normal current-product certification does not require them.
-- **PROTECTED:** always separate fresh authorization. No source profile grants
+- **PROTECTED:** reviewed bounded authorization under the standing rule. No source profile grants
   native Windows acceptance, provider/Robinhood/OAuth access, broker effects, or
   production effects; all profiles reject protected opt-ins.
 
@@ -182,7 +204,7 @@ The normal handoff is implementation + focused checks -> exact-file commit/push
 -> terminal GitHub source gate/canonical mapped certification -> ChatGPT exact
 GitHub review/acceptance -> local host/protected gate only when materially
 distinct -> docs closeout. LEGACY/EXHAUSTIVE remain explicit exceptional gates;
-PROTECTED is always separately authorized.
+PROTECTED is authorized within the exact reviewed bounds under the standing rule.
 
 ## AI development workflow
 
@@ -221,14 +243,15 @@ should state, when applicable:
 The user should not need a follow-up merely to ask what to do next, which model
 to use, what command to run, what output to send back, or whether the checkpoint
 is ready to advance. If the next action crosses a protected effect boundary,
-provide the safe preflight/readiness material and stop at the authorization
-boundary rather than presenting the effectful command as ordinary verification.
+provide safe preflight/readiness material and state exact reviewed effect
+bounds. The user's execution authorizes only those bounds under the standing
+rule; never present a protected effect as ordinary verification.
 
 
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
-- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Stop at the exact approval boundary for production/provider effects, storage provisioning, scheduler mutation, merge/rebase/amend/force-push, PR metadata/review-thread changes, broker/live effects, or other explicitly protected actions.
+- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority never implies merge/rebase/amend/force-push or PR mutation authority.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
 - Codex is primarily a bounded implementation agent for changes already scoped and discussed.
 - After Codex ordinary-pushes a branch that has a CI/source gate, its implementation handoff is not complete merely because the run is `queued` or `in_progress`. Codex should wait/poll until the relevant CI run reaches a terminal state. If the gate fails, inspect the exact failing job/logs, make the smallest correction consistent with the frozen contract, rerun focused checks, ordinary-push, and wait for the replacement CI run. Repeat until CI is green or a protected/ambiguous boundary requires ChatGPT/user review. Never hide a red gate behind an "in progress" handoff.
@@ -527,7 +550,7 @@ Current registered examples:
 ```
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a
-source/preflight PASS. It may be invoked only after fresh explicit approval at
+source/preflight PASS. It may be invoked only after authorization within the exact reviewed bounds under the standing rule at
 the effect boundary and with the checkpoint's exact reviewed authorization
 interlock.
 

@@ -29,6 +29,7 @@ from trading_bot.gui.operator_observability_page import OperatorOperationsPage
 from trading_bot.gui.paper_account_page import PaperAccountPage
 from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
+from trading_bot.gui.runtime_page import RuntimePage
 from trading_bot.gui.services import GuiApplicationService
 from trading_bot.gui.system_health_adapter import build_system_health_state
 from trading_bot.gui.system_health_page import SystemHealthPage
@@ -40,6 +41,7 @@ PAGE_IDS = (
     "paper-account",
     "market-data",
     "operations",
+    "runtime",
     "evidence",
     "system",
 )
@@ -77,12 +79,14 @@ class MainWindow(QMainWindow):
         paper_account_state = service.get_paper_account_state()
         market_data_state = service.get_market_data_state()
         operations_state = service.get_operator_observability_state()
+        runtime_state = service.get_runtime_state()
         evidence_timeline_state = build_evidence_timeline_state(
             research_state,
             paper_state,
             paper_account_state,
             market_data_state,
             operations_state,
+            runtime_state,
         )
         system_health_state = build_system_health_state(
             self._overview,
@@ -91,6 +95,7 @@ class MainWindow(QMainWindow):
             paper_account_state,
             market_data_state,
             operations_state,
+            runtime_state,
         )
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
@@ -118,6 +123,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._market_data_page)
         self._operations_page = OperatorOperationsPage(operations_state, self)
         self._stack.addWidget(self._operations_page)
+        self._runtime_page = RuntimePage(runtime_state, self)
+        self._stack.addWidget(self._runtime_page)
         self._evidence_timeline_page = EvidenceTimelinePage(
             evidence_timeline_state,
             self,
@@ -189,6 +196,7 @@ class MainWindow(QMainWindow):
             "paper-account": "Paper Account",
             "market-data": "Market Data",
             "operations": "Operations",
+            "runtime": "Runtime",
             "evidence": "Evidence",
             "system": "System",
         }

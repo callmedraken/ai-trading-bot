@@ -1,0 +1,16 @@
+{
+  "schema": "production-paper-runtime-acl/v1",
+  "status": "PROVISIONED",
+  "result": "PASS",
+  "runtime_sid_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "acl_apply_attempts": 3,
+  "acl_applies_verified": 3,
+  "parent_mutations": 0,
+  "recursive_mutations": 0,
+  "credential_mutations": 0,
+  "scheduler_mutations": 0,
+  "provider_calls": 0,
+  "paper_mutations": 0,
+  "session_mutations": 0,
+  "broker_mutations": 0
+}

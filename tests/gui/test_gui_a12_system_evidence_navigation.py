@@ -30,6 +30,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_runtime_state,
 )
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.main_window import MainWindow
@@ -103,6 +104,10 @@ class _NavigationService:
         self.calls += 1
         return unavailable_operator_operations_state()
 
+    def get_runtime_state(self):
+        self.calls += 1
+        return unavailable_runtime_state()
+
 
 @pytest.mark.parametrize(
     ("source", "expected"),
@@ -112,6 +117,7 @@ class _NavigationService:
         ("Paper Account", EvidenceTimelineSource.PAPER_ACCOUNT),
         ("Market Data", EvidenceTimelineSource.MARKET_DATA),
         ("Operations", EvidenceTimelineSource.OPERATIONS),
+        ("Runtime", EvidenceTimelineSource.RUNTIME),
     ),
 )
 def test_system_audit_mapping_is_closed_and_exact(
@@ -222,7 +228,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     window.show()
     application.processEvents()
 
-    assert service.calls == 6
+    assert service.calls == 7
     window.select_page("system")
     buttons = window.findChildren(QPushButton, "systemHealthViewEvidenceButton")
     assert len(buttons) == 2
@@ -231,7 +237,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     application.processEvents()
 
     assert window.current_page_id == "evidence"
-    assert service.calls == 6
+    assert service.calls == 7
 
     source = window.findChild(QComboBox, "evidenceTimelineSourceFilter")
     search = window.findChild(QLineEdit, "evidenceTimelineSearch")

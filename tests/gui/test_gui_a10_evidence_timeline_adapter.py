@@ -35,6 +35,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_runtime_state,
 )
 from trading_bot.gui.operator_observability_models import OperatorStrategyPreview
 
@@ -197,6 +198,7 @@ def test_unavailable_states_produce_truthful_empty_timeline() -> None:
         unavailable_paper_account_state(),
         unavailable_market_data_state(),
         unavailable_operator_operations_state(),
+        unavailable_runtime_state(),
     )
 
     assert state.entries == ()
@@ -210,6 +212,7 @@ def test_timeline_orders_timed_newest_first_then_stable_untimed_evidence() -> No
         _paper_account(),
         _market_data(),
         _operations(),
+        unavailable_runtime_state(),
     )
 
     assert tuple(entry.identifier for entry in state.entries[:3]) == (
@@ -249,6 +252,7 @@ def test_timeline_excludes_paths_and_copies_only_bounded_identity_and_hashes() -
         _paper_account(),
         _market_data(),
         _operations(),
+        unavailable_runtime_state(),
     )
 
     rendered = "\n".join(

@@ -260,6 +260,7 @@ def test_default_overview_includes_all_read_only_pages() -> None:
         "market-data",
         "operations",
         "evidence",
+        "runtime",
         "system",
     )
     assert components["paper-account"].status is PresentationStatus.UNAVAILABLE

@@ -26,6 +26,7 @@ from trading_bot.gui.paper_models import (
     PaperPageState,
     PaperPageStatus,
 )
+from trading_bot.gui.runtime_models import RuntimePageState, RuntimePageStatus
 from trading_bot.gui.system_health_models import (
     SystemAuditEntryView,
     SystemComponentHealthView,
@@ -49,6 +50,7 @@ def build_system_health_state(
     paper_account: PaperAccountPageState,
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
+    runtime: RuntimePageState,
 ) -> SystemHealthPageState:
     """Build diagnostics without any service reread, I/O, or authority access."""
     expected = (
@@ -58,6 +60,7 @@ def build_system_health_state(
         (paper_account, PaperAccountPageState, "paper_account"),
         (market_data, MarketDataPageState, "market_data"),
         (operations, OperatorOperationsPageState, "operations"),
+        (runtime, RuntimePageState, "runtime"),
     )
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
@@ -69,6 +72,16 @@ def build_system_health_state(
         _paper_account_component(paper_account),
         _market_data_component(market_data),
         _operations_component(operations),
+        SystemComponentHealthView(
+            "runtime",
+            "Runtime",
+            {
+                RuntimePageStatus.UNAVAILABLE: SystemComponentStatus.UNAVAILABLE,
+                RuntimePageStatus.AVAILABLE: SystemComponentStatus.AVAILABLE,
+                RuntimePageStatus.ATTENTION: SystemComponentStatus.BLOCKED,
+            }[runtime.status],
+            runtime.message,
+        ),
     )
     audit_entries = (
         *_research_audit(research),
@@ -76,6 +89,7 @@ def build_system_health_state(
         *_paper_account_audit(paper_account),
         *_market_data_audit(market_data),
         *_operations_audit(operations),
+        *_runtime_audit(runtime),
     )
     status = (
         SystemHealthStatus.ATTENTION
@@ -301,6 +315,43 @@ def _operations_audit(
                 "Operations",
                 "Account checkpoint ID",
                 str(state.account.checkpoint_id),
+            )
+        )
+    return tuple(entries)
+
+
+def _runtime_audit(state: RuntimePageState) -> tuple[SystemAuditEntryView, ...]:
+    entries: list[SystemAuditEntryView] = []
+    if state.acl is not None and state.acl.runtime_sid_digest is not None:
+        entries.append(
+            SystemAuditEntryView(
+                "Runtime", "Runtime-principal digest", state.acl.runtime_sid_digest
+            )
+        )
+    for title, evidence in (
+        ("Qualification", state.qualification),
+        ("Session", state.session),
+    ):
+        if evidence is not None:
+            entries.extend(
+                (
+                    SystemAuditEntryView(
+                        "Runtime", f"{title} HEAD", evidence.source_head
+                    ),
+                    SystemAuditEntryView(
+                        "Runtime", f"{title} TREE", evidence.source_tree
+                    ),
+                )
+            )
+    if state.session is not None:
+        entries.extend(
+            (
+                SystemAuditEntryView(
+                    "Runtime", "Session contract ID", str(state.session.contract_id)
+                ),
+                SystemAuditEntryView(
+                    "Runtime", "Session operation ID", str(state.session.operation_id)
+                ),
             )
         )
     return tuple(entries)

@@ -19,6 +19,7 @@ class EvidenceSourcePage(Enum):
     PAPER_ACCOUNT = "paper-account"
     MARKET_DATA = "market-data"
     OPERATIONS = "operations"
+    RUNTIME = "runtime"
 
 
 _SOURCE_TO_PAGE = {
@@ -27,6 +28,7 @@ _SOURCE_TO_PAGE = {
     EvidenceTimelineSource.PAPER_ACCOUNT: EvidenceSourcePage.PAPER_ACCOUNT,
     EvidenceTimelineSource.MARKET_DATA: EvidenceSourcePage.MARKET_DATA,
     EvidenceTimelineSource.OPERATIONS: EvidenceSourcePage.OPERATIONS,
+    EvidenceTimelineSource.RUNTIME: EvidenceSourcePage.RUNTIME,
 }
 
 

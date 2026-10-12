@@ -29,6 +29,14 @@ from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
 )
+from trading_bot.gui.runtime_evidence_service import (
+    ProductionRuntimeEvidenceInspectionService,
+)
+from trading_bot.gui.runtime_models import (
+    RuntimePageState,
+    RuntimePageStatus,
+    unavailable_runtime_state,
+)
 from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
     VerifiedGenesisPaperAccountInspectionService,
 )
@@ -45,6 +53,9 @@ class GuiStartupConfiguration:
     """Explicit local read-only artifacts selected for one GUI startup."""
 
     research_report: Path | None = None
+    runtime_acl_evidence: Path | None = None
+    runtime_qualification_evidence: Path | None = None
+    runtime_session_evidence: Path | None = None
     market_data_snapshot: Path | None = None
     market_data_expected_sha256: str | None = None
     market_data_expected_byte_length: int | None = None
@@ -60,6 +71,9 @@ class GuiStartupConfiguration:
 
     def __post_init__(self) -> None:
         path_fields = (
+            "runtime_acl_evidence",
+            "runtime_qualification_evidence",
+            "runtime_session_evidence",
             "research_report",
             "market_data_snapshot",
             "paper_account_genesis",
@@ -137,6 +151,20 @@ class ReadOnlyGuiApplicationService:
         if type(config) is not GuiStartupConfiguration:
             raise TypeError("config must be exactly GuiStartupConfiguration")
         self._config = config
+        runtime_paths = (
+            config.runtime_acl_evidence,
+            config.runtime_qualification_evidence,
+            config.runtime_session_evidence,
+        )
+        self._runtime = (
+            ProductionRuntimeEvidenceInspectionService(
+                acl=config.runtime_acl_evidence,
+                qualification=config.runtime_qualification_evidence,
+                session=config.runtime_session_evidence,
+            )
+            if any(path is not None for path in runtime_paths)
+            else None
+        )
         self._research = (
             None
             if config.research_report is None
@@ -182,11 +210,16 @@ class ReadOnlyGuiApplicationService:
         return None
 
     def get_overview(self) -> ApplicationOverview:
-        """Describe configured read-only sources without inspecting them."""
+        """Describe configured sources and the cached explicit runtime evidence."""
         market_configured = self._config.market_data_snapshot is not None
         paper_account_configured = (
             self._config.paper_account_genesis is not None
             or self._config.paper_account_successor is not None
+        )
+        runtime = (
+            unavailable_runtime_state()
+            if self._runtime is None
+            else self._runtime.get_runtime_state()
         )
         return ApplicationOverview(
             mode=OperatingMode.RESEARCH,
@@ -263,6 +296,16 @@ class ReadOnlyGuiApplicationService:
                     ),
                 ),
                 ComponentStatus(
+                    key="runtime",
+                    title="Runtime",
+                    status={
+                        RuntimePageStatus.UNAVAILABLE: PresentationStatus.UNAVAILABLE,
+                        RuntimePageStatus.AVAILABLE: PresentationStatus.INFO,
+                        RuntimePageStatus.ATTENTION: PresentationStatus.BLOCKED,
+                    }[runtime.status],
+                    detail=runtime.message,
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,
@@ -276,6 +319,12 @@ class ReadOnlyGuiApplicationService:
         if self._research is None:
             return unavailable_research_state()
         return self._research.get_research_state()
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return one cached explicit evidence acquisition, or no-I/O default."""
+        if self._runtime is None:
+            return unavailable_runtime_state()
+        return self._runtime.get_runtime_state()
 
     def get_paper_state(self) -> PaperPageState:
         """Keep Paper Operation unavailable without already-verified inputs."""

@@ -8,6 +8,7 @@ from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.operator_observability_models import OperatorOperationsPageState
 from trading_bot.gui.paper_account_models import PaperAccountPageState
 from trading_bot.gui.paper_models import PaperPageState
+from trading_bot.gui.runtime_models import RuntimePageState
 
 
 class ResearchReportLoader(Protocol):
@@ -23,6 +24,10 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_overview(self) -> ApplicationOverview:
         """Return the current read-only application overview."""
+        ...
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return bounded recorded runtime evidence without execution authority."""
         ...
 
     def get_research_state(self) -> ResearchPageState:

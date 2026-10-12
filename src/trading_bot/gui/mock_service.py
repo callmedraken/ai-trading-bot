@@ -26,6 +26,7 @@ from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
 )
+from trading_bot.gui.runtime_models import RuntimePageState, unavailable_runtime_state
 
 
 class MockGuiApplicationService:
@@ -90,6 +91,12 @@ class MockGuiApplicationService:
                     ),
                 ),
                 ComponentStatus(
+                    "runtime",
+                    "Runtime",
+                    PresentationStatus.UNAVAILABLE,
+                    unavailable_runtime_state().message,
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,
@@ -101,6 +108,10 @@ class MockGuiApplicationService:
     def get_research_state(self) -> ResearchPageState:
         """Return the deterministic empty research state."""
         return unavailable_research_state()
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return the deterministic unavailable Runtime state."""
+        return unavailable_runtime_state()
 
     def get_paper_state(self) -> PaperPageState:
         """Return the deterministic unavailable paper-inspection state."""
@@ -133,6 +144,10 @@ class ResearchReportGuiApplicationService:
     def get_overview(self) -> ApplicationOverview:
         """Return the existing deterministic read-only overview."""
         return self._overview_service.get_overview()
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return the deterministic unavailable Runtime state."""
+        return unavailable_runtime_state()
 
     def get_research_state(self) -> ResearchPageState:
         """Return the bounded state for the explicit compact report path."""

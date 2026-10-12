@@ -16,6 +16,7 @@ _SYSTEM_SOURCE_TO_EVIDENCE = {
     "Paper Account": EvidenceTimelineSource.PAPER_ACCOUNT,
     "Market Data": EvidenceTimelineSource.MARKET_DATA,
     "Operations": EvidenceTimelineSource.OPERATIONS,
+    "Runtime": EvidenceTimelineSource.RUNTIME,
 }
 
 

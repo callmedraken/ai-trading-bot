@@ -42,13 +42,50 @@ explicit ACL/qualification/session JSON through bounded immutable GUI models.
 Runtime, System and Evidence navigation add zero reads. Complete real-PySide6
 offscreen GUI verification passes; exact results are in
 `docs/validation/gui-a14-production-runtime-status.md`. Accepted R1/R2 execution
-source, source pins and branches are unchanged. GUI source acceptance is pending.
+source, production executable pins and branches are unchanged.
+GUI source acceptance is pending.
 
-The user selected a local-only checkpoint because the required pre-push CI
-bootstrap is unresolved. One normal local commit is authorized; no push or
-R1/R2 authority change is authorized by that choice. ChatGPT owns the next
-bounded bootstrap decision and exact source review. A missing workflow run is
-not PASS. Do not duplicate local ROBINHOOD/FULL certification for this GUI.
+The GUI-A14 implementation was ordinary-pushed as HEAD
+`693c0d15b8521d4d6c9bdcc6c090143299767b72`, TREE
+`4786038698de47a71971f4072c7b7b4d495d013a`. Dedicated GUI CI
+[38316319422](https://github.com/callmedraken/ai-trading-bot/actions/runs/38316319422)
+SUCCEEDED: 470 passed, zero skips, real PySide6 6.10.3, Ruff/diff PASS.
+Default-branch dispatch bootstrap is accepted on develop HEAD
+`011051e9ac4e79e4c42da984e34022e3767713ff`, TREE
+`8ac2cb990be1178d47d00b70230d7d3736aae409`; bootstrap CI
+[#505 / 38318201408](https://github.com/callmedraken/ai-trading-bot/actions/runs/38318201408)
+SUCCEEDED.
+
+The first repository workflow_dispatch
+[38320329303](https://github.com/callmedraken/ai-trading-bot/actions/runs/38320329303)
+FAILED during source-static: 62 of 63 active authorities passed. Only the
+historical supervised-release-publication-recovery authority failed with
+`publication recovery runner authority drift`; diff/Ruff passed, pytest was
+SKIP and source identity remained stable. Full-tests never started. This was
+an intentional historical closure fuse, not a GUI behavior failure. Preserve
+that run; do not rerun it.
+
+This correction retires only
+`arch133-robinhood-supervised-release-publication-recovery` from CURRENT ACTIVE
+CI (63 -> 62), preserving its registry, source, protected bindings and historical
+pins. REGISTERED HISTORICAL CHECKPOINT != CURRENT ACTIVE CI CHECKPOINT. Its
+unchanged authority now returns exactly, in order, `publication recovery
+registration drift` and `publication recovery runner authority drift`: the
+historical active-registration requirement and stale `_checkpoint_specs` AST
+pin independently keep recovery closed. No other active member is removed or
+reordered. Current tuple AST SHA-256 is
+`06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440`.
+Directly affected topology/count assertions and their test-only source hashes
+are updated; production executable pins and frozen R1/R2 branches remain exact.
+GUI-A14's five added legacy test modules make current inventory FULL 169,
+ROBINHOOD 94, LEGACY 210, EXHAUSTIVE 379.
+
+GUI-A14 source acceptance remains pending a fresh exact-source repository gate
+following ChatGPT's exact GitHub correction review. Codex owns this one normal
+correction commit/ordinary push and terminal dedicated GUI CI, without adding
+the GUI branch to the repository push allowlist or changing workflow_dispatch.
+ChatGPT owns the fresh repository workflow_dispatch; no local broad profile or
+protected operator is selected. No production effect occurred.
 
 ### Current D2 end-state — ON/OFF, arbitrary-time startup
 

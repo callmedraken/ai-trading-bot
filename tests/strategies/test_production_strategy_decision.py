@@ -324,7 +324,7 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
         "arch134-production-strategy-contract",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 63
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 62
 
     root = Path(certification.__file__).resolve().parents[1]
     inventory = certification.discover_inventory(root)
@@ -335,8 +335,8 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 205,
-        "exhaustive": 374,
+        "legacy": 210,
+        "exhaustive": 379,
     }
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]
     assert (

@@ -7,7 +7,7 @@ Frozen parent: HEAD `2f122958366d1db282fea51abbd461b83fa893d9`, TREE
 `c3fb82add37bdbea12ebad9836ca10000b924fe1`. Worktree:
 `F:\AI\worktrees\ai-trading-bot-gui-production-runtime-status`; branch:
 `feature/gui-production-runtime-status`. Accepted D1/R1 runtime and R2 ACL
-execution source and checkpoint authority remain frozen.
+execution source and protected checkpoint bindings remain frozen.
 
 ## Allowed composition
 
@@ -103,11 +103,20 @@ The dedicated `gui-source-gates.yml` targets Windows/Python 3.14, installs
 GUI Ruff checks and git diff checks. It performs no protected operation.
 GUI-A14 is not registered in the R1/R2 checkpoint or ROBINHOOD profile.
 
-Before the first push, the repository's branch-bootstrap rule requires an
-independently reviewed registration on integration/default source. Neither the
-frozen parent nor current develop admits this GUI branch. Adding it to the
-existing push allowlist would also invalidate an exact branch-list test pinned
-by frozen R1/R2 authority. Do not modify those pins or silently self-register.
-The user chose to keep R1/R2 frozen, complete one local commit and return the
-bootstrap decision to ChatGPT. No push is performed; publication and terminal
-CI remain pending that decision.
+The initial local-only bootstrap decision is historical. GUI source
+`693c0d15b8521d4d6c9bdcc6c090143299767b72` was ordinary-pushed and dedicated
+GUI CI 38316319422 passed (470 tests, real PySide6 6.10.3). The separately
+reviewed default-branch dispatch bootstrap is develop source
+`011051e9ac4e79e4c42da984e34022e3767713ff` / CI #505, 38318201408 SUCCESS.
+The first repository dispatch 38320329303 failed solely on the deliberately
+closed historical publication-recovery authority, before broad tests started.
+
+The current correction removes that registered historical checkpoint from the
+62-member current active CI batch without changing its source, protected
+bindings or historical pins. Its unchanged authority must return both
+registration drift and runner authority drift. Repository push branch triggers
+and workflow_dispatch remain unchanged; the GUI branch is not added to the
+repository source-gate allowlist. Source acceptance awaits ChatGPT's exact
+GitHub correction review and a fresh exact-source repository dispatch. See
+`docs/validation/gui-a14-production-runtime-status.md` for incident evidence and
+the remaining gate. No production effect or local broad certification occurs.

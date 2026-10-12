@@ -509,8 +509,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 63
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 63
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 62
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")

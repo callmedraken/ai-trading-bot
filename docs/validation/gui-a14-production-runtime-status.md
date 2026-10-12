@@ -2,12 +2,47 @@
 
 ## Current checkpoint
 
-Implemented for exact source review on `feature/gui-production-runtime-status`,
-from `2f122958366d1db282fea51abbd461b83fa893d9` /
-`c3fb82add37bdbea12ebad9836ca10000b924fe1`. This is a local checkpoint,
-not source acceptance. The user selected local commit/no push because the
-pre-push bootstrap requires ChatGPT review without changing frozen R1/R2 pins.
-Dedicated GUI CI and existing source-gate CI have not run on this checkpoint.
+The GUI-A14 implementation was ordinary-pushed as HEAD
+`693c0d15b8521d4d6c9bdcc6c090143299767b72`, TREE
+`4786038698de47a71971f4072c7b7b4d495d013a`. Dedicated GUI CI
+[38316319422](https://github.com/callmedraken/ai-trading-bot/actions/runs/38316319422)
+SUCCEEDED: 470 passed, zero skips, real PySide6 6.10.3, Ruff/diff PASS.
+Default-branch dispatch bootstrap is accepted on develop HEAD
+`011051e9ac4e79e4c42da984e34022e3767713ff`, TREE
+`8ac2cb990be1178d47d00b70230d7d3736aae409`; bootstrap CI
+[#505 / 38318201408](https://github.com/callmedraken/ai-trading-bot/actions/runs/38318201408)
+SUCCEEDED.
+
+The first repository workflow_dispatch
+[38320329303](https://github.com/callmedraken/ai-trading-bot/actions/runs/38320329303)
+FAILED during source-static: 62 of 63 active authorities passed. Only the
+historical supervised-release-publication-recovery authority failed with
+`publication recovery runner authority drift`; diff/Ruff passed, pytest was
+SKIP and source identity remained stable. Full-tests never started. This was
+an intentional historical closure fuse, not a GUI behavior failure. Preserve
+that run; do not rerun it.
+
+This correction retires only
+`arch133-robinhood-supervised-release-publication-recovery` from CURRENT ACTIVE
+CI (63 -> 62), preserving its registry, source, protected bindings and historical
+pins. REGISTERED HISTORICAL CHECKPOINT != CURRENT ACTIVE CI CHECKPOINT. Its
+unchanged authority now returns exactly, in order, `publication recovery
+registration drift` and `publication recovery runner authority drift`: the
+historical active-registration requirement and stale `_checkpoint_specs` AST
+pin independently keep recovery closed. No other active member is removed or
+reordered. Current tuple AST SHA-256 is
+`06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440`.
+Directly affected topology/count assertions and their test-only source hashes
+are updated; production executable pins and frozen R1/R2 branches remain exact.
+GUI-A14's five added legacy test modules make current inventory FULL 169,
+ROBINHOOD 94, LEGACY 210, EXHAUSTIVE 379.
+
+GUI-A14 source acceptance remains pending a fresh exact-source repository gate
+following ChatGPT's exact GitHub correction review. Codex owns this one normal
+correction commit/ordinary push and terminal dedicated GUI CI, without adding
+the GUI branch to the repository push allowlist or changing workflow_dispatch.
+ChatGPT owns the fresh repository workflow_dispatch; no local broad profile or
+protected operator is selected. No production effect occurred.
 
 ## Verification performed
 
@@ -44,8 +79,38 @@ Visual QA uses a synthetic 920x620 offscreen capture with Segoe UI explicitly
 loaded in the temporary preview helper because offscreen font discovery on
 this host returned missing-glyph boxes. No GUI font/runtime configuration was
 changed by that preview helper.
-No local ROBINHOOD/FULL profile is selected. No R1/R2 executable,
-checkpoint registry, source authority pin or global source-gate topology changes.
+The original GUI implementation selected no local ROBINHOOD/FULL profile and
+changed no R1/R2 executable, checkpoint registry, source authority pin or global
+source-gate topology. The present CI correction changes only current active
+topology and directly affected test metadata; historical recovery and production
+executable pins remain unchanged. Complete real-PySide6 offscreen GUI regression
+was repeated for this correction: 470 passed, zero skips.
+
+## Topology correction focused verification
+
+The initial 214-case focused selection produced 208 passes and six failures:
+R1/R2 detected the changed core-test blob, and four tests retained pre-GUI
+LEGACY/EXHAUSTIVE counts. Those directly affected assertions/hashes were corrected.
+The 11-case affected rerun passed, including three newly affected inventory cases,
+for **217 distinct focused cases verified**. Publication-recovery, runner core/CI,
+R1/R2 and every changed topology/count assertion are covered. Complete GUI:
+**470 passed, 0 skipped**, real PySide6 6.10.3, offscreen. Focused Ruff check,
+Ruff format --check (18 touched Python files), and git diff --check pass.
+
+All 62 current active authority functions passed against final local edits;
+publication recovery is excluded and its direct historical test returns exactly
+the two closure failures. The official source-static-only runner must run on the
+clean correction commit before push, because verify-batch requires a clean
+worktree. No local pytest/broad profile is selected by that batch. This sequencing
+preserves the runner's clean-source admission and the one-commit boundary.
+
+Only six directly affected test-file hashes in the R1 source-owned metadata are
+refreshed: runner helpers/core/CI, certification profile inventory and production
+strategy contract/decision inventory tests. R1/R2 authority functions and all
+production executable/native/source AST pins remain unchanged. The historical
+publication-recovery function, source pins, runner pins, registry and bindings
+are unchanged. Repository branch triggers, workflow_dispatch, the dedicated GUI
+workflow and GUI runtime source/tests/fixtures are unchanged.
 
 ## Review contract
 
@@ -82,12 +147,14 @@ REAL_PRODUCTION_EVIDENCE_READS_DURING_TESTS=0
 
 ## Next owner and stop condition
 
-ChatGPT reviews the exact local checkpoint and chooses a separate narrowly
-reviewed CI-bootstrap path. Do not self-register with the first GUI push,
-modify frozen R1/R2 source pins, claim missing CI as PASS, merge or perform any
-production effect. After approved bootstrap and ordinary push, require terminal
-dedicated GUI and existing source-gate coverage on the exact source before
-ChatGPT source acceptance. No repeated local broad certification is needed.
+ChatGPT reviews the exact ordinary-pushed correction after dedicated GUI CI
+becomes terminal, then issues a fresh repository workflow_dispatch against that
+exact corrected HEAD. All 62 current active authorities must pass before the
+broad fallback starts; the direct historical recovery test must still prove its
+two closure failures. Preserve failed run 38320329303. Do not manually rerun or
+dispatch the repository gate from Codex, broaden push triggers, merge, perform
+production effects or claim GUI-A14 source acceptance. CI owns the fresh broad
+fallback; no local ROBINHOOD/FULL/broad shards are selected.
 
 Optional exact local GUI re-verification (already completed, not a new gate):
 

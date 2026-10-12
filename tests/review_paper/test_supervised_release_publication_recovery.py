@@ -526,11 +526,13 @@ def test_native_scope_close_ambiguity_escapes_to_operator(monkeypatch):
         native.publish_preserved_image(subject.expected_image())
 
 
-def test_aj_routes_single_active_checkpoint_and_retains_split_workflow():
+def test_aj_remains_registered_historical_and_closed_outside_active_ci():
+    assert NAME == runner.SUPERVISED_PUBLICATION_RECOVERY_NAME
     spec = runner._checkpoint_specs()[NAME]
+    assert NAME not in runner.ACTIVE_CI_CHECKPOINTS
     assert (
         runner.resolve_ci_checkpoint(runner._checkpoint_specs(), subject.BRANCH, "push")
-        == NAME
+        is None
     )
     assert (
         runner.resolve_ci_checkpoint(
@@ -540,13 +542,24 @@ def test_aj_routes_single_active_checkpoint_and_retains_split_workflow():
     )
     assert spec.preflight is runner._supervised_publication_preflight
     assert spec.execute is runner._supervised_publication_execute
-    assert spec.remote_head_env is None
-    root = Path(runner.__file__).resolve().parents[1]
-    assert runner._batch_workflow_is_reviewed(
-        (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert (
+        spec.authority_check is runner._supervised_publication_recovery_authority_check
     )
+    assert spec.name == NAME
+    assert spec.remote_branch == subject.BRANCH
+    assert spec.remote_head_env is None
+    assert spec.tests == runner.SUPERVISED_PUBLICATION_RECOVERY_TESTS
+    assert spec.ruff_paths == runner.SUPERVISED_PUBLICATION_RECOVERY_RUFF_PATHS
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    active_batch = workflow.split("  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n", 1)[
+        1
+    ].split("\njobs:", 1)[0]
+    assert NAME not in active_batch.split()
+    assert runner._batch_workflow_is_reviewed(workflow)
     # AJ pins the complete historical registry. Later checkpoint additions must
     # keep that protected recovery gate closed without changing any other pin.
+    # Retirement also violates its frozen active-registration requirement.
     functions = {
         node.name: node
         for node in ast.parse(
@@ -564,6 +577,7 @@ def test_aj_routes_single_active_checkpoint_and_retains_split_workflow():
     }
     assert drifted == {"_checkpoint_specs"}
     assert runner._supervised_publication_recovery_authority_check(root) == (
+        "publication recovery registration drift",
         "publication recovery runner authority drift",
     )
 

@@ -135,9 +135,10 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "9be10678e014f0a7db34338409f89f82be1ec9b05933120e24f3f2d8b25289ff"
+    "06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440"
 )
 
+# Registered historical recovery remains closed; it is excluded from active CI.
 ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation-operator",
     "arch133-robinhood-supervised-deployment-qualification",
@@ -146,7 +147,6 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation",
     "arch133-robinhood-supervised-release-build-verification",
     "arch133-robinhood-supervised-release-foundation",
-    "arch133-robinhood-supervised-release-publication-recovery",
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
     "arch131-robinhood-paper-cycle",
@@ -10332,13 +10332,13 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
     ),
     "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "43379a9c45810a3fa8832e57aa2a498371217b45"
+        "952ff67e6e40a6635f2c49d47b838ecf18123ad3"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "45b50d0330553719b59b66aaca94f5c7bbb7eb8d"
+        "a8470acf3f263ba8b4a9b888ce168b56c95f33a6"
     ),
     "tests/runtime/checkpoint_runner/helpers.py": (
-        "f231582f3912ec619ed78ae1df23c829de69d4c6"
+        "c99bb51c67ef1d0c475ebb4f58ec869c59a3c253"
     ),
     "src/trading_bot/review_paper/production_strategy_cycle.py": (
         "3636889acaddf0de0a27e4dc4de0687839c59ee8"
@@ -10359,13 +10359,13 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "4ab15822bded9c6e76e7badb78b9e7fe0db63b40"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "352aa2cb29219ad3fedbbf79d4fe4996636ecc88"
+        "529911f2dba657bcaa36596203608985168faad2"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "8281b217ec3bebf5d8d1e5240464ccc385e7ed48"
+        "9e8c318582ba30333758ea8104355658a6c749cf"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
-        "75d4b33d929a4a8a72f86708908090c619c071e1"
+        "0d55c6e95a55a99dfedcad024c3f80341cbb36df"
     ),
 }
 ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (

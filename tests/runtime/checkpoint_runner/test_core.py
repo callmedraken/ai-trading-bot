@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import hashlib
 import json
 import subprocess
 from dataclasses import replace
@@ -847,6 +849,17 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
         assert set(spec.tests) <= set(tests)
         assert set(spec.ruff_paths) <= set(ruff)
     assert runner.ACTIVE_CI_CHECKPOINTS == _EXPECTED_ACTIVE_CI_CHECKPOINTS
+    # Reconstruct the exact GUI-A14 parent tuple: only historical AJ is retired.
+    active = runner.ACTIVE_CI_CHECKPOINTS
+    parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
+    assert len(parent) == 63 and len(active) == 62
+    parent_value = ast.parse(repr(parent), mode="eval").body
+    assert (
+        hashlib.sha256(
+            ast.dump(parent_value, include_attributes=False).encode("utf-8")
+        ).hexdigest()
+        == "9be10678e014f0a7db34338409f89f82be1ec9b05933120e24f3f2d8b25289ff"
+    )
 
 
 def test_ci_checkpoint_resolution_is_exact_and_fails_broad():

@@ -170,8 +170,8 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 205,
-        "exhaustive": 374,
+        "legacy": 210,
+        "exhaustive": 379,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

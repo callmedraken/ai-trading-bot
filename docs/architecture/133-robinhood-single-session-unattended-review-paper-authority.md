@@ -1,5 +1,34 @@
 # Architecture 133 — Single-Session Robinhood Unattended Review-Paper Authority
 
+## 2026-10-12 — Current active CI retirement of historical AJ recovery
+
+REGISTERED HISTORICAL CHECKPOINT != CURRENT ACTIVE CI CHECKPOINT.
+`arch133-robinhood-supervised-release-publication-recovery` remains registered
+with its original source/test/Ruff definitions and protected preflight/execute
+bindings, but is excluded from CURRENT ACTIVE CI (63 -> 62). No other active
+checkpoint is removed or reordered. Historical AJ chronology below records its
+then-accepted source and route; it does not grant current recovery authority.
+
+Repository dispatch 38320329303 on GUI-A14 source 693c0d15b8521d4d6c9bdcc6c090143299767b72
+failed during source-static because AJ's historical `_checkpoint_specs` AST pin
+was intentionally stale. All other 62 authorities passed. The active batch must
+exclude this closed checkpoint rather than refresh its historical pins.
+
+The unchanged recovery authority now returns exactly:
+
+```text
+publication recovery registration drift
+publication recovery runner authority drift
+```
+
+The first failure preserves the frozen historical active-registration
+requirement; the second preserves the stale complete-registry AST pin. Only
+`_checkpoint_specs` drifts among `SUPERVISED_PUBLICATION_RUNNER_PINS`. Both
+failures are required historical closure evidence. No protected recovery,
+publication, provider, scheduler, broker or production effect is authorized.
+GUI-A14 source acceptance remains pending exact GitHub correction review and a
+fresh repository dispatch; failed run 38320329303 is preserved, never rerun.
+
 ## Canonical source-gate topology non-regression notary — normative
 
 This rule is **normative**, not merely historical. The accepted source-gate
@@ -27,7 +56,7 @@ CURRENT AJ ROUTE  source-static + active-tests; full-tests skipped
 The accepted workflow contract is:
 
 - `source-static` always owns classification, static checks, and authority;
-- an exact registered feature-branch push routes to `active-tests`;
+- an exact registered CURRENT ACTIVE feature-branch push routes to `active-tests`;
 - broad/fallback source changes route to four duration-balanced
   `full-tests` shards `[0, 1, 2, 3]`;
 - `source-gates` is only the terminal aggregator and must depend on

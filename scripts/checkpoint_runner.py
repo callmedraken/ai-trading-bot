@@ -503,7 +503,7 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and workflow.count(
             "  source-gates:\n"
             "    needs: [source-static, active-tests, full-tests, "
-        "certification-tests]\n"
+            "certification-tests]\n"
             "    if: always()\n"
         )
         == 1

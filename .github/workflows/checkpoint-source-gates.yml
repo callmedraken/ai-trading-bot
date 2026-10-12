@@ -9,6 +9,7 @@ on:
       - feature/d10c-r8-incident-reconciliation
       - "feature/robinhood-*"
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read

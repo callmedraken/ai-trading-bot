@@ -1,64 +1,81 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-11 - Architecture 134-D1 armed paper MVP SOURCE IMPLEMENTED / REVIEW PENDING
+## 2026-10-11 - Architecture 134-D1 armed paper MVP SOURCE ACCEPTED; ROBINHOOD certification selected
 
-Current work proceeds on `feature/robinhood-production-paper-mvp`, in
-`F:\AI\worktrees\ai-trading-bot-production-paper-mvp`, directly from
-`0f8c7390ddbac4c8750874587aa1a15250e8fedf` /
-`d573738c00d95bb821bc979720e407d017922bd0`.
-The branch matches the integration workflow's already-reviewed
-`feature/robinhood-*` family. The frozen B3Q worktree remains unchanged.
+Architecture **134-D1 — Armed paper MVP** is **SOURCE ACCEPTED** on the exact
+reviewed executable/test source:
 
-The current-product historical path is the new 134-D1 Alpaca bridge. Robinhood
-historicals are removed from the paper MVP critical path. B3/B3Q code, tests and
-incident evidence remain retained; the ambiguous B3Q authorization is consumed
-and MUST NOT be retried. Robinhood remains only at the unchanged 134-C quote and
-Architecture-131 account/order-history/review-paper boundaries.
+~~~text
+BRANCH     feature/robinhood-production-paper-mvp
+HEAD       13fbab7fbe5b8727b512050f940cec5a4d934033
+TREE       9cd006a96cc4bba4d1a999814703c5de703dd797
+PARENT     5d62fc272f0bfc941176d4ec229db736b7fac861
+CI         #490 / 38212683255 SUCCESS
+CHECKPOINT arch134-armed-paper-mvp
+~~~
 
-The manually armed controller owns one production contract, target published
-XNYS session, source HEAD/TREE, strategy/risk policy and ReviewPaperStore. It
-reserves a durable unique symbol/session attempt before any provider read,
-acquires exactly `long_window + 1` raw Alpaca daily snapshots, verifies them
-through existing acceptance/canonical replay, verifies the preceding
-`long_window` bars as StrategyHistorySeed, and evaluates accepted B2 once.
-NO_SIGNAL leaves the paper store unchanged and calls Robinhood zero times.
-A proposal waits once for published open plus the opening buffer, re-admits
-source/session, calls unchanged 134-C SHADOW PREPARE once, and permits at most
-one unchanged synthetic-paper EXECUTE through a consumed one-session ARM.
+The first selected ROBINHOOD certification on the pre-reconciliation D1 source
+`bfa4f94c667f9fbffe06a57b565de64fc6b7df29` failed **42/8,396** cases.
+Its evidence is preserved and MUST NOT be rerun or reused:
 
-D1 adds SQLite full-synchronous pre-effect fences and a closed sanitized
-32-KiB result schema. Completed matching attempts replay without provider or
-paper effects. Any other reserved/interrupted/ambiguous attempt is blocked:
-no reclaim, automatic retry, new IDs, alternate provider or catch-up. An existing
-paper fill in the target session also blocks before historical acquisition.
-Evidence records uncertain paper mutation counts as null with
-`effect_counts_complete=false`; an ambiguous effect must not be reported as zero.
+~~~text
+F:\AI\temp\certification\arch134d1-robinhood-03497281cbff454582fe91f813e9e910
+~~~
 
-**Production launch remains BLOCKED pending current-product Alpaca credential
-binding and protected host/runtime qualification.** The existing native Alpaca
-reader imports legacy C1/C3 operational authority, so D1 deliberately uses the
-explicit fail-closed credential-composition seam permitted by the implementation
-contract. It neither imports that graph nor reads environment credentials.
-The source program is fake-qualified, not a claim of a presently runnable
-credential-backed production session. No production runtime/store is provisioned.
+That failure exposed stale cross-checkpoint topology assertions rather than a
+134-D1 production-behavior defect. Broad push-time CI was restored in the
+source-only policy commit `5d62fc272f0bfc941176d4ec229db736b7fac861`.
+For every non-docs push the active checkpoint and the four-shard broad batch now
+run together; the terminal source-gate requires both. Each broad shard also
+fails closed at **>=300 seconds** so test-topology/hygiene review occurs before
+runtime drift is accepted.
 
-Checkpoint `arch134-armed-paper-mvp` is source-only (`preflight=None`,
-`execute=None`). Critical controller/store/history/host/launcher and existing
-Alpaca parser/HTTPS bytes are pinned. AST checks reject historical Robinhood,
-generic MCP, broker placement/cancel/options/crypto, alternate evaluation,
-research/legacy imports, fallback and scheduler mutation. The existing exact
-134-A/B/C authority/order assertions remain unchanged. Current inventories are
-active 61, FULL 167, ROBINHOOD 92, LEGACY 205, EXHAUSTIVE 372; frozen required
-baselines are unchanged. Only focused fake tests, Ruff and diff checks belong
-to this implementation; no broad certification is represented as completed.
+CI #489 exercised that policy and exposed the complete stale surface in one
+pass. The bounded reconciliation commit
+`13fbab7fbe5b8727b512050f940cec5a4d934033` changes only tests and
+`scripts/checkpoint_runner.py`: current inventory counts are active **61**,
+FULL **167**, ROBINHOOD **92**, LEGACY **205**, EXHAUSTIVE **372**; the reviewed
+complete active-tuple AST digest is
+`b0a403304ed0603897faf443c03a63b5bdccf40f9b71ef909ef1e6b4823d39d2`;
+Architecture-133 tail assertions are realigned without reordering the canonical
+tuple; and workflow-policy mutation tests now fail closed if broad-on-active,
+four-shard, aggregation or >=300-second hygiene semantics are weakened.
 
-Next owner: ChatGPT for exact pushed-source review and certification selection.
-The next planned product source checkpoint is 134-D2 Task Scheduler wiring
-around the same zero-semantic-input program. Credential binding (Sol High),
-existing-store/runtime qualification and a manually armed integration session
-must be accepted before a scheduled provider/paper effect is enabled. Scheduler
-installation/update/run, real provider/OAuth, production paper-store mutation and
-broker effects remain separately protected. No real-money authority is added.
+Terminal CI #490 is green: source-static, active-tests, all four broad shards
+and source-gates passed. The broad JUnit totals are **8,304 passed, 1 skipped,
+0 failed/errors**. Measured broad-shard times are **84.631 s, 89.156 s,
+67.960 s and 53.728 s**; no performance hygiene audit is required.
+
+No production trading source, workflow YAML, provider/OAuth behavior,
+paper-store behavior, scheduler behavior or broker behavior changed in the
+reconciliation. The accepted 134-D1 product path remains:
+
+- Alpaca raw completed daily history -> accepted B2 decision exactly once;
+- NO_SIGNAL -> zero Robinhood/paper effects;
+- proposal -> one admitted wait -> unchanged 134-C PREPARE;
+- READY_TO_PROCEED -> at most one unchanged local synthetic-paper EXECUTE;
+- durable one-session fences prevent replay/retry after ambiguous or consumed
+  effects;
+- real broker placement remains impossible.
+
+Production launch remains **BLOCKED** by the deliberate current-product Alpaca
+credential-binding seam and protected host/runtime/store qualification. B3Q
+remains ambiguous/consumed/no-retry and is not on the MVP critical path.
+
+The selected source-certification tier remains **ROBINHOOD** because D1 is a
+coherent Architecture-131/134 Robinhood review-paper integration boundary and
+ROBINHOOD is the smallest profile covering it. Run exactly one fresh ROBINHOOD
+certification on the final docs-only descendant of this accepted executable/test
+source. Do not run FULL, LEGACY or EXHAUSTIVE unless that certification exposes
+a separate breadth requirement.
+
+After ROBINHOOD certification passes, the most direct product checkpoint is
+**134-D1Q runtime enablement**: add the narrow current-product Alpaca credential
+binding, qualify/provision the Architecture-134 runtime and its two stores, then
+perform one separately authorized manual armed paper session through this exact
+runner. **134-D2 Task Scheduler wiring follows only after that manual session is
+accepted.** Scheduler installation/run, provider/OAuth access and production
+paper mutation remain protected; no real-money authority is added.
 
 
 ## 2026-10-11 — Architecture 134-B3Q live qualification AMBIGUOUS; NO RETRY

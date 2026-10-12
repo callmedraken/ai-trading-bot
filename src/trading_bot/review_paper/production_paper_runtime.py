@@ -96,6 +96,8 @@ def preflight_runtime() -> dict[str, object]:
         "status": "BLOCKED",
         "paper_records": None,
         "session_reservations": None,
+        "paper_store_write_readiness": "NOT_CHECKED",
+        "session_store_write_readiness": "NOT_CHECKED",
         "alpaca_credential_reads": 0,
         "robinhood_credential_reads": 0,
         "alpaca_http_calls": 0,
@@ -118,6 +120,86 @@ def preflight_runtime() -> dict[str, object]:
             )
     except Exception:
         pass
+    return result
+
+
+def _probe_store_write(path: Path, *, paper: bool) -> None:
+    """Exercise the native rollback journal, never commit or initialize a store."""
+    table, key_column, value_column, count_table = (
+        ("metadata", "key", "value", "review_fills")
+        if paper
+        else ("armed_session_v1", "session_key", "evidence", "armed_session_v1")
+    )
+    key = "production-runtime-write-probe/v1"
+    value = "rollback-only" if paper else b"rollback-only"
+    schema_sql = "SELECT type,name,tbl_name,sql FROM sqlite_master ORDER BY name"
+    select_sql = f"SELECT {value_column} FROM {table} WHERE {key_column}=?"
+    count_sql = f"SELECT count(*) FROM {count_table}"
+    uri = path.resolve().as_uri()
+    # mode=rw cannot create a missing database. No immutable/read-only VFS and
+    # no store constructor that might initialize, migrate or repair the schema.
+    with closing(
+        sqlite3.connect(uri + "?mode=rw", uri=True, timeout=0, isolation_level=None)
+    ) as connection:
+        # Do not silently replace an incompatible journal configuration. MEMORY
+        # and OFF cannot establish the required native journal write authority.
+        if connection.execute("PRAGMA journal_mode").fetchone() != ("delete",):
+            raise ValueError("runtime journal mode rejected")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            schema = connection.execute(schema_sql).fetchall()
+            schema_version = connection.execute("PRAGMA schema_version").fetchone()
+            count = connection.execute(count_sql).fetchone()
+            if connection.execute(select_sql, (key,)).fetchone() is not None:
+                raise ValueError("runtime probe collision")
+            connection.execute(
+                f"INSERT INTO {table} ({key_column},{value_column}) VALUES (?,?)",
+                (key, value),
+            )
+            if connection.execute(select_sql, (key,)).fetchone() != (value,):
+                raise ValueError("runtime write readback rejected")
+        finally:
+            # Even a failed first write/readback must attempt explicit rollback.
+            # Rollback or close failure propagates; implicit close is not proof.
+            connection.execute("ROLLBACK")
+        if connection.in_transaction:
+            raise ValueError("runtime rollback incomplete")
+    # A fresh, ordinary read-only connection must independently observe rollback.
+    # Immutable reads are inappropriate for verifying transaction visibility.
+    with closing(sqlite3.connect(uri + "?mode=ro", uri=True, timeout=0)) as check:
+        if (
+            check.execute(schema_sql).fetchall() != schema
+            or check.execute("PRAGMA schema_version").fetchone() != schema_version
+            or check.execute(count_sql).fetchone() != count
+            or check.execute(select_sql, (key,)).fetchone() is not None
+            or check.execute("PRAGMA integrity_check").fetchall() != [("ok",)]
+        ):
+            raise ValueError("runtime rollback verification rejected")
+
+
+def qualify_runtime_write_readiness() -> dict[str, object]:
+    """Rollback-only qualification in this process; no credentials or providers."""
+    result = {
+        "paper_store_write_readiness": "NOT_CHECKED",
+        "session_store_write_readiness": "NOT_CHECKED",
+    }
+    for path, paper, field in (
+        (PAPER_PATH, True, "paper_store_write_readiness"),
+        (SESSION_PATH, False, "session_store_write_readiness"),
+    ):
+        result[field] = "BLOCKED"
+        try:
+            _paths()
+            before = _compatible()
+            _probe_store_write(path, paper=paper)
+            _paths()
+            if _compatible() != before:
+                raise ValueError("runtime inventory changed")
+            result[field] = "WRITE_READY"
+        except Exception:
+            # Fixed classifications only: no native strings, principal or ACL data.
+            pass
     return result
 
 
@@ -228,6 +310,8 @@ def main(argv: list[str] | None = None) -> int:
             "runtime_status": "NOT_QUALIFIED",
             "paper_records": None,
             "session_reservations": None,
+            "paper_store_write_readiness": "NOT_CHECKED",
+            "session_store_write_readiness": "NOT_CHECKED",
             "alpaca_credential_reads": None,
             "robinhood_credential_reads": None,
             "persisted_oauth_available": False,
@@ -242,6 +326,13 @@ def main(argv: list[str] | None = None) -> int:
         with args.evidence.open("xb") as stream:
             try:
                 result.update(provision_runtime())
+                readiness = qualify_runtime_write_readiness()
+                result.update(readiness)
+                if readiness != {
+                    "paper_store_write_readiness": "WRITE_READY",
+                    "session_store_write_readiness": "WRITE_READY",
+                }:
+                    raise ValueError("runtime write readiness blocked")
                 with read_current_product_alpaca_secrets():
                     pass
                 result["alpaca_credential_reads"] = 2

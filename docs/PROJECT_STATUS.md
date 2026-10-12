@@ -1,5 +1,41 @@
 # Project Status and Roadmap
 
+## 2026-10-12 - Architecture 134-D1Q-R1 write-readiness implementation
+
+D1Q-R1 is implemented for source review on the existing
+`feature/robinhood-production-paper-runtime` branch, based exactly on
+`a8fc2bd85fd7518de59c76ea60e22402ef24a838` /
+`16bbb2e2c8c64d517ea10e97448342ceeac3f99f`.
+
+The native Windows incident supersedes the earlier read-compatible-only READY
+result: BEGIN IMMEDIATE succeeded but the first reservation INSERT returned
+SQLITE_READONLY. No paper record, reservation or provider/application effect
+occurred in that failed attempt. Existing production material is preserved.
+
+Protected qualification now requires rollback-only native write/readback,
+explicit rollback and independent schema/count verification for BOTH fixed
+D1 databases under the current process/account. Sanitized per-store readiness
+must be WRITE_READY before credential readiness can produce READY. Paper probes
+use existing metadata, never fake trades; session probes use a transient
+non-session sentinel, never a committed reservation. Read-only preflight remains
+compatibility-only with write readiness NOT_CHECKED. Armed host startup repeats
+both probes before reservation/provider composition under its own identity.
+
+This implementation does not change production ACLs, ownership, attributes,
+schemas or records, and does not ARM a real session or access real credentials
+or providers. Fixed paths, SPY MA 2/3, cash 10000 and quote-only/zero-broker
+semantics are unchanged. Current inventory remains ACTIVE 62, FULL 168,
+ROBINHOOD 93, LEGACY 205 and EXHAUSTIVE 373.
+
+Next: terminal mapped source-gate/CI-owned ROBINHOOD on the exact pushed source,
+then ChatGPT exact GitHub review. No duplicate local broad profile is required.
+After acceptance, the remaining protected dependency is a separately reviewed
+administrator/operator provisioning design for the intended runtime principal's
+database write and parent-directory journal create/remove authority. The
+qualifier has no security-mutation authority. Production qualification and a
+manual ARM each require separate authorization; D2 remains after manual-session
+acceptance. B3Q remains consumed/no-retry and real-money placement remains NO-GO.
+
 ## 2026-10-12 - Architecture 134-D1Q runtime enablement implementation
 
 D1Q is implemented for source review on

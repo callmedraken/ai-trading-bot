@@ -10096,7 +10096,7 @@ ARCH134_ARMED_PAPER_SOURCE_PINS: Final = {
         "94288880c8899ddee7e5d5505c69d6ad093ec559"
     ),
     "src/trading_bot/review_paper/armed_session_host.py": (
-        "391b6cd2f4c15931e87d7dd2c71927578d0a866c"
+        "221bf261c89062fdc766168daca444231d4d4bb4"
     ),
     "scripts/run_production_paper_session.py": (
         "b2c99d36bfc8ee80f04a6e3a0be06e36feee547b"
@@ -10311,7 +10311,7 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "2554a8e0d5b86d68db6a277e530005e6dae87745"
     ),
     "src/trading_bot/review_paper/production_paper_runtime.py": (
-        "5636e94d539355f47eb504e00972387750108fbc"
+        "1771a63bca73c7a3bf82f91d7448b70a15043e59"
     ),
     "scripts/qualify_production_paper_runtime.py": (
         "7772ab5495b38d87ac50d2ad54b9633115b3d5de"
@@ -10323,7 +10323,7 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "a334b1bf1097477b1ff0807a07c81ffc7f7fcffb"
     ),
     "tests/review_paper/test_production_paper_runtime.py": (
-        "ba7401fa9ab825986a06daca27d2d2c76b0ba59b"
+        "ce754781f6bdca68609579b62f35c00a4da4720a"
     ),
     "tests/review_paper/test_armed_production_paper_session.py": (
         "82cbf0785399afd95e0065160d2a3e43245faaae"
@@ -10441,6 +10441,13 @@ def _arch134_production_paper_runtime_authority_check(
     """D1Q exact fixed-source closure; qualification remains separately protected."""
     failures = list(_arch134_armed_paper_authority_check(repo_root))
     forbidden = {
+        "SetNamedSecurityInfoW",
+        "SetFileSecurityW",
+        "SetSecurityInfo",
+        "chmod",
+        "chown",
+        "icacls",
+        "takeown",
         "CredWriteW",
         "CredDeleteW",
         "getenv",

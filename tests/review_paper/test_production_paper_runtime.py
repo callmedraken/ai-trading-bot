@@ -4,13 +4,19 @@ from __future__ import annotations
 
 import ctypes
 import json
+import os
+import socket
 import sqlite3
+import stat
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from tests.review_paper.test_armed_production_paper_session import (  # noqa: F401
+    AlpacaTransport,
+    Clock,
     harness,
     run,
 )
@@ -360,6 +366,381 @@ def cli_args(*extra):
     return ["--expected-head", "a" * 40, "--expected-tree", "b" * 40, *extra]
 
 
+def deny_probe(monkeypatch, path, fault):
+    """Inject VFS failures only on the existing-file native write connection."""
+    connect = sqlite3.connect
+    statements = []
+    uri = path.resolve().as_uri()
+
+    class Connection:
+        def __init__(self, real):
+            self.real = real
+            self.wrote = False
+
+        @property
+        def in_transaction(self):
+            return self.real.in_transaction
+
+        def execute(self, sql, parameters=()):
+            statements.append(sql)
+            if (
+                (fault == "begin" and sql == "BEGIN IMMEDIATE")
+                or (fault in {"write", "journal"} and sql.startswith("INSERT"))
+                or (fault == "rollback" and sql == "ROLLBACK")
+            ):
+                error = sqlite3.OperationalError("PRIVATE USER SID ACL PATH SECRET")
+                error.sqlite_errorcode = (
+                    sqlite3.SQLITE_READONLY
+                    if fault == "write"
+                    else sqlite3.SQLITE_IOERR
+                )
+                raise error
+            if fault == "rollback_noop" and sql == "ROLLBACK":
+                return self.real.execute("SELECT 1")
+            cursor = self.real.execute(sql, parameters)
+            if sql.startswith("INSERT"):
+                self.wrote = True
+            if (
+                fault == "readback"
+                and self.wrote
+                and sql.startswith("SELECT")
+                and parameters
+            ):
+                return SimpleNamespace(fetchone=lambda: ("wrong",))
+            return cursor
+
+        def close(self):
+            self.real.close()
+
+    def open_connection(database, *args, **kwargs):
+        if database == uri + "?mode=rw":
+            if fault == "readonly":
+                database = uri + "?mode=ro"
+            return Connection(connect(database, *args, **kwargs))
+        if fault == "postcheck" and database == uri + "?mode=ro":
+            raise sqlite3.OperationalError("PRIVATE USER SID ACL PATH SECRET")
+        return connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(runtime.sqlite3, "connect", open_connection)
+    return statements
+
+
+@pytest.mark.parametrize("store", ["paper", "session"])
+@pytest.mark.parametrize(
+    "fault",
+    [
+        "readonly",
+        "begin",
+        "write",
+        "journal",
+        "readback",
+        "rollback",
+        "rollback_noop",
+        "postcheck",
+    ],
+)
+def test_qualification_write_failure_blocks_without_semantic_mutation(
+    paths, fixed_reader, monkeypatch, tmp_path, capsys, store, fault
+):
+    runtime.provision_runtime()
+    before = {p.name: p.read_bytes() for p in paths.iterdir()}
+    path = runtime.PAPER_PATH if store == "paper" else runtime.SESSION_PATH
+    statements = deny_probe(monkeypatch, path, fault)
+    monkeypatch.setattr(runtime, "_admit_source", lambda *_: ())
+    monkeypatch.setattr(
+        runtime,
+        "persisted_oauth_availability",
+        lambda: pytest.fail("OAuth after failed probe"),
+    )
+    evidence = tmp_path / "write-evidence.json"
+    assert (
+        runtime.main(
+            cli_args(
+                "--qualify", runtime.QUALIFY_INTERLOCK, "--evidence", str(evidence)
+            )
+        )
+        == 3
+    )
+    result = json.loads(evidence.read_bytes())
+    assert result["status"] == "BLOCKED"
+    assert result[f"{store}_store_write_readiness"] == "BLOCKED"
+    other = "session" if store == "paper" else "paper"
+    assert result[f"{other}_store_write_readiness"] == "WRITE_READY"
+    assert fixed_reader.calls == []
+    assert result["paper_records"] == result["session_reservations"] == 0
+    assert all(
+        result[k] == 0
+        for k in (
+            "alpaca_http_calls",
+            "robinhood_application_calls",
+            "paper_trade_mutations",
+            "scheduler_mutations",
+            "broker_mutations",
+        )
+    )
+    if fault == "write":
+        assert (
+            statements.index("BEGIN IMMEDIATE")
+            < next(i for i, sql in enumerate(statements) if sql.startswith("INSERT"))
+            < statements.index("ROLLBACK")
+        )
+    assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
+    assert "PRIVATE" not in evidence.read_text() + capsys.readouterr().out
+
+
+@pytest.mark.skipif(os.name != "nt", reason="native Windows read-only file attribute")
+@pytest.mark.parametrize("store", ["paper", "session"])
+def test_native_windows_readonly_store_is_readable_but_not_write_ready(paths, store):
+    runtime.provision_runtime()
+    path = runtime.PAPER_PATH if store == "paper" else runtime.SESSION_PATH
+    before = {p.name: p.read_bytes() for p in paths.iterdir()}
+    # Test-only file attributes; no ACL/security API and no production path.
+    path.chmod(stat.S_IREAD)
+    try:
+        assert runtime.preflight_runtime()["status"] == "PRESENT_COMPATIBLE"
+        result = runtime.qualify_runtime_write_readiness()
+        assert result[f"{store}_store_write_readiness"] == "BLOCKED"
+        other = "session" if store == "paper" else "paper"
+        assert result[f"{other}_store_write_readiness"] == "WRITE_READY"
+        assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
+    finally:
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+
+
+def test_both_native_journals_readback_rollback_and_independent_reopen(
+    paths, monkeypatch
+):
+    runtime.provision_runtime()
+    before = {p.name: p.read_bytes() for p in paths.iterdir()}
+    connect = sqlite3.connect
+    events = []
+
+    class Connection:
+        def __init__(self, real, path):
+            self.real, self.path = real, path
+
+        @property
+        def in_transaction(self):
+            return self.real.in_transaction
+
+        def execute(self, sql, parameters=()):
+            cursor = self.real.execute(sql, parameters)
+            if sql.startswith("INSERT"):
+                assert Path(str(self.path) + "-journal").stat().st_size > 0
+                events.append((self.path.name, "journal"))
+            if sql == "ROLLBACK":
+                events.append((self.path.name, "rollback"))
+            assert sql != "COMMIT"
+            return cursor
+
+        def close(self):
+            self.real.close()
+
+    def open_connection(database, *args, **kwargs):
+        real = connect(database, *args, **kwargs)
+        for path in (runtime.PAPER_PATH, runtime.SESSION_PATH):
+            if database == path.resolve().as_uri() + "?mode=rw":
+                return Connection(real, path)
+            if database == path.resolve().as_uri() + "?mode=ro":
+                assert (path.name, "rollback") in events
+                events.append((path.name, "reopen"))
+        return real
+
+    monkeypatch.setattr(runtime.sqlite3, "connect", open_connection)
+    assert runtime.qualify_runtime_write_readiness() == {
+        "paper_store_write_readiness": "WRITE_READY",
+        "session_store_write_readiness": "WRITE_READY",
+    }
+    assert events == [
+        (name, phase)
+        for name in ("paper.sqlite", "armed-sessions.sqlite")
+        for phase in ("journal", "rollback", "reopen")
+    ]
+    assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
+    state = runtime.preflight_runtime()
+    assert state["paper_records"] == state["session_reservations"] == 0
+    assert state["paper_store_write_readiness"] == "NOT_CHECKED"
+
+
+@pytest.mark.parametrize("store", ["paper", "session"])
+def test_write_probe_lock_contention_blocks(paths, store):
+    runtime.provision_runtime()
+    path = runtime.PAPER_PATH if store == "paper" else runtime.SESSION_PATH
+    with sqlite3.connect(path) as lock:
+        lock.execute("BEGIN IMMEDIATE")
+        result = runtime.qualify_runtime_write_readiness()
+        assert result[f"{store}_store_write_readiness"] == "BLOCKED"
+        lock.rollback()
+    assert runtime.preflight_runtime()["session_reservations"] == 0
+
+
+@pytest.mark.parametrize("store", ["paper", "session"])
+def test_incompatible_journal_mode_is_preserved_not_repaired(paths, store):
+    runtime.provision_runtime()
+    path = runtime.PAPER_PATH if store == "paper" else runtime.SESSION_PATH
+    with sqlite3.connect(path) as connection:
+        assert connection.execute("PRAGMA journal_mode=WAL").fetchone() == ("wal",)
+    before = path.read_bytes()
+    assert (
+        runtime.qualify_runtime_write_readiness()[f"{store}_store_write_readiness"]
+        == "BLOCKED"
+    )
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "readiness",
+    [
+        {},
+        {"paper_store_write_readiness": "WRITE_READY"},
+        {"session_store_write_readiness": "WRITE_READY"},
+        {
+            "paper_store_write_readiness": "WRITE_READY",
+            "session_store_write_readiness": "NOT_CHECKED",
+        },
+    ],
+)
+def test_ready_requires_complete_both_store_evidence(
+    paths, fixed_reader, monkeypatch, tmp_path, readiness
+):
+    monkeypatch.setattr(runtime, "_admit_source", lambda *_: ())
+    monkeypatch.setattr(runtime, "qualify_runtime_write_readiness", lambda: readiness)
+    evidence = tmp_path / "out.json"
+    assert (
+        runtime.main(
+            cli_args(
+                "--qualify", runtime.QUALIFY_INTERLOCK, "--evidence", str(evidence)
+            )
+        )
+        == 3
+    )
+    assert json.loads(evidence.read_bytes())["status"] == "BLOCKED"
+    assert fixed_reader.calls == []
+
+
+def host_startup(monkeypatch, paths):
+    # Redirect only the fixed namespace to isolated test storage; keep the real
+    # host composition, store constructors, controller and provider factory.
+    for name in ("RUNTIME_ROOT", "PAPER_PATH", "SESSION_PATH"):
+        monkeypatch.setattr(host, name, getattr(runtime, name))
+    monkeypatch.setattr(host, "admit_armed_session_host", lambda *_: ())
+    clock = Clock()
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=UTC):
+            return clock.at.astimezone(tz)
+
+    monkeypatch.setattr(host, "datetime", FixedDateTime)
+    return clock
+
+
+@pytest.mark.parametrize("store", ["paper", "session"])
+def test_fixed_host_main_stops_before_reservation_and_provider_on_readonly(
+    paths, fixed_reader, monkeypatch, tmp_path, capsys, store
+):
+    runtime.provision_runtime()
+    host_startup(monkeypatch, paths)
+    before = {p.name: p.read_bytes() for p in paths.iterdir()}
+    deny_probe(
+        monkeypatch,
+        runtime.PAPER_PATH if store == "paper" else runtime.SESSION_PATH,
+        "write",
+    )
+    monkeypatch.setattr(
+        host,
+        "create_current_product_alpaca_provider",
+        lambda: pytest.fail("Alpaca composition"),
+    )
+    monkeypatch.setattr(
+        host,
+        "create_current_product_quote_adapter",
+        lambda: pytest.fail("Robinhood composition"),
+    )
+    assert (
+        host.main(
+            cli_args(
+                "--arm",
+                host.ARM_INTERLOCK,
+                "--evidence",
+                str(tmp_path / "session.json"),
+            )
+        )
+        == 3
+    )
+    result = json.loads(capsys.readouterr().err)
+    assert result["status"] == "BLOCKED"
+    assert result[f"{store}_store_write_readiness"] == "BLOCKED"
+    assert fixed_reader.calls == []
+    assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
+    assert not (tmp_path / "session.json").exists()
+
+
+def test_fixed_host_main_composes_provider_only_after_write_ready_and_reservation(
+    paths, fixed_reader, monkeypatch, tmp_path, capsys
+):
+    runtime.provision_runtime()
+    clock = host_startup(monkeypatch, paths)
+    # A real no-signal strategy path avoids any quote or synthetic execution.
+    transport = AlpacaTransport(closes=(10, 10, 12, 9))
+
+    def compose_transport():
+        assert ArmedSessionStore(runtime.SESSION_PATH).qualify() == 1
+        assert runtime.preflight_runtime()["paper_records"] == 0
+        return transport
+
+    monkeypatch.setattr(host, "StdlibAlpacaHistoricalBarsTransport", compose_transport)
+    monkeypatch.setattr(
+        host,
+        "create_current_product_quote_adapter",
+        lambda: pytest.fail("NO_SIGNAL quote"),
+    )
+    monkeypatch.setattr(host.time, "sleep", clock.sleep)
+    assert (
+        host.main(
+            cli_args(
+                "--arm",
+                host.ARM_INTERLOCK,
+                "--evidence",
+                str(tmp_path / "session.json"),
+            )
+        )
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "NO_SIGNAL"
+    assert len(transport.calls) == 4
+    assert fixed_reader.calls == [creds.API_KEY_TARGET, creds.API_SECRET_TARGET]
+    assert ArmedSessionStore(runtime.SESSION_PATH).qualify() == 1
+    assert runtime.preflight_runtime()["paper_records"] == 0
+
+
+def test_fixed_host_main_preflight_is_readonly_not_write_qualified(
+    paths, fixed_reader, monkeypatch, tmp_path, capsys
+):
+    runtime.provision_runtime()
+    host_startup(monkeypatch, paths)
+    before = {p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths.iterdir()}
+    monkeypatch.setattr(
+        host, "qualify_runtime_write_readiness", lambda: pytest.fail("preflight writes")
+    )
+    assert (
+        host.main(cli_args("--preflight", "--evidence", str(tmp_path / "session.json")))
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "RUNTIME_COMPATIBLE"
+    assert (
+        result["paper_store_write_readiness"]
+        == result["session_store_write_readiness"]
+        == "NOT_CHECKED"
+    )
+    assert fixed_reader.calls == []
+    assert before == {
+        p.name: (p.read_bytes(), p.stat().st_mtime_ns) for p in paths.iterdir()
+    }
+
+
 def test_cli_preflight_completely_effect_free(paths, monkeypatch, capsys):
     monkeypatch.setattr(runtime, "_admit_source", lambda *_: ())
     monkeypatch.setattr(runtime, "provision_runtime", lambda: pytest.fail("provision"))
@@ -381,6 +762,12 @@ def test_protected_fake_qualification_only_fixed_readiness(
     paths, fixed_reader, monkeypatch, tmp_path, capsys, available
 ):
     calls = []
+
+    def forbid_network(*args, **kwargs):
+        pytest.fail("qualification network effect")
+
+    monkeypatch.setattr(socket, "create_connection", forbid_network)
+    monkeypatch.setattr(socket.socket, "connect", forbid_network)
     monkeypatch.setattr(runtime, "_admit_source", lambda *_: ())
     monkeypatch.setattr(
         runtime,
@@ -406,6 +793,8 @@ def test_protected_fake_qualification_only_fixed_readiness(
     assert fixed_reader.calls == [creds.API_KEY_TARGET, creds.API_SECRET_TARGET]
     assert calls == ["token", "client"] and result["robinhood_credential_reads"] == 2
     assert result["alpaca_credential_reads"] == 2 and result["effect_counts_complete"]
+    assert result["paper_store_write_readiness"] == "WRITE_READY"
+    assert result["session_store_write_readiness"] == "WRITE_READY"
     assert all(
         result[key] == 0
         for key in (
@@ -421,6 +810,7 @@ def test_protected_fake_qualification_only_fixed_readiness(
         and "fake-" not in evidence.read_text() + capsys.readouterr().out
     )
     assert runtime.preflight_runtime()["session_reservations"] == 0
+    assert runtime.preflight_runtime()["paper_records"] == 0
 
 
 def test_invalid_interlock_and_evidence_stop_before_protected_effects(
@@ -532,6 +922,11 @@ def test_existing_session_and_fill_preserved(paths, harness):  # noqa: F811
         "session_reservations": 1,
     }
     assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
+    assert runtime.qualify_runtime_write_readiness() == {
+        "paper_store_write_readiness": "WRITE_READY",
+        "session_store_write_readiness": "WRITE_READY",
+    }
+    assert before == {p.name: p.read_bytes() for p in paths.iterdir()}
 
 
 def test_source_rejection_before_any_qualification_effect(
@@ -580,6 +975,9 @@ def test_no_overwrite_existing_evidence(paths, fixed_reader, monkeypatch, tmp_pa
         "import trading_bot.runtime.windows_effectful_capture_credentials\n",
         "def bad(reader):\n    reader.CredWriteW()\n",
         "def bad(reader):\n    reader.CredDeleteW()\n",
+        "def bad(security):\n    security.SetNamedSecurityInfoW()\n",
+        "def bad(security):\n    security.SetFileSecurityW()\n",
+        "def bad(path):\n    path.chmod(0)\n",
         "def bad(client):\n    client.call_tool('x', {})\n",
         "def bad(client):\n    client.get_equity_historicals({})\n",
         "def bad(client):\n    client.place_equity_order({})\n",

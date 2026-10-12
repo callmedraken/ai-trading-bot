@@ -31,7 +31,10 @@ from trading_bot.review_paper.armed_session_store import ArmedSessionStore
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
-from trading_bot.review_paper.production_paper_runtime import preflight_runtime
+from trading_bot.review_paper.production_paper_runtime import (
+    preflight_runtime,
+    qualify_runtime_write_readiness,
+)
 from trading_bot.review_paper.store import ReviewPaperStore
 from trading_bot.risk.models import RiskLimits
 from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter
@@ -197,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
                         else "BLOCKED",
                         "runtime_status": state["status"],
                         "credential_readiness": "NOT_CHECKED",
+                        "paper_store_write_readiness": "NOT_CHECKED",
+                        "session_store_write_readiness": "NOT_CHECKED",
                         "provider_calls": 0,
                         "paper_mutations": 0,
                     },
@@ -206,6 +211,19 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if state["status"] == "PRESENT_COMPATIBLE" else 3
         if preflight_runtime()["status"] != "PRESENT_COMPATIBLE":
             raise ValueError("qualified runtime required")
+        readiness = qualify_runtime_write_readiness()
+        if readiness != {
+            "paper_store_write_readiness": "WRITE_READY",
+            "session_store_write_readiness": "WRITE_READY",
+        }:
+            print(
+                json.dumps(
+                    {"schema": "armed-paper-host/v1", "status": "BLOCKED", **readiness},
+                    sort_keys=True,
+                ),
+                file=sys.stderr,
+            )
+            return 3
         result = run_armed_production_paper_session(
             contract=contract,
             store=ReviewPaperStore(PAPER_PATH, starting_cash=Decimal("10000")),

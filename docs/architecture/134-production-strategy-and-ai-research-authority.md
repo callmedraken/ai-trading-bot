@@ -829,7 +829,7 @@ stores, with full SQLite synchronous durability and writable-handle file flush.
 The parent `F:\AITradingBot` must already exist; no parent provisioning or
 fallback is introduced. Failed/partial material is preserved and blocks repeat
 attempts until separately reviewed. Compatible nonempty stores are preserved
-and report bounded paper/reservation counts. No fake reservation is inserted.
+and report bounded paper/reservation counts. No durable probe reservation is inserted.
 ReviewPaperStore adds read-only opening with unchanged default behavior;
 ArmedSessionStore exposes initialize/qualify without reserving.
 
@@ -840,9 +840,11 @@ ArmedSessionStore exposes initialize/qualify without reserving.
 runtime/credential effects. Preflight has zero credential/provider/paper/runtime
 write/scheduler/broker effects and writes no evidence. Protected qualification
 exclusively reserves bounded sanitized evidence, provisions/validates stores,
-reads exactly two Alpaca records, and reuses the reviewed Architecture-133
+proves rollback-only native write readiness on both fixed stores as specified
+by D1Q-R1 below, reads exactly two Alpaca records, and reuses the reviewed Architecture-133
 `persisted_oauth_availability()` (two fixed read-only records, no SDK/client,
-refresh/browser/MCP composition). Success reports READY_FOR_MANUAL_PAPER_SESSION,
+refresh/browser/MCP composition). Success requires both stores to report
+WRITE_READY and reports READY_FOR_MANUAL_PAPER_SESSION,
 two Alpaca and two OAuth reads, and zero HTTP/application/fill/scheduler/broker
 calls. Read failures retain uncertain counts as null with incomplete evidence.
 Qualification is evidence only and grants no manual-session authority.
@@ -860,3 +862,52 @@ refrozen deliberately. CI owns canonical ROBINHOOD; full-tests and local profile
 reruns are excluded on this mapped path. Real qualification and the subsequent
 manual session each require fresh authorization. D2 follows only after manual
 session acceptance; B3Q remains consumed/no-retry.
+
+### 134-D1Q-R1 - Native runtime write-readiness hardening
+
+Readable, compatible schemas are insufficient readiness evidence. Native Windows
+qualification discovered that BEGIN IMMEDIATE could succeed while the first
+INSERT returned SQLITE_READONLY. That earlier READY result is superseded and
+does not authorize a manual session.
+
+Protected qualification now opens each fixed database with SQLite mode=rw,
+timeout=0 and synchronous=FULL under the exact current process/account. No
+impersonation, elevation, alternate VFS, migration or repair is admitted. The
+existing DELETE journal mode is required without changing it. Each probe performs
+BEGIN IMMEDIATE, a harmless INSERT, exact readback and explicit ROLLBACK. The
+paper probe inserts only a nonsemantic sentinel into existing metadata, never a
+paper trade. The session probe inserts a non-session sentinel key and bounded
+nonsemantic blob into the existing reservation table. Neither sentinel is
+committed; no persistent schema is created. Existing probe-key collisions block.
+
+After close, a separate ordinary mode=ro connection verifies the exact schema,
+schema version, semantic count, sentinel absence and integrity. Fixed path/content
+admission and both canonical store reconstructions/counts are checked again.
+Read-only handles, journal/write denial, lock contention, readback failure,
+rollback/close failure, leftover sidecars or changed inventory fail closed.
+Partial/incompatible material is preserved, including unexpected SQLite sidecars;
+qualification never cleans or repairs it.
+
+Sanitized evidence adds paper_store_write_readiness and
+session_store_write_readiness, each NOT_CHECKED, BLOCKED or WRITE_READY. Both
+must equal WRITE_READY before credential readiness or READY. Evidence contains
+no ACLs, principal/SID/user data, arbitrary paths or native exception strings.
+Transient native journal writes are qualification effects, not paper fills or
+durable reservations. Credential/provider boundaries and fixed cash, strategy
+and paths are unchanged.
+
+Read-only runtime and host preflight remain compatibility observations and report
+NOT_CHECKED for write readiness. Armed host startup repeats both rollback probes
+under its own process/account before store construction, durable reservation or
+provider composition. A prior qualifier's privileges or evidence never transfer
+write authority to a later process. Probe success is a point-in-time observation;
+later drift still fails through the existing store/controller boundaries.
+
+The qualifier has no Windows security-mutation authority. Fixed-store file write
+and parent-directory journal creation/removal rights must be provisioned for the
+intended runtime principal by a separately reviewed administrator/operator design.
+Read/execute rights or directory creation by a privileged process alone do not
+establish that authority. No existing production ACL, ownership or file attribute
+is changed by this checkpoint. Real qualification and ARM remain separately
+authorized; source tests use only isolated temporary stores and fake credentials
+and providers. Canonical ROBINHOOD runs once through the existing mapped CI path.

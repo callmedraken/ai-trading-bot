@@ -660,6 +660,9 @@ independently on a separate branch.
 
 ## 134-D1 - Armed paper MVP source validation and remaining protected boundary
 
+This section retains historical D1 validation provenance. Its inert credential
+seam and later runtime next step are superseded by D1Q and D1Q-R1 below.
+
 134-D1 source tests use the concrete Alpaca daily provider/strict parser with a
 fake HTTPS transport, real B2 strategy/prior/snapshot/seed validation and real
 134-C/Architecture-131 PREPARE/EXECUTE cores. The only execution effect is a
@@ -718,3 +721,44 @@ real effects; both Ruff phases, git diff and authority checks PASS. Stop on
 source/identity drift, missing CI, any rejected/ambiguous provider/paper result,
 missing credential/runtime qualification, or any request to retry B3Q. Return
 only CI/commit identity or a failing source-gate summary for another review turn.
+
+## 134-D1Q-R1 - Rollback-only write readiness and host startup
+
+The old read-compatible-only READY criterion is replaced. Focused tests cover
+both readable but non-writable stores, native Windows read-only file attributes
+on test-only files, BEGIN IMMEDIATE success followed by first-write SQLITE_READONLY,
+journal/write denial, lock contention, failed readback/rollback/independent reopen,
+and real native journal creation followed by rollback and independent verification.
+Successful probes preserve exact database bytes/schema and zero new semantic rows;
+existing nonempty canonical history/reservations are also preserved.
+
+Direct armed_session_host.main() tests retain the fixed composition while
+redirecting the namespace to isolated test stores and faking source admission,
+clock, credentials and HTTP transport. A failed probe stops before reservation
+and either provider factory. A passing startup enters the real controller and
+fixed Alpaca provider factory only after durable reservation, then produces
+NO_SIGNAL with four fake history requests, zero quote/application calls and zero
+fills. Read-only host preflight never executes a write probe.
+
+Qualification tests require WRITE_READY for both stores and keep credential
+readiness unchanged. They reject network attempts and assert zero Alpaca HTTP,
+Robinhood application/MCP, paper trade, scheduler and broker mutations. Failure
+evidence is bounded and sanitized; incomplete credential counts remain unknown.
+Current-process write readiness grants no ACL/ownership repair or ARM authority.
+
+Run affected runtime/controller/store and checkpoint-authority tests, then both
+focused non-mutating Ruff phases and git diff --check. Ordinary push on the
+existing runtime branch selects arch134-production-paper-runtime and its mapped
+canonical ROBINHOOD certification. Wait for terminal CI and exact-source review;
+do not duplicate ROBINHOOD locally. No real qualification, production SQLite
+probe, credential access, session ARM or production ACL change is source testing.
+The next protected dependency is a separate operator provisioning design for
+the intended runtime principal's database and native journal write rights.
+
+Implementation verification passed 180 cases across runtime, host/controller
+and paper-store modules, followed by 196 cases across the finalized runtime
+regressions and checkpoint routing/authority checks (overlapping selections).
+Both focused Ruff phases and git diff --check passed. Tests used fresh external
+arch134d1qr1-focused-* roots with -B and -p no:cacheprovider. Native read-only
+file-attribute coverage passed on Windows against test-only databases. Final
+canonical profile evidence belongs to the mapped CI run on the pushed source.

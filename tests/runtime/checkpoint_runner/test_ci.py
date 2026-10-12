@@ -282,10 +282,12 @@ def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mut
     elif mutation == "aggregator":
         workflow = workflow.replace(
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, "
+            "certification-tests]\n"
             "    if: always()\n",
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, "
+            "certification-tests]\n"
             "    if: success()\n",
         )
     else:
@@ -478,9 +480,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
-    assert runner.CI_CERTIFICATION_PROFILES == {
-        "arch134-armed-paper-mvp": "robinhood"
-    }
+    assert runner.CI_CERTIFICATION_PROFILES == {"arch134-armed-paper-mvp": "robinhood"}
     assert (
         runner.resolve_ci_certification_profile("arch134-armed-paper-mvp")
         == "robinhood"

@@ -404,14 +404,16 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     certification_run_marker = (
         "      - name: Run canonical certification profile\n"
         "        env:\n"
-        "          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}\n"
+        "          CERT_PROFILE: "
+        "${{ needs.source-static.outputs.certification_profile }}\n"
     )
     certification_hygiene_marker = (
         "      - name: Enforce canonical certification hygiene budget\n"
         "        if: always()\n"
     )
     aggregate_policy = (
-        "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
+        "    needs: [source-static, active-tests, full-tests, "
+        "certification-tests]\n"
         "    if: always()\n"
         "    runs-on: ubuntu-latest\n"
         "    timeout-minutes: 5\n"
@@ -426,7 +428,8 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "          CERT_RESULT: ${{ needs.certification-tests.result }}\n"
         "          MODE: ${{ needs.source-static.outputs.mode }}\n"
         "          ROUTE: ${{ needs.source-static.outputs.route }}\n"
-        "          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}\n"
+        "          CERT_PROFILE: "
+        "${{ needs.source-static.outputs.certification_profile }}\n"
         "        run: |\n"
         "          set -euo pipefail\n"
         '          test "$STATIC_RESULT" = "success"\n'
@@ -499,7 +502,8 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and "workflow_dispatch:" in workflow
         and workflow.count(
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, "
+        "certification-tests]\n"
             "    if: always()\n"
         )
         == 1
@@ -507,6 +511,7 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and workflow.count("- name: Require source gate success") == 1
         and "verify arch" not in workflow
     )
+
 
 def _git_blob_sha1(path: Path) -> str:
     # Text mode normalizes Git's LF source across Windows checkout CRLF.

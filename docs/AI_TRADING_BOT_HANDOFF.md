@@ -1,53 +1,60 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-11 — Architecture 134-B3Q SOURCE ACCEPTED; ROBINHOOD gate selected
+## 2026-10-11 — Architecture 134-B3Q ROBINHOOD CERTIFIED; protected qualification ready
 
 Architecture **134-B3Q — Source-owned historical qualification operator** is
-**SOURCE ACCEPTED** on the exact executable/test source:
+**SOURCE ACCEPTED and ROBINHOOD CERTIFIED** on the exact final source:
 
 ~~~text
-BRANCH  feature/robinhood-production-strategy-live-paper
-HEAD    2a11a2597a2edad8351e50a25d9454420318089f
-TREE    80b16dd877c0c5a56f5572922d3fa4c77e940f4d
-SUBJECT feat: add Robinhood historical qualification operator
-CI      #484 / 38190487015 SUCCESS
+BRANCH     feature/robinhood-production-strategy-live-paper
+HEAD       473b18ce4cbc2ff9c7d4f793d7ae4e316e585471
+TREE       f7ffc107f9f9206e857049dd9ea178ec612a0c26
+SOURCE CI  #484 / 38190487015 SUCCESS
+DOCS CI    #485 / 38191544614 SUCCESS
 ~~~
 
-Exact review confirms one source-owned protected CLI for the already-scoped
-single read-only `get_equity_historicals` qualification. Frozen live semantics
-are SPY, `long_window=3`, four completed XNYS sessions, exact
-`interval=day`, `bounds=regular`, `adjustment_type=none`, no provider
-fallback and no retry. The accepted B3 parser/materializer and the exact
-four-tool MCP allowlist remain unchanged.
+The source-owned operator permits exactly one read-only
+`get_equity_historicals` qualification. Frozen live semantics are SPY,
+`long_window=3`, four completed XNYS sessions, exact `interval=day`,
+`bounds=regular`, `adjustment_type=none`, no provider fallback and no retry.
+The accepted B3 parser/materializer and exact four-tool MCP allowlist remain
+unchanged.
 
 The operator admits exact clean local/remote/live source identity before OAuth,
-rejects mixed import roots, reserves a fresh evidence file outside every
+rejects mixed import roots, reserves fresh bounded evidence outside every
 repository worktree, forbids interactive OAuth renewal, and re-admits source
 after the response. A durable `CALL_STARTED` ambiguity fence is fsynced before
-transport control; transport uncertainty remains
-`AMBIGUOUS_PROVIDER_EFFECT`. Returned structured data must pass the unchanged
-strict B3 parser and materializer or the qualification fails. Evidence is bounded
-canonical JSONL and omits free-form guide text and credential/provider error
-material. Offline replay cannot call the provider and cannot reconstruct or
-claim verification of the omitted guide bytes.
+transport control. Returned structured data must pass the unchanged strict B3
+parser and materializer. Evidence is canonical JSONL, omits free-form guide text
+and credential/provider error material, and supports provider-free replay only.
 
 Current inventory is active **60**, FULL **166**, ROBINHOOD **91**, LEGACY
-**205**, EXHAUSTIVE **371**. Focused implementation verification reported 602
-distinct passing cases, including 68 new B3Q cases. No real provider/OAuth call
-or other protected effect occurred.
+**205**, EXHAUSTIVE **371**. The selected fresh ROBINHOOD certification passed:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| robinhood-1 | 45 | 4,027 | 4,027 | 0 | 0 | 0 |
+| robinhood-2 | 46 | 4,310 | 4,310 | 0 | 0 | 0 |
+| Total | 91 | 8,337 | 8,337 | 0 | 0 | 0 |
+
+Wall time: **272.922 s**.
+
+Certification evidence:
+
+~~~text
+F:\AI\temp\certification\arch134b3q-robinhood-1a7d9742efd3439797c3ed713837e29c
+~~~
+
+No FULL, LEGACY or EXHAUSTIVE run is required.
 
 The previously granted user authorization for exactly one read-only
-`get_equity_historicals` qualification remains valid but **has not been
-consumed**. The canonical workflow requires one ROBINHOOD certification before a
-protected Robinhood qualification. Therefore the next gate is exactly one fresh
-ROBINHOOD certification on the final docs-only closeout source. No FULL,
-LEGACY or EXHAUSTIVE run is selected. If that certification passes, ChatGPT may
-consume the already-granted one-read authorization without asking again, provided
-the reviewed effect scope remains unchanged.
-
-A failed certification stops before provider access. A later live qualification
-result of FAIL or AMBIGUOUS_PROVIDER_EFFECT is also a STOP and grants no retry,
-SHADOW PREPARE, paper execution, scheduler mutation or broker effect.
+`get_equity_historicals` qualification remains valid and is still
+**unconsumed**. The next action is the provider/OAuth-free B3Q preflight on this
+exact final source. If preflight passes on a published XNYS session date, the
+same existing authorization may then be consumed for the one live historical
+read without another approval round. Any preflight failure, live FAIL or
+AMBIGUOUS_PROVIDER_EFFECT is a STOP and grants no retry, SHADOW PREPARE, paper
+execution, scheduler mutation or broker authority.
 
 
 ## 2026-10-11 — Architecture 134-B3 CERTIFIED/CLOSED

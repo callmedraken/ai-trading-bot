@@ -538,7 +538,7 @@ effect; persistence/operator wiring, SHADOW PREPARE, paper execution, scheduler
 mutation and broker placement remain outside this closure.
 
 
-## 134-B3Q — Source-owned historical qualification operator (SOURCE ACCEPTED)
+## 134-B3Q — Source-owned historical qualification operator (SOURCE ACCEPTED / ROBINHOOD CERTIFIED)
 
 B3's accepted parser, request, four-tool transport allowlist and materializer
 remain unchanged. B3Q prepares the already scoped single read-only qualification;
@@ -634,15 +634,24 @@ Exact GitHub review accepts B3Q source at
 `80b16dd877c0c5a56f5572922d3fa4c77e940f4d`; push-triggered source gate
 #484 / 38190487015 is terminal SUCCESS. No source correction is required.
 
-The previously granted user authorization for exactly one read-only
-`get_equity_historicals` qualification remains valid but unconsumed. Under the
-canonical certification ladder, a protected Robinhood qualification requires a
-fresh ROBINHOOD source-certification gate first. Select exactly one ROBINHOOD
-certification on the final docs-only closeout source; do not stack FULL,
-LEGACY or EXHAUSTIVE merely for confidence. A certification failure stops before
-provider access.
+The selected ROBINHOOD certification passed on the exact final
+docs-only source `473b18ce4cbc2ff9c7d4f793d7ae4e316e585471` /
+`f7ffc107f9f9206e857049dd9ea178ec612a0c26`: robinhood-1 passed
+4,027/4,027 across 45 modules; robinhood-2 passed 4,310/4,310 across
+46 modules; total **8,337/8,337**, zero skips/failures/errors, wall
+272.922 s. Evidence is preserved at:
 
-After a clean ROBINHOOD result, ChatGPT may consume the existing one-read
-authorization without asking again if this reviewed scope is unchanged. A live
-FAIL or AMBIGUOUS_PROVIDER_EFFECT remains a STOP with no automatic retry and no
-later SHADOW PREPARE, paper execution, scheduler mutation or broker authority.
+~~~text
+F:\AI\temp\certification\arch134b3q-robinhood-1a7d9742efd3439797c3ed713837e29c
+~~~
+
+No FULL, LEGACY or EXHAUSTIVE run is selected.
+
+The previously granted user authorization for exactly one read-only
+`get_equity_historicals` qualification remains valid and unconsumed. The next
+action is the provider/OAuth-free B3Q preflight on this exact final source. If
+preflight passes on a published XNYS session date, ChatGPT may consume the
+existing one-read authorization without another approval round because the
+reviewed effect scope is unchanged. Any preflight failure, live FAIL or
+AMBIGUOUS_PROVIDER_EFFECT is a STOP with no automatic retry and no later SHADOW
+PREPARE, paper execution, scheduler mutation or broker authority.

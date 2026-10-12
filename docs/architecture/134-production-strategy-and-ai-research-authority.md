@@ -434,13 +434,46 @@ certification obligation is deliberately batched with the next current-history
 acquisition/materialization checkpoint so that one coherent current-decision
 source is certified exactly once before any protected SHADOW PREPARE.
 
-## 134-B3 — Current Robinhood market-history evidence (implemented, review pending)
+## 134-B3 — Current Robinhood market-history evidence (CERTIFIED/CLOSED)
 
 The current source checkpoint remains `arch134-production-strategy-live-paper`
 on `feature/robinhood-production-strategy-live-paper`, with no preflight/execute
 registration. B3 adds two owned test modules to that existing source gate;
 active count stays 60. FULL/ROBINHOOD/LEGACY/EXHAUSTIVE inventory is now
 165/90/205/370. Frozen required baselines remain 122/49.
+
+B3 source/certification closeout:
+
+~~~text
+BRANCH      feature/robinhood-production-strategy-live-paper
+HEAD        7ef32ec87dbcfeea4d5436c424cdbb0eb16e1058
+TREE        738f078722337903ba7daf950bf19078167a75e4
+CHECKPOINT  arch134-production-strategy-live-paper
+CI          #482 / 38181823892 SUCCESS
+~~~
+
+The first ROBINHOOD certification on
+`fde8cb35256e4448fef20e666f00b0d687b3f423` ran 8,269 cases and failed only
+three stale current-profile inventory assertions. Its failed evidence is
+preserved at:
+
+~~~text
+F:\AI\temp\certification\arch134b3-robinhood-4eaa0b0201cf43a19c420d00d5bbced5
+~~~
+
+The bounded test-only correction changed no production behavior, authority,
+classification, topology or baselines. Final ROBINHOOD certification on the
+exact HEAD/TREE above passed **8,269/8,269** cases across **90** modules:
+robinhood-1 3,865/3,865 and robinhood-2 4,404/4,404, zero
+skips/failures/errors, wall 325.912 s. Evidence:
+
+~~~text
+F:\AI\temp\certification\arch134b3-robinhood-b14f5add0e5040599b093c7238b01a54
+~~~
+
+No FULL/LEGACY/EXHAUSTIVE rerun and no protected provider/OAuth/paper/scheduler/
+broker effect was required for B3 closure.
+
 
 `RobinhoodDailyHistoryRequest` derives exactly `long_window + 1` consecutive
 sessions through the exact bound XNYS calendar, checks them against the existing
@@ -493,11 +526,13 @@ The exact application read/review allowlist is now four public tools:
 enumeration requires all four; extra advertised broker tools never become
 application capabilities. Placement/cancel/options/crypto remain excluded.
 
-Real-server qualification remains outstanding. The published tool metadata
-documents raw `none` request semantics but no required response adjustment echo;
-request honoring must be qualified. Daily regular-open left-edge labels and
-explicit false interpolation/regular-session flags must also be qualified.
-`close_price` means the last trade in the regular daily bar, not an official
-settled close. Any mismatch blocks materialization rather than weakening the
-parser. Later persistence/operator wiring and real-server qualification require
-their own reviewed boundary; source acceptance grants no provider/OAuth effect.
+B3 source/certification is closed. Real-server qualification remains the next
+separately protected boundary. The published tool metadata documents raw
+`none` request semantics but no required response adjustment echo; request
+honoring must be qualified. Daily regular-open left-edge labels and explicit
+false interpolation/regular-session flags must also be qualified. `close_price`
+means the last trade in the regular daily bar, not an official settled close.
+Any mismatch blocks materialization rather than weakening the parser. The
+qualification may perform only the explicitly authorized read-only provider/OAuth
+effect; persistence/operator wiring, SHADOW PREPARE, paper execution, scheduler
+mutation and broker placement remain outside this closure.

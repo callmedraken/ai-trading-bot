@@ -1,11 +1,24 @@
 # Project Status and Roadmap
 
-## 2026-10-11 — Architecture 134-B3 implemented; source review pending
+## 2026-10-11 — Architecture 134-B3 CERTIFIED/CLOSED
 
-The B3 checkpoint extends the current application read/review surface to exactly
-four tools: `review_equity_order`, `get_equity_quotes`, `get_equity_orders`, and
-`get_equity_historicals`. `get_accounts` remains private/internal. No generic
-tool-call API, placement/cancel/options/crypto or provider fallback is added.
+Architecture **134-B3 — Current Robinhood market-history evidence** is
+**CERTIFIED/CLOSED** at the exact current-product source below:
+
+~~~text
+BRANCH      feature/robinhood-production-strategy-live-paper
+HEAD        7ef32ec87dbcfeea4d5436c424cdbb0eb16e1058
+TREE        738f078722337903ba7daf950bf19078167a75e4
+CHECKPOINT  arch134-production-strategy-live-paper
+CORRECTION  test: refresh current certification profile inventory
+CI          #482 / 38181823892 SUCCESS
+~~~
+
+The accepted B3 surface extends the application read/review allowlist to exactly
+four public tools: `review_equity_order`, `get_equity_quotes`,
+`get_equity_orders`, and `get_equity_historicals`. `get_accounts` remains
+private/internal. No generic tool-call API, placement/cancel/options/crypto or
+provider fallback is added.
 
 One bounded historical read supplies exactly the preceding configured
 long-window XNYS sessions plus the prior completed session. The current bar
@@ -13,31 +26,68 @@ passes existing daily-snapshot acceptance, canonical serialization and offline
 verification; preceding bars become canonical `StrategyHistorySeed` bytes and
 pass the unchanged strict verifier. The inner source remains `OFFLINE_SEED`
 and non-authoritative. Outer canonical evidence retains exact request arguments,
-response content, capture times and selected calendar sessions. Materialization
-returns bytes for later separately reviewed persistence; it owns no filesystem
-or durable-store write. Composition delegates once to accepted 134-B2.
+structured response content, capture times and selected calendar sessions.
+Materialization owns no filesystem or durable-store write and composition
+delegates exactly once to accepted 134-B2.
 
 Current inventories are active **60**, FULL **165**, ROBINHOOD **90**,
 LEGACY **205**, EXHAUSTIVE **370**; required baselines stay **122/49**.
 Earlier dated inventories and three-tool qualification records below are
 historical/superseded for the current B3 surface.
 
-Source tests use fakes and external temporary stores only. No real Robinhood,
-OAuth, provider, SHADOW PREPARE, paper execution, scheduler or broker effect is
-authorized or performed. No broad certification is part of B3 implementation.
+### Source and certification lineage
 
-Next owner: ChatGPT reviews the exact B3 GitHub commit/diff and terminal source
-gate. Acceptance remains pending. After acceptance, select the already batched
-ROBINHOOD certification before considering separately authorized real-server
-schema qualification and SHADOW PREPARE. Do not run FULL merely for confidence.
+The implementation commit `aec26fe3e84b5f476d097c8d6901f6656a35ec50`
+exposed one source-gate family-isolation defect in CI #480. The bounded
+`fde8cb35256e4448fef20e666f00b0d687b3f423` correction preserved independent
+checkpoint-family registration and reached terminal-green CI #481.
 
-Real-server assumptions still need qualification: explicit raw `none` requests
-are honored (the documented result has no required adjustment echo), every daily
-bar carries `session=reg` and `interpolated=false`, left-edge timestamps equal
-published regular-session openings, and the explicit range returns the complete
-series. Unknown/midnight labels, missing flags, incompatible adjustment echoes,
-insufficient/gapped/duplicate series or schema drift fail closed. `close_price`
-is the last regular-session trade, not an official settled close.
+The first ROBINHOOD certification on that source ran all 8,269 cases and found
+only three stale historical profile-count assertions. Its evidence is preserved
+and must not be overwritten or reused:
+
+~~~text
+F:\AI\temp\certification\arch134b3-robinhood-4eaa0b0201cf43a19c420d00d5bbced5
+~~~
+
+The final bounded test-only correction changed only those three current
+inventory assertions to FULL 165 / ROBINHOOD 90 / LEGACY 205 /
+EXHAUSTIVE 370. Source-gate CI #482 passed on the exact final HEAD/TREE above.
+
+Final fresh ROBINHOOD certification:
+
+| Lane | Modules | Cases | Passed | Skipped | Failed | Errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| robinhood-1 | 44 | 3,865 | 3,865 | 0 | 0 | 0 |
+| robinhood-2 | 46 | 4,404 | 4,404 | 0 | 0 | 0 |
+| Total | 90 | 8,269 | 8,269 | 0 | 0 | 0 |
+
+Wall time: **325.912 s**.
+
+Certification evidence:
+
+~~~text
+F:\AI\temp\certification\arch134b3-robinhood-b14f5add0e5040599b093c7238b01a54
+~~~
+
+No FULL/LEGACY/EXHAUSTIVE rerun was required. No real Robinhood/OAuth/provider,
+SHADOW PREPARE, paper execution, scheduler or broker effect was performed.
+
+### Next protected boundary
+
+The next step is a separately authorized, read-only real-server qualification
+of `get_equity_historicals` against the accepted B3 parser/authority. It must
+confirm that explicit raw `adjustment_type=none` requests are honored, every
+accepted daily bar carries `session=reg` and `interpolated=false`, left-edge
+timestamps equal published regular-session openings, and the explicit requested
+range returns the complete required session series. Unknown/midnight labels,
+missing flags, incompatible adjustment echoes, insufficient/gapped/duplicate
+series or schema drift remain fail-closed. `close_price` is the last
+regular-session trade, not an official settled close.
+
+That qualification is a real provider/OAuth read and requires fresh explicit
+authorization. It does not authorize SHADOW PREPARE, paper EXECUTE, scheduler
+mutation or any real broker order.
 
 
 ## 2026-10-11 — Architecture 134-C CERTIFIED/CLOSED

@@ -899,6 +899,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     reject_protected_opt_ins(dict(os.environ))
     identity = verify_source(args)
     _validate_pytest_temp_root(args)
+    if not args.plan:
+        args.temp_root.mkdir(parents=True, exist_ok=True)
     profile = getattr(args, "profile", "full")
     repository_inventory = discover_inventory(args.root)
     if profile not in PROFILES:

@@ -245,6 +245,7 @@ def test_all_profiles_retain_temp_root_requirement(
     with pytest.raises(runner.CertificationError, match="basetemp root"):
         runner.run(args)
 
+
 @pytest.mark.parametrize("profile", runner.PROFILES)
 def test_github_actions_runner_temp_descendant_is_allowed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
@@ -285,6 +286,7 @@ def test_github_actions_runner_temp_descendant_is_allowed(
     summary = runner.run(args)
 
     assert summary["status"] == "passed"
+    assert args.temp_root.is_dir()
 
 
 def test_github_actions_temp_root_outside_runner_temp_is_rejected(

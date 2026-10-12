@@ -1,5 +1,55 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-11 — Architecture 132-R3 CI-owned selected certification
+
+R3 serializes the expedited verification path without changing profile ownership
+or the R2 lane topology.
+
+An exact active checkpoint may be explicitly mapped in source to one canonical
+CI-owned profile: `robinhood` or `full`. No profile is inferred from branch
+name, changed paths, or product naming. A mapping change is itself reviewed
+workflow/certification authority.
+
+For a mapped non-docs push, GitHub runs:
+
+~~~text
+source-static
++ active checkpoint tests
++ scripts/run_test_certification.py --profile <mapped-profile>
+-> source-gates
+~~~
+
+The four-shard checkpoint-union broad job is skipped only for that mapped push,
+because the active checkpoint covers checkpoint-owned integration tests while
+the canonical profile independently discovers/admit all tests owned by that
+profile. Unmapped active pushes keep active + four-shard broad CI. FULL fallback
+and docs-only behavior remain distinct and fail closed.
+
+The canonical profile still uses exactly the Architecture-132 inventory,
+required-baseline, two-lane FULL/ROBINHOOD topology, JUnit validation,
+whole-repository Ruff/diff checks, protected-opt-in rejection, and exact
+source/live-remote admission before/after execution. Hosted GitHub execution may
+place pytest basetemps only below `RUNNER_TEMP`; human/local execution retains
+the frozen `F:\AI\temp\pytest` root.
+
+A successful CI-owned profile is final certification evidence for that exact
+HEAD/tree. Repeating the same profile locally is prohibited duplicate work unless
+the CI evidence is invalid/incomplete or a materially different host-specific
+gate is explicitly required.
+
+Both the checkpoint-union broad shard and CI-owned canonical profile have a
+**300-second hygiene ceiling**. Reaching or exceeding it fails the source gate
+and requires an audit before acceptance. Do not raise the ceiling as a substitute
+for fixing test-topology growth.
+
+134-D1 supplied the transition evidence: after broad CI was restored and stale
+topology corrected, its exact accepted source
+`e9e75bed815f5cdcffd474c4d01fad9c98a6403e` /
+`74b3dc7c1d550c5dbc4787ab475a0e7d0d8a4c8b` passed the selected ROBINHOOD
+profile **8,420/8,420** across 92 modules. Local wall time was **306.239 s**,
+which triggers this R3 serialization/hygiene response rather than another
+duplicated local run.
+
 ## 2026-10-11 — Normative test and certification workflow
 
 Verification is fail-fast before longer pytest/certification execution.
@@ -75,11 +125,12 @@ The latest reviewed certification topology is Architecture 132-R2:
   `robinhood-2`, with no serial lane;
 - LEGACY and EXHAUSTIVE alone retain the exact five-module serial safety lane.
 
-A human broad current-product run therefore uses
+A canonical current-product certification therefore uses
 `scripts/run_test_certification.py --profile full` (or the selected
-`--profile robinhood` when that narrower gate is the one ChatGPT chose), not a
-manually reconstructed three-lane repository suite and not raw monolithic
-pytest. Focused tests remain focused.
+`--profile robinhood`). Under R3 this normally runs in GitHub when the exact
+checkpoint has an explicit CI profile mapping; otherwise the human operator runs
+the materially distinct selected gate. Never reconstruct a three-lane repository
+suite or use raw monolithic pytest as certification. Focused tests remain focused.
 
 Audit chronology:
 

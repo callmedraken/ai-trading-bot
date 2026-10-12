@@ -1,5 +1,64 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-11 — Architecture 134-D1 ROBINHOOD CERTIFIED; expedited certification serialization
+
+Architecture **134-D1 — Armed paper MVP** is **ROBINHOOD CERTIFIED** on the
+exact accepted source:
+
+~~~text
+BRANCH      feature/robinhood-production-paper-mvp
+HEAD        e9e75bed815f5cdcffd474c4d01fad9c98a6403e
+TREE        74b3dc7c1d550c5dbc4787ab475a0e7d0d8a4c8b
+SOURCE CI   #490 / 38212683255 SUCCESS
+DOCS CI     #491 / 38213372457 SUCCESS
+PROFILE     ROBINHOOD
+MODULES     92
+CASES       8,420
+PASSED      8,420
+SKIPPED     0
+FAILED      0
+ERRORS      0
+WALL        306.239 s
+EVIDENCE    F:\AI\temp\certification\arch134d1-final-robinhood-967d12f34db441518945ed02a1963b0e
+~~~
+
+The selected plan admitted 45/47 modules across the two canonical Robinhood
+lanes. Certification re-admitted the exact clean local source and live feature/
+develop refs and completed the whole-repository static checks. No protected
+provider/OAuth/paper/scheduler/broker effect occurred.
+
+The 306.239-second local wall time crosses the project's approximately
+300-second hygiene signal. Rather than continue duplicating thousands of tests
+locally after terminal-green GitHub source CI, the next workflow checkpoint
+serializes **CI-owned selected certification**. A source-owned explicit mapping
+assigns a canonical `robinhood` or `full` profile only to reviewed coherent
+integration checkpoints. For a mapped non-docs push, GitHub runs the active
+checkpoint plus the canonical certification profile and skips the redundant
+four-shard checkpoint-union batch. Unmapped non-docs checkpoints retain the
+active + four-shard broad safety net. Docs-only remains cheap.
+
+The CI-owned certification uses the unchanged Architecture-132 profile
+inventory/lane semantics, exact HEAD/tree/branch plus live remote admission,
+JUnit/evidence validation, whole-repository Ruff/diff checks and protected-opt-in
+rejection. A hosted-runner temporary root is accepted only when it is a
+`RUNNER_TEMP` descendant; local certification retains the frozen
+`F:\AI\temp\pytest` requirement. Both broad shards and canonical CI
+certification fail the source gate at **>=300 seconds** and require a
+test-topology/hygiene review before acceptance.
+
+Once this serialization checkpoint is accepted, a terminal-green CI-owned
+canonical profile is the certification evidence for that exact source. The human
+operator does **not** rerun the same profile locally. Local commands are reserved
+for materially distinct host/runtime admission or separately authorized
+protected effects.
+
+The direct product path remains **134-D1Q runtime enablement**: narrow
+current-product Alpaca credential binding, Architecture-134 runtime/store
+qualification/provisioning, then one separately authorized manual armed paper
+session. Task Scheduler wiring follows only after the manual session is accepted.
+B3Q remains consumed/no-retry; real broker placement remains impossible.
+
+
 ## 2026-10-11 - Architecture 134-D1 armed paper MVP SOURCE ACCEPTED; ROBINHOOD certification selected
 
 Architecture **134-D1 — Armed paper MVP** is **SOURCE ACCEPTED** on the exact

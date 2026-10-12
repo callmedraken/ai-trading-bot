@@ -152,13 +152,15 @@ that implementation.
 All profiles retain whole-repository Ruff check/format and `git diff --check`,
 exact source/remote admission and final verification, JUnit/evidence validation,
 and external temporary-root requirements. ChatGPT chooses the appropriate tier
-after exact GitHub code review and source acceptance; users normally run local
-certification. The normal handoff remains implementation + focused checks ->
-exact-file commit/push -> ChatGPT exact GitHub code review -> source acceptance
--> appropriate certification tier -> docs closeout. The certification workflow
-is FOCUSED -> SOURCE-GATE CI -> ROBINHOOD when appropriate -> FULL at coherent
-current-product boundaries -> LEGACY/EXHAUSTIVE only when explicitly relevant,
-with PROTECTED separately authorized.
+after exact GitHub code review and source acceptance. When an exact checkpoint
+has a reviewed CI certification-profile mapping, GitHub owns that canonical
+ROBINHOOD/FULL run and the human operator must not rerun the same profile locally.
+Unmapped or materially host-specific certification remains local when selected.
+The normal handoff is implementation + focused checks -> exact-file commit/push
+-> terminal GitHub source gate/canonical mapped certification -> ChatGPT exact
+GitHub review/acceptance -> local host/protected gate only when materially
+distinct -> docs closeout. LEGACY/EXHAUSTIVE remain explicit exceptional gates;
+PROTECTED is always separately authorized.
 
 ## AI development workflow
 
@@ -219,8 +221,8 @@ boundary rather than presenting the effectful command as ordinary verification.
 - Do not re-investigate settled architecture decisions unless implementation exposes a concrete contradiction or blocker.
 - Keep implementation prompts narrow and avoid broad repository scans when relevant files and architecture documents are already known. Astra's broader exploration allowance applies only when discovery is part of the task.
 - Keep implementation reports to files changed, verification commands/results, commit/push result when authorized, and deviations or unresolved concerns.
-- Codex should run focused tests/checks while implementing. Broad/full repository suites, long integration/E2E suites, release certification, deployment, and operator Windows gates are normally run locally by the user when ChatGPT supplies the exact commands.
-- If a broad local certification run fails, diagnose the affected area, make only the bounded correction needed, and run focused verification before asking the user to rerun the broad suite. Do not repeatedly rerun expensive full suites during iteration.
+- Codex should run focused tests/checks while implementing. For checkpoints with an explicit reviewed CI certification-profile mapping, GitHub owns the canonical ROBINHOOD/FULL certification and its evidence; do not ask the user to rerun that same profile locally. Unmapped certification, deployment, host/runtime qualification, and protected Windows/operator gates remain local only when they provide materially distinct required evidence.
+- If a broad/canonical certification fails, diagnose from the preserved evidence, make only the bounded correction needed, and run focused verification before the replacement push. Do not repeatedly rerun expensive suites during iteration. A mapped replacement push lets GitHub rerun the canonical profile automatically.
 - The normal review handoff for bounded implementation is: Codex implements and runs focused checks; when the task prompt explicitly authorizes the checkpoint, Codex exact-file stages only the intended paths, verifies the staged filename set and diff check, creates a normal commit, and ordinary-pushes the isolated feature branch; ChatGPT then inspects the exact GitHub commit/diff. If commit/push authorization is withheld, Codex stops before those Git operations and reports the local changes.
 - Manual patch uploads or pasted large diffs are fallback-only when GitHub/tool review is unavailable; they are not the normal review workflow.
 - Routine exact-file staging/commit/ordinary-push operations may be delegated to Codex when the current task explicitly authorizes that checkpoint. This authorization never includes merge, rebase, amend, force-push, PR metadata/review-thread changes, branch switching, or unrelated files.

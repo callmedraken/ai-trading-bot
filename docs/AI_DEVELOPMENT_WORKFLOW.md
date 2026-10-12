@@ -1,5 +1,38 @@
 # AI Development and Review Workflow
 
+## CI-owned selected certification — normative expedited path
+
+For reviewed coherent integration checkpoints, the source gate may own the
+selected Architecture-132 certification profile directly. The mapping from exact
+checkpoint name to `robinhood` or `full` is source-owned, explicit, and
+fail-closed; there is no heuristic profile selection.
+
+For a mapped non-docs push:
+
+- `source-static` runs first and emits the exact checkpoint plus selected profile;
+- `active-tests` still runs the checkpoint-specific fast/current integration gate;
+- the canonical profile runs through `scripts/run_test_certification.py` in
+  GitHub Actions with the unchanged profile inventory and lane semantics;
+- the redundant four-shard checkpoint-union `full-tests` job is skipped;
+- `source-gates` requires source-static + active-tests + canonical certification
+  success before the source may advance.
+
+For an unmapped active non-docs push, retain active-tests plus the four-shard
+broad checkpoint-union safety net. FULL fallback retains the four-shard broad
+path. Docs-only retains the reviewed cheap path.
+
+A terminal-green CI-owned canonical certification on the exact source satisfies
+that profile obligation. Do not ask the human operator to rerun the same profile
+locally. Local certification is reserved for an unmapped selected gate, invalid
+or incomplete CI evidence, or materially different host/runtime evidence.
+Protected provider/OAuth/paper/scheduler/broker operations remain separately
+authorized and are never implied by source certification.
+
+The canonical CI profile and each broad shard have a 300-second hygiene ceiling.
+Crossing it is a STOP for source acceptance and triggers a test-topology/hygiene
+audit; do not normalize recurring >300-second verification by increasing the
+budget.
+
 ## Canonical source-gate topology non-regression notary — normative
 
 This rule is **normative**, not merely historical. The accepted source-gate
@@ -322,8 +355,10 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> relevant push-triggered CI/source gate is polled to terminal
 -> ChatGPT reviews the exact GitHub commit/diff
 -> ChatGPT accepts the reviewed source checkpoint
--> user runs the appropriate certification tier when ChatGPT declares its gate
--> ChatGPT accepts/rejects certification
+-> when the checkpoint has an explicit CI profile mapping, terminal GitHub CI
+   supplies the canonical certification and no duplicate local profile is run
+-> otherwise ChatGPT selects a materially distinct local certification only when required
+-> ChatGPT accepts/rejects the resulting certification evidence
 -> ChatGPT reviews/updates PROJECT_STATUS + HANDOFF
 -> ChatGPT automatically provides and, when safe, advances into the next
    actionable milestone

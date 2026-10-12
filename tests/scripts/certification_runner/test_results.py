@@ -244,3 +244,69 @@ def test_all_profiles_retain_temp_root_requirement(
     )
     with pytest.raises(runner.CertificationError, match="basetemp root"):
         runner.run(args)
+
+@pytest.mark.parametrize("profile", runner.PROFILES)
+def test_github_actions_runner_temp_descendant_is_allowed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, profile: str
+) -> None:
+    _profile_inventory(tmp_path, profile)
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner-temp"
+    runner_temp.mkdir()
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    monkeypatch.setattr(
+        runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_children",
+        lambda *args: {name: {"exit_code": 0} for name in _lane_names(profile)},
+    )
+    monkeypatch.setattr(
+        runner,
+        "run_static_checks",
+        lambda *args: {
+            name: {"exit_code": 0}
+            for name in ("ruff_check", "ruff_format", "git_diff_check")
+        },
+    )
+    args = SimpleNamespace(
+        root=tmp_path,
+        python=Path("python"),
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        evidence_dir=runner_temp / "evidence",
+        temp_root=runner_temp / "pytest",
+        plan=False,
+        profile=profile,
+    )
+
+    summary = runner.run(args)
+
+    assert summary["status"] == "passed"
+
+
+def test_github_actions_temp_root_outside_runner_temp_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runner_temp = tmp_path.parent / f"{tmp_path.name}-runner-temp"
+    runner_temp.mkdir()
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("RUNNER_TEMP", str(runner_temp))
+    monkeypatch.setattr(
+        runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
+    )
+    args = SimpleNamespace(
+        root=tmp_path,
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        profile="robinhood",
+        plan=False,
+        temp_root=tmp_path,
+    )
+
+    with pytest.raises(runner.CertificationError, match="RUNNER_TEMP"):
+        runner.run(args)
+

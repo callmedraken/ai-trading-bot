@@ -203,6 +203,14 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 )
 
 
+# Canonical certification profiles that GitHub owns for exact active checkpoints.
+# Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
+CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-armed-paper-mvp": "robinhood",
+}
+CI_CERTIFICATION_PROFILE_VALUES: Final = frozenset({"robinhood", "full"})
+
+
 CI_TEST_DURATION_WEIGHTS: Final = {
     # Frozen from successful source gate #422 (2026-10-10); unknown tests use 1s.
     "tests/execution/test_execution_models.py": 0.002,
@@ -292,8 +300,18 @@ def resolve_ci_checkpoint(
     return matches[0]
 
 
+def resolve_ci_certification_profile(checkpoint: str | None) -> str | None:
+    """Return the reviewed GitHub-owned certification profile for one checkpoint."""
+    if checkpoint is None:
+        return None
+    profile = CI_CERTIFICATION_PROFILES.get(checkpoint)
+    if profile is not None and profile not in CI_CERTIFICATION_PROFILE_VALUES:
+        raise RuntimeError(f"Unsupported CI certification profile: {profile}")
+    return profile
+
+
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze fast active routing plus the complete fail-closed batch fallback.
+    # Freeze active routing, CI-owned certification, broad fallback and aggregation.
     checkpoint_block = (
         "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
         + "".join(f"              {name} `\n" for name in ACTIVE_CI_CHECKPOINTS[:-1])
@@ -302,14 +320,17 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
     needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
     batch = "verify-batch @Checkpoints"
-    # Pin routing, aggregation and the measured broad execution window together.
     active_job = workflow.partition("  active-tests:\n")[2].partition(
         "\n  full-tests:\n"
     )[0]
     full_job = workflow.partition("  full-tests:\n")[2].partition(
+        "\n  certification-tests:\n"
+    )[0]
+    certification_job = workflow.partition("  certification-tests:\n")[2].partition(
         "\n  source-gates:\n"
     )[0]
     aggregate_job = workflow.partition("  source-gates:\n")[2]
+
     active_header = (
         "    needs: source-static\n"
         "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
@@ -319,13 +340,21 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     )
     full_header = (
         "    needs: source-static\n"
-        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY'\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.certification_profile == ''\n"
         "    runs-on: windows-latest\n"
         "    timeout-minutes: 20\n"
         "    strategy:\n"
         "      fail-fast: false\n"
         "      matrix:\n"
         "        shard: [0, 1, 2, 3]\n"
+    )
+    certification_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.certification_profile != ''\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
     )
     broad_start = (
         "      - name: Record broad test shard start\n"
@@ -372,8 +401,17 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "          }\n"
         "\n"
     )
+    certification_run_marker = (
+        "      - name: Run canonical certification profile\n"
+        "        env:\n"
+        "          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}\n"
+    )
+    certification_hygiene_marker = (
+        "      - name: Enforce canonical certification hygiene budget\n"
+        "        if: always()\n"
+    )
     aggregate_policy = (
-        "    needs: [source-static, active-tests, full-tests]\n"
+        "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
         "    if: always()\n"
         "    runs-on: ubuntu-latest\n"
         "    timeout-minutes: 5\n"
@@ -385,8 +423,10 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "          STATIC_RESULT: ${{ needs.source-static.result }}\n"
         "          ACTIVE_RESULT: ${{ needs.active-tests.result }}\n"
         "          FULL_RESULT: ${{ needs.full-tests.result }}\n"
+        "          CERT_RESULT: ${{ needs.certification-tests.result }}\n"
         "          MODE: ${{ needs.source-static.outputs.mode }}\n"
         "          ROUTE: ${{ needs.source-static.outputs.route }}\n"
+        "          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}\n"
         "        run: |\n"
         "          set -euo pipefail\n"
         '          test "$STATIC_RESULT" = "success"\n'
@@ -394,19 +434,28 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         '          if [ "$MODE" = "DOCS_ONLY" ]; then\n'
         '            test "$ACTIVE_RESULT" = "skipped"\n'
         '            test "$FULL_RESULT" = "skipped"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
+        '          elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "success"\n'
+        '            test "$FULL_RESULT" = "skipped"\n'
+        '            test "$CERT_RESULT" = "success"\n'
         '          elif [ "$ROUTE" = "ACTIVE" ]; then\n'
         '            test "$ACTIVE_RESULT" = "success"\n'
         '            test "$FULL_RESULT" = "success"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
         "          else\n"
         '            test "$ACTIVE_RESULT" = "skipped"\n'
         '            test "$FULL_RESULT" = "success"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
         "          fi\n"
     )
     return (
         active_job.startswith(active_header + "\n    steps:\n")
         and full_job.startswith(full_header + "\n    steps:\n")
+        and certification_job.startswith(certification_header + "\n    steps:\n")
         and workflow.count("  active-tests:\n") == 1
         and workflow.count("  full-tests:\n") == 1
+        and workflow.count("  certification-tests:\n") == 1
         and aggregate_job == aggregate_policy
         and full_job.count(broad_start) == 1
         and full_job.count(broad_hygiene) == 1
@@ -416,6 +465,23 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         < full_job.index(broad_execution)
         < full_job.index(broad_hygiene)
         < full_job.index("      - name: Upload full test evidence\n")
+        and certification_job.count(certification_run_marker) == 1
+        and certification_job.count(certification_hygiene_marker) == 1
+        and certification_job.count(
+            ".\\scripts\\run_test_certification.py `\n"
+            "              --profile $env:CERT_PROFILE"
+        )
+        == 1
+        and certification_job.count(
+            'Write-Host "CANONICAL_CERTIFICATION_WALL_SECONDS=$Wall"'
+        )
+        == 1
+        and certification_job.count("if ($Wall -ge 300)") == 1
+        and certification_job.count("exit 86") == 1
+        and certification_job.count(
+            "      - name: Upload canonical certification evidence\n"
+        )
+        == 1
         and workflow.count(checkpoint_block) == 1
         and workflow.count(batch) == 2
         and workflow.count(batch + "\n          exit $LASTEXITCODE") == 2
@@ -426,13 +492,14 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: static") == 2
         and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: tests") == 2
         and "resolve_ci_checkpoint(" in workflow
+        and "resolve_ci_certification_profile(" in workflow
         and "shard: [0, 1, 2, 3]" in workflow
         and "group: ${{ github.workflow }}-${{ github.ref }}" in workflow
         and "cancel-in-progress: true" in workflow
         and "workflow_dispatch:" in workflow
         and workflow.count(
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
             "    if: always()\n"
         )
         == 1
@@ -440,7 +507,6 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         and workflow.count("- name: Require source gate success") == 1
         and "verify arch" not in workflow
     )
-
 
 def _git_blob_sha1(path: Path) -> str:
     # Text mode normalizes Git's LF source across Windows checkout CRLF.

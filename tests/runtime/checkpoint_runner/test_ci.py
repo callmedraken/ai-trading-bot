@@ -216,9 +216,13 @@ def test_ci_workflow_fast_route_full_fallback_and_slim_artifacts():
     assert "resolve_ci_checkpoint(" in workflow
     assert (
         "  source-gates:\n"
-        "    needs: [source-static, active-tests, full-tests]\n"
+        "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
         "    if: always()\n" in workflow
     )
+    assert "resolve_ci_certification_profile(" in workflow
+    assert workflow.count("  certification-tests:\n") == 1
+    assert ".\\scripts\\run_test_certification.py `" in workflow
+    assert "CANONICAL_CERTIFICATION_WALL_SECONDS=" in workflow
     assert "- name: Require source gate success" in workflow
     assert workflow.index("classify-ci") < workflow.index(
         "Verify active checkpoint static authority"
@@ -278,10 +282,10 @@ def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mut
     elif mutation == "aggregator":
         workflow = workflow.replace(
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
             "    if: always()\n",
             "  source-gates:\n"
-            "    needs: [source-static, active-tests, full-tests]\n"
+            "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
             "    if: success()\n",
         )
     else:
@@ -412,67 +416,26 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
         ),
         pytest.param(
             "if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
-            "needs.source-static.outputs.route == 'ACTIVE'",
-            "if: needs.source-static.outputs.route == 'ACTIVE'",
-            id="active-docs",
+            "needs.source-static.outputs.certification_profile == ''",
+            "if: needs.source-static.outputs.mode != 'DOCS_ONLY'",
+            id="profile-skips-broad",
         ),
         pytest.param(
-            "if: needs.source-static.outputs.mode != 'DOCS_ONLY'\n    runs-on:",
             "if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
-            "needs.source-static.outputs.route == 'FULL'\n"
-            "    runs-on:",
-            id="broad-on-active",
+            "needs.source-static.outputs.certification_profile != ''",
+            "if: needs.source-static.outputs.mode != 'DOCS_ONLY'",
+            id="profile-certification-condition",
         ),
         pytest.param(
-            "if: needs.source-static.outputs.mode != 'DOCS_ONLY'\n    runs-on:",
-            "if: always()\n    runs-on:",
-            id="full-docs",
-        ),
-        pytest.param(
-            'elif [ "$ROUTE" = "ACTIVE" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "success"',
-            'elif [ "$ROUTE" = "ACTIVE" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "skipped"',
-            id="active-result",
-        ),
-        pytest.param(
-            'elif [ "$ROUTE" = "ACTIVE" ]; then\n'
+            'elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then\n'
             '            test "$ACTIVE_RESULT" = "success"\n'
-            '            test "$FULL_RESULT" = "success"',
-            'elif [ "$ROUTE" = "ACTIVE" ]; then\n'
+            '            test "$FULL_RESULT" = "skipped"\n'
+            '            test "$CERT_RESULT" = "success"',
+            'elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then\n'
             '            test "$ACTIVE_RESULT" = "success"\n'
-            '            test "$FULL_RESULT" = "skipped"',
-            id="active-full-result",
-        ),
-        pytest.param(
-            'else\n            test "$ACTIVE_RESULT" = "skipped"',
-            'else\n            test "$ACTIVE_RESULT" = "success"',
-            id="fallback-active-result",
-        ),
-        pytest.param(
-            "else\n"
-            '            test "$ACTIVE_RESULT" = "skipped"\n'
-            '            test "$FULL_RESULT" = "success"',
-            "else\n"
-            '            test "$ACTIVE_RESULT" = "skipped"\n'
-            '            test "$FULL_RESULT" = "skipped"',
-            id="fallback-full-result",
-        ),
-        pytest.param(
-            'if [ "$MODE" = "DOCS_ONLY" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "skipped"',
-            'if [ "$MODE" = "DOCS_ONLY" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "success"',
-            id="docs-active-result",
-        ),
-        pytest.param(
-            'if [ "$MODE" = "DOCS_ONLY" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "skipped"\n'
-            '            test "$FULL_RESULT" = "skipped"',
-            'if [ "$MODE" = "DOCS_ONLY" ]; then\n'
-            '            test "$ACTIVE_RESULT" = "skipped"\n'
-            '            test "$FULL_RESULT" = "success"',
-            id="docs-full-result",
+            '            test "$FULL_RESULT" = "success"\n'
+            '            test "$CERT_RESULT" = "skipped"',
+            id="profile-aggregate",
         ),
         pytest.param(
             "AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT: 4",
@@ -482,65 +445,27 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
         pytest.param("shard: [0, 1, 2, 3]", "shard: [0, 1, 2, 3, 4]", id="matrix"),
         pytest.param("fail-fast: false", "fail-fast: true", id="fail-fast"),
         pytest.param(
-            (
-                "      - name: Enforce broad test hygiene budget\n"
-                "        if: always()\n"
-                "        shell: powershell\n"
-                "        run: |\n"
-                "          $Started = "
-                "[int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS\n"
-                "          $Finished = "
-                "[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
-                "          $Seconds = [math]::Round(($Finished - $Started) / "
-                "1000.0, 3)\n"
-                '          Write-Host "BROAD_TEST_SHARD_SECONDS=$Seconds"\n'
-                "          if ($Seconds -ge 300) {\n"
-                '            Write-Host "::error::Broad test shard exceeded '
-                "the 300-second hygiene threshold ($Seconds s). Run a test "
-                'topology/hygiene audit before accepting this source."\n'
-                "            exit 86\n"
-                "          }\n"
-                "\n"
-            ),
-            "",
-            id="hygiene-step",
-        ),
-        pytest.param(
             "- name: Enforce broad test hygiene budget\n        if: always()",
             "- name: Enforce broad test hygiene budget\n        if: success()",
-            id="hygiene-always",
+            id="broad-hygiene-always",
         ),
         pytest.param(
-            "if ($Seconds -ge 300)", "if ($Seconds -gt 300)", id="hygiene-boundary"
+            "if ($Seconds -ge 300)", "if ($Seconds -ge 600)", id="broad-hygiene-budget"
         ),
         pytest.param(
-            "if ($Seconds -ge 300)", "if ($Seconds -ge 600)", id="hygiene-budget"
-        ),
-        pytest.param("exit 86", "exit 0", id="hygiene-exit"),
-        pytest.param(
-            (
-                "      - name: Record broad test shard start\n"
-                "        shell: powershell\n"
-                "        run: |\n"
-                "          $Started = "
-                "[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
-                '          "AI_TRADING_BOT_BROAD_SHARD_STARTED_MS=$Started" |\n'
-                "            Out-File -FilePath $env:GITHUB_ENV -Encoding "
-                "utf8 -Append\n"
-                "\n"
-            ),
-            "",
-            id="timer-start",
+            "- name: Enforce canonical certification hygiene budget\n"
+            "        if: always()",
+            "- name: Enforce canonical certification hygiene budget\n"
+            "        if: success()",
+            id="cert-hygiene-always",
         ),
         pytest.param(
-            "$Started = [int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS",
-            "$Started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()",
-            id="timer-observation",
+            "if ($Wall -ge 300)", "if ($Wall -ge 600)", id="cert-hygiene-budget"
         ),
         pytest.param(
-            "FULL_RESULT: ${{ needs.full-tests.result }}",
-            "FULL_RESULT: success",
-            id="aggregate-binding",
+            "CERT_RESULT: ${{ needs.certification-tests.result }}",
+            "CERT_RESULT: success",
+            id="cert-aggregate-binding",
         ),
         pytest.param("set -euo pipefail", "set +e", id="aggregate-fail-closed"),
     ],
@@ -550,6 +475,23 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(old) == 1
     assert not runner._batch_workflow_is_reviewed(workflow.replace(old, new, 1))
+
+
+def test_ci_certification_profile_mapping_is_explicit_and_bounded():
+    assert runner.CI_CERTIFICATION_PROFILES == {
+        "arch134-armed-paper-mvp": "robinhood"
+    }
+    assert (
+        runner.resolve_ci_certification_profile("arch134-armed-paper-mvp")
+        == "robinhood"
+    )
+    assert (
+        runner.resolve_ci_certification_profile(
+            "arch134-production-strategy-live-paper"
+        )
+        is None
+    )
+    assert runner.resolve_ci_certification_profile(None) is None
 
 
 def test_reviewed_active_batch_digest_matches_single_canonical_tuple():

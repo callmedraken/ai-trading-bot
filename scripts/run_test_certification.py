@@ -865,6 +865,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_pytest_temp_root(args: argparse.Namespace) -> None:
+    """Keep local certification on the frozen root; admit hosted CI runner temp."""
+    if args.plan:
+        return
+    requested = args.temp_root.resolve()
+    if requested == DEFAULT_TEMP_ROOT.resolve():
+        return
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        runner_temp_raw = os.environ.get("RUNNER_TEMP")
+        if runner_temp_raw:
+            runner_temp = Path(runner_temp_raw).resolve()
+            if requested == runner_temp or runner_temp in requested.parents:
+                return
+    raise CertificationError(
+        f"Pytest basetemp root must be {DEFAULT_TEMP_ROOT} locally or "
+        "a GitHub Actions RUNNER_TEMP descendant"
+    )
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     """Admit source, save exact topology, and optionally execute certification."""
     if bool(args.expected_feature_ref) != bool(args.expected_feature_head):
@@ -879,8 +898,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise CertificationError("Timeout must be positive")
     reject_protected_opt_ins(dict(os.environ))
     identity = verify_source(args)
-    if not args.plan and args.temp_root.resolve() != DEFAULT_TEMP_ROOT.resolve():
-        raise CertificationError(f"Pytest basetemp root must be {DEFAULT_TEMP_ROOT}")
+    _validate_pytest_temp_root(args)
     profile = getattr(args, "profile", "full")
     repository_inventory = discover_inventory(args.root)
     if profile not in PROFILES:

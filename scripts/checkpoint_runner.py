@@ -9622,7 +9622,118 @@ def _arch134_market_history_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS: Final = {
+    "src/trading_bot/robinhood_history_qualification.py": (
+        "a50921d45e69a875afcca054b33b8362aff16d07"
+    ),
+    "scripts/qualify_robinhood_history.py": "88d3d9c6e282fb3f69e8c39cd146cd2acad15b67",
+}
+
+
+def _arch134_history_qualification_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only B3Q admission; no execute registration or real provider check."""
+    failures: list[str] = []
+    allowed_imports = {
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "contextlib",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "json",
+        "logging",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "typing",
+        "warnings",
+        "zoneinfo",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.strategy_market_history",
+        "trading_bot.robinhood_history_qualification",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.historical",
+        "trading_bot.robinhood_mcp.models",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+    }
+    forbidden_calls = {
+        "get_accounts",
+        "_get_accounts",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "review_equity_order",
+        "review_market_order",
+        "call_tool",
+        "_invoke",
+        "_request_once",
+        "ReviewPaperStore",
+        "record_market_review",
+        "connect",
+        "execute",
+        "Popen",
+        "sleep",
+        "eval",
+        "exec",
+        "__import__",
+        "prepare_production_strategy_paper_cycle",
+        "execute_production_strategy_paper_cycle",
+    }
+    try:
+        for relative, pin in ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B3Q source drift: " + relative)
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B3Q import surface expanded: " + relative)
+            calls = [
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            ]
+            if set(calls) & forbidden_calls:
+                failures.append("134-B3Q effect surface expanded: " + relative)
+            if relative.startswith("src/"):
+                if (
+                    calls.count("get_equity_historicals") != 1
+                    or calls.count("equity_daily_history") != 1
+                ):
+                    failures.append("134-B3Q single-history binding drift")
+                if not {
+                    "parse_equity_historicals_response",
+                    "materialize_production_strategy_history",
+                    "RobinhoodDailyHistoryRequest",
+                    "RobinhoodReviewReadAdapter",
+                    "RobinhoodMcpStreamableHttpTransport",
+                    "admit_robinhood_paper_source",
+                } <= set(calls):
+                    failures.append("134-B3Q accepted boundary binding missing")
+    except (OSError, UnicodeError, SyntaxError, TypeError, ValueError):
+        failures.append("134-B3Q source boundary unavailable")
+    return tuple(failures)
+
+
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
+    "tests/review_paper/test_history_qualification.py",
     "tests/robinhood_mcp/test_historical.py",
     "tests/review_paper/test_strategy_market_history.py",
     "tests/robinhood_mcp/test_adapter.py",
@@ -9640,6 +9751,8 @@ ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
     "tests/runtime/test_strategy_history_seed.py",
 )
 ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
+    *ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS,
+    "tests/review_paper/test_history_qualification.py",
     *ARCH134_MARKET_HISTORY_SOURCE_PINS,
     "src/trading_bot/robinhood_mcp/adapter.py",
     "src/trading_bot/robinhood_mcp/sdk_transport.py",
@@ -9673,6 +9786,7 @@ def _arch134_production_strategy_live_paper_authority_check(
     failures = list(_arch134_production_strategy_decision_authority_check(repo_root))
     failures.extend(_arch134_current_decision_authority_check(repo_root))
     failures.extend(_arch134_market_history_authority_check(repo_root))
+    failures.extend(_arch134_history_qualification_authority_check(repo_root))
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
         if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:

@@ -536,3 +536,101 @@ Any mismatch blocks materialization rather than weakening the parser. The
 qualification may perform only the explicitly authorized read-only provider/OAuth
 effect; persistence/operator wiring, SHADOW PREPARE, paper execution, scheduler
 mutation and broker placement remain outside this closure.
+
+
+## 134-B3Q — Source-owned historical qualification operator (awaiting exact source review)
+
+B3's accepted parser, request, four-tool transport allowlist and materializer
+remain unchanged. B3Q prepares the already scoped single read-only qualification;
+source implementation/CI uses fakes only. This section is the current operator
+path; earlier B3 closure statements describe the pre-operator source boundary.
+It does not certify the live server or consume provider authorization.
+
+The reviewed entry point is `scripts/qualify_robinhood_history.py`. Its only
+operator inputs are exact expected source HEAD/TREE, an external fresh evidence
+file, and a mode/interlock. There are no symbol/window/time/interval/bounds/
+adjustment/account/provider arguments. Frozen v1 inputs are **SPY**,
+**long_window=3** (four completed sessions), and a 2/3 moving-average config
+used only for existing B3 materialization validation, never strategy evaluation.
+The desired quantity `1` is a required config field, not an order or risk input.
+
+One actual UTC clock observation supplies `requested_at`. The current New York
+session date must be published by existing XNYS authority; weekends, holidays,
+missing published coverage and insufficient predecessor coverage block before
+OAuth. The request selects exactly the three predecessors plus the prior
+completed session through `RobinhoodDailyHistoryRequest`. The resulting range
+is first regular open through last regular close, with exactly `interval=day`,
+`bounds=regular`, `adjustment_type=none` and `symbols=["SPY"]`. A pre-open
+observation on a published session date is permitted. Capture must remain on
+that same session date and follow both request and call-start observations.
+
+Before OAuth, require exact clean tracked/untracked/index source, fixed feature
+branch, fixed origin, local remote HEAD/TREE and live remote HEAD. Reject mixed
+`trading_bot` import roots. Re-admit exact source after the response. No fetching,
+branch repair or repository mutation belongs to the operator. Evidence must be
+an absolute fresh path outside every repository worktree with an existing
+parent. Exclusive creation rejects collision before OAuth/provider access.
+
+`--preflight` is provider/OAuth/credential-free and writes no evidence. It checks
+source/calendar/output readiness and reports the derived request; it grants no
+call authority. Protected execution requires the exact interlock
+`AUTHORIZE_ARCH134_B3Q_ONE_HISTORICAL_READ`. OAuth uses the accepted Windows
+factory with source-owned `http://127.0.0.1:8765/callback` and a browser handler
+that refuses interactive renewal. Persisted OAuth/session establishment and
+MCP capability enumeration remain the accepted transport's responsibilities.
+
+An enclosing transport exposes only `get_equity_historicals`, validates exact
+request arguments, and delegates at most once. No `get_accounts`, quotes,
+orders, review, placement, cancel, options, crypto, SHADOW PREPARE, store access,
+paper fill, scheduler/runtime mutation or broker execution is invoked.
+The four-tool allowlist and capability enumeration are not broadened. The raw
+structured response goes through the unchanged `RobinhoodReviewReadAdapter`
+and strict B3 parser, then unchanged `materialize_production_strategy_history`.
+Missing explicit flags, timestamp labeling, adjustment/schema drift, gaps,
+duplicates, reordering, extras and insufficient history remain failures.
+No transformation, alternate parser, fallback provider or retry can make a
+rejected live response pass.
+
+Evidence is a canonical JSONL journal bounded to **64 KiB**. Each complete
+record is flushed and fsynced. Reservation records `BLOCKED`/zero attempts;
+before transport control, a durable `CALL_STARTED` record carries
+`AMBIGUOUS_PROVIDER_EFFECT`/one attempt and the call-start timestamp. A
+terminal record reports `PASS`, `BLOCKED`, `FAIL` or
+`AMBIGUOUS_PROVIDER_EFFECT`, fixed reason, exact source HEAD/TREE/branch,
+arguments, ordered session dates, request/capture timestamps, tool and attempt
+count. Counts describe attempted transport-boundary calls, not proof that an
+HTTP application request was sent. Any unclassified transport failure is
+conservatively ambiguous, including a failure that may have occurred before
+sending. Returned structured data rejected by B3 is `FAIL`. All failures stop;
+none grants retry. Interruption or terminal publication failure leaves the
+pre-call ambiguity fence. Partial/truncated evidence must never be called PASS.
+Preserve it for read-only reconciliation and human review.
+
+Only strict-parser-validated historical `data` is retained, plus `guide_present`
+and hashes. Arbitrary `guide` text, malformed payloads, OAuth errors, credential
+material, URLs/auth capabilities and account identifiers are never persisted;
+provider stdout/stderr/logs/warnings are discarded. The SHA256 of the original
+canonical complete response is audit-only. A separate digest binds the retained
+canonical historical data. PASS evidence can be replayed with `--replay` through
+the same parser/materializer without any provider/OAuth call. Since the free-form
+guide is deliberately omitted, replay supplies a fixed nonblank disclosure only
+after checking canonical PASS evidence, source identity, ordered journal,
+arguments, sessions, capture ordering and retained-data digest. It neither
+reconstructs the original guide/snapshot audit bytes nor claims to verify the
+original full-response hash. All historical fields remain exact; this sanitized
+evidence replay cannot serve as a live-response fallback or strategy authority.
+
+B3Q belongs to existing `arch134-production-strategy-live-paper` registration.
+The registered source gate includes the new fake-only test module, CLI/operator
+Ruff paths and source/AST authority pins. `preflight=None`, `execute=None` stay
+unchanged: the CLI is the explicit separately reviewed protected surface, never
+an `ops.ps1 execute` effect. No workflow/topology/checkpoint-family change is
+needed. Active inventory stays **60**; FULL/ROBINHOOD/LEGACY/EXHAUSTIVE now
+**166/91/205/371**, required baselines unchanged **122/49**. Implementation runs
+focused checks only; no broad profile certification or real call is performed.
+
+The immediate handoff is ChatGPT exact GitHub review after terminal-green
+push-triggered source gate. Only then may ChatGPT consume the previously granted
+one-read authorization if this reviewed scope is unchanged. A failed or ambiguous
+qualification stops before any later SHADOW PREPARE/paper effect. Source review
+or preflight PASS alone is not authorization for any wider effect.

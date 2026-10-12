@@ -392,7 +392,7 @@ def test_source_registration_inventory_and_pins():
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-maintenance-rebind"
     assert runner.ACTIVE_CI_CHECKPOINTS[3] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 60
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 61
     assert spec.authority_check(ROOT) == ()
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -402,10 +402,10 @@ def test_source_registration_inventory_and_pins():
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 166,
-        "robinhood": 91,
+        "full": 167,
+        "robinhood": 92,
         "legacy": 205,
-        "exhaustive": 371,
+        "exhaustive": 372,
     }
 
 

@@ -856,3 +856,26 @@ def test_copied_local_authority_baseline_passes(tmp_path, copy, authority):
         Path(runner.__file__).read_bytes()
     )
     assert authority(root) == ()
+
+
+def test_reviewed_batch_pin_rejects_synchronized_source_and_runtime_drift(
+    tmp_path, monkeypatch
+):
+    root = _133e_authority_copy(tmp_path)
+    assert runner._arch133_host_scheduler_authority_check(root) == ()
+    path = root / "scripts/checkpoint_runner.py"
+    source = path.read_text(encoding="utf-8")
+    line = '    "arch134-armed-paper-mvp",\n'
+    assert source.count(line) == 1
+    path.write_text(source.replace(line, ""), encoding="utf-8")
+    monkeypatch.setattr(
+        runner,
+        "ACTIVE_CI_CHECKPOINTS",
+        tuple(
+            name
+            for name in runner.ACTIVE_CI_CHECKPOINTS
+            if name != "arch134-armed-paper-mvp"
+        ),
+    )
+    failures = runner._arch133_host_scheduler_authority_check(root)
+    assert "133-E batch registration drift" in failures

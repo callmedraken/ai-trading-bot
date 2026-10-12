@@ -133,6 +133,11 @@ RETAINED_CHECKPOINTS: Final = (
     "arch130-r8i-d1",
 )
 
+# Reviewed pin of the complete active tuple AST; refresh only with topology review.
+REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    "b0a403304ed0603897faf443c03a63b5bdccf40f9b71ef909ef1e6b4823d39d2"
+)
+
 ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-supervised-release-installation-operator",
     "arch133-robinhood-supervised-deployment-qualification",
@@ -297,8 +302,121 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
     needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
     batch = "verify-batch @Checkpoints"
+    # Pin routing, aggregation and the measured broad execution window together.
+    active_job = workflow.partition("  active-tests:\n")[2].partition(
+        "\n  full-tests:\n"
+    )[0]
+    full_job = workflow.partition("  full-tests:\n")[2].partition(
+        "\n  source-gates:\n"
+    )[0]
+    aggregate_job = workflow.partition("  source-gates:\n")[2]
+    active_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.route == 'ACTIVE'\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
+    )
+    full_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY'\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
+        "    strategy:\n"
+        "      fail-fast: false\n"
+        "      matrix:\n"
+        "        shard: [0, 1, 2, 3]\n"
+    )
+    broad_start = (
+        "      - name: Record broad test shard start\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
+        '          "AI_TRADING_BOT_BROAD_SHARD_STARTED_MS=$Started" |\n'
+        "            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append\n"
+        "\n"
+    )
+    broad_execution = (
+        "      - name: Verify full batch test shard\n"
+        "        env:\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX: ${{ matrix.shard }}\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT: 4\n"
+        "          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ "
+        "runner.temp }}/ai-trading-bot-checkpoints\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Checkpoints = @(\n"
+        "            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\\s+' |\n"
+        "              Where-Object { $_ -like 'arch*' }\n"
+        "          )\n"
+        "          & powershell.exe -NoProfile -ExecutionPolicy "
+        "Bypass -File .\\ops.ps1 verify-batch @Checkpoints\n"
+        "          exit $LASTEXITCODE\n"
+        "\n"
+    )
+    broad_hygiene = (
+        "      - name: Enforce broad test hygiene budget\n"
+        "        if: always()\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Started = [int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS\n"
+        "          $Finished = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
+        "          $Seconds = [math]::Round(($Finished - $Started) / 1000.0, 3)\n"
+        '          Write-Host "BROAD_TEST_SHARD_SECONDS=$Seconds"\n'
+        "          if ($Seconds -ge 300) {\n"
+        '            Write-Host "::error::Broad test shard exceeded '
+        "the 300-second hygiene threshold ($Seconds s). Run a test "
+        'topology/hygiene audit before accepting this source."\n'
+        "            exit 86\n"
+        "          }\n"
+        "\n"
+    )
+    aggregate_policy = (
+        "    needs: [source-static, active-tests, full-tests]\n"
+        "    if: always()\n"
+        "    runs-on: ubuntu-latest\n"
+        "    timeout-minutes: 5\n"
+        "\n"
+        "    steps:\n"
+        "      - name: Require source gate success\n"
+        "        shell: bash\n"
+        "        env:\n"
+        "          STATIC_RESULT: ${{ needs.source-static.result }}\n"
+        "          ACTIVE_RESULT: ${{ needs.active-tests.result }}\n"
+        "          FULL_RESULT: ${{ needs.full-tests.result }}\n"
+        "          MODE: ${{ needs.source-static.outputs.mode }}\n"
+        "          ROUTE: ${{ needs.source-static.outputs.route }}\n"
+        "        run: |\n"
+        "          set -euo pipefail\n"
+        '          test "$STATIC_RESULT" = "success"\n'
+        "\n"
+        '          if [ "$MODE" = "DOCS_ONLY" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "skipped"\n'
+        '            test "$FULL_RESULT" = "skipped"\n'
+        '          elif [ "$ROUTE" = "ACTIVE" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "success"\n'
+        '            test "$FULL_RESULT" = "success"\n'
+        "          else\n"
+        '            test "$ACTIVE_RESULT" = "skipped"\n'
+        '            test "$FULL_RESULT" = "success"\n'
+        "          fi\n"
+    )
     return (
-        workflow.count(checkpoint_block) == 1
+        active_job.startswith(active_header + "\n    steps:\n")
+        and full_job.startswith(full_header + "\n    steps:\n")
+        and workflow.count("  active-tests:\n") == 1
+        and workflow.count("  full-tests:\n") == 1
+        and aggregate_job == aggregate_policy
+        and full_job.count(broad_start) == 1
+        and full_job.count(broad_hygiene) == 1
+        and full_job.count(broad_execution) == 1
+        and full_job.count("      - name: Upload full test evidence\n") == 1
+        and full_job.index(broad_start)
+        < full_job.index(broad_execution)
+        < full_job.index(broad_hygiene)
+        < full_job.index("      - name: Upload full test evidence\n")
+        and workflow.count(checkpoint_block) == 1
         and workflow.count(batch) == 2
         and workflow.count(batch + "\n          exit $LASTEXITCODE") == 2
         and workflow.count(local_active) == 1
@@ -991,7 +1109,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
@@ -3710,7 +3828,7 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-G batch registration drift")
@@ -3808,7 +3926,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
@@ -3906,7 +4024,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
@@ -4010,7 +4128,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
@@ -4109,7 +4227,7 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
@@ -4224,7 +4342,7 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
@@ -4334,7 +4452,7 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
@@ -4432,7 +4550,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
@@ -4534,7 +4652,7 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
@@ -4633,7 +4751,7 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
@@ -4732,7 +4850,7 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
@@ -4828,7 +4946,7 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
@@ -4924,7 +5042,7 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
@@ -5022,7 +5140,7 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
@@ -5122,7 +5240,7 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
@@ -5230,7 +5348,7 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "dcb99cf01a8a2e4e214bbcb3c7d4ac7ba6aee6d857e54cfd810d6059fa5329a3"
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
             or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(

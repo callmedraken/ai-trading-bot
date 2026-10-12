@@ -241,7 +241,7 @@ jobs:
 
   full-tests:
     needs: source-static
-    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.route == 'FULL'
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY'
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
@@ -268,6 +268,13 @@ jobs:
             "ruff>=0.6,<1.0" `
             "tzdata>=2024.1,<2027.0"
 
+      - name: Record broad test shard start
+        shell: powershell
+        run: |
+          $Started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          "AI_TRADING_BOT_BROAD_SHARD_STARTED_MS=$Started" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Verify full batch test shard
         env:
           AI_TRADING_BOT_SOURCE_GATE_PHASE: tests
@@ -282,6 +289,19 @@ jobs:
           )
           & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-batch @Checkpoints
           exit $LASTEXITCODE
+
+      - name: Enforce broad test hygiene budget
+        if: always()
+        shell: powershell
+        run: |
+          $Started = [int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS
+          $Finished = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          $Seconds = [math]::Round(($Finished - $Started) / 1000.0, 3)
+          Write-Host "BROAD_TEST_SHARD_SECONDS=$Seconds"
+          if ($Seconds -ge 300) {
+            Write-Host "::error::Broad test shard exceeded the 300-second hygiene threshold ($Seconds s). Run a test topology/hygiene audit before accepting this source."
+            exit 86
+          }
 
       - name: Upload full test evidence
         if: always()
@@ -320,7 +340,7 @@ jobs:
             test "$FULL_RESULT" = "skipped"
           elif [ "$ROUTE" = "ACTIVE" ]; then
             test "$ACTIVE_RESULT" = "success"
-            test "$FULL_RESULT" = "skipped"
+            test "$FULL_RESULT" = "success"
           else
             test "$ACTIVE_RESULT" = "skipped"
             test "$FULL_RESULT" = "success"

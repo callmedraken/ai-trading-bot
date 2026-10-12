@@ -33,6 +33,14 @@ Crossing it is a STOP for source acceptance and triggers a test-topology/hygiene
 audit; do not normalize recurring >300-second verification by increasing the
 budget.
 
+R3 is accepted on `fecc7a7aacefa2b7253f36f5077935c6b76b5810` /
+`1eb3d2882af4fb06e17c9e8753d0418830e34790`, CI
+**#498 / 38217916400 SUCCESS**. The mapped ROBINHOOD profile selected 92 modules
+in 45/47-module lanes and recorded 8,416 passed / 1 skipped / 0 failed/errors in
+170.058 seconds. Active tests passed, the redundant four-shard union was skipped,
+and terminal source-gates passed. This exact result is the reference proof that
+mapped CI certification replaces a duplicate human rerun.
+
 ## Canonical source-gate topology non-regression notary — normative
 
 This rule is **normative**, not merely historical. The accepted source-gate
@@ -61,10 +69,14 @@ The accepted workflow contract is:
 
 - `source-static` always owns classification, static checks, and authority;
 - an exact registered feature-branch push routes to `active-tests`;
-- broad/fallback source changes route to four duration-balanced
-  `full-tests` shards `[0, 1, 2, 3]`;
+- an explicitly mapped integration checkpoint additionally routes to the
+  source-owned canonical `certification-tests` profile and skips the redundant
+  four-shard checkpoint-union batch;
+- unmapped active and broad/fallback source changes retain the four
+  duration-balanced `full-tests` shards `[0, 1, 2, 3]`;
 - `source-gates` is only the terminal aggregator and must depend on
-  `source-static`, `active-tests`, and `full-tests`;
+  `source-static`, `active-tests`, `full-tests`, and `certification-tests`,
+  requiring the exact applicable combination;
 - exact route resolution, source-gate phase controls, concurrency cancellation,
   exit-code propagation, and the terminal aggregator remain fail closed;
 - docs-only changes may skip test jobs only through the reviewed docs-only

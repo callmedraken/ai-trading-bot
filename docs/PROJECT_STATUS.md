@@ -1,63 +1,72 @@
 # Project Status and Roadmap
 
-## 2026-10-11 — Architecture 134-D1 ROBINHOOD CERTIFIED; expedited certification serialization
+## 2026-10-12 — Architecture 132-R3 expedited certification serialization ACCEPTED / CLOSED
 
-Architecture **134-D1 — Armed paper MVP** is **ROBINHOOD CERTIFIED** on the
-exact accepted source:
+The expedited certification workflow is **ACCEPTED and CLOSED** on the exact
+reviewed source:
 
 ~~~text
-BRANCH      feature/robinhood-production-paper-mvp
-HEAD        e9e75bed815f5cdcffd474c4d01fad9c98a6403e
-TREE        74b3dc7c1d550c5dbc4787ab475a0e7d0d8a4c8b
-SOURCE CI   #490 / 38212683255 SUCCESS
-DOCS CI     #491 / 38213372457 SUCCESS
-PROFILE     ROBINHOOD
-MODULES     92
-CASES       8,420
-PASSED      8,420
-SKIPPED     0
-FAILED      0
-ERRORS      0
-WALL        306.239 s
-EVIDENCE    F:\AI\temp\certification\arch134d1-final-robinhood-967d12f34db441518945ed02a1963b0e
+BRANCH        feature/robinhood-production-paper-mvp
+HEAD          fecc7a7aacefa2b7253f36f5077935c6b76b5810
+TREE          1eb3d2882af4fb06e17c9e8753d0418830e34790
+CI            #498 / 38217916400 SUCCESS
+ACTIVE-TESTS  SUCCESS
+PROFILE       ROBINHOOD
+MODULES       92
+LANES         45 / 47
+CASES         8,417
+PASSED        8,416
+SKIPPED       1
+FAILED        0
+ERRORS        0
+WALL          170.058 s
+FULL-TESTS    SKIPPED (mapped certification path)
+SOURCE-GATES  SUCCESS
 ~~~
 
-The selected plan admitted 45/47 modules across the two canonical Robinhood
-lanes. Certification re-admitted the exact clean local source and live feature/
-develop refs and completed the whole-repository static checks. No protected
-provider/OAuth/paper/scheduler/broker effect occurred.
+This is the first terminal-green proof of the serialized R3 path. For the mapped
+`arch134-armed-paper-mvp` checkpoint, GitHub runs source-static, the active
+checkpoint gate and the independently discovered canonical ROBINHOOD profile.
+The redundant four-shard active-checkpoint-union broad job is skipped only on
+that mapped path. Unmapped active pushes retain active + four-shard broad CI;
+fallback FULL routing retains the broad path; docs-only remains cheap.
 
-The 306.239-second local wall time crosses the project's approximately
-300-second hygiene signal. Rather than continue duplicating thousands of tests
-locally after terminal-green GitHub source CI, the next workflow checkpoint
-serializes **CI-owned selected certification**. A source-owned explicit mapping
-assigns a canonical `robinhood` or `full` profile only to reviewed coherent
-integration checkpoints. For a mapped non-docs push, GitHub runs the active
-checkpoint plus the canonical certification profile and skips the redundant
-four-shard checkpoint-union batch. Unmapped non-docs checkpoints retain the
-active + four-shard broad safety net. Docs-only remains cheap.
+The canonical profile still owns exact HEAD/tree/branch and live remote
+admission, profile inventory/required-baseline validation, JUnit evidence,
+whole-repository Ruff check/format, `git diff --check`, protected-opt-in
+rejection and final source re-admission. Hosted pytest temp roots are restricted
+to `RUNNER_TEMP`; local certification retains its established external temp-root
+contract.
 
-The CI-owned certification uses the unchanged Architecture-132 profile
-inventory/lane semantics, exact HEAD/tree/branch plus live remote admission,
-JUnit/evidence validation, whole-repository Ruff/diff checks and protected-opt-in
-rejection. A hosted-runner temporary root is accepted only when it is a
-`RUNNER_TEMP` descendant; local certification retains the frozen
-`F:\AI\temp\pytest` requirement. Both broad shards and canonical CI
-certification fail the source gate at **>=300 seconds** and require a
-test-topology/hygiene review before acceptance.
+R3 recovery exposed one hosted-Windows concurrency assumption in the D1 test
+suite. `ArmedSessionStore` intentionally uses SQLite `timeout=0`, so simultaneous
+contenders may both fail closed under lock contention. The test was corrected to
+prove the safety invariant that no more than one durable reservation can exist;
+production store behavior was unchanged. A subsequent run passed all test cases
+but found one repository formatting defect, which was corrected mechanically.
+CI #498 then passed the complete serialized gate.
 
-Once this serialization checkpoint is accepted, a terminal-green CI-owned
-canonical profile is the certification evidence for that exact source. The human
-operator does **not** rerun the same profile locally. Local commands are reserved
-for materially distinct host/runtime admission or separately authorized
-protected effects.
+The previously accepted local D1 certification remains valid historical evidence
+for `e9e75bed815f5cdcffd474c4d01fad9c98a6403e`: **8,420/8,420** in
+**306.239 s**. It motivated the R3 hygiene change; it is not to be repeated.
+From R3 onward, a terminal-green CI-owned canonical profile satisfies the same
+profile obligation for its exact source. The human operator must **not** rerun
+that same profile locally unless CI evidence is invalid/incomplete or a
+materially different host-specific gate is explicitly required.
 
-The direct product path remains **134-D1Q runtime enablement**: narrow
-current-product Alpaca credential binding, Architecture-134 runtime/store
-qualification/provisioning, then one separately authorized manual armed paper
-session. Task Scheduler wiring follows only after the manual session is accepted.
-B3Q remains consumed/no-retry; real broker placement remains impossible.
+Both canonical CI certification and the fallback broad shards retain the
+**>=300-second** hygiene STOP. CI #498's canonical certification completed in
+170.058 seconds, so no further performance audit is required now.
 
+No provider, OAuth, production-paper, scheduler or broker effect occurred during
+R3. B3Q remains consumed/no-retry and outside the MVP critical path.
+
+The direct product path is now **Architecture 134-D1Q runtime enablement**:
+implement the narrow current-product Alpaca credential binding and reviewed
+runtime/store admission/provisioning, then stop at the protected boundary for
+one manually armed paper session. **134-D2 Task Scheduler wiring follows only
+after that manual session is accepted.** Real broker placement remains
+impossible.
 
 ## 2026-10-11 - Architecture 134-D1 armed paper MVP SOURCE ACCEPTED; ROBINHOOD certification selected
 

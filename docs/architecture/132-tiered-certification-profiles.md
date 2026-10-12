@@ -50,6 +50,17 @@ profile **8,420/8,420** across 92 modules. Local wall time was **306.239 s**,
 which triggers this R3 serialization/hygiene response rather than another
 duplicated local run.
 
+R3 itself is **ACCEPTED/CLOSED** on
+`fecc7a7aacefa2b7253f36f5077935c6b76b5810` /
+`1eb3d2882af4fb06e17c9e8753d0418830e34790`, CI
+**#498 / 38217916400 SUCCESS**. The CI-owned ROBINHOOD profile selected the same
+92 modules in 45/47-module lanes and recorded **8,416 passed / 1 skipped /
+0 failed / 0 errors** in **170.058 s**. The active checkpoint passed,
+checkpoint-union `full-tests` was correctly skipped, whole-repository static
+certification checks passed, and terminal source-gates passed. This is the
+normative proof that a mapped terminal-green CI profile satisfies the selected
+profile obligation without a second human-run copy.
+
 ## 2026-10-11 — Normative test and certification workflow
 
 Verification is fail-fast before longer pytest/certification execution.

@@ -25,6 +25,7 @@ from trading_bot.review_paper.alpaca_windows_credentials import (
 from trading_bot.review_paper.armed_history_failure import history_failure_path
 from trading_bot.review_paper.armed_session import (
     ARM_INTERLOCK,
+    RECOVERY_INTERLOCK,
     ArmedSessionPolicy,
     run_armed_production_paper_session,
 )
@@ -47,7 +48,7 @@ from trading_bot.robinhood_paper_operator import admit_robinhood_paper_source
 from trading_bot.strategies import MovingAverageCrossoverConfig
 from trading_bot.strategies.production import ProductionStrategyContract
 
-BRANCH = "feature/robinhood-production-paper-history-diagnostics"
+BRANCH = "feature/robinhood-production-paper-history-recovery"
 ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 RUNTIME_ROOT = Path(r"F:\AITradingBot\Arch134D1")
 PAPER_PATH = RUNTIME_ROOT / "paper.sqlite"
@@ -65,6 +66,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--expected-tree", required=True)
     parser.add_argument("--evidence", required=True, type=Path)
     parser.add_argument("--arm", choices=(ARM_INTERLOCK,))
+    parser.add_argument("--recover-history", choices=(RECOVERY_INTERLOCK,))
+    parser.add_argument("--predecessor-execute-evidence", type=Path)
     parser.add_argument("--preflight", action="store_true")
     return parser
 
@@ -160,8 +163,11 @@ def admit_armed_session_host(head: str, tree: str) -> tuple[Path, ...]:
 def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
-        if (args.preflight and args.arm is not None) or (
-            not args.preflight and not args.arm
+        if sum(
+            (args.preflight, args.arm is not None, args.recover_history is not None)
+        ) != 1 or (
+            (args.recover_history is not None)
+            != (args.predecessor_execute_evidence is not None)
         ):
             raise ValueError("INVALID_ARGUMENTS")
         roots = admit_armed_session_host(args.expected_head, args.expected_tree)
@@ -181,6 +187,16 @@ def main(argv: list[str] | None = None) -> int:
             or output.resolve().is_relative_to(RUNTIME_ROOT.resolve())
         ):
             raise ValueError("evidence admission failed")
+        predecessor_output = args.predecessor_execute_evidence
+        if predecessor_output is not None and (
+            not predecessor_output.is_absolute()
+            or predecessor_output.exists()
+            or predecessor_output.is_symlink()
+            or not predecessor_output.parent.is_dir()
+            or any(predecessor_output.resolve().is_relative_to(root) for root in roots)
+            or predecessor_output.resolve().is_relative_to(RUNTIME_ROOT.resolve())
+        ):
+            raise ValueError("predecessor execution evidence admission failed")
         now = datetime.now(UTC)
         target = now.astimezone(ZoneInfo("America/New_York")).date()
         if NYSEPublishedRegularSessionAuthority().schedule_for(target) is None:
@@ -238,6 +254,8 @@ def main(argv: list[str] | None = None) -> int:
             evidence_path=output,
             execute_evidence_path=execution_output,
             arm_interlock=args.arm,
+            recovery_interlock=args.recover_history,
+            predecessor_execute_evidence_path=predecessor_output,
             clock=lambda: datetime.now(UTC),
             sleeper=time.sleep,
             admit_source=lambda: admit_armed_session_host(

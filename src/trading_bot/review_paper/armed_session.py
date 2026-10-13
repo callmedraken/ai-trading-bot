@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
-from uuid import UUID, uuid5
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from trading_bot.domain import OrderType, TimeInForce
@@ -25,12 +26,15 @@ from trading_bot.review_paper.armed_history_failure import (
     HistoryFailureClassification,
     HistoryFailureDetails,
     history_failure_path,
+    serialize_history_failure,
     write_history_failure,
 )
 from trading_bot.review_paper.armed_session_store import (
     ArmedSessionStatus,
     ArmedSessionStore,
+    armed_operation_id,
     evidence_bytes,
+    recovery_reason_for,
     write_session_evidence,
 )
 from trading_bot.review_paper.nyse_published_regular_sessions import (
@@ -60,7 +64,7 @@ from trading_bot.strategies.production import ProductionStrategyContract
 from trading_bot.strategies.production_decision import ProductionStrategyDecisionStatus
 
 ARM_INTERLOCK = "AUTHORIZE_ARCH134_D1_ONE_SYNTHETIC_PAPER_SESSION"
-_NAMESPACE = UUID("b719fe73-bc50-565d-9b77-c39da34008bd")
+RECOVERY_INTERLOCK = "AUTHORIZE_ARCH134_D1R2_ONE_PRE_EFFECT_HISTORY_RECOVERY"
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +105,19 @@ class _OneSessionArm:
         self.consumed = True
 
 
+class _OneSessionRecovery:
+    """Execution permission from a consumed recovery CAS, never a second ARM."""
+
+    def __init__(self, contract: ProductionStrategyContract) -> None:
+        self.contract = contract
+        self.consumed = False
+
+    def consume(self, contract: ProductionStrategyContract) -> None:
+        if self.consumed or contract is not self.contract:
+            raise ValueError("recovery execution already consumed or contract changed")
+        self.consumed = True
+
+
 def run_armed_production_paper_session(
     *,
     contract: ProductionStrategyContract,
@@ -110,7 +127,9 @@ def run_armed_production_paper_session(
     expected_branch: str,
     evidence_path: Path,
     execute_evidence_path: Path,
-    arm_interlock: str,
+    arm_interlock: str | None = None,
+    recovery_interlock: str | None = None,
+    predecessor_execute_evidence_path: Path | None = None,
     clock: Callable[[], datetime],
     sleeper: Callable[[float], None],
     admit_source: Callable[[], None],
@@ -120,22 +139,38 @@ def run_armed_production_paper_session(
     """Run one target date, one evaluation, one PREPARE and at most one EXECUTE.
 
     Source/secret factories are host-owned seams, never CLI-selected capabilities.
-    All exceptions are sanitized. Any reserved prior attempt is non-retryable;
-    only a matching durable NO_SIGNAL/PAPER_EXECUTED is reported completed.
+    All exceptions are sanitized. Normal ARM never retries a reservation.
+    Explicit recovery consumes one eligible pre-effect history predecessor CAS.
     """
     if (
         type(contract) is not ProductionStrategyContract
         or type(store) is not ReviewPaperStore
         or type(session_store) is not ArmedSessionStore
         or type(policy) is not ArmedSessionPolicy
-        or arm_interlock != ARM_INTERLOCK
+        or not (
+            (
+                arm_interlock == ARM_INTERLOCK
+                and recovery_interlock is None
+                and predecessor_execute_evidence_path is None
+            )
+            or (
+                arm_interlock is None
+                and recovery_interlock == RECOVERY_INTERLOCK
+                and type(predecessor_execute_evidence_path) is type(evidence_path)
+            )
+        )
     ):
         raise ValueError("session ARM admission rejected")
     key = f"armed-paper-session/v1:{contract.symbol}:{contract.target_session_date}"
-    material = ("armed-paper-result/v1", str(contract.contract_id))
-    operation_id = uuid5(_NAMESPACE, "".join(f"{len(x)}:{x}" for x in material))
+    operation_id = armed_operation_id(contract.contract_id)
     evidence: dict[str, object] = {
-        "schema": "armed-paper-session/v1",
+        "schema": "armed-paper-session/v2",
+        "strategy_contract": contract.to_json(),
+        "history_failure": None,
+        "recovery_count": 0,
+        "recovery_reason": None,
+        "predecessor_evidence": None,
+        "predecessor_sha256": None,
         "source_head": contract.source_head,
         "source_tree": contract.source_tree,
         "contract_id": str(contract.contract_id),
@@ -187,7 +222,82 @@ def run_armed_production_paper_session(
         or evidence_path.resolve() == execute_evidence_path.resolve()
     ):
         raise ValueError("session paths overlap")
-    prior = session_store.reserve(key, evidence)
+    recovering = recovery_interlock is not None
+    if recovering:
+        # Read-only rejection never changes the predecessor. The exact-byte CAS
+        # below is the only write granting a recovery attempt.
+        prior, predecessor_bytes = session_store.read(key)
+        try:
+            reason = recovery_reason_for(prior)
+            sessions = required_alpaca_history_sessions(contract)
+            if prior["historical_sessions"] != [
+                s.session_date.isoformat() for s in sessions
+            ]:
+                raise ValueError("recovery history differs")
+            schedule = NYSEPublishedRegularSessionAuthority().schedule_for(
+                contract.target_session_date
+            )
+            now = clock()
+            if type(now) is not datetime or now.tzinfo is None:
+                raise ValueError("invalid clock")
+            if schedule is None:
+                raise ValueError("missing session")
+            current = admit_review_paper_session(
+                schedule=schedule,
+                as_of=now,
+                opening_buffer=policy.opening_buffer,
+                closing_buffer=policy.closing_buffer,
+            )
+            expired = (
+                now.astimezone(ZoneInfo("America/New_York")).date()
+                != contract.target_session_date
+                or now >= current.admission_closes_at
+            )
+            if expired:
+                result = dict(evidence)
+                result["status"] = ArmedSessionStatus.SESSION_EXPIRED.value
+                write_session_evidence(evidence_path, evidence_bytes(result))
+                return result
+            if (
+                predecessor_execute_evidence_path.exists()
+                or predecessor_execute_evidence_path.is_symlink()
+                or execute_evidence_path.exists()
+                or execute_evidence_path.is_symlink()
+            ):
+                raise ValueError("execution evidence exists")
+            if any(
+                str(r.intent.order_id) == prior["operation_id"]
+                or (
+                    r.intent.symbol == contract.symbol
+                    and r.filled_at.astimezone(ZoneInfo("America/New_York")).date()
+                    == contract.target_session_date
+                )
+                for r in store.history()
+            ):
+                raise ValueError("existing paper fill")
+            evidence.update(
+                {
+                    "historical_sessions": prior["historical_sessions"],
+                    "operation_id": prior["operation_id"],
+                    "recovery_count": 1,
+                    "recovery_reason": reason,
+                    "predecessor_evidence": prior,
+                    "predecessor_sha256": sha256(predecessor_bytes).hexdigest(),
+                    "status": ArmedSessionStatus.RECOVERY_STARTED.value,
+                }
+            )
+            evidence_bytes(evidence)  # independently validate full lineage
+            admit_source()
+            persisted = session_store.publish(key, predecessor_bytes, evidence)
+        except Exception:
+            result = dict(prior)
+            result["status"] = ArmedSessionStatus.BLOCKED.value
+            write_session_evidence(evidence_path, evidence_bytes(result))
+            return result
+        operation_id = UUID(prior["operation_id"])
+        prior = None
+    else:
+        prior = session_store.reserve(key, evidence)
     if prior is not None:
         same = all(
             prior.get(k) == evidence[k]
@@ -222,7 +332,7 @@ def run_armed_production_paper_session(
         write_session_evidence(evidence_path, evidence_bytes(result))
         return result
     persisted = evidence_bytes(evidence)
-    arm = _OneSessionArm(contract)
+    arm = _OneSessionRecovery(contract) if recovering else _OneSessionArm(contract)
 
     def publish(status: ArmedSessionStatus) -> None:
         nonlocal persisted
@@ -466,28 +576,30 @@ def run_armed_production_paper_session(
     except _SessionTerminal:
         pass
     except ProductionHistoryAcquisitionFailure as failure:
-        # Retry prevention is durable before any fallible external diagnostic I/O.
-        publish(ArmedSessionStatus.BLOCKED)
         details = failure.details
+        diagnostic = ArmedHistoryFailureEvidence(
+            "armed-paper-history-failure/v1",
+            contract.source_head,
+            contract.source_tree,
+            contract.contract_id,
+            contract.target_session_date,
+            operation_id,
+            details.history_session,
+            details.read_ordinal,
+            details.classification,
+            details.transport_stage,
+            details.metadata_reason,
+            details.http_status,
+            details.provider_code,
+            evidence["alpaca_reads"],
+        )
+        evidence["history_failure"] = json.loads(serialize_history_failure(diagnostic))
+        # Durable classification and BLOCKED precede fallible external exports.
+        publish(ArmedSessionStatus.BLOCKED)
         try:
             write_history_failure(
                 diagnostic_path,
-                ArmedHistoryFailureEvidence(
-                    "armed-paper-history-failure/v1",
-                    contract.source_head,
-                    contract.source_tree,
-                    contract.contract_id,
-                    contract.target_session_date,
-                    operation_id,
-                    details.history_session,
-                    details.read_ordinal,
-                    details.classification,
-                    details.transport_stage,
-                    details.metadata_reason,
-                    details.http_status,
-                    details.provider_code,
-                    evidence["alpaca_reads"],
-                ),
+                diagnostic,
             )
         except Exception:
             # A failed export grants no retry and cannot suppress ordinary export.

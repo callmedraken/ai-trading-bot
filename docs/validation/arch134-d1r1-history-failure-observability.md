@@ -1,5 +1,13 @@
 # Architecture 134-D1R1 — Bounded history failure observability
 
+This document preserves the historical D1R1 acceptance/no-retry contract.
+Current-product recovery behavior is superseded only within the
+[D1R2 contract](arch134-d1r2-pre-effect-history-recovery.md), whose source
+acceptance remains pending terminal mapped CI and exact ChatGPT GitHub review.
+The fresh D1Q next step recorded below has completed on the docs-only parent;
+the supplied result is serialized in the current status/handoff. D1R1 did not
+authorize recovery, and its historical conclusions are not rewritten.
+
 ## 2026-10-13 — SOURCE ACCEPTED
 
 Exact accepted source:

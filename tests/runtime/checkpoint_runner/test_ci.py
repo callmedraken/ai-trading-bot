@@ -550,6 +550,22 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
             "ARCH134_RUNTIME_ACL_AST_PINS",
             "367c40b729e8f149ec4c0d2e63d8c9d18db51befb214e83a0e9d26d0c70d429b",
         ),
+        (
+            "ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES",
+            "e30e003129212123771fad4326f24862e074d982126a274f660bf2d31b5d6ba5",
+        ),
+        (
+            "ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES",
+            "d0cb70147df26eb7e489f4009cb8144223f529bb1396619adbe0dcedc2930aff",
+        ),
+        (
+            "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS",
+            "339c6ca847760c421ae536585728c9deced55a7f769b592fb2d9019d2892ca6f",
+        ),
+        (
+            "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS",
+            "8223c3f7ba506bfb3b69be5b9e59c0466faa4d31ec10ea54104a3f4cd0e80079",
+        ),
     ],
 )
 def test_d1r1_frozen_predecessor_authority_material(name, digest):
@@ -559,28 +575,29 @@ def test_d1r1_frozen_predecessor_authority_material(name, digest):
     assert hashlib.sha256(payload).hexdigest() == digest
 
 
-def test_d1r1_exact_successor_overlay_registration_and_frozen_refs():
-    armed = runner.ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES
+def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
+    armed = runner.ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES
     assert set(armed) == {
         "src/trading_bot/review_paper/" + name
         for name in (
-            "alpaca_strategy_history.py",
+            "armed_session_store.py",
             "armed_session.py",
             "armed_session_host.py",
         )
     }
-    assert set(runner.ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES) == set(armed)
+    assert set(runner.ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES) == set(armed)
     assert all(
         value != runner.ARCH134_ARMED_PAPER_SOURCE_PINS[path]
         for path, value in armed.items()
     )
-    successor = runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS
+    successor = runner.ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS
     diagnostic = "src/trading_bot/review_paper/armed_history_failure.py"
     assert set(successor) == set(
         runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS
     ) | {diagnostic}
     for path, value in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items():
         if path not in armed and path not in {
+            "src/trading_bot/review_paper/alpaca_strategy_history.py",
             "tests/review_paper/test_armed_production_paper_session.py",
             "tests/review_paper/test_production_paper_runtime.py",
             "tests/runtime/checkpoint_runner/test_ci.py",
@@ -597,9 +614,7 @@ def test_d1r1_exact_successor_overlay_registration_and_frozen_refs():
         == "feature/robinhood-production-paper-runtime-acl"
     )
     spec = specs[runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
-    assert (
-        spec.remote_branch == "feature/robinhood-production-paper-history-diagnostics"
-    )
+    assert spec.remote_branch == "feature/robinhood-production-paper-history-recovery"
     assert spec.preflight is spec.execute is None
     assert (
         spec.authority_check is runner._arch134_production_paper_runtime_authority_check
@@ -671,42 +686,42 @@ def test_d1r1_exact_successor_overlay_registration_and_frozen_refs():
         "unreviewed_runtime",
     ],
 )
-def test_d1r1_successor_authority_drift_fails_closed(monkeypatch, which):
+def test_d1r2_successor_authority_drift_fails_closed(monkeypatch, which):
     root = Path(runner.__file__).resolve().parents[1]
     path = "src/trading_bot/review_paper/armed_session.py"
     if which in {"armed_pin", "unreviewed_armed"}:
-        values = dict(runner.ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES)
+        values = dict(runner.ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES)
         values[
             path
             if which == "armed_pin"
-            else "src/trading_bot/review_paper/armed_session_store.py"
+            else "src/trading_bot/review_paper/production_paper_runtime.py"
         ] = "0" * 40
         monkeypatch.setattr(
-            runner, "ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES", values
+            runner, "ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES", values
         )
     elif which == "armed_import":
-        values = dict(runner.ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES)
+        values = dict(runner.ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES)
         values[path] = (*values[path], "unreviewed")
         monkeypatch.setattr(
-            runner, "ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES", values
+            runner, "ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES", values
         )
     elif which in {"runtime_pin", "new_pin", "unreviewed_runtime"}:
-        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS)
+        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS)
         target = (
             "src/trading_bot/review_paper/armed_history_failure.py"
             if which == "new_pin"
-            else "src/trading_bot/review_paper/armed_session_store.py"
+            else "src/trading_bot/review_paper/production_paper_runtime.py"
             if which == "unreviewed_runtime"
             else path
         )
         values[target] = "0" * 40
         monkeypatch.setattr(
-            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS", values
+            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS", values
         )
     else:
-        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS)
+        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS)
         values[path] = (*values[path], "unreviewed")
         monkeypatch.setattr(
-            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS", values
+            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS", values
         )
     assert runner._arch134_production_paper_runtime_authority_check(root)

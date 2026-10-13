@@ -10301,6 +10301,40 @@ ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES: Final = {
 }
 
 
+ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/armed_session.py": (
+        "f96d31447c0c25115d0f629e2cbcd47dc99ebd05"
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        "aa57fd196c24856f81af81b3ae9294362a1b01a3"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "a510ec78b984b4fcc6143176b15f35e367fd6311"
+    ),
+}
+ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/armed_session.py": (
+        *ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES[
+            "src/trading_bot/review_paper/armed_session.py"
+        ],
+        "json",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES[
+            "src/trading_bot/review_paper/armed_session_host.py"
+        ]
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        *ARCH134_ARMED_PAPER_IMPORTS[
+            "src/trading_bot/review_paper/armed_session_store.py"
+        ],
+        "hashlib",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.strategies.production",
+    ),
+}
+
+
 def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Exact source/AST closure; D1 gains no protected qualification authority."""
     failures = list(_arch134_production_strategy_live_paper_authority_check(repo_root))
@@ -10336,13 +10370,25 @@ def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
             or set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES) != reviewed_overrides
         ):
             failures.append("134-D1 unreviewed successor override")
+        recovery_overrides = {
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_store.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+        }
+        if (
+            set(ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES) != recovery_overrides
+            or set(ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES) != recovery_overrides
+        ):
+            failures.append("134-D1R2 unreviewed recovery override")
         pins = {
             **ARCH134_ARMED_PAPER_SOURCE_PINS,
             **ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES,
+            **ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES,
         }
         imports = {
             **ARCH134_ARMED_PAPER_IMPORTS,
             **ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES,
+            **ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES,
         }
         for relative, pin in pins.items():
             path = repo_root / relative
@@ -10656,8 +10702,28 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS: Final = {
 ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS: Final = (
     *ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
 )
+ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS,
+    **ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES,
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "e4f799b2a002311ed448c59406765fd675707b36"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "c904cdb38e09f004c6479bdf43bdfd64cf5366e1"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "1ccfe438470886b4d1db9d1dded254bbe49e577e"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS,
+    **ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES,
+}
 ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS: Final = (
-    *ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS,
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS,
     *ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
     *COMMON_RUFF_PATHS,
 )
@@ -10700,13 +10766,14 @@ def _arch134_production_paper_runtime_authority_check(
             "src/trading_bot/review_paper/alpaca_strategy_history.py",
             "src/trading_bot/review_paper/armed_session.py",
             "src/trading_bot/review_paper/armed_session_host.py",
+            "src/trading_bot/review_paper/armed_session_store.py",
             "tests/review_paper/test_armed_production_paper_session.py",
             "tests/review_paper/test_production_paper_runtime.py",
             "tests/runtime/checkpoint_runner/test_ci.py",
             "tests/runtime/checkpoint_runner/test_core.py",
         }
         diagnostic = "src/trading_bot/review_paper/armed_history_failure.py"
-        pins = ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS
+        pins = ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS
         if set(pins) != set(ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS) | {
             diagnostic
         } or any(
@@ -10715,25 +10782,27 @@ def _arch134_production_paper_runtime_authority_check(
             if relative not in reviewed_changes
         ):
             failures.append("134-D1Q unreviewed successor source override")
-        imports = ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS
+        imports = ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS
         expected_imports = (
             set(ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS)
             | set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES)
+            | set(ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES)
             | {diagnostic}
         )
         if set(imports) != expected_imports or any(
             imports.get(relative) != value
             for relative, value in ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS.items()
+            if relative not in ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES
         ):
             failures.append("134-D1Q unreviewed successor import override")
         for (
             relative,
             pin,
-        ) in ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS.items():
+        ) in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS.items():
             path = repo_root / relative
             if _git_blob_sha1(path) != pin:
                 failures.append("134-D1Q source drift: " + relative)
-            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS:
+            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imports = {
@@ -10747,7 +10816,7 @@ def _arch134_production_paper_runtime_authority_check(
                 for alias in node.names
             }
             if imports != set(
-                ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS[relative]
+                ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS[relative]
             ):
                 failures.append("134-D1Q import closure drift: " + relative)
             names = {
@@ -10760,7 +10829,7 @@ def _arch134_production_paper_runtime_authority_check(
             spec.tests != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS
             or spec.ruff_paths != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS
             or spec.remote_branch
-            != "feature/robinhood-production-paper-history-diagnostics"
+            != "feature/robinhood-production-paper-history-recovery"
             or spec.authority_check
             is not _arch134_production_paper_runtime_authority_check
             or spec.preflight is not None
@@ -11371,7 +11440,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             tests=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
             ruff_paths=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS,
             authority_check=_arch134_production_paper_runtime_authority_check,
-            remote_branch="feature/robinhood-production-paper-history-diagnostics",
+            remote_branch="feature/robinhood-production-paper-history-recovery",
             preflight=None,
             execute=None,
         ),

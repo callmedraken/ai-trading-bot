@@ -741,6 +741,71 @@ def test_fixed_host_main_preflight_is_readonly_not_write_qualified(
     }
 
 
+@pytest.mark.parametrize(
+    "flags",
+    [
+        ["--arm", host.ARM_INTERLOCK, "--recover-history", host.RECOVERY_INTERLOCK],
+        ["--preflight", "--recover-history", host.RECOVERY_INTERLOCK],
+        ["--recover-history", host.RECOVERY_INTERLOCK],
+        ["--arm", host.ARM_INTERLOCK, "--predecessor-execute-evidence", "unused.json"],
+        ["--recover-history", "yes"],
+    ],
+)
+def test_d1r2_cli_interlock_exclusion_before_source_or_effects(
+    monkeypatch, tmp_path, flags
+):
+    monkeypatch.setattr(
+        host, "admit_armed_session_host", lambda *_: pytest.fail("source access")
+    )
+    assert host.main(cli_args("--evidence", str(tmp_path / "out.json"), *flags)) == 3
+
+
+def test_d1r2_host_routes_recovery_separate_from_arm_with_no_real_edges(
+    paths, monkeypatch, tmp_path, capsys
+):
+    runtime.provision_runtime()
+    host_startup(monkeypatch, paths)
+    observed = []
+
+    def recovery_controller(**kwargs):
+        observed.append(kwargs)
+        assert kwargs["arm_interlock"] is None
+        assert kwargs["recovery_interlock"] == host.RECOVERY_INTERLOCK
+        assert (
+            kwargs["predecessor_execute_evidence_path"] == tmp_path / "old.execute.json"
+        )
+        return {"status": "NO_SIGNAL"}
+
+    monkeypatch.setattr(host, "run_armed_production_paper_session", recovery_controller)
+    monkeypatch.setattr(
+        host,
+        "create_current_product_alpaca_provider",
+        lambda: pytest.fail("real credential/provider"),
+    )
+    monkeypatch.setattr(
+        host,
+        "create_current_product_quote_adapter",
+        lambda: pytest.fail("real Robinhood"),
+    )
+    assert (
+        host.main(
+            cli_args(
+                "--evidence",
+                str(tmp_path / "new.json"),
+                "--recover-history",
+                host.RECOVERY_INTERLOCK,
+                "--predecessor-execute-evidence",
+                str(tmp_path / "old.execute.json"),
+            )
+        )
+        == 0
+    )
+    assert (
+        len(observed) == 1
+        and json.loads(capsys.readouterr().out)["status"] == "NO_SIGNAL"
+    )
+
+
 def test_cli_preflight_completely_effect_free(paths, monkeypatch, capsys):
     monkeypatch.setattr(runtime, "_admit_source", lambda *_: ())
     monkeypatch.setattr(runtime, "provision_runtime", lambda: pytest.fail("provision"))
@@ -994,17 +1059,17 @@ def test_d1q_authority_rejects_forbidden_expansion_with_refreshed_pin(
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
-    for relative in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS:
+    for relative in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS:
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text((root / relative).read_text(encoding="utf-8"), encoding="utf-8")
     relative = "src/trading_bot/review_paper/production_paper_runtime.py"
     path = tmp_path / relative
     path.write_text(path.read_text() + addition, encoding="utf-8")
-    pins = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS)
+    pins = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS)
     pins[relative] = runner._git_blob_sha1(path)
     monkeypatch.setattr(
-        runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS", pins
+        runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS", pins
     )
     monkeypatch.setattr(runner, "_arch134_armed_paper_authority_check", lambda _: ())
     assert any(

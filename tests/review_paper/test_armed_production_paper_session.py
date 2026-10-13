@@ -91,6 +91,8 @@ class AlpacaTransport:
         from urllib.parse import parse_qs, urlsplit
 
         self.calls.append(request)
+        if self.fault == "transport":
+            raise AlpacaTransportError(AlpacaTransportFailureStage.REQUEST)
         if self.fault == "exception":
             raise RuntimeError("SECRET-ALPACA-KEY https://authorization.invalid")
         params = parse_qs(urlsplit(request.target).query)
@@ -305,6 +307,414 @@ def harness(tmp_path, monkeypatch):
 
 def run(h, **changes):
     return subject.run_armed_production_paper_session(**(h.kwargs | changes))
+
+
+def legacy_predecessor(h):
+    """Build only a fake copy of the supplied frozen pre-D1R1 tuple."""
+    old_contract = host.ProductionStrategyContract(
+        date(2026, 10, 13),
+        "6bf8753b0cc8950ae27b32b6858b64d454c512f0",
+        "ce3feb2ac48e7aebc23970142aafed5059c447e7",
+        Symbol("SPY"),
+        MovingAverageCrossoverConfig(2, 3, Decimal("1")),
+    )
+    h.clock.at = datetime(2026, 10, 13, 14, tzinfo=UTC)
+    h.transport.fault = "exception"
+    value = run(h, contract=old_contract)
+    original = evidence_bytes(value)
+    for name in (
+        "strategy_contract",
+        "history_failure",
+        "recovery_count",
+        "recovery_reason",
+        "predecessor_evidence",
+        "predecessor_sha256",
+    ):
+        value.pop(name)
+    value["schema"] = "armed-paper-session/v1"
+    key = "armed-paper-session/v1:SPY:2026-10-13"
+    h.kwargs["session_store"].publish(key, original, value)
+    h.kwargs["contract"] = contract(date(2026, 10, 13))
+    h.transport.fault = None
+    h.transport.calls.clear()
+    return key, value
+
+
+def recover(h, label="recovery", **changes):
+    return run(
+        h,
+        arm_interlock=None,
+        recovery_interlock=subject.RECOVERY_INTERLOCK,
+        predecessor_execute_evidence_path=h.kwargs["execute_evidence_path"],
+        evidence_path=h.kwargs["evidence_path"].with_name(label + ".json"),
+        execute_evidence_path=h.kwargs["evidence_path"].with_name(
+            label + ".execute.json"
+        ),
+        **changes,
+    )
+
+
+@pytest.mark.parametrize("signal", [False, True])
+def test_d1r2_exact_legacy_recovers_once_original_operation_existing_pipeline(
+    harness, monkeypatch, signal
+):
+    h = harness
+    key, prior = legacy_predecessor(h)
+    monkeypatch.setattr(subject, "_OneSessionArm", lambda *_: pytest.fail("second ARM"))
+    if not signal:
+        h.transport.closes = (10, 11, 12, 13)
+    result = recover(h)
+    assert result["status"] == ("PAPER_EXECUTED" if signal else "NO_SIGNAL")
+    assert result["schema"] == "armed-paper-session/v2"
+    assert result["recovery_count"] == 1
+    assert result["predecessor_evidence"] == prior
+    assert result["operation_id"] == prior["operation_id"]
+    assert result["contract_id"] != prior["contract_id"]
+    assert result["source_head"] == h.kwargs["contract"].source_head
+    assert result["predecessor_evidence"]["source_head"] == prior["source_head"]
+    assert h.kwargs["session_store"].qualify() == 1
+    assert len(h.evaluations) == 1 and len(h.transport.calls) == 4
+    assert result["broker_placement_count"] == 0
+    if signal:
+        assert h.calls == ["quote", "operator"]
+        assert str(h.store.history()[0].intent.order_id) == prior["operation_id"]
+        assert result["prepare_attempts"] == result["execute_attempts"] == 1
+    else:
+        assert (
+            h.calls == []
+            and result["prepare_attempts"] == result["execute_attempts"] == 0
+        )
+    before = h.kwargs["session_store"].read(key)[1]
+    assert recover(h, "second")["status"] == "BLOCKED"
+    assert h.kwargs["session_store"].read(key)[1] == before
+    assert len(h.transport.calls) == 4
+
+
+@pytest.mark.parametrize("stage", ["provider", "fetch"])
+def test_d1r2_crash_after_durable_permission_prevents_recovery(
+    harness, stage, monkeypatch
+):
+    h = harness
+    key, _ = legacy_predecessor(h)
+    original = h.kwargs["alpaca_provider"]
+
+    def crash_provider():
+        durable, _ = h.kwargs["session_store"].read(key)
+        assert durable["recovery_count"] == 1
+        assert durable["status"] == "RECOVERY_STARTED"
+        if stage == "provider":
+            raise KeyboardInterrupt
+
+        def crash_fetch(*_):
+            durable, _ = h.kwargs["session_store"].read(key)
+            assert durable["status"] == "HISTORY_STARTED"
+            assert durable["recovery_count"] == 1
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(AlpacaDailySnapshotProvider, "fetch", crash_fetch)
+        return original()
+
+    with pytest.raises(KeyboardInterrupt):
+        recover(h, alpaca_provider=crash_provider)
+    before = h.kwargs["session_store"].read(key)[1]
+    assert recover(h, "after-crash")["status"] == "BLOCKED"
+    assert h.kwargs["session_store"].read(key)[1] == before
+    assert h.transport.calls == h.calls == h.evaluations == []
+
+
+def test_d1r2_concurrent_stale_read_only_one_caller_reacquires(harness, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    h = harness
+    legacy_predecessor(h)
+    h.transport.closes = (10, 11, 12, 13)
+    original = ArmedSessionStore.read
+    barrier = Barrier(2)
+
+    def synchronized_read(self, key):
+        value = original(self, key)
+        barrier.wait(timeout=10)
+        return value
+
+    monkeypatch.setattr(ArmedSessionStore, "read", synchronized_read)
+    with ThreadPoolExecutor(2) as pool:
+        futures = [pool.submit(recover, h, label) for label in ("caller-a", "caller-b")]
+        results = [f.result(timeout=20) for f in futures]
+    assert sorted(r["status"] for r in results) == ["BLOCKED", "NO_SIGNAL"]
+    assert len(h.transport.calls) == 4 and len(h.evaluations) == 1
+    assert h.kwargs["session_store"].qualify() == 1
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source_head", "c" * 40),
+        ("source_tree", "d" * 40),
+        ("contract_id", "00000000-0000-0000-0000-000000000000"),
+        ("operation_id", "00000000-0000-0000-0000-000000000000"),
+        ("target_session", "2026-10-12"),
+        ("historical_sessions", ["2026-10-07"]),
+        ("alpaca_reads", 2),
+        ("effect_counts_complete", True),
+        ("strategy_evaluations", 1),
+        ("prepare_attempts", 1),
+        ("execute_attempts", 1),
+        ("robinhood_get_equity_quotes", 1),
+        ("robinhood_get_accounts", 1),
+        ("robinhood_get_equity_orders", 1),
+        ("robinhood_review_equity_order", 1),
+        ("paper_mutations", 1),
+        ("paper_mutations", None),
+        ("broker_placement_count", 1),
+        ("strategy_outcome", "NO_SIGNAL"),
+        ("prepare_result", "READY_TO_PROCEED"),
+        ("execute_result", "PASS"),
+        ("proposal_id", "00000000-0000-0000-0000-000000000000"),
+        ("order_id", "00000000-0000-0000-0000-000000000000"),
+        ("fill_id", "00000000-0000-0000-0000-000000000000"),
+        ("status", "HISTORY_STARTED"),
+        ("status", "READY_TO_PROCEED"),
+        ("status", "EXECUTE_STARTED"),
+    ],
+)
+def test_d1r2_any_frozen_or_downstream_fact_mismatch_blocks(harness, field, value):
+    h = harness
+    key, prior = legacy_predecessor(h)
+    prior[field] = value
+    # Deliberately inject even invalid bytes to exercise read-time admission.
+    payload = (json.dumps(prior, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    with sqlite3.connect(h.kwargs["session_store"].path) as db:
+        db.execute(
+            "UPDATE armed_session_v1 SET evidence=? WHERE session_key=?", (payload, key)
+        )
+    before = h.kwargs["session_store"].path.read_bytes()
+    try:
+        assert recover(h)["status"] == "BLOCKED"
+    except ValueError:
+        pass
+    assert h.kwargs["session_store"].path.read_bytes() == before
+    assert h.transport.calls == h.calls == h.evaluations == []
+
+
+@pytest.mark.parametrize("boundary", ["execute", "fill", "expired", "source"])
+def test_d1r2_existing_effect_expiry_and_source_boundaries(
+    harness, boundary, monkeypatch
+):
+    h = harness
+    key, _ = legacy_predecessor(h)
+    if boundary == "execute":
+        h.kwargs["execute_evidence_path"].write_bytes(b"existing")
+    elif boundary == "fill":
+        monkeypatch.setattr(
+            ReviewPaperStore,
+            "history",
+            lambda _: (
+                SimpleNamespace(
+                    intent=SimpleNamespace(
+                        symbol=Symbol("SPY"),
+                        order_id=UUID("8e8c5102-8b52-5534-8288-b3261f65b2d4"),
+                    ),
+                    filled_at=h.clock.at,
+                ),
+            ),
+        )
+    elif boundary == "expired":
+        h.clock.at = h.clock.at.replace(hour=20)
+    else:
+        h.fail_source_after = (
+            h.source_calls + 2
+        )  # initial source passes; CAS admission fails
+    before = h.kwargs["session_store"].read(key)[1]
+    assert recover(h)["status"] == (
+        "SESSION_EXPIRED" if boundary == "expired" else "BLOCKED"
+    )
+    assert h.kwargs["session_store"].read(key)[1] == before
+    assert h.transport.calls == h.calls == h.evaluations == []
+
+
+@pytest.mark.parametrize(
+    "classification,status,eligible",
+    [
+        ("TRANSPORT_FAILED", None, True),
+        ("HTTP_FAILED", 429, True),
+        ("HTTP_FAILED", 500, True),
+        ("HTTP_FAILED", 599, True),
+        ("HTTP_FAILED", 401, False),
+        ("HTTP_FAILED", 403, False),
+        ("HTTP_FAILED", 408, False),
+        ("HTTP_FAILED", None, False),
+        ("PROVIDER_RESPONSE_INVALID", None, False),
+        ("CAPTURE_OBSERVATION_REJECTED", None, False),
+        ("SNAPSHOT_ACCEPTANCE_REJECTED", None, False),
+        ("SNAPSHOT_VERIFICATION_REJECTED", None, False),
+        ("VERIFIED_HISTORY_REJECTED", None, False),
+        ("HISTORY_SEED_REJECTED", None, False),
+        ("INTERNAL_FAILED", None, False),
+        ("PROVIDER_CONSTRUCTION_FAILED", None, False),
+        (None, None, False),
+    ],
+)
+def test_d1r2_future_durable_closed_failure_policy(
+    harness, classification, status, eligible
+):
+    h = harness
+    h.transport.fault = "exception"
+    prior = run(h)
+    key = "armed-paper-session/v1:SPY:2026-10-12"
+    before = evidence_bytes(prior)
+    failure = prior["history_failure"]
+    if classification is None:
+        prior["history_failure"] = None
+    else:
+        failure["classification"] = classification
+        failure["transport_stage"] = (
+            "REQUEST" if classification == "TRANSPORT_FAILED" else None
+        )
+        failure["metadata_reason"] = None
+        failure["http_status"] = status
+        if classification in {"INTERNAL_FAILED", "PROVIDER_CONSTRUCTION_FAILED"}:
+            failure["history_session"] = None
+            failure["read_ordinal"] = 0
+        if classification == "PROVIDER_CONSTRUCTION_FAILED":
+            prior["alpaca_reads"] = failure["alpaca_reads"] = 0
+    h.kwargs["session_store"].publish(key, before, prior)
+    h.transport.fault = None
+    h.transport.calls.clear()
+    h.transport.closes = (10, 11, 12, 13)
+    result = recover(h)
+    assert result["status"] == ("NO_SIGNAL" if eligible else "BLOCKED")
+    assert len(h.transport.calls) == (4 if eligible else 0)
+    assert recover(h, "again")["status"] == "BLOCKED"
+
+
+def test_d1r2_failed_recovery_durable_blocked_before_exports(harness, monkeypatch):
+    h = harness
+    key, _ = legacy_predecessor(h)
+    h.transport.fault = "transport"
+    exported_states = []
+
+    def failed_export(*_):
+        value, _ = h.kwargs["session_store"].read(key)
+        exported_states.append(value)
+        assert value["status"] == "BLOCKED" and value["recovery_count"] == 1
+        assert value["history_failure"]["classification"] == "TRANSPORT_FAILED"
+        raise OSError("SECRET provider URL")
+
+    monkeypatch.setattr(subject, "write_history_failure", failed_export)
+    result = recover(h)
+    assert result["status"] == "BLOCKED"
+    assert len(exported_states) == 1
+    assert exported_states[0]["status"] == "BLOCKED"
+    assert exported_states[0]["recovery_count"] == 1
+    assert exported_states[0]["history_failure"]["classification"] == "TRANSPORT_FAILED"
+    assert recover(h, "no-third")["status"] == "BLOCKED"
+    assert len(h.transport.calls) == 1 and h.calls == h.evaluations == []
+    assert b"SECRET" not in h.kwargs["session_store"].read(key)[1]
+
+
+def test_d1r2_metadata_validation_transport_and_unclassified_v1_closed(harness):
+    h = harness
+    h.transport.fault = "transport"
+    prior = run(h)
+    key = "armed-paper-session/v1:SPY:2026-10-12"
+    before = evidence_bytes(prior)
+    prior["history_failure"]["transport_stage"] = "RESPONSE_METADATA"
+    # Use an existing closed reason, without assuming raw provider diagnostics.
+    prior["history_failure"]["metadata_reason"] = next(
+        iter(AlpacaResponseMetadataFailureReason)
+    ).value
+    h.kwargs["session_store"].publish(key, before, prior)
+    h.transport.calls.clear()
+    assert recover(h)["status"] == "BLOCKED"
+    before = evidence_bytes(prior)
+    for name in (
+        "strategy_contract",
+        "history_failure",
+        "recovery_count",
+        "recovery_reason",
+        "predecessor_evidence",
+        "predecessor_sha256",
+    ):
+        prior.pop(name)
+    prior["schema"] = "armed-paper-session/v1"
+    h.kwargs["session_store"].publish(key, before, prior)
+    assert recover(h, "unclassified-v1")["status"] == "BLOCKED"
+    assert h.transport.calls == h.calls == h.evaluations == []
+
+
+def test_d1r2_future_successor_retains_original_operation(harness):
+    h = harness
+    h.transport.fault = "transport"
+    prior = run(h)
+    h.transport.fault = None
+    h.transport.calls.clear()
+    h.transport.closes = (10, 11, 12, 13)
+    h.kwargs["contract"] = replace(h.kwargs["contract"], source_head="c" * 40)
+    result = recover(h)
+    assert result["status"] == "NO_SIGNAL"
+    assert result["operation_id"] == prior["operation_id"]
+    assert result["contract_id"] != prior["contract_id"]
+    assert result["predecessor_evidence"] == prior
+
+
+def test_d1r2_sensitive_failure_sanitized_in_both_exports(harness, capsys):
+    h = harness
+    key, _ = legacy_predecessor(h)
+    h.transport.fault = "exception"
+    result = recover(h)
+    outputs = capsys.readouterr()
+    raw = h.kwargs["session_store"].read(key)[1]
+    exported = (h.kwargs["evidence_path"].with_name("recovery.json")).read_bytes()
+    diagnostic = history_failure_path(
+        h.kwargs["evidence_path"].with_name("recovery.json")
+    ).read_bytes()
+    assert evidence_bytes(result) == exported == raw
+    assert all(
+        token not in raw + exported + diagnostic + (outputs.out + outputs.err).encode()
+        for token in (b"SECRET", b"authorization.invalid", b"fake-key", b"fake-secret")
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "digest",
+        "operation",
+        "contract",
+        "source",
+        "count",
+        "extra",
+        "predecessor",
+        "reason",
+        "start_effect",
+    ],
+)
+def test_d1r2_tampered_lineage_rejected(harness, change):
+    h = harness
+    legacy_predecessor(h)
+    h.transport.closes = (10, 11, 12, 13)
+    result = recover(h)
+    if change == "digest":
+        result["predecessor_sha256"] = "0" * 64
+    elif change == "operation":
+        result["operation_id"] = "00000000-0000-0000-0000-000000000000"
+    elif change == "contract":
+        result["contract_id"] = result["predecessor_evidence"]["contract_id"]
+    elif change == "source":
+        result["source_head"] = "c" * 40
+    elif change == "count":
+        result["recovery_count"] = 2
+    elif change == "extra":
+        result["secret"] = "forbidden"
+    elif change == "predecessor":
+        result["predecessor_evidence"]["prepare_attempts"] = 1
+    elif change == "start_effect":
+        result["status"] = "RECOVERY_STARTED"
+    else:
+        result["recovery_reason"] = "arbitrary"
+    with pytest.raises(ValueError):
+        evidence_bytes(result)
 
 
 def test_ready_delegates_existing_prepare_execute_once_and_records_one_fill(harness):
@@ -1142,7 +1552,7 @@ def test_history_failure_existing_path_rejected_before_reservation(harness):
     assert harness.transport.calls == harness.calls == harness.evaluations == []
 
 
-def test_history_failure_old_consumed_v1_row_valid_and_never_rewritten(
+def test_history_failure_old_consumed_v1_row_normal_arm_never_rewrites(
     harness, tmp_path
 ):
     h = harness
@@ -1156,6 +1566,20 @@ def test_history_failure_old_consumed_v1_row_valid_and_never_rewritten(
     h.clock.at = datetime(2026, 10, 13, 14, tzinfo=UTC)
     h.transport.fault = "exception"
     old = run(h, contract=old_contract)
+    current_bytes = evidence_bytes(old)
+    for name in (
+        "strategy_contract",
+        "history_failure",
+        "recovery_count",
+        "recovery_reason",
+        "predecessor_evidence",
+        "predecessor_sha256",
+    ):
+        old.pop(name)
+    old["schema"] = "armed-paper-session/v1"
+    h.kwargs["session_store"].publish(
+        "armed-paper-session/v1:SPY:2026-10-13", current_bytes, old
+    )
     assert old["contract_id"] == "d490a15f-2c6e-5a1c-af36-e5f233760a7b"
     assert old["operation_id"] == "8e8c5102-8b52-5534-8288-b3261f65b2d4"
     assert old["historical_sessions"] == [
@@ -1170,7 +1594,7 @@ def test_history_failure_old_consumed_v1_row_valid_and_never_rewritten(
     assert h.kwargs["session_store"].qualify() == 1
     before = h.kwargs["session_store"].path.read_bytes()
     result = run(h, contract=old_contract, evidence_path=tmp_path / "old-retry.json")
-    assert result == old and evidence_bytes(result) == evidence_bytes(old)
+    assert result["status"] == "BLOCKED"
     successor = replace(old_contract, source_head="c" * 40)
     assert (
         run(h, contract=successor, evidence_path=tmp_path / "successor-retry.json")[

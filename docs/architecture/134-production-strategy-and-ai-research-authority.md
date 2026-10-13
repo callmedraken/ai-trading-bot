@@ -1,5 +1,37 @@
 # Architecture 134 — Production strategy and AI-research authority
 
+## 2026-10-13 — Architecture 134-D1R2 current recovery contract / acceptance pending
+
+D1R2 introduces exactly one explicit same-session pre-effect history recovery,
+superseding current-product permanent history-failure blocking only within the
+closed [D1R2 contract](../validation/arch134-d1r2-pre-effect-history-recovery.md).
+Normal ARM never retries. Recovery preserves the existing reservation/table/key
+and original operation identity, binds exact predecessor canonical evidence and
+digest plus successor source/contract, and consumes permission by exact-byte CAS
+before Alpaca construction or reacquisition. All downstream counters/results must
+independently prove zero/no effects; execution evidence or any matching fill blocks.
+The exact October-13 pre-D1R1 row uses its frozen legacy reason, with no fabricated
+diagnostic. Future v2 transport failures excluding deterministic metadata rejection,
+HTTP 429 and HTTP 500..599 may recover once. Other/unknown classifications block.
+Crash, failed recovery, concurrent conflict and all downstream-effect boundaries
+remain no-retry; normal market opening/closing checks apply without a day wait.
+
+Parent `cbcc1addfb392ca87939df0f77fe9dde10685abf` /
+`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d` has the supplied accepted fresh
+D1Q READY_FOR_MANUAL_PAPER_SESSION observation: both stores WRITE_READY,
+paper_records=0, session_reservations=1, credential reads=2/2, persisted OAuth=true,
+all application/paper/scheduler/broker effects=0, effect_counts_complete=true.
+Evidence: `F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
+This is serialized operational history, never test input or D1R2 readiness.
+
+Implementation branch `feature/robinhood-production-paper-history-recovery` maps
+the unchanged `arch134-production-paper-runtime` name to canonical ROBINHOOD.
+Frozen armed/R1/R2 and D1R1 dictionaries remain preserved; exact recovery overlays
+own current source. ACTIVE/order and split CI remain unchanged. Source acceptance
+requires terminal mapped CI and exact ChatGPT GitHub review; no real recovery or
+production effect is performed here. Fresh exact-source readiness remains required.
+The dated entries below retain historical facts, not current recovery authority.
+
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 
 Architecture 134-D1R1 — bounded Alpaca history-failure observability and runtime

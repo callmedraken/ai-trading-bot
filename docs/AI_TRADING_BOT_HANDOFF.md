@@ -1,5 +1,40 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-13 — Architecture 134-D1R2 implementation / acceptance pending
+
+Active implementation branch: `feature/robinhood-production-paper-history-recovery`.
+Use only `F:\AI\worktrees\ai-trading-bot-production-paper-history-recovery`.
+Reviewed parent HEAD/tree: `cbcc1addfb392ca87939df0f77fe9dde10685abf` /
+`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d`.
+
+D1R2 replaces the current permanent pre-effect history stop with one explicit
+recovery CAS for the same symbol/session reservation and original operation ID.
+Normal ARM remains one-shot. The frozen pre-D1R1 October-13 tuple gets a distinct
+legacy reason, never a fabricated diagnostic. New canonical v2 BLOB evidence
+retains the exact predecessor/digest and binds the executing successor source
+and contract. Recovery is consumed before provider construction/acquisition;
+crash, conflict or second recovery cannot reacquire. No strategy, PREPARE,
+Robinhood, execution or paper-effect retry is added. The SQLite table is unchanged.
+
+Accepted fresh D1Q on the parent: READY_FOR_MANUAL_PAPER_SESSION,
+ALREADY_PROVISIONED, paper_records=0, session_reservations=1, both stores
+WRITE_READY, credential reads=2/2, persisted OAuth=true, all application/paper/
+scheduler/broker effects=0, effect_counts_complete=true. Supplied evidence:
+`F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
+Tests and implementation neither read this file nor access the production runtime.
+
+Next owner: ChatGPT exact GitHub review after terminal mapped ROBINHOOD CI;
+acceptance is pending, not granted by this document. Review the exact final
+HEAD/tree, intended file set, terminal run/job conclusions and canonical profile
+counts. Stop on identity drift, failed/missing CI or any weakened effect fence.
+After source acceptance, fresh exact-source readiness is required before the
+separately authorized real recovery; an expired target session stays expired.
+See [D1R2 contract](validation/arch134-d1r2-pre-effect-history-recovery.md).
+D2 remains disconnected and real-money placement remains **NO-GO**.
+
+The dated D1R1 entries below retain historical facts and are superseded for
+current next-step guidance by this entry.
+
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 
 Architecture 134-D1R1 — bounded Alpaca history-failure observability and runtime

@@ -1,5 +1,36 @@
 # Project Status and Roadmap
 
+## 2026-10-13 — Architecture 134-D1R2 implementation / acceptance pending
+
+Current source checkpoint: `feature/robinhood-production-paper-history-recovery`,
+canonical worktree `F:\AI\worktrees\ai-trading-bot-production-paper-history-recovery`,
+from reviewed parent `cbcc1addfb392ca87939df0f77fe9dde10685abf` /
+`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d`. D1R2 adds exactly one explicit
+same-session pre-effect history recovery through the existing reservation and
+original operation ID. It supersedes the D1/D1R1 permanent history-failure stop
+only for the exact frozen October-13 bridge and closed transient v2 failures.
+Normal ARM still cannot retry. All strategy/PREPARE/Robinhood/EXECUTE/paper
+effect and ambiguous execution boundaries remain closed to recovery.
+
+The accepted fresh D1Q observation on that parent is
+READY_FOR_MANUAL_PAPER_SESSION / ALREADY_PROVISIONED: paper_records=0,
+session_reservations=1, both stores WRITE_READY, Alpaca/Robinhood credential
+reads=2/2, persisted OAuth available, all HTTP/application/paper/scheduler/broker
+effects=0, effect_counts_complete=true. Supplied preserved evidence:
+`F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
+Implementation does not read or mutate this file or the production runtime.
+
+See [D1R2 design and validation](validation/arch134-d1r2-pre-effect-history-recovery.md).
+Source acceptance remains pending terminal mapped CI and exact ChatGPT GitHub
+review. Next: review the pushed exact D1R2 commit/tree and terminal canonical
+ROBINHOOD evidence, then require fresh exact-source readiness before any real
+recovery. No actual October-13 recovery, credentials, provider, production-store,
+ACL, scheduler or broker effect is authorized by this implementation checkpoint.
+D2 remains disconnected; real-money placement remains **NO-GO**.
+
+The dated D1R1 entries below preserve historical acceptance and no-retry facts;
+their next-step guidance is superseded by this entry.
+
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 
 Architecture 134-D1R1 — bounded Alpaca history-failure observability and runtime

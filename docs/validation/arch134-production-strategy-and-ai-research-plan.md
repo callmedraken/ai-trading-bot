@@ -1,5 +1,34 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
+## 2026-10-13 — Architecture 134-D1R2 validation / acceptance pending
+
+Current checkpoint is bounded same-session pre-effect history recovery on
+`feature/robinhood-production-paper-history-recovery`, from
+`cbcc1addfb392ca87939df0f77fe9dde10685abf` /
+`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d`.
+The [D1R2 design and focused validation](arch134-d1r2-pre-effect-history-recovery.md)
+supersedes current-product tests/instructions imposing permanent blocking on all
+pre-effect history failures. Ordinary ARM, deterministic failures, unknown rows,
+all downstream-effect boundaries and ambiguous execution still cannot retry.
+
+The supplied fresh D1Q parent qualification is accepted operational history:
+READY_FOR_MANUAL_PAPER_SESSION / ALREADY_PROVISIONED, paper_records=0,
+session_reservations=1, both stores WRITE_READY, credential reads=2/2, persisted
+OAuth=true, application/paper/scheduler/broker effects=0, effect_counts_complete=true.
+Preserved evidence: `F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
+Do not read/mutate this evidence or production runtime in implementation/tests.
+
+Focused fake-only tests cover exact legacy admission, one reservation/original
+operation/no second ARM, durable consumption, concurrent CAS/crash/second-attempt
+blocking, NO_SIGNAL and unchanged trade pipeline, frozen mismatches, downstream
+effects, execution evidence/fills, expiry/source drift, closed transient policy,
+strict v1/v2 canonical evidence and sanitized publication. Both focused Ruff phases
+and git diff checks precede exact-file commit/push. No local broad profile is run.
+GitHub owns mapped ROBINHOOD and must reach terminal success before ChatGPT exact
+GitHub review/source acceptance. Fresh exact-source readiness precedes real recovery;
+closed sessions are never bypassed. D2 remains disconnected; real-money **NO-GO**.
+Dated D1R1 evidence and its original no-retry conclusions remain historical.
+
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 
 Architecture 134-D1R1 — bounded Alpaca history-failure observability and runtime

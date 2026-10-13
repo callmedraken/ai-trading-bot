@@ -37,12 +37,41 @@ are updated; production executable pins and frozen R1/R2 branches remain exact.
 GUI-A14's five added legacy test modules make current inventory FULL 169,
 ROBINHOOD 94, LEGACY 210, EXHAUSTIVE 379.
 
-GUI-A14 source acceptance remains pending a fresh exact-source repository gate
-following ChatGPT's exact GitHub correction review. Codex owns this one normal
-correction commit/ordinary push and terminal dedicated GUI CI, without adding
-the GUI branch to the repository push allowlist or changing workflow_dispatch.
-ChatGPT owns the fresh repository workflow_dispatch; no local broad profile or
-protected operator is selected. No production effect occurred.
+The topology correction is published as HEAD
+`a483ada10d621a91add0a9b41b6f47cd244bc8bb`, TREE
+`239952505f556de55282890e28c147db05d863d6`; dedicated GUI CI
+[38322700069](https://github.com/callmedraken/ai-trading-bot/actions/runs/38322700069)
+SUCCEEDED (470 passed, zero skips, real PySide6 6.10.3, Ruff/diff PASS).
+Repository dispatch
+[38324505785](https://github.com/callmedraken/ai-trading-bot/actions/runs/38324505785)
+passed source-static and shards 0, 2 and 3. Shard 1 failed only
+`test_retired_families_are_legacy_and_research_is_supported`: its `tests/gui`
+legacy count retained 34 rather than 39. The terminal source-gates aggregator
+therefore failed; active-tests and certification-tests were correctly skipped.
+This is a stale test inventory assertion, not GUI or production behavior.
+
+The bounded follow-up changes only that count (34 -> 39) and its source-owned
+test-file blob pin, plus current status documentation. Current ACTIVE/FULL/
+ROBINHOOD/LEGACY/EXHAUSTIVE totals remain 62/169/94/210/379. Historical recovery
+closure, active tuple digest, production executable pins and R1/R2 heads remain
+unchanged. Both failed runs 38320329303 and 38324505785 are preserved, never rerun.
+
+Focused follow-up verification passes: **413 cases**, covering the complete
+certification-profile test module, unchanged R1/R2 authority checks and the
+historical recovery two-failure closure. Ruff check, Ruff format --check (both
+touched Python files) and git diff --check pass. Only the profile test's blob
+pin is refreshed; no runtime behavior, function AST, active tuple, other pin or
+workflow changes. Dedicated GUI CI supplies the fresh complete GUI regression;
+repository CI supplies the fresh broad fallback. No local broad suite is run.
+
+The user authorizes one normal follow-up commit/ordinary push. After dedicated
+GUI CI passes, Codex must perform a fresh Checkpoint Source Gates
+workflow_dispatch against the exact new GUI branch HEAD, wait for the entire
+run to become terminal and report every job/shard. Source identity drift,
+unexpected widening or a fresh repository-gate failure is STOP. No repository
+push-trigger change, local broad profile or production/protected effect is
+selected. GUI-A14 source acceptance remains pending terminal exact-source CI
+and final review. No production effect occurred.
 
 ## Verification performed
 
@@ -99,10 +128,10 @@ Ruff format --check (18 touched Python files), and git diff --check pass.
 
 All 62 current active authority functions passed against final local edits;
 publication recovery is excluded and its direct historical test returns exactly
-the two closure failures. The official source-static-only runner must run on the
-clean correction commit before push, because verify-batch requires a clean
-worktree. No local pytest/broad profile is selected by that batch. This sequencing
-preserves the runner's clean-source admission and the one-commit boundary.
+the two closure failures. The official source-static-only runner passed all 62
+on the clean topology correction commit before push, with pytest SKIP and
+identity stable. Repository dispatch 38324505785 also passed source-static.
+No local broad profile was run; clean-source admission was preserved.
 
 Only six directly affected test-file hashes in the R1 source-owned metadata are
 refreshed: runner helpers/core/CI, certification profile inventory and production
@@ -147,14 +176,15 @@ REAL_PRODUCTION_EVIDENCE_READS_DURING_TESTS=0
 
 ## Next owner and stop condition
 
-ChatGPT reviews the exact ordinary-pushed correction after dedicated GUI CI
-becomes terminal, then issues a fresh repository workflow_dispatch against that
-exact corrected HEAD. All 62 current active authorities must pass before the
-broad fallback starts; the direct historical recovery test must still prove its
-two closure failures. Preserve failed run 38320329303. Do not manually rerun or
-dispatch the repository gate from Codex, broaden push triggers, merge, perform
-production effects or claim GUI-A14 source acceptance. CI owns the fresh broad
-fallback; no local ROBINHOOD/FULL/broad shards are selected.
+Codex owns the user-authorized fresh repository workflow_dispatch after the
+single stale-count correction is ordinary-pushed and dedicated GUI CI succeeds.
+Require the dispatched run's HEAD to match the exact new remote GUI HEAD and
+wait for source-static, all four full-tests shards and terminal source-gates.
+Report active-tests and certification-tests skips as well. Do not ask the user
+to dispatch or rerun preserved failures 38320329303 / 38324505785. Stop on source
+identity change, unexpected scope widening or a new repository-gate failure.
+Final source acceptance remains with review; no production/protected effect,
+merge, PR mutation or local broad profile is authorized.
 
 Optional exact local GUI re-verification (already completed, not a new gate):
 

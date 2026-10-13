@@ -2,12 +2,14 @@
 
 ## Current D1Q inventory and certification route
 
-Architecture 134-D1Q appends `arch134-production-paper-runtime` once, preserving
-prior relative ordering. Source-discovered inventory is ACTIVE 62, FULL 168,
-ROBINHOOD 93, LEGACY 205, EXHAUSTIVE 373. Earlier inventories are historical;
-frozen required baselines and lane rules are unchanged. The explicit mapping
-is CI-owned robinhood certification. Terminal-green CI satisfies the profile
-obligation without another local profile run.
+Current GUI-A14/D1Q-R2 source-discovered inventory is ACTIVE 62, FULL 169,
+ROBINHOOD 94, LEGACY 210, EXHAUSTIVE 379. GUI-A14 adds five legacy GUI test
+modules, making `tests/gui/` 39 rather than 34; source classification and frozen
+required baselines/lane rules are unchanged. Historical AJ publication recovery
+remains registered but deliberately closed and excluded from active CI.
+Earlier inventories are historical. D1Q/R2's explicit mapping remains CI-owned
+robinhood certification. GUI-A14's unmapped repository dispatch uses the reviewed
+four-shard source-gate fallback, not a locally selected broad profile.
 
 ## 2026-10-11 — Architecture 132-R3 CI-owned selected certification
 
@@ -1795,7 +1797,8 @@ tests/test_robinhood_prepare_qualification_verifier.py
 
 ## Reviewed legacy ownership and EXHAUSTIVE
 
-At the current tree:
+At the historical pre-GUI-A14 inventory tree (provenance only; current inventory
+is stated at the top of this document and `tests/gui/` now contains 39 modules):
 
 | Legacy population | Modules |
 | --- | ---: |

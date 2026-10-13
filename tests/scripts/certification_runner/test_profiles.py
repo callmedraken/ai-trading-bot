@@ -227,7 +227,7 @@ def test_retired_families_are_legacy_and_research_is_supported() -> None:
     expected_counts = {
         "tests/acceptance": 1,
         "tests/cli": 34,
-        "tests/gui": 34,
+        "tests/gui": 39,
         "tests/market_data": 8,
         "tests/runtime": 126,
         "tests/scripts": 1,

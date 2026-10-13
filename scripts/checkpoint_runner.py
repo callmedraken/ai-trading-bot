@@ -10332,7 +10332,7 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
     ),
     "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "952ff67e6e40a6635f2c49d47b838ecf18123ad3"
+        "55de0de68c1dfdb707b333c4aa49a498cd696015"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "a8470acf3f263ba8b4a9b888ce168b56c95f33a6"

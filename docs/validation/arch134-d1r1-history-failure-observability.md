@@ -1,5 +1,31 @@
 # Architecture 134-D1R1 — Bounded history failure observability
 
+## 2026-10-13 — SOURCE ACCEPTED
+
+Exact accepted source:
+
+```text
+HEAD 2154cb53017cccbd3908d2174bb0943d4657c451
+TREE 9b9718353aa7ad51dbfa5d21f54e11b0f8fa9b58
+BASE 6e2081a1278f579ca0cee5a00e2bd83632bc2856
+```
+
+Mapped Checkpoint Source Gates #511 / 38359252324 completed SUCCESS on that
+exact HEAD. The route selected `arch134-production-paper-runtime`; source-static
+and active-tests passed; canonical ROBINHOOD passed 94 modules / 8,738 cases /
+8,737 passed / 1 skipped / 0 failed / 0 errors in 136.46 seconds; full-tests
+were skipped as designed for the mapped certification route; terminal
+source-gates passed.
+
+Focused fake-only verification passed 999 tests plus Ruff check, format --check
+and git diff --check. Historical armed/R1/R2 dictionaries and frozen branches,
+ACTIVE membership/order/digest, checkpoint names and canonical ROBINHOOD mapping
+remain as documented. No implementation/CI protected effect occurred.
+
+D1R1 does not grant retry or same-session recovery authority. The consumed
+2026-10-13 row remains no-retry. Fresh protected D1Q qualification is the next
+operational step and must use canonical stdin-fed Python.
+
 Status: focused verification PASS; terminal CI/exact ChatGPT review pending.
 
 ## 2026-10-12 — Architecture 134-D1R1 history diagnostics / review pending
@@ -145,7 +171,7 @@ git diff --check. No local FULL/ROBINHOOD certification. The existing
 feature/robinhood-* workflow must select arch134-production-paper-runtime and
 pass source-static, active-tests, canonical ROBINHOOD and terminal source-gates.
 Broad full-tests are skipped because mapped certification owns breadth. Missing
-CI is not PASS. After terminal CI, STOP for exact ChatGPT review.
+CI is not PASS. Terminal mapped CI and exact ChatGPT source review are complete; D1R1 is SOURCE ACCEPTED.
 
 No production database, credential, provider, ARM, scheduler, ACL or paper effect
 is authorized by implementation/CI. Fresh protected D1Q qualification follows

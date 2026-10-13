@@ -1,64 +1,101 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-12 — Architecture 134-D1R1 history diagnostics / review pending
+## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 
-Current operational descendant: `feature/robinhood-production-paper-history-diagnostics`.
-Base HEAD `6e2081a1278f579ca0cee5a00e2bd83632bc2856`, TREE
-`5858cc644d78eab9bbe58d1332f02c1b56aa5c65`. This entry supersedes earlier
-current-runtime branch and next-D1-attempt guidance. ChatGPT owns source
-acceptance after exact GitHub review and terminal mapped ROBINHOOD CI.
+Architecture 134-D1R1 — bounded Alpaca history-failure observability and runtime
+successor — is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-history-diagnostics` at the exact
+executable/test source:
 
-The earlier `python -m trading_bot.review_paper.armed_session_host` returned zero
-without JSON/evidence because the module defines `main()` without invoking it.
-This import-only no-op caused zero reservation, provider access and paper effects;
-it was not a D1 attempt or consumed session. Canonical Windows operator execution
-is stdin-fed Python explicitly calling `main()`. The existing script launcher
-already calls `main()`; no module guard or generic runner is added.
+```text
+HEAD 2154cb53017cccbd3908d2174bb0943d4657c451
+TREE 9b9718353aa7ad51dbfa5d21f54e11b0f8fa9b58
+BASE 6e2081a1278f579ca0cee5a00e2bd83632bc2856
+```
 
-The actual New York **2026-10-13** attempt is **consumed / BLOCKED / no retry**.
-Contract `d490a15f-2c6e-5a1c-af36-e5f233760a7b`; operation
-`8e8c5102-8b52-5534-8288-b3261f65b2d4`. Required history: 2026-10-07,
-2026-10-08, 2026-10-09, 2026-10-12. Source/runtime admission, runtime write
-readiness, fixed provider construction and durable reservation succeeded.
-The first history-read fence was crossed: alpaca_reads=1, first required session
-2026-10-07; snapshot_sha256=[], history_seed_sha256=null,
-strategy_evaluations=0, strategy_outcome=null, PREPARE=0, EXECUTE=0,
-all Robinhood calls=0, paper_mutations=0, broker placement=0,
-effect_counts_complete=false. No execute evidence file exists. Current incident
-evidence cannot identify the exact Alpaca failure stage. No transport, HTTP,
-schema, capture, acceptance or verification cause is inferred.
+The exact delta is one commit / 14 paths. D1R1 adds the separate bounded
+`armed-paper-history-failure/v1` artifact without changing
+`armed-paper-session/v1`, retry ownership, production strategy semantics or
+paper/broker authority.
 
-D1R1 preserves `armed-paper-session/v1` and the one-shot fences. The separate
-bounded external `armed-paper-history-failure/v1` artifact retains only closed
-sanitized session/read/stage facts and grants no retry. Durable BLOCKED precedes
-diagnostic export; ordinary session export is attempted even if diagnostic export
-fails. No existing reservation is migrated, rewritten, cleaned or reclaimed.
-R1 stays frozen at `6bf8753b0cc8950ae27b32b6858b64d454c512f0` /
-`ce3feb2ac48e7aebc23970142aafed5059c447e7`; R2 stays frozen at
+The accepted diagnostic contains exactly fourteen closed fields: schema, source
+HEAD/tree, contract/operation IDs, target/history sessions, read ordinal,
+classification, transport stage, metadata reason, HTTP status, provider code and
+Alpaca-read count. Serialization is exact canonical compact UTF-8 plus one trailing
+newline, bounded to 4096 bytes, duplicate/unknown/missing/noncanonical input is
+rejected, and external writes are exclusive `xb` with flush/fsync.
+
+The closed classification set is PROVIDER_CONSTRUCTION_FAILED,
+TRANSPORT_FAILED, HTTP_FAILED, PROVIDER_RESPONSE_INVALID,
+CAPTURE_OBSERVATION_REJECTED, SNAPSHOT_ACCEPTANCE_REJECTED,
+SNAPSHOT_VERIFICATION_REJECTED, VERIFIED_HISTORY_REJECTED,
+HISTORY_SEED_REJECTED and INTERNAL_FAILED. Transport/metadata classification
+reuses the already-sanitized Alpaca enums; safe HTTP status/provider code may be
+retained, while request ID, raw exception, credentials, headers, URL/body,
+filesystem paths and provider free text are excluded.
+
+Failure ordering is accepted: the durable one-session fence remains authoritative;
+HISTORY_STARTED is published before each provider fetch; classified acquisition
+failure publishes durable BLOCKED before fallible diagnostic export; diagnostic
+export failure cannot retry or suppress the ordinary final session export; no
+failure path advances to strategy evaluation, Robinhood PREPARE, synthetic
+EXECUTE, paper mutation or broker placement. Focused tests prove one failed fetch
+is never reacquired and raw sensitive material is absent from durable/exported
+evidence and stdout/stderr.
+
+The accepted source also preserves the consumed New York 2026-10-13 v1 row
+unchanged and unretryable. That incident remains BLOCKED with alpaca_reads=1,
+zero accepted snapshots, zero strategy evaluations, zero Robinhood calls,
+PREPARE=0, EXECUTE=0, paper_mutations=0 and broker placement=0. The preceding
+`python -m trading_bot.review_paper.armed_session_host` import-only invocation
+remains a zero-effect no-op, not a consumed D1 attempt. Canonical Windows operator
+guidance remains stdin-fed Python explicitly calling `main()`.
+
+Historical authority material was independently reviewed against the admitted
+base and is exactly unchanged: armed-MVP source pins/imports, historical R1
+runtime source pins/imports, and R2 source/import/AST pins. D1R1 uses exact
+successor overlays for the three changed inherited armed files and the current
+runtime diagnostic/test material. The older armed-MVP authority is
+successor-aware while retaining its historical branch/spec. The existing
+`arch134-production-paper-runtime` checkpoint alone maps to the diagnostics
+branch and retains canonical `robinhood` certification. ACTIVE membership/order
+remains 62 and reviewed digest remains
+`06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440`.
+
+Focused local verification passed **999** tests: 320
+history/controller/provider, 121 runtime/host and 558 checkpoint/routing/profile.
+Focused Ruff check, Ruff format --check and git diff --check passed. No local
+broad certification or protected operation ran.
+
+Mapped Checkpoint Source Gates
+[38359252324](https://github.com/callmedraken/ai-trading-bot/actions/runs/38359252324) (#511) completed SUCCESS on the exact accepted HEAD.
+source-static passed the mapped `arch134-production-paper-runtime` authority;
+active-tests passed with stable identity; canonical ROBINHOOD certification
+passed **94 modules / 8,738 cases / 8,737 passed / 1 skipped / 0 failed /
+0 errors** in **136.46 seconds**; full-tests were correctly skipped because the
+mapped certification profile owns breadth; terminal source-gates passed.
+
+Current inventory remains ACTIVE 62 / FULL 170 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 385. Historical R1 remains
+`6bf8753b0cc8950ae27b32b6858b64d454c512f0` /
+`ce3feb2ac48e7aebc23970142aafed5059c447e7`; R2 remains
 `2f122958366d1db282fea51abbd461b83fa893d9` /
 `c3fb82add37bdbea12ebad9836ca10000b924fe1`.
 
-`arch134-production-paper-runtime` maps to the successor branch and retains
-canonical `robinhood` certification. Frozen armed/R1 pin/import dictionaries
-remain predecessor evidence; exact successor overlays validate current source.
-R2 pin/import/structural material, branch mapping, ACTIVE tuple/order/digest and
-workflow remain unchanged. Tests extend existing modules without inventory
-expansion. Implementation effects are fake-only; production effects are zero.
+Implementation/CI effects are all zero: production SQLite reads/writes,
+credential reads, Alpaca/Robinhood/broker/scheduler calls, ACL/paper mutations,
+D1 reservations and D1 executions. Real-money broker placement remains **NO-GO**.
 
-Focused verification PASS: 999 cases (320 history/controller/provider, 121
-runtime/host, 558 checkpoint/routing/profile). Focused Ruff check, format --check,
-git diff --check and all armed/runtime/ACL authority checks PASS. Computed current
-inventory: ACTIVE 62 / FULL 170 / ROBINHOOD 94 / LEGACY 215 / EXHAUSTIVE 385.
-No local broad certification or protected effect occurred.
+Any later documentation-only descendant does not replace the accepted D1R1
+executable/test identity above.
 
-Next: terminal mapped CI, then ChatGPT exact-source review. After acceptance,
-fresh protected D1Q qualification must use the new exact source and canonical
-stdin-fed Python. Only a future separately admitted NYSE target may become
-eligible for D1 after READY_FOR_MANUAL_PAPER_SESSION. Never retry 2026-10-13.
-D2 stays disconnected; real-money placement remains **NO-GO**.
-
-See `docs/validation/arch134-d1r1-history-failure-observability.md` for the
-closed diagnostic contract and verification evidence.
+**Next operational step:** fresh protected D1Q qualification against this exact
+accepted D1R1 source using canonical stdin-fed Python. Qualification may inspect
+the fixed runtime stores and fixed Windows credentials according to the already
+accepted D1Q authority, but it must not ARM a session, contact Alpaca/Robinhood
+application APIs, mutate paper state, scheduler or ACLs, or retry the consumed
+2026-10-13 session. D1R2 same-session/pre-effect recovery remains a subsequent
+source-design milestone; it is not authority granted by D1R1.
 
 ## 2026-10-12 — Architecture 137 / RCL-1 SOURCE ACCEPTED
 

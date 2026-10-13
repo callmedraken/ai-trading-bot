@@ -1,50 +1,81 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
-## 2026-10-13 — Architecture 138 / RCL-2 implemented; exact review pending
+## 2026-10-13 — Architecture 138 / RCL-2 SOURCE ACCEPTED
 
-Architecture 138 adds deterministic walk-forward qualification and a separate
-immutable WALK_FORWARD_PASSED research successor on
-`feature/research-candidate-walk-forward-qualification`, from exact canonical
-parent HEAD `6e2081a1278f579ca0cee5a00e2bd83632bc2856` / TREE
-`5858cc644d78eab9bbe58d1332f02c1b56aa5c65`. This is implementation evidence;
-ChatGPT owns exact GitHub source review and source acceptance after terminal CI.
+Architecture 138 / RCL-2 is **SOURCE ACCEPTED** on
+`feature/research-candidate-walk-forward-qualification` at the exact executable/test source:
 
-Architecture 137 remains accepted at executable/test HEAD
-`2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6` / TREE
-`9d33c980510f841f6dd254b3ff9f587ac2f43203`, CI #510 / 38346016265 SUCCESS.
-Its BACKTESTED-only v1 source/identity/bytes and stage order remain frozen.
+```text
+PARENT HEAD  6e2081a1278f579ca0cee5a00e2bd83632bc2856
+PARENT TREE  5858cc644d78eab9bbe58d1332f02c1b56aa5c65
+HEAD         e0735af265894757ff9b90ab185bcbd77ee2dee9
+TREE         a29f51faaa81e866d0825ffbe082c5fcddb94584
+CI           #516 / 38380502369 / SUCCESS
+```
 
-RCL-2 requires an explicit four-field, no-default policy, complete independent
-candidate/report reconciliation and defensive completed walk-forward validation.
-The candidate must be selected rank-one in every fold; original rank 1/2/None
-remains evidence only and is preserved by the successor. Equal test duration and
-schedule count are mandatory; thresholds use inclusive exact Decimal bounds.
-One existing pure aggregate analyzer supplies minimum/median return and maximum
-drawdown. Valid threshold/selection/window failures produce canonical FAILED
-research evidence; malformed provenance raises. Only matching PASSED evidence
-can produce the dedicated successor. Canonical parsing proves self-consistency;
-external report/walk-forward verification remains an independent API.
+The implementation is one ordinary commit / 17 paths. Architecture-137
+`research-strategy-candidate/v1` remains byte/identity compatible and
+BACKTESTED-only; its accepted executable/test identity remains
+`2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6` /
+`9d33c980510f841f6dd254b3ff9f587ac2f43203`.
 
-Current discovery is ACTIVE 62 / FULL 171 / ROBINHOOD 94 / LEGACY 215 /
-EXHAUSTIVE 386 / tests/gui 44. Only three directly affected retained test blobs
-are repinned. ACTIVE tuple/digest, production/native/AST pins and workflow bytes
-remain frozen. SHADOW and later stages, production compatibility, human approval,
-promotion, GUI integration and D1/D2 authority remain unavailable from RCL-2.
+RCL-2 adds only pure in-memory deterministic research evidence: an explicit
+four-field walk-forward qualification policy, canonical PASSED/FAILED evidence,
+independent external-evidence verification, and a separate immutable
+WALK_FORWARD_PASSED successor. Candidate provenance is fail-closed: the candidate
+must appear with matching ordinal/name in every training report and must be the
+rank-one selected variant in every fold to pass. Original BACKTESTED rank 1/2/None
+remains evidence only and is copied unchanged into the successor.
 
-All operational effect counts are zero. R1/R2 identities remain unchanged;
-D1 manual proving remains a separate protected boundary. Real-money placement
-remains NO-GO. The dated Architecture-137 entries below are retained historical
-evidence; their future-policy wording is superseded by this RCL-2 implementation.
+Qualification uses one existing pure aggregate analyzer with an internally
+derived fixed policy: SIMULATION_RETURN MINIMUM+MEDIAN and
+MAXIMUM_DRAWDOWN_PERCENTAGE MAXIMUM. Equal test duration and rebalance-count
+comparability are mandatory. Threshold equality is inclusive. Valid policy,
+selection or comparability failures produce canonical FAILED evidence; malformed
+provenance raises. Parsing proves canonical/self-consistent bytes only; external
+candidate/report/walk-forward verification remains separately required. Only a
+matching self-consistent PASSED qualification can build the immutable successor,
+and its independent successor verifier still does not substitute for external
+qualification verification.
 
-Next action: finish focused checks, exact-file commit/ordinary push and dispatch
-one exact-head repository Checkpoint Source Gates run. Expected source-static and
-four broad shards PASS, active-tests/certification-tests SKIPPED, terminal
-source-gates PASS, each shard below 300 seconds. No local broad certification is
-requested. Then STOP and hand the exact HEAD/TREE/diff and CI to ChatGPT for review;
-no source acceptance, SHADOW or production authority is inferred from green CI.
+The frozen identities are:
 
-See `docs/architecture/138-research-candidate-walk-forward-qualification.md` and
-`docs/validation/arch138-research-candidate-walk-forward-qualification-plan.md`.
+- policy schema `research-candidate-walk-forward-qualification-policy/v1`,
+  namespace `e07d29da-3084-5572-9a47-46f9e81dc0f8`;
+- qualification schema `research-candidate-walk-forward-qualification/v1`,
+  namespace `3c206910-6ced-5f74-b515-52901f6bdbbb`;
+- successor schema `research-strategy-candidate-walk-forward-passed/v1`,
+  namespace `e9f8a60f-7b82-57d6-868a-040cb79bb81a`.
+
+Focused implementation evidence records 723 distinct passing cases. Fresh
+Checkpoint Source Gates #516 independently passed on the exact accepted source:
+source-static verified all 62 current authorities with 83 test paths and 356 Ruff
+paths; git diff/Ruff check/Ruff format passed with stable source identity. The
+four broad shards independently contain 2,174 / 2,050 / 1,880 / 2,350 passed
+cases plus one optional SDK skip in shard 3: **8,454 passed, 1 skipped, 0 failed,
+0 errors** total. Broad hygiene timings were 98.041 / 91.323 / 92.354 / 106.281
+seconds, all below 300 seconds. active-tests and certification-tests were skipped
+as expected; terminal source-gates passed.
+
+Canonical inventory is ACTIVE 62 / FULL 171 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 386 / tests/gui 44. Exactly three retained
+`ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS` test blobs changed, and each pin
+matches the committed Git blob. Executable/native/AST pins, ACTIVE tuple/digest,
+historical recovery pins and workflow bytes remain frozen.
+
+No operational research, walk-forward, production SQLite, credential, provider,
+broker, scheduler, ACL, paper, D1, D1R2 or D2 effect occurred. RCL-2 grants no
+SHADOW, production compatibility, approval, promotion or execution authority.
+Real-money broker placement remains **NO-GO**. Any later documentation-only
+descendant does not replace the accepted executable/test identity above.
+
+Next research milestone: **Architecture 139 / RCL-3 — canonical no-effect SHADOW
+observation and qualification evidence** for a WALK_FORWARD_PASSED candidate.
+Architecture 139 must define the deterministic evidence/policy boundary before
+SHADOW can be materialized; its source checkpoint must not itself grant live
+provider access, production compatibility, promotion, D1 or D2 authority. Any
+actual live/no-effect shadow observation remains a separately reviewed protected
+qualification. The D1R2 recovery remains an independent operational lane.
 
 ## 2026-10-12 — Architecture 137 / RCL-1 implemented, exact review pending
 

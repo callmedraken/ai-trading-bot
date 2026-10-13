@@ -1,6 +1,30 @@
 # Architecture 138 / RCL-2 — Focused qualification validation plan
 
-Status: IMPLEMENTED; terminal repository CI and ChatGPT exact-source review pending.
+Status: SOURCE ACCEPTED at HEAD `e0735af265894757ff9b90ab185bcbd77ee2dee9`, TREE `a29f51faaa81e866d0825ffbe082c5fcddb94584`; Checkpoint Source Gates #516 / 38380502369 SUCCESS.
+
+## Acceptance evidence
+
+Exact accepted executable/test source is HEAD
+`e0735af265894757ff9b90ab185bcbd77ee2dee9`, TREE
+`a29f51faaa81e866d0825ffbe082c5fcddb94584`, one commit after exact parent
+`6e2081a1278f579ca0cee5a00e2bd83632bc2856` /
+`5858cc644d78eab9bbe58d1332f02c1b56aa5c65`.
+
+Checkpoint Source Gates #516 / 38380502369 is terminal SUCCESS on that exact
+source. source-static verified 62/62 authorities, 83 test paths and 356 Ruff
+paths with git diff/Ruff check/Ruff format PASS and stable source identity.
+Broad shards passed 2,174 / 2,050 / 1,880 / 2,350 cases plus one optional SDK
+skip: 8,454 passed, 1 skipped, 0 failed/errors. Hygiene times were
+98.041 / 91.323 / 92.354 / 106.281 seconds. active-tests and
+certification-tests were skipped as expected; terminal source-gates PASSed.
+
+Focused implementation evidence records 723 distinct passing cases. Exactly
+three retained Architecture-134 test-file Git-blob pins changed and were
+independently matched to the committed blobs. No operational effect occurred.
+
+Architecture 139 / RCL-3 owns the next lifecycle boundary: deterministic
+no-effect SHADOW observation/qualification evidence. RCL-2 itself grants no
+SHADOW, compatibility, approval, promotion, D1 or D2 authority.
 
 Exact parent HEAD `6e2081a1278f579ca0cee5a00e2bd83632bc2856`, TREE
 `5858cc644d78eab9bbe58d1332f02c1b56aa5c65`. Branch

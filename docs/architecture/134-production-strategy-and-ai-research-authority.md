@@ -1,5 +1,78 @@
 # Architecture 134 — Production strategy and AI-research authority
 
+## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
+
+The separately authorized Architecture 134-D1R3 real authentication
+qualification was executed once against the accepted docs-descendant operational
+source HEAD `5dd510a73e9eb15ade4a4fa7ed90152d2ac85b3b`, TREE
+`df8f208224ae8646e79d4d5ce92a70bb18e900d3`, after a zero-effect preflight
+proved the exact source/import/probe/evidence boundary.
+
+The preflight performed zero credential reads and zero Alpaca HTTPS requests.
+The real qualification then crossed exactly one D1R3 authority boundary and
+published canonical external evidence at:
+
+```text
+F:\AI\temp\qualification\arch134-d1r3-auth-bb7ebdbb0669479d82b13f2ff9171781.json
+```
+
+Canonical outcome:
+
+```text
+schema                           alpaca-authentication-qualification/v1
+status                           BLOCKED
+reason                           HTTP_REJECTED
+http_status                      401
+provider_code                    null
+credential_pair_read_attempts    1
+credential_pair_read_succeeded   true
+alpaca_request_attempts          1
+source_readmitted                true
+probe_session                    2026-10-07
+probe_method                     GET
+probe_host                       data.alpaca.markets
+```
+
+Because pair readiness succeeded, the accepted reader consumed the two fixed
+Windows Credential Manager records exactly once each. Exactly one Alpaca HTTPS
+request was attempted. The qualification made no production SQLite access,
+session reservation/recovery, strategy evaluation, Robinhood call,
+PREPARE/EXECUTE, paper mutation, broker placement, scheduler/ACL mutation, D1
+launch or D2 invocation. The accepted source was re-admitted after the external
+read. The result is definitive and non-ambiguous: the current fixed credential
+pair is locally readable but rejected by Alpaca.
+
+The D1R3 invocation is consumed. **Do not rerun D1R3 unchanged.**
+
+The current reader is hard-coded to the accepted Architecture-84 `/v2` targets:
+
+```text
+AITradingBot/MarketData/Alpaca/ApiKeyId/v2
+AITradingBot/MarketData/Alpaca/ApiSecretKey/v2
+```
+
+Architecture 84A already freezes the post-first-provider-effect immutability
+rule: once a real provider effect has used `/v2`, those two targets are
+historical credential-reference state and must not be overwritten, deleted for
+replacement, or silently rebound to another Alpaca pair. D1R2 had already used
+the `/v2` pair; D1R3 now independently confirms remote rejection. Therefore
+manual replacement of either existing `/v2` entry is **not authorized**.
+
+The next production milestone is **Architecture 134-D1R4 — versioned Alpaca
+credential rotation to `/v3` plus fresh authentication requalification
+authority**. It must freeze a new credential policy and exact new target names,
+preserve `/v2` as immutable historical evidence, reuse the existing
+secret-free local witness discipline, prohibit fallback, update the D1R3
+qualification path to the new fixed pair, and keep actual generation/provisioning
+and the later real authentication probe as separately reviewed protected
+operator boundaries.
+
+Until D1R4 source/deployment/provisioning is accepted and a fresh `/v3`
+authentication qualification passes, no fresh D1 session is authorized.
+The still-required pre-market start/WAITING_FOR_MARKET/wake qualification remains
+after remote Alpaca authentication is proven. D2 remains disconnected and
+real-money trading remains **NO-GO**.
+
 ## 2026-10-13 — Architecture 134-D1R3 SOURCE ACCEPTED
 
 Architecture 134-D1R3 — bounded Alpaca authentication-validity qualification —

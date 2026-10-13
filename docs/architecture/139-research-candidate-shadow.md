@@ -1,6 +1,27 @@
 # Architecture 139 / RCL-3 — exact binding, then no-effect SHADOW evidence
 
-Status: **139-A implemented; exact-source review pending. 139-B deferred.**
+Status: **139-A SOURCE ACCEPTED** at HEAD `e730b3b05c0c78181a4b3ff6b8e257cb04f3ff15` / TREE `ea13572c565bcfe65959014bf1c98572c89cc3a7`; Checkpoint Source Gates #517 / 38387248166 SUCCESS. 139-B deferred while returning to the main production lane.
+
+## Acceptance evidence
+
+Exact accepted executable/test source is HEAD
+`e730b3b05c0c78181a4b3ff6b8e257cb04f3ff15`, TREE
+`ea13572c565bcfe65959014bf1c98572c89cc3a7`, one commit after exact base
+`1af8150c9985f5dc7ad1e143a16d90dcdc86be1a` /
+`f0adb7a370c5ab1d41c4a6d62e2b9db012096952`.
+
+Checkpoint Source Gates #517 / 38387248166 is terminal SUCCESS on that exact
+source. source-static passed all 62 authorities with 83 test paths and 356 Ruff
+paths. Broad shards passed 2,174 / 2,050 / 1,880 / 2,350 cases plus one optional
+SDK skip: 8,454 passed, 1 skipped, 0 failed/errors. Hygiene timings were
+96.994 / 47.760 / 72.335 / 95.456 seconds. Focused implementation evidence
+records 966 distinct passing cases. Exactly three retained Architecture-134
+test-file pins changed and match the committed Git blobs.
+
+The lossy-Decimal historical-identity case is intentionally fail-closed. No
+SHADOW stage, live observation, production compatibility, production contract,
+promotion, D1/D1R2 or D2 authority is created. 139-B is deferred while work
+returns to the protected production lane.
 
 ## Split architecture and frozen base
 

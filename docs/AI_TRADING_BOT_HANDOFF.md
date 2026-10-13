@@ -1,47 +1,75 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-13 — Architecture 139-A / RCL-3A implemented, review pending
+## 2026-10-13 — Architecture 139-A / RCL-3A SOURCE ACCEPTED
 
-The Architecture-139 boundary is split: **139-A exact variant binding**, then
-**139-B no-effect observation + SHADOW qualification**. 139-A adds only a pure
-immutable canonical provenance binding from WALK_FORWARD_PASSED through its
-BACKTESTED predecessor, report, completed HistoricalExperimentResult and exact
-retained run/variant. The full 137/138 chain is independently verified. No
-variant configuration is duplicated: the existing result identity remains the
-commitment to complete request/run/variant semantics. Resolver returns only the
-exact retained original variant after independent result validation.
+Architecture 139-A / RCL-3A is **SOURCE ACCEPTED** on
+`feature/research-candidate-shadow-variant-binding` at the exact executable/test source:
 
-Binding schema `research-candidate-shadow-variant-binding/v1`, namespace
-`0521440a-535c-4ebc-baa4-b071db744593`; strict canonical JSON proves internal
-self-consistency only. Complete external verification remains mandatory before
-future observation. Prior 137/138 schemas, identities, bytes and stage parsers
-are unchanged. Original rank 1/2/null is evidence only and preserved.
+```text
+PARENT HEAD  1af8150c9985f5dc7ad1e143a16d90dcdc86be1a
+PARENT TREE  f0adb7a370c5ab1d41c4a6d62e2b9db012096952
+HEAD         e730b3b05c0c78181a4b3ff6b8e257cb04f3ff15
+TREE         ea13572c565bcfe65959014bf1c98572c89cc3a7
+CI           #517 / 38387248166 / SUCCESS
+```
 
-Branch `feature/research-candidate-shadow-variant-binding`; worktree
-`F:\AI\worktrees\ai-trading-bot-research-candidate-shadow-variant-binding`.
-Exact base `1af8150c9985f5dc7ad1e143a16d90dcdc86be1a` /
-`f0adb7a370c5ab1d41c4a6d62e2b9db012096952`. Accepted 138 executable/test identity
-remains `e0735af265894757ff9b90ab185bcbd77ee2dee9` /
-`a29f51faaa81e866d0825ffbe082c5fcddb94584`, CI #516 / 38380502369 SUCCESS.
+The implementation is one ordinary commit / 17 paths. Architectures 137 and 138
+remain byte/identity compatible. 139-A adds only an inert canonical provenance
+binding plus pure resolver from an accepted WALK_FORWARD_PASSED lifecycle chain
+back to the exact completed `HistoricalExperimentResult` run/variant that owns
+the full historical research configuration. It does not duplicate the full
+variant configuration or create a second configuration serializer.
 
-Canonical discovery is ACTIVE 62 / FULL 172 / ROBINHOOD 94 / LEGACY 215 /
-EXHAUSTIVE 387 / GUI 44. Only directly affected inventory assertions and three
-retained test blobs change; production executable/native/AST pins, ACTIVE
-tuple/digest and workflow/push allowlist remain frozen. No local broad
-certification runs. Focused verification and one exact-source repository dispatch
-are required before handoff; ChatGPT still owns source acceptance.
+Binding schema:
+`research-candidate-shadow-variant-binding/v1`.
 
-139-A materializes no SHADOW and performs no live/provider observation, real
-research/walk-forward execution, production-contract creation, compatibility,
-promotion, production SQLite, credentials, provider/broker, scheduler/ACL/paper,
-D1/D1R2 or D2 effects. D1/D1R1/D1R2 worktrees and F:\AITradingBot\Arch134D1
-remain untouched. Real-money trading remains **NO-GO**.
+Identity version:
+`research-candidate-shadow-variant-binding-identity/v1`.
 
-Immediate next step: ChatGPT exact-source review of the committed 139-A tree and
-terminal CI evidence, then freeze 139-B observation/evidence/policy semantics.
-Stop at this handoff; no 139-B implementation or protected authority is granted.
-See [Architecture 139](architecture/139-research-candidate-shadow.md) and
-[139 validation](validation/arch139-research-candidate-shadow-plan.md).
+UUID5 namespace:
+`0521440a-535c-4ebc-baa4-b071db744593`.
+
+The external-chain builder independently verifies the Architecture-137
+candidate/report relationship, Architecture-138 walk-forward qualification and
+passed successor, then defensively revalidates the original completed historical
+result. It requires exact result/request/fingerprint/run/rolling/ordinal/UUID/name/
+metrics relationships. The resolver accepts only a self-consistent binding plus
+the matching validated completed result and returns that result's exact retained
+request variant; a reused UUID/name in another result is insufficient.
+
+Canonical parsing proves only local bytes/identity consistency. Independent
+external-chain verification remains mandatory. No SHADOW stage is materialized.
+No live/provider observation, simulator execution, production compatibility,
+ProductionStrategyContract, promotion, paper authority, D1/D1R2 or D2 authority
+is added.
+
+Focused implementation evidence records **966 distinct passing cases**. Exact
+Checkpoint Source Gates #517 / 38387248166 is terminal SUCCESS. source-static
+passed all 62 authorities with 83 test paths / 356 Ruff paths, git diff/Ruff
+check/Ruff format PASS and stable identity. The four broad shards contain
+2,174 / 2,050 / 1,880 / 2,350 passed cases plus one optional SDK skip:
+**8,454 passed, 1 skipped, 0 failures/errors**. Broad hygiene timings were
+96.994 / 47.760 / 72.335 / 95.456 seconds, all below 300 seconds.
+active-tests and certification-tests were skipped as expected; source-gates passed.
+
+Canonical inventory is ACTIVE 62 / FULL 172 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 387 / tests/gui 44. Exactly three retained
+`ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS` test blobs changed and each was
+independently matched to its committed Git blob. Production executable/native/AST
+pins, ACTIVE tuple/digest, historical recovery pins and workflow bytes remain
+frozen.
+
+Historical evidence whose old identity depended on lossy Decimal normalization
+may fail the new defensive revalidation. This is an intentional conservative
+fail-closed limitation; 139-A does not weaken or rewrite historical identities.
+
+All operational effects are zero, including credentials/providers, live shadow
+observations, production SQLite, paper/broker/scheduler/ACL effects, real
+research/walk-forward execution, production contracts, promotion and D1/D1R2/D2.
+
+**139-B remains the next research boundary but is intentionally deferred while
+the project returns to the main production lane.** A documentation-only
+descendant does not replace the accepted executable/test identity above.
 
 ## 2026-10-13 — Architecture 138 / RCL-2 SOURCE ACCEPTED
 

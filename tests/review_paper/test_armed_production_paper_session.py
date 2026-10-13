@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import pytest
@@ -17,12 +19,32 @@ from tests.review_paper.test_store import _review
 
 import trading_bot.robinhood_paper_pipeline as pipeline
 from trading_bot.domain import Symbol
-from trading_bot.market_data import create_alpaca_daily_snapshot_provider
+from trading_bot.market_data import (
+    AlpacaDailySnapshotProvider,
+    AlpacaHttpStatusError,
+    AlpacaResponseError,
+    AlpacaResponseMetadataFailureReason,
+    AlpacaTransportError,
+    AlpacaTransportFailureStage,
+    create_alpaca_daily_snapshot_provider,
+)
 from trading_bot.review_paper import alpaca_strategy_history as history
 from trading_bot.review_paper import armed_session as subject
 from trading_bot.review_paper import armed_session_host as host
 from trading_bot.review_paper import risk_price_acquisition, supervised_forward_paper
-from trading_bot.review_paper.armed_session_store import ArmedSessionStore
+from trading_bot.review_paper.armed_history_failure import (
+    ArmedHistoryFailureEvidence,
+    HistoryFailureClassification,
+    history_failure_path,
+    parse_history_failure,
+    serialize_history_failure,
+    write_history_failure,
+)
+from trading_bot.review_paper.armed_session_store import (
+    ArmedSessionStore,
+    evidence_bytes,
+    validate_session_evidence,
+)
 from trading_bot.review_paper.store import ReviewPaperStore
 from trading_bot.risk import RiskLimits
 from trading_bot.robinhood_mcp.adapter import RobinhoodReviewReadAdapter
@@ -728,3 +750,475 @@ def test_source_pin_rejects_even_a_comment_change(tmp_path, monkeypatch):
         "source drift" in f
         for f in runner._arch134_armed_paper_authority_check(tmp_path)
     )
+
+
+SENSITIVE = "FAKE-SENSITIVE Authorization https://fake.invalid F:/private/fake.key"
+
+
+def diagnostic():
+    return ArmedHistoryFailureEvidence(
+        "armed-paper-history-failure/v1",
+        "a" * 40,
+        "b" * 40,
+        UUID("d490a15f-2c6e-5a1c-af36-e5f233760a7b"),
+        date(2026, 10, 13),
+        UUID("8e8c5102-8b52-5534-8288-b3261f65b2d4"),
+        date(2026, 10, 7),
+        1,
+        HistoryFailureClassification.INTERNAL_FAILED,
+        None,
+        None,
+        None,
+        None,
+        1,
+    )
+
+
+def test_history_failure_pure_canonical_roundtrip_exclusive_fsync(
+    tmp_path, monkeypatch
+):
+    value = diagnostic()
+    raw = serialize_history_failure(value)
+    assert raw.endswith(b"\n") and len(raw) <= 4096
+    assert parse_history_failure(raw) == value
+    assert len(json.loads(raw)) == 14
+    with pytest.raises((AttributeError, TypeError)):
+        value.alpaca_reads = 2
+    calls = []
+    monkeypatch.setattr(
+        "trading_bot.review_paper.armed_history_failure.os.fsync",
+        lambda fd: calls.append(fd),
+    )
+    path = tmp_path / "diagnostic.json"
+    write_history_failure(path, value)
+    assert calls and path.read_bytes() == raw
+    with pytest.raises(FileExistsError):
+        write_history_failure(path, value)
+    assert path.read_bytes() == raw
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda raw: raw[:-1],
+        lambda raw: b" " + raw,
+        lambda raw: raw.replace(
+            b'"alpaca_reads":1', b'"alpaca_reads":1,"alpaca_reads":1'
+        ),
+        lambda raw: raw.replace(b'"alpaca_reads":1', b'"alpaca_reads":true'),
+        lambda raw: raw.replace(b'"alpaca_reads":1', b'"alpaca_reads":254'),
+        lambda raw: raw.replace(b'"read_ordinal":1', b'"read_ordinal":0'),
+        lambda raw: raw.replace(
+            b'"source_head":"' + b"a" * 40, b'"source_head":"' + b"A" * 40
+        ),
+        lambda raw: raw.replace(
+            b"d490a15f-2c6e-5a1c-af36-e5f233760a7b",
+            b"D490A15F-2C6E-5A1C-AF36-E5F233760A7B",
+        ),
+        lambda raw: raw.replace(b"2026-10-07", b"20261007"),
+        lambda raw: raw.replace(b'"http_status":null', b'"http_status":401'),
+        lambda raw: raw.replace(
+            b'"transport_stage":null', b'"transport_stage":"REQUEST"'
+        ),
+        lambda raw: raw.replace(
+            b'"classification":"INTERNAL_FAILED"',
+            b'"classification":"' + SENSITIVE.encode() + b'"',
+        ),
+        lambda raw: raw.replace(b'"schema":', b'"unknown":'),
+        lambda raw: raw.replace(b'"metadata_reason":null,', b""),
+        lambda raw: b"x" * 4097,
+    ],
+)
+def test_history_failure_pure_strict_rejection(mutation):
+    with pytest.raises(ValueError) as caught:
+        parse_history_failure(mutation(serialize_history_failure(diagnostic())))
+    assert SENSITIVE not in str(caught.value) + repr(caught.value)
+    assert caught.value.__context__ is None
+
+
+def test_history_failure_pure_oversize_serializer(monkeypatch):
+    import trading_bot.review_paper.armed_history_failure as failure_module
+
+    monkeypatch.setattr(failure_module, "MAX_HISTORY_FAILURE_BYTES", 20)
+    with pytest.raises(ValueError, match="bound"):
+        serialize_history_failure(diagnostic())
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"transport_stage": AlpacaTransportFailureStage.REQUEST},
+        {"metadata_reason": AlpacaResponseMetadataFailureReason.GENERIC},
+        {"alpaca_reads": 0},
+        {"http_status": 401},
+        {"provider_code": 1},
+        {"read_ordinal": True},
+        {"history_session": AT},
+        {"source_tree": "x" * 40},
+        {"classification": "INTERNAL_FAILED"},
+        {"classification": HistoryFailureClassification.PROVIDER_CONSTRUCTION_FAILED},
+        {"history_session": date(2026, 10, 13)},
+    ],
+)
+def test_history_failure_pure_closed_model(changes):
+    with pytest.raises(ValueError):
+        replace(diagnostic(), **changes)
+
+
+TRANSPORT_FAILURES = [
+    AlpacaTransportError(stage)
+    for stage in AlpacaTransportFailureStage
+    if stage is not AlpacaTransportFailureStage.RESPONSE_METADATA
+] + [
+    AlpacaTransportError(
+        AlpacaTransportFailureStage.RESPONSE_METADATA, metadata_reason=reason
+    )
+    for reason in AlpacaResponseMetadataFailureReason
+]
+FETCH_FAILURES = TRANSPORT_FAILURES + [
+    AlpacaHttpStatusError(401, request_id=SENSITIVE),
+    AlpacaHttpStatusError(403, request_id=SENSITIVE),
+    AlpacaHttpStatusError(429, request_id=SENSITIVE, provider_code=42910000),
+    AlpacaHttpStatusError(True, request_id=SENSITIVE, provider_code=True),
+    AlpacaHttpStatusError(999, request_id=SENSITIVE, provider_code=1 << 63),
+    AlpacaResponseError(SENSITIVE),
+    RuntimeError(SENSITIVE),
+]
+
+
+def assert_failure_fences(h, result, capsys):
+    assert result["status"] == "BLOCKED"
+    assert h.calls == h.evaluations == []
+    assert not h.store.history()
+    for key in (
+        "strategy_evaluations",
+        "prepare_attempts",
+        "execute_attempts",
+        "robinhood_get_equity_quotes",
+        "robinhood_get_accounts",
+        "robinhood_get_equity_orders",
+        "robinhood_review_equity_order",
+        "paper_mutations",
+        "broker_placement_count",
+    ):
+        assert result[key] == 0
+    assert not h.kwargs["execute_evidence_path"].exists()
+    with sqlite3.connect(h.kwargs["session_store"].path) as connection:
+        durable = connection.execute(
+            "SELECT evidence FROM armed_session_v1"
+        ).fetchone()[0]
+    assert json.loads(durable)["status"] == "BLOCKED"
+    exported = h.kwargs["evidence_path"].read_bytes()
+    diagnostic_bytes = history_failure_path(h.kwargs["evidence_path"]).read_bytes()
+    output = capsys.readouterr()
+    combined = (
+        durable + exported + diagnostic_bytes + (output.out + output.err).encode()
+    )
+    for fragment in (
+        b"FAKE-SENSITIVE",
+        b"Authorization",
+        b"fake.invalid",
+        b"private/fake.key",
+    ):
+        assert fragment not in combined
+    return parse_history_failure(diagnostic_bytes)
+
+
+@pytest.mark.parametrize("error", FETCH_FAILURES)
+def test_history_failure_fetch_classifications_no_retry(
+    harness, monkeypatch, capsys, error
+):
+    h = harness
+    attempts = []
+
+    def fetch(self, request):
+        attempts.append(request)
+        with sqlite3.connect(h.kwargs["session_store"].path) as connection:
+            durable = json.loads(
+                connection.execute("SELECT evidence FROM armed_session_v1").fetchone()[
+                    0
+                ]
+            )
+        assert durable["status"] == "HISTORY_STARTED" and durable["alpaca_reads"] == 1
+        raise error
+
+    monkeypatch.setattr(AlpacaDailySnapshotProvider, "fetch", fetch)
+    result = run(h)
+    value = assert_failure_fences(h, result, capsys)
+    assert value.history_session == date(2026, 10, 6)
+    assert value.read_ordinal == value.alpaca_reads == len(attempts) == 1
+    if type(error) is AlpacaTransportError:
+        assert value.classification is HistoryFailureClassification.TRANSPORT_FAILED
+        assert value.transport_stage is error.stage
+        assert value.metadata_reason is error.metadata_reason
+    elif type(error) is AlpacaHttpStatusError:
+        assert value.classification is HistoryFailureClassification.HTTP_FAILED
+        assert value.http_status == (
+            error.status
+            if type(error.status) is int and 100 <= error.status <= 599
+            else None
+        )
+        assert value.provider_code == (
+            error.provider_code
+            if type(error.provider_code) is int and 0 <= error.provider_code < 1 << 63
+            else None
+        )
+    else:
+        assert value.classification is (
+            HistoryFailureClassification.PROVIDER_RESPONSE_INVALID
+            if type(error) is AlpacaResponseError
+            else HistoryFailureClassification.INTERNAL_FAILED
+        )
+    second = run(h, evidence_path=h.kwargs["evidence_path"].with_name("retry.json"))
+    assert second["status"] == "BLOCKED" and len(attempts) == 1
+    assert h.calls == h.evaluations == []
+
+
+@pytest.mark.parametrize("offset", [timedelta(seconds=-1), timedelta(days=1)])
+def test_history_failure_capture_date_and_regression(
+    harness, monkeypatch, capsys, offset
+):
+    original = AlpacaDailySnapshotProvider.fetch
+
+    def fetch(self, request):
+        return replace(original(self, request), captured_at=AT + offset)
+
+    monkeypatch.setattr(AlpacaDailySnapshotProvider, "fetch", fetch)
+    result = run(harness)
+    value = assert_failure_fences(harness, result, capsys)
+    assert (
+        value.classification
+        is HistoryFailureClassification.CAPTURE_OBSERVATION_REJECTED
+    )
+    assert len(harness.transport.calls) == value.alpaca_reads == 1
+
+
+@pytest.mark.parametrize(
+    "seam,classification,reads",
+    [
+        ("accept_daily_provider_response", "SNAPSHOT_ACCEPTANCE_REJECTED", 1),
+        ("serialize_daily_snapshot", "SNAPSHOT_VERIFICATION_REJECTED", 1),
+        ("verify_daily_snapshot", "SNAPSHOT_VERIFICATION_REJECTED", 1),
+        ("replay_verified_daily_snapshot", "SNAPSHOT_VERIFICATION_REJECTED", 1),
+        ("create_strategy_history_seed", "HISTORY_SEED_REJECTED", 4),
+        ("serialize_strategy_history_seed", "HISTORY_SEED_REJECTED", 4),
+        ("verify_strategy_history_seed", "HISTORY_SEED_REJECTED", 4),
+    ],
+)
+def test_history_failure_bounded_stage_rejection(
+    harness, monkeypatch, capsys, seam, classification, reads
+):
+    def reject(*args, **kwargs):
+        raise ValueError(SENSITIVE)
+
+    monkeypatch.setattr(history, seam, reject)
+    result = run(harness)
+    value = assert_failure_fences(harness, result, capsys)
+    assert value.classification.value == classification
+    assert (
+        value.read_ordinal
+        == value.alpaca_reads
+        == len(harness.transport.calls)
+        == reads
+    )
+    assert (
+        value.history_session
+        == history.required_alpaca_history_sessions(contract())[reads - 1].session_date
+    )
+
+
+@pytest.mark.parametrize(
+    "seam",
+    [
+        "accept_daily_provider_response",
+        "verify_daily_snapshot",
+        "replay_verified_daily_snapshot",
+    ],
+)
+def test_history_failure_rejected_results(harness, monkeypatch, capsys, seam):
+    values = {
+        "accept_daily_provider_response": SimpleNamespace(
+            snapshot=None, diagnostics=()
+        ),
+        "verify_daily_snapshot": SimpleNamespace(passed=False),
+        "replay_verified_daily_snapshot": SimpleNamespace(
+            target_session=None, symbols=(), bars=()
+        ),
+    }
+    monkeypatch.setattr(history, seam, lambda *args: values[seam])
+    result = run(harness)
+    value = assert_failure_fences(harness, result, capsys)
+    expected = {
+        "accept_daily_provider_response": "SNAPSHOT_ACCEPTANCE_REJECTED",
+        "verify_daily_snapshot": "SNAPSHOT_VERIFICATION_REJECTED",
+        "replay_verified_daily_snapshot": "VERIFIED_HISTORY_REJECTED",
+    }
+    assert value.classification.value == expected[seam]
+    assert len(harness.transport.calls) == 1
+
+
+def test_history_failure_provider_construction_zero_reads(harness, capsys):
+    def reject():
+        raise RuntimeError(SENSITIVE)
+
+    result = run(harness, alpaca_provider=reject)
+    value = assert_failure_fences(harness, result, capsys)
+    assert (
+        value.classification
+        is HistoryFailureClassification.PROVIDER_CONSTRUCTION_FAILED
+    )
+    assert (
+        value.history_session is None and value.read_ordinal == value.alpaca_reads == 0
+    )
+    assert harness.transport.calls == []
+
+
+def test_history_failure_typed_exception_discards_context(monkeypatch):
+    def fail(self, request):
+        raise RuntimeError(SENSITIVE)
+
+    monkeypatch.setattr(AlpacaDailySnapshotProvider, "fetch", fail)
+    with pytest.raises(history.ProductionHistoryAcquisitionFailure) as caught:
+        history.acquire_current_production_strategy_history_from_alpaca(
+            contract(),
+            provider(AlpacaTransport(), Clock()),
+            requested_at=AT,
+            before_read=lambda: None,
+        )
+    error = caught.value
+    assert error.args == ("INTERNAL_FAILED",)
+    assert error.__context__ is error.__cause__ is None
+    assert SENSITIVE not in str(error) + repr(error) + repr(error.details)
+    assert error.details.read_ordinal == 1
+
+
+def test_history_failure_export_failure_preserves_durable_blocked_and_final_export(
+    harness, monkeypatch, capsys
+):
+    h = harness
+    h.transport.fault = "exception"
+    events = []
+    original = subject.write_session_evidence
+
+    def diagnostic_export(path, value):
+        with sqlite3.connect(h.kwargs["session_store"].path) as connection:
+            raw = connection.execute(
+                "SELECT evidence FROM armed_session_v1"
+            ).fetchone()[0]
+        assert json.loads(raw)["status"] == "BLOCKED"
+        events.append("diagnostic_after_blocked")
+        raise OSError(SENSITIVE)
+
+    def ordinary_export(path, payload):
+        events.append("ordinary_export")
+        original(path, payload)
+
+    monkeypatch.setattr(subject, "write_history_failure", diagnostic_export)
+    monkeypatch.setattr(subject, "write_session_evidence", ordinary_export)
+    result = run(h)
+    assert result["status"] == "BLOCKED"
+    assert events == ["diagnostic_after_blocked", "ordinary_export"]
+    assert len(h.transport.calls) == 1 and h.calls == h.evaluations == []
+    assert not history_failure_path(h.kwargs["evidence_path"]).exists()
+    assert SENSITIVE not in h.kwargs["evidence_path"].read_text() + str(
+        capsys.readouterr()
+    )
+    assert (
+        run(h, evidence_path=h.kwargs["evidence_path"].with_name("retry.json"))[
+            "status"
+        ]
+        == "BLOCKED"
+    )
+    assert len(h.transport.calls) == 1
+
+
+def test_history_failure_existing_path_rejected_before_reservation(harness):
+    path = history_failure_path(harness.kwargs["evidence_path"])
+    path.write_bytes(b"preserve")
+    with pytest.raises(ValueError, match="fresh"):
+        run(harness)
+    assert not harness.kwargs["session_store"].path.exists()
+    assert path.read_bytes() == b"preserve"
+    assert harness.transport.calls == harness.calls == harness.evaluations == []
+
+
+def test_history_failure_old_consumed_v1_row_valid_and_never_rewritten(
+    harness, tmp_path
+):
+    h = harness
+    old_contract = host.ProductionStrategyContract(
+        date(2026, 10, 13),
+        "6bf8753b0cc8950ae27b32b6858b64d454c512f0",
+        "ce3feb2ac48e7aebc23970142aafed5059c447e7",
+        Symbol("SPY"),
+        MovingAverageCrossoverConfig(2, 3, Decimal("1")),
+    )
+    h.clock.at = datetime(2026, 10, 13, 14, tzinfo=UTC)
+    h.transport.fault = "exception"
+    old = run(h, contract=old_contract)
+    assert old["contract_id"] == "d490a15f-2c6e-5a1c-af36-e5f233760a7b"
+    assert old["operation_id"] == "8e8c5102-8b52-5534-8288-b3261f65b2d4"
+    assert old["historical_sessions"] == [
+        "2026-10-07",
+        "2026-10-08",
+        "2026-10-09",
+        "2026-10-12",
+    ]
+    assert old["snapshot_sha256"] == [] and old["history_seed_sha256"] is None
+    assert not old["effect_counts_complete"] and old["alpaca_reads"] == 1
+    validate_session_evidence(old)
+    assert h.kwargs["session_store"].qualify() == 1
+    before = h.kwargs["session_store"].path.read_bytes()
+    result = run(h, contract=old_contract, evidence_path=tmp_path / "old-retry.json")
+    assert result == old and evidence_bytes(result) == evidence_bytes(old)
+    successor = replace(old_contract, source_head="c" * 40)
+    assert (
+        run(h, contract=successor, evidence_path=tmp_path / "successor-retry.json")[
+            "status"
+        ]
+        == "BLOCKED"
+    )
+    assert h.kwargs["session_store"].path.read_bytes() == before
+    assert len(h.transport.calls) == 1 and h.calls == h.evaluations == []
+
+
+@pytest.mark.parametrize("ordinal", [2, 3, 4])
+def test_history_failure_identifies_later_read_without_reacquisition(
+    harness, monkeypatch, capsys, ordinal
+):
+    attempts = []
+    original = AlpacaDailySnapshotProvider.fetch
+
+    def fetch(self, request):
+        attempts.append(request)
+        if len(attempts) == ordinal:
+            raise AlpacaTransportError(AlpacaTransportFailureStage.RESPONSE_BODY)
+        return original(self, request)
+
+    monkeypatch.setattr(AlpacaDailySnapshotProvider, "fetch", fetch)
+    result = run(harness)
+    value = assert_failure_fences(harness, result, capsys)
+    assert (
+        value.history_session
+        == history.required_alpaca_history_sessions(contract())[
+            ordinal - 1
+        ].session_date
+    )
+    assert value.read_ordinal == value.alpaca_reads == len(attempts) == ordinal
+    assert len(harness.transport.calls) == ordinal - 1
+
+
+def test_history_failure_real_fake_provider_schema_rejection(
+    harness, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        harness.transport,
+        "execute",
+        lambda *args, **kwargs: _http_response(b'{"unexpected":"FAKE-SENSITIVE"}'),
+    )
+    result = run(harness)
+    value = assert_failure_fences(harness, result, capsys)
+    assert (
+        value.classification is HistoryFailureClassification.PROVIDER_RESPONSE_INVALID
+    )
+    assert value.alpaca_reads == 1

@@ -15,9 +15,17 @@ from trading_bot.domain import OrderType, TimeInForce
 from trading_bot.execution.models import ExecutionInstruction
 from trading_bot.market_data import AlpacaDailySnapshotProvider
 from trading_bot.review_paper.alpaca_strategy_history import (
+    ProductionHistoryAcquisitionFailure,
     acquire_current_production_strategy_history_from_alpaca,
     production_history_calendar,
     required_alpaca_history_sessions,
+)
+from trading_bot.review_paper.armed_history_failure import (
+    ArmedHistoryFailureEvidence,
+    HistoryFailureClassification,
+    HistoryFailureDetails,
+    history_failure_path,
+    write_history_failure,
 )
 from trading_bot.review_paper.armed_session_store import (
     ArmedSessionStatus,
@@ -161,7 +169,12 @@ def run_armed_production_paper_session(
         "status": ArmedSessionStatus.ADMITTED.value,
     }
     admit_source()
-    if evidence_path.exists():
+    diagnostic_path = history_failure_path(evidence_path)
+    if (
+        evidence_path.exists()
+        or diagnostic_path.exists()
+        or diagnostic_path.is_symlink()
+    ):
         raise ValueError("fresh evidence destinations required")
     if (
         session_store.path.resolve()
@@ -169,6 +182,7 @@ def run_armed_production_paper_session(
             store.path.resolve(),
             evidence_path.resolve(),
             execute_evidence_path.resolve(),
+            diagnostic_path.resolve(),
         }
         or evidence_path.resolve() == execute_evidence_path.resolve()
     ):
@@ -270,9 +284,33 @@ def run_armed_production_paper_session(
             evidence["effect_counts_complete"] = False
             publish(ArmedSessionStatus.HISTORY_STARTED)
 
-        history = acquire_current_production_strategy_history_from_alpaca(
-            contract, alpaca_provider(), requested_at=now, before_read=before_read
-        )
+        def construct_provider():
+            try:
+                return alpaca_provider()
+            except Exception:
+                pass
+            raise ProductionHistoryAcquisitionFailure(
+                HistoryFailureDetails(
+                    None, 0, HistoryFailureClassification.PROVIDER_CONSTRUCTION_FAILED
+                )
+            ) from None
+
+        provider = construct_provider()
+        try:
+            history = acquire_current_production_strategy_history_from_alpaca(
+                contract, provider, requested_at=now, before_read=before_read
+            )
+        except ProductionHistoryAcquisitionFailure:
+            raise
+        except Exception:
+            # Unknown acquisition failures retain no guessed session or stage.
+            history = None
+        if history is None:
+            raise ProductionHistoryAcquisitionFailure(
+                HistoryFailureDetails(
+                    None, 0, HistoryFailureClassification.INTERNAL_FAILED
+                )
+            ) from None
         evidence["snapshot_sha256"] = [
             sha256(p).hexdigest() for p in history.snapshot_bytes
         ]
@@ -427,6 +465,33 @@ def run_armed_production_paper_session(
         publish(ArmedSessionStatus.PAPER_EXECUTED)
     except _SessionTerminal:
         pass
+    except ProductionHistoryAcquisitionFailure as failure:
+        # Retry prevention is durable before any fallible external diagnostic I/O.
+        publish(ArmedSessionStatus.BLOCKED)
+        details = failure.details
+        try:
+            write_history_failure(
+                diagnostic_path,
+                ArmedHistoryFailureEvidence(
+                    "armed-paper-history-failure/v1",
+                    contract.source_head,
+                    contract.source_tree,
+                    contract.contract_id,
+                    contract.target_session_date,
+                    operation_id,
+                    details.history_session,
+                    details.read_ordinal,
+                    details.classification,
+                    details.transport_stage,
+                    details.metadata_reason,
+                    details.http_status,
+                    details.provider_code,
+                    evidence["alpaca_reads"],
+                ),
+            )
+        except Exception:
+            # A failed export grants no retry and cannot suppress ordinary export.
+            pass
     except Exception:
         # If publication also fails, the last durable pre-effect fence survives.
         publish(ArmedSessionStatus.BLOCKED)

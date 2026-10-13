@@ -10215,6 +10215,92 @@ ARCH134_ARMED_PAPER_IMPORTS: Final = {
 }
 
 
+# D1R1 is an exact successor overlay; accepted predecessor material stays frozen.
+ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "ad99796a7b89ac29450047dfad9cb0e87db52cc6"
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "8133bed61cc8f6924876ce41b05ef9124bfb2701"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "0fe62babc2dafc67bca6b0c56463dce49439df6d"
+    ),
+}
+ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "pathlib",
+        "trading_bot.domain",
+        "trading_bot.execution.models",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.alpaca_strategy_history",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_cycle",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.session_admission",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.domain",
+        "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+        "zoneinfo",
+    ),
+}
+
+
 def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Exact source/AST closure; D1 gains no protected qualification authority."""
     failures = list(_arch134_production_strategy_live_paper_authority_check(repo_root))
@@ -10240,11 +10326,29 @@ def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
         "import_module",
     }
     try:
-        for relative, pin in ARCH134_ARMED_PAPER_SOURCE_PINS.items():
+        reviewed_overrides = {
+            "src/trading_bot/review_paper/alpaca_strategy_history.py",
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+        }
+        if (
+            set(ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES) != reviewed_overrides
+            or set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES) != reviewed_overrides
+        ):
+            failures.append("134-D1 unreviewed successor override")
+        pins = {
+            **ARCH134_ARMED_PAPER_SOURCE_PINS,
+            **ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES,
+        }
+        imports = {
+            **ARCH134_ARMED_PAPER_IMPORTS,
+            **ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES,
+        }
+        for relative, pin in pins.items():
             path = repo_root / relative
             if _git_blob_sha1(path) != pin:
                 failures.append("134-D1 source drift: " + relative)
-            if relative not in ARCH134_ARMED_PAPER_IMPORTS:
+            if relative not in imports:
                 continue  # unchanged reviewed concrete provider/HTTPS pins
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = {
@@ -10257,7 +10361,7 @@ def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
                 if isinstance(node, ast.Import)
                 for alias in node.names
             }
-            if imported != set(ARCH134_ARMED_PAPER_IMPORTS[relative]):
+            if imported != set(imports[relative]):
                 failures.append("134-D1 import closure drift: " + relative)
             calls = [
                 getattr(node.func, "attr", getattr(node.func, "id", ""))
@@ -10437,6 +10541,128 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS: Final = {
 }
 
 
+# Current D1R1 runtime authority: exact changed source/tests plus one diagnostic.
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS,
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "ad99796a7b89ac29450047dfad9cb0e87db52cc6"
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "8133bed61cc8f6924876ce41b05ef9124bfb2701"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "0fe62babc2dafc67bca6b0c56463dce49439df6d"
+    ),
+    "src/trading_bot/review_paper/armed_history_failure.py": (
+        "07265a0a2259290e6629ee9a901822c4ee49d5a2"
+    ),
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "d997fd8520be5e29a38877677b18a4c7c5b8dcd1"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "21811c26f3a5be014e5d5966da2830c0670a4076"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "bddff88dbefbe4907437080a3d6261803b30ff44"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "93da0226ad50d95602e0b3297e1f9f8acc44e3d7"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS,
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "pathlib",
+        "trading_bot.domain",
+        "trading_bot.execution.models",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.alpaca_strategy_history",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_cycle",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.session_admission",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.domain",
+        "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_history_failure.py": (
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.market_data",
+        "uuid",
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS,
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
 def _arch134_production_paper_runtime_authority_check(
     repo_root: Path,
 ) -> tuple[str, ...]:
@@ -10470,11 +10696,44 @@ def _arch134_production_paper_runtime_authority_check(
         "import_module",
     }
     try:
-        for relative, pin in ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items():
+        reviewed_changes = {
+            "src/trading_bot/review_paper/alpaca_strategy_history.py",
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+            "tests/review_paper/test_armed_production_paper_session.py",
+            "tests/review_paper/test_production_paper_runtime.py",
+            "tests/runtime/checkpoint_runner/test_ci.py",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        }
+        diagnostic = "src/trading_bot/review_paper/armed_history_failure.py"
+        pins = ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS
+        if set(pins) != set(ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS) | {
+            diagnostic
+        } or any(
+            pins.get(relative) != pin
+            for relative, pin in ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items()
+            if relative not in reviewed_changes
+        ):
+            failures.append("134-D1Q unreviewed successor source override")
+        imports = ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS
+        expected_imports = (
+            set(ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS)
+            | set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES)
+            | {diagnostic}
+        )
+        if set(imports) != expected_imports or any(
+            imports.get(relative) != value
+            for relative, value in ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS.items()
+        ):
+            failures.append("134-D1Q unreviewed successor import override")
+        for (
+            relative,
+            pin,
+        ) in ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS.items():
             path = repo_root / relative
             if _git_blob_sha1(path) != pin:
                 failures.append("134-D1Q source drift: " + relative)
-            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS:
+            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS:
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imports = {
@@ -10487,7 +10746,9 @@ def _arch134_production_paper_runtime_authority_check(
                 if isinstance(node, ast.Import)
                 for alias in node.names
             }
-            if imports != set(ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS[relative]):
+            if imports != set(
+                ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS[relative]
+            ):
                 failures.append("134-D1Q import closure drift: " + relative)
             names = {
                 node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
@@ -10496,9 +10757,10 @@ def _arch134_production_paper_runtime_authority_check(
                 failures.append("134-D1Q forbidden authority: " + relative)
         spec = _checkpoint_specs()[ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
         if (
-            spec.tests != ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS
-            or spec.ruff_paths != ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS
-            or spec.remote_branch != "feature/robinhood-production-paper-runtime"
+            spec.tests != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS
+            or spec.remote_branch
+            != "feature/robinhood-production-paper-history-diagnostics"
             or spec.authority_check
             is not _arch134_production_paper_runtime_authority_check
             or spec.preflight is not None
@@ -11106,10 +11368,10 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: CheckpointSpec(
             name=ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
             description="Architecture 134-D1Q fixed runtime and credential readiness",
-            tests=ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
-            ruff_paths=ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS,
+            tests=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS,
             authority_check=_arch134_production_paper_runtime_authority_check,
-            remote_branch="feature/robinhood-production-paper-runtime",
+            remote_branch="feature/robinhood-production-paper-history-diagnostics",
             preflight=None,
             execute=None,
         ),

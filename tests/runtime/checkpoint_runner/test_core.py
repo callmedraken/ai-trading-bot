@@ -341,7 +341,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         if spec.name == "arch134-armed-paper-mvp":
             expected_branch = "feature/robinhood-production-paper-mvp"
         if spec.name == "arch134-production-paper-runtime":
-            expected_branch = "feature/robinhood-production-paper-runtime"
+            expected_branch = "feature/robinhood-production-paper-history-diagnostics"
         if spec.name == "arch134-production-paper-runtime-acl":
             expected_branch = "feature/robinhood-production-paper-runtime-acl"
         assert spec.remote_branch == expected_branch

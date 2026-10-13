@@ -994,18 +994,96 @@ def test_d1q_authority_rejects_forbidden_expansion_with_refreshed_pin(
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
-    for relative in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS:
+    for relative in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS:
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text((root / relative).read_text(encoding="utf-8"), encoding="utf-8")
     relative = "src/trading_bot/review_paper/production_paper_runtime.py"
     path = tmp_path / relative
     path.write_text(path.read_text() + addition, encoding="utf-8")
-    pins = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS)
+    pins = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS)
     pins[relative] = runner._git_blob_sha1(path)
-    monkeypatch.setattr(runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS", pins)
+    monkeypatch.setattr(
+        runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS", pins
+    )
     monkeypatch.setattr(runner, "_arch134_armed_paper_authority_check", lambda _: ())
     assert any(
         "import closure" in f or "forbidden authority" in f
         for f in runner._arch134_production_paper_runtime_authority_check(tmp_path)
     )
+
+
+@pytest.mark.parametrize("suffix", ["", ".execute.json", ".history-failure.json"])
+def test_d1r1_host_evidence_collision_before_runtime_credentials_and_reservation(
+    paths, monkeypatch, tmp_path, suffix
+):
+    host_startup(monkeypatch, paths)
+    evidence = tmp_path / "session.json"
+    collision = evidence.with_name(evidence.name + suffix)
+    collision.write_bytes(b"preserve")
+    monkeypatch.setattr(
+        host, "preflight_runtime", lambda: pytest.fail("runtime access")
+    )
+    monkeypatch.setattr(
+        host,
+        "create_current_product_alpaca_provider",
+        lambda: pytest.fail("credentials/provider"),
+    )
+    assert (
+        host.main(cli_args("--arm", host.ARM_INTERLOCK, "--evidence", str(evidence)))
+        == 3
+    )
+    assert collision.read_bytes() == b"preserve" and not paths.exists()
+
+
+def test_d1r1_host_history_failure_stdout_stderr_sanitized(
+    paths, monkeypatch, tmp_path, capsys
+):
+    runtime.provision_runtime()
+    host_startup(monkeypatch, paths)
+
+    def construction():
+        raise RuntimeError("FAKE-SENSITIVE Authorization F:/private/fake.key")
+
+    monkeypatch.setattr(host, "create_current_product_alpaca_provider", construction)
+    monkeypatch.setattr(
+        host,
+        "create_current_product_quote_adapter",
+        lambda: pytest.fail("Robinhood factory"),
+    )
+    evidence = tmp_path / "session.json"
+    assert (
+        host.main(cli_args("--arm", host.ARM_INTERLOCK, "--evidence", str(evidence)))
+        == 3
+    )
+    output = capsys.readouterr()
+    assert json.loads(output.out)["status"] == "BLOCKED"
+    assert output.err == ""
+    assert "FAKE-SENSITIVE" not in output.out + output.err + evidence.read_text()
+    assert ArmedSessionStore(runtime.SESSION_PATH).qualify() == 1
+
+
+def test_d1r1_canonical_stdin_entrypoint_calls_main_and_preserves_module_noop():
+    import ast
+
+    root = Path(__file__).resolve().parents[2]
+    module = ast.parse(
+        (root / "src/trading_bot/review_paper/armed_session_host.py").read_text()
+    )
+    assert any(
+        isinstance(node, ast.FunctionDef) and node.name == "main"
+        for node in module.body
+    )
+    assert not any(
+        isinstance(node, ast.If)
+        and isinstance(node.test, ast.Compare)
+        and ast.unparse(node.test) == "__name__ == '__main__'"
+        for node in module.body
+    )
+    docs = (
+        root / "docs/validation/arch134-d1r1-history-failure-observability.md"
+    ).read_text()
+    assert "from trading_bot.review_paper.armed_session_host import main" in docs
+    assert "raise SystemExit(main())" in docs
+    assert "'@ | & $PythonExe -B -" in docs
+    assert "python -c" not in docs

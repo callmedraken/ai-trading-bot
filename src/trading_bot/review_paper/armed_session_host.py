@@ -22,6 +22,7 @@ from trading_bot.market_data.alpaca_http import StdlibAlpacaHistoricalBarsTransp
 from trading_bot.review_paper.alpaca_windows_credentials import (
     read_current_product_alpaca_secrets,
 )
+from trading_bot.review_paper.armed_history_failure import history_failure_path
 from trading_bot.review_paper.armed_session import (
     ARM_INTERLOCK,
     ArmedSessionPolicy,
@@ -46,7 +47,7 @@ from trading_bot.robinhood_paper_operator import admit_robinhood_paper_source
 from trading_bot.strategies import MovingAverageCrossoverConfig
 from trading_bot.strategies.production import ProductionStrategyContract
 
-BRANCH = "feature/robinhood-production-paper-runtime"
+BRANCH = "feature/robinhood-production-paper-history-diagnostics"
 ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 RUNTIME_ROOT = Path(r"F:\AITradingBot\Arch134D1")
 PAPER_PATH = RUNTIME_ROOT / "paper.sqlite"
@@ -166,12 +167,16 @@ def main(argv: list[str] | None = None) -> int:
         roots = admit_armed_session_host(args.expected_head, args.expected_tree)
         output = args.evidence
         execution_output = output.with_name(output.name + ".execute.json")
+        diagnostic_output = history_failure_path(output)
         if (
             not output.is_absolute()
             or output.is_symlink()
             or not output.parent.is_dir()
             or output.exists()
             or execution_output.exists()
+            or execution_output.is_symlink()
+            or diagnostic_output.exists()
+            or diagnostic_output.is_symlink()
             or any(output.resolve().is_relative_to(root) for root in roots)
             or output.resolve().is_relative_to(RUNTIME_ROOT.resolve())
         ):

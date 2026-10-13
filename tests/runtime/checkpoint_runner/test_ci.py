@@ -517,3 +517,196 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
         ).hexdigest()
         == runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
     )
+
+
+@pytest.mark.parametrize(
+    "name,digest",
+    [
+        (
+            "ARCH134_ARMED_PAPER_SOURCE_PINS",
+            "53dbbc49e50ecb94659b32e7280225be4cd16893b4d787a1f2aec3a960f5327b",
+        ),
+        (
+            "ARCH134_ARMED_PAPER_IMPORTS",
+            "44360941702468b9ff64ae7590925584dadfe918836585a463c509cfac7f53fc",
+        ),
+        (
+            "ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS",
+            "dae912a803d8907587ca1f75f6183e7492404713d78de28708c70305078f93a7",
+        ),
+        (
+            "ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS",
+            "c1fa7ca10e3f5290d9ca5a59d2d37659482dae8cdc8a1039fb901df561cd4b44",
+        ),
+        (
+            "ARCH134_RUNTIME_ACL_SOURCE_PINS",
+            "d0afa4f6c071cb7a1883c3089b49eda97cd993100bcc17b5c9d3518dd91d9354",
+        ),
+        (
+            "ARCH134_RUNTIME_ACL_IMPORTS",
+            "a8649856d3e25f5edd33b5ce52cc7bb4349cd862985ef7e7e6dd84f0687c1263",
+        ),
+        (
+            "ARCH134_RUNTIME_ACL_AST_PINS",
+            "367c40b729e8f149ec4c0d2e63d8c9d18db51befb214e83a0e9d26d0c70d429b",
+        ),
+    ],
+)
+def test_d1r1_frozen_predecessor_authority_material(name, digest):
+    payload = json.dumps(
+        getattr(runner, name), sort_keys=True, separators=(",", ":")
+    ).encode()
+    assert hashlib.sha256(payload).hexdigest() == digest
+
+
+def test_d1r1_exact_successor_overlay_registration_and_frozen_refs():
+    armed = runner.ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES
+    assert set(armed) == {
+        "src/trading_bot/review_paper/" + name
+        for name in (
+            "alpaca_strategy_history.py",
+            "armed_session.py",
+            "armed_session_host.py",
+        )
+    }
+    assert set(runner.ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES) == set(armed)
+    assert all(
+        value != runner.ARCH134_ARMED_PAPER_SOURCE_PINS[path]
+        for path, value in armed.items()
+    )
+    successor = runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS
+    diagnostic = "src/trading_bot/review_paper/armed_history_failure.py"
+    assert set(successor) == set(
+        runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS
+    ) | {diagnostic}
+    for path, value in runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items():
+        if path not in armed and path not in {
+            "tests/review_paper/test_armed_production_paper_session.py",
+            "tests/review_paper/test_production_paper_runtime.py",
+            "tests/runtime/checkpoint_runner/test_ci.py",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        }:
+            assert successor[path] == value
+    specs = runner._checkpoint_specs()
+    assert (
+        specs[runner.ARCH134_ARMED_PAPER_NAME].remote_branch
+        == "feature/robinhood-production-paper-mvp"
+    )
+    assert (
+        specs[runner.ARCH134_RUNTIME_ACL_NAME].remote_branch
+        == "feature/robinhood-production-paper-runtime-acl"
+    )
+    spec = specs[runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
+    assert (
+        spec.remote_branch == "feature/robinhood-production-paper-history-diagnostics"
+    )
+    assert spec.preflight is spec.execute is None
+    assert (
+        spec.authority_check is runner._arch134_production_paper_runtime_authority_check
+    )
+    assert spec.tests == runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS
+    assert (
+        spec.ruff_paths == runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS
+    )
+    assert runner.resolve_ci_checkpoint(specs, spec.remote_branch, "push") == spec.name
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, "feature/robinhood-production-paper-runtime", "push"
+        )
+        is None
+    )
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 62
+    assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
+        runner.ARCH134_ARMED_PAPER_NAME,
+        runner.ARCH134_PRODUCTION_STRATEGY_NAME,
+        runner.ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
+        runner.ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
+        runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
+        runner.ARCH134_RUNTIME_ACL_NAME,
+    )
+    assert (
+        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        == "06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440"
+    )
+    root = Path(runner.__file__).resolve().parents[1]
+    for check in (
+        runner._arch134_armed_paper_authority_check,
+        runner._arch134_production_paper_runtime_authority_check,
+        runner._arch134_runtime_acl_authority_check,
+    ):
+        assert check(root) == ()
+    for branch, head, tree in [
+        (
+            "feature/robinhood-production-paper-runtime",
+            "6bf8753b0cc8950ae27b32b6858b64d454c512f0",
+            "ce3feb2ac48e7aebc23970142aafed5059c447e7",
+        ),
+        (
+            "feature/robinhood-production-paper-runtime-acl",
+            "2f122958366d1db282fea51abbd461b83fa893d9",
+            "c3fb82add37bdbea12ebad9836ca10000b924fe1",
+        ),
+    ]:
+        # Verify retained refs when a CI checkout includes the frozen branches.
+        ref = "refs/remotes/origin/" + branch
+        present = subprocess.run(
+            ["git", "-C", str(root), "show-ref", "--verify", "--quiet", ref],
+            capture_output=True,
+        )
+        if present.returncode == 0:
+            assert runner._git_output(root, "rev-parse", ref) == head
+            assert runner._git_output(root, "rev-parse", ref + "^{tree}") == tree
+
+
+@pytest.mark.parametrize(
+    "which",
+    [
+        "armed_pin",
+        "armed_import",
+        "runtime_pin",
+        "runtime_import",
+        "new_pin",
+        "unreviewed_armed",
+        "unreviewed_runtime",
+    ],
+)
+def test_d1r1_successor_authority_drift_fails_closed(monkeypatch, which):
+    root = Path(runner.__file__).resolve().parents[1]
+    path = "src/trading_bot/review_paper/armed_session.py"
+    if which in {"armed_pin", "unreviewed_armed"}:
+        values = dict(runner.ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES)
+        values[
+            path
+            if which == "armed_pin"
+            else "src/trading_bot/review_paper/armed_session_store.py"
+        ] = "0" * 40
+        monkeypatch.setattr(
+            runner, "ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES", values
+        )
+    elif which == "armed_import":
+        values = dict(runner.ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES)
+        values[path] = (*values[path], "unreviewed")
+        monkeypatch.setattr(
+            runner, "ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES", values
+        )
+    elif which in {"runtime_pin", "new_pin", "unreviewed_runtime"}:
+        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS)
+        target = (
+            "src/trading_bot/review_paper/armed_history_failure.py"
+            if which == "new_pin"
+            else "src/trading_bot/review_paper/armed_session_store.py"
+            if which == "unreviewed_runtime"
+            else path
+        )
+        values[target] = "0" * 40
+        monkeypatch.setattr(
+            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS", values
+        )
+    else:
+        values = dict(runner.ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS)
+        values[path] = (*values[path], "unreviewed")
+        monkeypatch.setattr(
+            runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS", values
+        )
+    assert runner._arch134_production_paper_runtime_authority_check(root)

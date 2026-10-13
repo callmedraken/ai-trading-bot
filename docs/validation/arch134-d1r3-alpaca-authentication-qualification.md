@@ -1,4 +1,4 @@
-# Architecture 134-D1R3 — Alpaca authentication qualification
+# Architecture 134-D1R3 â€” Alpaca authentication qualification
 
 Status: implemented source checkpoint; ChatGPT acceptance and fresh protected
 qualification authorization remain required. Base HEAD
@@ -171,8 +171,55 @@ Focused checks use `-B`, `-p no:cacheprovider`, and a fresh external
 ROBINHOOD certification, with full fallback skipped. No duplicate local broad
 certification or real qualification is run during implementation.
 
-Stop after terminal source CI. ChatGPT owns exact GitHub source acceptance and
+Stop only after terminal successful mapped source CI on the exact final HEAD/tree.
+Bounded test/registration corrections may iterate through ordinary commits and
+pushes without widening production authority. ChatGPT owns exact source acceptance and
 fresh authorization for any real D1R3 credential/provider qualification. PASS
 only means REMOTE_ALPACA_AUTH_READY for this source/request/read observation; no
 ongoing validity, reservation, D1 launch or D2 authority is implied. A later reviewed
 operator step must bind and consume this evidence before a fresh future D1 session.
+
+
+## D1R3 failed-CI correction
+
+Implementation `0cfd621ab3d91c349df4394e5d757d98d25f5ba1` /
+`f24fd9321a71ce982f05c4b7bd883c47f6fbd47a` produced mapped CI #519 /
+38458088952 FAILURE: active 658 passed/one retained concurrency failure;
+ROBINHOOD 8,887 passed/ten stale topology failures/one skipped, zero errors.
+All 84 D1R3 tests and source-static passed. This correction leaves qualification
+and every production executable/native/CAS/recovery/credential boundary unchanged.
+
+The grouped disposable concurrency diagnostic captured two SQLITE_BUSY (code 5)
+exceptions at RECOVERY_STARTED. The existing zero-timeout store may block both
+contenders before either CAS consumes authority; the test incorrectly required
+one NO_SIGNAL result for uncontrolled SQLite lock timing. No fixture/global-state
+or provider-counter leak was required to reproduce it. Function-scoped fixtures,
+fresh SQLite roots, fixed fake identities and joined worker lifetimes remain.
+
+The corrected test first barriers two equal stale predecessor reads, then uses
+bounded test-only events to choose either caller's real exact-byte CAS first.
+The second real UPDATE must reject those stale bytes, and the winner waits for
+that rejection before publishing history. Both possible winners are covered;
+exactly one consumes/reacquires, four history requests and one evaluation occur,
+and PREPARE/EXECUTE/paper/broker effects remain zero. A separate deterministic
+BEGIN EXCLUSIVE lock on a disposable database proves actual SQLITE_BUSY still
+blocks without changing predecessor bytes or making a provider request. No
+production wait, mutex, retry, timeout or CAS behavior is added.
+
+Ten retained topology tests now assert 63 checkpoints, the exact new checkpoint
+at position -7, and their correctly shifted exact historical predecessor pairs.
+No exact tuple assertion becomes a membership/subset approximation. Inventory
+is recomputed through the canonical discovery/selection functions; module
+ownership is unchanged. One separately named narrow correction test-pin overlay
+owns only tests/review_paper/test_armed_production_paper_session.py; every frozen
+accepted D1/R1/R2 and initial D1R3 source dictionary is retained unchanged.
+
+Focused verification covers all directly changed test modules, all previously
+failing nodes, D1R3 registration, repeated isolated CAS cases and representative
+runtime/qualification grouping with fresh external basetemp roots. Both Ruff
+phases and unstaged/staged diff checks are required before ordinary publication.
+Mapped CI must finish source-static/active-tests/certification-tests/source-gates
+SUCCESS, full-tests SKIPPED, zero failures/errors and ROBINHOOD wall below 300s.
+Final correction identity, exact pins, focused counts and CI evidence belong in
+the implementation handoff. No local broad certification or real qualification
+is performed by this correction.

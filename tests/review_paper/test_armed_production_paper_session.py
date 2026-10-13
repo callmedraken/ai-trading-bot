@@ -422,28 +422,115 @@ def test_d1r2_crash_after_durable_permission_prevents_recovery(
     assert h.transport.calls == h.calls == h.evaluations == []
 
 
-def test_d1r2_concurrent_stale_read_only_one_caller_reacquires(harness, monkeypatch):
+@pytest.mark.parametrize("first_caller", ["caller-a", "caller-b"])
+def test_d1r2_concurrent_stale_read_only_one_caller_reacquires(
+    harness, monkeypatch, first_caller
+):
     from concurrent.futures import ThreadPoolExecutor
-    from threading import Barrier
+    from threading import Barrier, Event, local
 
     h = harness
-    legacy_predecessor(h)
+    key, predecessor = legacy_predecessor(h)
     h.transport.closes = (10, 11, 12, 13)
-    original = ArmedSessionStore.read
+    original_read = ArmedSessionStore.read
+    original_publish = ArmedSessionStore.publish
     barrier = Barrier(2)
+    committed = Event()
+    rejected = Event()
+    caller = local()
+    stale_bytes = {}
+    consumed_callers = []
+    rejected_callers = []
 
     def synchronized_read(self, key):
-        value = original(self, key)
+        value = original_read(self, key)
+        stale_bytes[caller.label] = value[1]
         barrier.wait(timeout=10)
         return value
 
+    def ordered_publish(self, key, before, evidence):
+        if evidence["status"] != "RECOVERY_STARTED":
+            return original_publish(self, key, before, evidence)
+        # Both callers hold the same stale bytes. Order only the test's CAS
+        # interleaving so timeout=0 does not turn this into a SQLite BUSY test.
+        # The real exact-byte UPDATE must still accept one and reject the other.
+        if caller.label != first_caller:
+            assert committed.wait(timeout=10)
+        try:
+            result = original_publish(self, key, before, evidence)
+        except ValueError:
+            rejected_callers.append(caller.label)
+            rejected.set()
+            raise
+        consumed_callers.append(caller.label)
+        committed.set()
+        # Let the loser finish its stale CAS before the winner publishes history.
+        assert rejected.wait(timeout=10)
+        return result
+
+    def recover_caller(label):
+        caller.label = label
+        return recover(h, label)
+
     monkeypatch.setattr(ArmedSessionStore, "read", synchronized_read)
+    monkeypatch.setattr(ArmedSessionStore, "publish", ordered_publish)
+    labels = ("caller-a", "caller-b")
     with ThreadPoolExecutor(2) as pool:
-        futures = [pool.submit(recover, h, label) for label in ("caller-a", "caller-b")]
+        futures = [pool.submit(recover_caller, label) for label in labels]
         results = [f.result(timeout=20) for f in futures]
-    assert sorted(r["status"] for r in results) == ["BLOCKED", "NO_SIGNAL"]
+    other_caller = next(label for label in labels if label != first_caller)
+    assert {
+        label: result["status"] for label, result in zip(labels, results, strict=True)
+    } == {
+        first_caller: "NO_SIGNAL",
+        other_caller: "BLOCKED",
+    }
+    assert stale_bytes == {label: evidence_bytes(predecessor) for label in labels}
+    assert consumed_callers == [first_caller] and rejected_callers == [other_caller]
     assert len(h.transport.calls) == 4 and len(h.evaluations) == 1
+    assert h.calls == [] and h.store.history() == ()
+    assert all(
+        result[name] == 0
+        for result in results
+        for name in (
+            "prepare_attempts",
+            "execute_attempts",
+            "paper_mutations",
+            "broker_placement_count",
+        )
+    )
+    durable, _ = original_read(h.kwargs["session_store"], key)
+    assert durable["status"] == "NO_SIGNAL" and durable["recovery_count"] == 1
+    assert durable["operation_id"] == predecessor["operation_id"]
     assert h.kwargs["session_store"].qualify() == 1
+
+
+def test_d1r2_zero_timeout_busy_cas_blocks_without_consumption(harness, monkeypatch):
+    h = harness
+    key, predecessor = legacy_predecessor(h)
+    before = h.kwargs["session_store"].read(key)[1]
+    original = ArmedSessionStore.publish
+    busy_codes = []
+
+    def locked_publish(self, key, before, evidence):
+        assert evidence["status"] == "RECOVERY_STARTED"
+        # Real contention on the disposable test database, with no retry/wait
+        # added to the production zero-timeout connection or CAS.
+        with sqlite3.connect(self.path, timeout=0) as blocker:
+            blocker.execute("BEGIN EXCLUSIVE")
+            try:
+                return original(self, key, before, evidence)
+            except sqlite3.OperationalError as error:
+                busy_codes.append(error.sqlite_errorcode)
+                raise
+
+    monkeypatch.setattr(ArmedSessionStore, "publish", locked_publish)
+    result = recover(h)
+    assert result == predecessor
+    assert busy_codes == [sqlite3.SQLITE_BUSY]
+    assert h.kwargs["session_store"].read(key)[1] == before
+    assert h.transport.calls == h.calls == h.evaluations == []
+    assert h.store.history() == () and h.kwargs["session_store"].qualify() == 1
 
 
 @pytest.mark.parametrize(

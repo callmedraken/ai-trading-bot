@@ -10802,7 +10802,9 @@ def _arch134_production_paper_runtime_authority_check(
             pin,
         ) in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS.items():
             path = repo_root / relative
-            expected_pin = ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
+            expected_pin = ARCH134_AUTH_CORRECTION_TEST_PINS.get(
+                relative, ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
+            )
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -10885,6 +10887,13 @@ ARCH134_AUTH_TEST_PIN_OVERRIDES: Final = {
         "tests/scripts/certification_runner/test_profiles.py",
     )
 }
+# D1R3 correction: only the directly changed retained concurrency test evolves.
+# Accepted D1/R1/R2 and initial D1R3 dictionaries remain frozen.
+ARCH134_AUTH_CORRECTION_TEST_PINS: Final = {
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "4e06e2d922f6ca784681cffe8ccda6b4806bc14f"
+    ),
+}
 ARCH134_AUTH_IMPORTS: Final = {
     "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
         "__future__",
@@ -10959,6 +10968,13 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
         "import_module",
     }
     try:
+        if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
+            "tests/review_paper/test_armed_production_paper_session.py"
+        }:
+            failures.append("134-D1R3 unreviewed correction test override")
+        for relative, pin in ARCH134_AUTH_CORRECTION_TEST_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R3 correction test drift: " + relative)
         for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R3 source drift: " + relative)

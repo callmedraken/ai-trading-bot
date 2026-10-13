@@ -7,8 +7,9 @@ import os
 from collections.abc import Callable
 from typing import TypeVar
 
-API_KEY_TARGET = "AITradingBot/MarketData/Alpaca/ApiKeyId/v2"
-API_SECRET_TARGET = "AITradingBot/MarketData/Alpaca/ApiSecretKey/v2"
+CREDENTIAL_POLICY = "windows-credential-manager-alpaca-market-data/v3"
+API_KEY_TARGET = "AITradingBot/MarketData/Alpaca/ApiKeyId/v3"
+API_SECRET_TARGET = "AITradingBot/MarketData/Alpaca/ApiSecretKey/v3"
 CRED_TYPE_GENERIC = 1
 CRED_PERSIST_LOCAL_MACHINE = 2
 CRED_MAX_CREDENTIAL_BLOB_SIZE = 2560
@@ -217,3 +218,24 @@ def read_current_product_alpaca_secrets() -> ScopedAlpacaSecrets:
         for blob in blobs:
             if type(blob) is bytearray:
                 _zero(blob)
+
+
+def validate_alpaca_credential_bytes(blob: bytearray) -> None:
+    """Apply the same strict secret invariants to interactive/provisioned bytes."""
+    _decode(blob)
+
+
+def read_fixed_current_product_credential(target: str) -> bytearray | None:
+    """Read a fixed v3 record; caller owns and must clear the mutable copy."""
+    _require_target(target)
+    blob = _WindowsCredentialReader().read_fixed(target)
+    if blob is not None:
+        failed = False
+        try:
+            validate_alpaca_credential_bytes(blob)
+        except Exception:
+            failed = True
+        if failed:
+            _zero(blob)
+            raise AlpacaCredentialReadError("Alpaca credential readiness failed")
+    return blob

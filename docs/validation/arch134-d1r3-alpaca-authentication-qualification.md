@@ -1,5 +1,14 @@
 # Architecture 134-D1R3 â€” Alpaca authentication qualification
 
+## Historical snapshot — current operator superseded by D1R4
+
+The material below records D1R3 source acceptance, its original `/v2` operator
+contract and the consumed real HTTP 401 result. Original future-tense commands
+and unexecuted statements are retained historical snapshots, not current
+authority. Do not rerun D1R3. Current preparation is governed by
+[D1R4 validation](arch134-d1r4-alpaca-v3-credential-generation.md) and the reviewed
+v3 concurrency amendment; real provisioning/authentication remain protected.
+
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 
 The separately authorized Architecture 134-D1R3 real authentication

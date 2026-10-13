@@ -1,8 +1,9 @@
-"""D1R3 fake-only transport, authority and canonical evidence verification."""
+"""D1R4 fake-only transport, authority and canonical evidence verification."""
 
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import subprocess
@@ -18,6 +19,11 @@ from trading_bot.market_data.alpaca_http import (
 from trading_bot.review_paper import alpaca_authentication_host as host
 from trading_bot.review_paper import alpaca_authentication_qualification as auth
 from trading_bot.review_paper import alpaca_windows_credentials as creds
+from trading_bot.review_paper.alpaca_credential_generation import (
+    ROLES,
+    GenerationJournal,
+    credential_witness,
+)
 
 HEAD, TREE = "a" * 40, "b" * 40
 SENSITIVE = "fake-SECRET-key-free-text"
@@ -29,6 +35,18 @@ BODY = (
 
 @pytest.fixture
 def boundary(monkeypatch):
+    class Exclusion:
+        owned = False
+        abandoned = False
+
+        def acquire(self):
+            self.owned = True
+            return True
+
+        def release(self):
+            self.owned = False
+
+    monkeypatch.setattr(host, "WindowsV3Exclusion", Exclusion)
     state = SimpleNamespace(
         reads=[],
         blobs=[],
@@ -330,6 +348,17 @@ def test_interlock_and_exact_transport_required(boundary):
 
 
 def argv(path):
+    generation = path.parent / "generation.json"
+    if not generation.exists():
+        with generation.open("xb") as output:
+            journal = GenerationJournal(output, HEAD, TREE)
+            journal.witnesses = tuple(
+                credential_witness(role, bytearray(SENSITIVE.encode()))
+                for role in ROLES
+            )
+            journal.record("EXPECTED_GENERATION")
+            journal.record("PAIR_CONFIRMED")
+            journal.record("FINAL", "LOCAL_EXACT_MATCH")
     return [
         "--expected-head",
         HEAD,
@@ -339,6 +368,10 @@ def argv(path):
         str(path),
         "--qualify-auth",
         auth.QUALIFY_AUTH_INTERLOCK,
+        "--generation-evidence",
+        str(generation),
+        "--generation-sha256",
+        hashlib.sha256(generation.read_bytes()).hexdigest(),
     ]
 
 
@@ -391,6 +424,7 @@ def test_evidence_failure_does_not_retry(
         host, "StdlibAlpacaHistoricalBarsTransport", lambda: boundary.transport
     )
     path = tmp_path / "result.json"
+    arguments = argv(path)
 
     def fail(*a, **kw):
         raise OSError(SENSITIVE)
@@ -399,8 +433,9 @@ def test_evidence_failure_does_not_retry(
         monkeypatch.setattr(Path, "open", fail)
     else:
         monkeypatch.setattr(host.os, "fsync", fail)
-    assert host.main(argv(path)) == 2
-    assert len(boundary.requests) == (0 if failure == "open" else 1)
+    exit_code = host.main(arguments)
+    assert exit_code == 2
+    assert len(boundary.requests) == 0
     captured = capsys.readouterr()
     assert SENSITIVE not in captured.out + captured.err
 
@@ -539,7 +574,7 @@ def test_linked_evidence_parent_is_rejected(tmp_path, monkeypatch):
         host.admit_authentication_evidence(parent / "file.json", ())
 
 
-def test_d1r3_source_only_registration_and_frozen_predecessors(monkeypatch):
+def test_d1r4_source_only_registration_and_frozen_predecessors(monkeypatch):
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
@@ -559,10 +594,74 @@ def test_d1r3_source_only_registration_and_frozen_predecessors(monkeypatch):
         runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
         runner.ARCH134_RUNTIME_ACL_NAME,
     )
-    pins = dict(runner.ARCH134_AUTH_SOURCE_PINS)
+    pins = dict(runner.ARCH134_D1R4_SOURCE_PINS)
     pins["src/trading_bot/review_paper/alpaca_authentication_host.py"] = "0" * 40
-    monkeypatch.setattr(runner, "ARCH134_AUTH_SOURCE_PINS", pins)
+    monkeypatch.setattr(runner, "ARCH134_D1R4_SOURCE_PINS", pins)
     assert any(
         "source drift" in x
         for x in runner._arch134_authentication_authority_check(root)
     )
+
+
+def test_consumed_generation_cannot_authorize_second_qualification(
+    boundary, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        host, "admit_authentication_source", lambda *a: boundary.admit()
+    )
+    monkeypatch.setattr(
+        host, "StdlibAlpacaHistoricalBarsTransport", lambda: boundary.transport
+    )
+    first = tmp_path / "first.json"
+    assert host.main(argv(first)) == 0
+    reads = list(boundary.reads)
+    assert host.main(argv(tmp_path / "second.json")) == 2
+    assert boundary.reads == reads and len(boundary.requests) == 1
+
+
+def test_generation_witness_mismatch_prevents_provider_attempt(
+    boundary, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        host, "admit_authentication_source", lambda *a: boundary.admit()
+    )
+    monkeypatch.setattr(
+        host, "StdlibAlpacaHistoricalBarsTransport", lambda: boundary.transport
+    )
+    arguments = argv(tmp_path / "mismatch.json")
+    monkeypatch.setattr(
+        host,
+        "read_current_product_alpaca_secrets",
+        lambda: creds.ScopedAlpacaSecrets("different-fake-key", SENSITIVE),
+    )
+    assert host.main(arguments) == 1
+    assert not boundary.requests
+    result = auth.parse_authentication_qualification(
+        (tmp_path / "mismatch.json").read_bytes()
+    )
+    assert result.reason is auth.AuthQualificationReason.CREDENTIAL_READ_FAILED
+
+
+def test_authentication_publication_failure_after_request_never_reopens_staging(
+    boundary, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        host, "admit_authentication_source", lambda *a: boundary.admit()
+    )
+    monkeypatch.setattr(
+        host, "StdlibAlpacaHistoricalBarsTransport", lambda: boundary.transport
+    )
+    arguments = argv(tmp_path / "fsync.json")
+    original = host.os.fsync
+    calls = []
+
+    def fsync(fd):
+        calls.append(fd)
+        if len(calls) == 2:
+            raise OSError(SENSITIVE)
+        return original(fd)
+
+    monkeypatch.setattr(host.os, "fsync", fsync)
+    assert host.main(arguments) == 2 and len(boundary.requests) == 1
+    assert host.main(argv(tmp_path / "later.json")) == 2
+    assert len(boundary.requests) == 1

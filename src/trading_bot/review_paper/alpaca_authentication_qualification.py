@@ -1,4 +1,4 @@
-"""D1R3 fixed Alpaca authentication probe; no session or trading authority."""
+"""D1R4 fixed Alpaca authentication probe; no session or trading authority."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ from trading_bot.review_paper.alpaca_windows_credentials import (
     read_current_product_alpaca_secrets,
 )
 
-QUALIFY_AUTH_INTERLOCK = "AUTHORIZE_ARCH134_D1R3_ONE_ALPACA_AUTH_QUALIFICATION"
+QUALIFY_AUTH_INTERLOCK = "AUTHORIZE_ARCH134_D1R4_ONE_ALPACA_AUTH_QUALIFICATION"
 MAX_AUTH_QUALIFICATION_BYTES = 4096
 PROBE_SESSION = date(2026, 10, 7)
 PROBE_TIMESTAMP = datetime(2026, 10, 7, 4, tzinfo=UTC)

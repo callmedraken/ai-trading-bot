@@ -1,5 +1,15 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
+## 2026-10-13 — D1R4 current source validation
+
+The [D1R4 validation plan](arch134-d1r4-alpaca-v3-credential-generation.md)
+supersedes current reader/operator assumptions with fixed `/v3`, witnessed durable
+generation, cooperating-writer exclusion and read-only ambiguity reconciliation.
+The authentication evidence schema and fixed provider probe remain unchanged.
+Exact source acceptance is pending terminal mapped ROBINHOOD CI and ChatGPT
+review. All `/v2` incident entries below remain historical; D1R3 401 is consumed.
+No real credential/provider/production operation is part of source validation.
+
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 
 The separately authorized Architecture 134-D1R3 real authentication

@@ -10805,6 +10805,7 @@ def _arch134_production_paper_runtime_authority_check(
             expected_pin = ARCH134_AUTH_CORRECTION_TEST_PINS.get(
                 relative, ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
             )
+            expected_pin = ARCH134_D1R4_SOURCE_PINS.get(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -10924,8 +10925,123 @@ ARCH134_AUTH_IMPORTS: Final = {
         "trading_bot.review_paper.alpaca_authentication_qualification",
     ),
 }
+# D1R4 current overlay only. All accepted D1/D1Q/R1/R2/R3 pins above are historical.
+ARCH134_D1R4_PATHS: Final = (
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py",
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py",
+    "src/trading_bot/review_paper/alpaca_authentication_host.py",
+    "src/trading_bot/review_paper/alpaca_credential_generation.py",
+    "src/trading_bot/review_paper/alpaca_credential_native.py",
+    "src/trading_bot/review_paper/alpaca_credential_host.py",
+    "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+ARCH134_D1R4_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "e01fd44cd2eec663ac5f3eab78b3a7499b6ada7e"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "331351635e522e6e05d4d2d82dc1ac25def6341b"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "c3377e757372f9a33ddabc5ac15f1b124a49d570"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "5db10d41ff4746591a8d158d38254d78fa02091f"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_native.py": (
+        "4c3a6857156275a443eecded5cf7915c71f05724"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "07d6dec0f73c9313e4a8c76a5eb819d9ea6fe8fb"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
+    ),
+    "tests/review_paper/test_alpaca_credential_generation.py": (
+        "686e9c048e82316703768b8682b2dfcb433b581f"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "1162c2bfa9c548c77227971bcac38726ab0ad075"
+    ),
+}  # D1R4_GENERATED_PINS
+ARCH134_D1R4_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data.alpaca_daily_snapshot",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.market_data.daily_snapshot_models",
+        "trading_bot.market_data.daily_snapshot_provider",
+        "trading_bot.market_data.exceptions",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "uuid",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "__future__",
+        "argparse",
+        "hashlib",
+        "os",
+        "pathlib",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_authentication_qualification",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_native.py": (
+        "__future__",
+        "ctypes",
+        "os",
+        "threading",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.runtime.windows_authority_security",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "__future__",
+        "argparse",
+        "getpass",
+        "hashlib",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "warnings",
+    ),
+}  # D1R4_GENERATED_IMPORTS
 ARCH134_AUTH_TESTS: Final = (
     "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
     "tests/review_paper/test_production_paper_runtime.py",
     "tests/review_paper/test_armed_production_paper_session.py",
     "tests/market_data/test_alpaca_daily_snapshot.py",
@@ -10934,13 +11050,14 @@ ARCH134_AUTH_TESTS: Final = (
 )
 ARCH134_AUTH_RUFF_PATHS: Final = (
     *ARCH134_AUTH_SOURCE_PINS,
+    *ARCH134_D1R4_PATHS,
     *ARCH134_AUTH_TESTS,
     *COMMON_RUFF_PATHS,
 )
 
 
 def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
-    """D1R3 read-only source closure; real qualification is never a CI gate."""
+    """D1R4 source closure; credential/provider operations are never CI gates."""
     failures = list(_arch134_production_paper_runtime_authority_check(repo_root))
     forbidden = {
         "sqlite3",
@@ -10968,6 +11085,15 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
         "import_module",
     }
     try:
+        if set(ARCH134_D1R4_SOURCE_PINS) != set(ARCH134_D1R4_PATHS):
+            failures.append("134-D1R4 unreviewed source override")
+        if set(ARCH134_D1R4_IMPORTS) != {
+            p for p in ARCH134_D1R4_PATHS if p.startswith("src/")
+        }:
+            failures.append("134-D1R4 unreviewed import override")
+        for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
             "tests/review_paper/test_armed_production_paper_session.py"
         }:
@@ -10976,9 +11102,14 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R3 correction test drift: " + relative)
         for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4_SOURCE_PINS.get(
+                relative, pin
+            ):
                 failures.append("134-D1R3 source drift: " + relative)
-        for relative, allowed in ARCH134_AUTH_IMPORTS.items():
+        for relative, allowed in {
+            **ARCH134_AUTH_IMPORTS,
+            **ARCH134_D1R4_IMPORTS,
+        }.items():
             tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
             imports = {
                 n.module
@@ -10999,9 +11130,11 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             disallowed = forbidden - (
                 {"run"} if relative.endswith("_host.py") else set()
             )
+            if relative.endswith("alpaca_credential_native.py"):
+                disallowed -= {"CredWriteW", "CredDeleteW"}
             if names & disallowed:
                 failures.append("134-D1R3 forbidden authority: " + relative)
-            if relative.endswith("_qualification.py"):
+            if relative.endswith("alpaca_authentication_qualification.py"):
                 calls = [
                     n
                     for n in ast.walk(tree)
@@ -11612,7 +11745,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     return {
         ARCH134_AUTH_NAME: CheckpointSpec(
             name=ARCH134_AUTH_NAME,
-            description="Architecture 134-D1R3 Alpaca authentication source only",
+            description="Architecture 134-D1R4 v3 credentials/auth source only",
             tests=ARCH134_AUTH_TESTS,
             ruff_paths=ARCH134_AUTH_RUFF_PATHS,
             authority_check=_arch134_authentication_authority_check,

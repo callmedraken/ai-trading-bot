@@ -1,5 +1,17 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-13 — Architecture 134-D1R4 source preparation
+
+Current source prepares the fixed `/v3` credential pair, durable witnessed
+provisioning, conservative ambiguity/read-only reconciliation and D1R4 one-shot
+authentication host. See [D1R4 validation](validation/arch134-d1r4-alpaca-v3-credential-generation.md)
+and [reviewed concurrency contract](architecture/134-d1r4-alpaca-v3-provisioning-concurrency.md).
+Source acceptance is pending exact GitHub review after terminal mapped ROBINHOOD
+CI. All incident entries below retain historical authority: D1R3 401 is consumed
+and `/v2` is immutable. Source checks perform zero protected operational effects.
+Next owner: ChatGPT exact source review, followed by separately reviewed v3
+provisioning/witness and authentication boundaries. No D1/D2/live authority.
+
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 
 The separately authorized Architecture 134-D1R3 real authentication

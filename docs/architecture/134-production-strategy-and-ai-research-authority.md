@@ -1,5 +1,15 @@
 # Architecture 134 — Production strategy and AI-research authority
 
+## 2026-10-13 — D1R4 current credential authority
+
+Current source uses only fixed `windows-credential-manager-alpaca-market-data/v3`
+targets. The [reviewed D1R4 concurrency contract](134-d1r4-alpaca-v3-provisioning-concurrency.md)
+and [validation](../validation/arch134-d1r4-alpaca-v3-credential-generation.md)
+govern provisioning/witness and authentication preparation. Source acceptance is
+pending. Operational incident descriptions below retain historical `/v2`/D1R3
+facts; they grant no retry or mutable alias. D1R3 is consumed, and actual v3
+generation/provisioning/authentication are separate protected boundaries.
+
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 
 The separately authorized Architecture 134-D1R3 real authentication
@@ -1326,8 +1336,11 @@ EXECUTE. The controller is unchanged. The host pins
 The standalone `review_paper/alpaca_windows_credentials.py` uses only
 CredReadW/CredFree for two fixed generic/local-machine records:
 
-- `AITradingBot/MarketData/Alpaca/ApiKeyId/v2`
-- `AITradingBot/MarketData/Alpaca/ApiSecretKey/v2`
+- `AITradingBot/MarketData/Alpaca/ApiKeyId/v3`
+- `AITradingBot/MarketData/Alpaca/ApiSecretKey/v3`
+
+D1R4 supersedes the original D1Q `/v2` reader targets only; consumed D1Q/R2/R3
+operational provenance remains historical and is not rewritten.
 
 Strict nonempty UTF-8 is bounded to 1024 bytes with no surrounding whitespace,
 CR/LF/NUL. Native memory is zeroed before freeing within the validated Windows

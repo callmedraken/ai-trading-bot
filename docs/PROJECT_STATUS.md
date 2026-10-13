@@ -1,5 +1,19 @@
 # Project Status and Roadmap
 
+## 2026-10-13 — Architecture 134-D1R4 source preparation
+
+Current implementation prepares fixed `/v3` Alpaca credential rotation and D1R4
+authentication requalification under the reviewed cooperating-writer concurrency
+contract. Exact GitHub source acceptance is pending. See
+[D1R4 validation](validation/arch134-d1r4-alpaca-v3-credential-generation.md).
+The shared current-product reader and operator use `/v3` only. D1R3 remains
+consumed BLOCKED/HTTP_REJECTED/401; all `/v2` incident descriptions below are
+historical snapshots. `/v2` records remain immutable. No real credentials,
+dashboard, provider, production database or trading operation ran during this
+source checkpoint. Next: exact GitHub review after terminal mapped ROBINHOOD CI,
+then separately reviewed provisioning and one-shot D1R4 authentication readiness.
+D1/D2 remain disconnected; real-money trading remains NO-GO.
+
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 
 The separately authorized Architecture 134-D1R3 real authentication

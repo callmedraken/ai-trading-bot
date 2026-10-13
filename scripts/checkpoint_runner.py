@@ -10332,7 +10332,7 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
     ),
     "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "46e93ca65eedf6fb72712806c297873a8593af37"
+        "0cc34d94fec379ff35ee6b14c3b78f7c01d65acd"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "a8470acf3f263ba8b4a9b888ce168b56c95f33a6"
@@ -10362,10 +10362,10 @@ ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
         "529911f2dba657bcaa36596203608985168faad2"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "ba9af47714203bb6a63499a261861ebcd53baff7"
+        "4ddbee60f2fb0ad6b611c7b1baeff30217e45930"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
-        "603902f41c9c65209b6fcac504286de7a9094912"
+        "4a2c4ad7f1fd9a05fa5fd1713f07ba553689d7c7"
     ),
 }
 ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (

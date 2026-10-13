@@ -138,6 +138,16 @@ from trading_bot.experiments.research_candidate import (
     build_backtested_research_candidate,
     verify_research_candidate_against_report,
 )
+from trading_bot.experiments.research_candidate_shadow_binding import (
+    RESEARCH_CANDIDATE_SHADOW_BINDING_IDENTITY_VERSION,
+    RESEARCH_CANDIDATE_SHADOW_BINDING_NAMESPACE,
+    RESEARCH_CANDIDATE_SHADOW_BINDING_SCHEMA,
+    ResearchCandidateShadowBindingError,
+    ResearchCandidateShadowVariantBinding,
+    build_research_candidate_shadow_variant_binding,
+    resolve_bound_research_candidate_variant,
+    verify_research_candidate_shadow_variant_binding,
+)
 from trading_bot.experiments.research_candidate_walk_forward import (
     RESEARCH_CANDIDATE_WALK_FORWARD_POLICY_SCHEMA,
     RESEARCH_CANDIDATE_WALK_FORWARD_QUALIFICATION_SCHEMA,
@@ -198,6 +208,14 @@ from trading_bot.experiments.walk_forward_stability import (
 )
 
 __all__ = [
+    "RESEARCH_CANDIDATE_SHADOW_BINDING_SCHEMA",
+    "RESEARCH_CANDIDATE_SHADOW_BINDING_IDENTITY_VERSION",
+    "RESEARCH_CANDIDATE_SHADOW_BINDING_NAMESPACE",
+    "ResearchCandidateShadowBindingError",
+    "ResearchCandidateShadowVariantBinding",
+    "build_research_candidate_shadow_variant_binding",
+    "resolve_bound_research_candidate_variant",
+    "verify_research_candidate_shadow_variant_binding",
     "RESEARCH_CANDIDATE_WALK_FORWARD_POLICY_SCHEMA",
     "RESEARCH_CANDIDATE_WALK_FORWARD_QUALIFICATION_SCHEMA",
     "WALK_FORWARD_PASSED_RESEARCH_CANDIDATE_SCHEMA",

@@ -1,39 +1,44 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-13 — Architecture 134-D1R2 implementation / acceptance pending
+## 2026-10-13 — Architecture 134-D1R2 SOURCE ACCEPTED
 
-Active implementation branch: `feature/robinhood-production-paper-history-recovery`.
-Use only `F:\AI\worktrees\ai-trading-bot-production-paper-history-recovery`.
-Reviewed parent HEAD/tree: `cbcc1addfb392ca87939df0f77fe9dde10685abf` /
-`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d`.
+Architecture 134-D1R2 is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-history-recovery` at the exact executable/test source:
 
-D1R2 replaces the current permanent pre-effect history stop with one explicit
-recovery CAS for the same symbol/session reservation and original operation ID.
-Normal ARM remains one-shot. The frozen pre-D1R1 October-13 tuple gets a distinct
-legacy reason, never a fabricated diagnostic. New canonical v2 BLOB evidence
-retains the exact predecessor/digest and binds the executing successor source
-and contract. Recovery is consumed before provider construction/acquisition;
-crash, conflict or second recovery cannot reacquire. No strategy, PREPARE,
-Robinhood, execution or paper-effect retry is added. The SQLite table is unchanged.
+```text
+HEAD 114608d220ab6653fcb48fc0002b6ae9497f90c9
+TREE b57cecd27865bda88ec104748fef55c0dcb54f34
+BASE cbcc1addfb392ca87939df0f77fe9dde10685abf
+CI   #514 / 38370765607 / SUCCESS
+```
 
-Accepted fresh D1Q on the parent: READY_FOR_MANUAL_PAPER_SESSION,
-ALREADY_PROVISIONED, paper_records=0, session_reservations=1, both stores
-WRITE_READY, credential reads=2/2, persisted OAuth=true, all application/paper/
-scheduler/broker effects=0, effect_counts_complete=true. Supplied evidence:
-`F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
-Tests and implementation neither read this file nor access the production runtime.
+The exact delta is one implementation commit / 14 paths. Exact GitHub review
+accepted the same-session pre-effect recovery contract: one existing reservation,
+the predecessor operation identity, strict v2 predecessor/digest/source/contract
+lineage, exact frozen October-13 legacy admission, one durable recovery CAS before
+Alpaca construction/reacquisition, and no second ARM. Recovery remains closed
+after any strategy/PREPARE/Robinhood/EXECUTE/paper/broker effect or ambiguity.
+Future eligibility is closed to non-metadata transport failures and HTTP 429/5xx;
+deterministic/unknown/internal failures remain blocked.
 
-Next owner: ChatGPT exact GitHub review after terminal mapped ROBINHOOD CI;
-acceptance is pending, not granted by this document. Review the exact final
-HEAD/tree, intended file set, terminal run/job conclusions and canonical profile
-counts. Stop on identity drift, failed/missing CI or any weakened effect fence.
-After source acceptance, fresh exact-source readiness is required before the
-separately authorized real recovery; an expired target session stays expired.
-See [D1R2 contract](validation/arch134-d1r2-pre-effect-history-recovery.md).
-D2 remains disconnected and real-money placement remains **NO-GO**.
+Terminal mapped CI #514 passed on the exact HEAD: source-static SUCCESS,
+active-tests SUCCESS, certification-tests SUCCESS, full-tests SKIPPED and
+source-gates SUCCESS. Canonical ROBINHOOD covered 94 modules / 8,814 cases:
+8,813 passed, one skipped, zero failures/errors; wall 262.431 seconds. No
+duplicate local ROBINHOOD certification is required.
 
-The dated D1R1 entries below retain historical facts and are superseded for
-current next-step guidance by this entry.
+The supplied parent D1Q qualification remains accepted operational history only.
+No real recovery occurred during source acceptance. Fresh exact-source runtime/
+credential readiness is required before the separately bounded real recovery.
+An expired target session remains expired; D2 stays disconnected and real-money
+placement remains **NO-GO**.
+
+Any later documentation-only descendant does not replace the accepted D1R2
+executable/test identity above.
+
+**Next operational step:** fresh exact-source readiness on the reviewed D1R2
+branch tip, then the separately bounded same-session recovery only while the
+October-13 NYSE admission remains open. Do not rerun canonical certification.
 
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 

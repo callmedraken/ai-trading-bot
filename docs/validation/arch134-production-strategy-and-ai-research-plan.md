@@ -1,33 +1,43 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
-## 2026-10-13 — Architecture 134-D1R2 validation / acceptance pending
+## 2026-10-13 — Architecture 134-D1R2 SOURCE ACCEPTED
 
-Current checkpoint is bounded same-session pre-effect history recovery on
-`feature/robinhood-production-paper-history-recovery`, from
-`cbcc1addfb392ca87939df0f77fe9dde10685abf` /
-`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d`.
-The [D1R2 design and focused validation](arch134-d1r2-pre-effect-history-recovery.md)
-supersedes current-product tests/instructions imposing permanent blocking on all
-pre-effect history failures. Ordinary ARM, deterministic failures, unknown rows,
-all downstream-effect boundaries and ambiguous execution still cannot retry.
+Architecture 134-D1R2 is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-history-recovery` at the exact executable/test source:
 
-The supplied fresh D1Q parent qualification is accepted operational history:
-READY_FOR_MANUAL_PAPER_SESSION / ALREADY_PROVISIONED, paper_records=0,
-session_reservations=1, both stores WRITE_READY, credential reads=2/2, persisted
-OAuth=true, application/paper/scheduler/broker effects=0, effect_counts_complete=true.
-Preserved evidence: `F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
-Do not read/mutate this evidence or production runtime in implementation/tests.
+```text
+HEAD 114608d220ab6653fcb48fc0002b6ae9497f90c9
+TREE b57cecd27865bda88ec104748fef55c0dcb54f34
+BASE cbcc1addfb392ca87939df0f77fe9dde10685abf
+CI   #514 / 38370765607 / SUCCESS
+```
 
-Focused fake-only tests cover exact legacy admission, one reservation/original
-operation/no second ARM, durable consumption, concurrent CAS/crash/second-attempt
-blocking, NO_SIGNAL and unchanged trade pipeline, frozen mismatches, downstream
-effects, execution evidence/fills, expiry/source drift, closed transient policy,
-strict v1/v2 canonical evidence and sanitized publication. Both focused Ruff phases
-and git diff checks precede exact-file commit/push. No local broad profile is run.
-GitHub owns mapped ROBINHOOD and must reach terminal success before ChatGPT exact
-GitHub review/source acceptance. Fresh exact-source readiness precedes real recovery;
-closed sessions are never bypassed. D2 remains disconnected; real-money **NO-GO**.
-Dated D1R1 evidence and its original no-retry conclusions remain historical.
+The exact delta is one implementation commit / 14 paths. Exact GitHub review
+accepted the same-session pre-effect recovery contract: one existing reservation,
+the predecessor operation identity, strict v2 predecessor/digest/source/contract
+lineage, exact frozen October-13 legacy admission, one durable recovery CAS before
+Alpaca construction/reacquisition, and no second ARM. Recovery remains closed
+after any strategy/PREPARE/Robinhood/EXECUTE/paper/broker effect or ambiguity.
+Future eligibility is closed to non-metadata transport failures and HTTP 429/5xx;
+deterministic/unknown/internal failures remain blocked.
+
+Terminal mapped CI #514 passed on the exact HEAD: source-static SUCCESS,
+active-tests SUCCESS, certification-tests SUCCESS, full-tests SKIPPED and
+source-gates SUCCESS. Canonical ROBINHOOD covered 94 modules / 8,814 cases:
+8,813 passed, one skipped, zero failures/errors; wall 262.431 seconds. No
+duplicate local ROBINHOOD certification is required.
+
+The supplied parent D1Q qualification remains accepted operational history only.
+No real recovery occurred during source acceptance. Fresh exact-source runtime/
+credential readiness is required before the separately bounded real recovery.
+An expired target session remains expired; D2 stays disconnected and real-money
+placement remains **NO-GO**.
+
+Any later documentation-only descendant does not replace the accepted D1R2
+executable/test identity above.
+
+Validation next step is fresh exact-source readiness followed by the bounded
+recovery invocation only if the target market session remains admitted.
 
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 

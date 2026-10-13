@@ -1,7 +1,10 @@
 # Architecture 134-D1R2 — Same-session pre-effect history recovery
 
-Status: implementation checkpoint; source acceptance pending terminal mapped CI
-and exact ChatGPT GitHub review. No production effect or actual recovery ran.
+Status: SOURCE ACCEPTED. Exact executable/test source:
+`114608d220ab6653fcb48fc0002b6ae9497f90c9` / `b57cecd27865bda88ec104748fef55c0dcb54f34`, parent `cbcc1addfb392ca87939df0f77fe9dde10685abf`.
+Terminal mapped CI #514 / 38370765607 succeeded; canonical ROBINHOOD covered
+94 modules / 8,814 cases with 8,813 passed, one skipped and zero failures/errors
+in 262.431 seconds. No production effect or actual recovery ran.
 
 ## Authority and identity
 
@@ -116,7 +119,6 @@ session_reservations=1, both stores WRITE_READY, credential reads=2/2, persisted
 OAuth=true, all provider/application/paper/scheduler/broker effects=0,
 effect_counts_complete=true. Evidence:
 `F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
-Do not access it or `F:\AITradingBot\Arch134D1` in tests. After exact ChatGPT
-source acceptance, require fresh exact-source readiness and separately authorized
-real recovery within the unexpired target market session. D2/scheduler remain
+Do not access it or `F:\AITradingBot\Arch134D1` in tests. After this source acceptance, require fresh exact-source readiness and the
+separately bounded real recovery within the unexpired target market session. D2/scheduler remain
 disconnected; real-money placement remains NO-GO.

@@ -1,36 +1,44 @@
 # Architecture 134 — Production strategy and AI-research authority
 
-## 2026-10-13 — Architecture 134-D1R2 current recovery contract / acceptance pending
+## 2026-10-13 — Architecture 134-D1R2 SOURCE ACCEPTED
 
-D1R2 introduces exactly one explicit same-session pre-effect history recovery,
-superseding current-product permanent history-failure blocking only within the
-closed [D1R2 contract](../validation/arch134-d1r2-pre-effect-history-recovery.md).
-Normal ARM never retries. Recovery preserves the existing reservation/table/key
-and original operation identity, binds exact predecessor canonical evidence and
-digest plus successor source/contract, and consumes permission by exact-byte CAS
-before Alpaca construction or reacquisition. All downstream counters/results must
-independently prove zero/no effects; execution evidence or any matching fill blocks.
-The exact October-13 pre-D1R1 row uses its frozen legacy reason, with no fabricated
-diagnostic. Future v2 transport failures excluding deterministic metadata rejection,
-HTTP 429 and HTTP 500..599 may recover once. Other/unknown classifications block.
-Crash, failed recovery, concurrent conflict and all downstream-effect boundaries
-remain no-retry; normal market opening/closing checks apply without a day wait.
+Architecture 134-D1R2 is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-history-recovery` at the exact executable/test source:
 
-Parent `cbcc1addfb392ca87939df0f77fe9dde10685abf` /
-`d1868397eaedc3ad31a8f655a4b45a20fe3e1f2d` has the supplied accepted fresh
-D1Q READY_FOR_MANUAL_PAPER_SESSION observation: both stores WRITE_READY,
-paper_records=0, session_reservations=1, credential reads=2/2, persisted OAuth=true,
-all application/paper/scheduler/broker effects=0, effect_counts_complete=true.
-Evidence: `F:\AI\temp\qualification\arch134-d1r1-d1q-98696f7aa11b4028b60b0247906c0da7.json`.
-This is serialized operational history, never test input or D1R2 readiness.
+```text
+HEAD 114608d220ab6653fcb48fc0002b6ae9497f90c9
+TREE b57cecd27865bda88ec104748fef55c0dcb54f34
+BASE cbcc1addfb392ca87939df0f77fe9dde10685abf
+CI   #514 / 38370765607 / SUCCESS
+```
 
-Implementation branch `feature/robinhood-production-paper-history-recovery` maps
-the unchanged `arch134-production-paper-runtime` name to canonical ROBINHOOD.
-Frozen armed/R1/R2 and D1R1 dictionaries remain preserved; exact recovery overlays
-own current source. ACTIVE/order and split CI remain unchanged. Source acceptance
-requires terminal mapped CI and exact ChatGPT GitHub review; no real recovery or
-production effect is performed here. Fresh exact-source readiness remains required.
-The dated entries below retain historical facts, not current recovery authority.
+The exact delta is one implementation commit / 14 paths. Exact GitHub review
+accepted the same-session pre-effect recovery contract: one existing reservation,
+the predecessor operation identity, strict v2 predecessor/digest/source/contract
+lineage, exact frozen October-13 legacy admission, one durable recovery CAS before
+Alpaca construction/reacquisition, and no second ARM. Recovery remains closed
+after any strategy/PREPARE/Robinhood/EXECUTE/paper/broker effect or ambiguity.
+Future eligibility is closed to non-metadata transport failures and HTTP 429/5xx;
+deterministic/unknown/internal failures remain blocked.
+
+Terminal mapped CI #514 passed on the exact HEAD: source-static SUCCESS,
+active-tests SUCCESS, certification-tests SUCCESS, full-tests SKIPPED and
+source-gates SUCCESS. Canonical ROBINHOOD covered 94 modules / 8,814 cases:
+8,813 passed, one skipped, zero failures/errors; wall 262.431 seconds. No
+duplicate local ROBINHOOD certification is required.
+
+The supplied parent D1Q qualification remains accepted operational history only.
+No real recovery occurred during source acceptance. Fresh exact-source runtime/
+credential readiness is required before the separately bounded real recovery.
+An expired target session remains expired; D2 stays disconnected and real-money
+placement remains **NO-GO**.
+
+Any later documentation-only descendant does not replace the accepted D1R2
+executable/test identity above.
+
+The accepted authority remains source-only until a fresh exact-source readiness
+gate passes and the bounded recovery interlock is invoked. Historical D1R1
+no-retry facts remain historical rather than rewritten.
 
 ## 2026-10-13 — Architecture 134-D1R1 SOURCE ACCEPTED
 

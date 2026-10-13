@@ -2,8 +2,10 @@
 
 This document preserves the historical D1R1 acceptance/no-retry contract.
 Current-product recovery behavior is superseded only within the
-[D1R2 contract](arch134-d1r2-pre-effect-history-recovery.md), whose source
-acceptance remains pending terminal mapped CI and exact ChatGPT GitHub review.
+[D1R2 contract](arch134-d1r2-pre-effect-history-recovery.md), which is SOURCE
+ACCEPTED at `114608d220ab6653fcb48fc0002b6ae9497f90c9` /
+`b57cecd27865bda88ec104748fef55c0dcb54f34` after terminal mapped CI #514 and
+exact ChatGPT GitHub review.
 The fresh D1Q next step recorded below has completed on the docs-only parent;
 the supplied result is serialized in the current status/handoff. D1R1 did not
 authorize recovery, and its historical conclusions are not rewritten.

@@ -190,6 +190,14 @@ def test_abandoned_only_observes_and_never_prompts(tmp_path):
         assert all(any(v) for v in h.values)  # interactive input was not called
 
 
+def test_abandoned_owner_read_failure_still_requires_reconciliation(tmp_path):
+    with harness(tmp_path, abandoned=True) as h:
+        h.store.fail = ("read", gen.TARGETS[0])
+        assert h.run() == "ABANDONED_OWNER"
+        assert all(c[0] == "read" for c in h.store.calls)
+        assert h.mutex.released
+
+
 @pytest.mark.parametrize(
     "kind", ["write", "false", "missing", "readback", "foreign", "confirmation"]
 )

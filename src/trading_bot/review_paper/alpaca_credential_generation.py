@@ -436,6 +436,9 @@ def operate_generation(
         )
         raise
     finally:
+        # Abandonment remains the controlling reason even when inspection fails.
+        if mutex.abandoned:
+            outcome = "ABANDONED_OWNER"
         if values is not None:
             for value in values:
                 clear_credential(value)

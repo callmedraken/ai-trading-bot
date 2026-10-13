@@ -10948,7 +10948,7 @@ ARCH134_D1R4_SOURCE_PINS: Final = {
         "c3377e757372f9a33ddabc5ac15f1b124a49d570"
     ),
     "src/trading_bot/review_paper/alpaca_credential_generation.py": (
-        "5db10d41ff4746591a8d158d38254d78fa02091f"
+        "5dbdd29a2fe64febce8ea22be9294f047e0a4f8d"
     ),
     "src/trading_bot/review_paper/alpaca_credential_native.py": (
         "4c3a6857156275a443eecded5cf7915c71f05724"
@@ -10960,7 +10960,7 @@ ARCH134_D1R4_SOURCE_PINS: Final = {
         "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
     ),
     "tests/review_paper/test_alpaca_credential_generation.py": (
-        "686e9c048e82316703768b8682b2dfcb433b581f"
+        "c607965ea0d73d66982c3c762e4801d321fdf553"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
         "1162c2bfa9c548c77227971bcac38726ab0ad075"

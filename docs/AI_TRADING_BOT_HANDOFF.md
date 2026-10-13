@@ -1,5 +1,51 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-13 — Architecture 138 / RCL-2 implemented; exact review pending
+
+Architecture 138 adds deterministic walk-forward qualification and a separate
+immutable WALK_FORWARD_PASSED research successor on
+`feature/research-candidate-walk-forward-qualification`, from exact canonical
+parent HEAD `6e2081a1278f579ca0cee5a00e2bd83632bc2856` / TREE
+`5858cc644d78eab9bbe58d1332f02c1b56aa5c65`. This is implementation evidence;
+ChatGPT owns exact GitHub source review and source acceptance after terminal CI.
+
+Architecture 137 remains accepted at executable/test HEAD
+`2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6` / TREE
+`9d33c980510f841f6dd254b3ff9f587ac2f43203`, CI #510 / 38346016265 SUCCESS.
+Its BACKTESTED-only v1 source/identity/bytes and stage order remain frozen.
+
+RCL-2 requires an explicit four-field, no-default policy, complete independent
+candidate/report reconciliation and defensive completed walk-forward validation.
+The candidate must be selected rank-one in every fold; original rank 1/2/None
+remains evidence only and is preserved by the successor. Equal test duration and
+schedule count are mandatory; thresholds use inclusive exact Decimal bounds.
+One existing pure aggregate analyzer supplies minimum/median return and maximum
+drawdown. Valid threshold/selection/window failures produce canonical FAILED
+research evidence; malformed provenance raises. Only matching PASSED evidence
+can produce the dedicated successor. Canonical parsing proves self-consistency;
+external report/walk-forward verification remains an independent API.
+
+Current discovery is ACTIVE 62 / FULL 171 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 386 / tests/gui 44. Only three directly affected retained test blobs
+are repinned. ACTIVE tuple/digest, production/native/AST pins and workflow bytes
+remain frozen. SHADOW and later stages, production compatibility, human approval,
+promotion, GUI integration and D1/D2 authority remain unavailable from RCL-2.
+
+All operational effect counts are zero. R1/R2 identities remain unchanged;
+D1 manual proving remains a separate protected boundary. Real-money placement
+remains NO-GO. The dated Architecture-137 entries below are retained historical
+evidence; their future-policy wording is superseded by this RCL-2 implementation.
+
+Next action: finish focused checks, exact-file commit/ordinary push and dispatch
+one exact-head repository Checkpoint Source Gates run. Expected source-static and
+four broad shards PASS, active-tests/certification-tests SKIPPED, terminal
+source-gates PASS, each shard below 300 seconds. No local broad certification is
+requested. Then STOP and hand the exact HEAD/TREE/diff and CI to ChatGPT for review;
+no source acceptance, SHADOW or production authority is inferred from green CI.
+
+See `docs/architecture/138-research-candidate-walk-forward-qualification.md` and
+`docs/validation/arch138-research-candidate-walk-forward-qualification-plan.md`.
+
 ## 2026-10-12 — Architecture 137 / RCL-1 SOURCE ACCEPTED
 
 Architecture 137 / RCL-1 is **SOURCE ACCEPTED** on

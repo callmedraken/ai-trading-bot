@@ -1,5 +1,69 @@
 # Architecture 134-D1R1 — Bounded history failure observability
 
+## 2026-10-13 — D1R2 real recovery consumed; Alpaca authentication blocked
+
+The separately authorized Architecture 134-D1R2 real recovery was executed once
+against exact current docs-descendant source HEAD
+`aa2e843e9954435ba9e9bcf55b2bdde23ab93fb9`, TREE
+`5453d008116c8719ce1d024c7c1f3d9bb45e3674`. Final pre-effect
+reconciliation passed before the boundary. The supplied frozen predecessor
+artifact retained SHA-256
+`ae4b85b657810ff7701323934af9c5013805230a772094e6259e3b9a75870f4c`.
+
+The one permitted recovery CAS was consumed and the durable session advanced to
+`armed-paper-session/v2` with `recovery_count=1`,
+`recovery_reason=FROZEN_OCTOBER_13_PRE_D1R1`, successor contract
+`93091b0e-a1a6-52fd-930f-f88eb2009c05`, and the original downstream operation
+ID `8e8c5102-8b52-5534-8288-b3261f65b2d4` preserved.
+
+The first recovered Alpaca history fetch, for 2026-10-07, returned the closed
+diagnostic classification `HTTP_FAILED` with HTTP status **401** and no provider
+code. The session durably published `BLOCKED` with `alpaca_reads=1`,
+`effect_counts_complete=false`, no accepted snapshots/history seed,
+`strategy_evaluations=0`, PREPARE=0, EXECUTE=0, all Robinhood application-call
+counters zero, `paper_mutations=0`, and `broker_placement_count=0`.
+No proposal/order/fill or execution evidence was created.
+
+External evidence paths from the terminal attempt are:
+
+```text
+SESSION
+F:\AI\temp\arch134-d1r2-recovery-b01a29c0a03842de949748fcbbedb2e3.json
+
+HISTORY FAILURE
+F:\AI\temp\arch134-d1r2-recovery-b01a29c0a03842de949748fcbbedb2e3.json.history-failure.json
+
+EXECUTE DESTINATION (must remain absent for this failure)
+F:\AI\temp\arch134-d1r2-recovery-b01a29c0a03842de949748fcbbedb2e3.json.execute.json
+```
+
+This is a terminal consumed D1R2 outcome. The accepted recovery policy permits a
+future count-zero v2 retry only for eligible transport failures or HTTP 429/5xx.
+HTTP 401 is intentionally not recovery-eligible, and this row already has
+`recovery_count=1`. **Do not retry the October-13 session by ARM, recovery,
+reclaim, reservation replacement, or a second provider read.**
+
+D1R2 therefore proved the intended same-session lineage, one-shot CAS,
+classified diagnostic, and fail-closed downstream isolation, but did not
+establish successful history acquisition or strategy/paper execution.
+
+The operational finding also exposes a readiness gap: the existing D1Q
+credential check proves that the two fixed Windows Credential Manager records are
+present/readable/canonical, but it does not prove that Alpaca currently accepts
+the stored key/secret pair. The next production milestone is
+**Architecture 134-D1R3 — bounded Alpaca authentication-validity qualification**.
+D1R3 must validate the fixed current-product credential pair against the fixed
+Alpaca historical-data boundary under separately bounded read-only provider
+authority *before* any future one-shot session reservation/recovery authority is
+consumed. It must retain only sanitized nonsecret evidence and must grant no
+strategy, Robinhood, paper, broker, scheduler or D2 authority.
+
+After D1R3 is source-accepted and a fresh protected authentication qualification
+passes, use a fresh future NYSE session for the still-required pre-market
+start/WAITING_FOR_MARKET/wake/re-admission qualification. Architecture D2 remains
+disconnected until those production proving steps complete. Real-money placement
+remains **NO-GO**.
+
 This document preserves the historical D1R1 acceptance/no-retry contract.
 Current-product recovery behavior is superseded only within the
 [D1R2 contract](arch134-d1r2-pre-effect-history-recovery.md), which is SOURCE

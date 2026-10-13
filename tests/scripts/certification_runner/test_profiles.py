@@ -170,8 +170,8 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 210,
-        "exhaustive": 379,
+        "legacy": 215,
+        "exhaustive": 384,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
@@ -227,7 +227,7 @@ def test_retired_families_are_legacy_and_research_is_supported() -> None:
     expected_counts = {
         "tests/acceptance": 1,
         "tests/cli": 34,
-        "tests/gui": 39,
+        "tests/gui": 44,
         "tests/market_data": 8,
         "tests/runtime": 126,
         "tests/scripts": 1,

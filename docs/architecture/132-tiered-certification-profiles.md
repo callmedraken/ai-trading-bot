@@ -2,14 +2,15 @@
 
 ## Current D1Q inventory and certification route
 
-Current GUI-A14/D1Q-R2 source-discovered inventory is ACTIVE 62, FULL 169,
-ROBINHOOD 94, LEGACY 210, EXHAUSTIVE 379. GUI-A14 adds five legacy GUI test
-modules, making `tests/gui/` 39 rather than 34; source classification and frozen
-required baselines/lane rules are unchanged. Historical AJ publication recovery
-remains registered but deliberately closed and excluded from active CI.
-Earlier inventories are historical. D1Q/R2's explicit mapping remains CI-owned
-robinhood certification. GUI-A14's unmapped repository dispatch uses the reviewed
-four-shard source-gate fallback, not a locally selected broad profile.
+Current GUI-A15/D1Q-R2 source-discovered inventory is ACTIVE 62, FULL 169,
+ROBINHOOD 94, LEGACY 215, EXHAUSTIVE 384. A15 adds five legacy GUI test
+modules, making `tests/gui/` 44 rather than the accepted A14 inventory of 39;
+source classification and frozen required baselines/lane rules are unchanged.
+Historical AJ publication recovery remains registered but deliberately closed
+and excluded from active CI. Earlier inventories are historical. D1Q/R2's
+explicit mapping remains CI-owned robinhood certification. GUI-A15's unmapped
+repository dispatch uses the four-shard source-gate fallback; no local broad
+profile is selected.
 
 ## 2026-10-11 — Architecture 132-R3 CI-owned selected certification
 
@@ -1798,7 +1799,7 @@ tests/test_robinhood_prepare_qualification_verifier.py
 ## Reviewed legacy ownership and EXHAUSTIVE
 
 At the historical pre-GUI-A14 inventory tree (provenance only; current inventory
-is stated at the top of this document and `tests/gui/` now contains 39 modules):
+is stated at the top of this document and `tests/gui/` now contains 44 modules):
 
 | Legacy population | Modules |
 | --- | ---: |

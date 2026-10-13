@@ -23,6 +23,7 @@ class EvidenceTimelineSource(Enum):
     MARKET_DATA = "Market Data"
     OPERATIONS = "Operations"
     RUNTIME = "Runtime"
+    SUPERVISOR = "Supervisor"
 
 
 def _require_text(value: str, field_name: str, maximum: int) -> None:

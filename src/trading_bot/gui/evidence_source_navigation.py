@@ -20,6 +20,7 @@ class EvidenceSourcePage(Enum):
     MARKET_DATA = "market-data"
     OPERATIONS = "operations"
     RUNTIME = "runtime"
+    SUPERVISOR = "supervisor"
 
 
 _SOURCE_TO_PAGE = {
@@ -29,6 +30,7 @@ _SOURCE_TO_PAGE = {
     EvidenceTimelineSource.MARKET_DATA: EvidenceSourcePage.MARKET_DATA,
     EvidenceTimelineSource.OPERATIONS: EvidenceSourcePage.OPERATIONS,
     EvidenceTimelineSource.RUNTIME: EvidenceSourcePage.RUNTIME,
+    EvidenceTimelineSource.SUPERVISOR: EvidenceSourcePage.SUPERVISOR,
 }
 
 

@@ -31,6 +31,8 @@ from trading_bot.gui.paper_page import PaperPage
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.runtime_page import RuntimePage
 from trading_bot.gui.services import GuiApplicationService
+from trading_bot.gui.supervisor_adapter import build_supervisor_state
+from trading_bot.gui.supervisor_page import SupervisorPage
 from trading_bot.gui.system_health_adapter import build_system_health_state
 from trading_bot.gui.system_health_page import SystemHealthPage
 
@@ -42,6 +44,7 @@ PAGE_IDS = (
     "market-data",
     "operations",
     "runtime",
+    "supervisor",
     "evidence",
     "system",
 )
@@ -80,6 +83,10 @@ class MainWindow(QMainWindow):
         market_data_state = service.get_market_data_state()
         operations_state = service.get_operator_observability_state()
         runtime_state = service.get_runtime_state()
+        strategy_state = service.get_production_strategy_state()
+        supervisor_state = build_supervisor_state(
+            research_state, runtime_state, strategy_state
+        )
         evidence_timeline_state = build_evidence_timeline_state(
             research_state,
             paper_state,
@@ -87,6 +94,7 @@ class MainWindow(QMainWindow):
             market_data_state,
             operations_state,
             runtime_state,
+            supervisor_state,
         )
         system_health_state = build_system_health_state(
             self._overview,
@@ -96,6 +104,7 @@ class MainWindow(QMainWindow):
             market_data_state,
             operations_state,
             runtime_state,
+            supervisor_state,
         )
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
@@ -125,6 +134,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._operations_page)
         self._runtime_page = RuntimePage(runtime_state, self)
         self._stack.addWidget(self._runtime_page)
+        self._supervisor_page = SupervisorPage(supervisor_state, self)
+        self._stack.addWidget(self._supervisor_page)
         self._evidence_timeline_page = EvidenceTimelinePage(
             evidence_timeline_state,
             self,
@@ -197,6 +208,7 @@ class MainWindow(QMainWindow):
             "market-data": "Market Data",
             "operations": "Operations",
             "runtime": "Runtime",
+            "supervisor": "Supervisor",
             "evidence": "Evidence",
             "system": "System",
         }

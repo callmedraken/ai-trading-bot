@@ -1,5 +1,9 @@
 # Architecture 135 / GUI-A14 — Read-only production runtime evidence
 
+Current GUI-A15 extends startup to eight acquisitions, adds the Supervisor
+source/page and preserves all A14 recorded-evidence boundaries. See
+Architecture 136; the accepted A14 source/validation counts below are historical.
+
 ## Source boundary
 
 SOURCE ACCEPTED at HEAD `c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE `921b7b32bbfecbb454acc8916faa4362464b19d3` after dedicated GUI CI 38325919046 and repository source-gate CI 38326059553 both completed SUCCESS.
@@ -61,7 +65,7 @@ qualify, provision, refresh, polling or effect button is present.
 
 Overview adds a neutral unavailable Runtime card by default, an informational
 recorded-evidence card when available, and BLOCKED when evidence requires
-attention. MainWindow acquires exactly seven application-service states once:
+attention. Historical GUI-A14 MainWindow acquired seven application-service states once:
 overview, research, paper, paper-account, market-data, operations, runtime.
 System and Evidence receive already-acquired RuntimePageState. Navigation,
 filtering and Evidence -> Runtime source navigation perform zero service/file

@@ -1,5 +1,44 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-12 — Architecture 136 / GUI-A15 implementation checkpoint
+
+Active source work: `feature/gui-supervisor-research-governance`, worktree
+`F:\AI\worktrees\ai-trading-bot-gui-supervisor-research-governance`, from exact
+HEAD `43899b2014fe452f921c2f320a2f8d0c2a26b817`, TREE
+`ad2b2b980927d77d86b52e270d9a5c259f676c31`. This is the docs-only descendant
+of accepted A14 executable/test source and successful CI recorded below.
+
+A15 adds read-only Supervisor presentation, explicit canonical production
+contract inspection, exact contract/session consistency and descriptive strategy
+governance. The sole new startup input is `--production-strategy-contract PATH`.
+The canonical pure production parser is reused with bounded binary acquisition,
+strict UTF-8 and cached success/failure. No path means no strategy reader/I/O.
+
+MainWindow has exactly eight ordered service acquisitions. System/Evidence use
+the already-built Supervisor state; navigation adds zero service/file rereads.
+Research report evidence does not prove process liveness. D1 statuses are
+RECORDED. D2 supervisor remains not connected. Automatic promotion is disabled,
+human promotion required, promotion authority disconnected and research cannot
+replace production. No canonical research candidate/promotion schema or D2
+effects are implemented.
+
+Current source inventory: GUI 44, ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215,
+EXHAUSTIVE 384. Only directly stale current count assertions/test-file pins and
+current documentation are reconciled. Dedicated GUI push selection becomes
+`feature/gui-*`; repository checkpoint allowlist and active tuple are frozen.
+
+Next action: Codex completes focused gates, ordinary publication and terminal
+dedicated GUI CI followed by a fresh repository workflow_dispatch. ChatGPT then
+reviews the exact GitHub commit/tree, GUI results and every repository job/shard
+before source acceptance/docs closeout. Any wider CI failure/identity drift is
+STOP. No local broad certification, merge/PR mutation or production operation
+is authorized by A15. R1 `6bf8753b0cc8950ae27b32b6858b64d454c512f0` and R2
+`2f122958366d1db282fea51abbd461b83fa893d9` remain frozen. The first D1 manual
+production-paper session is independent and protected.
+
+See Architecture 136 and the GUI-A15 validation document for the exact contract,
+test surface, capability freeze and expected success evidence.
+
 ## 2026-10-12 — Architecture 135 / GUI-A14 SOURCE ACCEPTED
 
 Architecture 135 / GUI-A14 is **SOURCE ACCEPTED** on

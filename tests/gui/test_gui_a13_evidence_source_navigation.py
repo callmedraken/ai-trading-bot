@@ -28,6 +28,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_production_strategy_state,
     unavailable_runtime_state,
 )
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
@@ -168,6 +169,10 @@ class _NavigationService:
         self.calls += 1
         return unavailable_operator_operations_state()
 
+    def get_production_strategy_state(self):
+        self.calls += 1
+        return unavailable_production_strategy_state()
+
     def get_runtime_state(self):
         self.calls += 1
         return unavailable_runtime_state()
@@ -195,7 +200,7 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     window.show()
     application.processEvents()
 
-    assert service.calls == 7
+    assert service.calls == 8
     window.select_page("evidence")
     page = window.findChild(EvidenceTimelinePage, "evidenceTimelinePage")
     assert page is not None
@@ -205,7 +210,7 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     application.processEvents()
 
     assert window.current_page_id == "research"
-    assert service.calls == 7
+    assert service.calls == 8
 
     window.select_page("evidence")
     market = _source_button(page, "Market Data — Verified market-data snapshot")
@@ -213,6 +218,6 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     application.processEvents()
 
     assert window.current_page_id == "market-data"
-    assert service.calls == 7
+    assert service.calls == 8
 
     window.close()

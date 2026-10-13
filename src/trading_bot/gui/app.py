@@ -54,10 +54,12 @@ def _parse_startup_arguments(
     parser.add_argument("--runtime-acl-evidence", type=Path)
     parser.add_argument("--runtime-qualification-evidence", type=Path)
     parser.add_argument("--runtime-session-evidence", type=Path)
+    parser.add_argument("--production-strategy-contract", type=Path)
 
     arguments, qt_arguments = parser.parse_known_args(argv)
     try:
         config = GuiStartupConfiguration(
+            production_strategy_contract=arguments.production_strategy_contract,
             runtime_acl_evidence=arguments.runtime_acl_evidence,
             runtime_qualification_evidence=arguments.runtime_qualification_evidence,
             runtime_session_evidence=arguments.runtime_session_evidence,

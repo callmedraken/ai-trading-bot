@@ -384,8 +384,8 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 210,
-        "exhaustive": 379,
+        "legacy": 215,
+        "exhaustive": 384,
     }
     assert "tests/review_paper/test_production_strategy_cycle.py" in profiles["full"]
     assert (

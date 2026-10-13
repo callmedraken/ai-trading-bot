@@ -30,6 +30,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_production_strategy_state,
     unavailable_runtime_state,
 )
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
@@ -103,6 +104,10 @@ class _NavigationService:
     def get_operator_observability_state(self):
         self.calls += 1
         return unavailable_operator_operations_state()
+
+    def get_production_strategy_state(self):
+        self.calls += 1
+        return unavailable_production_strategy_state()
 
     def get_runtime_state(self):
         self.calls += 1
@@ -228,7 +233,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     window.show()
     application.processEvents()
 
-    assert service.calls == 7
+    assert service.calls == 8
     window.select_page("system")
     buttons = window.findChildren(QPushButton, "systemHealthViewEvidenceButton")
     assert len(buttons) == 2
@@ -237,7 +242,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     application.processEvents()
 
     assert window.current_page_id == "evidence"
-    assert service.calls == 7
+    assert service.calls == 8
 
     source = window.findChild(QComboBox, "evidenceTimelineSourceFilter")
     search = window.findChild(QLineEdit, "evidenceTimelineSearch")

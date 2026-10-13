@@ -47,13 +47,19 @@ explicit ACL/qualification/session JSON through bounded immutable GUI models.
 Runtime, System and Evidence navigation add zero reads. Complete real-PySide6
 offscreen GUI verification passes; exact results are in
 `docs/validation/gui-a14-production-runtime-status.md`. Accepted R1/R2 execution
-source, source pins and branches are unchanged. GUI source acceptance is pending.
+source, source pins and branches are unchanged. GUI-A14 is SOURCE ACCEPTED:
+HEAD `c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE
+`921b7b32bbfecbb454acc8916faa4362464b19d3`; dedicated GUI CI 38325919046
+SUCCESS and repository source gate 38326059553 SUCCESS.
 
-The user selected a local-only checkpoint because the required pre-push CI
-bootstrap is unresolved. One normal local commit is authorized; no push or
-R1/R2 authority change is authorized by that choice. ChatGPT owns the next
-bounded bootstrap decision and exact source review. A missing workflow run is
-not PASS. Do not duplicate local ROBINHOOD/FULL certification for this GUI.
+The earlier local-only bootstrap decision is historical and resolved by the
+accepted A14 CI chain. Current GUI-A15 is presentation-only: an explicitly
+selected canonical production contract may be inspected read-only. A historical
+research report is evidence, not research process liveness. A15 introduces no
+canonical candidate/promotion artifact. Automatic promotion remains disabled;
+human promotion remains required; promotion authority and D2 supervisor are
+not connected. No D2 effects are implemented. R1/R2 source remains frozen;
+ChatGPT owns exact source/CI acceptance. See Architecture 136.
 
 ### Current D2 end-state — ON/OFF, arbitrary-time startup
 

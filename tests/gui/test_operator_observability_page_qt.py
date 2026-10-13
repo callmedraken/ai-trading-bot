@@ -42,6 +42,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_production_strategy_state,
     unavailable_runtime_state,
 )
 from trading_bot.gui.main_window import MainWindow
@@ -242,6 +243,9 @@ class _RecordingService:
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         self.operations_calls += 1
         return self.state
+
+    def get_production_strategy_state(self):
+        return unavailable_production_strategy_state()
 
     def get_runtime_state(self):
         return unavailable_runtime_state()

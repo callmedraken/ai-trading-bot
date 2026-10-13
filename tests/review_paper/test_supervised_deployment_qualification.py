@@ -642,8 +642,8 @@ def test_registration_workflow_profiles_and_authority_chain():
     assert {name: len(modules) for name, modules in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 210,
-        "exhaustive": 379,
+        "legacy": 215,
+        "exhaustive": 384,
     }
     assert set(profiles["robinhood"]) <= set(profiles["full"])
     assert set(profiles["full"]).isdisjoint(profiles["legacy"])

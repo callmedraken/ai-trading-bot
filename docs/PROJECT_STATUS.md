@@ -1,5 +1,40 @@
 # Project Status and Roadmap
 
+## 2026-10-12 — Architecture 136 / GUI-A15 implementation checkpoint
+
+Current safe source milestone: read-only Supervisor, Research & Strategy
+Governance on `feature/gui-supervisor-research-governance`, worktree
+`F:\AI\worktrees\ai-trading-bot-gui-supervisor-research-governance`.
+Exact base HEAD `43899b2014fe452f921c2f320a2f8d0c2a26b817`, TREE
+`ad2b2b980927d77d86b52e270d9a5c259f676c31`. GUI-A14 remains accepted at the
+executable/test identity and successful CI recorded below; the A15 base is its
+docs-only closeout descendant.
+
+A15 explicitly inspects the canonical `production-strategy-contract/v1` through
+its existing pure parser, bounded read-only acquisition and immutable GUI view.
+MainWindow acquires eight states once. Supervisor, System and Evidence compose
+already-acquired state; navigation adds zero service/file reads. Exact production
+contract/session ID, HEAD, TREE and target-session comparison is descriptive and
+reports any mismatch as CONFLICTING/ATTENTION without repair.
+
+Historical research evidence is not research process liveness. Automatic
+promotion is disabled, human promotion is required, promotion authority is not
+connected and research cannot replace production. No canonical candidate or
+promotion artifact is introduced. D2 supervisor is not connected and no D2
+effects are implemented. R1/R2 production source/branches and operational state
+remain frozen. The first D1 manual session remains an independent protected step.
+
+Current source inventory: GUI 44, ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215,
+EXHAUSTIVE 384. A15 remains legacy presentation under Architecture 132.
+Only dedicated GUI push selection changes to `feature/gui-*`; repository source
+gate allowlist and active checkpoint registration remain unchanged.
+
+Source acceptance is pending ChatGPT exact GitHub diff/CI review after dedicated
+GUI CI and fresh repository dispatch reach terminal SUCCESS. No local broad
+certification is selected. Next owner: ChatGPT for exact source/CI review and
+docs closeout; stop on unexpected identity/CI drift or a protected effect.
+See Architecture 136 and `docs/validation/gui-a15-supervisor-research-governance.md`.
+
 ## 2026-10-12 — Architecture 135 / GUI-A14 SOURCE ACCEPTED
 
 Architecture 135 / GUI-A14 is **SOURCE ACCEPTED** on

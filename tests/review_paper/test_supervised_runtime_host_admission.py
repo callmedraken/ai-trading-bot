@@ -542,8 +542,8 @@ def test_source_registration_profiles_and_authority():
     assert {name: len(modules) for name, modules in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 210,
-        "exhaustive": 379,
+        "legacy": 215,
+        "exhaustive": 384,
     }
 
 

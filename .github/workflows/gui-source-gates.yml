@@ -3,7 +3,7 @@ name: GUI Source Gates
 on:
   push:
     branches:
-      - feature/gui-production-runtime-status
+      - "feature/gui-*"
   pull_request:
     paths:
       - "src/trading_bot/gui/**"

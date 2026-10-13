@@ -24,6 +24,7 @@ from trading_bot.gui import (
     OperatorOperationsPageState,
     unavailable_market_data_state,
     unavailable_operator_operations_state,
+    unavailable_production_strategy_state,
     unavailable_runtime_state,
 )
 from trading_bot.gui.comparison_chart import (
@@ -117,6 +118,9 @@ class _WindowResearchService:
 
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         return unavailable_operator_operations_state()
+
+    def get_production_strategy_state(self):
+        return unavailable_production_strategy_state()
 
     def get_runtime_state(self):
         return unavailable_runtime_state()

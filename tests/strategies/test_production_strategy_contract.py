@@ -284,8 +284,8 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 169,
         "robinhood": 94,
-        "legacy": 210,
-        "exhaustive": 379,
+        "legacy": 215,
+        "exhaustive": 384,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

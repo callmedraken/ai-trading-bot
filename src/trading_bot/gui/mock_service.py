@@ -22,6 +22,10 @@ from trading_bot.gui.paper_account_models import (
     unavailable_paper_account_state,
 )
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
+from trading_bot.gui.production_strategy_models import (
+    ProductionStrategyPageState,
+    unavailable_production_strategy_state,
+)
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
@@ -31,6 +35,10 @@ from trading_bot.gui.runtime_models import RuntimePageState, unavailable_runtime
 
 class MockGuiApplicationService:
     """Return static presentation data without invoking application effects."""
+
+    def get_production_strategy_state(self) -> ProductionStrategyPageState:
+        """Return the disconnected strategy default."""
+        return unavailable_production_strategy_state()
 
     def get_overview(self) -> ApplicationOverview:
         """Return deterministic read-only overview state."""
@@ -102,6 +110,13 @@ class MockGuiApplicationService:
                     status=PresentationStatus.INFO,
                     detail="The GUI is read-only; no production authority is granted.",
                 ),
+                ComponentStatus(
+                    "supervisor",
+                    "Supervisor",
+                    PresentationStatus.UNAVAILABLE,
+                    "D2 supervisor runtime is not connected; "
+                    "no relevant evidence is selected.",
+                ),
             ),
         )
 
@@ -136,6 +151,10 @@ class MockGuiApplicationService:
 
 class ResearchReportGuiApplicationService:
     """Compose the normal overview with one explicit read-only report adapter."""
+
+    def get_production_strategy_state(self) -> ProductionStrategyPageState:
+        """Return the disconnected strategy default."""
+        return unavailable_production_strategy_state()
 
     def __init__(self, artifact_path: Path) -> None:
         self._overview_service = MockGuiApplicationService()

@@ -27,6 +27,7 @@ from trading_bot.gui.paper_models import (
     PaperPageStatus,
 )
 from trading_bot.gui.runtime_models import RuntimePageState, RuntimePageStatus
+from trading_bot.gui.supervisor_models import SupervisorPageState, SupervisorPageStatus
 from trading_bot.gui.system_health_models import (
     SystemAuditEntryView,
     SystemComponentHealthView,
@@ -51,6 +52,7 @@ def build_system_health_state(
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
     runtime: RuntimePageState,
+    supervisor: SupervisorPageState | None = None,
 ) -> SystemHealthPageState:
     """Build diagnostics without any service reread, I/O, or authority access."""
     expected = (
@@ -65,6 +67,8 @@ def build_system_health_state(
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
             raise TypeError(f"{name} has an unsupported type")
+    if supervisor is not None and type(supervisor) is not SupervisorPageState:
+        raise TypeError("Exact SupervisorPageState required")
 
     components = (
         _research_component(research),
@@ -90,7 +94,21 @@ def build_system_health_state(
         *_market_data_audit(market_data),
         *_operations_audit(operations),
         *_runtime_audit(runtime),
+        *(_supervisor_audit(supervisor) if supervisor is not None else ()),
     )
+    if supervisor is not None:
+        components += (
+            SystemComponentHealthView(
+                "supervisor",
+                "Supervisor",
+                {
+                    SupervisorPageStatus.UNAVAILABLE: SystemComponentStatus.UNAVAILABLE,
+                    SupervisorPageStatus.AVAILABLE: SystemComponentStatus.AVAILABLE,
+                    SupervisorPageStatus.ATTENTION: SystemComponentStatus.BLOCKED,
+                }[supervisor.status],
+                supervisor.message,
+            ),
+        )
     status = (
         SystemHealthStatus.ATTENTION
         if any(item.status is SystemComponentStatus.BLOCKED for item in components)
@@ -355,3 +373,16 @@ def _runtime_audit(state: RuntimePageState) -> tuple[SystemAuditEntryView, ...]:
             )
         )
     return tuple(entries)
+
+
+def _supervisor_audit(state: SupervisorPageState) -> tuple[SystemAuditEntryView, ...]:
+    contract = state.production_strategy.contract
+    if contract is None:
+        return ()
+    return (
+        SystemAuditEntryView(
+            "Supervisor", "Production contract ID", str(contract.contract_id)
+        ),
+        SystemAuditEntryView("Supervisor", "Production HEAD", contract.source_head),
+        SystemAuditEntryView("Supervisor", "Production TREE", contract.source_tree),
+    )

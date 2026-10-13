@@ -17,6 +17,7 @@ _SYSTEM_SOURCE_TO_EVIDENCE = {
     "Market Data": EvidenceTimelineSource.MARKET_DATA,
     "Operations": EvidenceTimelineSource.OPERATIONS,
     "Runtime": EvidenceTimelineSource.RUNTIME,
+    "Supervisor": EvidenceTimelineSource.SUPERVISOR,
 }
 
 

@@ -22,6 +22,7 @@ from trading_bot.gui.paper_account_models import (
 )
 from trading_bot.gui.paper_models import PaperPageState, PaperPageStatus
 from trading_bot.gui.runtime_models import RuntimePageState
+from trading_bot.gui.supervisor_models import SupervisorPageState
 
 
 def build_evidence_timeline_state(
@@ -31,6 +32,7 @@ def build_evidence_timeline_state(
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
     runtime: RuntimePageState,
+    supervisor: SupervisorPageState | None = None,
 ) -> EvidenceTimelinePageState:
     """Build a deterministic timeline without I/O, discovery, or service rereads."""
     expected = (
@@ -44,6 +46,8 @@ def build_evidence_timeline_state(
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
             raise TypeError(f"{name} has an unsupported type")
+    if supervisor is not None and type(supervisor) is not SupervisorPageState:
+        raise TypeError("Exact SupervisorPageState required")
 
     entries = (
         *_research_entries(research),
@@ -52,6 +56,7 @@ def build_evidence_timeline_state(
         *_market_data_entries(market_data),
         *_operations_entries(operations),
         *_runtime_entries(runtime),
+        *(_supervisor_entries(supervisor) if supervisor is not None else ()),
     )
     timed = [entry for entry in entries if entry.occurred_at is not None]
     untimed = [entry for entry in entries if entry.occurred_at is None]
@@ -70,6 +75,27 @@ def build_evidence_timeline_state(
             "read-only GUI state."
         )
     return EvidenceTimelinePageState(message, ordered)
+
+
+def _supervisor_entries(
+    state: SupervisorPageState,
+) -> tuple[EvidenceTimelineEntry, ...]:
+    contract = state.production_strategy.contract
+    if contract is None:
+        return ()
+    return (
+        EvidenceTimelineEntry(
+            EvidenceTimelineSource.SUPERVISOR,
+            "Production strategy contract",
+            str(contract.contract_id),
+            None,
+            None,
+            f"Target session: {contract.target_session_date.isoformat()}; "
+            f"strategy: {contract.strategy_id}/{contract.strategy_version}; "
+            f"symbol: {contract.symbol}; HEAD: {contract.source_head}; "
+            f"TREE: {contract.source_tree}.",
+        ),
+    )
 
 
 def _research_entries(

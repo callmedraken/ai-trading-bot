@@ -17,6 +17,7 @@ from trading_bot.gui import (
     MarketDataPageState,
     unavailable_market_data_state,
     unavailable_operator_operations_state,
+    unavailable_production_strategy_state,
     unavailable_runtime_state,
 )
 from trading_bot.gui.main_window import MainWindow
@@ -62,6 +63,9 @@ class _GuiA2RecordingService:
 
     def get_operator_observability_state(self):
         return unavailable_operator_operations_state()
+
+    def get_production_strategy_state(self):
+        return unavailable_production_strategy_state()
 
     def get_runtime_state(self):
         return unavailable_runtime_state()

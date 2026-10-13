@@ -1,5 +1,50 @@
 # Project Status and Roadmap
 
+## 2026-10-12 — Architecture 135 / GUI-A14 SOURCE ACCEPTED
+
+Architecture 135 / GUI-A14 is **SOURCE ACCEPTED** on
+`feature/gui-production-runtime-status` at the exact executable/test source:
+
+```text
+HEAD c29bb678dd7c64a317de602b81ba9df0aa8e1bd8
+TREE 921b7b32bbfecbb454acc8916faa4362464b19d3
+```
+
+Dedicated GUI Source Gates
+[38325919046](https://github.com/callmedraken/ai-trading-bot/actions/runs/38325919046)
+SUCCEEDED on that exact HEAD: **470 passed**, real PySide6 6.10.3, Ruff PASS,
+format PASS and git diff PASS.
+
+Fresh repository Checkpoint Source Gates
+[38326059553](https://github.com/callmedraken/ai-trading-bot/actions/runs/38326059553)
+also SUCCEEDED on the exact accepted HEAD. Source-static passed all **62** current
+active authorities with 83 test paths inventoried, 356 Ruff paths, pytest SKIP
+and stable source identity. The unmapped dispatch then passed all four reviewed
+broad shards: shard 0 = 17 paths / 72.914 s, shard 1 = 21 paths / 80.002 s,
+shard 2 = 23 paths / 98.674 s, shard 3 = 22 paths / 98.006 s. All are below
+the 300-second hygiene threshold. active-tests and certification-tests were
+correctly skipped for this route, and the terminal source-gates aggregator PASSed.
+
+Failed runs 38320329303 and 38324505785 remain preserved and were never rerun.
+They document the historical publication-recovery active-topology defect and the
+single stale GUI legacy-inventory assertion respectively; both were corrected by
+ordinary descendant commits before the accepted source above.
+
+Frozen production branches remain unchanged: R1
+`6bf8753b0cc8950ae27b32b6858b64d454c512f0` and R2
+`2f122958366d1db282fea51abbd461b83fa893d9`. GUI-A14 performed no production
+SQLite, credential, provider, broker, scheduler, ACL or paper mutation/effect.
+Real-money broker placement remains **NO-GO**.
+
+Any documentation-only descendant after this entry does not replace the accepted
+GUI-A14 executable/test identity above.
+
+Next operational proving step remains the first D1 manual production-paper
+session. The next safe parallel design milestone is Architecture 136 / GUI-A15:
+read-only Supervisor & Research Plane status/promotion visibility aligned with
+the ON/OFF arbitrary-time-startup D2 end-state, without adding D2 execution,
+scheduler authority or production effects.
+
 ## 2026-10-12 — Current D1Q-R2 operational state / GUI-A14 checkpoint
 
 This current entry supersedes pending/failed R2 wording in the dated historical
@@ -43,7 +88,7 @@ Runtime, System and Evidence navigation add zero reads. Complete real-PySide6
 offscreen GUI verification passes; exact results are in
 `docs/validation/gui-a14-production-runtime-status.md`. Accepted R1/R2 execution
 source, production executable pins and branches are unchanged.
-GUI source acceptance is pending.
+GUI-A14 source is accepted at HEAD `c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE `921b7b32bbfecbb454acc8916faa4362464b19d3`.
 
 The GUI-A14 implementation was ordinary-pushed as HEAD
 `693c0d15b8521d4d6c9bdcc6c090143299767b72`, TREE
@@ -107,14 +152,13 @@ pin is refreshed; no runtime behavior, function AST, active tuple, other pin or
 workflow changes. Dedicated GUI CI supplies the fresh complete GUI regression;
 repository CI supplies the fresh broad fallback. No local broad suite is run.
 
-The user authorizes one normal follow-up commit/ordinary push. After dedicated
-GUI CI passes, Codex must perform a fresh Checkpoint Source Gates
-workflow_dispatch against the exact new GUI branch HEAD, wait for the entire
-run to become terminal and report every job/shard. Source identity drift,
-unexpected widening or a fresh repository-gate failure is STOP. No repository
-push-trigger change, local broad profile or production/protected effect is
-selected. GUI-A14 source acceptance remains pending terminal exact-source CI
-and final review. No production effect occurred.
+The bounded follow-up is accepted at HEAD
+`c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE
+`921b7b32bbfecbb454acc8916faa4362464b19d3`. Dedicated GUI CI 38325919046 and
+fresh repository Checkpoint Source Gates 38326059553 are both terminal SUCCESS
+on that exact source. All 62 current active authorities and all four reviewed
+broad shards pass. GUI-A14 is SOURCE ACCEPTED; no local broad rerun, protected
+operator, production effect, merge or PR mutation is required for acceptance.
 
 ### Current D2 end-state — ON/OFF, arbitrary-time startup
 

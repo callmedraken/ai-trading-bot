@@ -1,5 +1,23 @@
 # GUI-A14 — Production runtime evidence validation
 
+## Source acceptance
+
+GUI-A14 is **SOURCE ACCEPTED** at:
+
+```text
+HEAD c29bb678dd7c64a317de602b81ba9df0aa8e1bd8
+TREE 921b7b32bbfecbb454acc8916faa4362464b19d3
+```
+
+Dedicated GUI CI 38325919046 is SUCCESS with 470 passed using real PySide6
+6.10.3 plus Ruff/format/diff PASS. Fresh repository Checkpoint Source Gates
+38326059553 is SUCCESS on the same HEAD: source-static 62/62 authorities PASS,
+full shards 0/1/2/3 PASS with 17/21/23/22 test paths and
+72.914/80.002/98.674/98.006 seconds respectively, active-tests and
+certification-tests skipped as expected, terminal source-gates PASS. Source
+identity remained stable and all shard times are below the 300-second hygiene
+threshold.
+
 ## Current checkpoint
 
 The GUI-A14 implementation was ordinary-pushed as HEAD
@@ -64,14 +82,13 @@ pin is refreshed; no runtime behavior, function AST, active tuple, other pin or
 workflow changes. Dedicated GUI CI supplies the fresh complete GUI regression;
 repository CI supplies the fresh broad fallback. No local broad suite is run.
 
-The user authorizes one normal follow-up commit/ordinary push. After dedicated
-GUI CI passes, Codex must perform a fresh Checkpoint Source Gates
-workflow_dispatch against the exact new GUI branch HEAD, wait for the entire
-run to become terminal and report every job/shard. Source identity drift,
-unexpected widening or a fresh repository-gate failure is STOP. No repository
-push-trigger change, local broad profile or production/protected effect is
-selected. GUI-A14 source acceptance remains pending terminal exact-source CI
-and final review. No production effect occurred.
+The bounded follow-up is accepted at HEAD
+`c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE
+`921b7b32bbfecbb454acc8916faa4362464b19d3`. Dedicated GUI CI 38325919046 and
+fresh repository Checkpoint Source Gates 38326059553 are both terminal SUCCESS
+on that exact source. All 62 current active authorities and all four reviewed
+broad shards pass. GUI-A14 is SOURCE ACCEPTED; no local broad rerun, protected
+operator, production effect, merge or PR mutation is required for acceptance.
 
 ## Verification performed
 
@@ -176,15 +193,16 @@ REAL_PRODUCTION_EVIDENCE_READS_DURING_TESTS=0
 
 ## Next owner and stop condition
 
-Codex owns the user-authorized fresh repository workflow_dispatch after the
-single stale-count correction is ordinary-pushed and dedicated GUI CI succeeds.
-Require the dispatched run's HEAD to match the exact new remote GUI HEAD and
-wait for source-static, all four full-tests shards and terminal source-gates.
-Report active-tests and certification-tests skips as well. Do not ask the user
-to dispatch or rerun preserved failures 38320329303 / 38324505785. Stop on source
-identity change, unexpected scope widening or a new repository-gate failure.
-Final source acceptance remains with review; no production/protected effect,
-merge, PR mutation or local broad profile is authorized.
+GUI-A14 is closed and SOURCE ACCEPTED at the exact source identity recorded
+above. Preserve failed runs 38320329303 / 38324505785 as historical diagnostic
+evidence; do not rerun them. No additional local broad profile is required.
+
+Next operational proving step: the first D1 manual production-paper session.
+Next safe parallel design milestone: Architecture 136 / GUI-A15, a read-only
+Supervisor & Research Plane status/promotion view aligned with the current D2
+ON/OFF arbitrary-time-startup design. It must remain presentation-only until its
+architecture is separately reviewed; no scheduler, broker, credential, SQLite
+mutation or D2 execution authority is implied by this closeout.
 
 Optional exact local GUI re-verification (already completed, not a new gate):
 

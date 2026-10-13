@@ -2,7 +2,7 @@
 
 ## Source boundary
 
-Implementation checkpoint, pending exact GitHub source/CI review and acceptance.
+SOURCE ACCEPTED at HEAD `c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE `921b7b32bbfecbb454acc8916faa4362464b19d3` after dedicated GUI CI 38325919046 and repository source-gate CI 38326059553 both completed SUCCESS.
 Frozen parent: HEAD `2f122958366d1db282fea51abbd461b83fa893d9`, TREE
 `c3fb82add37bdbea12ebad9836ca10000b924fe1`. Worktree:
 `F:\AI\worktrees\ai-trading-bot-gui-production-runtime-status`; branch:
@@ -116,7 +116,11 @@ The current correction removes that registered historical checkpoint from the
 bindings or historical pins. Its unchanged authority must return both
 registration drift and runner authority drift. Repository push branch triggers
 and workflow_dispatch remain unchanged; the GUI branch is not added to the
-repository source-gate allowlist. Source acceptance awaits ChatGPT's exact
-GitHub correction review and a fresh exact-source repository dispatch. See
-`docs/validation/gui-a14-production-runtime-status.md` for incident evidence and
-the remaining gate. No production effect or local broad certification occurs.
+repository source-gate allowlist. Final accepted GUI-A14 source is HEAD
+`c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE
+`921b7b32bbfecbb454acc8916faa4362464b19d3`. Dedicated GUI CI 38325919046
+passed 470 real-PySide6 tests plus Ruff/diff checks. Fresh repository dispatch
+38326059553 passed source-static for all 62 current authorities, all four broad
+shards and the terminal aggregator. See
+`docs/validation/gui-a14-production-runtime-status.md` for the full evidence
+chain. No production effect or local broad certification occurred.

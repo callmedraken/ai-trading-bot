@@ -1,39 +1,72 @@
 # Project Status and Roadmap
 
-## 2026-10-12 — Architecture 136 / GUI-A15 implementation checkpoint
+## 2026-10-12 — Architecture 136 / GUI-A15 SOURCE ACCEPTED
 
-Current safe source milestone: read-only Supervisor, Research & Strategy
-Governance on `feature/gui-supervisor-research-governance`, worktree
-`F:\AI\worktrees\ai-trading-bot-gui-supervisor-research-governance`.
-Exact base HEAD `43899b2014fe452f921c2f320a2f8d0c2a26b817`, TREE
-`ad2b2b980927d77d86b52e270d9a5c259f676c31`. GUI-A14 remains accepted at the
-executable/test identity and successful CI recorded below; the A15 base is its
-docs-only closeout descendant.
+Architecture 136 / GUI-A15 is **SOURCE ACCEPTED** on
+`feature/gui-supervisor-research-governance` at the exact executable/test source:
 
-A15 explicitly inspects the canonical `production-strategy-contract/v1` through
-its existing pure parser, bounded read-only acquisition and immutable GUI view.
-MainWindow acquires eight states once. Supervisor, System and Evidence compose
-already-acquired state; navigation adds zero service/file reads. Exact production
-contract/session ID, HEAD, TREE and target-session comparison is descriptive and
-reports any mismatch as CONFLICTING/ATTENTION without repair.
+```text
+HEAD 1dd46169deb69d7a381687b6ba835af9d6c12e5a
+TREE 383b237aebfc553b10c7a5ef121a0191559c3f11
+```
 
-Historical research evidence is not research process liveness. Automatic
-promotion is disabled, human promotion is required, promotion authority is not
-connected and research cannot replace production. No canonical candidate or
-promotion artifact is introduced. D2 supervisor is not connected and no D2
-effects are implemented. R1/R2 production source/branches and operational state
-remain frozen. The first D1 manual session remains an independent protected step.
+The implementation commit is
+`039464727ee1ddd5e56e2513800b46002b0a882b`; the final descendant
+`1dd46169deb69d7a381687b6ba835af9d6c12e5a` changes only three documentation
+files to reconcile stale seven-read wording. No executable, test or workflow
+material changes in that second commit.
 
-Current source inventory: GUI 44, ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215,
-EXHAUSTIVE 384. A15 remains legacy presentation under Architecture 132.
-Only dedicated GUI push selection changes to `feature/gui-*`; repository source
-gate allowlist and active checkpoint registration remain unchanged.
+Dedicated GUI Source Gates
+[38343026765](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343026765)
+SUCCEEDED on the exact accepted HEAD: **531 passed**, zero skipped, real PySide6
+6.10.3, Ruff PASS, format PASS and git diff PASS.
 
-Source acceptance is pending ChatGPT exact GitHub diff/CI review after dedicated
-GUI CI and fresh repository dispatch reach terminal SUCCESS. No local broad
-certification is selected. Next owner: ChatGPT for exact source/CI review and
-docs closeout; stop on unexpected identity/CI drift or a protected effect.
-See Architecture 136 and `docs/validation/gui-a15-supervisor-research-governance.md`.
+Fresh repository Checkpoint Source Gates
+[38343142780](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343142780)
+also SUCCEEDED on the exact accepted HEAD. Source-static passed all **62** current
+active authorities with 83 test paths, 356 Ruff paths, pytest SKIP and stable
+source identity. The four reviewed broad shards passed with 17/21/23/22 executed
+test paths and 103.166/88.225/78.019/90.367 seconds respectively, all below the
+300-second hygiene threshold. active-tests and certification-tests were correctly
+skipped for the unmapped dispatch route; terminal source-gates PASSed.
+
+Final inventory is GUI 44, ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215 and
+EXHAUSTIVE 384. The only checkpoint-runner changes are three directly affected
+test-file blob pins; production executable/native/AST pins, ACTIVE_CI_CHECKPOINTS,
+the repository source-gate push allowlist and frozen R1/R2 production source are
+unchanged.
+
+The accepted A15 boundary remains presentation-only: explicit canonical
+production-strategy-contract inspection, recorded D1/Research presentation,
+exact contract/session consistency, disconnected D2 Supervisor and fixed
+human-only promotion governance. It adds no canonical research-candidate schema,
+research execution, strategy promotion, D2 execution, scheduler authority,
+provider/credential access, production SQLite mutation or broker capability.
+
+Frozen production branches remain R1
+`6bf8753b0cc8950ae27b32b6858b64d454c512f0` and R2
+`2f122958366d1db282fea51abbd461b83fa893d9`. Real-money broker placement remains
+**NO-GO**. Any documentation-only descendant after this entry does not replace
+the accepted A15 executable/test identity above.
+
+Next operational proving step remains the first D1 manual production-paper
+session. The next safe parallel milestone is Architecture 137: define the
+canonical read-only research-candidate artifact and lifecycle semantics
+(EXPERIMENTAL -> BACKTESTED -> WALK_FORWARD_PASSED -> SHADOW -> PAPER_CANDIDATE
+-> AWAITING_HUMAN_PROMOTION) without granting automatic promotion or production
+mutation authority.
+
+## 2026-10-12 — Architecture 136 / GUI-A15 accepted checkpoint summary
+
+A15 is accepted at HEAD `1dd46169deb69d7a381687b6ba835af9d6c12e5a`, TREE
+`383b237aebfc553b10c7a5ef121a0191559c3f11`. Dedicated GUI CI 38343026765
+and repository source-gate CI 38343142780 are both terminal SUCCESS. The
+presentation remains explicit-input/read-only; D2 is not connected, automatic
+promotion is disabled, human promotion is required, and no candidate/promotion
+authority is introduced. Inventory is GUI 44 / ACTIVE 62 / FULL 169 /
+ROBINHOOD 94 / LEGACY 215 / EXHAUSTIVE 384. No protected or production effect
+occurred. The detailed acceptance evidence is recorded immediately above and in
+Architecture 136 / GUI-A15 validation.
 
 ## 2026-10-12 — Architecture 135 / GUI-A14 SOURCE ACCEPTED
 

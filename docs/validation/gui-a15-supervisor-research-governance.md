@@ -2,8 +2,9 @@
 
 ## Source and verification scope
 
-Branch/worktree and exact base are recorded in Architecture 136. Acceptance
-remains pending ChatGPT exact GitHub source/CI review. Synthetic contracts,
+Branch/worktree and exact base are recorded in Architecture 136. GUI-A15 is
+SOURCE ACCEPTED at HEAD `1dd46169deb69d7a381687b6ba835af9d6c12e5a`, TREE
+`383b237aebfc553b10c7a5ef121a0191559c3f11`. Synthetic contracts,
 synthetic runtime fixtures and the existing historical compact-report fixture
 are used; no production/operator evidence is read.
 
@@ -11,6 +12,25 @@ Five new test modules bring actual tests/gui inventory to 44. Current inventory
 is ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215, EXHAUSTIVE 384. Direct
 current count assertions and three affected test-file blob pins are reconciled.
 No production executable/native/AST pin or active registration is changed.
+
+## Terminal acceptance evidence
+
+Dedicated GUI Source Gates 38343026765 completed SUCCESS on the exact accepted
+HEAD with **531 passed, 0 skipped**, real PySide6 6.10.3, Ruff PASS, format PASS
+and git diff PASS.
+
+Fresh repository Checkpoint Source Gates 38343142780 completed SUCCESS on the
+same HEAD. Source-static passed all **62** active authorities with 83 test paths,
+356 Ruff paths, PYTEST=SKIP and stable identity. Broad shards passed with:
+
+- shard 0: 17 paths / 103.166 s
+- shard 1: 21 paths / 88.225 s
+- shard 2: 23 paths / 78.019 s
+- shard 3: 22 paths / 90.367 s
+
+All broad runtimes are below 300 seconds. active-tests and certification-tests
+were skipped as expected for the unmapped workflow_dispatch route; terminal
+source-gates PASSed. No failed A15 CI run or correction cycle occurred.
 
 ## Required evidence
 
@@ -46,14 +66,8 @@ real-PySide6 GUI: **531 passed, 0 skipped**. Focused profile/authority checks, c
 final diff evidence are reported with the final implementation handoff.
 No local FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification is run.
 
-After ordinary push, require dedicated GUI Source Gates SUCCESS on the exact
-HEAD, then a fresh Checkpoint Source Gates workflow_dispatch on that exact
-branch. Its unmapped route requires source-static, four full-tests shards,
-active-tests/certification-tests skipped, and terminal source-gates SUCCESS.
-Preserve any failed run; never rerun historical failures. At most one directly
-stale inventory/test-file-pin correction cycle is authorized. Any wider CI
-failure is STOP. CI identities/results belong in the final report and later
-ChatGPT docs closeout, not an invented acceptance claim here.
+The required publication gates are complete and accepted as recorded above. No
+additional local or CI broad rerun is required for A15 closeout.
 
 ## Zero-effect evidence
 

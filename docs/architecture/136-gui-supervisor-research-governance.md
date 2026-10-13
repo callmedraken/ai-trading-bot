@@ -8,8 +8,9 @@ Exact base HEAD `43899b2014fe452f921c2f320a2f8d0c2a26b817`, TREE
 `ad2b2b980927d77d86b52e270d9a5c259f676c31`. This docs-only descendant closes
 accepted A14 source HEAD `c29bb678dd7c64a317de602b81ba9df0aa8e1bd8`, TREE
 `921b7b32bbfecbb454acc8916faa4362464b19d3`, GUI CI 38325919046 SUCCESS and
-repository CI 38326059553 SUCCESS. A15 source acceptance requires subsequent
-exact GitHub source/CI review by ChatGPT.
+repository CI 38326059553 SUCCESS. A15 is SOURCE ACCEPTED at HEAD `1dd46169deb69d7a381687b6ba835af9d6c12e5a`, TREE
+`383b237aebfc553b10c7a5ef121a0191559c3f11`, after dedicated GUI CI
+38343026765 and repository source-gate CI 38343142780 both completed SUCCESS.
 
 Frozen R1/R2 remain `6bf8753b0cc8950ae27b32b6858b64d454c512f0` and
 `2f122958366d1db282fea51abbd461b83fa893d9`. No D1 operation is performed.
@@ -103,8 +104,11 @@ Only dedicated GUI workflow push selection becomes `feature/gui-*`.
 Windows/Python 3.14, `.[dev,gui]`, real PySide6, complete tests/gui, combined
 non-mutating Ruff and diff checks remain. Repository checkpoint push allowlist,
 ACTIVE_CI_CHECKPOINTS and production checkpoint/profile mapping remain unchanged.
-Fresh repository dispatch follows successful dedicated GUI CI. Missing runs are
-never PASS. Source acceptance remains ChatGPT-owned.
+Dedicated GUI CI 38343026765 passed 531 real-PySide6 tests plus Ruff/format/diff
+checks. Fresh repository dispatch 38343142780 passed source-static for all 62
+current authorities, all four broad shards and the terminal aggregator. The
+accepted executable/test identity is frozen above; later docs-only descendants
+do not replace it.
 
 Source inventory: GUI 44, ACTIVE 62, FULL 169, ROBINHOOD 94, LEGACY 215,
 EXHAUSTIVE 384. GUI remains legacy under Architecture 132; A15 does not

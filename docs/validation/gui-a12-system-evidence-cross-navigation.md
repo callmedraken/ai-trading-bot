@@ -52,7 +52,7 @@ Verify:
 - Evidence search is the exact audit identifier;
 - resulting visible cards match that source/identifier;
 - Evidence scroll resets to the top;
-- service call count remains exactly seven.
+- service acquisition count remains exactly eight.
 
 ## A12d regression gate
 

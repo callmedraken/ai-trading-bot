@@ -51,7 +51,7 @@ Verify:
 - Market Data target selects `market-data`;
 - Operations target selects `operations`;
 - Runtime target selects `runtime` without any evidence reread;
-- service call count remains exactly seven.
+- service acquisition count remains exactly eight.
 
 Do not add destination-page rereads or exact-row-selection claims.
 

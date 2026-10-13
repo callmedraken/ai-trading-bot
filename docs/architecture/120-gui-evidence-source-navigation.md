@@ -143,7 +143,7 @@ Focused tests must prove:
 4. each rendered evidence card has one source-navigation control;
 5. clicking Research evidence selects the Research page;
 6. clicking Market Data evidence selects the Market Data page;
-7. service call count remains exactly seven;
+7. service acquisition count remains exactly eight;
 8. existing A11 filtering remains intact;
 9. existing A12 System -> Evidence exact targeting remains intact;
 10. navigation introduces no runtime I/O/effect control;

@@ -1,16 +1,67 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
-## 2026-10-13 — Architecture 134-D1R4 source preparation
+## 2026-10-13 — Architecture 134-D1R4 SOURCE ACCEPTED
 
-Current source prepares the fixed `/v3` credential pair, durable witnessed
-provisioning, conservative ambiguity/read-only reconciliation and D1R4 one-shot
-authentication host. See [D1R4 validation](validation/arch134-d1r4-alpaca-v3-credential-generation.md)
-and [reviewed concurrency contract](architecture/134-d1r4-alpaca-v3-provisioning-concurrency.md).
-Source acceptance is pending exact GitHub review after terminal mapped ROBINHOOD
-CI. All incident entries below retain historical authority: D1R3 401 is consumed
-and `/v2` is immutable. Source checks perform zero protected operational effects.
-Next owner: ChatGPT exact source review, followed by separately reviewed v3
-provisioning/witness and authentication boundaries. No D1/D2/live authority.
+Architecture 134-D1R4 — fixed `/v3` Alpaca credential rotation preparation,
+durable witnessed provisioning, conservative ambiguity/read-only reconciliation
+and one-shot authentication requalification — is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-alpaca-auth-qualification`.
+
+Accepted executable/test source:
+
+```text
+HEAD             c49ab6413b2713c249f1b878edd67a92ce2b6bbd
+TREE             e3f5d09040d6e8764c00854f7fdcd2cf987edffd
+CI               #525 / 38478403817 / SUCCESS
+CERT ARTIFACT    11856071786
+ROBINHOOD        96 modules
+CASES            8,981
+PASSED           8,980
+SKIPPED          1
+FAILED/ERRORS    0 / 0
+WALL             281.659 s
+```
+
+The accepted source freezes policy
+`windows-credential-manager-alpaca-market-data/v3` and exactly
+`AITradingBot/MarketData/Alpaca/ApiKeyId/v3` plus
+`AITradingBot/MarketData/Alpaca/ApiSecretKey/v3`. The existing `/v2`
+credential records remain immutable historical credential-reference state with
+no fallback, alias, environment/config/CLI selector or mutation path.
+
+The reviewed cooperating-writer contract is implemented with the fixed
+`Global\AITradingBot-Arch134-D1R4-AlpacaV3-Provision-v1` mutex, durable
+pre-effect journal fences, exact post-write witness/readback confirmation,
+fail-closed ambiguity/no-cleanup semantics and separate read-only reconciliation.
+All 14 predecessor Architecture-134 pin dictionaries remain byte-identical; D1R4
+adds a successor overlay instead of rewriting historical authority.
+
+The authentication contract remains
+`alpaca-authentication-qualification/v1` with the unchanged fixed SPY
+2026-10-07 SIP/raw/USD provider probe and at most one HTTPS request. A preserved
+accepted generation journal and digest must reproduce the exact nonsecret
+witnesses under the same mutex, then durably record
+`V3_PROVIDER_EFFECT_INTENT` before any possible provider request. Once that
+fence exists, `/v3` staging is permanently closed regardless of later PASS,
+BLOCKED, transport failure, crash or publication failure.
+
+Checkpoint Source Gates #525 is terminal SUCCESS: source-static, active-tests,
+canonical ROBINHOOD certification and source-gates passed; redundant full-tests
+was intentionally skipped. The documented Architecture-77 repository-local
+Windows cache-path condition remains a pre-existing LEGACY compatibility issue,
+not a D1R4 regression or acceptance blocker.
+
+Implementation, corrections and mapped CI performed zero real `/v3` credential
+reads/writes/deletes, zero Alpaca HTTPS requests, zero production SQLite/session/
+strategy/Robinhood/PREPARE/EXECUTE/paper/broker/scheduler/ACL effects and zero
+D1/D2 invocations. D1R3 remains consumed BLOCKED/HTTP_REJECTED/401 and `/v2`
+remains immutable.
+
+**Next protected sequence:** exact docs-descendant source admission and zero-effect
+host/evidence readiness; one fresh interactive `/v3` provisioning/witness
+operation; review and preserve its journal/digest; then, only from an accepted
+exact-pair generation, one separately bounded D1R4 authentication qualification.
+D1/D2/live trading remain unauthorized.
 
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 

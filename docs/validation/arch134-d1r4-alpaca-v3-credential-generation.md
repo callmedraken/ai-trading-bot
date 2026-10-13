@@ -1,7 +1,10 @@
 # Architecture 134-D1R4 — v3 credential generation and authentication preparation
 
-Status: source implementation pending exact GitHub review/acceptance. No real
-credential, mutex-host qualification, dashboard or Alpaca operation has run.
+Status: **SOURCE ACCEPTED** at executable/test HEAD
+`c49ab6413b2713c249f1b878edd67a92ce2b6bbd` / TREE
+`e3f5d09040d6e8764c00854f7fdcd2cf987edffd`; Checkpoint Source Gates
+#525 / 38478403817 SUCCESS. No real credential, mutex-host qualification,
+dashboard or Alpaca operation has run.
 
 ## Current source contract
 
@@ -112,9 +115,16 @@ Ordinary exact-file commit/push is authorized; mapped GitHub CI owns canonical
 ROBINHOOD. No local broad certification is required. All source tests use fakes;
 the two-process exclusion test uses a disposable test-only synchronization object.
 
-After terminal CI, ChatGPT reviews the exact commit/tree and preserved historical
-pins before source acceptance. The next protected step is reviewed host readiness
-and actual v3 dashboard generation/provisioning/witness evidence; then a distinct
-one-shot D1R4 authentication invocation against exact accepted source. Neither is
-executed here. The D1R3 401 is consumed. D1 launch, D2 and real-money trading remain
-NO-GO.
+Exact GitHub review is complete. The accepted source preserves all 14 predecessor
+Architecture-134 pin dictionaries byte-for-byte and adds the D1R4 successor
+overlay. Checkpoint Source Gates #525 is terminal green; canonical ROBINHOOD
+selected 96 modules and 8,981 cases, with 8,980 passed, one optional skip and
+zero failures/errors in 281.659 seconds. The documented Architecture-77
+repository-local Windows cache-path condition remains a separate pre-existing
+LEGACY compatibility issue and is not a D1R4 acceptance blocker.
+
+The next protected step is exact docs-descendant host/evidence readiness and one
+fresh v3 dashboard generation/provisioning/witness operation; then, only after
+review of the preserved journal and digest, a distinct one-shot D1R4
+authentication invocation. Neither protected effect has executed here. The D1R3
+401 is consumed. D1 launch, D2 and real-money trading remain NO-GO.

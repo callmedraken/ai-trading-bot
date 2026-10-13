@@ -1,18 +1,40 @@
 # Project Status and Roadmap
 
-## 2026-10-13 — Architecture 134-D1R4 source preparation
+## 2026-10-13 — Architecture 134-D1R4 SOURCE ACCEPTED
 
-Current implementation prepares fixed `/v3` Alpaca credential rotation and D1R4
-authentication requalification under the reviewed cooperating-writer concurrency
-contract. Exact GitHub source acceptance is pending. See
-[D1R4 validation](validation/arch134-d1r4-alpaca-v3-credential-generation.md).
-The shared current-product reader and operator use `/v3` only. D1R3 remains
-consumed BLOCKED/HTTP_REJECTED/401; all `/v2` incident descriptions below are
-historical snapshots. `/v2` records remain immutable. No real credentials,
-dashboard, provider, production database or trading operation ran during this
-source checkpoint. Next: exact GitHub review after terminal mapped ROBINHOOD CI,
-then separately reviewed provisioning and one-shot D1R4 authentication readiness.
-D1/D2 remain disconnected; real-money trading remains NO-GO.
+Architecture 134-D1R4 is **SOURCE ACCEPTED** at executable/test HEAD
+`c49ab6413b2713c249f1b878edd67a92ce2b6bbd`, TREE
+`e3f5d09040d6e8764c00854f7fdcd2cf987edffd` on
+`feature/robinhood-production-paper-alpaca-auth-qualification`.
+Checkpoint Source Gates #525 / 38478403817 is terminal SUCCESS. Canonical
+ROBINHOOD selected 96 modules and 8,981 cases: 8,980 passed, one optional skip,
+zero failures/errors, wall 281.659 seconds. source-static, active-tests and
+source-gates passed; redundant full-tests was intentionally skipped.
+
+Current-product Alpaca credentials are fixed to policy
+`windows-credential-manager-alpaca-market-data/v3` and the exact
+`ApiKeyId/v3` + `ApiSecretKey/v3` Windows Credential Manager targets.
+`/v2` is immutable historical state and has no fallback/alias/mutation path.
+The fixed Global cooperating-writer mutex, durable mutation/provider-intent
+fences, exact witness/readback confirmation, ambiguity/no-cleanup behavior and
+read-only reconciliation are accepted. All 14 predecessor pin dictionaries
+remain preserved and D1R4 is expressed as a successor overlay.
+
+The authentication evidence remains
+`alpaca-authentication-qualification/v1`; the fixed SPY 2026-10-07 probe,
+request/parser semantics and one-request/no-retry budget are unchanged.
+The known Architecture-77 Windows repository-local cache-path problem remains a
+pre-existing LEGACY compatibility condition and is classified separately from
+D1R4 acceptance.
+
+No real credential, provider, production database, session, strategy,
+Robinhood, PREPARE/EXECUTE, paper, broker, scheduler, ACL, D1 or D2 effect
+occurred during source work or CI. D1R3 remains consumed
+BLOCKED/HTTP_REJECTED/401. Next: zero-effect admission/readiness on the exact
+docs-descendant, then one fresh protected `/v3` provisioning/witness operation,
+followed only after evidence review by one separately bounded D1R4
+authentication qualification. D1/D2 remain disconnected; real-money trading
+remains NO-GO.
 
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 

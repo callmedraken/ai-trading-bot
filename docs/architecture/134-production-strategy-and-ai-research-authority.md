@@ -1,14 +1,26 @@
 # Architecture 134 — Production strategy and AI-research authority
 
-## 2026-10-13 — D1R4 current credential authority
+## 2026-10-13 — D1R4 current credential authority SOURCE ACCEPTED
 
-Current source uses only fixed `windows-credential-manager-alpaca-market-data/v3`
-targets. The [reviewed D1R4 concurrency contract](134-d1r4-alpaca-v3-provisioning-concurrency.md)
+D1R4 source is accepted at HEAD
+`c49ab6413b2713c249f1b878edd67a92ce2b6bbd` / TREE
+`e3f5d09040d6e8764c00854f7fdcd2cf987edffd`; Checkpoint Source Gates
+#525 / 38478403817 is terminal SUCCESS. Current source uses only fixed
+`windows-credential-manager-alpaca-market-data/v3` targets. The
+[reviewed D1R4 concurrency contract](134-d1r4-alpaca-v3-provisioning-concurrency.md)
 and [validation](../validation/arch134-d1r4-alpaca-v3-credential-generation.md)
-govern provisioning/witness and authentication preparation. Source acceptance is
-pending. Operational incident descriptions below retain historical `/v2`/D1R3
-facts; they grant no retry or mutable alias. D1R3 is consumed, and actual v3
-generation/provisioning/authentication are separate protected boundaries.
+govern provisioning/witness and authentication preparation.
+
+The fixed Global cooperating-writer mutex, durable mutation/provider-intent
+fences, exact witness/readback confirmation, fail-closed ambiguity/no-cleanup and
+read-only reconciliation are accepted. The authentication v1 schema and exact
+fixed SPY provider probe remain unchanged. All 14 predecessor Architecture-134
+pin dictionaries remain preserved; D1R4 is a successor overlay.
+
+Operational incident descriptions below retain historical `/v2`/D1R3 facts;
+they grant no retry or mutable alias. D1R3 is consumed. Actual v3
+generation/provisioning and the later one-shot authentication request remain
+separate protected boundaries; source acceptance grants neither effect.
 
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 

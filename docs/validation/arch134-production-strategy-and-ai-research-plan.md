@@ -1,14 +1,26 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
-## 2026-10-13 — D1R4 current source validation
+## 2026-10-13 — D1R4 current source validation ACCEPTED
 
 The [D1R4 validation plan](arch134-d1r4-alpaca-v3-credential-generation.md)
 supersedes current reader/operator assumptions with fixed `/v3`, witnessed durable
 generation, cooperating-writer exclusion and read-only ambiguity reconciliation.
 The authentication evidence schema and fixed provider probe remain unchanged.
-Exact source acceptance is pending terminal mapped ROBINHOOD CI and ChatGPT
-review. All `/v2` incident entries below remain historical; D1R3 401 is consumed.
-No real credential/provider/production operation is part of source validation.
+
+Exact source acceptance is complete at HEAD
+`c49ab6413b2713c249f1b878edd67a92ce2b6bbd` / TREE
+`e3f5d09040d6e8764c00854f7fdcd2cf987edffd`. Checkpoint Source Gates
+#525 / 38478403817 is terminal SUCCESS with canonical ROBINHOOD 96 modules,
+8,980 passed / one skipped / zero failed or errors, wall 281.659 seconds.
+All 14 predecessor pin dictionaries remain frozen and the D1R4 successor overlay
+owns the evolved current source/tests.
+
+All `/v2` incident entries below remain historical; D1R3 401 is consumed. The
+known Architecture-77 Windows cache-path condition remains a separate pre-existing
+LEGACY compatibility issue. No real credential/provider/production operation was
+part of source validation. The next sequence is zero-effect docs-descendant
+admission, one protected fresh `/v3` provisioning/witness operation, evidence
+review, then one separately bounded authentication qualification.
 
 ## 2026-10-13 — D1R3 real authentication qualification BLOCKED / HTTP 401
 

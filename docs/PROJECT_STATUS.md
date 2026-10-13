@@ -1,68 +1,89 @@
 # Project Status and Roadmap
 
-## 2026-10-12 — Architecture 137 / RCL-1 implemented, exact review pending
+## 2026-10-12 — Architecture 137 / RCL-1 SOURCE ACCEPTED
 
-Architecture 137 adds the pure in-memory canonical research artifact
-`research-strategy-candidate/v1` on
-`feature/research-candidate-lifecycle-foundation`, based on GUI-A15 docs-closeout
-HEAD `778151fe8f91632a1af66384a3ab0a85d8d65069`, TREE
-`03c50482427b04ebfc6ed061d048bb95e86edeae`. It is implementation evidence
-pending terminal repository CI and ChatGPT exact GitHub review, not source acceptance.
+Architecture 137 / RCL-1 is **SOURCE ACCEPTED** on
+`feature/research-candidate-lifecycle-foundation` at the exact executable/test source:
 
-GUI-A15 accepted executable/test source remains HEAD
-`1dd46169deb69d7a381687b6ba835af9d6c12e5a`, TREE
-`383b237aebfc553b10c7a5ef121a0191559c3f11`; dedicated GUI CI
-[38343026765](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343026765)
-and repository CI
-[38343142780](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343142780)
-are terminal SUCCESS. Earlier dated inventories remain historical provenance.
+```text
+HEAD 2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6
+TREE 9d33c980510f841f6dd254b3ff9f587ac2f43203
+BASE 778151fe8f91632a1af66384a3ab0a85d8d65069
+```
 
-The exact conceptual order is EXPERIMENTAL -> BACKTESTED -> WALK_FORWARD_PASSED
--> SHADOW -> PAPER_CANDIDATE -> AWAITING_HUMAN_PROMOTION. EXPERIMENTAL is
-pre-canonical hypothesis state. Only BACKTESTED is materialized in 137; all later
-stages remain reserved for separately reviewed evidence/policy gates. Awaiting
-human promotion means eligibility for review, without approval or promotion.
-There is no generic stage setter/advance API.
+The exact implementation delta is one commit / 17 paths. It adds the pure
+in-memory canonical `research-strategy-candidate/v1` artifact and focused tests,
+plus current inventory/documentation reconciliation. No ACTIVE production
+checkpoint, production workflow route or executable production source is added.
 
-The builder requires explicit selection from one completed exact
-HistoricalExperimentReport, revalidates its invariants and retains all report/
-row identity and rank facts. Rank is evidence: rank-1, rank-2 and unranked explicit
-selection are supported, with no automatic rank selection. Strict JSON parsing
-establishes canonical self-consistency only; independent report reconciliation
-must be invoked to verify external evidence.
+The accepted v1 materializes **BACKTESTED only**. EXPERIMENTAL is pre-canonical;
+WALK_FORWARD_PASSED, SHADOW, PAPER_CANDIDATE and AWAITING_HUMAN_PROMOTION remain
+reserved for separately reviewed evidence/policy boundaries. There is no
+set-stage/advance/promote API and no caller-settable stage/schema/candidate ID.
 
-There is no WALK_FORWARD_PASSED policy yet. Architecture 138 must separately
-freeze ResearchCandidateWalkForwardQualificationPolicy; existence of a
-walk-forward result grants no passed stage. Broad historical portfolio variants
-are not equivalent to the current production moving-average strategy. No
-research-to-production compatibility claim, production contract, approval,
-promotion or execution material is introduced. Compatibility and human promotion
-remain separate future reviewed boundaries.
+Candidate construction requires an explicitly supplied exact variant UUID from
+one completed exact HistoricalExperimentReport. Rank is retained evidence, not
+authority: rank-1, rank-2 and unranked variants are all explicitly selectable.
+No automatic rank-one selection exists. Candidate JSON proves canonical
+self-consistency only; external report evidence is independently reconciled on
+report_id, experiment_result_id, variant_id, caller_ordinal, variant_name and
+rank.
 
-Canonical current inventory is ACTIVE 62 / FULL 170 / ROBINHOOD 94 / LEGACY 215 /
-EXHAUSTIVE 385 / tests/gui 44. No ACTIVE production checkpoint is added. Current
-inventory assertions and only three directly affected retained test-file blob
-pins are reconciled; executable/native/AST pins, ACTIVE tuple/digest, historical
-publication-recovery pins and production push allowlist remain unchanged.
+Canonical JSON is strict: exact field set, duplicate/unknown/missing rejection,
+canonical UUID/source/stage/name/types, recomputed UUID5 identity and byte-for-byte
+canonical reserialization. The module is pure/in-memory and has no filesystem,
+credential, provider/network, broker, scheduler, production store/runtime,
+research execution, walk-forward execution or production-strategy conversion
+capability. It does not infer production compatibility, approval or promotion.
 
-R1 `6bf8753b0cc8950ae27b32b6858b64d454c512f0` and R2
-`2f122958366d1db282fea51abbd461b83fa893d9` remain frozen. D1 proving remains
-independent/protected; D2 is disconnected. No production SQLite, credentials,
-provider, broker, scheduler, ACL, paper, research execution, walk-forward
-execution, strategy promotion or production contract effect occurred.
-Real-money broker placement remains **NO-GO**.
+Focused local evidence passed: candidate plus directly affected report tests
+**162 passed**; profile/current-inventory plus exact R1/R2 source-authority checks
+**418 passed**; focused Ruff/format/diff checks passed. No local
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification was run.
 
-Immediate handoff: Codex completes focused checks and ordinary commit/push, then
-dispatches Checkpoint Source Gates on this exact research branch and waits for
-source-static plus four full-tests shards and terminal source-gates success
-(active-tests/certification-tests skipped). No GUI run or local broad profile is
-requested. ChatGPT then reviews the exact final GitHub HEAD/tree/diff and CI and
-owns acceptance/closeout. The next research design boundary after acceptance is
-Architecture 138; D1 remains an independent operational milestone.
+Fresh Checkpoint Source Gates
+[38346016265](https://github.com/callmedraken/ai-trading-bot/actions/runs/38346016265)
+(#510) SUCCEEDED on the exact accepted HEAD. Source-static passed all **62**
+current authorities with 83 test paths, 356 Ruff paths, PYTEST=SKIP and stable
+identity. Broad shards passed with 17/21/23/22 paths and
+88.439/84.138/91.002/59.167 seconds respectively. active-tests and
+certification-tests were correctly skipped for the unmapped dispatch route;
+terminal source-gates PASSed. Every broad shard remained below the 300-second
+hygiene limit.
 
-See `docs/architecture/137-research-candidate-lifecycle-foundation.md` and
-`docs/validation/arch137-research-candidate-lifecycle-plan.md` for the frozen
-contract, focused evidence, exact verification commands and stop conditions.
+Current inventory is ACTIVE 62 / FULL 170 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 385 / tests/gui 44. Only three directly affected retained test-file
+blob pins changed; production executable/native/AST pins, ACTIVE tuple/digest,
+historical publication-recovery pins and production push allowlist remain frozen.
+
+R1 remains `6bf8753b0cc8950ae27b32b6858b64d454c512f0`; R2 remains
+`2f122958366d1db282fea51abbd461b83fa893d9`. Architecture 137 grants no
+research-to-production compatibility, promotion, D1 or D2 authority and performed
+no protected/production effects. Real-money broker placement remains **NO-GO**.
+
+Any documentation-only descendant after this entry does not replace the accepted
+Architecture 137 executable/test identity above.
+
+Next research milestone: Architecture 138 — freeze a deterministic
+`ResearchCandidateWalkForwardQualificationPolicy` and evidence contract before
+WALK_FORWARD_PASSED can be materialized. The first D1 manual production-paper
+session remains an independent protected operational milestone.
+
+## 2026-10-12 — Architecture 137 / RCL-1 accepted checkpoint summary
+
+RCL-1 is accepted at HEAD `2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6`,
+TREE `9d33c980510f841f6dd254b3ff9f587ac2f43203`. Focused candidate/report
+verification passed 162 cases; profile/inventory plus exact R1/R2 authority
+verification passed 418 cases. Repository source-gate #510 / 38346016265 is
+terminal SUCCESS with 62/62 current authorities and all four broad shards green.
+
+Only BACKTESTED is materializable. Explicit variant selection is mandatory,
+report reconciliation is independent from JSON self-consistency, and no
+walk-forward pass, production compatibility, human approval, promotion, D1 or
+D2 authority is inferred. Current inventory is ACTIVE 62 / FULL 170 /
+ROBINHOOD 94 / LEGACY 215 / EXHAUSTIVE 385 / GUI 44. No protected or production
+effect occurred. Architecture 138 owns the future deterministic walk-forward
+qualification policy.
 
 ## 2026-10-12 — Architecture 136 / GUI-A15 SOURCE ACCEPTED
 

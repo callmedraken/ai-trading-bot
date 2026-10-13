@@ -1,7 +1,26 @@
 # Architecture 137 / RCL-1 — Research candidate validation
 
-Status: focused verification complete; repository CI and ChatGPT exact GitHub
-review are required before source acceptance.
+Status: SOURCE ACCEPTED at HEAD `2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6`, TREE `9d33c980510f841f6dd254b3ff9f587ac2f43203`.
+
+## Terminal acceptance evidence
+
+Fresh repository Checkpoint Source Gates #510 /
+[38346016265](https://github.com/callmedraken/ai-trading-bot/actions/runs/38346016265)
+completed SUCCESS on the exact accepted HEAD.
+
+- source-static: 62/62 current authorities PASS, 83 test paths, 356 Ruff paths,
+  PYTEST=SKIP, identity stable
+- shard 0: 17 paths / 88.439 s
+- shard 1: 21 paths / 84.138 s
+- shard 2: 23 paths / 91.002 s
+- shard 3: 22 paths / 59.167 s
+- active-tests: SKIPPED as expected
+- certification-tests: SKIPPED as expected
+- terminal source-gates: PASS
+
+All shard runtimes are below 300 seconds. Combined with the focused 162-case
+candidate/report verification and 418-case inventory/R1/R2 authority verification
+below, this closes the source evidence without a local broad certification run.
 
 ## Scope and prior accepted evidence
 
@@ -83,26 +102,15 @@ strategy decision tests. Production executables/native/AST pins, the ACTIVE
 tuple digest and historical publication-recovery pins remain unchanged. Exact
 R1 and R2 source-only authority tests pass on the resulting tree.
 
-## Repository CI ownership and stop conditions
+## Repository CI closeout
 
-Codex ordinary-pushes one logical implementation commit, then dispatches
-Checkpoint Source Gates itself on exactly
-`feature/research-candidate-lifecycle-foundation` and waits for terminal status.
-This branch is intentionally not registered in the production push allowlist.
-No GUI workflow is needed. No local FULL/ROBINHOOD/LEGACY/EXHAUSTIVE is run.
+The requested exact-source repository dispatch is complete and accepted as
+recorded above. No further broad rerun is required for Architecture 137.
+Architecture 138 must separately define the deterministic
+ResearchCandidateWalkForwardQualificationPolicy; existing walk-forward evidence
+alone still cannot materialize WALK_FORWARD_PASSED. Research-to-production
+compatibility remains a separate future review boundary.
 
-Require source-static SUCCESS, four full-tests shard successes with recorded
-durations, active-tests and certification-tests SKIPPED and terminal source-gates
-SUCCESS on the exact pushed HEAD/tree. CI silence is not success. A failure
-solely due to directly stale inventory/count/test-file-pin assertions permits
-at most one bounded ordinary correction cycle with the failed run preserved.
-Any other failure or scope widening requires STOP and ChatGPT review.
-
-ChatGPT performs exact final GitHub review and closeout; this document does not
-self-declare source acceptance. Architecture 138 must separately define an
-explicit deterministic ResearchCandidateWalkForwardQualificationPolicy. Existing
-walk-forward results alone never materialize WALK_FORWARD_PASSED. A future
-research-to-production compatibility decision is separate from human promotion.
 
 ## Operational effect freeze
 

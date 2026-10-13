@@ -1,6 +1,6 @@
 # Architecture 137 / RCL-1 — Research candidate lifecycle foundation
 
-Status: implemented for exact GitHub review; source acceptance belongs to ChatGPT.
+Status: SOURCE ACCEPTED at HEAD `2ade3899e2ec97aa53f9cc7af3bfdbe5bab786a6`, TREE `9d33c980510f841f6dd254b3ff9f587ac2f43203`.
 
 ## Provenance and frozen operational boundary
 
@@ -128,9 +128,9 @@ are reconciled. Only three directly affected retained test-file blob pins are
 refreshed with LF-normalized Git-blob hashing; executable/native/AST pins,
 ACTIVE tuple/digest and historical publication-recovery pins remain frozen.
 
-The research branch is intentionally outside the production push allowlist.
-After ordinary push, dispatch Checkpoint Source Gates against exactly
-`feature/research-candidate-lifecycle-foundation`. Expected route: source-static,
-four full-tests shards, active-tests/certification-tests skipped, terminal
-source-gates success. No dedicated GUI run or local broad certification is
-required by RCL-1. ChatGPT owns exact final GitHub review and acceptance/closeout.
+The research branch remains intentionally outside the production push allowlist.
+Fresh repository dispatch #510 / 38346016265 completed SUCCESS on the accepted
+HEAD: source-static passed all 62 current authorities, all four broad shards
+passed below the 300-second hygiene limit, active-tests/certification-tests were
+skipped as expected, and terminal source-gates passed. The accepted executable/
+test identity is frozen above; later docs-only descendants do not replace it.

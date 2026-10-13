@@ -26,7 +26,7 @@ D1R1 does not grant retry or same-session recovery authority. The consumed
 2026-10-13 row remains no-retry. Fresh protected D1Q qualification is the next
 operational step and must use canonical stdin-fed Python.
 
-Status: focused verification PASS; terminal CI/exact ChatGPT review pending.
+Status: SOURCE ACCEPTED; terminal mapped CI and exact ChatGPT review complete.
 
 ## 2026-10-12 — Architecture 134-D1R1 history diagnostics / review pending
 

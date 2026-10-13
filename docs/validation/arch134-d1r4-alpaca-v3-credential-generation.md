@@ -82,8 +82,11 @@ exclusive external authentication evidence rules remain intact.
 ## Historical replacement classification
 
 Current shared reader/operator names are v3/D1R4. Frozen predecessor dictionaries
-remain untouched; a nine-path current overlay owns precisely the six evolved/new
-source files and three directly affected tests/profile assertions. The existing
+remain untouched; a thirteen-path current overlay owns the six evolved/new
+source files and seven affected tests/profile assertions. This includes four
+retained current-product exact inventory assertions exposed by canonical CI;
+their expected FULL/ROBINHOOD/EXHAUSTIVE counts are updated without weakening the
+assertions. The existing
 branch maps once to `arch134-alpaca-authentication-qualification`, still
 ROBINHOOD, source-only with no runner preflight/execute hook. ACTIVE remains 63;
 inventory becomes FULL 172 / ROBINHOOD 96 / LEGACY 215 / EXHAUSTIVE 387. Required

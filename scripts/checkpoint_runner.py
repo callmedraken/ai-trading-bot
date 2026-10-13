@@ -10936,6 +10936,10 @@ ARCH134_D1R4_PATHS: Final = (
     "tests/review_paper/test_alpaca_authentication_qualification.py",
     "tests/review_paper/test_alpaca_credential_generation.py",
     "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
 )
 ARCH134_D1R4_SOURCE_PINS: Final = {
     "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
@@ -10964,6 +10968,18 @@ ARCH134_D1R4_SOURCE_PINS: Final = {
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
         "1162c2bfa9c548c77227971bcac38726ab0ad075"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "deb80454ffae2c7f579752b2728b2b9551a09a66"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "a8240b76945f2aef0de956eb2bd99cceda71595a"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "74527e1ad3d83bee153f82a628c202c3d6e48f43"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "a5eebc024445f4c4629876aaeb69fd9497be40fc"
     ),
 }  # D1R4_GENERATED_PINS
 ARCH134_D1R4_IMPORTS: Final = {
@@ -11046,6 +11062,10 @@ ARCH134_AUTH_TESTS: Final = (
     "tests/review_paper/test_armed_production_paper_session.py",
     "tests/market_data/test_alpaca_daily_snapshot.py",
     "tests/market_data/test_alpaca_http.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
     *COMMON_TESTS,
 )
 ARCH134_AUTH_RUFF_PATHS: Final = (

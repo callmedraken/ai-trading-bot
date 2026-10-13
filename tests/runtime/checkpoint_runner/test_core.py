@@ -205,6 +205,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-armed-paper-mvp",
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
+        "arch134-alpaca-authentication-qualification",
     }
     for spec in specs.values():
         assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
@@ -344,6 +345,10 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = "feature/robinhood-production-paper-history-recovery"
         if spec.name == "arch134-production-paper-runtime-acl":
             expected_branch = "feature/robinhood-production-paper-runtime-acl"
+        if spec.name == "arch134-alpaca-authentication-qualification":
+            expected_branch = (
+                "feature/robinhood-production-paper-alpaca-auth-qualification"
+            )
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -850,7 +855,11 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
         assert set(spec.ruff_paths) <= set(ruff)
     assert runner.ACTIVE_CI_CHECKPOINTS == _EXPECTED_ACTIVE_CI_CHECKPOINTS
     # Reconstruct the exact GUI-A14 parent tuple: only historical AJ is retired.
-    active = runner.ACTIVE_CI_CHECKPOINTS
+    active = tuple(
+        name
+        for name in runner.ACTIVE_CI_CHECKPOINTS
+        if name != runner.ARCH134_AUTH_NAME
+    )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
     assert len(parent) == 63 and len(active) == 62
     parent_value = ast.parse(repr(parent), mode="eval").body
@@ -1303,6 +1312,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                "arch134-alpaca-authentication-qualification",
             }
             else (
                 *runner.COMMON_TESTS,

@@ -76,6 +76,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 "tests/review_paper/test_current_production_strategy_decision.py",
                 "tests/review_paper/test_strategy_market_history.py",
                 "tests/review_paper/test_history_qualification.py",
+                "tests/review_paper/test_alpaca_authentication_qualification.py",
                 "tests/review_paper/test_armed_production_paper_session.py",
                 "tests/review_paper/test_production_paper_runtime.py",
                 "tests/review_paper/test_production_paper_runtime_acl.py",
@@ -83,7 +84,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
             )
         )
     )
-    assert len(selected) == 94
+    assert len(selected) == 95
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -149,6 +150,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/review_paper/test_current_production_strategy_decision.py",
                 "tests/review_paper/test_strategy_market_history.py",
                 "tests/review_paper/test_history_qualification.py",
+                "tests/review_paper/test_alpaca_authentication_qualification.py",
                 "tests/review_paper/test_armed_production_paper_session.py",
                 "tests/review_paper/test_production_paper_runtime.py",
                 "tests/review_paper/test_production_paper_runtime_acl.py",
@@ -169,10 +171,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 170,
-        "robinhood": 94,
+        "full": 171,
+        "robinhood": 95,
         "legacy": 215,
-        "exhaustive": 385,
+        "exhaustive": 386,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

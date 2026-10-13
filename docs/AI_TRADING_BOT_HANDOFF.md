@@ -1,5 +1,42 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-13 — D1R3 authentication qualification source checkpoint
+
+Architecture 134-D1R3 is implemented on
+`feature/robinhood-production-paper-alpaca-auth-qualification`, based exactly on
+`d595450daa029f37e2f69bbb6b20263dc7e0e987` /
+`4822a6723b10fd223a138df580aa7a3daf2ee5bc`. It awaits terminal mapped source CI
+and ChatGPT exact-source acceptance; implementation is not production readiness
+or authorization to perform a real credential/provider read.
+
+The separate noninteractive qualification reads only the existing fixed Alpaca
+Windows credential pair and attempts at most one accepted historical-bars HTTPS
+request: SPY, completed XNYS session 2026-10-07, daily, SIP, raw, USD. PASS requires
+HTTP 200, accepted bounded response metadata/body, existing strict JSON parsing,
+exact SPY/session data and final unchanged live-origin source admission. A 401,
+403, other HTTP rejection, transport/response failure or source drift is BLOCKED.
+The canonical `alpaca-authentication-qualification/v1` file contains only closed
+nonsecret facts and fixed request semantics, and is reserved exclusively before
+credentials/provider access, flushed/fsynced and never overwritten.
+
+The consumed October-13 D1R2 row remains permanently BLOCKED/count one, with
+operation `8e8c5102-8b52-5534-8288-b3261f65b2d4`, successor contract
+`93091b0e-a1a6-52fd-930f-f88eb2009c05`, one HTTP-401 history read and zero trading
+effects. Its accepted source remains `114608d220ab6653fcb48fc0002b6ae9497f90c9` /
+`b57cecd27865bda88ec104748fef55c0dcb54f34`; no session code, recovery eligibility
+or operational evidence is changed. D1R3 has zero production SQLite, reservation,
+recovery, strategy, Robinhood, PREPARE, EXECUTE, paper, broker, scheduler or ACL
+effects. It cannot launch D1; D2 remains disconnected and live remains NO-GO.
+
+The dedicated source-only runner checkpoint
+`arch134-alpaca-authentication-qualification` maps this branch to GitHub-owned
+ROBINHOOD certification. Existing reviewed `feature/robinhood-*` first-push
+admission already covers the branch. No duplicate local broad certification is
+needed. Next owner: ChatGPT exact GitHub source/CI review, then separately scoped
+fresh authorization for one real qualification. A later operator milestone must
+consume an exact-source PASS before a fresh future session; that coupling is
+outside D1R3. See the [D1R3 authority and validation contract](validation/arch134-d1r3-alpaca-authentication-qualification.md).
+
 ## 2026-10-13 — D1R2 real recovery consumed; Alpaca authentication blocked
 
 The separately authorized Architecture 134-D1R2 real recovery was executed once

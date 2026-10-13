@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "06a3101a319f6b268404deb67299d87d484fd238212131074c5f86cfea9a6440"
+    "048463be854c93fc20872e025181ab25c333b172433ca4ecc7079135b4f91ede"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -196,6 +196,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-alpaca-authentication-qualification",
     "arch134-armed-paper-mvp",
     "arch134-production-strategy-contract",
     "arch134-production-strategy-decision",
@@ -208,6 +209,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-alpaca-authentication-qualification": "robinhood",
     "arch134-armed-paper-mvp": "robinhood",
     "arch134-production-paper-runtime": "robinhood",
     "arch134-production-paper-runtime-acl": "robinhood",
@@ -10800,7 +10802,8 @@ def _arch134_production_paper_runtime_authority_check(
             pin,
         ) in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            expected_pin = ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
+            if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
                 continue
@@ -10843,6 +10846,175 @@ def _arch134_production_paper_runtime_authority_check(
             failures.append("134-D1Q registration authority drift")
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         failures.append("134-D1Q authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_AUTH_NAME: Final = "arch134-alpaca-authentication-qualification"
+ARCH134_AUTH_BRANCH: Final = (
+    "feature/robinhood-production-paper-alpaca-auth-qualification"
+)
+ARCH134_AUTH_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "171101537f96271988c35683ed22ba85a1b37661"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "f7d23b2edc2292f980970ca4deea8ce6d942925d"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "ac40ce84d910bbe93986490acaecac66c43f7dfb"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "4793e8935fa5af1c60e1bf0dfdc186956c330058"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "d3c4965c51d6ca79070af5e7319768af5d75122b"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "d495b90c6d47da6959fa539cd1f3504a4989e631"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a44e5181f33c2d52c11726477b3240da94c3ff6e"
+    ),
+}
+ARCH134_AUTH_TEST_PIN_OVERRIDES: Final = {
+    relative: ARCH134_AUTH_SOURCE_PINS[relative]
+    for relative in (
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/helpers.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+}
+ARCH134_AUTH_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data.alpaca_daily_snapshot",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.market_data.daily_snapshot_models",
+        "trading_bot.market_data.daily_snapshot_provider",
+        "trading_bot.market_data.exceptions",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "uuid",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "__future__",
+        "argparse",
+        "os",
+        "pathlib",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_authentication_qualification",
+    ),
+}
+ARCH134_AUTH_TESTS: Final = (
+    "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/market_data/test_alpaca_daily_snapshot.py",
+    "tests/market_data/test_alpaca_http.py",
+    *COMMON_TESTS,
+)
+ARCH134_AUTH_RUFF_PATHS: Final = (
+    *ARCH134_AUTH_SOURCE_PINS,
+    *ARCH134_AUTH_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """D1R3 read-only source closure; real qualification is never a CI gate."""
+    failures = list(_arch134_production_paper_runtime_authority_check(repo_root))
+    forbidden = {
+        "sqlite3",
+        "ReviewPaperStore",
+        "ArmedSessionStore",
+        "run_armed_production_paper_session",
+        "run",
+        "Popen",
+        "environ",
+        "getenv",
+        "CredWriteW",
+        "CredDeleteW",
+        "chmod",
+        "chown",
+        "icacls",
+        "schtasks",
+        "register_task",
+        "evaluate",
+        "prepare",
+        "place_equity_order",
+        "execute_paper",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+    }
+    try:
+        for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R3 source drift: " + relative)
+        for relative, allowed in ARCH134_AUTH_IMPORTS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(allowed):
+                failures.append("134-D1R3 import closure drift: " + relative)
+            names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | {
+                n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
+            }
+            # The host alone needs the fixed argument-array Git admission helper.
+            disallowed = forbidden - (
+                {"run"} if relative.endswith("_host.py") else set()
+            )
+            if names & disallowed:
+                failures.append("134-D1R3 forbidden authority: " + relative)
+            if relative.endswith("_qualification.py"):
+                calls = [
+                    n
+                    for n in ast.walk(tree)
+                    if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == "execute"
+                ]
+                if len(calls) != 1:
+                    failures.append("134-D1R3 provider call budget drift")
+        spec = _checkpoint_specs()[ARCH134_AUTH_NAME]
+        if (
+            spec.remote_branch != ARCH134_AUTH_BRANCH
+            or spec.tests != ARCH134_AUTH_TESTS
+            or spec.ruff_paths != ARCH134_AUTH_RUFF_PATHS
+            or spec.authority_check is not _arch134_authentication_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_AUTH_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_AUTH_NAME) != "robinhood"
+        ):
+            failures.append("134-D1R3 source-only registration drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("134-D1R3 workflow drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1R3 authority unavailable")
     return tuple(failures)
 
 
@@ -11422,6 +11594,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_AUTH_NAME: CheckpointSpec(
+            name=ARCH134_AUTH_NAME,
+            description="Architecture 134-D1R3 Alpaca authentication source only",
+            tests=ARCH134_AUTH_TESTS,
+            ruff_paths=ARCH134_AUTH_RUFF_PATHS,
+            authority_check=_arch134_authentication_authority_check,
+            remote_branch=ARCH134_AUTH_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_RUNTIME_ACL_NAME: CheckpointSpec(
             name=ARCH134_RUNTIME_ACL_NAME,
             description=(

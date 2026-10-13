@@ -1,14 +1,38 @@
 # Architecture 134-D1R3 â€” Alpaca authentication qualification
 
-Status: implemented source checkpoint; ChatGPT acceptance and fresh protected
-qualification authorization remain required. Base HEAD
-`d595450daa029f37e2f69bbb6b20263dc7e0e987`, TREE
-`4822a6723b10fd223a138df580aa7a3daf2ee5bc`; base source CI #518 / 38454451965
-SUCCESS. Branch `feature/robinhood-production-paper-alpaca-auth-qualification`;
-worktree `F:\AI\worktrees\ai-trading-bot-production-paper-alpaca-auth-qualification`.
-The one implementation commit's exact HEAD/TREE and terminal source CI are supplied
-in the implementation handoff; no self-referential Git identity is fabricated.
+Status: **SOURCE ACCEPTED** at HEAD `2a106c10178efa38eb7a24c7d97866201e0d2b76` / TREE `03be6ef612542f204b4d5d80924473b5274aa25d`; Checkpoint Source Gates #520 / 38462482959 attempt 2 SUCCESS. Real qualification remains separately protected and unexecuted.
 
+## Acceptance evidence
+
+Exact accepted source is the two-commit descendant of the D1R2 operational closeout:
+implementation `0cfd621ab3d91c349df4394e5d757d98d25f5ba1` /
+`f24fd9321a71ce982f05c4b7bd883c47f6fbd47a`, then correction
+`2a106c10178efa38eb7a24c7d97866201e0d2b76` /
+`03be6ef612542f204b4d5d80924473b5274aa25d`. The correction changes no D1R3
+production module and no D1/D1R2 executable source.
+
+The corrected controlled stale-CAS tests prove either caller can be the sole real
+exact-byte CAS winner while the other stale CAS rejects before history publication;
+exactly one reacquisition/evaluation occurs and downstream trading effects remain
+zero. A separate real disposable SQLite `BEGIN EXCLUSIVE` test deterministically
+proves `SQLITE_BUSY` blocks without consuming predecessor bytes or calling the
+provider. The narrow correction pin covers only the directly changed retained
+armed-session test blob `4e06e2d922f6ca784681cffe8ccda6b4806bc14f`; initial D1R3 and all frozen
+accepted predecessor dictionaries remain unchanged.
+
+CI #520 attempt 1 executed the exact final source with 8,899 passed, one optional
+SDK skip and zero failures/errors, but failed the hygiene gate because canonical
+wall time was 331.725 seconds. The single certification retry used the unchanged
+HEAD/tree and is accepted as an infrastructure/performance retry, not a semantic
+retry. Attempt 2 is terminal SUCCESS: 8,899 passed / one skipped / zero
+failures/errors, wall 255.502 seconds. Artifact 11848066370 records 95 ROBINHOOD
+modules, exact source identity before/after tests and successful repository-wide
+git-diff/Ruff check/Ruff format checks. source-static, active-tests and terminal
+source-gates are SUCCESS; full-tests are intentionally skipped.
+
+All implementation/correction/CI operational effect counts remain zero. Source
+acceptance grants no real credential/provider operation. The next boundary is one
+fresh explicitly authorized real D1R3 authentication qualification.
 ## Purpose and frozen incident
 
 D1Q established storage/readability, whereas the separately authorized D1R2

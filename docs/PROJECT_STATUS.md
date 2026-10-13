@@ -1,41 +1,99 @@
 # Project Status and Roadmap
 
-## 2026-10-13 — D1R3 authentication qualification source checkpoint
+## 2026-10-13 — Architecture 134-D1R3 SOURCE ACCEPTED
 
-Architecture 134-D1R3 is implemented on
-`feature/robinhood-production-paper-alpaca-auth-qualification`, based exactly on
-`d595450daa029f37e2f69bbb6b20263dc7e0e987` /
-`4822a6723b10fd223a138df580aa7a3daf2ee5bc`. It awaits terminal mapped source CI
-and ChatGPT exact-source acceptance; implementation is not production readiness
-or authorization to perform a real credential/provider read.
+Architecture 134-D1R3 — bounded Alpaca authentication-validity qualification —
+is **SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-alpaca-auth-qualification`.
 
-The separate noninteractive qualification reads only the existing fixed Alpaca
-Windows credential pair and attempts at most one accepted historical-bars HTTPS
-request: SPY, completed XNYS session 2026-10-07, daily, SIP, raw, USD. PASS requires
-HTTP 200, accepted bounded response metadata/body, existing strict JSON parsing,
-exact SPY/session data and final unchanged live-origin source admission. A 401,
-403, other HTTP rejection, transport/response failure or source drift is BLOCKED.
-The canonical `alpaca-authentication-qualification/v1` file contains only closed
-nonsecret facts and fixed request semantics, and is reserved exclusively before
-credentials/provider access, flushed/fsynced and never overwritten.
+Exact source history:
 
-The consumed October-13 D1R2 row remains permanently BLOCKED/count one, with
-operation `8e8c5102-8b52-5534-8288-b3261f65b2d4`, successor contract
-`93091b0e-a1a6-52fd-930f-f88eb2009c05`, one HTTP-401 history read and zero trading
-effects. Its accepted source remains `114608d220ab6653fcb48fc0002b6ae9497f90c9` /
-`b57cecd27865bda88ec104748fef55c0dcb54f34`; no session code, recovery eligibility
-or operational evidence is changed. D1R3 has zero production SQLite, reservation,
-recovery, strategy, Robinhood, PREPARE, EXECUTE, paper, broker, scheduler or ACL
-effects. It cannot launch D1; D2 remains disconnected and live remains NO-GO.
+```text
+BASE HEAD        d595450daa029f37e2f69bbb6b20263dc7e0e987
+BASE TREE        4822a6723b10fd223a138df580aa7a3daf2ee5bc
 
-The dedicated source-only runner checkpoint
-`arch134-alpaca-authentication-qualification` maps this branch to GitHub-owned
-ROBINHOOD certification. Existing reviewed `feature/robinhood-*` first-push
-admission already covers the branch. No duplicate local broad certification is
-needed. Next owner: ChatGPT exact GitHub source/CI review, then separately scoped
-fresh authorization for one real qualification. A later operator milestone must
-consume an exact-source PASS before a fresh future session; that coupling is
-outside D1R3. See the [D1R3 authority and validation contract](validation/arch134-d1r3-alpaca-authentication-qualification.md).
+IMPLEMENTATION
+HEAD             0cfd621ab3d91c349df4394e5d757d98d25f5ba1
+TREE             f24fd9321a71ce982f05c4b7bd883c47f6fbd47a
+
+ACCEPTED FINAL
+HEAD             2a106c10178efa38eb7a24c7d97866201e0d2b76
+TREE             03be6ef612542f204b4d5d80924473b5274aa25d
+
+CI               #520 / 38462482959 / attempt 2 / SUCCESS
+CERT ARTIFACT    11848066370
+```
+
+The original implementation is one ordinary commit / 14 paths. It adds the
+separate noninteractive D1R3 host and strict
+`alpaca-authentication-qualification/v1` evidence contract without changing the
+accepted D1/D1R1/D1R2 production session, CAS, recovery, strategy, paper or
+broker source. The exact fixed probe reuses the accepted Alpaca historical-bars
+transport/request/parser for SPY on completed XNYS session 2026-10-07. Successful
+pair readiness reads only the two fixed Windows Credential Manager records and
+permits at most one HTTPS request; there is no retry, environment/config secret
+fallback, D1 launch or session reservation.
+
+The exact correction commit
+`2a106c10178efa38eb7a24c7d97866201e0d2b76` /
+`03be6ef612542f204b4d5d80924473b5274aa25d`, subject
+`test: reconcile D1R3 source topology and recovery concurrency`, changes only
+the D1R3 validation document, source-authority runner metadata and retained tests.
+It changes no D1R3 production module and no frozen D1/D1R2 executable source.
+
+The retained D1R2 stale-CAS test was corrected to distinguish two independent
+facts that the previous uncontrolled contention test conflated. A controlled
+two-caller stale-read test barriers identical predecessor bytes, deterministically
+orders either caller's real exact-byte CAS first, requires the other stale UPDATE
+to reject, and proves exactly one history reacquisition/strategy evaluation with
+zero PREPARE/EXECUTE/paper/broker effects. A separate disposable
+`BEGIN EXCLUSIVE` test deterministically produces `SQLITE_BUSY` and proves BUSY
+returns BLOCKED without consuming predecessor bytes or issuing a provider request.
+No production timeout, wait, mutex, retry or CAS behavior changed.
+
+The ten retained topology assertions remain exact: ACTIVE is 63 checkpoints, the
+new D1R3 checkpoint is exactly position -7 before the retained Architecture-134
+six-checkpoint suffix, and historical exact predecessor pairs shift explicitly.
+No tuple assertion was weakened to subset/membership-only semantics. Canonical
+inventory is FULL 171 / ROBINHOOD 95 / LEGACY 215 / EXHAUSTIVE 386. Initial D1R3
+source/test pins remain frozen. The correction adds exactly one narrow correction
+test pin, for
+`tests/review_paper/test_armed_production_paper_session.py`, whose committed Git
+blob is `4e06e2d922f6ca784681cffe8ccda6b4806bc14f`.
+
+Checkpoint Source Gates #520 first certification attempt was not a semantic test
+failure: on the exact accepted source it produced 8,899 passed / 1 optional SDK
+skip / 0 failed / 0 errors, but the canonical wall was 331.725 seconds and
+therefore failed only the <300-second hygiene gate. The single certification
+retry used the unchanged exact HEAD/tree. Attempt 2 passed 8,900 cases total:
+8,899 passed / 1 optional SDK skip / 0 failed / 0 errors, with lane counts
+5,248 and 3,651+1 skip and canonical wall 255.502 seconds. Successful artifact
+11848066370 independently records exact source before/after tests, 95 selected
+ROBINHOOD modules, git diff/Ruff check/Ruff format exit 0 and stable source
+identity. source-static and active-tests were already successful; terminal
+source-gates then passed and full-tests remained skipped as intended.
+
+The accepted D1R3 artifact is strictly nonsecret and fail-closed. PASS requires
+fixed credential-pair readiness, exactly one request, HTTP 200, accepted bounded
+response metadata/body, strict existing Alpaca JSON parsing, exact SPY/session
+probe compatibility and final unchanged source readmission. 401/403/429/5xx,
+transport failure, incompatible 200 response or source drift are BLOCKED and
+never retry. Parsing/canonical evidence contains no credential, auth header,
+response body, provider request ID or provider free text.
+
+Implementation, correction, tests and CI performed zero real operational effects:
+no Windows Alpaca credential reads, no Alpaca HTTPS request, no production SQLite
+read/write, no reservation/recovery, no strategy evaluation, no Robinhood call,
+no PREPARE/EXECUTE, no paper/broker/scheduler/ACL effect and no D1/D2 invocation.
+The consumed October-13 D1R2 row remains untouched and HTTP 401 remains
+non-recovery-eligible.
+
+**Next protected boundary:** one separately reviewed real D1R3 authentication
+qualification against this exact accepted source. Source acceptance alone grants
+no credential/provider read. A PASS means only
+`REMOTE_ALPACA_AUTH_READY` for the exact fixed probe at the observation time; it
+does not reserve a session, launch D1, authorize paper execution, connect D2 or
+grant live trading.
 
 ## 2026-10-13 — D1R2 real recovery consumed; Alpaca authentication blocked
 

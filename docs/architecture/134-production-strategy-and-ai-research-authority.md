@@ -1,5 +1,69 @@
 # Architecture 134 — Production strategy and AI-research authority
 
+## 2026-10-12 — Architecture 137 / RCL-1 implemented, exact review pending
+
+Architecture 137 adds the pure in-memory canonical research artifact
+`research-strategy-candidate/v1` on
+`feature/research-candidate-lifecycle-foundation`, based on GUI-A15 docs-closeout
+HEAD `778151fe8f91632a1af66384a3ab0a85d8d65069`, TREE
+`03c50482427b04ebfc6ed061d048bb95e86edeae`. It is implementation evidence
+pending terminal repository CI and ChatGPT exact GitHub review, not source acceptance.
+
+GUI-A15 accepted executable/test source remains HEAD
+`1dd46169deb69d7a381687b6ba835af9d6c12e5a`, TREE
+`383b237aebfc553b10c7a5ef121a0191559c3f11`; dedicated GUI CI
+[38343026765](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343026765)
+and repository CI
+[38343142780](https://github.com/callmedraken/ai-trading-bot/actions/runs/38343142780)
+are terminal SUCCESS. Earlier dated inventories remain historical provenance.
+
+The exact conceptual order is EXPERIMENTAL -> BACKTESTED -> WALK_FORWARD_PASSED
+-> SHADOW -> PAPER_CANDIDATE -> AWAITING_HUMAN_PROMOTION. EXPERIMENTAL is
+pre-canonical hypothesis state. Only BACKTESTED is materialized in 137; all later
+stages remain reserved for separately reviewed evidence/policy gates. Awaiting
+human promotion means eligibility for review, without approval or promotion.
+There is no generic stage setter/advance API.
+
+The builder requires explicit selection from one completed exact
+HistoricalExperimentReport, revalidates its invariants and retains all report/
+row identity and rank facts. Rank is evidence: rank-1, rank-2 and unranked explicit
+selection are supported, with no automatic rank selection. Strict JSON parsing
+establishes canonical self-consistency only; independent report reconciliation
+must be invoked to verify external evidence.
+
+There is no WALK_FORWARD_PASSED policy yet. Architecture 138 must separately
+freeze ResearchCandidateWalkForwardQualificationPolicy; existence of a
+walk-forward result grants no passed stage. Broad historical portfolio variants
+are not equivalent to the current production moving-average strategy. No
+research-to-production compatibility claim, production contract, approval,
+promotion or execution material is introduced. Compatibility and human promotion
+remain separate future reviewed boundaries.
+
+Canonical current inventory is ACTIVE 62 / FULL 170 / ROBINHOOD 94 / LEGACY 215 /
+EXHAUSTIVE 385 / tests/gui 44. No ACTIVE production checkpoint is added. Current
+inventory assertions and only three directly affected retained test-file blob
+pins are reconciled; executable/native/AST pins, ACTIVE tuple/digest, historical
+publication-recovery pins and production push allowlist remain unchanged.
+
+R1 `6bf8753b0cc8950ae27b32b6858b64d454c512f0` and R2
+`2f122958366d1db282fea51abbd461b83fa893d9` remain frozen. D1 proving remains
+independent/protected; D2 is disconnected. No production SQLite, credentials,
+provider, broker, scheduler, ACL, paper, research execution, walk-forward
+execution, strategy promotion or production contract effect occurred.
+Real-money broker placement remains **NO-GO**.
+
+Immediate handoff: Codex completes focused checks and ordinary commit/push, then
+dispatches Checkpoint Source Gates on this exact research branch and waits for
+source-static plus four full-tests shards and terminal source-gates success
+(active-tests/certification-tests skipped). No GUI run or local broad profile is
+requested. ChatGPT then reviews the exact final GitHub HEAD/tree/diff and CI and
+owns acceptance/closeout. The next research design boundary after acceptance is
+Architecture 138; D1 remains an independent operational milestone.
+
+See `docs/architecture/137-research-candidate-lifecycle-foundation.md` and
+`docs/validation/arch137-research-candidate-lifecycle-plan.md` for the frozen
+contract, focused evidence, exact verification commands and stop conditions.
+
 ## 2026-10-12 — Current D1Q-R2 operational state / GUI-A14 checkpoint
 
 This current entry supersedes pending/failed R2 wording in the dated historical

@@ -126,6 +126,18 @@ from trading_bot.experiments.report import (
     HistoricalExperimentReportVariant,
     HistoricalExperimentReportVariantSource,
 )
+from trading_bot.experiments.research_candidate import (
+    MAX_RESEARCH_CANDIDATE_NAME_LENGTH,
+    MAX_RESEARCH_CANDIDATE_ORDINAL,
+    MAX_RESEARCH_CANDIDATE_RANK,
+    RESEARCH_CANDIDATE_IDENTITY_VERSION,
+    RESEARCH_CANDIDATE_SCHEMA,
+    ResearchCandidateError,
+    ResearchCandidateStage,
+    ResearchStrategyCandidate,
+    build_backtested_research_candidate,
+    verify_research_candidate_against_report,
+)
 from trading_bot.experiments.walk_forward import (
     HistoricalExperimentWalkForwardFold,
     HistoricalExperimentWalkForwardFoldResult,
@@ -171,6 +183,16 @@ from trading_bot.experiments.walk_forward_stability import (
 )
 
 __all__ = [
+    "MAX_RESEARCH_CANDIDATE_NAME_LENGTH",
+    "MAX_RESEARCH_CANDIDATE_ORDINAL",
+    "MAX_RESEARCH_CANDIDATE_RANK",
+    "RESEARCH_CANDIDATE_IDENTITY_VERSION",
+    "RESEARCH_CANDIDATE_SCHEMA",
+    "ResearchCandidateError",
+    "ResearchCandidateStage",
+    "ResearchStrategyCandidate",
+    "build_backtested_research_candidate",
+    "verify_research_candidate_against_report",
     "HistoricalExperimentBootstrapPosition",
     "HistoricalExperimentComparator",
     "HistoricalExperimentComparisonError",

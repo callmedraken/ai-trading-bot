@@ -56,12 +56,22 @@ HEAD  f156953b373aafbf80b6984752f65f3dc42caea1
 TREE  40fcf475584b2145dc3b99f6af3a75273f21d84d
 ```
 
-The exact current operational branch HEAD/TREE must be re-proven from local
-Git and origin at every protected source admission. This closeout does not
-predict the final tip created by its own documentation commit.
+The HIST-2 operational integration executable/test source is accepted at:
 
-HIST-2B integration changes documentation, history, and archive tooling only.
-It grants no trading or provider authority.
+```text
+HEAD  cb1971eaf22eb27690bf60a24d72b5db50c67c34
+TREE  a39db98bec8a1096b8ee2cea6212bd0090953101
+CI    #549 / 38522621732 / SUCCESS
+```
+
+The exact current operational branch HEAD/TREE must still be re-proven from
+local Git and origin at every protected source admission; the accepted identity
+above is the source-gated integration checkpoint, not permission to infer a
+later docs-only tip.
+
+HIST-2B integration changes documentation, history, archive tooling, and the
+certification inventory needed to own the new archive test. It grants no trading
+or provider authority.
 
 ## Exact D1R4 state
 
@@ -174,16 +184,24 @@ its authority boundaries:
   state is historical and superseded.
 - The D1R4 local `/v3` pair was accepted only as local exact provisioning. The
   next provider boundary remains separately protected as described above.
+- Checkpoint Source Gates #549 accepted the integrated operational source:
+  static authority passed; active tests passed; canonical ROBINHOOD certification
+  passed 9,065 / 9,066 cases with one skip and zero failures/errors in
+  200.417 seconds. Artifact `11875285428` has SHA-256
+  `02c29f3debd0cf274e85986ab5bd74ebbfc7b9ce9ec234e04fd9d3ad93240b2e`.
+  HIST-2 adds one FULL-only archive-tool test, so current inventory is FULL 174,
+  ROBINHOOD 97, LEGACY 215, EXHAUSTIVE 389; frozen predecessor authority pins
+  remain preserved through the reviewed HIST-2 test-pin overlay.
 
 ## Immediate next step
 
-The immediate safe source step is to review this tiny integration closeout,
-commit it on the operational branch, push once, and require the exact
-operational GitHub source gate to reach terminal success. Re-establish the
-exact current operational branch HEAD/TREE from Git and origin, and
-authentication readiness, before any provider request. Stop before that
-request unless every fixed source, mutex, witness, journal, and provider-intent
-condition is proven.
+The history integration and its source-gate repair are accepted. The immediate
+safe operational step is a separately reviewed, zero-provider authentication
+readiness check after synchronizing the local operational worktree to origin.
+It must re-prove exact source identity and the preserved generation evidence
+without entering Credential Manager or issuing an Alpaca request. Stop before
+the protected authentication invocation unless every fixed source, mutex,
+witness, journal, evidence-destination, and provider-intent condition is proven.
 
 ## Historical reconstruction
 

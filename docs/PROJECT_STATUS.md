@@ -32,10 +32,18 @@ HEAD  a2d4e4aca8e31fa9c72b4e21372c4d97f45b74fa
 TREE  2d29744b4d116c9567fe8a5894f5adaece4578cf
 ```
 
-That baseline is not the current operational branch tip. At every protected
-source admission, exact current operational branch HEAD/TREE must be re-proven
-from local Git and origin; this closeout does not predict the final tip created
-by its own documentation commit.
+That baseline is not the current operational branch tip. The accepted HIST-2
+operational integration executable/test source is:
+
+```text
+HEAD  cb1971eaf22eb27690bf60a24d72b5db50c67c34
+TREE  a39db98bec8a1096b8ee2cea6212bd0090953101
+CI    #549 / 38522621732 / SUCCESS
+```
+
+At every protected source admission, exact current operational branch HEAD/TREE
+must still be re-proven from local Git and origin; the accepted identity above
+does not predict a later docs-only tip.
 
 ## Operational checkpoint
 
@@ -121,10 +129,16 @@ PROTECTED only at the exact separately reviewed effect boundary
 ```
 
 Mapped certification remains CI-owned; local repetition of the same valid
-profile is not routine. FULL covers currently supported functionality, while
-LEGACY/EXHAUSTIVE retain explicit historical compatibility. This documentation
-cutover does not select or run a product certification and does not grant any
-protected authority. See the [tiered certification profile](architecture/132-tiered-certification-profiles.md)
+profile is not routine. Checkpoint Source Gates #549 accepted the integrated
+operational source: static authority and active tests passed, and canonical
+ROBINHOOD certification passed 9,065 / 9,066 cases with one skip and zero
+failures/errors in 200.417 seconds. Artifact `11875285428` has SHA-256
+`02c29f3debd0cf274e85986ab5bd74ebbfc7b9ce9ec234e04fd9d3ad93240b2e`.
+Current inventory is FULL 174 / ROBINHOOD 97 / LEGACY 215 / EXHAUSTIVE 389;
+the HIST-2 archive-tool test is FULL-only. FULL covers currently supported
+functionality, while LEGACY/EXHAUSTIVE retain explicit historical
+compatibility. This acceptance grants no protected authority. See the
+[tiered certification profile](architecture/132-tiered-certification-profiles.md)
 and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ## Roadmap
@@ -133,12 +147,12 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 - Keep the bounded status and handoff aligned with the exact operational D1R4
   state.
-- Review this tiny HIST-2B integration closeout.
-- Commit it on the operational branch, push once, and require the exact
-  operational GitHub source gate to reach terminal success.
-- Re-prove exact current operational branch HEAD/TREE from Git and origin and
-  authentication readiness before any provider request.
 - Keep the immutable HIST-2B snapshot unchanged.
+- Synchronize the local operational worktree to origin.
+- Run only a separately reviewed zero-provider authentication-readiness check:
+  re-prove exact source identity and preserved generation evidence without
+  entering Credential Manager or issuing an Alpaca request.
+- Stop for review before the one-shot protected authentication invocation.
 
 ### Next
 

@@ -1,5 +1,52 @@
 # Project Status and Roadmap
 
+## 2026-10-13 — D1R4 real /v3 provisioning consumed; authentication STOPPED on input-shape anomaly
+
+The separately protected D1R4 local provisioning operation was executed once
+against exact docs-descendant source HEAD
+`41351ade6a2434adc26b9389106339e034b53a06`, TREE
+`6a6e6528c7e0bfb43835f70c620276f960f723ee`. The reviewed host returned
+`LOCAL_EXACT_MATCH` with exit 0 and published the canonical external generation
+journal:
+
+```text
+F:\AI\temp\qualification\arch134-d1r4-v3-generation-77f1e13347fb4559b07523d30c4a7fb5.json
+SHA256 217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193
+BYTES  4865
+```
+
+The journal is complete and canonical through sequence 9:
+`PROVISIONING_RESERVED`, `LOCK_ACQUIRED`, `EXPECTED_GENERATION`,
+`INITIAL_STATE_ACCEPTED`, key write intent/confirmation, secret write
+intent/confirmation, `PAIR_CONFIRMED`, then
+`FINAL / LOCAL_EXACT_MATCH`. It contains no
+`V3_PROVIDER_EFFECT_INTENT`, no ambiguity classification, no cleanup event and
+no abandoned-owner classification. No Alpaca HTTPS request, D1 invocation or D2
+invocation occurred.
+
+However, the nonsecret witness metadata records `utf8_length=1` for both the
+API-key role and secret-key role. The accepted source currently admits any
+non-empty bounded UTF-8 credential satisfying its whitespace/control-character
+rules, so this one-byte pair can pass local exact readback. That is not accepted
+as proof of the intended full dashboard credential pair. **Remote authentication
+must not run from this generation.**
+
+The provisioning operation is consumed and MUST NOT be rerun. The current
+`/v3` records now exist, so ordinary fresh provisioning would correctly block
+on existing state. Manual overwrite/delete and out-of-band Credential Manager
+repair remain unauthorized. Because no `V3_PROVIDER_EFFECT_INTENT` exists and
+no provider request occurred, the `/v3` staging window is not yet permanently
+closed by provider use.
+
+Next safe milestone: a source-only, separately reviewed D1R4 recovery checkpoint
+for pre-provider exact-pair staging reset. It must bind the preserved journal and
+digest, acquire the same fixed mutex, independently reproduce the exact current
+witnesses/lengths, durably fence each delete before `CredDeleteW`, verify exact
+absence, make zero provider requests, and stop on any mismatch or delete
+ambiguity. After that source is accepted and one protected cleanup succeeds, a
+fresh generation can be separately provisioned. Authentication remains blocked
+until a new generation is accepted.
+
 ## 2026-10-13 — Architecture 134-D1R4 SOURCE ACCEPTED
 
 Architecture 134-D1R4 is **SOURCE ACCEPTED** at executable/test HEAD

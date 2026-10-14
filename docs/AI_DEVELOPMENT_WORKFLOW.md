@@ -131,13 +131,16 @@ more detail.
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. Read the current Git-tracked
-`docs/AI_TRADING_BOT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `AGENTS.md`, the
-relevant architecture/validation documents, and the available Trading Bot
-project conversation history. Verify the active remote branch/HEAD, recent
-commits/diff and CI through GitHub when material. Git-tracked canonical docs
-outrank uploaded mirrors or older chat summaries unless the conversation clearly
-records a newer intentional change that has not yet been committed.
+state before recommending or authorizing work. Read, in order,
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
+relevant current architecture/validation document. Then read
+`docs/history/INDEX.md` or an immutable legacy snapshot only when older
+provenance, incident reconstruction, predecessor semantics, or disputed
+historical evidence is actually necessary. Verify the active remote branch/HEAD,
+recent commits/diff and CI through GitHub when material. Git-tracked canonical
+docs outrank uploaded mirrors or older chat summaries unless the conversation
+clearly records a newer intentional change that has not yet been committed.
 
 Do not ask the user to paste GitHub diffs/comments, prior Trading Bot chats,
 repository files, or other project material when the available project/GitHub
@@ -711,14 +714,14 @@ retrieval tools can obtain them.
 
 #### 7. Docs-only closeout preserves accepted test evidence
 
-Keep a docs-only closeout strictly under `docs/**` so the existing classifier
-uses its cheap validation path. Do not modify `AGENTS.md` merely to mirror
-these details and thereby trigger a redundant non-docs test run. It was reviewed
-for this closeout and remains compatible: it already forbids repeatedly
-rerunning expensive full suites and delegates detailed certification behavior
-to Architecture 132/workflow docs. A future naturally necessary non-docs
-workflow checkpoint may mirror this wording without a standalone duplicate-test
-event. Docs-only verification uses appropriate source/docs checks, including
+Keep ordinary docs-only closeout strictly under `docs/**` so the existing
+classifier uses its cheap validation path. A separately reviewed history-
+storage cutover may include the explicitly scoped standing-rule update to
+`AGENTS.md`; do not broaden that exception to unrelated repository rules.
+Current-state documents record only current consequences and state. Closed
+detail belongs once in the relevant architecture, validation, or history
+record; do not append the same long milestone narrative to both current-state
+files. Docs-only verification uses appropriate source/docs checks, including
 exact admission, exact changed-file review, `git diff --check` and staged diff
 check; it does not rerun pytest, FULL/ROBINHOOD or Ruff over unchanged Python.
 

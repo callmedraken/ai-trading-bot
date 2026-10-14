@@ -33,9 +33,14 @@ remain unavailable until the separately reviewed brokerage, credential,
 reconciliation, operator-control, and live-readiness gates are implemented and
 accepted. Paper trading remains the default operating mode.
 
-`docs/PROJECT_STATUS.md` is the canonical high-level source for the current
-milestone, completed foundations, roadmap, and production status. Read it before
-starting a new milestone or preparing a broad implementation plan.
+`docs/PROJECT_STATUS.md` is the bounded current high-level source for the
+current milestone, completed foundations, roadmap, and production status.
+`docs/AI_TRADING_BOT_HANDOFF.md` is the bounded active-session and current-
+boundary handoff. Read both before starting a new milestone or preparing a
+broad implementation plan. `docs/history/INDEX.md` and the immutable legacy
+snapshots are historical retrieval surfaces, not routine startup material.
+Historical detail belongs once in the relevant architecture, validation, or
+history record rather than being repeatedly copied into both current documents.
 
 ## Supervised release and unattended-runtime invariant
 
@@ -213,12 +218,15 @@ PROTECTED is authorized within the exact reviewed bounds under the standing rule
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
 state before recommending or authorizing work. Read the current Git-tracked
-`docs/AI_TRADING_BOT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `AGENTS.md`, the
-relevant architecture/validation documents, and the available Trading Bot
-project conversation history. Verify the active remote branch/HEAD, recent
-commits/diff and CI through GitHub when material. Git-tracked canonical docs
-outrank uploaded mirrors or older chat summaries unless the conversation clearly
-records a newer intentional change that has not yet been committed.
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
+relevant current architecture/validation documents. Read
+`docs/history/INDEX.md` or an immutable legacy snapshot only when older
+provenance, incident reconstruction, predecessor semantics, or disputed
+historical evidence is actually necessary. Verify the active remote branch/HEAD,
+recent commits/diff and CI through GitHub when material. Git-tracked canonical
+docs outrank uploaded mirrors or older chat summaries unless the conversation
+clearly records a newer intentional change that has not yet been committed.
 
 Do not ask the user to paste GitHub diffs/comments, prior Trading Bot chats,
 repository files, or other project material when the available project/GitHub

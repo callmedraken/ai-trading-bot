@@ -1,7 +1,24 @@
 # Architecture 139-A / RCL-3A — exact research-candidate variant binding
 
-Status: **Current-lineage forward-port implemented; exact-source acceptance pending.**
-139-B remains a separate future architecture.
+Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B remains a separate future architecture.
+
+## Acceptance evidence
+
+The current-lineage forward-port is accepted on the exact source above.
+Checkpoint Source Gates #562 / `38640090298` completed SUCCESS in one
+workflow_dispatch attempt. source-static passed 64 current authorities with 88
+test paths and 372 Ruff paths; git diff, Ruff check and Ruff format passed. The
+four broad shards completed in 90.389 / 98.647 / 104.755 / 121.06 seconds, all
+below the 300-second hygiene ceiling.
+
+The binding module, its 857-line focused test and the package export surface are
+byte-for-byte identical to the historically accepted 139-A blobs. The
+current-lineage delta is limited to live inventory assertions and the exact
+seven-test 139-A successor overlay after Architecture 138. All seven declared
+successor blobs independently match GitHub. Frozen predecessor dictionaries,
+executable/native/AST pins, ACTIVE membership/digest, D1R5 source/registration
+and workflow bytes remain unchanged. Focused verification records 1,808
+distinct passing cases. All recorded operational effect counters are zero.
 
 ## Frozen contract and current source admission
 
@@ -214,17 +231,15 @@ Architecture-134 docs and bounded status/handoff are not implementation paths.
 
 ## Publication and next boundary
 
-Focused verification precedes one exact-file normal commit and ordinary push
-of the fresh research branch, then exactly one fresh Checkpoint Source Gates
-workflow_dispatch. Require terminal source-static, four broad shards and
-source-gates PASS on the exact pushed HEAD; each broad shard must be below
-300 seconds. No local FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification runs.
+The current-lineage 139-A source checkpoint is accepted. No local
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification was required beyond the focused
+verification and repository source gate recorded above.
 
-Stop after terminal CI and implementation handoff. ChatGPT owns exact GitHub
-source review, bounded closeout and the separate 139-B design. 139-B will define
+139-B is the next genuinely new research boundary. It may define deterministic
 no-effect observation provenance, minimum session/observation policy, failure
 semantics, no-effect enforcement, SHADOW qualification and any immutable SHADOW
-successor. These remain unimplemented in 139-A.
+successor. Those capabilities remain unimplemented in 139-A and require their
+own reviewed source/effect boundaries.
 
 No real research/walk-forward execution, SHADOW live observation, strategy
 promotion, ProductionStrategyContract conversion, D1/D1R5/D2 operation,

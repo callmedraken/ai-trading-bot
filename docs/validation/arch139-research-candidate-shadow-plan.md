@@ -1,7 +1,21 @@
 # Architecture 139-A / RCL-3A — current-lineage forward-port validation
 
-Status: **Implementation and focused verification; exact-source acceptance pending.**
-This plan covers only exact variant provenance. Architecture 139-B is deferred.
+Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. This plan covers only exact variant provenance. Architecture 139-B is deferred.
+
+## Terminal acceptance evidence
+
+Fresh Checkpoint Source Gates #562 / `38640090298` completed SUCCESS on the
+exact pushed source in one dispatch/attempt. source-static passed all 64 current
+authorities with 88 test paths and 372 Ruff paths; git diff, Ruff check and Ruff
+format passed. The four broad shards completed in 90.389 / 98.647 / 104.755 /
+121.06 seconds, all below the 300-second hygiene ceiling. active-tests and
+certification-tests skipped as expected for this unmapped research dispatch.
+
+Focused verification records 1,808 distinct passing cases. The three required
+historically accepted 139-A blobs match exactly, all seven current successor
+blobs match the committed Git blobs, and D1Q/D1R3/D1R4/D1R4R/D1R5 authority
+checks pass with predecessor dictionaries frozen. No protected or operational
+effect occurred.
 
 ## Admission and unchanged accepted semantics
 
@@ -122,12 +136,12 @@ shard below 300 seconds; active-tests/certification-tests skip as expected for
 the unmapped research dispatch; terminal source-gates PASS. Preserve failures;
 no blind retry, amend, rebase, force-push, merge or PR mutation.
 
-Stop after terminal CI and report exact base/final HEAD/tree, 13 changed paths,
-three accepted blob matches, before/after inventory, distinct focused case
-counts, static results, seven successor blobs, frozen predecessor evidence,
-authority results and CI number/id/conclusion. ChatGPT owns exact GitHub source
-acceptance and bounded docs closeout. This implementation does not update
-cumulative Architecture-134 docs or status/handoff and does not implement 139-B.
+The implementation stop boundary is complete: terminal CI and exact GitHub
+source review both passed. Architecture 139-A is SOURCE ACCEPTED on the identity
+recorded above. The bounded status/handoff closeout records it as a parallel
+safe-side checkpoint without changing the active D1R5 protected boundary or
+moving the canonical handoff branch onto research executable source. 139-B
+remains unimplemented.
 
 ## Zero-effect accounting
 

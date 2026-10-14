@@ -215,29 +215,42 @@ its authority boundaries:
   zero failed/errors, wall 253.493 seconds. Current inventory is FULL 175,
   ROBINHOOD 98, LEGACY 215, EXHAUSTIVE 390. No real D1R5 host/effect ran.
 
-## Parallel safe-side checkpoint
+## Parallel safe-side checkpoints
 
-Architecture 138 / RCL-2 is SOURCE ACCEPTED on the separate research branch
-`feature/research-candidate-walk-forward-qualification-current`:
+Architecture 138 / RCL-2 is SOURCE ACCEPTED at
+`a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1` / tree
+`55841f5119228dbf302747256326d43ff7d32e23`, CI #561 / `38634855492`.
+
+Architecture 139-A / RCL-3A is SOURCE ACCEPTED on
+`feature/research-candidate-shadow-variant-binding-current`:
 
 ```text
-HEAD  a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1
-TREE  55841f5119228dbf302747256326d43ff7d32e23
-CI    #561 / 38634855492 / SUCCESS
+HEAD  bf500ffecefe0a8be8117e315228e3bc07ffdf54
+TREE  69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd
+CI    #562 / 38640090298 / SUCCESS
 ```
 
-It adds deterministic walk-forward qualification evidence and an immutable
-WALK_FORWARD_PASSED research successor only. The accepted domain/export blobs
-match the previously accepted Architecture-138 implementation; the
-current-lineage reconciliation changes only live inventory assertions and the
-exact seven-test successor pin overlay. All effect counters are zero. This
-parallel source is not integrated into the active D1R5 product lineage and
-grants no promotion, production, D1/D2, provider, broker or live authority.
+139-A binds a WALK_FORWARD_PASSED research candidate to the exact retained
+historical experiment variant and can resolve only that exact original variant
+from independently validated evidence. Its domain/test/export blobs match the
+historically accepted 139-A checkpoint exactly; current-lineage reconciliation
+is limited to live inventory assertions and the seven-test successor overlay.
+All effect counters are zero. It creates no SHADOW stage, observation,
+qualification, production compatibility, promotion, D1/D2, provider, broker or
+live authority.
 
 To preserve the canonical handoff invariant, do not move
-`feature/project-history-storage-foundation` onto this research executable
+`feature/project-history-storage-foundation` onto either research executable
 branch. Keep it on the active product lineage until a later reviewed integration
 or replay makes the accepted research source part of that lineage.
+
+## Next safe-side boundary
+
+Architecture 139-B is now the first genuinely new research checkpoint. It may
+define deterministic no-effect observation provenance, minimum observation /
+session policy, failure semantics, no-effect enforcement, SHADOW qualification
+and an immutable SHADOW successor. Any real provider/live observation remains a
+separate protected boundary; source work must stay deterministic and effect-free.
 
 ## Immediate next step
 

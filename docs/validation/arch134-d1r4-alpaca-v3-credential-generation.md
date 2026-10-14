@@ -1,65 +1,86 @@
 # Architecture 134-D1R4 — v3 credential generation and authentication preparation
 
-## 2026-10-13 — Architecture 134-D1R4R implemented; SOURCE ACCEPTANCE PENDING
+## 2026-10-13 — Architecture 134-D1R4R SOURCE ACCEPTED
 
-D1R4R adds a source-owned, incident-specific pre-provider `/v3` exact-pair
-cleanup protocol and protected host. This is source/fake-test work only: **the
-real cleanup has NOT executed**, and authentication remains frozen. Exact
-GitHub diff, mapped source-gate/ROBINHOOD CI and ChatGPT review are required
-before source acceptance; canonical accepted-checkpoint closeout follows review.
+Architecture 134-D1R4R — incident-specific pre-provider `/v3` exact-pair
+staging cleanup recovery and fresh-input anti-truncation hardening — is
+**SOURCE ACCEPTED** on
+`feature/robinhood-production-paper-alpaca-auth-qualification`.
 
-The consumed incident is fixed in source: generation HEAD
-`41351ade6a2434adc26b9389106339e034b53a06`, TREE
-`6a6e6528c7e0bfb43835f70c620276f960f723ee`, 4865 bytes, SHA-256
-`217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193`.
-The supplied journal path must resolve to the original frozen incident path,
-with no symlink or hardlink; copies cannot substitute for a provider-fenced
-original. Both preserved witnesses have length one; this generation is not accepted for
-authentication. Its original journal is read-only and remains unmodified.
+Accepted executable/test source:
 
-Cleanup reserves one fixed incident-wide external latch:
+```text
+HEAD             a847ce6d9ab65e7cfc7983cd19c3378abb5c8851
+TREE             9c3de40cc6c4e42f5a9fe62389d7558ce2d38ba0
+CI               #529 / 38493263422 / attempt 1 / SUCCESS
+CERT ARTIFACT    11863061550
+ARTIFACT SHA256  7f0bf5dd5e26a712b55e3186b9ed4fbee7f3daf9c3c9469075bdb138610fe97a
+ROBINHOOD        97 modules
+CASES            9,066
+PASSED           9,065
+SKIPPED          1
+FAILED/ERRORS    0 / 0
+WALL             276.064 s
+```
+
+The accepted recovery is intentionally bound to the single consumed D1R4
+generation: source HEAD `41351ade6a2434adc26b9389106339e034b53a06`,
+TREE `6a6e6528c7e0bfb43835f70c620276f960f723ee`, exactly 4865 bytes,
+SHA-256
+`217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193`,
+at the original fixed external journal path. Both preserved witnesses have
+UTF-8 length one, so that generation remains rejected for authentication.
+
+D1R4R owns one fixed incident-wide cleanup latch:
 `F:\AI\temp\qualification\arch134-d1r4r-cleanup-217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193.json`.
-There is no selectable evidence destination, role, target, policy, digest,
-witness or generation. Moving/copying the supplied preserved journal does not
-change this latch. An existing, partial, blocked or ambiguous latch prevents
-another attempt; no automatic retry or latch removal is authorized.
+There is no caller-selected latch/evidence destination, credential role, target,
+policy, digest, witness or generation. Existing/partial/blocked/ambiguous latch
+state permanently prevents another destructive attempt unless a later separately
+reviewed source checkpoint explicitly establishes otherwise.
 
-Under the same fixed D1R4 Global mutex and accepted security policy, cleanup
-revalidates source and original incident bytes throughout observation/deletion.
-Busy or abandoned ownership gives zero credential effects. Both current fixed
-`/v3` records must reproduce both preserved witnesses/lengths before the first
-delete. Cleanup also rejects unexpected flags, attributes, alias, username or
-comment metadata; the ordinary reader's one-byte readability is retained.
-Each role has a distinct durable flush/fsync intent, at most one delete,
-immediate verified absence and durable confirmation. The remaining secret must
-still match before its delete. Independent final absence of both records and
-final durable evidence under continuous ownership are required for
-`CLEANUP_EXACT_PAIR_REMOVED`. Any uncertainty after native delete entry is
-`DELETE_OUTCOME_AMBIGUOUS`, stopping every later delete and preserving partial
-state without restoration. Failed final publication/release cannot report success.
+Under the existing fixed Global D1R4 mutex, cleanup makes zero credential writes
+and permits deletion only after both exact current `/v3` records reproduce the
+frozen witnesses and strict metadata. Each delete has a distinct durable
+flush/fsync intent, at most one native call, immediate absence proof and durable
+confirmation. The remaining secret is re-proven before its delete and final
+success requires independent pair absence. Any uncertainty after native delete
+entry is `DELETE_OUTCOME_AMBIGUOUS`; no later delete, restoration, repair or
+automatic retry is permitted. Busy or abandoned ownership performs zero
+credential effects.
 
-New interactive provisioning requires strict bounded UTF-8 values of at least
-eight bytes, exact repeated hidden entry, displayed nonsecret lengths and the
-fixed human confirmation
-`CONFIRM_LENGTHS_MATCH_INTENDED_FRESH_DASHBOARD_GENERATION`. This local floor
-only rejects truncation/placeholders; it asserts neither a provider format nor
-remote authentication. Every mutable input/repeat/readback copy is cleared;
-immutable Python string zeroization is not claimed. Shared/recovery readers
-continue to admit the historical one-byte pair.
+Fresh interactive provisioning now has a local anti-truncation/placeholder floor
+of eight UTF-8 bytes, requires exact repeated hidden entry, displays only
+nonsecret lengths and requires the fixed human length confirmation before
+credential state inspection/mutation. This is not a claimed Alpaca credential
+format or remote-authentication proof. The shared/recovery reader deliberately
+continues to read the historical one-byte incident pair for exact recovery.
 
-All predecessor Architecture-134 pin dictionaries, including D1R4, are frozen;
-D1R4R is a narrow successor overlay. Actual runner inventory is FULL 173 /
-ROBINHOOD 97 / LEGACY 215 / EXHAUSTIVE 388, with unchanged required baselines
-and exact topology assertions. The existing branch/checkpoint mapping remains
-ROBINHOOD-owned and source-only; CI never invokes cleanup or authentication.
+All predecessor Architecture-134 source-pin dictionaries, including the accepted
+D1R4 overlay, remain frozen; D1R4R is a separate successor overlay. Current
+inventory is FULL 173 / ROBINHOOD 97 / LEGACY 215 / EXHAUSTIVE 388 with the
+required baseline tuples unchanged. The existing mapped checkpoint remains
+ROBINHOOD-owned and source-only: it exposes no registered preflight or protected
+execute hook.
 
-No real Credential Manager, Alpaca/provider, production SQLite/session,
-strategy, Robinhood, PREPARE/EXECUTE, paper, broker, scheduler, ACL, D1 or D2
-effect occurs in this checkpoint. `/v2` is immutable historical state. After
-source acceptance, the next boundary is separately guarded read-only/pre-effect
-readiness and one protected incident cleanup. Only reviewed successful cleanup
-can precede separately provisioned/accepted fresh credentials and a separately
-reviewed one-shot authentication. D1/D2 remain disconnected; real money is NO-GO.
+Checkpoint Source Gates #529 is terminal SUCCESS on the exact accepted source:
+source-static, active-tests, canonical ROBINHOOD certification and source-gates
+all passed; full-tests was intentionally skipped. Static evidence records
+`GIT_DIFF_CHECK=PASS`, `RUFF_CHECK=PASS`, `RUFF_FORMAT=PASS`,
+`AUTHORITY=PASS` and stable source identity. Canonical certification completed
+under the 300-second hygiene threshold.
+
+Implementation, fake/temp tests and CI performed zero real Windows Credential
+Manager reads/writes/deletes, zero Alpaca/provider requests, zero production
+SQLite/session/strategy/Robinhood/PREPARE/EXECUTE/paper/broker/scheduler/ACL
+effects and zero D1/D2 invocations. The real D1R4R cleanup has NOT executed.
+
+**Next protected sequence:** synchronize the exact docs-only acceptance
+descendant; run a separately guarded read-only/pre-effect readiness gate that
+does not enter Credential Manager; then, only if that passes and the fixed latch
+is still absent, invoke the reviewed D1R4R cleanup host exactly once. A successful
+cleanup authorizes neither authentication nor D1/D2. Authentication remains
+blocked until a new fresh `/v3` generation is separately provisioned, reviewed
+and accepted. Real-money trading remains NO-GO.
 
 ## 2026-10-13 — D1R4 real /v3 provisioning consumed; authentication STOPPED on input-shape anomaly
 

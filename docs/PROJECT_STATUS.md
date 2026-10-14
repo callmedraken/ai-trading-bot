@@ -47,6 +47,24 @@ does not predict a later docs-only tip.
 
 ## Operational checkpoint
 
+The one-shot D1R4 authentication qualification is **PASS / consumed**.
+
+```text
+evidence  F:\AI\temp\qualification\arch134-d1r4-auth-234614a21d68680f5b1e0ccd.json
+bytes     635
+SHA256    100e3590543b8ba36002d50d890578533100035b9f618434dd2c9adc2f3505c4
+status    PASS
+reason    PASS
+HTTP      200
+requests  1
+source    234614a21d68680f5b1e0ccdb5854347a6a8d090
+tree      f70459d91c393c6ea7a4a6358f02a2073b246574
+```
+
+The post-auth generation journal SHA-256 is
+`344f64a1c421c41174142aa4f30f2574537bb26e70901dd77cf56ec930ec7434`;
+its provider-effect fence is now irreversible. Authentication must not be retried.
+
 The accepted fresh `/v3` provisioning effect was executed from:
 
 ```text
@@ -79,8 +97,10 @@ classification is `LOCAL_V3_PAIR_EXACTLY_PROVISIONED`. There is no
 The provisioning invocation is consumed and must not be rerun. Ordinary fresh
 `/v3` provisioning must block because the accepted staging pair exists.
 
-This establishes neither remote Alpaca authentication nor D1, paper, D2,
-broker, or live-trading readiness.
+The provisioning record alone did not establish remote authentication, but the
+subsequent one-shot D1R4 qualification now does establish
+`REMOTE_ALPACA_AUTH_READY` for the fixed accepted probe/source observation.
+It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Completed foundations
 
@@ -98,24 +118,22 @@ broker, or live-trading readiness.
 
 ## Active work
 
-The immediate product boundary is a separately reviewed one-shot D1R4
-authentication qualification. Its host must re-admit the exact operational
-source, acquire the fixed mutex, read the same local pair, reproduce the
-accepted journal witnesses, durably append `V3_PROVIDER_EFFECT_INTENT`, and
-only then permit the bounded authentication request.
+The immediate product boundary is now the still-required pre-market start /
+`WAITING_FOR_MARKET` / wake qualification for the accepted Architecture 134
+armed-session/runtime path. It must be implemented and verified as its own
+source checkpoint before a fresh D1 session can be authorized.
 
-HIST-2B and this integration closeout change documentation, history, and
-archive tooling only. They grant no authority for the authentication request
-or any credential, provider, broker, trading, scheduler, production,
-deployment, ACL, SQLite, OAuth, PREPARE, EXECUTE, D1, or D2 effect.
+The D1R4 authentication PASS grants no PREPARE, EXECUTE, paper mutation, broker
+placement, scheduler/ACL mutation, D1 launch, D2 invocation, or live-trading
+authority.
 
 ## Current blocker / protected boundary
 
-The local pair classification does not prove remote authentication. The next
-authentication qualification is one-shot: after the provider-effect fence,
-the generation cannot authorize another qualification regardless of HTTP
-result, transport outcome, ambiguity, interruption, or failure. Real-money
-trading is **NO-GO**.
+Remote Alpaca authentication is proven for the fixed probe, but the required
+pre-market / `WAITING_FOR_MARKET` / wake qualification has not yet been
+accepted. No fresh D1 session is authorized until that boundary is complete.
+The D1R4 authentication invocation is permanently consumed and must not be
+retried. Real-money trading is **NO-GO**.
 
 ## Verification and certification posture
 
@@ -148,19 +166,19 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Keep the bounded status and handoff aligned with the exact operational D1R4
   state.
 - Keep the immutable HIST-2B snapshot unchanged.
-- Synchronize the local operational worktree to origin.
-- Run only a separately reviewed zero-provider authentication-readiness check:
-  re-prove exact source identity and preserved generation evidence without
-  entering Credential Manager or issuing an Alpaca request.
-- Stop for review before the one-shot protected authentication invocation.
+- Record and preserve the consumed D1R4 authentication evidence and fenced
+  generation journal.
+- Design and source-review the pre-market start / `WAITING_FOR_MARKET` / wake
+  qualification using the existing armed-session/runtime composition.
+- Keep all D1/PREPARE/EXECUTE/paper/broker effects stopped until that source and
+  operator boundary are separately accepted.
 
 ### Next
 
-- Perform only the separately reviewed, one-shot D1R4 authentication
-  qualification after its exact source, mutex, witness, journal, and
-  provider-intent preconditions are proven.
-- Preserve the resulting evidence and stop for review before any further
-  operational boundary.
+- Qualify pre-market start, durable `WAITING_FOR_MARKET`, wake timing, and
+  exact source re-admission.
+- Only after that qualification is accepted, review the next fresh D1 session
+  authorization boundary.
 
 ### Later
 

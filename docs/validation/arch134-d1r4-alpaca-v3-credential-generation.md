@@ -1,5 +1,58 @@
 # Architecture 134-D1R4 — v3 credential generation and authentication preparation
 
+## 2026-10-14 — D1R4 one-shot Alpaca authentication qualification PASS
+
+The separately reviewed one-shot D1R4 authentication qualification executed
+once against exact operational source HEAD
+`234614a21d68680f5b1e0ccdb5854347a6a8d090`, TREE
+`f70459d91c393c6ea7a4a6358f02a2073b246574`.
+
+Canonical external evidence:
+
+```text
+F:\AI\temp\qualification\arch134-d1r4-auth-234614a21d68680f5b1e0ccd.json
+BYTES   635
+SHA256  100e3590543b8ba36002d50d890578533100035b9f618434dd2c9adc2f3505c4
+```
+
+Accepted canonical result:
+
+```text
+schema                          alpaca-authentication-qualification/v1
+status                          PASS
+reason                          PASS
+credential_pair_read_attempts   1
+credential_pair_read_succeeded  true
+alpaca_request_attempts         1
+http_status                     200
+provider_code                   null
+source_readmitted               true
+```
+
+The evidence source HEAD/tree exactly match the admitted operational source.
+The host read the fixed staged pair once, reproduced the preserved witnesses,
+durably appended `V3_PROVIDER_EFFECT_INTENT` before the provider attempt, made
+exactly one Alpaca HTTPS request, received the compatible fixed-probe HTTP 200
+response, and re-admitted the source afterward. No retry is authorized.
+
+The preserved generation journal remains canonical and accepted, is not
+truncated, and remains pair-accepted. Its post-auth SHA-256 is:
+
+`344f64a1c421c41174142aa4f30f2574537bb26e70901dd77cf56ec930ec7434`.
+
+That changed digest records the irreversible provider-effect fence. The
+generation can never authorize another authentication qualification regardless
+of any later credential/provider state.
+
+This establishes only remote Alpaca authentication readiness for the fixed
+qualification probe and source observation. It authorizes no fresh D1 session,
+PREPARE, EXECUTE, Robinhood paper mutation, broker placement, scheduler/ACL
+effect, D2 invocation, or live trading.
+
+The next required Architecture 134 milestone is the pre-market start /
+`WAITING_FOR_MARKET` / wake qualification before a fresh D1 session can be
+authorized. Real-money trading remains **NO-GO**.
+
 ## 2026-10-13 — Second hardened fresh v3 input attempt blocked pre-effect
 
 A second separately reviewed fresh provisioning invocation at source `6b42a65e9b8849e1c7affa20c9fb2bae0f11a1e0` / `09df0e02528fbbd0e7d5689c8e80106b2946170e` ended `INPUT_OR_ADMISSION_FAILED` with exit 1. Evidence is `F:\AI\temp\qualification\arch134-d1r4-v3-generation-6eeaddebcbbf4cca8fc812da2e525674.json`, 926 bytes, SHA-256 `6bdd54624a124244e38b0fef29522d00e3f05e7f172521449159e1722d0ab047`.

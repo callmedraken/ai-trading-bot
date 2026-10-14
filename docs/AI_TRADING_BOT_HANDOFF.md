@@ -75,6 +75,26 @@ or provider authority.
 
 ## Exact D1R4 state
 
+The one-shot D1R4 authentication qualification has now completed successfully
+and is permanently consumed. The accepted canonical authentication evidence is:
+
+```text
+path    F:\AI\temp\qualification\arch134-d1r4-auth-234614a21d68680f5b1e0ccd.json
+bytes   635
+SHA256  100e3590543b8ba36002d50d890578533100035b9f618434dd2c9adc2f3505c4
+status  PASS
+reason  PASS
+source  234614a21d68680f5b1e0ccdb5854347a6a8d090
+tree    f70459d91c393c6ea7a4a6358f02a2073b246574
+```
+
+The qualification read the staged pair once, succeeded, made exactly one Alpaca
+request, received HTTP 200, retained no provider code, and re-admitted the exact
+source. The generation journal is now irreversibly provider-fenced; its post-auth
+SHA-256 is
+`344f64a1c421c41174142aa4f30f2574537bb26e70901dd77cf56ec930ec7434`.
+The authentication invocation must never be rerun from this generation.
+
 The consumed fresh `/v3` provisioning effect was executed from:
 
 ```text
@@ -108,32 +128,30 @@ PAIR_CONFIRMED
 FINAL / LOCAL_EXACT_MATCH
 ```
 
-The only accepted classification is
-`LOCAL_V3_PAIR_EXACTLY_PROVISIONED`. `V3_PROVIDER_EFFECT_INTENT` is absent,
-Alpaca/provider requests are 0, and ambiguity is none. The provisioning
-invocation is consumed and must not be rerun. Ordinary fresh `/v3`
-provisioning must now block because the accepted staging pair exists.
+The provisioning classification remains
+`LOCAL_V3_PAIR_EXACTLY_PROVISIONED`, but the journal now also contains the
+durable `V3_PROVIDER_EFFECT_INTENT` fence consumed by the accepted
+authentication qualification. Provisioning and authentication are both
+consumed and must not be rerun.
 
-This state does not establish remote Alpaca authentication, D1 readiness,
-paper readiness, D2 readiness, broker readiness, or live-trading authority.
+Remote Alpaca authentication is now proven only for the fixed qualification
+probe and exact accepted source. This still does not establish D1 session
+readiness, paper-session readiness, D2 readiness, broker readiness, or
+live-trading authority.
 
 ## Current protected boundary
 
-The next operational boundary is a separately reviewed one-shot D1R4
-authentication qualification. Before any possible Alpaca request, its host
-must:
+D1R4 authentication is complete and consumed. The next product boundary is the
+still-required Architecture 134 pre-market start / `WAITING_FOR_MARKET` / wake
+qualification before any fresh D1 session may be authorized.
 
-1. re-admit the exact reviewed operational source;
-2. acquire and use the fixed mutex required by the accepted D1R4 contract;
-3. read the same locally staged pair;
-4. reproduce the accepted journal witnesses;
-5. durably append `V3_PROVIDER_EFFECT_INTENT`; and
-6. only then permit the bounded authentication request.
+That next milestone must prove the accepted armed-session/runtime composition can
+start before the admission window, durably enter `WAITING_FOR_MARKET`, wake at
+the intended admission boundary, re-admit source, and continue through the
+reviewed state machine without widening provider, Robinhood, PREPARE, EXECUTE,
+paper, broker, scheduler, or live authority.
 
-Once that provider-effect fence is appended, this generation can never
-authorize a second authentication qualification, regardless of HTTP result,
-transport outcome, ambiguity, interruption, or failure. HIST-2B and its
-integration closeout do not authorize that request.
+No D1 launch is authorized by the authentication PASS itself.
 
 ## Standing safety and effect invariants
 
@@ -195,13 +213,11 @@ its authority boundaries:
 
 ## Immediate next step
 
-The history integration and its source-gate repair are accepted. The immediate
-safe operational step is a separately reviewed, zero-provider authentication
-readiness check after synchronizing the local operational worktree to origin.
-It must re-prove exact source identity and the preserved generation evidence
-without entering Credential Manager or issuing an Alpaca request. Stop before
-the protected authentication invocation unless every fixed source, mutex,
-witness, journal, evidence-destination, and provider-intent condition is proven.
+D1R4 authentication is accepted and consumed. The immediate safe next step is
+source-only design and verification of the pre-market start /
+`WAITING_FOR_MARKET` / wake qualification. Do not invoke a fresh D1 session,
+PREPARE, EXECUTE, Robinhood paper effect, broker action, D2, or live trading
+until that qualification source and operator boundary are separately reviewed.
 
 ## Historical reconstruction
 

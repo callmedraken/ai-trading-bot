@@ -2,16 +2,21 @@
 
 ## Source checkpoint and authority
 
-This is a separate **source implementation, pending exact-source review** on
-`feature/robinhood-production-paper-premarket-wake-qualification`, in
-`F:\AI\worktrees\ai-trading-bot-production-paper-premarket-wake-qualification`.
-Bootstrap is intentionally local-only at HEAD
-`3e27d606dbec99e3e29c482a15c480139663118b`, TREE
-`344a6d1be0394d4f66f1a42caa62f169b0fdcac9`. The accepted remote parent anchor
-is `feature/robinhood-production-paper-alpaca-auth-qualification` at the same
-identity. This implementation bootstrap exception does not apply to the future
-real host: that host requires its own published branch, exact tracking and live
-remote identity, clean source, fixed worktree, and unmixed imports.
+This source checkpoint is **ACCEPTED** on
+`feature/robinhood-production-paper-premarket-wake-qualification` at:
+
+```text
+HEAD  a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
+TREE  9fcbc170e8339e0b4a93844466e8924ff8ef7f36
+CI    #557 / 38549244176 SUCCESS
+```
+
+The bootstrap parent was the accepted D1R4-authentication closeout
+`3e27d606dbec99e3e29c482a15c480139663118b` /
+`344a6d1be0394d4f66f1a42caa62f169b0fdcac9`. The future real host still
+requires the published exact D1R5 branch, exact tracking and live-remote
+identity, clean source, fixed worktree, and unmixed imports. Source acceptance
+does not authorize the real clock/sleep/evidence qualification.
 
 D1R4 remote Alpaca authentication is **PASS and permanently consumed**:
 
@@ -162,6 +167,13 @@ core/CI registration, and predecessor source authority. Ruff check/format and
 `git diff --check` are required. No local broad FULL/ROBINHOOD run is requested;
 mapped CI owns that obligation after separately authorized publication/review.
 
-Stop at local implementation: no staging, commit, push, remote branch creation,
-real qualification, ARM, credentials, provider access, or production-root access.
-Next owner is ChatGPT for exact local diff review and source-checkpoint handoff.
+Source and mapped certification are accepted. Checkpoint Source Gates #557
+passed static authority and active tests; canonical ROBINHOOD passed 9,182 cases
+with 9,181 passed, one skipped, zero failed/errors, and wall 253.493 seconds.
+The Architecture 132-R3H lane correction preserved two whole-file ROBINHOOD
+lanes while restoring the frozen sub-300-second hygiene requirement.
+
+No real D1R5 host invocation, real sleep, credential/provider/Robinhood access,
+production-root access, ARM, D1/D2 invocation, PREPARE/EXECUTE, paper/broker
+mutation, or live effect occurred. The next owner is ChatGPT for the separately
+reviewed real D1R5 qualification boundary on this exact accepted source.

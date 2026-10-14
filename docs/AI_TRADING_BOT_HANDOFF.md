@@ -147,7 +147,10 @@ qualification before any fresh D1 session may be authorized.
 
 The independent D1R5 timing/source qualifier must start before the admission
 window, durably enter `WAITING_FOR_MARKET`, wake at the admission boundary,
-re-admit source, and stop. Its source implementation is pending review; see
+re-admit source, and stop. Its source is **ACCEPTED** at HEAD
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`; Checkpoint Source Gates
+#557 / `38549244176` is SUCCESS. See
 [the D1R5 contract](validation/arch134-d1r5-pre-market-wake-qualification.md).
 It never enters D1 or the production armed-session effect path. Source acceptance
 does not authorize the separately reviewed real bounded wait qualification.
@@ -212,13 +215,22 @@ its authority boundaries:
   ROBINHOOD 97, LEGACY 215, EXHAUSTIVE 389; frozen predecessor authority pins
   remain preserved through the reviewed HIST-2 test-pin overlay.
 
+- Architecture 134-D1R5 and the Architecture 132-R3H hygiene correction are
+  source/certification accepted at HEAD
+  `a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
+  `9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. Checkpoint Source Gates
+  #557 / `38549244176` passed static authority, expanded active tests, and
+  canonical ROBINHOOD certification: 9,182 cases, 9,181 passed, one skipped,
+  zero failed/errors, wall 253.493 seconds. Current inventory is FULL 175,
+  ROBINHOOD 98, LEGACY 215, EXHAUSTIVE 390. No real D1R5 host/effect ran.
+
 ## Immediate next step
 
-D1R4 authentication is accepted and consumed. The immediate safe next step is
-source-only design and verification of the pre-market start /
-`WAITING_FOR_MARKET` / wake qualification. Do not invoke a fresh D1 session,
-PREPARE, EXECUTE, Robinhood paper effect, broker action, D2, or live trading
-until that qualification source and operator boundary are separately reviewed.
+D1R4 authentication is accepted and consumed, and D1R5 source is accepted.
+The immediate safe next step is the **separately reviewed real bounded D1R5
+clock/sleep/external-evidence qualification** on the exact accepted source.
+Do not invoke a fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect,
+broker action, D2, or live trading until that real qualification is accepted.
 
 ## Historical reconstruction
 

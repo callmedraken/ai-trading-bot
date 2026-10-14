@@ -1883,3 +1883,27 @@ Alpaca request. Once that fence is appended, the journal can never authorize a
 second qualification regardless of HTTP result, transport outcome or process
 interruption. Real-money trading remains NO-GO.
 This acceptance grants no D1/D2, Robinhood, broker, scheduler, ACL, PREPARE, EXECUTE or live authority.
+
+## 2026-10-14 — D1R5 source and R3H hygiene accepted
+
+Architecture 134-D1R5 source is accepted at HEAD
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. The same exact source includes
+the separately reviewed Architecture 132-R3H deterministic ROBINHOOD lane
+placement needed to clear the existing 300-second hygiene gate.
+
+Checkpoint Source Gates #557 / `38549244176` is SUCCESS:
+
+- source-static: diff, Ruff check, Ruff format, authority PASS;
+- expanded D1R5 active tests: PASS;
+- canonical ROBINHOOD: 9,182 cases, 9,181 passed, one skipped, zero
+  failed/errors;
+- two whole-file lanes: 47 / 51 modules;
+- canonical wall: 253.493 seconds.
+
+No real D1R5 host invocation or operational effect occurred during source
+acceptance/certification. The next protected boundary is the separately reviewed
+real bounded D1R5 pre-market clock/sleep/external-evidence qualification on this
+exact accepted source. D1 ARM, PREPARE, EXECUTE, paper/broker mutation, D2 and
+real-money trading remain unauthorized / NO-GO.
+

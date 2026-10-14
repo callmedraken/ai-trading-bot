@@ -118,10 +118,12 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The immediate product boundary is now the still-required pre-market start /
-`WAITING_FOR_MARKET` / wake qualification for the accepted Architecture 134
-armed-session/runtime path. It must be implemented and verified as its own
-source checkpoint before a fresh D1 session can be authorized.
+The immediate product boundary is now the real pre-market start /
+`WAITING_FOR_MARKET` / wake qualification. The independent Architecture 134-D1R5
+source checkpoint is accepted at HEAD
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`, but its real bounded
+clock/sleep/external-evidence qualification has not yet run.
 
 The D1R4 authentication PASS grants no PREPARE, EXECUTE, paper mutation, broker
 placement, scheduler/ACL mutation, D1 launch, D2 invocation, or live-trading
@@ -129,9 +131,10 @@ authority.
 
 ## Current blocker / protected boundary
 
-Remote Alpaca authentication is proven for the fixed probe, but the required
-pre-market / `WAITING_FOR_MARKET` / wake qualification has not yet been
-accepted. No fresh D1 session is authorized until that boundary is complete.
+Remote Alpaca authentication is proven for the fixed probe and D1R5 source is
+accepted, but the required real pre-market / `WAITING_FOR_MARKET` / wake
+qualification has not yet been executed or accepted. No fresh D1 session is
+authorized until that protected boundary is complete.
 The D1R4 authentication invocation is permanently consumed and must not be
 retried. Real-money trading is **NO-GO**.
 
@@ -152,8 +155,12 @@ operational source: static authority and active tests passed, and canonical
 ROBINHOOD certification passed 9,065 / 9,066 cases with one skip and zero
 failures/errors in 200.417 seconds. Artifact `11875285428` has SHA-256
 `02c29f3debd0cf274e85986ab5bd74ebbfc7b9ce9ec234e04fd9d3ad93240b2e`.
-Current inventory is FULL 174 / ROBINHOOD 97 / LEGACY 215 / EXHAUSTIVE 389;
-the HIST-2 archive-tool test is FULL-only. FULL covers currently supported
+Current inventory after accepted D1R5 is FULL 175 / ROBINHOOD 98 /
+LEGACY 215 / EXHAUSTIVE 390. The earlier #549 result remains historical
+integrated-source evidence. Current D1R5/R3H acceptance is Checkpoint Source
+Gates #557 / `38549244176`: static authority PASS, active tests PASS, canonical
+ROBINHOOD 9,182 cases / 9,181 passed / one skipped / zero failed/errors, wall
+253.493 seconds (below the frozen 300-second hygiene ceiling). FULL covers currently supported
 functionality, while LEGACY/EXHAUSTIVE retain explicit historical
 compatibility. This acceptance grants no protected authority. See the
 [tiered certification profile](architecture/132-tiered-certification-profiles.md)
@@ -168,9 +175,10 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Keep the immutable HIST-2B snapshot unchanged.
 - Record and preserve the consumed D1R4 authentication evidence and fenced
   generation journal.
-- Source-review the independent [D1R5 timing/source qualifier](validation/arch134-d1r5-pre-market-wake-qualification.md),
-  which reuses published session admission and stops after wake/source proof.
-  The real bounded clock/sleep/evidence qualification remains separately reviewed.
+- Preserve the accepted [D1R5 timing/source qualifier](validation/arch134-d1r5-pre-market-wake-qualification.md)
+  and its Architecture 132-R3H certification-hygiene proof.
+- Review only the separate real bounded clock/sleep/external-evidence D1R5
+  qualification next; it stops after wake/source proof and grants no D1 authority.
 - Keep all D1/PREPARE/EXECUTE/paper/broker effects stopped until that source and
   operator boundary are separately accepted.
 

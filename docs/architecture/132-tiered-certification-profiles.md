@@ -35,6 +35,16 @@ The placement is not learned dynamically and does not read prior CI artifacts
 at certification runtime. Any future timing/topology change remains separately
 reviewed and the 300-second gate continues to fail closed.
 
+R3H is **SOURCE/CERTIFICATION ACCEPTED** on the D1R5 branch at HEAD
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. Checkpoint Source Gates
+#557 / `38549244176` passed. Canonical ROBINHOOD retained all 98 modules
+and ran exactly two whole-file lanes: 47 modules / 4,828 passed in lane 1 and
+51 modules / 4,353 passed plus one skip in lane 2. Total: 9,182 cases,
+9,181 passed, one skipped, zero failed/errors, wall 253.493 seconds. This
+restores the frozen sub-300-second hygiene requirement without adding shards,
+dropping tests, changing ownership, or increasing the ceiling.
+
 
 ## 2026-10-13 — HIST-2 certification inventory integration
 

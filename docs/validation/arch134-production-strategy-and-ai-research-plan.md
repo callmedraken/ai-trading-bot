@@ -1715,3 +1715,29 @@ Alpaca request. Once that fence is appended, the journal can never authorize a
 second qualification regardless of HTTP result, transport outcome or process
 interruption. Real-money trading remains NO-GO.
 Plan consequence: the D1R4 local generation/provisioning milestone is accepted. The next protected milestone is the distinct one-request D1R4 Alpaca authentication qualification using this exact journal and digest.
+
+## 2026-10-14 — D1R5 source/certification closeout
+
+Accepted source:
+
+```text
+BRANCH  feature/robinhood-production-paper-premarket-wake-qualification
+HEAD    a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
+TREE    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
+CI      #557 / 38549244176 SUCCESS
+```
+
+The rejected #553 source had zero product-test failures but exceeded the frozen
+certification hygiene ceiling at 339.725 seconds. Architecture 132-R3H used the
+preserved JUnit evidence to separate four measured ROBINHOOD runtime outliers
+while retaining exactly two deterministic whole-file lanes, all 98 modules and
+the same 300-second ceiling. The accepted #557 profile passed 9,182 cases with
+9,181 passed, one skipped, zero failed/errors, and wall 253.493 seconds.
+
+D1R5 source is therefore accepted, but the real qualification is not yet run.
+The next step is one separately reviewed real bounded pre-market
+`WAITING_FOR_MARKET` / wake / source-readmission qualification on this exact
+source. It may create only its fresh external evidence and perform its bounded
+real clock/sleep behavior. It grants no automatic D1 ARM or downstream trading
+authority. D1/D2/live effects remain NO-GO.
+

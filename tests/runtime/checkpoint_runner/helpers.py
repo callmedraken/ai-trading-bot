@@ -217,6 +217,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-d1r5-pre-market-wake-qualification",
     "arch134-alpaca-authentication-qualification",
     "arch134-armed-paper-mvp",
     "arch134-production-strategy-contract",

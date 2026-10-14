@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "048463be854c93fc20872e025181ab25c333b172433ca4ecc7079135b4f91ede"
+    "0c3b10d990e11881a56656b0136faa383a7f23ff432626d6caac60924195d2c1"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -196,6 +196,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-d1r5-pre-market-wake-qualification",
     "arch134-alpaca-authentication-qualification",
     "arch134-armed-paper-mvp",
     "arch134-production-strategy-contract",
@@ -209,6 +210,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-d1r5-pre-market-wake-qualification": "robinhood",
     "arch134-alpaca-authentication-qualification": "robinhood",
     "arch134-armed-paper-mvp": "robinhood",
     "arch134-production-paper-runtime": "robinhood",
@@ -10808,6 +10810,7 @@ def _arch134_production_paper_runtime_authority_check(
             expected_pin = ARCH134_D1R4_SOURCE_PINS.get(relative, expected_pin)
             expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, expected_pin)
             expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11187,6 +11190,143 @@ ARCH134_HIST2_TEST_PIN_OVERRIDES: Final = {
     ),
 }
 
+# D1R5 successor only; all predecessor dictionaries remain byte-for-byte frozen.
+ARCH134_D1R5_NAME: Final = "arch134-d1r5-pre-market-wake-qualification"
+ARCH134_D1R5_BRANCH: Final = (
+    "feature/robinhood-production-paper-premarket-wake-qualification"
+)
+ARCH134_D1R5_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "3a295cebb75f8c47bf14981cdc61ef6706db5ae6"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "fd930fd5b99a2b941270a99f55c6ce2043204766"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "583939144200ac633907ef80956732064648ca3c"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "d1ea3594fdb1cdec6047b51ef6ce03cc2336fa2f"
+    ),
+}
+ARCH134_D1R5_PATHS: Final = (
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py",
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py",
+    "tests/review_paper/test_pre_market_wake_qualification.py",
+    "docs/validation/arch134-d1r5-pre-market-wake-qualification.md",
+)
+ARCH134_D1R5_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py": (
+        "c751590126453a51442ae10bbaf638f0a32c92b8"
+    ),
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py": (
+        "aa0364f57f1be2af450dd2bc196e7f0249d03bbb"
+    ),
+    "tests/review_paper/test_pre_market_wake_qualification.py": (
+        "a5ea7cbebce57f0c75503c24ebd953e84d4c4815"
+    ),
+    "docs/validation/arch134-d1r5-pre-market-wake-qualification.md": (
+        "3449492fd680a813c1fbc59aad1f16bf6cc378fc"
+    ),
+}
+ARCH134_D1R5_IMPORTS: Final = {
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "datetime",
+        "enum",
+        "json",
+        "os",
+        "pathlib",
+        "stat",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.session_admission",
+        "typing",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py": (
+        "__future__",
+        "argparse",
+        "datetime",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.review_paper.pre_market_wake_qualification",
+    ),
+}
+ARCH134_D1R5_TESTS: Final = (
+    "tests/review_paper/test_pre_market_wake_qualification.py",
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/review_paper/test_session_admission.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    *COMMON_TESTS,
+)
+ARCH134_D1R5_RUFF_PATHS: Final = (
+    *ARCH134_D1R5_PATHS[:3],
+    *ARCH134_D1R5_TEST_PIN_OVERRIDES,
+    *ARCH134_D1R5_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH134_D1R5_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/runtime/checkpoint_runner/helpers.py",
+    }:
+        raise ValueError("134-D1R5 unreviewed successor test pin override")
+    return ARCH134_D1R5_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Separate source-only checkpoint; no real clock/sleep/evidence CI operation."""
+    failures = list(_arch134_authentication_authority_check(repo_root))
+    try:
+        if set(ARCH134_D1R5_SOURCE_PINS) != set(ARCH134_D1R5_PATHS):
+            failures.append("134-D1R5 unreviewed source override")
+        if set(ARCH134_D1R5_IMPORTS) != set(ARCH134_D1R5_PATHS[:2]):
+            failures.append("134-D1R5 unreviewed import override")
+        for relative, pin in {
+            **ARCH134_D1R5_SOURCE_PINS,
+            **ARCH134_D1R5_TEST_PIN_OVERRIDES,
+        }.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R5 source drift: " + relative)
+        for relative, allowed in ARCH134_D1R5_IMPORTS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(allowed):
+                failures.append("134-D1R5 import closure drift: " + relative)
+        spec = _checkpoint_specs()[ARCH134_D1R5_NAME]
+        if (
+            spec.remote_branch != ARCH134_D1R5_BRANCH
+            or spec.tests != ARCH134_D1R5_TESTS
+            or spec.ruff_paths != ARCH134_D1R5_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1r5_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_D1R5_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_D1R5_NAME) != "robinhood"
+        ):
+            failures.append("134-D1R5 source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1R5 authority unavailable")
+    return tuple(failures)
+
+
 ARCH134_AUTH_TESTS: Final = (
     "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
     "tests/review_paper/test_alpaca_authentication_qualification.py",
@@ -11261,11 +11401,13 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("134-HIST2 unreviewed test pin override")
         for relative, pin in ARCH134_D1R4R_SOURCE_PINS.items():
             expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
             expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, pin)
             expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
@@ -11280,6 +11422,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, ARCH134_D1R4_SOURCE_PINS.get(relative, pin)
             )
             expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
@@ -11920,6 +12063,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_D1R5_NAME: CheckpointSpec(
+            name=ARCH134_D1R5_NAME,
+            description="Architecture 134-D1R5 bounded pre-market wake source only",
+            tests=ARCH134_D1R5_TESTS,
+            ruff_paths=ARCH134_D1R5_RUFF_PATHS,
+            authority_check=_arch134_d1r5_authority_check,
+            remote_branch=ARCH134_D1R5_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_AUTH_NAME: CheckpointSpec(
             name=ARCH134_AUTH_NAME,
             description="Architecture 134-D1R4R incident recovery source only",

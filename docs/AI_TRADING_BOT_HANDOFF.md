@@ -145,11 +145,12 @@ D1R4 authentication is complete and consumed. The next product boundary is the
 still-required Architecture 134 pre-market start / `WAITING_FOR_MARKET` / wake
 qualification before any fresh D1 session may be authorized.
 
-That next milestone must prove the accepted armed-session/runtime composition can
-start before the admission window, durably enter `WAITING_FOR_MARKET`, wake at
-the intended admission boundary, re-admit source, and continue through the
-reviewed state machine without widening provider, Robinhood, PREPARE, EXECUTE,
-paper, broker, scheduler, or live authority.
+The independent D1R5 timing/source qualifier must start before the admission
+window, durably enter `WAITING_FOR_MARKET`, wake at the admission boundary,
+re-admit source, and stop. Its source implementation is pending review; see
+[the D1R5 contract](validation/arch134-d1r5-pre-market-wake-qualification.md).
+It never enters D1 or the production armed-session effect path. Source acceptance
+does not authorize the separately reviewed real bounded wait qualification.
 
 No D1 launch is authorized by the authentication PASS itself.
 

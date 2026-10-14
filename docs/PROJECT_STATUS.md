@@ -168,8 +168,9 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Keep the immutable HIST-2B snapshot unchanged.
 - Record and preserve the consumed D1R4 authentication evidence and fenced
   generation journal.
-- Design and source-review the pre-market start / `WAITING_FOR_MARKET` / wake
-  qualification using the existing armed-session/runtime composition.
+- Source-review the independent [D1R5 timing/source qualifier](validation/arch134-d1r5-pre-market-wake-qualification.md),
+  which reuses published session admission and stops after wake/source proof.
+  The real bounded clock/sleep/evidence qualification remains separately reviewed.
 - Keep all D1/PREPARE/EXECUTE/paper/broker effects stopped until that source and
   operator boundary are separately accepted.
 

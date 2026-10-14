@@ -205,6 +205,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-armed-paper-mvp",
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
+        "arch134-d1r5-pre-market-wake-qualification",
         "arch134-alpaca-authentication-qualification",
     }
     for spec in specs.values():
@@ -348,6 +349,10 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         if spec.name == "arch134-alpaca-authentication-qualification":
             expected_branch = (
                 "feature/robinhood-production-paper-alpaca-auth-qualification"
+            )
+        if spec.name == "arch134-d1r5-pre-market-wake-qualification":
+            expected_branch = (
+                "feature/robinhood-production-paper-premarket-wake-qualification"
             )
         assert spec.remote_branch == expected_branch
 
@@ -858,7 +863,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
     active = tuple(
         name
         for name in runner.ACTIVE_CI_CHECKPOINTS
-        if name != runner.ARCH134_AUTH_NAME
+        if name not in {runner.ARCH134_AUTH_NAME, runner.ARCH134_D1R5_NAME}
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
     assert len(parent) == 63 and len(active) == 62
@@ -1312,6 +1317,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                "arch134-d1r5-pre-market-wake-qualification",
                 "arch134-alpaca-authentication-qualification",
             }
             else (

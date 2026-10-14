@@ -1,5 +1,12 @@
 # Project Status and Roadmap
 
+## 2026-10-13 — Hardened fresh v3 input attempt blocked pre-effect
+
+At source `c4c2126de19e3b35f54f407cd0b8b8c54dc7d861` / `dd8e24281dd370bdd1e4ebaf243d73e961869fd5`, one guarded fresh provisioning attempt ended `INPUT_OR_ADMISSION_FAILED` before `EXPECTED_GENERATION`. Evidence: `F:\AI\temp\qualification\arch134-d1r4-v3-generation-2c37092fed0545538c148ec6fe9c2800.json`, 926 bytes, SHA-256 `19ee1f33d9327fa30ab064bcb3e0d6c7a029fac20470b6009b5f322e5bd300e4`. The journal is reservation, lock acquisition, then final failure only; no staging-state observation, mutation fence, pair acceptance, or provider fence occurred.
+
+Preserve this consumed attempt. It is not write ambiguity, so a later separately reviewed fresh attempt with a new evidence destination remains eligible. Authentication stays blocked until a later `LOCAL_EXACT_MATCH` generation is separately reviewed and accepted.
+
+
 ## 2026-10-13 — D1R4R real pre-provider /v3 cleanup SUCCEEDED
 
 The separately guarded, one-shot Architecture 134-D1R4R cleanup was executed

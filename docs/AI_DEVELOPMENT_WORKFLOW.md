@@ -131,16 +131,19 @@ more detail.
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. Read, in order,
-`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+state before recommending or authorizing work. Resolve the canonical bounded
+handoff/history branch `feature/project-history-storage-foundation` first and
+read, in order, its `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
 `docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
-relevant current architecture/validation document. Then read
-`docs/history/INDEX.md` or an immutable legacy snapshot only when older
-provenance, incident reconstruction, predecessor semantics, or disputed
-historical evidence is actually necessary. Verify the active remote branch/HEAD,
-recent commits/diff and CI through GitHub when material. Git-tracked canonical
-docs outrank uploaded mirrors or older chat summaries unless the conversation
-clearly records a newer intentional change that has not yet been committed.
+relevant current architecture/validation document. Then verify the separately
+named active remote product branch/HEAD/tree, recent commits/diff and CI through
+GitHub when material. The canonical handoff branch is documentation/current-
+state authority only; it never substitutes for exact executable-source
+admission. Read `docs/history/INDEX.md` or an immutable legacy snapshot only
+when older provenance, incident reconstruction, predecessor semantics, or
+disputed historical evidence is actually necessary. Git-tracked canonical docs
+outrank uploaded mirrors or older chat summaries unless the conversation clearly
+records a newer intentional change that has not yet been committed.
 
 Do not ask the user to paste GitHub diffs/comments, prior Trading Bot chats,
 repository files, or other project material when the available project/GitHub
@@ -505,6 +508,30 @@ unreferenced Git objects as needed and retry by a supported atomic path. If the
 branch has already moved unexpectedly or a partial remote state exists, STOP,
 review that state explicitly, and reconcile it before any further update. Never
 continue by serially appending the remaining files.
+
+## Canonical bounded handoff/history branch
+
+`feature/project-history-storage-foundation` is the ongoing canonical branch
+for bounded new-chat reconstruction. It must remain ancestry-compatible with
+the accepted product lineage:
+
+1. close an accepted checkpoint's bounded status/handoff/docs on the active
+   product lineage first;
+2. require that docs descendant to be terminal/accepted under its applicable
+   gate;
+3. fast-forward `feature/project-history-storage-foundation` to that exact same
+   descendant;
+4. do not create independent source or handoff commits only on the canonical
+   branch;
+5. never merge, rebase, cherry-pick, force-update, or resolve divergence merely
+   to make the canonical branch look current; a non-fast-forward state is a
+   reconciliation STOP.
+
+The canonical branch is optimized for new-chat startup: routine reconstruction
+uses its bounded status/handoff documents and current architecture pointers,
+while immutable legacy megafiles remain targeted-retrieval only. Executable
+source authority always comes from the separately verified active product
+branch and exact HEAD/tree.
 
 ## ChatGPT-direct bounded-commit local catch-up
 

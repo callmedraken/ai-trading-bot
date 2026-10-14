@@ -12,25 +12,28 @@ journal.
 authority. Detailed architecture, validation, and closed chronology belong in
 their authoritative records and in `docs/history/`.
 
-The history-storage branch is not trading authority. The operational product
-branch and this history-storage branch must remain distinct:
+The ongoing canonical bounded new-chat handoff/history branch is
+`feature/project-history-storage-foundation`. It is documentation/current-state
+authority only and must remain a fast-forward mirror of the latest accepted
+bounded-docs descendant of the active product lineage. It is not executable-
+source, provider, broker, or trading authority.
 
-- operational branch: `feature/robinhood-production-paper-alpaca-auth-qualification`;
-- history-storage branch: `feature/project-history-storage-foundation`.
-
-This history checkpoint performs no credential, provider, broker, trading,
-scheduler, production, deployment, ACL, SQLite, OAuth, PREPARE, EXECUTE, D1,
-or D2 effect. Real-money trading remains **NO-GO**.
+The current product/source branch at this checkpoint is
+`feature/robinhood-production-paper-premarket-wake-qualification`. Exact
+source HEAD/tree and CI must always be verified on that active branch before
+source or protected work. Real-money trading remains **NO-GO**.
 
 ## New-session reading order
 
-Read, in order:
+Resolve `feature/project-history-storage-foundation` and read, in order:
 
-1. `AGENTS.md`;
-2. `docs/AI_DEVELOPMENT_WORKFLOW.md`;
-3. `docs/PROJECT_STATUS.md`;
-4. this file;
-5. the relevant current architecture or validation document.
+1. its `AGENTS.md`;
+2. its `docs/AI_DEVELOPMENT_WORKFLOW.md`;
+3. its `docs/PROJECT_STATUS.md`;
+4. this file from the same canonical branch;
+5. the relevant current architecture or validation document;
+6. then verify the separately named active product branch, exact HEAD/tree,
+   recent diff and applicable CI before source/protected work.
 
 Read `docs/history/INDEX.md` or an immutable legacy snapshot only when older
 provenance, incident reconstruction, predecessor semantics, or disputed
@@ -39,39 +42,27 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-The current operational product lane is Architecture 134 and its D1R4 Alpaca
-authentication qualification sequence. The pre-HIST-2 operational baseline was:
+Architecture 134-D1R5 source and the Architecture 132-R3H certification-hygiene
+correction are accepted on:
 
 ```text
-branch  feature/robinhood-production-paper-alpaca-auth-qualification
-HEAD    a2d4e4aca8e31fa9c72b4e21372c4d97f45b74fa
-TREE    2d29744b4d116c9567fe8a5894f5adaece4578cf
+branch  feature/robinhood-production-paper-premarket-wake-qualification
+source  a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
+tree    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
+CI      #557 / 38549244176 / SUCCESS
 ```
 
-Do not treat that baseline as the current operational branch tip. The accepted
-HIST-2C.1 integration source base for this HIST-2B closeout is:
+Canonical ROBINHOOD certification passed 9,182 cases with 9,181 passed, one
+skipped, zero failed/errors, wall 253.493 seconds. The later docs-only accepted
+descendant before this canonical-branch designation is
+`ed2eb3ef60e9c04ed9cfa89061fb28d2dfcc562c` /
+`c3831fb1508e254c464470db8d67ae14ac4c4985`, with Checkpoint Source
+Gates #559 SUCCESS.
 
-```text
-HEAD  f156953b373aafbf80b6984752f65f3dc42caea1
-TREE  40fcf475584b2145dc3b99f6af3a75273f21d84d
-```
-
-The HIST-2 operational integration executable/test source is accepted at:
-
-```text
-HEAD  cb1971eaf22eb27690bf60a24d72b5db50c67c34
-TREE  a39db98bec8a1096b8ee2cea6212bd0090953101
-CI    #549 / 38522621732 / SUCCESS
-```
-
-The exact current operational branch HEAD/TREE must still be re-proven from
-local Git and origin at every protected source admission; the accepted identity
-above is the source-gated integration checkpoint, not permission to infer a
-later docs-only tip.
-
-HIST-2B integration changes documentation, history, archive tooling, and the
-certification inventory needed to own the new archive test. It grants no trading
-or provider authority.
+The next protected boundary is the separately reviewed real D1R5 pre-market
+`WAITING_FOR_MARKET` / wake / source-readmission qualification. It has not yet
+run. No fresh D1 session, PREPARE, EXECUTE, paper/broker effect, D2, or live
+trading is authorized.
 
 ## Exact D1R4 state
 

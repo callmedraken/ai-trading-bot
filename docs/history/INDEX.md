@@ -9,6 +9,22 @@ part of routine startup. Current state belongs in:
 - `docs/AI_TRADING_BOT_HANDOFF.md`;
 - the relevant current architecture or validation document.
 
+## Canonical new-chat handoff branch
+
+The ongoing canonical bounded handoff/history branch is:
+
+`feature/project-history-storage-foundation`
+
+New chats should resolve that branch first for `AGENTS.md`,
+`docs/AI_DEVELOPMENT_WORKFLOW.md`, `docs/PROJECT_STATUS.md`, and
+`docs/AI_TRADING_BOT_HANDOFF.md`. The branch must remain a fast-forward mirror
+of the latest accepted bounded-docs descendant of the active product lineage;
+it must not carry an independent source history.
+
+This branch does not grant executable-source or trading authority. After reading
+it, separately verify the active product branch and exact HEAD/tree/CI before
+source or protected work.
+
 ## Immutable HIST-2B snapshot
 
 The exact pre-cutover cumulative documents are preserved under:
@@ -54,7 +70,7 @@ Use the authoritative contract rather than copying its historical narrative:
 
 For a historical question, use this order:
 
-1. current status and handoff for the current state;
+1. current status and handoff from the canonical handoff branch;
 2. this index for historical routing;
 3. the referenced architecture or validation document;
 4. the legacy snapshot only when deeper chronological reconstruction is

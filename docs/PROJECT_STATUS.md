@@ -2,48 +2,35 @@
 
 ## Current phase
 
-The project is in the Architecture 134 D1R4 local-staging and authentication-
-qualification sequence. HIST-2B has completed the documentation/state-storage
-cutover: the former cumulative current-state documents are preserved as an
-immutable legacy snapshot, while this file and
-`docs/AI_TRADING_BOT_HANDOFF.md` are bounded current-state documents.
+Architecture 134-D1R5 source is accepted and the project is waiting on the
+separately protected real pre-market `WAITING_FOR_MARKET` / wake /
+source-readmission qualification.
 
-The history-storage branch is not trading authority. HIST-2B is accepted: its
-exact legacy snapshot is sealed, these bounded current documents are accepted,
-and its integration changes documentation, history, and archive tooling only.
-It grants no trading or provider authority. The operational product lane
-remains:
+The canonical bounded new-chat handoff/history branch is
+`feature/project-history-storage-foundation`. It is maintained only as a
+fast-forward mirror of the latest accepted bounded-docs descendant and is not
+trading or executable-source authority.
 
-```text
-feature/robinhood-production-paper-alpaca-auth-qualification
-```
-
-The accepted HIST-2C.1 integration source base for this HIST-2B closeout is:
+Current accepted product/source identity:
 
 ```text
-HEAD  f156953b373aafbf80b6984752f65f3dc42caea1
-TREE  40fcf475584b2145dc3b99f6af3a75273f21d84d
+branch  feature/robinhood-production-paper-premarket-wake-qualification
+HEAD    a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
+TREE    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
+CI      #557 / 38549244176 / SUCCESS
 ```
 
-The pre-HIST-2 operational baseline was:
+Current accepted docs descendant before this canonical-branch designation:
 
 ```text
-HEAD  a2d4e4aca8e31fa9c72b4e21372c4d97f45b74fa
-TREE  2d29744b4d116c9567fe8a5894f5adaece4578cf
+HEAD    ed2eb3ef60e9c04ed9cfa89061fb28d2dfcc562c
+TREE    c3831fb1508e254c464470db8d67ae14ac4c4985
+CI      #559 / 38550603841 / SUCCESS
 ```
 
-That baseline is not the current operational branch tip. The accepted HIST-2
-operational integration executable/test source is:
-
-```text
-HEAD  cb1971eaf22eb27690bf60a24d72b5db50c67c34
-TREE  a39db98bec8a1096b8ee2cea6212bd0090953101
-CI    #549 / 38522621732 / SUCCESS
-```
-
-At every protected source admission, exact current operational branch HEAD/TREE
-must still be re-proven from local Git and origin; the accepted identity above
-does not predict a later docs-only tip.
+Exact active product HEAD/tree must still be re-proven before protected source
+admission. No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or
+live trading is authorized.
 
 ## Operational checkpoint
 
@@ -170,8 +157,10 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Now
 
-- Keep the bounded status and handoff aligned with the exact operational D1R4
-  state.
+- Keep the bounded status and handoff aligned with the accepted D1R5/current
+  protected-boundary state, and keep
+  `feature/project-history-storage-foundation` fast-forwarded to each accepted
+  bounded-docs descendant.
 - Keep the immutable HIST-2B snapshot unchanged.
 - Record and preserve the consumed D1R4 authentication evidence and fenced
   generation journal.

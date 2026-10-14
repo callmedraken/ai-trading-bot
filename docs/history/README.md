@@ -22,6 +22,23 @@ Current-state documents must remain bounded. Cumulative chronological
 narratives must not grow back into them. Closed detail belongs once in the
 relevant architecture, validation, or history record.
 
+## Canonical bounded handoff branch
+
+The ongoing canonical new-chat handoff/history branch is:
+
+`feature/project-history-storage-foundation`
+
+It is maintained as a **fast-forward mirror of the latest accepted bounded-docs
+descendant of the active product lineage**. It must not become an independent
+source line. Accepted checkpoint docs close on the active product lineage first;
+only after that descendant is accepted may this branch fast-forward to the same
+commit. A non-fast-forward relationship is a STOP for reconciliation.
+
+This branch is the routine startup surface for bounded status/handoff and
+history routing. It is not executable-source, provider, broker, or trading
+authority; protected source admission must independently verify the active
+product branch and exact HEAD/tree.
+
 ## HIST-2B exact snapshot and cutover
 
 The former cumulative handoff and project-status documents are frozen at
@@ -76,9 +93,11 @@ credential values, private keys, or tokens into history.
 
 ## Retrieval rule
 
-New sessions normally read `AGENTS.md`,
+New sessions normally resolve
+`feature/project-history-storage-foundation` and read its `AGENTS.md`,
 `docs/AI_DEVELOPMENT_WORKFLOW.md`, `docs/PROJECT_STATUS.md`,
 `docs/AI_TRADING_BOT_HANDOFF.md`, and the relevant architecture or validation
-document. Read [INDEX.md](INDEX.md) or a specific legacy snapshot only for
-targeted reconstruction. This keeps routine handoffs bounded while retaining
-the full audit trail.
+document. Then independently verify the active product branch and exact
+HEAD/tree before source or protected work. Read [INDEX.md](INDEX.md) or a
+specific legacy snapshot only for targeted reconstruction. This keeps routine
+handoffs bounded while retaining the full audit trail.

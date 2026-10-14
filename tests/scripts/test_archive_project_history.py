@@ -29,6 +29,7 @@ def _make_repository(
     *,
     handoff: bytes | None = "handoff\r\n📌\r\n".encode(),
     status: bytes | None = "status\n📊\n".encode(),
+    gitattributes: bytes | None = b"docs/history/legacy/** -text\n",
 ) -> Path:
     repository = root / "repository"
     repository.mkdir()
@@ -39,6 +40,8 @@ def _make_repository(
 
     history = repository / "docs" / "history"
     history.mkdir(parents=True)
+    if gitattributes is not None:
+        (repository / ".gitattributes").write_bytes(gitattributes)
     if handoff is not None:
         handoff_path = repository / archive.CANONICAL_SOURCE_PATHS[0]
         handoff_path.parent.mkdir(parents=True, exist_ok=True)
@@ -170,6 +173,13 @@ def test_archive_preserves_exact_bytes_and_records_manifest_identity(
         path: (repository / path).read_bytes()
         for path in archive.CANONICAL_SOURCE_PATHS
     }
+    archive_paths = tuple(
+        (archive.LEGACY_ROOT / "HIST-2A" / path.name).as_posix()
+        for path in archive.CANONICAL_SOURCE_PATHS
+    ) + ((archive.LEGACY_ROOT / "HIST-2A" / archive.MANIFEST_NAME).as_posix(),)
+    assert _git(
+        repository, "check-attr", "text", "--", *archive_paths
+    ).splitlines() == [f"{path}: text: unset" for path in archive_paths]
 
     result = archive.archive_repository(repository, "HIST-2A")
 
@@ -192,6 +202,34 @@ def test_archive_preserves_exact_bytes_and_records_manifest_identity(
         }
         for path, data in original.items()
     ]
+
+
+def test_archive_requires_legacy_paths_to_be_explicitly_non_text(
+    tmp_path: Path,
+) -> None:
+    repository = _make_repository(tmp_path, gitattributes=None)
+
+    with pytest.raises(archive.ArchiveError, match="text normalization"):
+        archive.archive_repository(repository, "HIST-2A")
+
+    assert not (repository / archive.LEGACY_ROOT / "HIST-2A").exists()
+
+
+def test_archive_rejects_conflicting_text_attribute_before_writes(
+    tmp_path: Path,
+) -> None:
+    repository = _make_repository(
+        tmp_path,
+        gitattributes=(
+            b"docs/history/legacy/** -text\n"
+            b"docs/history/legacy/HIST-2A/PROJECT_STATUS.md text\n"
+        ),
+    )
+
+    with pytest.raises(archive.ArchiveError, match="text normalization"):
+        archive.archive_repository(repository, "HIST-2A")
+
+    assert not (repository / archive.LEGACY_ROOT / "HIST-2A").exists()
 
 
 def test_archive_rejects_repository_dirtied_before_final_success(

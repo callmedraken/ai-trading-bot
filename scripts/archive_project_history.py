@@ -243,6 +243,41 @@ def _archive_relative_path(cutover_id: str, source_path: str) -> str:
     return (LEGACY_ROOT / cutover_id / Path(source_path).name).as_posix()
 
 
+def _require_non_text_archive_paths(
+    repository_root: Path,
+    cutover_id: str,
+    records: Sequence[SourceRecord],
+) -> None:
+    """Require every intended archive path to have an explicit ``-text`` rule."""
+
+    relative_paths = tuple(
+        _archive_relative_path(cutover_id, record.source_path) for record in records
+    ) + (f"{LEGACY_ROOT.as_posix()}/{cutover_id}/{MANIFEST_NAME}",)
+    output = _run_git(
+        repository_root,
+        "check-attr",
+        "text",
+        "--",
+        *relative_paths,
+    )
+    observed: dict[str, str] = {}
+    for line in output.splitlines():
+        parts = line.split(": ", 2)
+        if len(parts) != 3 or parts[1] != "text":
+            raise ArchiveError(
+                "Git text attribute output was not sufficient to prove archive "
+                "byte preservation"
+            )
+        observed[parts[0]] = parts[2]
+    for relative_path in relative_paths:
+        if observed.get(relative_path) != "unset":
+            value = observed.get(relative_path, "missing")
+            raise ArchiveError(
+                "archive path is not explicitly protected from Git text "
+                f"normalization: {relative_path} (text={value})"
+            )
+
+
 def _write_exclusive(path: Path, data: bytes) -> None:
     with path.open("xb") as stream:
         written = stream.write(data)
@@ -317,6 +352,11 @@ def archive_repository(
     inventory = inspect_repository(
         repository_root,
         cutover_id=validated_cutover_id,
+    )
+    _require_non_text_archive_paths(
+        inventory.repository_root,
+        validated_cutover_id,
+        inventory.files,
     )
     destination = inventory.destination
     legacy_root = destination.parent

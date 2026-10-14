@@ -103,6 +103,11 @@ credential, broker, scheduler, production, or trading operations. Do not run
 archive mode as part of HIST-2A against the real canonical documents; the real
 HIST-2 snapshot and HIST-2 cutover remain a separately reviewed checkpoint.
 
+Immutable legacy snapshots must be Git-stored byte-for-byte. The repository
+invariant `docs/history/legacy/** -text` prevents line-ending normalization, so
+the manifest digest refers to the exact Git-stored archival bytes, not merely a
+pre-stage Windows working-tree representation.
+
 ### HIST-3 — optional historical distillation
 
 After the exact snapshots are safely archived, older milestone history may be

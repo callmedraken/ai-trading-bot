@@ -204,9 +204,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             assert not set(selected) & set(_EXPECTED_SERIAL)
             expected = runner.balance_broad(root, selected)
             if name == "robinhood":
-                expected = runner.apply_lane_pins(
-                    expected, runner.ROBINHOOD_LANE_PINS
-                )
+                expected = runner.apply_lane_pins(expected, runner.ROBINHOOD_LANE_PINS)
             assert tuple(lanes.values()) == expected
 
 

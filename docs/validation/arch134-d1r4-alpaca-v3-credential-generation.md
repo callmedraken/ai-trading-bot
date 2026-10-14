@@ -50,7 +50,7 @@ until a new generation is accepted.
 Status: **SOURCE ACCEPTED** at executable/test HEAD
 `c49ab6413b2713c249f1b878edd67a92ce2b6bbd` / TREE
 `e3f5d09040d6e8764c00854f7fdcd2cf987edffd`; Checkpoint Source Gates
-#525 / 38462482959 is superseded operationally by the consumed real D1R4
+#525 / 38478403817 is superseded operationally by the consumed real D1R4
 provisioning record above. No Alpaca provider request has run under `/v3`;
 authentication is stopped pending exact-pair staging recovery.
 

@@ -138,6 +138,21 @@ from trading_bot.experiments.research_candidate import (
     build_backtested_research_candidate,
     verify_research_candidate_against_report,
 )
+from trading_bot.experiments.research_candidate_walk_forward import (
+    RESEARCH_CANDIDATE_WALK_FORWARD_POLICY_SCHEMA,
+    RESEARCH_CANDIDATE_WALK_FORWARD_QUALIFICATION_SCHEMA,
+    WALK_FORWARD_PASSED_RESEARCH_CANDIDATE_SCHEMA,
+    ResearchCandidateWalkForwardError,
+    ResearchCandidateWalkForwardFailureReason,
+    ResearchCandidateWalkForwardQualification,
+    ResearchCandidateWalkForwardQualificationPolicy,
+    ResearchCandidateWalkForwardQualificationStatus,
+    WalkForwardPassedResearchStrategyCandidate,
+    build_walk_forward_passed_research_candidate,
+    qualify_research_candidate_walk_forward,
+    verify_research_candidate_walk_forward_qualification,
+    verify_walk_forward_passed_research_candidate,
+)
 from trading_bot.experiments.walk_forward import (
     HistoricalExperimentWalkForwardFold,
     HistoricalExperimentWalkForwardFoldResult,
@@ -183,6 +198,19 @@ from trading_bot.experiments.walk_forward_stability import (
 )
 
 __all__ = [
+    "RESEARCH_CANDIDATE_WALK_FORWARD_POLICY_SCHEMA",
+    "RESEARCH_CANDIDATE_WALK_FORWARD_QUALIFICATION_SCHEMA",
+    "WALK_FORWARD_PASSED_RESEARCH_CANDIDATE_SCHEMA",
+    "ResearchCandidateWalkForwardError",
+    "ResearchCandidateWalkForwardQualificationPolicy",
+    "ResearchCandidateWalkForwardQualification",
+    "ResearchCandidateWalkForwardQualificationStatus",
+    "ResearchCandidateWalkForwardFailureReason",
+    "WalkForwardPassedResearchStrategyCandidate",
+    "qualify_research_candidate_walk_forward",
+    "verify_research_candidate_walk_forward_qualification",
+    "build_walk_forward_passed_research_candidate",
+    "verify_walk_forward_passed_research_candidate",
     "MAX_RESEARCH_CANDIDATE_NAME_LENGTH",
     "MAX_RESEARCH_CANDIDATE_ORDINAL",
     "MAX_RESEARCH_CANDIDATE_RANK",

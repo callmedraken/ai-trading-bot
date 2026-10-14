@@ -1,5 +1,41 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-14 — Architecture 132-R3H measured two-lane hygiene correction
+
+Architecture 134-D1R5 exposed a certification-lane imbalance without a product
+test failure. Checkpoint Source Gates #553 ran the exact ROBINHOOD inventory
+successfully: 9,179 passed, one skipped, zero failed/errors across 9,180 cases.
+Its canonical wall time was 339.725 seconds, so the existing 300-second hygiene
+gate correctly rejected the source.
+
+The preserved JUnit evidence showed the byte-size balancing proxy no longer
+tracked runtime cost. The measured testcase time was approximately 326.329
+seconds in robinhood-1 versus 87.068 seconds in robinhood-2. Four current
+runtime outliers dominated the skew:
+
+- `tests/runtime/checkpoint_runner/test_arch133_l_m.py`;
+- `tests/runtime/checkpoint_runner/test_arch133_h_k.py`;
+- `tests/runtime/checkpoint_runner/test_arch131.py`;
+- `tests/review_paper/test_arch133_scheduler_installation.py`.
+
+R3H preserves the exact Architecture-132 profile ownership, exact two-lane
+FULL/ROBINHOOD topology, whole-module partitioning, deterministic ordering,
+JUnit validation, static checks and 300-second ceiling. It does not remove,
+skip or reclassify any test and does not add shards.
+
+The ordinary byte-size greedy assignment remains the default. ROBINHOOD adds
+one source-owned deterministic placement overlay for only the four measured
+outliers: `arch131` and `arch133_h_k` remain in lane 0; `arch133_l_m` and
+the scheduler-installation module are placed in lane 1. Missing overlay modules
+are inert so frozen/minimal profile fixtures remain valid. On the exact #553
+timing evidence, applying only this placement changes the observed lane work
+from about 326.329/87.068 seconds to 207.890/205.507 seconds.
+
+The placement is not learned dynamically and does not read prior CI artifacts
+at certification runtime. Any future timing/topology change remains separately
+reviewed and the 300-second gate continues to fail closed.
+
+
 ## 2026-10-13 — HIST-2 certification inventory integration
 
 HIST-2 adds `tests/scripts/test_archive_project_history.py` as one supported

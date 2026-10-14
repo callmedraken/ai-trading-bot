@@ -28,6 +28,16 @@ ROBINHOOD_DIRECTORIES = (
     "tests/review_paper",
     "tests/robinhood_mcp",
 )
+ROBINHOOD_LANE_PINS = {
+    # Architecture 132-R3H: #553 JUnit timing evidence showed the byte-size
+    # proxy co-locating the dominant runtime outliers. Keep exactly two lanes
+    # and deterministically separate only these measured modules.
+    "tests/runtime/checkpoint_runner/test_arch131.py": 0,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 0,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 1,
+    "tests/review_paper/test_arch133_scheduler_installation.py": 1,
+}
+
 ROBINHOOD_INFRASTRUCTURE_MODULES = (
     "tests/runtime/checkpoint_runner/test_arch131.py",
     "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
@@ -402,6 +412,25 @@ def balance_broad(
     return tuple(lanes[0]), tuple(lanes[1])
 
 
+def apply_lane_pins(
+    lanes: tuple[tuple[str, ...], tuple[str, ...]],
+    pins: dict[str, int],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Apply deterministic reviewed lane placement without changing coverage."""
+    if any(type(lane) is not int or lane not in {0, 1} for lane in pins.values()):
+        raise CertificationError("Lane pins must select lane 0 or 1")
+    mutable = [list(lanes[0]), list(lanes[1])]
+    assigned = {module for lane in lanes for module in lane}
+    for module, target in sorted(pins.items()):
+        if module not in assigned:
+            continue
+        for lane in mutable:
+            if module in lane:
+                lane.remove(module)
+        mutable[target].append(module)
+    return tuple(mutable[0]), tuple(mutable[1])
+
+
 def validate_partitions(
     inventory: tuple[str, ...], lanes: tuple[tuple[str, ...], ...]
 ) -> None:
@@ -526,6 +555,10 @@ def build_lanes(
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second, "serial": serial}
     elif profile in {"full", "robinhood"}:
         first, second = balance_broad(root, inventory)
+        if profile == "robinhood":
+            first, second = apply_lane_pins(
+                (first, second), ROBINHOOD_LANE_PINS
+            )
         prefix = "broad" if profile == "full" else "robinhood"
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second}
     else:

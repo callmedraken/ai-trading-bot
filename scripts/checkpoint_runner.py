@@ -11220,6 +11220,9 @@ ARCH134_D1R5_TEST_PIN_OVERRIDES: Final = {
     "tests/review_paper/test_production_strategy_cycle.py": (
         "2c1b28cff7f0a0812246d79b6650bd2adaad3b44"
     ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "bc9c49ac7df48753c49b7b5df7087a9a0bc55660"
+    ),
 }
 ARCH134_D1R5_PATHS: Final = (
     "src/trading_bot/review_paper/pre_market_wake_qualification.py",
@@ -11283,12 +11286,14 @@ ARCH134_D1R5_TESTS: Final = (
     "tests/review_paper/test_supervised_maintenance_rebind.py",
     "tests/review_paper/test_production_strategy_cycle.py",
     "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
     *COMMON_TESTS,
 )
 ARCH134_D1R5_RUFF_PATHS: Final = (
     *ARCH134_D1R5_PATHS[:3],
     *ARCH134_D1R5_TEST_PIN_OVERRIDES,
     *ARCH134_D1R5_TESTS,
+    "scripts/run_test_certification.py",
     *COMMON_RUFF_PATHS,
 )
 
@@ -11303,6 +11308,7 @@ def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
         "tests/review_paper/test_supervised_runtime_host_admission.py",
         "tests/review_paper/test_supervised_maintenance_rebind.py",
         "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/scripts/certification_runner/test_lanes.py",
     }:
         raise ValueError("134-D1R5 unreviewed successor test pin override")
     return ARCH134_D1R5_TEST_PIN_OVERRIDES.get(relative, predecessor)

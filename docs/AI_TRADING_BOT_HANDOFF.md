@@ -1,5 +1,14 @@
 # AI Trading Bot â€” Project Development Roadmap & Handoff
 
+## 2026-10-13 — Hardened fresh v3 input attempt blocked before effects
+
+A separately guarded fresh v3 provisioning attempt at source HEAD `c4c2126de19e3b35f54f407cd0b8b8c54dc7d861` / TREE `dd8e24281dd370bdd1e4ebaf243d73e961869fd5` ended `INPUT_OR_ADMISSION_FAILED` with exit 1. Evidence is `F:\AI\temp\qualification\arch134-d1r4-v3-generation-2c37092fed0545538c148ec6fe9c2800.json`, 926 bytes, SHA-256 `19ee1f33d9327fa30ab064bcb3e0d6c7a029fac20470b6009b5f322e5bd300e4`.
+
+The journal is exactly `PROVISIONING_RESERVED`, `LOCK_ACQUIRED`, then `FINAL / INPUT_OR_ADMISSION_FAILED`. It contains no expected-generation, state-observation, write-intent, write-confirmation, pair-confirmation, cleanup, or provider-intent event. The invocation therefore stopped in the hardened interactive input/admission stage before any fixed-target credential read/write/delete or provider request. Preserve this evidence and do not reuse its destination.
+
+This is not a write-ambiguity case. A later fresh provisioning attempt requires a new separately reviewed invocation and fresh evidence destination; it is not an automatic retry. Authentication remains blocked until a later generation reaches `LOCAL_EXACT_MATCH` and its evidence is separately reviewed and accepted.
+
+
 ## 2026-10-13 — D1R4R real pre-provider /v3 cleanup SUCCEEDED
 
 The separately guarded, one-shot Architecture 134-D1R4R cleanup was executed

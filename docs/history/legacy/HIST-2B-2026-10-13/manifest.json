@@ -1,0 +1,21 @@
+{
+  "cutover_id": "HIST-2B-2026-10-13",
+  "files": [
+    {
+      "archive_path": "docs/history/legacy/HIST-2B-2026-10-13/AI_TRADING_BOT_HANDOFF.md",
+      "byte_count": 1003908,
+      "sha256": "be5993375efa8720e9ee8afc25e4a5bf4ba7ce317f4544f23e2229195e27856f",
+      "source_path": "docs/AI_TRADING_BOT_HANDOFF.md"
+    },
+    {
+      "archive_path": "docs/history/legacy/HIST-2B-2026-10-13/PROJECT_STATUS.md",
+      "byte_count": 1006035,
+      "sha256": "6bca0c92cc0e237bf0f7037ce550d8edbe14c7f207e63c017c78ecb4952ffe4d",
+      "source_path": "docs/PROJECT_STATUS.md"
+    }
+  ],
+  "schema": "project-history-archive-manifest",
+  "source_head": "f8e2bd96f5a640c25ea33b56f76b2f06d44bf512",
+  "source_tree": "4b9c2772c26589c04bd3a50d81387a1c1095846b",
+  "version": 1
+}

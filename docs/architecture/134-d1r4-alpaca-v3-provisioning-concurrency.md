@@ -929,3 +929,61 @@ Next safe boundary:
 Authentication remains blocked until a later generation is independently
 reviewed as the exact local `/v3` pair and its witness journal is accepted.
 This diagnosis changes no concurrency, mutex, reconciliation, cleanup, witness, or provider-fence semantics.
+
+## 2026-10-13 — D1R4 fresh /v3 provisioning ACCEPTED / LOCAL_EXACT_MATCH
+
+The separately reviewed post-diagnostic fresh D1R4 provisioning invocation at
+source `ae19cc933f00445d00f196f7b7963bf01b5433ae` /
+`b361c153035ec1dca3ffacc5c819398239f55da6` completed with exit 0 and
+`FINAL / LOCAL_EXACT_MATCH`.
+
+Preserved generation evidence:
+
+- path:
+  `F:\AI\temp\qualification\arch134-d1r4-v3-generation-b206df8a30964c4c9a807d306b54c0b9.json`;
+- bytes: 4881;
+- SHA-256:
+  `3cb18e50b821c4f7361b213f2095d148dd18a172f60cdf72255e36838eaa7ce3`;
+- schema: `alpaca-v3-credential-generation-journal/v1`;
+- policy: `windows-credential-manager-alpaca-market-data/v3`;
+- expected UTF-8 lengths: key 26, secret 44.
+
+The complete ten-record journal is:
+
+`PROVISIONING_RESERVED` ->
+`LOCK_ACQUIRED` ->
+`EXPECTED_GENERATION` ->
+`INITIAL_STATE_ACCEPTED` ->
+`KEY_WRITE_INTENT` ->
+`KEY_WRITE_CONFIRMED` ->
+`SECRET_WRITE_INTENT` ->
+`SECRET_WRITE_CONFIRMED` ->
+`PAIR_CONFIRMED` ->
+`FINAL / LOCAL_EXACT_MATCH`.
+
+There is no ambiguity classification, cleanup event or
+`V3_PROVIDER_EFFECT_INTENT`. No Alpaca/provider request occurred during this
+provisioning invocation. The later shell parse error from entering a detached
+PowerShell `else` occurred only after the host had returned success and after
+the preserved evidence file had been sized, hashed and printed; it does not
+alter the generation journal or provisioning classification.
+
+This checkpoint therefore establishes only:
+
+`LOCAL_V3_PAIR_EXACTLY_PROVISIONED`.
+
+It does not establish remote Alpaca authentication, D1 readiness, paper
+readiness, D2 readiness, broker readiness or live-trading authority.
+
+The provisioning invocation is consumed and MUST NOT be rerun. Ordinary fresh
+`/v3` provisioning must now block because both staging targets are present.
+The preserved generation journal and exact digest above are the authority input
+for the next separately reviewed one-shot D1R4 authentication qualification.
+
+Before that provider boundary, the authentication host must re-admit exact
+source, read the same local pair under the fixed mutex, reproduce the journal
+witnesses, and durably append `V3_PROVIDER_EFFECT_INTENT` before any possible
+Alpaca request. Once that fence is appended, the journal can never authorize a
+second qualification regardless of HTTP result, transport outcome or process
+interruption. Real-money trading remains NO-GO.
+This acceptance changes no mutex, reconciliation, cleanup, immutability or provider-effect-freeze semantics.

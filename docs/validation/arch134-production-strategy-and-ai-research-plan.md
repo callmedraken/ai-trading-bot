@@ -1612,3 +1612,48 @@ amend/rebase/force-push/merge. Wait for fresh mapped canonical ROBINHOOD CI and
 exact GitHub source review on the corrected source. Do not invoke production diagnosis/provisioning,
 qualification or ARM while certification remains failed/pending. Return only the
 correction commit/CI identity or a failing source-gate summary for review.
+
+## 2026-10-13 — D1R4 Windows hidden-input transport diagnosis CONFIRMED
+
+A nonsecret local diagnostic reproduced the D1R4 hidden-input failure mechanism
+without reading, writing or deleting Credential Manager state and without any
+Alpaca/provider request. The diagnostic file completed with exit 0 and SHA-256
+`a63b2fe0b1796c069bd278bc06d5aa0981de03ef5be579dcdf5f858376b9333c`.
+
+Observed exact input behavior:
+
+- expected dummy value: 19 characters / 19 UTF-8 bytes;
+- ordinary `Ctrl+V` at Python `getpass()`: exactly one character / one UTF-8
+  byte, `U+0016` (SYN);
+- manual hidden entry: exact 19-character / 19-byte dummy value;
+- right-click paste: multi-character input rather than `U+0016`, but the
+  pasted value was not the dummy value and is intentionally redacted from the
+  repository.
+
+This directly explains the original one-byte dashboard-key and secret
+observation and the two later hardened attempts that failed before
+`Fresh UTF-8 lengths` / `EXPECTED_GENERATION`: ordinary `Ctrl+V` must not
+be used for D1R4 hidden credential prompts on this Windows terminal path.
+
+The right-click probe also revealed a credential-looking value that was not the
+dummy. That value is not trusted provisioning material and is not recorded here.
+If it was a real Alpaca credential identifier, its pair must be treated as
+exposed and replaced before any later protected provisioning attempt.
+
+The two hardened provisioning attempts remain consumed pre-effect evidence.
+This diagnostic does not retroactively authorize a retry and does not alter
+their zero-read / zero-write / zero-delete / zero-Alpaca-request classification.
+
+Next safe boundary:
+
+1. preserve the two consumed journals unchanged;
+2. admit the exact reviewed branch/worktree/source state;
+3. use a fresh external generation-evidence path;
+4. use only a known-good non-`Ctrl+V` hidden-input method;
+5. do not reuse any credential material exposed by the diagnostic/chat;
+6. execute at most one newly reviewed protected D1R4 provisioning invocation;
+7. stop for journal/digest review before any D1R4 authentication request.
+
+Authentication remains blocked until a later generation is independently
+reviewed as the exact local `/v3` pair and its witness journal is accepted.
+Plan consequence: the input-channel blocker is diagnosed; the next protected provisioning remains one-shot and requires fresh source/evidence admission plus credential hygiene before execution.

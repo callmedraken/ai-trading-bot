@@ -1,5 +1,14 @@
 # Architecture 134 — Production strategy and AI-research validation plan
 
+## 2026-10-13 — Second hardened fresh v3 input attempt blocked pre-effect
+
+A second separately reviewed fresh provisioning invocation at source `6b42a65e9b8849e1c7affa20c9fb2bae0f11a1e0` / `09df0e02528fbbd0e7d5689c8e80106b2946170e` ended `INPUT_OR_ADMISSION_FAILED` with exit 1. Evidence is `F:\AI\temp\qualification\arch134-d1r4-v3-generation-6eeaddebcbbf4cca8fc812da2e525674.json`, 926 bytes, SHA-256 `6bdd54624a124244e38b0fef29522d00e3f05e7f172521449159e1722d0ab047`.
+
+Its journal again contains only `PROVISIONING_RESERVED`, `LOCK_ACQUIRED`, and `FINAL / INPUT_OR_ADMISSION_FAILED`. There is no `EXPECTED_GENERATION`, fixed-target state observation, mutation fence, pair acceptance, cleanup, or provider fence. Preserve this consumed attempt and do not rerun the same invocation. Authentication remains blocked.
+
+Because two fresh attempts have now failed at the identical pre-length interactive stage, do not authorize another unchanged protected attempt until the Windows hidden-input transport is independently diagnosed with nonsecret dummy input.
+
+
 ## 2026-10-13 — Hardened fresh v3 input attempt blocked pre-effect
 
 A guarded fresh provisioning attempt at source `c4c2126de19e3b35f54f407cd0b8b8c54dc7d861` / `dd8e24281dd370bdd1e4ebaf243d73e961869fd5` ended `INPUT_OR_ADMISSION_FAILED` before `EXPECTED_GENERATION`. Evidence: `F:\AI\temp\qualification\arch134-d1r4-v3-generation-2c37092fed0545538c148ec6fe9c2800.json`, 926 bytes, SHA-256 `19ee1f33d9327fa30ab064bcb3e0d6c7a029fac20470b6009b5f322e5bd300e4`.

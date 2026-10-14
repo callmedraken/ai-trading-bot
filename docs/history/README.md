@@ -66,6 +66,43 @@ The migration must never infer that old prose is expendable merely because a
 shorter summary exists. The exact legacy snapshots remain available for deep
 reconstruction.
 
+### HIST-2A — exact-archive tooling checkpoint
+
+`scripts/archive_project_history.py` prepares the exact HIST-2 snapshot but does
+not perform the canonical cutover. Its two source files are read as raw bytes:
+
+- `docs/AI_TRADING_BOT_HANDOFF.md`
+- `docs/PROJECT_STATUS.md`
+
+The read-only inventory requires an explicit mode and may include a proposed
+cutover identifier:
+
+```text
+python -B scripts/archive_project_history.py --dry-run --cutover-id HIST-2A
+```
+
+It reports the source HEAD/TREE, proposed destination, byte count, SHA-256, and
+informational line count for each source. It does not write an archive or
+modify either source document. Without `--cutover-id`, dry-run uses the visible
+placeholder `docs/history/legacy/<cutover-id>/` as its proposed destination.
+
+The archive mode requires a caller-supplied, single-component cutover
+identifier and refuses dirty repositories, malformed identifiers, missing
+sources, existing destinations, and any post-copy digest or byte mismatch:
+
+```text
+python -B scripts/archive_project_history.py --archive --cutover-id HIST-2A
+```
+
+Successful archive mode writes only beneath
+`docs/history/legacy/<cutover-id>/`, preserves source bytes exactly, and writes
+`manifest.json` with the source HEAD/TREE and per-file source/archive paths,
+byte counts, and SHA-256 digests. It does not update `docs/history/INDEX.md`,
+replace either canonical document, infer dates, or perform provider,
+credential, broker, scheduler, production, or trading operations. Do not run
+archive mode as part of HIST-2A against the real canonical documents; the real
+HIST-2 snapshot and HIST-2 cutover remain a separately reviewed checkpoint.
+
 ### HIST-3 — optional historical distillation
 
 After the exact snapshots are safely archived, older milestone history may be

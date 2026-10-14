@@ -1,5 +1,18 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-13 — HIST-2 certification inventory integration
+
+HIST-2 adds `tests/scripts/test_archive_project_history.py` as one supported
+FULL-only infrastructure module. It is intentionally not Robinhood product
+coverage and does not change the frozen FULL/Robinhood required baselines,
+legacy ownership, serial safety lane, checkpoint routing, or protected-effect
+authority.
+
+The current source-discovered inventory is ACTIVE 63, FULL 174, ROBINHOOD 97,
+LEGACY 215, EXHAUSTIVE 389. The added archive test is admitted through the
+reviewed FULL exact-module surface; unknown `tests/scripts/` modules continue
+to fail closed.
+
 ## Current D1Q inventory and certification route
 
 Current GUI-A15/D1Q-R2 source-discovered inventory is ACTIVE 62, FULL 169,

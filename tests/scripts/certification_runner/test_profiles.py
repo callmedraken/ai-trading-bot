@@ -162,9 +162,13 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/strategies/test_production_strategy_contract.py",
                 "tests/strategies/test_production_strategy_decision.py",
                 "tests/experiments/test_research_candidate.py",
+                "tests/scripts/test_archive_project_history.py",
             )
         )
     )
+    assert "tests/scripts/test_archive_project_history.py" in profiles["full"]
+    assert "tests/scripts/test_archive_project_history.py" not in profiles["robinhood"]
+    assert "tests/scripts/test_archive_project_history.py" not in profiles["legacy"]
     assert _PUBLISHED_PREPARE_TEST in profiles["robinhood"]
     assert _PREPARE_OPERATOR_TEST in profiles["robinhood"]
     assert _PREPARE_OPERATOR_TEST in profiles["full"]
@@ -175,10 +179,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 173,
+        "full": 174,
         "robinhood": 97,
         "legacy": 215,
-        "exhaustive": 388,
+        "exhaustive": 389,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

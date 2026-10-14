@@ -153,6 +153,7 @@ FULL_EXACT_MODULES = (
     "tests/scripts/certification_runner/test_profiles.py",
     "tests/scripts/certification_runner/test_results.py",
     "tests/scripts/certification_runner/test_source.py",
+    "tests/scripts/test_archive_project_history.py",
     "tests/scripts/test_create_walk_forward_research_bundle.py",
     "tests/scripts/test_research_session_archive_scripts.py",
     "tests/scripts/test_run_backtest.py",

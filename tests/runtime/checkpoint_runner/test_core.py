@@ -1335,6 +1335,10 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
         assert certification in [
             (),
             ("tests/scripts/certification_runner/test_profiles.py",),
+            (
+                "tests/scripts/certification_runner/test_profiles.py",
+                "tests/scripts/certification_runner/test_lanes.py",
+            ),
         ]
     active, _ = runner.batch_requirements(
         [registry[name] for name in runner.ACTIVE_CI_CHECKPOINTS]

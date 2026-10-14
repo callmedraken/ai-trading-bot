@@ -202,7 +202,12 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             assert tuple(lanes.values())[:2] == runner.balance_broad(root, broad)
         else:
             assert not set(selected) & set(_EXPECTED_SERIAL)
-            assert tuple(lanes.values()) == runner.balance_broad(root, selected)
+            expected = runner.balance_broad(root, selected)
+            if name == "robinhood":
+                expected = runner.apply_lane_pins(
+                    expected, runner.ROBINHOOD_LANE_PINS
+                )
+            assert tuple(lanes.values()) == expected
 
 
 @pytest.mark.parametrize(

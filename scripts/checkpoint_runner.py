@@ -11197,10 +11197,10 @@ ARCH134_D1R5_BRANCH: Final = (
 )
 ARCH134_D1R5_TEST_PIN_OVERRIDES: Final = {
     "tests/scripts/certification_runner/test_profiles.py": (
-        "3a295cebb75f8c47bf14981cdc61ef6706db5ae6"
+        "74739fc32a20cd2cb94fe86e10043ad27e662311"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "fd930fd5b99a2b941270a99f55c6ce2043204766"
+        "577e30be94451da671d50a76c6d25882bef3a43a"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "583939144200ac633907ef80956732064648ca3c"

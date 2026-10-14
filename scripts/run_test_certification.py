@@ -556,9 +556,7 @@ def build_lanes(
     elif profile in {"full", "robinhood"}:
         first, second = balance_broad(root, inventory)
         if profile == "robinhood":
-            first, second = apply_lane_pins(
-                (first, second), ROBINHOOD_LANE_PINS
-            )
+            first, second = apply_lane_pins((first, second), ROBINHOOD_LANE_PINS)
         prefix = "broad" if profile == "full" else "robinhood"
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second}
     else:

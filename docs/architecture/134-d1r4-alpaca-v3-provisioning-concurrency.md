@@ -1,5 +1,65 @@
 # Architecture 134-D1R4 — `/v3` provisioning concurrency and reconciliation contract
 
+## 2026-10-13 — D1R4R real pre-provider /v3 cleanup SUCCEEDED
+
+The separately guarded, one-shot Architecture 134-D1R4R cleanup was executed
+once against the accepted docs-descendant source:
+
+```text
+SOURCE HEAD  3e2c901c13fcbebf5ff309e3dd878cce0932c24f
+SOURCE TREE  021884731ed58d7459b0366f0b46b833da10e14a
+```
+
+The fixed consumed D1R4 generation remained bound to the original external
+journal:
+
+```text
+F:\AI\temp\qualification\arch134-d1r4-v3-generation-77f1e13347fb4559b07523d30c4a7fb5.json
+BYTES   4865
+SHA256  217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193
+```
+
+The D1R4R cleanup host returned `CLEANUP_EXACT_PAIR_REMOVED` with exit 0 and
+published the fixed incident-wide durable cleanup latch:
+
+```text
+F:\AI\temp\qualification\arch134-d1r4r-cleanup-217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193.json
+BYTES   5089
+SHA256  73dcbc73d94a49af2b8ab086a13bb7d756db45ae8914a17cca835976521f1433
+```
+
+The canonical cleanup sequence is complete through sequence 9:
+`CLEANUP_RESERVED`, `LOCK_ACQUIRED`,
+`PRESERVED_GENERATION_ACCEPTED`, `PAIR_MATCH_CONFIRMED`,
+`KEY_DELETE_INTENT`, `KEY_DELETE_CONFIRMED`,
+`SECRET_DELETE_INTENT`, `SECRET_DELETE_CONFIRMED`,
+`PAIR_ABSENCE_CONFIRMED`, then
+`FINAL / CLEANUP_EXACT_PAIR_REMOVED`.
+
+This proves the exact preserved one-byte staging pair matched before deletion,
+the key deletion was durably fenced and confirmed absent, the remaining secret
+was re-proven before its separately fenced deletion, and both fixed `/v3`
+targets were independently confirmed absent under continuous accepted mutex
+ownership before the final success record. There is no ambiguity, abandoned
+owner, partial cleanup or retry authority. The incident cleanup latch is now
+permanently consumed and MUST NOT be deleted, reset or reused to obtain another
+cleanup attempt.
+
+The wrapper's post-effect source guard remained exact at the same HEAD/tree.
+The cleanup performed no credential writes, no `/v2` mutation, no Alpaca
+HTTPS request, no authentication request, no production SQLite/session/strategy/
+Robinhood/PREPARE/EXECUTE/paper/broker/scheduler/ACL effect and no D1/D2
+invocation.
+
+The bad D1R4 generation remains historical consumed evidence and is not
+authentication authority. The current `/v3` staging targets are now absent.
+Authentication remains **BLOCKED**. The next permitted sequence is a separately
+guarded fresh dashboard generation plus hardened fresh `/v3` provisioning,
+followed by review/acceptance of that new generation evidence. Only after that
+separate acceptance may the one-shot authentication qualification be considered.
+Real-money trading remains NO-GO.
+
+
 ## 2026-10-13 — Architecture 134-D1R4R SOURCE ACCEPTED
 
 Architecture 134-D1R4R — incident-specific pre-provider `/v3` exact-pair

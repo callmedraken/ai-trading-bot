@@ -333,10 +333,10 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 176,
+        "full": 177,
         "robinhood": 98,
         "legacy": 215,
-        "exhaustive": 391,
+        "exhaustive": 392,
     }
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]
     assert (

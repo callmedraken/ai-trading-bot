@@ -41,6 +41,18 @@ NAME = "arch134-production-strategy-contract"
             "ARCH134_HIST2_TEST_PIN_OVERRIDES",
             "1d005a7fa62d7172d58be3a9b61443e548f0c62c92ad8652bc883b8df302d950",
         ),
+        (
+            "ARCH134_D1R4_SOURCE_PINS",
+            "9ed4ef533f4602b76382ce6e6841e790c1304de751684cd9a81cfb41a8f50ab2",
+        ),
+        (
+            "ARCH134_D1R4R_SOURCE_PINS",
+            "a6c6af6e231ea41074d2dd8b9fe26e36f9c8e70ef8d764626a22efd7217778c2",
+        ),
+        (
+            "ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES",
+            "8a4021b92a5354cfbdb5394692eb50c14f6a13982b9a50aeb7d259553c7e5988",
+        ),
     ],
 )
 def test_arch138_preserves_frozen_predecessor_pin_material(name, digest) -> None:
@@ -49,15 +61,13 @@ def test_arch138_preserves_frozen_predecessor_pin_material(name, digest) -> None
     assert sha256(material).hexdigest() == digest
 
 
-@pytest.mark.parametrize("mutation", ["missing", "executable", "drift"])
+@pytest.mark.parametrize("mutation", ["missing", "executable"])
 def test_arch138_successor_test_overlay_fails_closed(monkeypatch, mutation) -> None:
     pins = dict(checkpoint_runner.ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
     if mutation == "missing":
         pins.pop("tests/scripts/certification_runner/test_profiles.py")
-    elif mutation == "executable":
-        pins["src/trading_bot/review_paper/armed_session.py"] = "a" * 40
     else:
-        pins["tests/scripts/certification_runner/test_profiles.py"] = "0" * 40
+        pins["src/trading_bot/review_paper/armed_session.py"] = "a" * 40
     monkeypatch.setattr(
         checkpoint_runner, "ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES", pins
     )
@@ -77,6 +87,51 @@ def test_arch138_successor_preserves_unmodified_d1r5_pins() -> None:
         if relative not in overrides:
             assert checkpoint_runner._git_blob_sha1(root / relative) == pin
     assert checkpoint_runner._arch134_d1r5_authority_check(root) == ()
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra", "executable", "drift"])
+@pytest.mark.parametrize(
+    "check",
+    [
+        checkpoint_runner._arch134_production_paper_runtime_authority_check,
+        checkpoint_runner._arch134_authentication_authority_check,
+        checkpoint_runner._arch134_d1r5_authority_check,
+    ],
+)
+def test_arch139a_successor_test_overlay_fails_closed(monkeypatch, mutation, check):
+    pins = dict(checkpoint_runner.ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
+    if mutation == "missing":
+        pins.pop("tests/scripts/certification_runner/test_profiles.py")
+    elif mutation == "extra":
+        pins["tests/experiments/test_research_candidate_shadow_binding.py"] = "a" * 40
+    elif mutation == "executable":
+        pins["src/trading_bot/review_paper/armed_session.py"] = "a" * 40
+    else:
+        pins["tests/scripts/certification_runner/test_profiles.py"] = "0" * 40
+    monkeypatch.setattr(
+        checkpoint_runner, "ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES", pins
+    )
+    root = Path(checkpoint_runner.__file__).resolve().parents[1]
+    assert check(root)
+
+
+def test_arch139a_successor_pins_match_and_preserve_unmodified_d1r5_pins():
+    root = Path(checkpoint_runner.__file__).resolve().parents[1]
+    overrides = checkpoint_runner.ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    assert set(overrides) == set(
+        checkpoint_runner.ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    )
+    for relative, pin in overrides.items():
+        assert checkpoint_runner._git_blob_sha1(root / relative) == pin
+    for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
+        if relative not in overrides:
+            assert checkpoint_runner._git_blob_sha1(root / relative) == pin
+    for check in (
+        checkpoint_runner._arch134_production_paper_runtime_authority_check,
+        checkpoint_runner._arch134_authentication_authority_check,
+        checkpoint_runner._arch134_d1r5_authority_check,
+    ):
+        assert check(root) == ()
 
 
 def _contract(
@@ -340,10 +395,10 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 176,
+        "full": 177,
         "robinhood": 98,
         "legacy": 215,
-        "exhaustive": 391,
+        "exhaustive": 392,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

@@ -11,7 +11,9 @@ authority.
 The current source-discovered inventory is ACTIVE 63, FULL 174, ROBINHOOD 97,
 LEGACY 215, EXHAUSTIVE 389. The added archive test is admitted through the
 reviewed FULL exact-module surface; unknown `tests/scripts/` modules continue
-to fail closed.
+to fail closed. Architecture-134 current authority resolves a separate reviewed
+HIST-2 test-pin overlay after the frozen D1R4R pins for the five inventory tests
+whose count assertions changed; all predecessor pin dictionaries remain frozen.
 
 ## Current D1Q inventory and certification route
 

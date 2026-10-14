@@ -10807,6 +10807,9 @@ def _arch134_production_paper_runtime_authority_check(
             )
             expected_pin = ARCH134_D1R4_SOURCE_PINS.get(relative, expected_pin)
             expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, expected_pin)
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(
+                relative, expected_pin
+            )
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11166,6 +11169,26 @@ ARCH134_D1R4R_IMPORTS: Final = {
     ),
 }  # D1R4R_GENERATED_IMPORTS
 
+# HIST-2 certification-inventory descendant overlay only. All D1/D1Q/R1/R2/R3/
+# D1R4/D1R4R dictionaries above remain frozen.
+ARCH134_HIST2_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "ded8139e15785ed6c05cc77a1921160f24854689"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "fe06a99bed79f6a1e6ff1b0633939d855fdcf537"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "3897e232387636f6fae29fa25989aa54dd7ae3aa"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "b1d46618abb4e8f9eef1062ff0dd978230a1b9cf"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "2925a26cc00238b6fa9675e6e68d6f6acd8fa138"
+    ),
+}
+
 ARCH134_AUTH_TESTS: Final = (
     "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
     "tests/review_paper/test_alpaca_authentication_qualification.py",
@@ -11230,13 +11253,24 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             p for p in ARCH134_D1R4R_PATHS if p.startswith("src/")
         }:
             failures.append("134-D1R4R unreviewed import override")
+        if set(ARCH134_HIST2_TEST_PIN_OVERRIDES) != {
+            "tests/scripts/certification_runner/test_profiles.py",
+            "tests/review_paper/test_supervised_deployment_qualification.py",
+            "tests/review_paper/test_supervised_runtime_host_admission.py",
+            "tests/review_paper/test_supervised_maintenance_rebind.py",
+            "tests/review_paper/test_production_strategy_cycle.py",
+        }:
+            failures.append("134-HIST2 unreviewed test pin override")
         for relative, pin in ARCH134_D1R4R_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, pin)
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4R_SOURCE_PINS.get(
-                relative, pin
-            ):
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, pin)
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(
+                relative, expected_pin
+            )
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
             "tests/review_paper/test_armed_production_paper_session.py"
@@ -11246,9 +11280,13 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R3 correction test drift: " + relative)
         for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4R_SOURCE_PINS.get(
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(
                 relative, ARCH134_D1R4_SOURCE_PINS.get(relative, pin)
-            ):
+            )
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(
+                relative, expected_pin
+            )
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
             **ARCH134_AUTH_IMPORTS,

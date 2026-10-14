@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         print("PRE_MARKET_WAKE_QUALIFICATION_" + result.value)
         return 0 if result is WakeClassification.PASS else 1
-    except Exception:
+    except (Exception, KeyboardInterrupt):
         print("PRE_MARKET_WAKE_QUALIFICATION_HOST_BLOCKED", file=sys.stderr)
         return 2
 

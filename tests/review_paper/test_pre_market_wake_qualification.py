@@ -470,12 +470,12 @@ def test_host_rejects_semantic_or_abbreviated_inputs(option, capsys) -> None:
     assert capsys.readouterr().err == "PRE_MARKET_WAKE_QUALIFICATION_HOST_BLOCKED\n"
 
 
-def test_host_errors_are_fixed_text(monkeypatch, capsys) -> None:
-    monkeypatch.setattr(
-        host,
-        "qualify_pre_market_wake",
-        lambda **kw: (_ for _ in ()).throw(RuntimeError("SECRET")),
-    )
+@pytest.mark.parametrize("error", [RuntimeError("SECRET"), KeyboardInterrupt()])
+def test_host_errors_are_fixed_text(monkeypatch, capsys, error) -> None:
+    def fail(**kw):
+        raise error
+
+    monkeypatch.setattr(host, "qualify_pre_market_wake", fail)
     assert (
         host.main(
             [

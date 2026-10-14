@@ -11208,6 +11208,18 @@ ARCH134_D1R5_TEST_PIN_OVERRIDES: Final = {
     "tests/runtime/checkpoint_runner/helpers.py": (
         "d1ea3594fdb1cdec6047b51ef6ce03cc2336fa2f"
     ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "c2199a4c64befeaba238583a3ac53fb347757ef8"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "df5497ab5193204ebcf34eb20fac203307d47948"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "5ff9ac6035cc10335fec916fb8d9fde4a6c18bae"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "2c1b28cff7f0a0812246d79b6650bd2adaad3b44"
+    ),
 }
 ARCH134_D1R5_PATHS: Final = (
     "src/trading_bot/review_paper/pre_market_wake_qualification.py",
@@ -11220,10 +11232,10 @@ ARCH134_D1R5_SOURCE_PINS: Final = {
         "c751590126453a51442ae10bbaf638f0a32c92b8"
     ),
     "src/trading_bot/review_paper/pre_market_wake_qualification_host.py": (
-        "aa0364f57f1be2af450dd2bc196e7f0249d03bbb"
+        "809da0dd5f1d0fbe5fea515e51b0b6af3497ac8a"
     ),
     "tests/review_paper/test_pre_market_wake_qualification.py": (
-        "a5ea7cbebce57f0c75503c24ebd953e84d4c4815"
+        "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
     ),
     "docs/validation/arch134-d1r5-pre-market-wake-qualification.md": (
         "3449492fd680a813c1fbc59aad1f16bf6cc378fc"
@@ -11260,6 +11272,16 @@ ARCH134_D1R5_TESTS: Final = (
     "tests/review_paper/test_pre_market_wake_qualification.py",
     "tests/review_paper/test_armed_production_paper_session.py",
     "tests/review_paper/test_session_admission.py",
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+    "tests/review_paper/test_supervised_release_installation.py",
+    "tests/review_paper/test_arch133_reprovision_recovery.py",
+    "tests/review_paper/test_arch133_windows_rename_qualification.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
     "tests/scripts/certification_runner/test_profiles.py",
     *COMMON_TESTS,
 )
@@ -11277,6 +11299,10 @@ def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
         "tests/runtime/checkpoint_runner/test_core.py",
         "tests/runtime/checkpoint_runner/test_ci.py",
         "tests/runtime/checkpoint_runner/helpers.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
     }:
         raise ValueError("134-D1R5 unreviewed successor test pin override")
     return ARCH134_D1R5_TEST_PIN_OVERRIDES.get(relative, predecessor)

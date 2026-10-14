@@ -91,7 +91,9 @@ class _WindowsCredentialReader:
 
     __str__ = __repr__
 
-    def read_fixed(self, target: str) -> bytearray | None:
+    def read_fixed(
+        self, target: str, *, cleanup_metadata: bool = False
+    ) -> bytearray | None:
         _require_target(target)
         pointer = ctypes.POINTER(self._credential)()
         blob = bytearray()
@@ -116,6 +118,17 @@ class _WindowsCredentialReader:
                     record.TargetName != target
                     or record.Type != CRED_TYPE_GENERIC
                     or record.Persist != CRED_PERSIST_LOCAL_MACHINE
+                    or (
+                        cleanup_metadata
+                        and (
+                            record.Flags != 0
+                            or record.AttributeCount != 0
+                            or bool(record.Attributes)
+                            or bool(record.TargetAlias)
+                            or bool(record.UserName)
+                            or bool(record.Comment)
+                        )
+                    )
                     or oversized
                     or not _blob_range(address, size)
                 ):
@@ -225,10 +238,17 @@ def validate_alpaca_credential_bytes(blob: bytearray) -> None:
     _decode(blob)
 
 
-def read_fixed_current_product_credential(target: str) -> bytearray | None:
+def read_fixed_current_product_credential(
+    target: str, *, cleanup_metadata: bool = False
+) -> bytearray | None:
     """Read a fixed v3 record; caller owns and must clear the mutable copy."""
     _require_target(target)
-    blob = _WindowsCredentialReader().read_fixed(target)
+    reader = _WindowsCredentialReader()
+    blob = (
+        reader.read_fixed(target, cleanup_metadata=True)
+        if cleanup_metadata
+        else reader.read_fixed(target)
+    )
     if blob is not None:
         failed = False
         try:

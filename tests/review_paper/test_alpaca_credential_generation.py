@@ -743,7 +743,7 @@ def test_getpass_echo_fallback_is_rejected_and_first_value_cleared(monkeypatch):
         pytest.fail("echo fallback accepted")
 
     monkeypatch.setattr(host.getpass, "getpass", input_value)
-    with pytest.raises(host.getpass.GetPassWarning):
+    with pytest.raises(gen.GenerationError, match="input rejected"):
         host.interactive_generation_pair()
 
 

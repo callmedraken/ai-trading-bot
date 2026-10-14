@@ -10806,6 +10806,7 @@ def _arch134_production_paper_runtime_authority_check(
                 relative, ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
             )
             expected_pin = ARCH134_D1R4_SOURCE_PINS.get(relative, expected_pin)
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11055,7 +11056,118 @@ ARCH134_D1R4_IMPORTS: Final = {
         "warnings",
     ),
 }  # D1R4_GENERATED_IMPORTS
+
+# D1R4R incident recovery successor; ALL predecessor dictionaries stay frozen.
+ARCH134_D1R4R_PATHS: Final = (
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py",
+    "src/trading_bot/review_paper/alpaca_credential_generation.py",
+    "src/trading_bot/review_paper/alpaca_credential_host.py",
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py",
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+)
+ARCH134_D1R4R_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "f76962b00bc9c51196d5234e03620972763e2bf7"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "ee3ea56bdd1e820663b7d4b71dd71216c2a1eccc"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "4d452bbb923e5ca5deecfa2ddaa5d514aed681d6"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py": (
+        "8af64b8007f94c530b106999084b0c8454725dc6"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py": (
+        "1b86cf4b380f20564a17a59e83e0f228b25abac6"
+    ),
+    "tests/review_paper/test_alpaca_credential_generation.py": (
+        "e17c3bf76b12f2b2cc0fd353c0c4a0b05c6174f8"
+    ),
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py": (
+        "feb410ab64cbe6c19cbc2c86b03854e383339b42"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "30bcf0d14a78d02dd82438d532eaae26e3649f63"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "26fa20c5ab46bf20b202594f8cc973e54be532a2"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "b5eed90bbd5d468623a70efb6e61e3d61acf4c42"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "60e59e64087bd71ec27f7f372bcb8c1b64c82b64"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "6c65be330e18bbdd9a9e0e564c635948201e20f4"
+    ),
+}  # D1R4R_GENERATED_PINS
+ARCH134_D1R4R_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "__future__",
+        "argparse",
+        "getpass",
+        "hashlib",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "warnings",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py": (
+        "__future__",
+        "collections.abc",
+        "contextlib",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py": (
+        "__future__",
+        "argparse",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "trading_bot.review_paper.alpaca_credential_staging_cleanup",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+    ),
+}  # D1R4R_GENERATED_IMPORTS
+
 ARCH134_AUTH_TESTS: Final = (
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
     "tests/review_paper/test_alpaca_authentication_qualification.py",
     "tests/review_paper/test_alpaca_credential_generation.py",
     "tests/review_paper/test_production_paper_runtime.py",
@@ -11071,6 +11183,7 @@ ARCH134_AUTH_TESTS: Final = (
 ARCH134_AUTH_RUFF_PATHS: Final = (
     *ARCH134_AUTH_SOURCE_PINS,
     *ARCH134_D1R4_PATHS,
+    *ARCH134_D1R4R_PATHS,
     *ARCH134_AUTH_TESTS,
     *COMMON_RUFF_PATHS,
 )
@@ -11111,8 +11224,19 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             p for p in ARCH134_D1R4_PATHS if p.startswith("src/")
         }:
             failures.append("134-D1R4 unreviewed import override")
-        for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
+        if set(ARCH134_D1R4R_SOURCE_PINS) != set(ARCH134_D1R4R_PATHS):
+            failures.append("134-D1R4R unreviewed source override")
+        if set(ARCH134_D1R4R_IMPORTS) != {
+            p for p in ARCH134_D1R4R_PATHS if p.startswith("src/")
+        }:
+            failures.append("134-D1R4R unreviewed import override")
+        for relative, pin in ARCH134_D1R4R_SOURCE_PINS.items():
             if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R4R source drift: " + relative)
+        for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4R_SOURCE_PINS.get(
+                relative, pin
+            ):
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
             "tests/review_paper/test_armed_production_paper_session.py"
@@ -11122,13 +11246,14 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R3 correction test drift: " + relative)
         for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4_SOURCE_PINS.get(
-                relative, pin
+            if _git_blob_sha1(repo_root / relative) != ARCH134_D1R4R_SOURCE_PINS.get(
+                relative, ARCH134_D1R4_SOURCE_PINS.get(relative, pin)
             ):
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
             **ARCH134_AUTH_IMPORTS,
             **ARCH134_D1R4_IMPORTS,
+            **ARCH134_D1R4R_IMPORTS,
         }.items():
             tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
             imports = {
@@ -11765,7 +11890,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     return {
         ARCH134_AUTH_NAME: CheckpointSpec(
             name=ARCH134_AUTH_NAME,
-            description="Architecture 134-D1R4 v3 credentials/auth source only",
+            description="Architecture 134-D1R4R incident recovery source only",
             tests=ARCH134_AUTH_TESTS,
             ruff_paths=ARCH134_AUTH_RUFF_PATHS,
             authority_check=_arch134_authentication_authority_check,

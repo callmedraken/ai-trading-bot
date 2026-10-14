@@ -1,5 +1,66 @@
 # Project Status and Roadmap
 
+## 2026-10-13 — Architecture 134-D1R4R implemented; SOURCE ACCEPTANCE PENDING
+
+D1R4R adds a source-owned, incident-specific pre-provider `/v3` exact-pair
+cleanup protocol and protected host. This is source/fake-test work only: **the
+real cleanup has NOT executed**, and authentication remains frozen. Exact
+GitHub diff, mapped source-gate/ROBINHOOD CI and ChatGPT review are required
+before source acceptance; canonical accepted-checkpoint closeout follows review.
+
+The consumed incident is fixed in source: generation HEAD
+`41351ade6a2434adc26b9389106339e034b53a06`, TREE
+`6a6e6528c7e0bfb43835f70c620276f960f723ee`, 4865 bytes, SHA-256
+`217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193`.
+The supplied journal path must resolve to the original frozen incident path,
+with no symlink or hardlink; copies cannot substitute for a provider-fenced
+original. Both preserved witnesses have length one; this generation is not accepted for
+authentication. Its original journal is read-only and remains unmodified.
+
+Cleanup reserves one fixed incident-wide external latch:
+`F:\AI\temp\qualification\arch134-d1r4r-cleanup-217f3e05f3b456d8e83de7e2f6c2708b6b2b027b5ceb615065551b92ae138193.json`.
+There is no selectable evidence destination, role, target, policy, digest,
+witness or generation. Moving/copying the supplied preserved journal does not
+change this latch. An existing, partial, blocked or ambiguous latch prevents
+another attempt; no automatic retry or latch removal is authorized.
+
+Under the same fixed D1R4 Global mutex and accepted security policy, cleanup
+revalidates source and original incident bytes throughout observation/deletion.
+Busy or abandoned ownership gives zero credential effects. Both current fixed
+`/v3` records must reproduce both preserved witnesses/lengths before the first
+delete. Cleanup also rejects unexpected flags, attributes, alias, username or
+comment metadata; the ordinary reader's one-byte readability is retained.
+Each role has a distinct durable flush/fsync intent, at most one delete,
+immediate verified absence and durable confirmation. The remaining secret must
+still match before its delete. Independent final absence of both records and
+final durable evidence under continuous ownership are required for
+`CLEANUP_EXACT_PAIR_REMOVED`. Any uncertainty after native delete entry is
+`DELETE_OUTCOME_AMBIGUOUS`, stopping every later delete and preserving partial
+state without restoration. Failed final publication/release cannot report success.
+
+New interactive provisioning requires strict bounded UTF-8 values of at least
+eight bytes, exact repeated hidden entry, displayed nonsecret lengths and the
+fixed human confirmation
+`CONFIRM_LENGTHS_MATCH_INTENDED_FRESH_DASHBOARD_GENERATION`. This local floor
+only rejects truncation/placeholders; it asserts neither a provider format nor
+remote authentication. Every mutable input/repeat/readback copy is cleared;
+immutable Python string zeroization is not claimed. Shared/recovery readers
+continue to admit the historical one-byte pair.
+
+All predecessor Architecture-134 pin dictionaries, including D1R4, are frozen;
+D1R4R is a narrow successor overlay. Actual runner inventory is FULL 173 /
+ROBINHOOD 97 / LEGACY 215 / EXHAUSTIVE 388, with unchanged required baselines
+and exact topology assertions. The existing branch/checkpoint mapping remains
+ROBINHOOD-owned and source-only; CI never invokes cleanup or authentication.
+
+No real Credential Manager, Alpaca/provider, production SQLite/session,
+strategy, Robinhood, PREPARE/EXECUTE, paper, broker, scheduler, ACL, D1 or D2
+effect occurs in this checkpoint. `/v2` is immutable historical state. After
+source acceptance, the next boundary is separately guarded read-only/pre-effect
+readiness and one protected incident cleanup. Only reviewed successful cleanup
+can precede separately provisioned/accepted fresh credentials and a separately
+reviewed one-shot authentication. D1/D2 remain disconnected; real money is NO-GO.
+
 ## 2026-10-13 — D1R4 real /v3 provisioning consumed; authentication STOPPED on input-shape anomaly
 
 The separately protected D1R4 local provisioning operation was executed once

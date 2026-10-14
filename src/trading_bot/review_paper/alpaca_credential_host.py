@@ -20,6 +20,7 @@ from trading_bot.review_paper.alpaca_credential_generation import (
     clear_credential,
     operate_generation,
     parse_generation_journal,
+    validate_fresh_credential_pair,
 )
 from trading_bot.review_paper.alpaca_credential_native import (
     WindowsV3CredentialStore,
@@ -28,6 +29,7 @@ from trading_bot.review_paper.alpaca_credential_native import (
 
 PROVISION_INTERLOCK = "PROVISION_ARCH134_D1R4_ONE_FRESH_V3_GENERATION"
 RECONCILE_INTERLOCK = "RECONCILE_ARCH134_D1R4_V3_READ_ONLY"
+LENGTH_CONFIRMATION = "CONFIRM_LENGTHS_MATCH_INTENDED_FRESH_DASHBOARD_GENERATION"
 STAGING_CONFIRMATION = "NO_V3_PROVIDER_EFFECT_AND_NO_OUT_OF_BAND_CREDENTIAL_WRITERS"
 
 
@@ -44,16 +46,34 @@ def interactive_generation_pair() -> tuple[bytearray, bytearray]:
     if input("Confirm staging/exclusion contract: ") != STAGING_CONFIRMATION:
         raise GenerationError("staging/exclusion confirmation required")
     values = []
+    repeats = []
+    failed = False
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", getpass.GetPassWarning)
             for prompt in ("Dashboard key ID: ", "Dashboard secret: "):
                 values.append(bytearray(getpass.getpass(prompt).encode("utf-8")))
-        return tuple(values)
+                repeats.append(
+                    bytearray(getpass.getpass("Repeat " + prompt).encode("utf-8"))
+                )
+        pair = tuple(values)
+        validate_fresh_credential_pair(pair)
+        if values != repeats:
+            raise GenerationError("fresh credential repeated entry mismatch")
+        print(f"Fresh UTF-8 lengths: key={len(values[0])}, secret={len(values[1])}")
+        if input("Confirm intended dashboard lengths: ") != LENGTH_CONFIRMATION:
+            raise GenerationError("fresh credential length confirmation required")
     except BaseException:
-        for value in values:
+        failed = True
+    finally:
+        for value in repeats:
             clear_credential(value)
-        raise
+        if failed:
+            for value in values:
+                clear_credential(value)
+    if failed:
+        raise GenerationError("fresh interactive credential input rejected")
+    return pair
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -40,6 +40,18 @@ EVENTS = frozenset(
     }
 )
 MAX_JOURNAL_BYTES = 32768
+# Local anti-truncation/placeholder guard; not a provider format/auth assertion.
+MIN_FRESH_CREDENTIAL_BYTES = 8
+
+
+def validate_fresh_credential_pair(values: tuple[bytearray, bytearray]) -> None:
+    """Fresh inputs only; historical stored one-byte values remain readable."""
+    if type(values) is not tuple or len(values) != 2:
+        raise GenerationError("invalid fresh credential input")
+    for value in values:
+        validate_alpaca_credential_bytes(value)
+        if len(value) < MIN_FRESH_CREDENTIAL_BYTES:
+            raise GenerationError("fresh credential input below local byte floor")
 
 
 class GenerationError(RuntimeError):
@@ -346,8 +358,7 @@ def operate_generation(
             if interactive_pair is None:
                 raise GenerationError("interactive generation required")
             values = interactive_pair()
-            if type(values) is not tuple or len(values) != 2:
-                raise GenerationError("invalid generation input")
+            validate_fresh_credential_pair(values)
             journal.witnesses = tuple(
                 credential_witness(role, value)
                 for role, value in zip(ROLES, values, strict=True)

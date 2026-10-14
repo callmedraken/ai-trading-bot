@@ -1740,4 +1740,3 @@ The next step is one separately reviewed real bounded pre-market
 source. It may create only its fresh external evidence and perform its bounded
 real clock/sleep behavior. It grants no automatic D1 ARM or downstream trading
 authority. D1/D2/live effects remain NO-GO.
-

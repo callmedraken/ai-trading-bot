@@ -40,8 +40,7 @@ megafiles during startup.
 ## Current operational checkpoint
 
 The current operational product lane is Architecture 134 and its D1R4 Alpaca
-authentication qualification sequence. The current canonical operational branch
-state before this history cutover is:
+authentication qualification sequence. The pre-HIST-2 operational baseline was:
 
 ```text
 branch  feature/robinhood-production-paper-alpaca-auth-qualification
@@ -49,8 +48,20 @@ HEAD    a2d4e4aca8e31fa9c72b4e21372c4d97f45b74fa
 TREE    2d29744b4d116c9567fe8a5894f5adaece4578cf
 ```
 
-The history-storage branch is only carrying the bounded-document and history
-cutover. It does not replace, advance, or authorize the operational branch.
+Do not treat that baseline as the current operational branch tip. The accepted
+HIST-2C.1 integration source base for this HIST-2B closeout is:
+
+```text
+HEAD  f156953b373aafbf80b6984752f65f3dc42caea1
+TREE  40fcf475584b2145dc3b99f6af3a75273f21d84d
+```
+
+The exact current operational branch HEAD/TREE must be re-proven from local
+Git and origin at every protected source admission. This closeout does not
+predict the final tip created by its own documentation commit.
+
+HIST-2B integration changes documentation, history, and archive tooling only.
+It grants no trading or provider authority.
 
 ## Exact D1R4 state
 
@@ -111,8 +122,8 @@ must:
 
 Once that provider-effect fence is appended, this generation can never
 authorize a second authentication qualification, regardless of HTTP result,
-transport outcome, ambiguity, interruption, or failure. HIST-2B.2 does not
-authorize that request.
+transport outcome, ambiguity, interruption, or failure. HIST-2B and its
+integration closeout do not authorize that request.
 
 ## Standing safety and effect invariants
 
@@ -151,12 +162,12 @@ its authority boundaries:
 - The D1R3 `/v2` qualification is historical, consumed predecessor evidence
   only; it is not current authority.
 
-## Recent transitions that still matter
+## Accepted history integration
 
-- HIST-2B froze the former cumulative handoff and status documents as the
-  immutable snapshot `HIST-2B-2026-10-13`. Its source identity, exact bytes,
-  and manifest are recorded in [history/INDEX.md](history/INDEX.md) and
-  [history/legacy/HIST-2B-2026-10-13/manifest.json](history/legacy/HIST-2B-2026-10-13/manifest.json).
+- HIST-2B is accepted: its exact legacy snapshot is sealed, and these bounded
+  current handoff and status documents are accepted. Its source identity,
+  exact bytes, and manifest are recorded in [history/INDEX.md](history/INDEX.md)
+  and [history/legacy/HIST-2B-2026-10-13/manifest.json](history/legacy/HIST-2B-2026-10-13/manifest.json).
 - Exact Git preservation was finalized at HEAD
   `83d0ec7d599f7494bb964c756a8b5717ac567d6c`, TREE
   `f6badbe010bd85cbb3dbfd0dd71be7842bbe3612`; the earlier normalized storage
@@ -166,11 +177,13 @@ its authority boundaries:
 
 ## Immediate next step
 
-For this checkpoint, the next step is exact source review and acceptance of the
-bounded history-storage change. For the operational product lane, the next
-step is the separately reviewed one-shot D1R4 authentication qualification
-readiness sequence. Stop before any provider request unless every fixed
-source, mutex, witness, journal, and provider-intent condition is proven.
+The immediate safe source step is to review this tiny integration closeout,
+commit it on the operational branch, push once, and require the exact
+operational GitHub source gate to reach terminal success. Re-establish the
+exact current operational branch HEAD/TREE from Git and origin, and
+authentication readiness, before any provider request. Stop before that
+request unless every fixed source, mutex, witness, journal, and provider-intent
+condition is proven.
 
 ## Historical reconstruction
 

@@ -8,14 +8,34 @@ cutover: the former cumulative current-state documents are preserved as an
 immutable legacy snapshot, while this file and
 `docs/AI_TRADING_BOT_HANDOFF.md` are bounded current-state documents.
 
-The history-storage branch is not trading authority. The operational product
-lane remains on:
+The history-storage branch is not trading authority. HIST-2B is accepted: its
+exact legacy snapshot is sealed, these bounded current documents are accepted,
+and its integration changes documentation, history, and archive tooling only.
+It grants no trading or provider authority. The operational product lane
+remains:
 
 ```text
 feature/robinhood-production-paper-alpaca-auth-qualification
+```
+
+The accepted HIST-2C.1 integration source base for this HIST-2B closeout is:
+
+```text
+HEAD  f156953b373aafbf80b6984752f65f3dc42caea1
+TREE  40fcf475584b2145dc3b99f6af3a75273f21d84d
+```
+
+The pre-HIST-2 operational baseline was:
+
+```text
 HEAD  a2d4e4aca8e31fa9c72b4e21372c4d97f45b74fa
 TREE  2d29744b4d116c9567fe8a5894f5adaece4578cf
 ```
+
+That baseline is not the current operational branch tip. At every protected
+source admission, exact current operational branch HEAD/TREE must be re-proven
+from local Git and origin; this closeout does not predict the final tip created
+by its own documentation commit.
 
 ## Operational checkpoint
 
@@ -76,10 +96,10 @@ source, acquire the fixed mutex, read the same local pair, reproduce the
 accepted journal witnesses, durably append `V3_PROVIDER_EFFECT_INTENT`, and
 only then permit the bounded authentication request.
 
-HIST-2B.2 is documentation/state storage only. It does not authorize the
-authentication request or any credential, provider, broker, trading,
-scheduler, production, deployment, ACL, SQLite, OAuth, PREPARE, EXECUTE, D1,
-or D2 effect.
+HIST-2B and this integration closeout change documentation, history, and
+archive tooling only. They grant no authority for the authentication request
+or any credential, provider, broker, trading, scheduler, production,
+deployment, ACL, SQLite, OAuth, PREPARE, EXECUTE, D1, or D2 effect.
 
 ## Current blocker / protected boundary
 
@@ -113,7 +133,11 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 - Keep the bounded status and handoff aligned with the exact operational D1R4
   state.
-- Complete review and acceptance of the HIST-2B.2 storage cutover.
+- Review this tiny HIST-2B integration closeout.
+- Commit it on the operational branch, push once, and require the exact
+  operational GitHub source gate to reach terminal success.
+- Re-prove exact current operational branch HEAD/TREE from Git and origin and
+  authentication readiness before any provider request.
 - Keep the immutable HIST-2B snapshot unchanged.
 
 ### Next

@@ -1,6 +1,24 @@
 # Architecture 138 / RCL-2 — Deterministic walk-forward qualification
 
-Status: IMPLEMENTED; terminal repository CI and ChatGPT exact-source review pending.
+Status: SOURCE ACCEPTED at HEAD `a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1`, TREE `55841f5119228dbf302747256326d43ff7d32e23`; Checkpoint Source Gates #561 / `38634855492` SUCCESS.
+
+## Acceptance evidence
+
+The current-lineage forward-port is accepted on the exact source above. GitHub
+Checkpoint Source Gates #561 / `38634855492` completed SUCCESS in one
+workflow_dispatch attempt: source-static passed 64 current authorities with 88
+test paths and 372 Ruff paths, and all four broad shards passed in 104.626,
+103.206, 80.923 and 107.732 seconds. Focused implementation evidence records
+980 distinct passing cases. Ruff lint/format and diff checks passed.
+
+The new domain module, its 899-line test module and the package export surface
+match the previously accepted Architecture-138 blobs exactly. The current-lineage
+delta is limited to live inventory assertions and the exact seven-test successor
+pin resolver after the existing D1R5 resolution chain. All seven declared
+successor blobs independently match GitHub. Historical pin dictionaries,
+executable/native/AST pins, ACTIVE membership/digest, D1R5 source/registration
+and workflow bytes remain frozen. All recorded operational effect counters are
+zero.
 
 ## Exact source and scope
 
@@ -228,8 +246,8 @@ dictionaries, executable/native/AST pins, ACTIVE tuple/digest, historical recove
 pins, D1R5 registration and workflow bytes remain frozen.
 
 D1R5 real-host qualification and all D1/D2 production operations remain
-independent protected boundaries. No production authority is inferred.
-The research branch is outside the production push allowlist. After one exact-file
-commit/ordinary push, dispatch one fresh repository Checkpoint Source Gates run,
-wait for terminal evidence, then hand off to ChatGPT exact-source review and stop.
-No local FULL/ROBINHOOD/LEGACY/EXHAUSTIVE gate is run. Real-money placement is NO-GO.
+independent protected boundaries. No production authority is inferred. The
+research branch remains parallel to the active D1R5 product lineage; this source
+acceptance does not move the canonical handoff branch or the D1R5 source identity.
+No local FULL/ROBINHOOD/LEGACY/EXHAUSTIVE gate was required. Real-money placement
+remains NO-GO.

@@ -1,7 +1,24 @@
 # Architecture 138 / RCL-2 — Current-lineage forward-port validation
 
-Status: IMPLEMENTED; focused authority verification, terminal repository CI and
-ChatGPT exact-source review pending. No source acceptance is claimed.
+Status: SOURCE ACCEPTED at HEAD `a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1`, TREE
+`55841f5119228dbf302747256326d43ff7d32e23`; Checkpoint Source Gates #561 /
+`38634855492` SUCCESS.
+
+## Terminal acceptance evidence
+
+Fresh Checkpoint Source Gates #561 / `38634855492` completed SUCCESS on the
+exact accepted source in one dispatch/attempt. source-static passed with 64
+current authorities, 88 test paths and 372 Ruff paths; git diff, Ruff check and
+Ruff format all passed. The four broad shards passed in 104.626 / 103.206 /
+80.923 / 107.732 seconds, all below the 300-second hygiene ceiling. active-tests
+and certification-tests were skipped as expected for this unmapped research
+dispatch.
+
+Focused verification records 980 distinct passing cases after the explicitly
+approved D1R4R/D1R4/D1R3 successor-resolution correction. Every declared
+Architecture-138 successor blob matches the committed Git blob. Frozen
+predecessor dictionaries and executable/native/AST pins remain unchanged.
+No protected or operational effect occurred.
 
 ## Provenance and fixed contract
 
@@ -123,11 +140,11 @@ bytes remain unchanged; dispatch exactly one fresh Checkpoint Source Gates run
 on the exact branch. Require terminal source-static and applicable broad shards
 PASS, each shard below 300 seconds. Preserve failures; no blind retry.
 
-STOP after terminal CI and return identities, changed paths, inventory,
-focused/static/pin/CI results and zero effects for ChatGPT exact GitHub review.
-Source acceptance and bounded status/handoff closeout occur only afterward.
-Both bounded current documents were reviewed and remain unchanged during this
-implementation; no cumulative narrative is appended.
+The implementation stop boundary is complete: terminal CI and exact GitHub
+source review both passed. Architecture 138 is SOURCE ACCEPTED on the identity
+recorded above. The bounded status/handoff closeout records it as a parallel
+safe-side checkpoint without changing the active D1R5 protected boundary or
+advancing the canonical handoff branch onto research executable source.
 
 ## Zero-effect accounting
 

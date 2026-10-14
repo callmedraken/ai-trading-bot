@@ -112,6 +112,16 @@ source checkpoint is accepted at HEAD
 `9fcbc170e8339e0b4a93844466e8924ff8ef7f36`, but its real bounded
 clock/sleep/external-evidence qualification has not yet run.
 
+Parallel safe-side research has also advanced without changing that product
+boundary. Architecture 138 / RCL-2 is SOURCE ACCEPTED on
+`feature/research-candidate-walk-forward-qualification-current` at HEAD
+`a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1`, TREE
+`55841f5119228dbf302747256326d43ff7d32e23`, Checkpoint Source Gates
+#561 / `38634855492` SUCCESS. Its branch inventory is FULL 176 /
+EXHAUSTIVE 391 while ACTIVE 64 / ROBINHOOD 98 / LEGACY 215 / GUI 44 are
+unchanged. It grants no production authority and is not integrated into the
+active D1R5 product lineage.
+
 The D1R4 authentication PASS grants no PREPARE, EXECUTE, paper mutation, broker
 placement, scheduler/ACL mutation, D1 launch, D2 invocation, or live-trading
 authority.
@@ -173,10 +183,13 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Next
 
-- Qualify pre-market start, durable `WAITING_FOR_MARKET`, wake timing, and
-  exact source re-admission.
-- Only after that qualification is accepted, review the next fresh D1 session
-  authorization boundary.
+- Production: qualify pre-market start, durable `WAITING_FOR_MARKET`, wake
+  timing, and exact source re-admission; only after acceptance review a fresh D1
+  session authorization boundary.
+- Safe-side: Architecture 139 may define deterministic no-effect SHADOW
+  observation/qualification evidence, or GUI may expose accepted candidate
+  lifecycle/qualification evidence read-only. Neither path may imply promotion,
+  D1/D2, provider, broker, or live authority.
 
 ### Later
 

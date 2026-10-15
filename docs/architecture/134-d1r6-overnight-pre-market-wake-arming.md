@@ -47,8 +47,8 @@ MultipleInstancesPolicy IgnoreNew; ExecutionTimeLimit PT20M;
 AllowHardTerminate true; idle stop/restart false. InteractiveToken, least
 privilege, current observed principal name and SID; no password dependency.
 The fixed action is System32 Windows PowerShell -NoProfile -NonInteractive
--File against the fixed D1R6 task launcher. Its working directory is the fixed
-D1R6 worktree. The launcher selects the fixed development Python and isolated
+-ExecutionPolicy Bypass -File against the fixed D1R6 task launcher. Its working
+directory is the fixed D1R6 worktree. The launcher selects the fixed development Python and isolated
 source launcher. No environment executable/source override is accepted.
 
 Local COM transport uses TASK_CREATE=2 once, TASK_LOGON_INTERACTIVE_TOKEN=3,
@@ -137,3 +137,25 @@ D1R5 dictionaries stay frozen. Inventory is discovered, not reassigned.
 One exact-file implementation commit/push after focused PASS, attempt-1 mapped
 CI with canonical wall below 300 seconds, then STOP for ChatGPT exact review.
 PROJECT_STATUS.md and AI_TRADING_BOT_HANDOFF.md remain untouched.
+
+## D1R6R1 — process-scoped PowerShell transport correction
+
+The reported real-host read-only preflight passed all Git/source admission but
+Windows blocked the helper before principal/scheduler observation because scripts
+were disabled under the default process policy. No scheduler mutation or D1R5
+invocation occurred. D1R6R1 is a source correction, pending exact GitHub review.
+
+Both Python-to-scheduler-helper argv and Task-Scheduler-to-launcher arguments
+now use exactly `-NoProfile -NonInteractive -ExecutionPolicy Bypass -File`
+against their fixed absolute executable/helper paths. This follows
+[Architecture 126](126-d5-task-scheduler-readonly-observation-authority.md):
+`-ExecutionPolicy Bypass` configures only that fixed child process. It changes no
+persistent MachinePolicy/UserPolicy/CurrentUser/LocalMachine policy and grants no
+additional scheduler or trading authority. No caller-selected policy is accepted.
+
+Set-ExecutionPolicy, registry/Group Policy writes, environment policy overrides,
+profile edits and machine/user policy mutation are forbidden. Task identity,
+principal, timings, settings, one-create budget, evidence schema, D1R5 target and
+qualification interlock remain unchanged. Source verification does not invoke
+the real helper, preflight, scheduled action or D1R5. Stop after exact-head CI for
+ChatGPT source review; do not rerun the real-host preflight during this checkpoint.

@@ -88,7 +88,7 @@ try {
         $trigger.StartBoundary = $startText; $trigger.EndBoundary = $endText; $trigger.Enabled = $true
         $action = $definition.Actions.Create(0)
         $action.Path = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
-        $action.Arguments = '-NoProfile -NonInteractive -File "F:\AI\worktrees\ai-trading-bot-production-paper-overnight-wake-arming\scripts\arch134_d1r6_task_launcher.ps1"'
+        $action.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "F:\AI\worktrees\ai-trading-bot-production-paper-overnight-wake-arming\scripts\arch134_d1r6_task_launcher.ps1"'
         $action.WorkingDirectory = 'F:\AI\worktrees\ai-trading-bot-production-paper-overnight-wake-arming'
         $settings = $definition.Settings
         $settings.Enabled = $true; $settings.WakeToRun = $true; $settings.StartWhenAvailable = $false

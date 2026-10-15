@@ -106,6 +106,8 @@ class _WindowsRuntime:
                 overnight.POWERSHELL,
                 "-NoProfile",
                 "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
                 "-File",
                 str(
                     overnight.WORKTREE / "scripts" / "arch134_d1r6_scheduler_create.ps1"

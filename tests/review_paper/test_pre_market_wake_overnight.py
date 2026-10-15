@@ -179,7 +179,8 @@ def test_frozen_task_contract():
         "action_type": 0,
         "command": r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
         "arguments": (
-            '-NoProfile -NonInteractive -File "F:\\AI\\worktrees\\'
+            "-NoProfile -NonInteractive -ExecutionPolicy Bypass "
+            '-File "F:\\AI\\worktrees\\'
             "ai-trading-bot-production-paper-overnight-wake-arming\\scripts\\"
             'arch134_d1r6_task_launcher.ps1"'
         ),
@@ -764,7 +765,18 @@ def test_transport_input_is_stdin_and_output_is_closed(monkeypatch):
     )
     assert host._WindowsRuntime().create(plan())["registration_attempts"] == 1
     argv, kwargs = calls[0]
-    assert argv[-2:] == ["-Mode", "Create"]
+    assert argv == [
+        q.POWERSHELL,
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(q.WORKTREE / "scripts" / "arch134_d1r6_scheduler_create.ps1"),
+        "-Mode",
+        "Create",
+    ]
+    assert kwargs.get("shell", False) is False
     assert kwargs["input"].endswith("\n") and "principal_sid" not in " ".join(argv)
 
 
@@ -823,9 +835,16 @@ def test_static_capability_closure_and_fixed_transport():
     text = (ROOT / "scripts/arch134_d1r6_scheduler_create.ps1").read_text(
         encoding="utf-8"
     )
+    action_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("$action.Arguments =")
+    ]
+    assert action_lines == ["$action.Arguments = '" + plan().task["arguments"] + "'"]
     assert text.count(".RegisterTaskDefinition(") == 1
     assert "$definition, 2, $identity.sid, $null, 3, $null)" in text
     for forbidden in (
+        "Set-ExecutionPolicy",
         "TASK_UPDATE",
         ".Run(",
         ".Stop(",
@@ -1030,3 +1049,67 @@ def test_additional_predecessor_overlay_is_exact_and_test_only(monkeypatch):
         runner._arch134_d1r6_test_pin(
             next(iter(baseline)), next(iter(baseline.values()))
         )
+
+
+@pytest.mark.parametrize("mode", ["Principal", "Observe", "Create"])
+def test_all_scheduler_modes_use_only_fixed_process_policy(monkeypatch, mode):
+    calls = []
+    monkeypatch.setattr(
+        host.subprocess,
+        "run",
+        lambda argv, **kwargs: (
+            calls.append((argv, kwargs)) or SimpleNamespace(returncode=0, stdout="{}")
+        ),
+    )
+    host._WindowsRuntime()._scheduler(mode, plan() if mode == "Create" else None)
+    argv, kwargs = calls[0]
+    assert argv == [
+        q.POWERSHELL,
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(q.WORKTREE / "scripts" / "arch134_d1r6_scheduler_create.ps1"),
+        "-Mode",
+        mode,
+    ]
+    assert kwargs.get("shell", False) is False
+    assert "env" not in kwargs
+    assert kwargs["input"].endswith("\n")
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "option,value",
+    [
+        ("--execution-policy", "Unrestricted"),
+        ("--execution-policy", "bypass"),
+        ("--execution-policy", "ByPass"),
+        ("--execution-policy", "Bypass"),
+        ("--policy", "Bypass"),
+        ("--powershell", "caller.exe"),
+        ("--scheduler-script", "caller.ps1"),
+    ],
+)
+def test_caller_cannot_select_policy_executable_or_script(option, value):
+    with pytest.raises(ValueError):
+        host.build_parser().parse_args(["preflight", option, value])
+
+
+@pytest.mark.parametrize(
+    "keyword,value",
+    [
+        ("execution_policy", "Unrestricted"),
+        ("execution_policy", "bypass"),
+        ("execution_policy", "Bypass"),
+        ("script", "caller.ps1"),
+        ("executable", "caller.exe"),
+    ],
+)
+def test_transport_has_no_caller_policy_or_path_surface(monkeypatch, keyword, value):
+    monkeypatch.setattr(
+        host.subprocess, "run", lambda *a, **kw: pytest.fail("process entered")
+    )
+    with pytest.raises(TypeError):
+        host._WindowsRuntime()._scheduler("Observe", **{keyword: value})

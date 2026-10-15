@@ -36,3 +36,32 @@ overlay/resolvers/digests, inventories, focused counts and CI evidence, then
 STOP. ChatGPT owns exact GitHub acceptance. Later real read-only preflight,
 one protected arm, unattended D1R5 and morning read-only reconciliation each
 remain separately reviewed boundaries; none is run by this checkpoint.
+
+## D1R6R1 process-scoped transport regression
+
+The reported real-host preflight passed Git/source admission and then failed
+before principal/scheduler observation: default Windows PowerShell policy blocked
+the fixed helper. No scheduler mutation or D1R5 invocation occurred. Correct
+only the fixed child-process `-ExecutionPolicy Bypass` tokens, on both the
+Python-to-helper argv and Task-Scheduler-to-launcher action. No persistent policy
+mutation (including Set-ExecutionPolicy), registry/Group Policy change,
+environment policy override or profile edit is authorized.
+
+Mock all three scheduler transport modes and assert the complete fixed argv,
+including the exact executable, policy case, script and mode. Assert the exact
+scheduled action string independently and statically match the PowerShell
+creator to it. Reject caller policy/script selection and assert the creator
+contains no Set-ExecutionPolicy and exactly one TASK_CREATE registration call.
+Retain all existing no-retry, scheduler and trading-authority closure tests.
+Use PowerShell syntax parsing only; never invoke the real scheduler helper.
+
+The existing D1R6 checkpoint and ROBINHOOD mapping remain unchanged. Refresh only
+the six genuinely changed D1R6 source/script/test/doc pins. Inventory remains
+FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391. Focused D1R6, frozen D1R5,
+NYSE, runner, profile/lane and predecessor authority checks precede exact-file
+commit/push. Require attempt-1 static/active/canonical/terminal CI SUCCESS,
+full-tests SKIPPED and canonical wall <300 seconds, then stop for ChatGPT review.
+REAL_D1R6_PREFLIGHTS, REAL_SCHEDULER_MUTATIONS, REAL_TASK_RUNS and
+REAL_D1R5_EXECUTIONS remain zero during this correction. Do not rerun preflight
+or arm the scheduler after publication. PROJECT_STATUS and HANDOFF are reserved
+for post-acceptance closeout.

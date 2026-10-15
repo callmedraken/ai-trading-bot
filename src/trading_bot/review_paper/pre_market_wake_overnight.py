@@ -187,7 +187,7 @@ class Plan:
             "action_count": 1,
             "action_type": 0,
             "command": POWERSHELL,
-            "arguments": '-NoProfile -NonInteractive -File "'
+            "arguments": '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "'
             + str(WORKTREE / "scripts" / "arch134_d1r6_task_launcher.ps1")
             + '"',
             "working_directory": str(WORKTREE),

@@ -11624,7 +11624,7 @@ ARCH134_D1R7_SOURCE_PINS: Final = {
         "58b7cba899ff8f41ceb058be51e743ca4a87becd"
     ),
     "docs/validation/arch134-d1r7-stale-wake-retirement.md": (
-        "c97f47767d6dbd593fea970e267644b9ba3fdd8d"
+        "bb8a2c4224838a36ebf1dfb516de7bc3e8af90ab"
     ),
 }
 ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
@@ -11648,9 +11648,49 @@ ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
         "99efdaa678ef63541f3c583d7c3bcb5f965c357b",
         "39cd02b8d4752f2db4cbfd712cce90019016882a",
     ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "de7a77d3b0cf58fd9d5d58450181f8a1957fc7b2",
+        "29b5b9a865021ddc55d45661cdeec3d344076856",
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "ea7ca9f8a0ec33449f70101e2e27aa72d2f27a39",
+        "a5b36071b80c09abd6f5728e633cf09fd5e1230f",
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "127db46d0211570727c2a9fb6118bb8f6a3b45d2",
+        "712cd081e20442a0a83ad41c362ccc467283a5cc",
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "292f4b3fa8fc3b667f6b60c6498da99aa8b687b5",
+        "6847395a4bf937d64ef4d4cbf639706ae8dea97b",
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "7e86ab4182bf21577c061836b77269066410707b",
+        "12ac86757f895922dec061777fcf0f6ce682a58d",
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "ecd2074d3f4e9b42f314a6556e32b57b70753a1e",
+        "e2520faac38597fd99b8b66bb84b8359ecb3525f",
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "3c1fafd75920ba3346918fd3c44fb3a390e73678",
+        "76dd6c121c0e5cf3e83540bb08dce76a5ec04944",
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "e3a85fd7a71e9e83c89faf60bf25dea6d26a49d2",
+        "cfe36905819f4cc0eb2272b8f4f0eb615905081d",
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "b31d8a5055ebaa763abf1e2e6ed1a5485f1b2f31",
+        "15d675651a71c763a841d4e632514b85a320ba66",
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "9a7b88f8363b0c7c89ee6e23659b6a444679c7c4",
+        "89138c9cadffce1328925ea3b76d29211a2d95c1",
+    ),
 }
 ARCH134_D1R7_TEST_PINS_SHA256: Final = (
-    "ec7b577ad16690e701598b2a7bfafcfc0e8c6607ade8a47ceff156704a3eecde"
+    "6b6ce3f9915c06bfcece092da4fec09ca7b26310262124479e7d588bde662d73"
 )
 ARCH134_D1R7_PREDECESSOR_SHA256: Final = (
     "e1184752f6595ac632612e7bc51b8ea9a5b7a439c9e78016b0f6c6bd74b626ab"

@@ -56,3 +56,21 @@ EXHAUSTIVE only, absent from FULL, ROBINHOOD and the new active checkpoint.
 No retained source/test is changed. This is an existing compatibility limitation,
 not a current-product source-gate failure. Final focused commands above select
 the affected current runner modules; do not rerun the entire directory for D1R7.
+
+
+## Diagnosed registration correction
+
+The first D1R7 publication at 9119087feb72ee02f70e6fc95fda9d733c925ccd
+has source-static PASS but Checkpoint Source Gates #575 / 38804913747 active
+tests failed (2,758 passed, ten failed). Those ten tests freeze predecessor
+active-count/suffix-position/profile-count expectations. The initial focused
+selection missed those existing modules. All D1R7 behavioral cases passed.
+This source is not accepted. No CI retry is authorized or used.
+
+The corrective checkpoint updates only the ten failing registration tests and
+the closed test-only successor blob overlay. Active count is 66; tuple positions
+before the inserted D1R7 entry shift by one; inventory remains 177/100/215/392.
+Predecessor pin dictionaries, executable code, workflow and native authority stay
+unchanged. Run the exact ten failed tests plus successor authority/profile checks,
+commit normally, then require a new exact-head attempt-1 source gate. This is a
+diagnosed source correction, not a rerun of the failed source.

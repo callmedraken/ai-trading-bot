@@ -532,7 +532,7 @@ def test_source_registration_profiles_and_authority():
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-runtime-host-admission"
     assert runner.ACTIVE_CI_CHECKPOINTS[2] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 64
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 65
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     assert spec.authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
@@ -541,10 +541,10 @@ def test_source_registration_profiles_and_authority():
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 175,
-        "robinhood": 98,
+        "full": 176,
+        "robinhood": 99,
         "legacy": 215,
-        "exhaustive": 390,
+        "exhaustive": 391,
     }
 
 

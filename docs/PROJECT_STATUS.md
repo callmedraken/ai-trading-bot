@@ -146,102 +146,97 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The October 15 D1R6 arm attempt is consumed. Its native TASK_CREATE returned,
-but historical R2 confirmation rejected Windows' equivalent post-registration
-serialization and durably recorded FINAL/INDETERMINATE. Read-only diagnostics
-proved the registered task's trigger instants and principal SID were semantically
-identical to the frozen plan.
+The October 15 D1R6 incident is now **POST-TRIGGER RECONCILED FAIL-CLOSED**.
 
-R3 source is accepted, but its exact recovery preflight requires the task still
-be READY/HAS_NOT_RUN and the clock remain before the original 06:20 Pacific
-trigger. That time boundary has passed. Do not run `recover-preflight`,
-`recover`, `arm`, or any task mutation for the October 15 incident.
+Read-only reconciliation proved:
 
-The immediate boundary is a **post-trigger read-only reconciliation** from the
-still-frozen live task worktree and external qualification directory. It should
-determine, without mutation:
+```text
+live local HEAD       3cf4284d017e362eee58a2f27526ab4de8f292a2
+live local TREE       16a48a12756bb6d810799444859334ce6305001d
+remote branch HEAD    a72d1f4f3e84ff7682dbea5ba0c6851714547483
+source divergence     YES
 
-- whether the scheduler task actually fired;
-- its current state and LastTaskResult;
-- whether the D1R6 launch fence exists;
-- whether any D1R5 result evidence exists;
-- whether the historical consumed arm journal remains byte-identical.
+consumed journal      16917 bytes
+journal SHA-256       b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
+launch fence          ABSENT
+D1R5 result           ABSENT
+recovery artifacts    0
 
-Because the frozen predecessor launcher requires FINAL/ARMED, the expected
-fail-closed outcome is no D1R5 delegation, but real-host evidence should confirm
-that before cleanup or future-session planning.
+task state            3 / READY
+LastTaskResult         2
+LastRunTime            2026-10-15 06:20 Pacific
+NextRunTime            none / 1899-12-30 sentinel
+```
 
-Any future cleanup/replacement/re-arming is a separate protected effect boundary
-with no blind retry and no reuse of the consumed October 15 authority.
+The scheduled task fired exactly once at the intended 06:20 Pacific trigger and
+returned exit code 2. The frozen predecessor launcher first performs exact source
+admission, including a live `ls-remote` equality check. The remote branch had
+already moved to R3 while the live task worktree intentionally remained frozen
+at `3cf4284d...`; therefore the scheduled launch failed source admission before
+the consumed FINAL/INDETERMINATE journal could be considered and before any D1R5
+launch fence could be created.
+
+This is independently confirmed by the absent launch fence and absent D1R5
+result. No D1R5 delegation occurred. The historical consumed journal remains
+byte-identical and no recovery artifact was created.
+
+The immediate next boundary is **not recovery** and **not another arm**. The
+stale one-time task is still present/enabled but has no next run. A new,
+separately reviewed cleanup/replacement authority is required before any future
+session can use the fixed task path again.
 
 ## Current blocker / protected boundary
 
-Remote Alpaca authentication is proven for the fixed probe and D1R5 source is
-accepted, but the required real pre-market / `WAITING_FOR_MARKET` / wake
-qualification has not yet been executed or accepted. No fresh D1 session is
-authorized until that protected boundary is complete.
-The D1R4 authentication invocation is permanently consumed and must not be
-retried. Real-money trading is **NO-GO**.
+The stale October 15 Task Scheduler registration is the current protected
+boundary.
 
-## Verification and certification posture
+It must not be deleted, updated, rerun or reused ad hoc. Its single native create
+attempt is consumed, and the October 15 R3 recovery path is expired.
 
-Architecture 132 remains the governing posture:
+A successor checkpoint should provide an **exact stale-task retirement** path
+that:
 
-```text
-FOCUSED -> SOURCE-GATE CI
--> ChatGPT selects ROBINHOOD or FULL at a coherent current-product boundary
--> LEGACY / EXHAUSTIVE only when explicitly relevant
-PROTECTED only at the exact separately reviewed effect boundary
-```
+- admits accepted R3/current source and frozen D1R5 source;
+- pins the consumed journal name/size/SHA exactly;
+- requires launch fence absent, D1R5 result absent and recovery artifact absent;
+- requires the exact registered task definition after R3 canonical observation;
+- requires LastRunTime = 2026-10-15 06:20 Pacific and LastTaskResult = 2;
+- requires no next run;
+- permits at most one native TASK_DELETE attempt;
+- never runs/updates/recreates the task in the same operation;
+- durably records intent/result/confirmation in separate retirement evidence;
+- treats deletion ambiguity as consumed and non-retryable;
+- has zero D1R5/D1/paper/broker/provider/credential/live authority.
 
-Mapped certification remains CI-owned; local repetition of the same valid
-profile is not routine. Checkpoint Source Gates #549 accepted the integrated
-operational source: static authority and active tests passed, and canonical
-ROBINHOOD certification passed 9,065 / 9,066 cases with one skip and zero
-failures/errors in 200.417 seconds. Artifact `11875285428` has SHA-256
-`02c29f3debd0cf274e85986ab5bd74ebbfc7b9ce9ec234e04fd9d3ad93240b2e`.
-Current inventory after accepted D1R5 is FULL 175 / ROBINHOOD 98 /
-LEGACY 215 / EXHAUSTIVE 390. The earlier #549 result remains historical
-integrated-source evidence. Current D1R5/R3H acceptance is Checkpoint Source
-Gates #557 / `38549244176`: static authority PASS, active tests PASS, canonical
-ROBINHOOD 9,182 cases / 9,181 passed / one skipped / zero failed/errors, wall
-253.493 seconds (below the frozen 300-second hygiene ceiling). FULL covers currently supported
-functionality, while LEGACY/EXHAUSTIVE retain explicit historical
-compatibility. This acceptance grants no protected authority. See the
-[tiered certification profile](architecture/132-tiered-certification-profiles.md)
-and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
+Only after independently accepted retirement may a fresh next-session D1R6
+preflight/arming generation be considered.
 
 ## Roadmap
 
 ### Now
 
-- Preserve accepted D1R6R3 source at
-  `e6defea5aa7b9266f78c7d2f22ebac90bf568dd7` /
-  `f9ad06c9b26beb681ceb3429fd66452e4aef88a9`.
-- Preserve the consumed October 15 arm journal exactly; never rewrite or relabel
-  FINAL/INDETERMINATE.
-- Do not run the expired R3 recovery path for October 15.
-- Perform one source-owned/read-only post-trigger reconciliation of the existing
-  task, launch fence and D1R5 evidence.
-- Keep D1, PREPARE, EXECUTE, paper, broker, D2 and live effects closed.
+- Preserve D1R6R3 accepted source and the immutable October 15 consumed journal.
+- Treat October 15 as conclusively fail-closed: task fired, exit 2, no launch
+  fence, no D1R5 evidence, no recovery artifact.
+- Do not run R3 recover/recover-preflight for the expired incident.
+- Do not manually delete/update/run the stale task.
+- Design and source-review the next checkpoint for exact stale-task retirement.
 
 ### Next
 
-- If post-trigger evidence confirms fail-closed/no D1R5 delegation, design a
-  separately reviewed next-session cleanup/replacement authority for the stale
-  one-time task and consumed journal.
-- Create any new wake authority with a fresh session/task-generation/evidence
-  identity rather than retrying or repurposing the consumed October 15 attempt.
-- Run a fresh read-only preflight before any future scheduler mutation.
-- Only a separately authorized future task creation may schedule another D1R5
-  qualification.
+- Execute one separately authorized stale-task retirement after source acceptance
+  and a read-only retirement preflight.
+- Reconcile deletion independently; no blind retry.
+- Only after confirmed retirement, prepare a fresh next-session wake authority
+  with new session/evidence identity and a fresh read-only preflight.
+- Keep the D1R5 target unchanged unless separately reviewed.
 
 ### Later
 
-- After a future canonical D1R5 PASS is independently accepted, consider the
-  next fresh D1-session boundary.
-- Keep real-money trading unavailable until every explicit production/live gate
-  is implemented, accepted and separately enabled.
+- Only after a future canonical D1R5 PASS is independently accepted may a fresh
+  D1-session authorization be considered.
+- Keep PREPARE/EXECUTE, paper/broker, D2 and real-money trading behind their own
+  reviewed authority boundaries.
 
 ## History and deep-reference pointers
 

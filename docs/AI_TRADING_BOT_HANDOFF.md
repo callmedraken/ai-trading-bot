@@ -162,32 +162,36 @@ live-trading authority.
 
 ## Current protected boundary
 
-The October 15 one-shot TASK_CREATE attempt is consumed and cannot be retried.
-Its existing task and historical FINAL/INDETERMINATE journal must not be
-mutated, deleted, rewritten or reused.
+The October 15 wake incident is post-trigger reconciled and fail-closed.
 
-R3 source is accepted, but its incident-specific recovery path is now time-
-expired because recovery admission requires `clock < original trigger`. Do not
-run `recover-preflight`, `recover` or `arm` for this incident.
+The one-time task fired at 06:20 Pacific and returned exit code 2. Its frozen
+launcher was still sourced from local HEAD
+`3cf4284d017e362eee58a2f27526ab4de8f292a2`, while the live remote branch had
+already advanced. The accepted predecessor host's exact source admission checks
+`ls-remote` against local HEAD before loading arm authority, so the scheduled
+launch necessarily stopped at source admission.
 
-The only current authorized next step is read-only post-trigger reconciliation.
-It may inspect:
+Durable external facts:
 
-- exact frozen live-worktree source identity;
-- exact consumed journal bytes/hash;
-- current scheduler task state/LastTaskResult and definition;
-- launch-fence presence/absence;
-- D1R5-result presence/absence.
+```text
+consumed arm journal bytes/SHA exact      YES
+launch fence                              ABSENT
+D1R5 result                               ABSENT
+recovery artifact count                   0
+task LastRunTime                           2026-10-15 06:20 Pacific
+task LastTaskResult                        2
+task current state                         READY
+task next run                              none
+```
 
-It may not mutate Task Scheduler, create recovery evidence, invoke D1R5, or
-touch credentials/providers/paper/SQLite/ACL/D1/D2/live authority.
+Therefore D1R5 was not delegated and the October 15 incident grants no D1
+authority.
 
-If reconciliation confirms no D1R5 delegation, future scheduler cleanup and a
-new session wake must be designed as a distinct reviewed protected-effect
-boundary. No existing October 15 evidence or native-create budget may be reused.
-
-If any unexpected D1R5 evidence exists, stop and independently review that
-evidence before any other action.
+Do not run arm, recover, recover-preflight, manual task run, update or deletion.
+The next protected boundary is a new source-reviewed stale-task retirement
+checkpoint with one exact delete budget and zero recreation/delegation/trading
+authority. After retirement is independently reconciled, a fresh next-session
+wake generation may be planned.
 
 ## Standing safety and effect invariants
 

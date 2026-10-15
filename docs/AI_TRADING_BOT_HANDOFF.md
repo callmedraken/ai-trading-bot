@@ -42,57 +42,57 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-Architecture 134-D1R6R2 **byte-exact scheduler stdin correction** is SOURCE
-ACCEPTED on:
+Architecture 134-D1R6R3 **canonical observation + exact consumed-arm recovery**
+is SOURCE ACCEPTED:
 
 ```text
 branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    6f9548815cbd241f0ab21095c760c294e415a215
-TREE    41e350ca88f7efaf16387865ed01d29bb55a0ee9
-CI      #570 / 38720140775 / SUCCESS / attempt 1
+HEAD    e6defea5aa7b9266f78c7d2f22ebac90bf568dd7
+TREE    f9ad06c9b26beb681ceb3429fd66452e4aef88a9
+CI      #572 / 38737407813 / SUCCESS / attempt 1
 ```
 
-Independent GitHub review confirmed exactly one five-file correction commit over
-the accepted D1R6R1 docs descendant `07aaf06fecacfce3c666fe788fded6ab52290c8c`.
-Production behavior changed only in
-`pre_market_wake_overnight_host.py`: scheduler requests now use canonical raw
-bytes plus one LF, the subprocess runs in binary mode, the stdout bound counts
-raw bytes, and JSON parses raw bytes directly. Four corresponding D1R6 pins
-changed; the PowerShell helper, scheduled-action source, D1R5, workflow,
-PROJECT_STATUS and HANDOFF were frozen during implementation.
+Exact GitHub review confirmed the seven-file commit and frozen task launcher,
+D1R5 child, runner, D1R5 predecessor and source-gate workflow. R3 canonicalizes
+Task Scheduler offset-bearing trigger strings to the original UTC instants and
+resolves observed UserId values to canonical SIDs. It does not change task
+registration behavior or add scheduler update/delete/run authority.
 
-Source-static passed with zero authority failures and scheduler/provider/
-production/broker effects NOT_RUN. Active JUnit is 2,434 / 2,434. Canonical
-ROBINHOOD is 9,400 passed / 1 skipped / 0 failed / 0 errors, wall 282.381
-seconds. Selected ROBINHOOD inventory remains 99 modules; global inventory
-remains FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
+The exact October 15 consumed incident is hard-pinned by predecessor HEAD/TREE,
+journal filename, 16917 bytes and SHA-256
+`b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c`.
+Its durable terminal classification remains FINAL/INDETERMINATE after
+TASK_CREATE_RETURNED; the one native create attempt remains consumed.
 
-The preceding real-host diagnosis established two transport facts without
-crossing a protected scheduler boundary. D1R6R1's process-scoped
-`-ExecutionPolicy Bypass` allowed the helper to execute. Canonical Principal
-still returned NOT_CALLED / registration_attempts=0, while the same fixed
-argv/helper supplied with raw `b"{}\n"` returned the valid current Windows
-principal. That isolated Python text-mode newline translation as the remaining
-defect. No Observe/Create, task run, scheduler mutation, D1R5 execution, or
-qualification-evidence creation occurred.
+R3 adds only a separate recovery artifact path with zero scheduler mutation,
+task-run and D1R5-execution budgets. The consumed predecessor alone never grants
+launch authority.
 
-D1R6R2 therefore preserves the PowerShell helper's strict LF/EOF contract and
-changes only its caller. Principal/Observe input is exactly `b"{}\n"`;
-Create is the unchanged canonical request object plus one LF. No
-text/encoding/errors/environment/universal-newline or shell authority is
-introduced. CRLF on helper stdout is accepted only as ordinary JSON trailing
-whitespace.
+Checkpoint #572 independently passed source-static and active tests (2,599 /
+2,599) plus canonical ROBINHOOD (9,565 passed / 1 skipped / 0 failed/errors,
+164.700s wall). Static authority passed with scheduler/provider/production/
+broker effects NOT_RUN.
 
-The fixed D1R5 target remains:
+Operationally, the incident-specific recovery window has expired. Recovery
+requires current time strictly before the original 2026-10-15 06:20 Pacific
+trigger; that trigger is now past. Therefore do not fast-forward the live task
+worktree for the purpose of recovering today's task and do not run
+recover-preflight/recover.
+
+The current next boundary is read-only post-trigger reconciliation of the
+existing task, launch fence and D1R5 evidence. Expected behavior is fail-closed:
+the predecessor launcher cannot accept FINAL/INDETERMINATE, but this must be
+confirmed from the real host before any future scheduler cleanup/replacement.
+
+D1R5 remains:
 
 ```text
 HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
 TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-Real D1R5 qualification, real scheduler mutation, and D1 remain unrun. The next
-protected boundary is one fresh canonical read-only D1R6 preflight against the
-accepted D1R6R2 source. A PASS does not authorize task creation.
+No D1/PREPARE/EXECUTE/paper/broker/D2/live authority follows from R3 source
+acceptance.
 
 ## Exact D1R4 state
 
@@ -162,34 +162,32 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R4 authentication is complete and consumed. D1R6R2 source is accepted, but
-all real D1R6/D1R5 effects remain closed.
+The October 15 one-shot TASK_CREATE attempt is consumed and cannot be retried.
+Its existing task and historical FINAL/INDETERMINATE journal must not be
+mutated, deleted, rewritten or reused.
 
-The immediate step is exactly one fresh **read-only D1R6 preflight**. It may
-verify the final D1R6 source, fixed D1R5 target source, frozen NYSE session
-derivation, qualification-parent/evidence absence, current logged-in Windows
-principal, and fixed task absence/definition read-only. Its fixed PowerShell
-transport now has both reviewed host corrections: process-scoped
-`-ExecutionPolicy Bypass` and byte-exact stdin framing. No persistent policy
-mutation is authorized.
+R3 source is accepted, but its incident-specific recovery path is now time-
+expired because recovery admission requires `clock < original trigger`. Do not
+run `recover-preflight`, `recover` or `arm` for this incident.
 
-The prior blocked preflights and read-only Principal diagnostics are diagnostic
-only and not consumed scheduler/D1R5 attempts. No task creation, evidence
-reservation, sleep, D1R5 invocation, credential/provider access, paper/SQLite
-mutation, ACL mutation, or D1 operation occurred.
+The only current authorized next step is read-only post-trigger reconciliation.
+It may inspect:
 
-Only after a corrected canonical preflight is independently reviewed may one
-later checkpoint authorize at most one fixed `TASK_CREATE` attempt. The
-eventual scheduled launch is an untrusted wake signal and must still pass the
-unchanged D1R5 host's exact timing/source admission. D1R5 then stops after
-canonical wake/source evidence; there is no automatic continuation into D1.
+- exact frozen live-worktree source identity;
+- exact consumed journal bytes/hash;
+- current scheduler task state/LastTaskResult and definition;
+- launch-fence presence/absence;
+- D1R5-result presence/absence.
 
-Morning reconciliation remains read-only. Canonical D1R5 evidence, not Task
-Scheduler state or LastTaskResult, determines PASS/failure/incomplete status.
-Ambiguity or partial consumption is never retried.
+It may not mutate Task Scheduler, create recovery evidence, invoke D1R5, or
+touch credentials/providers/paper/SQLite/ACL/D1/D2/live authority.
 
-No fresh D1 launch is authorized by D1R4, D1R6R2 source acceptance, a corrected
-preflight PASS, or task creation alone.
+If reconciliation confirms no D1R5 delegation, future scheduler cleanup and a
+new session wake must be designed as a distinct reviewed protected-effect
+boundary. No existing October 15 evidence or native-create budget may be reused.
+
+If any unexpected D1R5 evidence exists, stop and independently review that
+evidence before any other action.
 
 ## Standing safety and effect invariants
 

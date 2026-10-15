@@ -2,8 +2,8 @@
 
 ## Current phase
 
-Architecture 134-D1R6R1 process-scoped PowerShell transport correction is
-**SOURCE ACCEPTED**. The next protected step is a fresh, separately reviewed
+Architecture 134-D1R6R2 byte-exact scheduler stdin correction is
+**SOURCE ACCEPTED**. The next protected step is one fresh, separately reviewed
 **read-only real-host D1R6 preflight**. No Task Scheduler mutation or D1R5
 qualification has run.
 
@@ -11,34 +11,35 @@ Accepted corrected D1R6 executable/test source:
 
 ```text
 branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    d02510b9dbe6e8d7f803ebadee22f36c51eba929
-TREE    8373086ebee2dc6b304d01f67261296a32bffa5a
-CI      #568 / 38716877077 / SUCCESS / attempt 1
+HEAD    6f9548815cbd241f0ab21095c760c294e415a215
+TREE    41e350ca88f7efaf16387865ed01d29bb55a0ee9
+CI      #570 / 38720140775 / SUCCESS / attempt 1
 ```
 
-Checkpoint #568 independently passed source-static, 2,429 active tests, and
-canonical ROBINHOOD certification with 9,395 passed / 1 skipped / 0 failed /
-0 errors in 257.789 seconds. Current inventory remains FULL 176 / ROBINHOOD 99 /
+Checkpoint #570 independently passed source-static, 2,434 active tests, and
+canonical ROBINHOOD certification with 9,400 passed / 1 skipped / 0 failed /
+0 errors in 282.381 seconds. Current inventory remains FULL 176 / ROBINHOOD 99 /
 LEGACY 215 / EXHAUSTIVE 391.
 
-The first real-host D1R6 preflight attempt was **read-only and BLOCKED before
-principal/Task Scheduler observation** because the host invoked its fixed
-PowerShell helper under the machine's default process execution policy. All
-D1R6/D1R5 Git identities had matched exactly; no task was created or modified,
-no D1R5 execution occurred, and no qualification evidence was consumed.
+Real-host diagnosis after D1R6R1 proved the process-scoped
+`-ExecutionPolicy Bypass` correction worked: the fixed PowerShell helper
+executed, but canonical Principal still returned NOT_CALLED with zero
+registration attempts. The identical fixed argv/helper with raw `b"{}\n"`
+stdin returned the valid current Windows principal. That isolated the remaining
+defect to Python text-mode newline translation. No Task Scheduler observation or
+mutation, D1R5 execution, task run, or qualification-evidence creation occurred.
 
-D1R6R1 corrects only that transport defect. Both the Python-to-scheduler-helper
-argv and the future Task-Scheduler-to-launcher action now use the fixed
-process-scoped sequence `-NoProfile -NonInteractive -ExecutionPolicy Bypass
--File` against fixed reviewed script paths. It does not use
-`Set-ExecutionPolicy`, does not change persistent machine/user policy, and
-does not widen scheduler or trading authority.
+D1R6R2 changes only the private Python scheduler transport framing. Principal
+and Observe now send exactly `b"{}\n"`; Create sends the existing sorted,
+compact canonical request bytes plus exactly one raw LF. The subprocess remains
+binary with no text/encoding/errors/environment/universal-newline or shell
+override. The 16,384-byte stdout bound applies directly to raw bytes, and JSON
+parses the returned bytes directly; ordinary CRLF output remains acceptable
+trailing JSON whitespace.
 
-D1R6 otherwise preserves the accepted D1R5 qualifier and one-session overnight
-contract: next eligible published NYSE session within 18 hours, trigger at
-regular open minus ten minutes, `WakeToRun=true`,
-`StartWhenAvailable=false`, no repetition/restart/demand start/automatic
-retry, and no D1/PREPARE/EXECUTE/paper/broker/live continuation.
+The accepted D1R6R1 PowerShell helper, process-scoped policy tokens, scheduled
+action, task settings, one-create budget, evidence model, and D1R5 target remain
+unchanged. Persistent Windows execution policy remains unchanged.
 
 The fixed external D1R5 target remains:
 
@@ -55,8 +56,7 @@ The accepted executable D1R5 source remains
 
 The canonical bounded history branch remains
 `feature/project-history-storage-foundation` at the accepted product-line
-boundary; this D1R6/D1R6R1 protected-source lineage does not move product/history
-authority by itself.
+boundary; D1R6R2 does not move product/history authority by itself.
 
 No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or live
 trading is authorized.
@@ -135,21 +135,24 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 ## Active work
 
 The immediate boundary is a fresh D1R6 **read-only real-host preflight** against
-the corrected D1R6R1 source. It may inspect exact D1R6 and D1R5 Git identities,
+the accepted D1R6R2 source. It may inspect exact D1R6 and D1R5 Git identities,
 the frozen NYSE calendar, current clock, current interactive Windows principal,
 the fixed qualification parent, derived evidence absence, and the fixed Task
 Scheduler identity read-only.
 
-The earlier preflight failure is not a consumed protected attempt: it stopped at
-the PowerShell execution-policy boundary before principal/scheduler observation
-and before any scheduler mutation, D1R5 invocation, or evidence reservation.
-D1R6R1 fixes only the process-scoped helper/action invocation needed to cross
-that read-only transport boundary.
+The two earlier blocked canonical preflights and their follow-up diagnostics are
+not consumed scheduler/D1R5 attempts. The first stopped at Windows PowerShell
+execution policy; the second reached the helper but stopped during Principal
+transport because text-mode stdin changed the strict LF framing. The raw-LF
+Principal diagnostic proved the helper itself healthy. Across those diagnostics,
+scheduler mutation, scheduler task execution, D1R5 invocation, and evidence
+creation remained zero.
 
-A corrected preflight PASS still does not create or alter a task and does not
-invoke D1R5. Only after ChatGPT reviews that output may a later separate
-checkpoint authorize at most one fixed Task Scheduler `TASK_CREATE` attempt.
-Any mutation-entry ambiguity remains consumed and never retried.
+D1R6R2 fixes only that byte framing. A successful corrected preflight still
+does not create or alter a task and does not invoke D1R5. Only after ChatGPT
+reviews that canonical preflight output may a later separate boundary authorize
+at most one fixed Task Scheduler `TASK_CREATE` attempt. Any mutation-entry
+ambiguity remains consumed and never retried.
 
 D1R4 authentication remains PASS / consumed. D1R5 remains unrun and grants no
 D1 authority until its future canonical result is independently reconciled and
@@ -196,15 +199,16 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Now
 
-- Preserve D1R6R1 accepted source at
-  `d02510b9dbe6e8d7f803ebadee22f36c51eba929` and its frozen D1R5
-  predecessor/workflow blobs.
+- Preserve D1R6R2 accepted source at
+  `6f9548815cbd241f0ab21095c760c294e415a215` and its frozen D1R5,
+  PowerShell-helper, scheduled-action, and workflow blobs.
 - Run exactly one fresh **read-only real-host D1R6 preflight** from the final
   accepted docs descendant and review its output.
 - Keep Task Scheduler mutation, D1R5 execution, D1, PREPARE, EXECUTE, paper,
   broker, D2, and live effects stopped during preflight.
-- Keep persistent Windows execution policy unchanged; D1R6R1 uses only the
-  reviewed process-scoped `-ExecutionPolicy Bypass` child invocation.
+- Keep persistent Windows execution policy unchanged; D1R6R1's process-scoped
+  `-ExecutionPolicy Bypass` and D1R6R2's raw-byte stdin framing are both
+  source-owned transport details only.
 - Keep `feature/project-history-storage-foundation` on the accepted product
   lineage until a separately reviewed integration/replay boundary.
 

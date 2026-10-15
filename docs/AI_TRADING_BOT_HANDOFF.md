@@ -42,43 +42,46 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-Architecture 134-D1R6R1 **process-scoped PowerShell transport correction** is
-SOURCE ACCEPTED on:
+Architecture 134-D1R6R2 **byte-exact scheduler stdin correction** is SOURCE
+ACCEPTED on:
 
 ```text
 branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    d02510b9dbe6e8d7f803ebadee22f36c51eba929
-TREE    8373086ebee2dc6b304d01f67261296a32bffa5a
-CI      #568 / 38716877077 / SUCCESS / attempt 1
+HEAD    6f9548815cbd241f0ab21095c760c294e415a215
+TREE    41e350ca88f7efaf16387865ed01d29bb55a0ee9
+CI      #570 / 38720140775 / SUCCESS / attempt 1
 ```
 
-Independent GitHub review confirmed exactly one seven-file correction commit over
-the accepted D1R6 docs descendant `893bcbc397077a2d86807c774c025f923821a824`.
-Production behavior changed only by adding the fixed process-scoped
-`-ExecutionPolicy Bypass` tokens to the Python scheduler-helper argv and the
-future scheduled launcher action. Six corresponding D1R6 source pins changed;
-D1R5 and the source-gate workflow remained byte-for-byte frozen.
+Independent GitHub review confirmed exactly one five-file correction commit over
+the accepted D1R6R1 docs descendant `07aaf06fecacfce3c666fe788fded6ab52290c8c`.
+Production behavior changed only in
+`pre_market_wake_overnight_host.py`: scheduler requests now use canonical raw
+bytes plus one LF, the subprocess runs in binary mode, the stdout bound counts
+raw bytes, and JSON parses raw bytes directly. Four corresponding D1R6 pins
+changed; the PowerShell helper, scheduled-action source, D1R5, workflow,
+PROJECT_STATUS and HANDOFF were frozen during implementation.
 
-Source-static passed with zero authority failures and no scheduler/provider/
-production/broker effects. Active JUnit is 2,429 / 2,429. Canonical ROBINHOOD
-is 9,395 passed / 1 skipped / 0 failed / 0 errors, wall 257.789 seconds.
-Inventory remains FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
+Source-static passed with zero authority failures and scheduler/provider/
+production/broker effects NOT_RUN. Active JUnit is 2,434 / 2,434. Canonical
+ROBINHOOD is 9,400 passed / 1 skipped / 0 failed / 0 errors, wall 282.381
+seconds. Selected ROBINHOOD inventory remains 99 modules; global inventory
+remains FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
 
-The preceding real-host preflight attempt had already passed exact D1R6/D1R5
-Git identity checks, then Windows blocked the fixed scheduler helper before
-principal/Task Scheduler observation because scripts were disabled under the
-default process policy. It therefore performed no scheduler mutation, no task
-run, no D1R5 execution, and no qualification-evidence reservation.
+The preceding real-host diagnosis established two transport facts without
+crossing a protected scheduler boundary. D1R6R1's process-scoped
+`-ExecutionPolicy Bypass` allowed the helper to execute. Canonical Principal
+still returned NOT_CALLED / registration_attempts=0, while the same fixed
+argv/helper supplied with raw `b"{}\n"` returned the valid current Windows
+principal. That isolated Python text-mode newline translation as the remaining
+defect. No Observe/Create, task run, scheduler mutation, D1R5 execution, or
+qualification-evidence creation occurred.
 
-D1R6R1 does not change persistent Windows execution policy. The corrected fixed
-transport is:
-
-```text
--NoProfile -NonInteractive -ExecutionPolicy Bypass -File <fixed reviewed script>
-```
-
-No caller-selected policy/path is accepted, and `Set-ExecutionPolicy`,
-registry/Group Policy/profile/environment policy mutation remain forbidden.
+D1R6R2 therefore preserves the PowerShell helper's strict LF/EOF contract and
+changes only its caller. Principal/Observe input is exactly `b"{}\n"`;
+Create is the unchanged canonical request object plus one LF. No
+text/encoding/errors/environment/universal-newline or shell authority is
+introduced. CRLF on helper stdout is accepted only as ordinary JSON trailing
+whitespace.
 
 The fixed D1R5 target remains:
 
@@ -88,8 +91,8 @@ TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
 Real D1R5 qualification, real scheduler mutation, and D1 remain unrun. The next
-protected boundary is one fresh read-only real-host D1R6 preflight against the
-corrected source. A PASS does not authorize task creation.
+protected boundary is one fresh canonical read-only D1R6 preflight against the
+accepted D1R6R2 source. A PASS does not authorize task creation.
 
 ## Exact D1R4 state
 
@@ -159,32 +162,33 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R4 authentication is complete and consumed. D1R6R1 source is accepted, but
+D1R4 authentication is complete and consumed. D1R6R2 source is accepted, but
 all real D1R6/D1R5 effects remain closed.
 
 The immediate step is exactly one fresh **read-only D1R6 preflight**. It may
 verify the final D1R6 source, fixed D1R5 target source, frozen NYSE session
 derivation, qualification-parent/evidence absence, current logged-in Windows
 principal, and fixed task absence/definition read-only. Its fixed PowerShell
-helper is now launched with process-scoped `-ExecutionPolicy Bypass`; no
-persistent policy mutation is authorized.
+transport now has both reviewed host corrections: process-scoped
+`-ExecutionPolicy Bypass` and byte-exact stdin framing. No persistent policy
+mutation is authorized.
 
-The prior blocked preflight is diagnostic only and not a consumed scheduler/D1R5
-attempt: it failed before principal/Task Scheduler observation and performed no
-task creation, evidence reservation, sleep, D1R5 invocation, credential/provider
-access, paper/SQLite mutation, ACL mutation, or D1 operation.
+The prior blocked preflights and read-only Principal diagnostics are diagnostic
+only and not consumed scheduler/D1R5 attempts. No task creation, evidence
+reservation, sleep, D1R5 invocation, credential/provider access, paper/SQLite
+mutation, ACL mutation, or D1 operation occurred.
 
-Only after a corrected preflight is independently reviewed may one later
-checkpoint authorize at most one fixed `TASK_CREATE` attempt. The eventual
-scheduled launch is an untrusted wake signal and must still pass the unchanged
-D1R5 host's exact timing/source admission. D1R5 then stops after canonical
-wake/source evidence; there is no automatic continuation into D1.
+Only after a corrected canonical preflight is independently reviewed may one
+later checkpoint authorize at most one fixed `TASK_CREATE` attempt. The
+eventual scheduled launch is an untrusted wake signal and must still pass the
+unchanged D1R5 host's exact timing/source admission. D1R5 then stops after
+canonical wake/source evidence; there is no automatic continuation into D1.
 
 Morning reconciliation remains read-only. Canonical D1R5 evidence, not Task
 Scheduler state or LastTaskResult, determines PASS/failure/incomplete status.
 Ambiguity or partial consumption is never retried.
 
-No fresh D1 launch is authorized by D1R4, D1R6R1 source acceptance, a corrected
+No fresh D1 launch is authorized by D1R4, D1R6R2 source acceptance, a corrected
 preflight PASS, or task creation alone.
 
 ## Standing safety and effect invariants

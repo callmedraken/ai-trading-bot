@@ -1046,10 +1046,9 @@ def test_additional_predecessor_overlay_is_exact_and_test_only(monkeypatch):
         == "572d83c4a3938678894c0cb9072c182373fbce4f596c4b66c26b51f07e2089ab"
     )
     for path, predecessor in baseline.items():
-        assert (
-            runner._arch134_d1r6_test_pin(path, predecessor)
-            == runner.ARCH134_D1R6_TEST_PIN_OVERRIDES[path]
-        )
+        successor_before, successor_after = runner.ARCH134_D1R7_TEST_PIN_OVERRIDES[path]
+        assert successor_before == runner.ARCH134_D1R6_TEST_PIN_OVERRIDES[path]
+        assert runner._arch134_d1r6_test_pin(path, predecessor) == successor_after
     monkeypatch.setattr(runner, "ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS", {})
     with pytest.raises(ValueError):
         runner._arch134_d1r6_test_pin(

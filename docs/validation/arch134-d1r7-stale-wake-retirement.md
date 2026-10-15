@@ -74,3 +74,14 @@ Predecessor pin dictionaries, executable code, workflow and native authority sta
 unchanged. Run the exact ten failed tests plus successor authority/profile checks,
 commit normally, then require a new exact-head attempt-1 source gate. This is a
 diagnosed source correction, not a rerun of the failed source.
+
+
+The second exact-head event #576 / 38805652240 at
+3ac4e3b8c50296d3cc99a66e56ae712745dd5b15 passed 2,767 active tests and failed
+one D1R6 assertion that compared the final resolved blob directly to its frozen
+pre-D1R7 override. The corrective test now independently requires the successor
+pair's before value to equal that frozen D1R6 pin and the resolved value to equal
+the exact successor after value. The frozen predecessor maps/digests are unchanged.
+Run the full D1R6 and D1R7 modules and predecessor-pin checks before normal
+publication. No CI attempt is rerun; each diagnosed correction is a new source
+commit. Retirement executable/PowerShell blobs remain those of the first commit.

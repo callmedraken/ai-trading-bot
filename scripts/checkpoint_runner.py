@@ -11624,7 +11624,7 @@ ARCH134_D1R7_SOURCE_PINS: Final = {
         "58b7cba899ff8f41ceb058be51e743ca4a87becd"
     ),
     "docs/validation/arch134-d1r7-stale-wake-retirement.md": (
-        "bb8a2c4224838a36ebf1dfb516de7bc3e8af90ab"
+        "712fab29d96bc903469b15178ac3c6b54c7e6987"
     ),
 }
 ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
@@ -11646,7 +11646,7 @@ ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
         "99efdaa678ef63541f3c583d7c3bcb5f965c357b",
-        "39cd02b8d4752f2db4cbfd712cce90019016882a",
+        "0ca08b5a05d814c045f6caaab0b4ab1c4366ffa8",
     ),
     "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
         "de7a77d3b0cf58fd9d5d58450181f8a1957fc7b2",
@@ -11690,7 +11690,7 @@ ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
     ),
 }
 ARCH134_D1R7_TEST_PINS_SHA256: Final = (
-    "6b6ce3f9915c06bfcece092da4fec09ca7b26310262124479e7d588bde662d73"
+    "b689b4c8cf2d49aea38932e0e59d68154134e93f867817eec1c53619e5005ae7"
 )
 ARCH134_D1R7_PREDECESSOR_SHA256: Final = (
     "e1184752f6595ac632612e7bc51b8ea9a5b7a439c9e78016b0f6c6bd74b626ab"

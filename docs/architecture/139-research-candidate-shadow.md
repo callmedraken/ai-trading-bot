@@ -1,6 +1,6 @@
 # Architecture 139-A / RCL-3A — exact research-candidate variant binding
 
-Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B remains a separate future architecture.
+Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B1 is implemented pending exact-source review; 139-B2 remains gated.
 
 ## Acceptance evidence
 
@@ -168,7 +168,7 @@ identities and nested policy serializers are unchanged.
 
 139-B must receive the original exact completed HistoricalExperimentResult (or
 an independently verified equivalent canonical source), verify the complete
-external binding chain and use this resolver before observing that variant.
+external binding chain and use this resolver before accepting observation evidence for that variant.
 The resolver establishes only the result bridge; it cannot verify absent report
 or walk-forward evidence.
 
@@ -246,3 +246,89 @@ promotion, ProductionStrategyContract conversion, D1/D1R5/D2 operation,
 production SQLite, credentials, provider/Robinhood/broker access, paper mutation
 or scheduler/ACL mutation occurs. This parallel research source grants no
 production compatibility or authority. Real-money trading remains **NO-GO**.
+
+## Architecture 139-B frozen source-only extension
+
+139-A remains SOURCE ACCEPTED at its exact recorded identity. 139-B is pending
+ChatGPT exact-source review. It consists of two independent implementation
+commits and one fresh workflow_dispatch per commit. No production/history branch
+is advanced. B1 terminal CI plus exact continuation self-review authorizes B2
+only; `139_B1_CONTINUATION_GATE=PASS` is not canonical source acceptance.
+
+139-B1 adds canonical caller-supplied observation evidence only. Exact frozen/
+slotted Observation and ObservationBatch models live in
+`research_candidate_shadow_observation.py`. Fingerprints are exact UUIDs.
+Dates are exact `date` values; timestamps are exact aware `datetime` values with
+`tzinfo is UTC`, fold zero, serialized with six microsecond digits and Z.
+Dates are caller session evidence, not proof that an exchange was open.
+Ordinals are exact integers 0..1,000,000; batches are exact nonempty tuples of
+at most 100,000 observations. Caller order must increase strictly by
+(session_date, ordinal), with globally nondecreasing timestamps. No sorting.
+Duplicate IDs or date/ordinal pairs and mismatched binding IDs raise.
+
+Each observation has nine mandatory exact integer zero counters: credential
+reads, provider calls, Robinhood reads, broker calls, paper mutations, scheduler
+calls, ACL mutations, production SQLite reads and writes. Batches retain those
+same fixed zero fields. Every semantic field is identity-bound. This enforces
+canonical zero accounting, not the truthfulness of a future external producer.
+No acquisition, filesystem, network, runtime, simulator or production interface
+is introduced. All fixtures are synthetic in memory.
+
+Observation and batch schemas are `research-candidate-shadow-observation/v1`
+and `research-candidate-shadow-observation-batch/v1`; identity versions replace
+`/v1` with `-identity/v1`. Namespaces are frozen literal UUID5 values derived
+from NAMESPACE_URL and each schema. Material is length-framed UTF-8 semantic
+scalars: schema, binding ID, date, timestamp, ordinal, input/decision fingerprints
+and nine zeros for observation; schema, binding ID, observation source HEAD/tree,
+count, ordered observation IDs and nine zeros for batch. No serialized bytes,
+clocks, paths, randomness, Python hash or ambient Decimal context enter identity.
+
+The batch builder and independent verifier receive the complete exact accepted
+137/138/139-A external chain, independently verify 139-A, then resolve the exact
+original historical variant without execution. Source HEAD/tree are lowercase
+40-hex provenance, not source acceptance. Strict parsers reject duplicate,
+unknown/missing fields, forged derived values, bool/int confusion, alternate
+UUID/date/timestamp representations, constants and noncanonical bytes. Parsing
+is self-consistency only. Verifiers rebuild from independently supplied evidence.
+
+139-B2 will qualify only provenance, session/observation coverage and mandatory
+zero effects. Three required exact positive bounded integer policy fields are
+minimum_session_count, minimum_total_observation_count and
+minimum_observations_per_session. Total minimum must be at least the product of
+the other minima. Insufficient valid coverage yields FAILED, with ordered reasons
+INSUFFICIENT_SESSIONS, INSUFFICIENT_TOTAL_OBSERVATIONS,
+INSUFFICIENT_OBSERVATIONS_PER_SESSION. Malformed evidence raises. No financial
+performance threshold is inferred. Only PASSED evidence may build a separate
+immutable SHADOW successor with original lineage/rank retained. No prior parser
+changes, generic lifecycle mutation, PAPER_CANDIDATE, AWAITING_HUMAN_PROMOTION,
+compatibility, promotion, production contract or execution authority is added.
+Real observation acquisition is outside Architecture 139-B.
+
+B1 and B2 add their own test-only successor overlays after 139-A, using exactly
+the same seven live-inventory paths at the five existing resolution sites.
+Every predecessor dictionary, domain blob, executable/native/AST pin, ACTIVE
+membership/digest and workflow byte remains frozen. Predecessor hash checks
+prevent an overlay from concealing historical drift. Canonical discovery adds
+one FULL/EXHAUSTIVE module per checkpoint; other inventories stay unchanged.
+Cheap admission/static/Ruff/diff gates precede focused pytest. No local broad
+profile runs. Each dispatch must have exact HEAD, attempt 1, source-static and
+four broad shards SUCCESS, each below 300 seconds, terminal source-gates SUCCESS;
+active/certification jobs skip as expected for unmapped research dispatch.
+No second dispatch or blind retry. Any gate concern stops before B2.
+Final source acceptance and bounded status/handoff closeout belong to ChatGPT.
+
+
+### B1 public source surface and verification
+
+Public artifacts: `ResearchCandidateShadowObservation`,
+`ResearchCandidateShadowObservationBatch`, and
+`ResearchCandidateShadowObservationError`. Public operations:
+`build_research_candidate_shadow_observation_batch` and
+`verify_research_candidate_shadow_observation_batch`. Package exports remain
+unchanged in B1; the module is imported explicitly.
+
+Observation namespace: `ba1eef1a-c096-53bf-a440-545a66226149`.
+Batch namespace: `3cc3c312-8a9c-5c29-9c6b-81eeeb49d5aa`.
+
+B1 inventory: ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 393 / GUI 44. B1 adds no other test module or ACTIVE authority.

@@ -1,6 +1,6 @@
 # Architecture 139-A / RCL-3A — current-lineage forward-port validation
 
-Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. This plan covers only exact variant provenance. Architecture 139-B is deferred.
+Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. That accepted identity covers 139-A. B1 implementation is pending exact-source review; B2 is gated below.
 
 ## Terminal acceptance evidence
 
@@ -140,8 +140,7 @@ The implementation stop boundary is complete: terminal CI and exact GitHub
 source review both passed. Architecture 139-A is SOURCE ACCEPTED on the identity
 recorded above. The bounded status/handoff closeout records it as a parallel
 safe-side checkpoint without changing the active D1R5 protected boundary or
-moving the canonical handoff branch onto research executable source. 139-B
-remains unimplemented.
+moving the canonical handoff branch onto research executable source. 139-B1 implementation and the guarded B2 continuation are recorded below.
 
 ## Zero-effect accounting
 
@@ -168,3 +167,95 @@ D2_SUPERVISOR_EXECUTIONS=0
 Synthetic fixtures/in-memory validation grant no operational authority. No
 SHADOW stage, live observation, production compatibility/conversion, promotion,
 D1/D2 or live-money capability is added. Real-money placement remains **NO-GO**.
+
+## 139-B1 / 139-B2 guarded validation contract
+
+The [architecture contract](../architecture/139-research-candidate-shadow.md)
+freezes both pure in-memory stages before B1 implementation. Actual observation
+acquisition is excluded. B1 is implemented, pending ChatGPT source acceptance.
+Its inventory is ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 393 / GUI 44. B2 must add exactly one FULL/EXHAUSTIVE test.
+
+Focused B1 domain verification: 673 cases passed, including 125 new B1 cases
+and 548 accepted predecessor cases. Coverage includes all semantic identities,
+nine mandatory zero counters, exact types/bounds, canonical timestamps/JSON,
+ordering/duplicates, complete external-chain builder/verifier, immutability and
+no acquisition/execution/private-import capability. Existing synthetic fixture
+factories produce only in-memory completed evidence; no real research executes.
+
+Affected inventory/authority tests additionally cover all seven successor paths,
+missing/extra/source/wrong successor blobs, every frozen predecessor dictionary,
+and D1Q/D1R3/D1R4/D1R4R/D1R5 authority. All prior 137/138/139-A domain/test
+blobs, B1 package exports, predecessor dictionary values, executable/native/AST
+pins, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
+
+Use fresh purpose/GUID basetemp under F:\AI\temp\pytest, -B,
+-p no:cacheprovider, -q --tb=short. Cheap static/Ruff/diff checks precede pytest;
+both Ruff phases and final checks are mandatory. No local broad profile runs.
+
+Publish B1 as one exact-file normal commit/ordinary push, then dispatch exactly
+one fresh Checkpoint Source Gates run. Require exact HEAD/tree, attempt 1,
+source-static and four broad shards SUCCESS, each under 300 seconds, and
+terminal source-gates SUCCESS. Active/certification tests skip as expected for
+an unmapped research dispatch. No second dispatch or blind retry.
+
+Re-prove exact remote parent/tree/diff/blobs, predecessor digests, inventory,
+CI and clean worktree/index; review B1 against the frozen contract. Only an
+unqualified `139_B1_CONTINUATION_GATE=PASS` permits B2 immediately within this
+task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
+stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
+gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
+Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
+counters recorded above remain zero. No real SHADOW observation or later stage.
+
+## 139-B1 / 139-B2 guarded validation contract
+
+The [architecture contract](../architecture/139-research-candidate-shadow.md)
+freezes both pure in-memory stages before B1 implementation. Actual observation
+acquisition is excluded. B1 is implemented, pending ChatGPT source acceptance.
+Its inventory is ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 393 / GUI 44. B2 must add exactly one FULL/EXHAUSTIVE test.
+
+Focused B1 domain verification: 673 cases passed, including 125 new B1 cases
+and 548 accepted predecessor cases. Coverage includes all semantic identities,
+nine mandatory zero counters, exact types/bounds, canonical timestamps/JSON,
+ordering/duplicates, complete external-chain builder/verifier, immutability and
+no acquisition/execution/private-import capability. Existing synthetic fixture
+factories produce only in-memory completed evidence; no real research executes.
+
+Affected inventory/authority tests additionally cover all seven successor paths,
+missing/extra/source/wrong successor blobs, every frozen predecessor dictionary,
+and D1Q/D1R3/D1R4/D1R4R/D1R5 authority. All prior 137/138/139-A domain/test
+blobs, B1 package exports, predecessor dictionary values, executable/native/AST
+pins, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
+
+Use fresh purpose/GUID basetemp under F:\AI\temp\pytest, -B,
+-p no:cacheprovider, -q --tb=short. Cheap static/Ruff/diff checks precede pytest;
+both Ruff phases and final checks are mandatory. No local broad profile runs.
+
+Publish B1 as one exact-file normal commit/ordinary push, then dispatch exactly
+one fresh Checkpoint Source Gates run. Require exact HEAD/tree, attempt 1,
+source-static and four broad shards SUCCESS, each under 300 seconds, and
+terminal source-gates SUCCESS. Active/certification tests skip as expected for
+an unmapped research dispatch. No second dispatch or blind retry.
+
+Re-prove exact remote parent/tree/diff/blobs, predecessor digests, inventory,
+CI and clean worktree/index; review B1 against the frozen contract. Only an
+unqualified `139_B1_CONTINUATION_GATE=PASS` permits B2 immediately within this
+task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
+stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
+gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
+Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
+counters recorded above remain zero. No real SHADOW observation or later stage.
+
+### B1 focused result
+
+Final distinct focused coverage is 1,981 passing cases: 673 domain and 1,308
+inventory/authority cases. The first authority run exposed 13 diagnostic
+regressions from over-freezing runtime dictionaries; narrowing the runtime
+guard to the four masked inventory overlays retained all 32 frozen-dictionary
+tests and restored original diagnostic behavior. The affected three-module
+rerun passed 323 cases in 26.15 seconds. Failed evidence is preserved; no broad
+certification or CI retry occurred. Both Ruff phases pass on all ten touched
+Python paths; diff check, all five authority boundaries and predecessor/blob/
+workflow/ACTIVE checks pass. Exact source acceptance remains pending.

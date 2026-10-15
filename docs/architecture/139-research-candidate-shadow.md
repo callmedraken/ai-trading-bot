@@ -1,6 +1,6 @@
-# Architecture 139-A / RCL-3A — exact research-candidate variant binding
+# Architecture 139 — exact variant binding and deterministic SHADOW evidence
 
-Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B1 is implemented pending exact-source review; 139-B2 remains gated.
+Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B1 is implemented pending exact-source review; 139-B2 is implemented pending exact-source review.
 
 ## Acceptance evidence
 
@@ -229,13 +229,13 @@ Executable/native/AST pins, ACTIVE membership/digest, D1R5 registration,
 workflow bytes and production push routing remain unchanged. Cumulative
 Architecture-134 docs and bounded status/handoff are not implementation paths.
 
-## Publication and next boundary
+## 139-A publication and next boundary (accepted predecessor)
 
 The current-lineage 139-A source checkpoint is accepted. No local
 FULL/ROBINHOOD/LEGACY/EXHAUSTIVE certification was required beyond the focused
 verification and repository source gate recorded above.
 
-139-B is the next genuinely new research boundary. It may define deterministic
+139-B extends this accepted predecessor with deterministic
 no-effect observation provenance, minimum session/observation policy, failure
 semantics, no-effect enforcement, SHADOW qualification and any immutable SHADOW
 successor. Those capabilities remain unimplemented in 139-A and require their
@@ -291,7 +291,7 @@ unknown/missing fields, forged derived values, bool/int confusion, alternate
 UUID/date/timestamp representations, constants and noncanonical bytes. Parsing
 is self-consistency only. Verifiers rebuild from independently supplied evidence.
 
-139-B2 will qualify only provenance, session/observation coverage and mandatory
+139-B2 qualifies only provenance, session/observation coverage and mandatory
 zero effects. Three required exact positive bounded integer policy fields are
 minimum_session_count, minimum_total_observation_count and
 minimum_observations_per_session. Total minimum must be at least the product of
@@ -332,3 +332,104 @@ Batch namespace: `3cc3c312-8a9c-5c29-9c6b-81eeeb49d5aa`.
 
 B1 inventory: ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
 EXHAUSTIVE 393 / GUI 44. B1 adds no other test module or ACTIVE authority.
+
+## 139-B2 complete deterministic qualification and SHADOW contract
+
+B1 passed its internal continuation gate at HEAD
+`3bf604f407445da0c587cfd91545c113c99e341f`, TREE
+`732f75cc09c8296ce09f244edc36ca8bda61e7b7`, CI #563 / 38664134287,
+attempt 1, terminal SUCCESS. Four shard job walls: 97 / 132 / 136 / 141 s,
+all below 300 s. This is internal continuation only; ChatGPT acceptance of
+both exact source checkpoints remains pending. B1 source/test and overlay are
+frozen. B2 is a separate normal commit and one fresh CI dispatch on the same
+research branch. Operational and canonical-history branches stay unchanged.
+
+The three policy minima are mandatory exact positive ints bounded at 100,000,
+the B1 maximum observation count. Total minimum must cover sessions multiplied
+by minimum per session. No defaults, disable switch, economic threshold or rank
+authority exists. Policy schema is
+`research-candidate-shadow-qualification-policy/v1`.
+
+`ResearchCandidateShadowQualification` retains exact binding/batch IDs, embedded
+policy, B2 qualification source HEAD/tree and recomputable positive bounded
+coverage facts (observation count, distinct session count and minimum actual
+observations in any session). Counts must describe a possible nonempty batch;
+for one session its minimum equals its total. Status and ordered failure
+reasons are derived, never constructor authority. Inclusive minima yield PASSED;
+otherwise FAILED reasons appear once in enum order: INSUFFICIENT_SESSIONS,
+INSUFFICIENT_TOTAL_OBSERVATIONS, INSUFFICIENT_OBSERVATIONS_PER_SESSION.
+Schema is `research-candidate-shadow-qualification/v1`.
+
+`qualify_research_candidate_shadow` takes the full exact 137/138/139-A chain,
+binding, B1 batch, B2 policy, exact original observations and all source IDs.
+It explicitly independently verifies 139-A and resolves the original variant,
+then invokes the independent B1 verifier against that same complete chain and
+caller evidence. It recomputes all counts by exact session dates and checks
+every observation/batch zero counter. Malformed provenance/effect evidence
+raises; it can never become a FAILED coverage result. The independent
+`verify_research_candidate_shadow_qualification` rebuilds that complete result
+and requires exact equality. B2 source kwargs are named
+`shadow_qualification_source_head/tree` to distinguish prior 138 source IDs.
+Stored B2 fields are `qualification_source_head/tree`.
+
+The separate frozen/slotted `ShadowResearchStrategyCandidate` has schema
+`research-strategy-candidate-shadow/v1` and fixed SHADOW stage. It retains the
+original source HEAD/tree, report/result/variant UUIDs, caller ordinal, name and
+rank. It additionally retains the exact WALK_FORWARD_PASSED predecessor ID,
+BACKTESTED ancestor ID, prior walk-forward qualification ID, binding/batch/B2
+qualification IDs, and each prior qualification/binding/observation/B2 source
+HEAD/tree. Its constructor reconstructs and checks exact prior candidate IDs.
+
+`build_shadow_research_candidate` requires exact passed predecessor, binding,
+batch and qualification models; validates every retained artifact; requires
+PASSED with no reasons; recomputes coverage from the batch; checks all linkage
+and original candidate/binding facts; and returns only the immutable successor.
+`verify_shadow_research_candidate` independently rebuilds that linkage. These
+operations/parsers prove self-consistency; use the full qualification verifier
+for independently supplied external evidence. No verified flag is retained.
+
+Namespaces are literal UUID5(NAMESPACE_URL, schema). Identity versions replace
+`/v1` with `-identity/v1`. All semantic scalars are length-framed UTF-8 in frozen
+order. Policy: schema then three minima. Qualification: schema, binding/batch
+IDs, policy ID and all policy fields, B2 HEAD/tree, three coverage counts,
+status, reason count, ordered reasons. Successor: schema, stage, then all 22
+constructor fields in declaration order. Every semantic field participates;
+no JSON bytes, clocks, paths, random identity or Decimal context is used.
+
+All three parsers require canonical compact sorted JSON, exact field sets,
+unique keys including nested policy, exact ints/UUIDs/sources and recomputed
+IDs/status/reasons/stage. Original parsers remain BACKTESTED/WALK_FORWARD_PASSED
+only. B2 imports public predecessor interfaces only. Package exports include
+the B1 and B2 public APIs without changing their modules or prior exports.
+
+B2 overlay follows B1 at the same five sites for exactly seven inventory tests;
+it freezes B1 dictionary bytes semantically while all earlier dictionaries,
+executable/native/AST pins, ACTIVE definition and workflow bytes stay frozen.
+Canonical inventory becomes FULL 179 / EXHAUSTIVE 394; ACTIVE 64, ROBINHOOD 98,
+LEGACY 215 and GUI 44 remain unchanged. No local broad profile runs.
+
+Real observation acquisition, PAPER_CANDIDATE, AWAITING_HUMAN_PROMOTION,
+production compatibility, promotion, human approval, production contracts,
+provider/network/runtime/broker/paper execution and generic lifecycle mutation
+remain absent. Final B2 CI must be terminal SUCCESS on exact source, attempt 1,
+with static/four broad shards/aggregator PASS and each shard below 300 s.
+After exact remote/diff/tree/CI proof, STOP for ChatGPT review of both commits.
+No final status/handoff closeout or Architecture 140 is part of this task.
+
+
+### B2 frozen namespaces and focused result
+
+Policy: `research-candidate-shadow-qualification-policy/v1`, namespace `e89daadf-93fb-53e9-ae24-ff364c022d31`.
+
+Qualification: `research-candidate-shadow-qualification/v1`, namespace `c93b2415-1b57-5794-811d-c84dfadf53e6`.
+
+SHADOW successor: `research-strategy-candidate-shadow/v1`, namespace `82dd4ec8-46f3-5f7c-af78-042b0f89bf69`.
+
+B2 focused verification passed 817 domain cases (144 new B2 cases and
+673 retained domain cases) plus 1,358 inventory/authority cases: 2,175 distinct
+passing cases, zero failures/errors/skips. Both Ruff phases pass on all eleven
+touched Python paths; diff and all five authority boundaries pass. B1 source/
+test blobs and overlay, all older dictionaries, accepted 137/138/139-A source/
+tests, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
+The package export surface is extended additively in B2; existing public names
+and their order are preserved. Final ChatGPT source acceptance is pending.

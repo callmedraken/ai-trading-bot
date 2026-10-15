@@ -1,6 +1,6 @@
-# Architecture 139-A / RCL-3A — current-lineage forward-port validation
+# Architecture 139 — current-lineage binding and SHADOW validation
 
-Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. That accepted identity covers 139-A. B1 implementation is pending exact-source review; B2 is gated below.
+Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. That accepted identity covers 139-A. B1 implementation is pending exact-source review; B2 implementation is pending exact-source review below.
 
 ## Terminal acceptance evidence
 
@@ -164,7 +164,7 @@ D1R5_OPERATIONS=0
 D2_SUPERVISOR_EXECUTIONS=0
 ```
 
-Synthetic fixtures/in-memory validation grant no operational authority. No
+Synthetic fixtures/in-memory validation grant no operational authority. The accepted 139-A checkpoint added no
 SHADOW stage, live observation, production compatibility/conversion, promotion,
 D1/D2 or live-money capability is added. Real-money placement remains **NO-GO**.
 
@@ -206,7 +206,7 @@ task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
 stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
 gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
 Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
-counters recorded above remain zero. No real SHADOW observation or later stage.
+counters recorded above remain zero. No real observation or post-SHADOW stage is added.
 
 ## 139-B1 / 139-B2 guarded validation contract
 
@@ -246,7 +246,7 @@ task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
 stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
 gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
 Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
-counters recorded above remain zero. No real SHADOW observation or later stage.
+counters recorded above remain zero. No real observation or post-SHADOW stage is added.
 
 ### B1 focused result
 
@@ -259,3 +259,44 @@ rerun passed 323 cases in 26.15 seconds. Failed evidence is preserved; no broad
 certification or CI retry occurred. Both Ruff phases pass on all ten touched
 Python paths; diff check, all five authority boundaries and predecessor/blob/
 workflow/ACTIVE checks pass. Exact source acceptance remains pending.
+
+## B2 validation scope
+
+The complete B2 contract is frozen in the linked architecture record. B1
+continuation passed at 3bf604f / tree 732f75c, CI #563 / 38664134287,
+attempt 1 SUCCESS. B1 module/test/overlay and all prior evidence remain frozen.
+B2 tests cover exact policy types/bounds, inclusive coverage, each failure and
+ordered combinations, malformed provenance/effects raising, exact session/total/
+minimum counts, strict canonical parsers, every semantic identity, independent
+verification, immutable SHADOW linkage/rank/source retention, wrong predecessors/
+bindings/batches/qualifications, forged IDs/stage, prior parser exclusion, caller
+immutability, package exports and closed AST capability. Both Ruff phases, diff
+checks and all predecessor authorities are required before one normal B2 commit/
+push and exactly one fresh terminal CI gate. No local broad profile or real
+observation acquisition. Final ChatGPT source acceptance remains pending.
+
+### B2 focused result and final implementation stop
+
+Domain verification passed 817 cases in 75.03 s: 144 new B2 and 673 retained
+domain cases. All eleven affected inventory/authority modules passed 1,358
+cases in 66.45 s. The sets are disjoint: 2,175 distinct cases, no failures,
+errors or skips. Both non-mutating Ruff phases pass on eleven touched Python
+paths, and diff check passes. Independent D1Q/D1R3/D1R4/D1R4R/D1R5 authority,
+frozen predecessor AST/blobs/dictionaries, B1 source/test/overlay, ACTIVE and
+workflow checks pass. Inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
+LEGACY 215 / EXHAUSTIVE 394 / GUI 44. No local certification profile ran.
+
+B1 overlay SHA-256 remains
+`d66e134a5491e1e2966728e27558f05c51946c5e89930707e1471f339324634c`;
+B2 adds its own overlay at the same five sites for the same seven paths. All
+33 predecessor dictionaries remain frozen. Full external qualification and
+self-consistent successor-linkage verification remain distinct public checks;
+canonical parsing never claims external evidence or source acceptance.
+
+Publish B2 as one exact-file normal commit and ordinary push, then exactly one
+fresh CI dispatch. Require exact HEAD/tree and parent B1, attempt 1, static and
+four broad shards SUCCESS, each under 300 s, terminal source-gates SUCCESS and
+clean final local/remote state. Preserve evidence and do not retry. STOP for
+ChatGPT to review both exact commits/trees/diffs/CI runs and perform bounded
+status/handoff closeout. No real observation acquisition or Architecture 140.
+All seventeen operational effect counters remain zero.

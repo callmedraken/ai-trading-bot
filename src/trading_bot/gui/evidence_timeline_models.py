@@ -18,6 +18,7 @@ class EvidenceTimelineSource(Enum):
     """Closed source vocabulary for already-acquired GUI evidence."""
 
     RESEARCH = "Research"
+    RESEARCH_LIFECYCLE = "Research Lifecycle"
     PAPER_OPERATION = "Paper Operation"
     PAPER_ACCOUNT = "Paper Account"
     MARKET_DATA = "Market Data"

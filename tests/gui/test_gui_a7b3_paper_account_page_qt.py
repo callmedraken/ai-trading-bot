@@ -44,6 +44,9 @@ from trading_bot.gui import (
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
 from trading_bot.gui.paper_account_page import PaperAccountPage
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 
 _AS_OF = datetime(2026, 8, 27, 22, 0, tzinfo=UTC)
 _CHECKPOINT_ID = UUID("00000000-0000-0000-0000-000000000201")
@@ -327,6 +330,9 @@ class _RecordingService:
     def get_operator_observability_state(self):
         return unavailable_operator_operations_state()
 
+    def get_research_candidate_lifecycle_state(self):
+        return unavailable_research_candidate_lifecycle_state()
+
     def get_production_strategy_state(self):
         return unavailable_production_strategy_state()
 
@@ -346,6 +352,7 @@ def test_main_window_acquires_paper_account_once_and_navigation_reuses_state() -
     assert window.page_ids == (
         "home",
         "research",
+        "research-lifecycle",
         "paper",
         "paper-account",
         "market-data",

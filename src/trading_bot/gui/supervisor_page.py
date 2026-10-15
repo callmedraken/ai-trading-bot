@@ -85,6 +85,14 @@ class SupervisorPage(QWidget):
             label(f"Report ID: {state.research_report_id}")
             label(f"Experiment result ID: {state.research_experiment_result_id}")
         label("Strategy Promotion", "operatorSectionTitle")
+        lifecycle = state.research_lifecycle
+        if lifecycle is not None:
+            label(lifecycle.message)
+            if lifecycle.evidence is not None:
+                label("Research candidate stage: SHADOW")
+                label(f"Candidate ID: {lifecycle.evidence.shadow_candidate_id}")
+            label("Human promotion required: Yes\nProduction replacement: Disabled")
+            label("Production compatibility: Not established")
         label(
             "Automatic promotion: Disabled\nHuman promotion: Required\n"
             "Promotion authority: Not connected"

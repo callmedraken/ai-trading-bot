@@ -12,6 +12,7 @@ from trading_bot.gui.system_health_models import SystemAuditEntryView
 
 _SYSTEM_SOURCE_TO_EVIDENCE = {
     "Research": EvidenceTimelineSource.RESEARCH,
+    "Research Lifecycle": EvidenceTimelineSource.RESEARCH_LIFECYCLE,
     "Paper Operation": EvidenceTimelineSource.PAPER_OPERATION,
     "Paper Account": EvidenceTimelineSource.PAPER_ACCOUNT,
     "Market Data": EvidenceTimelineSource.MARKET_DATA,

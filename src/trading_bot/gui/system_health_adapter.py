@@ -26,6 +26,10 @@ from trading_bot.gui.paper_models import (
     PaperPageState,
     PaperPageStatus,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    ResearchCandidateLifecyclePageStatus,
+)
 from trading_bot.gui.runtime_models import RuntimePageState, RuntimePageStatus
 from trading_bot.gui.supervisor_models import SupervisorPageState, SupervisorPageStatus
 from trading_bot.gui.system_health_models import (
@@ -53,6 +57,7 @@ def build_system_health_state(
     operations: OperatorOperationsPageState,
     runtime: RuntimePageState,
     supervisor: SupervisorPageState | None = None,
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None,
 ) -> SystemHealthPageState:
     """Build diagnostics without any service reread, I/O, or authority access."""
     expected = (
@@ -69,6 +74,11 @@ def build_system_health_state(
             raise TypeError(f"{name} has an unsupported type")
     if supervisor is not None and type(supervisor) is not SupervisorPageState:
         raise TypeError("Exact SupervisorPageState required")
+    if (
+        research_lifecycle is not None
+        and type(research_lifecycle) is not ResearchCandidateLifecyclePageState
+    ):
+        raise TypeError("Exact lifecycle presentation required")
 
     components = (
         _research_component(research),
@@ -109,6 +119,31 @@ def build_system_health_state(
                 supervisor.message,
             ),
         )
+    if research_lifecycle is not None:
+        components += (
+            SystemComponentHealthView(
+                "research-lifecycle",
+                "Research Lifecycle",
+                {
+                    ResearchCandidateLifecyclePageStatus.UNAVAILABLE: (
+                        SystemComponentStatus.UNAVAILABLE
+                    ),
+                    ResearchCandidateLifecyclePageStatus.AVAILABLE: (
+                        SystemComponentStatus.AVAILABLE
+                    ),
+                    ResearchCandidateLifecyclePageStatus.ATTENTION: (
+                        SystemComponentStatus.BLOCKED
+                    ),
+                }[research_lifecycle.status],
+                research_lifecycle.message,
+            ),
+        )
+        evidence = research_lifecycle.evidence
+        if evidence is not None:
+            audit_entries += tuple(
+                SystemAuditEntryView("Research Lifecycle", title, str(identifier))
+                for title, identifier in evidence.artifact_identifiers
+            )
     status = (
         SystemHealthStatus.ATTENTION
         if any(item.status is SystemComponentStatus.BLOCKED for item in components)

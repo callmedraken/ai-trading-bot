@@ -28,6 +28,9 @@ from trading_bot.gui.paper_account_models import (
     unavailable_paper_account_state,
 )
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -63,6 +66,9 @@ class _GuiA2RecordingService:
 
     def get_operator_observability_state(self):
         return unavailable_operator_operations_state()
+
+    def get_research_candidate_lifecycle_state(self):
+        return unavailable_research_candidate_lifecycle_state()
 
     def get_production_strategy_state(self):
         return unavailable_production_strategy_state()

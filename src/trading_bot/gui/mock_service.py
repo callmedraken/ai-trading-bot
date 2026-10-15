@@ -26,6 +26,10 @@ from trading_bot.gui.production_strategy_models import (
     ProductionStrategyPageState,
     unavailable_production_strategy_state,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    unavailable_research_candidate_lifecycle_state,
+)
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
@@ -35,6 +39,11 @@ from trading_bot.gui.runtime_models import RuntimePageState, unavailable_runtime
 
 class MockGuiApplicationService:
     """Return static presentation data without invoking application effects."""
+
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        return unavailable_research_candidate_lifecycle_state()
 
     def get_production_strategy_state(self) -> ProductionStrategyPageState:
         """Return the disconnected strategy default."""
@@ -151,6 +160,12 @@ class MockGuiApplicationService:
 
 class ResearchReportGuiApplicationService:
     """Compose the normal overview with one explicit read-only report adapter."""
+
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        """Report selection never implies lifecycle artifact selection."""
+        return unavailable_research_candidate_lifecycle_state()
 
     def get_production_strategy_state(self) -> ProductionStrategyPageState:
         """Return the disconnected strategy default."""

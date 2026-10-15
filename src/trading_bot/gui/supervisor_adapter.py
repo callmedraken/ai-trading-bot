@@ -7,6 +7,10 @@ from trading_bot.gui.production_strategy_models import (
     ProductionStrategyPageState,
     ProductionStrategyPageStatus,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    ResearchCandidateLifecyclePageStatus,
+)
 from trading_bot.gui.runtime_models import RuntimePageState, RuntimePageStatus
 from trading_bot.gui.supervisor_models import (
     SupervisorConsistency,
@@ -20,8 +24,14 @@ def build_supervisor_state(
     research: ResearchPageState,
     runtime: RuntimePageState,
     production_strategy: ProductionStrategyPageState,
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None,
 ) -> SupervisorPageState:
     """Compare only contract/session semantic identities; no reads or effects."""
+    if (
+        research_lifecycle is not None
+        and type(research_lifecycle) is not ResearchCandidateLifecyclePageState
+    ):
+        raise TypeError("Exact lifecycle state required")
     for value, kind in (
         (research, ResearchPageState),
         (runtime, RuntimePageState),
@@ -65,12 +75,18 @@ def build_supervisor_state(
     elif (
         production_strategy.status is ProductionStrategyPageStatus.ATTENTION
         or runtime.status is RuntimePageStatus.ATTENTION
+        or (
+            research_lifecycle is not None
+            and research_lifecycle.status
+            is ResearchCandidateLifecyclePageStatus.ATTENTION
+        )
     ):
         diagnostic = SupervisorDiagnostic.ATTENTION
     elif (
         contract is not None
         or runtime.status is RuntimePageStatus.AVAILABLE
         or report_id is not None
+        or (research_lifecycle is not None and research_lifecycle.evidence is not None)
     ):
         diagnostic = SupervisorDiagnostic.RECORDED
     else:
@@ -89,4 +105,5 @@ def build_supervisor_state(
         runtime,
         report_id,
         result_id,
+        research_lifecycle,
     )

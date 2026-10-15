@@ -115,9 +115,9 @@ def test_arch139a_successor_test_overlay_fails_closed(monkeypatch, mutation, che
     assert check(root)
 
 
-def test_arch139b2_successor_pins_match_and_preserve_unmodified_d1r5_pins():
+def test_arch140_successor_pins_match_and_preserve_unmodified_d1r5_pins():
     root = Path(checkpoint_runner.__file__).resolve().parents[1]
-    overrides = checkpoint_runner.ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    overrides = checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     assert set(overrides) == set(
         checkpoint_runner.ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     )
@@ -397,8 +397,8 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
     assert {name: len(value) for name, value in profiles.items()} == {
         "full": 179,
         "robinhood": 98,
-        "legacy": 215,
-        "exhaustive": 394,
+        "legacy": 220,
+        "exhaustive": 399,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

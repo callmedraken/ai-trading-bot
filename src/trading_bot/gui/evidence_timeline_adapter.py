@@ -21,6 +21,9 @@ from trading_bot.gui.paper_account_models import (
     PaperAccountPageStatus,
 )
 from trading_bot.gui.paper_models import PaperPageState, PaperPageStatus
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+)
 from trading_bot.gui.runtime_models import RuntimePageState
 from trading_bot.gui.supervisor_models import SupervisorPageState
 
@@ -33,6 +36,7 @@ def build_evidence_timeline_state(
     operations: OperatorOperationsPageState,
     runtime: RuntimePageState,
     supervisor: SupervisorPageState | None = None,
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None,
 ) -> EvidenceTimelinePageState:
     """Build a deterministic timeline without I/O, discovery, or service rereads."""
     expected = (
@@ -48,6 +52,11 @@ def build_evidence_timeline_state(
             raise TypeError(f"{name} has an unsupported type")
     if supervisor is not None and type(supervisor) is not SupervisorPageState:
         raise TypeError("Exact SupervisorPageState required")
+    if (
+        research_lifecycle is not None
+        and type(research_lifecycle) is not ResearchCandidateLifecyclePageState
+    ):
+        raise TypeError("Exact lifecycle presentation required")
 
     entries = (
         *_research_entries(research),
@@ -57,6 +66,11 @@ def build_evidence_timeline_state(
         *_operations_entries(operations),
         *_runtime_entries(runtime),
         *(_supervisor_entries(supervisor) if supervisor is not None else ()),
+        *(
+            _lifecycle_entries(research_lifecycle)
+            if research_lifecycle is not None
+            else ()
+        ),
     )
     timed = [entry for entry in entries if entry.occurred_at is not None]
     untimed = [entry for entry in entries if entry.occurred_at is None]
@@ -75,6 +89,37 @@ def build_evidence_timeline_state(
             "read-only GUI state."
         )
     return EvidenceTimelinePageState(message, ordered)
+
+
+def _lifecycle_entries(
+    state: ResearchCandidateLifecyclePageState,
+) -> tuple[EvidenceTimelineEntry, ...]:
+    evidence = state.evidence
+    if evidence is None:
+        return ()
+    observations = evidence.observations
+    first_utc = observations.first_observed_at_utc.isoformat(timespec="microseconds")
+    last_utc = observations.last_observed_at_utc.isoformat(timespec="microseconds")
+    return tuple(
+        EvidenceTimelineEntry(
+            EvidenceTimelineSource.RESEARCH_LIFECYCLE,
+            title,
+            str(identifier),
+            None,
+            None,
+            (
+                f"{observations.observation_count} caller-supplied observations; "
+                f"{observations.distinct_session_count} sessions; dates "
+                f"{observations.first_session_date.isoformat()} to "
+                f"{observations.last_session_date.isoformat()}; UTC "
+                f"{first_utc} to {last_utc}. "
+                "No canonical batch event timestamp."
+                if title == "B1 observation batch"
+                else state.message
+            ),
+        )
+        for title, identifier in evidence.artifact_identifiers
+    )
 
 
 def _supervisor_entries(

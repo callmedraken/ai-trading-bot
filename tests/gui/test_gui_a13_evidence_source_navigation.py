@@ -34,6 +34,9 @@ from trading_bot.gui import (
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 
 _UUID1 = UUID("11111111-1111-1111-1111-111111111111")
 _UUID2 = UUID("22222222-2222-2222-2222-222222222222")
@@ -169,6 +172,10 @@ class _NavigationService:
         self.calls += 1
         return unavailable_operator_operations_state()
 
+    def get_research_candidate_lifecycle_state(self):
+        self.calls += 1
+        return unavailable_research_candidate_lifecycle_state()
+
     def get_production_strategy_state(self):
         self.calls += 1
         return unavailable_production_strategy_state()
@@ -200,7 +207,7 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     window.show()
     application.processEvents()
 
-    assert service.calls == 8
+    assert service.calls == 9
     window.select_page("evidence")
     page = window.findChild(EvidenceTimelinePage, "evidenceTimelinePage")
     assert page is not None
@@ -210,7 +217,7 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     application.processEvents()
 
     assert window.current_page_id == "research"
-    assert service.calls == 8
+    assert service.calls == 9
 
     window.select_page("evidence")
     market = _source_button(page, "Market Data — Verified market-data snapshot")
@@ -218,6 +225,6 @@ def test_main_window_evidence_navigation_reuses_already_acquired_source_pages() 
     application.processEvents()
 
     assert window.current_page_id == "market-data"
-    assert service.calls == 8
+    assert service.calls == 9
 
     window.close()

@@ -2,35 +2,53 @@
 
 ## Current phase
 
-Architecture 134-D1R5 source is accepted and the project is waiting on the
-separately protected real pre-market `WAITING_FOR_MARKET` / wake /
-source-readmission qualification.
+Architecture 134-D1R6 overnight D1R5 wake arming is **SOURCE ACCEPTED**. The
+next protected step is one separately reviewed **read-only real-host D1R6
+preflight**. No real Task Scheduler mutation or D1R5 qualification has run.
 
-The canonical bounded new-chat handoff/history branch is
-`feature/project-history-storage-foundation`. It is maintained only as a
-fast-forward mirror of the latest accepted bounded-docs descendant and is not
-trading or executable-source authority.
+Accepted D1R6 executable/test source:
 
-Current accepted product/source identity:
+```text
+branch  feature/robinhood-production-paper-overnight-wake-arming
+HEAD    c92afc582064aaeff1bde4fd97205ca65a960ba2
+TREE    28b590760185f5359c979a36984c800c447b530a
+CI      #566 / 38712458146 / SUCCESS / attempt 1
+```
+
+Checkpoint #566 independently passed source-static, 2,414 active tests, and
+canonical ROBINHOOD certification with 9,380 passed / 1 skipped / 0 failed /
+0 errors in 225.385 seconds. Current inventory is FULL 176 / ROBINHOOD 99 /
+LEGACY 215 / EXHAUSTIVE 391.
+
+D1R6 preserves the accepted D1R5 qualifier byte-for-byte and changes the
+operator workflow from a narrow manual morning start to a one-session
+before-bed arm. Windows Task Scheduler is only an untrusted wake signal:
+the intended one-time task fires at regular open minus ten minutes,
+`WakeToRun=true`, `StartWhenAvailable=false`, with no repetition, restart,
+demand start, retry, D1, PREPARE, EXECUTE, paper, broker, or live authority.
+The unchanged D1R5 host still independently proves actual timing and source.
+
+The fixed external D1R5 target remains:
 
 ```text
 branch  feature/robinhood-production-paper-premarket-wake-qualification
-HEAD    a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
-TREE    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
-CI      #557 / 38549244176 / SUCCESS
+HEAD    7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
+TREE    c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-Current accepted docs descendant before this canonical-branch designation:
+Its accepted executable D1R5 source remains
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a` /
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. The real D1R5
+`WAITING_FOR_MARKET` / wake / source-readmission qualification remains
+unrun.
 
-```text
-HEAD    ed2eb3ef60e9c04ed9cfa89061fb28d2dfcc562c
-TREE    c3831fb1508e254c464470db8d67ae14ac4c4985
-CI      #559 / 38550603841 / SUCCESS
-```
+The canonical bounded history branch remains
+`feature/project-history-storage-foundation` at the accepted product-line
+boundary; D1R6 is a separately reviewed protected-source successor and does not
+move product/history authority by itself.
 
-Exact active product HEAD/tree must still be re-proven before protected source
-admission. No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or
-live trading is authorized.
+No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or live
+trading is authorized.
 
 ## Operational checkpoint
 
@@ -105,16 +123,19 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The immediate product boundary is now the real pre-market start /
-`WAITING_FOR_MARKET` / wake qualification. The independent Architecture 134-D1R5
-source checkpoint is accepted at HEAD
-`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
-`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`, but its real bounded
-clock/sleep/external-evidence qualification has not yet run.
+The immediate boundary is now D1R6's **read-only real-host preflight**. It may
+inspect exact D1R6 and D1R5 Git identities, the frozen NYSE calendar, current
+clock, current interactive Windows principal, the fixed qualification parent,
+derived evidence absence, and the fixed Task Scheduler identity read-only.
 
-The D1R4 authentication PASS grants no PREPARE, EXECUTE, paper mutation, broker
-placement, scheduler/ACL mutation, D1 launch, D2 invocation, or live-trading
-authority.
+A preflight PASS does not create or alter a task and does not invoke D1R5. After
+ChatGPT reviews the real preflight, the next separate effect may authorize at
+most one fixed Task Scheduler `TASK_CREATE` attempt for the selected one-session
+overnight wake. Any mutation-entry ambiguity is consumed and never retried.
+
+D1R4 authentication remains PASS / consumed. D1R5 remains unrun and grants no
+D1 authority until its future canonical result is independently reconciled and
+accepted.
 
 ## Current blocker / protected boundary
 
@@ -157,33 +178,32 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Now
 
-- Keep the bounded status and handoff aligned with the accepted D1R5/current
-  protected-boundary state, and keep
-  `feature/project-history-storage-foundation` fast-forwarded to each accepted
-  bounded-docs descendant.
-- Keep the immutable HIST-2B snapshot unchanged.
-- Record and preserve the consumed D1R4 authentication evidence and fenced
-  generation journal.
-- Preserve the accepted [D1R5 timing/source qualifier](validation/arch134-d1r5-pre-market-wake-qualification.md)
-  and its Architecture 132-R3H certification-hygiene proof.
-- Review only the separate real bounded clock/sleep/external-evidence D1R5
-  qualification next; it stops after wake/source proof and grants no D1 authority.
-- Keep all D1/PREPARE/EXECUTE/paper/broker effects stopped until that source and
-  operator boundary are separately accepted.
+- Preserve D1R6 accepted source at `c92afc582064aaeff1bde4fd97205ca65a960ba2`
+  and its frozen D1R5 predecessor/workflow blobs.
+- Run exactly one **read-only real-host D1R6 preflight** from the final accepted
+  docs descendant and review its output.
+- Keep Task Scheduler mutation, D1R5 execution, D1, PREPARE, EXECUTE, paper,
+  broker, D2, and live effects stopped during preflight.
+- Keep `feature/project-history-storage-foundation` on the accepted product
+  lineage until a separately reviewed integration/replay boundary.
 
 ### Next
 
-- Qualify pre-market start, durable `WAITING_FOR_MARKET`, wake timing, and
-  exact source re-admission.
-- Only after that qualification is accepted, review the next fresh D1 session
-  authorization boundary.
+- If preflight is accepted, separately authorize one D1R6 one-session task
+  creation before bed.
+- Let the fixed task act only as a wake signal; the accepted D1R5 host must
+  independently re-admit source/timing and produce its canonical journal.
+- After waking, run read-only D1R6 reconciliation and independently review the
+  D1R5 result.
+- Only after a canonical D1R5 PASS is accepted may the next fresh D1-session
+  authorization boundary be considered.
 
 ### Later
 
 - Consider D1, paper, broker-paper, and later live-readiness gates only through
   their own reviewed authority boundaries and reconciliation requirements.
-- Keep live trading unavailable until every explicit production/live gate is
-  implemented, accepted, and separately enabled.
+- Keep real-money trading unavailable until every explicit production/live gate
+  is implemented, accepted, and separately enabled.
 
 ## History and deep-reference pointers
 

@@ -42,27 +42,41 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-Architecture 134-D1R5 source and the Architecture 132-R3H certification-hygiene
-correction are accepted on:
+Architecture 134-D1R6 **Overnight D1R5 Wake Arming** is SOURCE ACCEPTED on:
 
 ```text
-branch  feature/robinhood-production-paper-premarket-wake-qualification
-source  a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a
-tree    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
-CI      #557 / 38549244176 / SUCCESS
+branch  feature/robinhood-production-paper-overnight-wake-arming
+HEAD    c92afc582064aaeff1bde4fd97205ca65a960ba2
+TREE    28b590760185f5359c979a36984c800c447b530a
+CI      #566 / 38712458146 / SUCCESS / attempt 1
 ```
 
-Canonical ROBINHOOD certification passed 9,182 cases with 9,181 passed, one
-skipped, zero failed/errors, wall 253.493 seconds. The later docs-only accepted
-descendant before this canonical-branch designation is
-`ed2eb3ef60e9c04ed9cfa89061fb28d2dfcc562c` /
-`c3831fb1508e254c464470db8d67ae14ac4c4985`, with Checkpoint Source
-Gates #559 SUCCESS.
+Independent GitHub review confirmed exactly one commit over D1R5 docs base
+`7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343`, with no D1R5 or workflow
+byte drift. Source-static passed; active JUnit is 2,414 / 2,414; canonical
+ROBINHOOD is 9,380 passed / 1 skipped / 0 failed / 0 errors, wall 225.385 s.
+Inventory is FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
 
-The next protected boundary is the separately reviewed real D1R5 pre-market
-`WAITING_FOR_MARKET` / wake / source-readmission qualification. It has not yet
-run. No fresh D1 session, PREPARE, EXECUTE, paper/broker effect, D2, or live
-trading is authorized.
+D1R6 does not widen D1R5. It adds a one-session before-bed arming layer:
+derive the next eligible published NYSE session within 18 hours, target regular
+open minus ten minutes, request `WakeToRun=true`, forbid late catch-up with
+`StartWhenAvailable=false`, and allow no repetition, restart, demand start, or
+automatic retry. Task Scheduler is not trading authority.
+
+The fixed D1R5 target remains the external branch/worktree at:
+
+```text
+HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
+TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
+```
+
+The accepted D1R5 executable bytes remain the source accepted at
+`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a` /
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. Real D1R5 qualification,
+real scheduler mutation, and D1 remain unrun.
+
+The next protected boundary is one read-only real-host D1R6 preflight. A PASS
+does not authorize task creation.
 
 ## Exact D1R4 state
 
@@ -132,21 +146,28 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R4 authentication is complete and consumed. The next product boundary is the
-still-required Architecture 134 pre-market start / `WAITING_FOR_MARKET` / wake
-qualification before any fresh D1 session may be authorized.
+D1R4 authentication is complete and consumed. D1R6 source is accepted, but all
+real D1R6/D1R5 effects remain closed.
 
-The independent D1R5 timing/source qualifier must start before the admission
-window, durably enter `WAITING_FOR_MARKET`, wake at the admission boundary,
-re-admit source, and stop. Its source is **ACCEPTED** at HEAD
-`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
-`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`; Checkpoint Source Gates
-#557 / `38549244176` is SUCCESS. See
-[the D1R5 contract](validation/arch134-d1r5-pre-market-wake-qualification.md).
-It never enters D1 or the production armed-session effect path. Source acceptance
-does not authorize the separately reviewed real bounded wait qualification.
+The immediate step is exactly one **read-only D1R6 preflight**. It may verify
+the final D1R6 source, fixed D1R5 target source, frozen NYSE session derivation,
+qualification-parent/evidence absence, current logged-in Windows principal, and
+fixed task absence/definition read-only. It must not create evidence, register
+or alter a task, sleep, invoke D1R5, read credentials/providers, touch paper or
+production SQLite, mutate ACLs, or enter D1.
 
-No D1 launch is authorized by the authentication PASS itself.
+Only after that preflight is independently reviewed may one later checkpoint
+authorize at most one fixed `TASK_CREATE` attempt. The eventual scheduled launch
+is an untrusted wake signal and must still pass the unchanged D1R5 host's exact
+timing/source admission. D1R5 then stops after canonical wake/source evidence;
+there is no automatic continuation into D1.
+
+Morning reconciliation is read-only. Canonical D1R5 evidence, not Task Scheduler
+state or LastTaskResult, determines PASS/failure/incomplete status. Ambiguity or
+partial consumption is never retried.
+
+No fresh D1 launch is authorized by D1R4, D1R6 source acceptance, a future
+preflight PASS, or task creation alone.
 
 ## Standing safety and effect invariants
 

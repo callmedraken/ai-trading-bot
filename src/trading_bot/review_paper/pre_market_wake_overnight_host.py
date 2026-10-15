@@ -115,13 +115,12 @@ class _WindowsRuntime:
                 "-Mode",
                 mode,
             ],
-            input=overnight.canonical(request).decode() + "\n",
+            input=overnight.canonical(request) + b"\n",
             capture_output=True,
-            text=True,
             timeout=45,
             check=False,
         )
-        if result.returncode != 0 or len(result.stdout.encode("utf-8")) > 16384:
+        if result.returncode != 0 or len(result.stdout) > 16384:
             raise ValueError("scheduler unavailable")
 
         # Duplicate fields and unexpected output fail before any further effect.

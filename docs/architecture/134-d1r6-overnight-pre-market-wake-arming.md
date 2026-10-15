@@ -159,3 +159,23 @@ principal, timings, settings, one-create budget, evidence schema, D1R5 target an
 qualification interlock remain unchanged. Source verification does not invoke
 the real helper, preflight, scheduled action or D1R5. Stop after exact-head CI for
 ChatGPT source review; do not rerun the real-host preflight during this checkpoint.
+
+## D1R6R2 — byte-exact scheduler stdin correction
+
+The reported D1R6R1 real-host diagnosis confirmed the process-policy fix, but
+canonical Principal still returned NOT_CALLED with zero registration attempts.
+The same fixed argv/helper with raw `b"{}\n"` returned the valid current Windows
+principal. Python text-mode pipe newline translation was the remaining defect.
+No scheduler observation/mutation, D1R5 invocation or qualification-evidence
+creation occurred during that diagnosis.
+
+The scheduler transport now sends canonical request bytes plus exactly one raw
+LF, in binary subprocess mode. Principal/Observe input is exactly `b"{}\n"`;
+Create uses the unchanged canonical request object plus `b"\n"`. The 16,384-byte
+stdout bound applies directly to raw bytes; JSON parses bytes directly and may
+accept normal CRLF output whitespace without rewriting it. Fixed R1 argv and
+process-scoped policy remain unchanged. No text/encoding/errors/environment or
+shell override is accepted. The PowerShell helper retains its strict LF/EOF
+framing unchanged, as do scheduled-action source and all scheduler semantics.
+Source verification uses mocked subprocesses only; no real helper, preflight,
+Principal/Observe/Create mode or qualification is invoked. Stop for exact review.

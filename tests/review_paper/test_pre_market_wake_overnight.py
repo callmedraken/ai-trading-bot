@@ -759,7 +759,7 @@ def test_transport_input_is_stdin_and_output_is_closed(monkeypatch):
             calls.append((argv, kw))
             or SimpleNamespace(
                 returncode=0,
-                stdout='{"disposition":"CALL_RETURNED","registration_attempts":1}',
+                stdout=b'{"disposition":"CALL_RETURNED","registration_attempts":1}\r\n',
             )
         ),
     )
@@ -777,7 +777,12 @@ def test_transport_input_is_stdin_and_output_is_closed(monkeypatch):
         "Create",
     ]
     assert kwargs.get("shell", False) is False
-    assert kwargs["input"].endswith("\n") and "principal_sid" not in " ".join(argv)
+    assert type(kwargs["input"]) is bytes
+    assert kwargs["input"].endswith(b"\n")
+    assert "principal_sid" not in " ".join(argv)
+    assert (
+        not {"text", "encoding", "errors", "env", "universal_newlines"} & kwargs.keys()
+    )
 
 
 def test_static_capability_closure_and_fixed_transport():
@@ -1054,14 +1059,23 @@ def test_additional_predecessor_overlay_is_exact_and_test_only(monkeypatch):
 @pytest.mark.parametrize("mode", ["Principal", "Observe", "Create"])
 def test_all_scheduler_modes_use_only_fixed_process_policy(monkeypatch, mode):
     calls = []
+    response = {
+        "Principal": {"name": PRINCIPAL.name, "sid": PRINCIPAL.sid},
+        "Observe": {"status": "ABSENT"},
+        "Create": {"disposition": "CALL_RETURNED", "registration_attempts": 1},
+    }[mode]
     monkeypatch.setattr(
         host.subprocess,
         "run",
         lambda argv, **kwargs: (
-            calls.append((argv, kwargs)) or SimpleNamespace(returncode=0, stdout="{}")
+            calls.append((argv, kwargs))
+            or SimpleNamespace(returncode=0, stdout=q.canonical(response) + b"\r\n")
         ),
     )
-    host._WindowsRuntime()._scheduler(mode, plan() if mode == "Create" else None)
+    assert (
+        host._WindowsRuntime()._scheduler(mode, plan() if mode == "Create" else None)
+        == response
+    )
     argv, kwargs = calls[0]
     assert argv == [
         q.POWERSHELL,
@@ -1075,8 +1089,29 @@ def test_all_scheduler_modes_use_only_fixed_process_policy(monkeypatch, mode):
         mode,
     ]
     assert kwargs.get("shell", False) is False
-    assert "env" not in kwargs
-    assert kwargs["input"].endswith("\n")
+    assert (
+        not {"text", "encoding", "errors", "env", "universal_newlines"} & kwargs.keys()
+    )
+    assert type(kwargs["input"]) is bytes
+    expected = b"{}\n"
+    if mode == "Create":
+        expected = (
+            q.canonical(
+                {
+                    "start_boundary": "2026-10-15T13:20:00+00:00",
+                    "end_boundary": "2026-10-15T13:35:00+00:00",
+                    "principal_name": PRINCIPAL.name,
+                    "principal_sid": PRINCIPAL.sid,
+                }
+            )
+            + b"\n"
+        )
+    assert kwargs["input"] == expected
+    assert kwargs["input"].count(b"\n") == 1
+    assert b"\r" not in kwargs["input"]
+    assert kwargs["capture_output"] is True
+    assert kwargs["timeout"] == 45
+    assert kwargs["check"] is False
     assert len(calls) == 1
 
 
@@ -1113,3 +1148,75 @@ def test_transport_has_no_caller_policy_or_path_surface(monkeypatch, keyword, va
     )
     with pytest.raises(TypeError):
         host._WindowsRuntime()._scheduler("Observe", **{keyword: value})
+
+
+def test_principal_crlf_output_keeps_raw_lf_stdin(monkeypatch):
+    def binary_only(argv, **kwargs):
+        assert type(kwargs["input"]) is bytes
+        assert kwargs["input"] == b"{}\n"
+        assert (
+            not {"text", "encoding", "errors", "env", "universal_newlines"}
+            & kwargs.keys()
+        )
+        assert kwargs.get("shell", False) is False
+        return SimpleNamespace(
+            returncode=0,
+            stdout=b'{"name":"DOMAIN\\\\User","sid":"S-1-5-21-1-2-3-1001"}\r\n',
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(host.subprocess, "run", binary_only)
+    assert host._WindowsRuntime().principal() == q.Principal(
+        r"DOMAIN\User", PRINCIPAL.sid
+    )
+
+
+@pytest.mark.parametrize("length,accepted", [(16384, True), (16385, False)])
+def test_scheduler_stdout_limit_counts_raw_bytes(monkeypatch, length, accepted):
+    monkeypatch.setattr(
+        host.subprocess,
+        "run",
+        lambda *a, **kw: SimpleNamespace(
+            returncode=0, stdout=b"{}" + b" " * (length - 2), stderr=b""
+        ),
+    )
+    if accepted:
+        assert host._WindowsRuntime()._scheduler("Observe") == {}
+    else:
+        with pytest.raises(ValueError, match="scheduler unavailable"):
+            host._WindowsRuntime()._scheduler("Observe")
+
+
+def test_scheduler_invalid_utf8_stdout_rejected(monkeypatch):
+    monkeypatch.setattr(
+        host.subprocess,
+        "run",
+        lambda *a, **kw: SimpleNamespace(
+            returncode=0, stdout=b"\xff{}\r\n", stderr=b""
+        ),
+    )
+    with pytest.raises(ValueError):
+        host._WindowsRuntime()._scheduler("Observe")
+
+
+def test_scheduler_transport_keyword_closure_is_binary_only():
+    tree = ast.parse(Path(host.__file__).read_text(encoding="utf-8"))
+    scheduler = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "_scheduler"
+    )
+    calls = [
+        node
+        for node in ast.walk(scheduler)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "run"
+    ]
+    assert len(calls) == 1
+    assert {keyword.arg for keyword in calls[0].keywords} == {
+        "input",
+        "capture_output",
+        "timeout",
+        "check",
+    }

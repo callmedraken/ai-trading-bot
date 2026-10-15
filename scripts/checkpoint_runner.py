@@ -11466,7 +11466,7 @@ ARCH134_D1R6_SOURCE_PINS: Final = {
         "651738caad07492671833c0df0bb691dc2383324"
     ),
     "src/trading_bot/review_paper/pre_market_wake_overnight_host.py": (
-        "1b7610653876c3d4053c41b4f11d0489c839c43f"
+        "379ef4492b95f5a4b09fdc8bca1248454c19502b"
     ),
     "scripts/run_arch134_d1r6.py": ("593eacf9495fcc4fe75a51f54f8947266a93b676"),
     "scripts/arch134_d1r6_d1r5_child.py": ("c03f163f5bbc1cb4a6c78428298f16ebc5f71368"),
@@ -11477,13 +11477,13 @@ ARCH134_D1R6_SOURCE_PINS: Final = {
         "62072df35376c5abb6adb4ff7ec764199621cb7c"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
-        "1e1f0d87102e0d3875740e089d17555b8ee89f4c"
+        "ff755f0fcb497457c74eb5e6a218f045688ef2e0"
     ),
     "docs/architecture/134-d1r6-overnight-pre-market-wake-arming.md": (
-        "aec343036b84e0bba340f5e08e8bf9205354dd56"
+        "e72101e919e270647e8d7cf9ab91e27c683e926d"
     ),
     "docs/validation/arch134-d1r6-overnight-pre-market-wake-arming.md": (
-        "aedb217fe5151fb1443825465e3fa512090bf8fd"
+        "0d3b04e12e3320d2e101331c43ac059056467823"
     ),
 }
 ARCH134_D1R6_TESTS: Final = (

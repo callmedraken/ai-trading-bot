@@ -7,6 +7,22 @@ function Get-Identity {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     return @{name=[string]$identity.Name;sid=[string]$identity.User.Value}
 }
+function Convert-ObservedBoundary([string]$Value) {
+    # Reject offset-less values before parsing; never assume the host time zone.
+    if ($Value -cnotmatch '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,7})?(?:Z|[+-][0-9]{2}:[0-9]{2})$') { throw 'boundary unavailable' }
+    $instant = [DateTimeOffset]::Parse($Value, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None)
+    # Do not silently truncate fractional seconds to a different instant.
+    if (($instant.Ticks % [TimeSpan]::TicksPerSecond) -ne 0) { throw 'boundary precision drift' }
+    return $instant.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:sszzz", [Globalization.CultureInfo]::InvariantCulture)
+}
+function Convert-ObservedPrincipalSid([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) { throw 'principal unavailable' }
+    if ($Value -match '^S-') {
+        return [Security.Principal.SecurityIdentifier]::new($Value).Value
+    }
+    $account = [Security.Principal.NTAccount]::new($Value)
+    return $account.Translate([Security.Principal.SecurityIdentifier]).Value
+}
 function Get-TaskObservation {
     $service = New-Object -ComObject 'Schedule.Service'
     $service.Connect()
@@ -25,10 +41,10 @@ function Get-TaskObservation {
     if ($trigger.Type -ne 1 -or $action.Type -ne 0) { throw 'task type drift' }
     $projected = @{
         task_path=[string]$task.Path;trigger_count=[int]$definition.Triggers.Count;trigger_type=[int]$trigger.Type
-        start_boundary=[string]$trigger.StartBoundary;end_boundary=[string]$trigger.EndBoundary
+        start_boundary=(Convert-ObservedBoundary ([string]$trigger.StartBoundary));end_boundary=(Convert-ObservedBoundary ([string]$trigger.EndBoundary))
         trigger_enabled=[bool]$trigger.Enabled;repetition_interval=[string]$trigger.Repetition.Interval
         repetition_duration=[string]$trigger.Repetition.Duration;repetition_stop=[bool]$trigger.Repetition.StopAtDurationEnd
-        random_delay=[string]$trigger.RandomDelay;principal_sid=[string]$principal.UserId
+        random_delay=[string]$trigger.RandomDelay;principal_sid=(Convert-ObservedPrincipalSid ([string]$principal.UserId))
         logon_type=[int]$principal.LogonType;run_level=[int]$principal.RunLevel
         action_count=[int]$definition.Actions.Count;action_type=[int]$action.Type
         command=[string]$action.Path;arguments=[string]$action.Arguments;working_directory=[string]$action.WorkingDirectory

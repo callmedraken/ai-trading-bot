@@ -180,10 +180,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser = _Parser(
         description="D1R6 one overnight wake; no D1 authority.", allow_abbrev=False
     )
-    parser.add_argument("mode", choices=("preflight", "arm", "launch", "reconcile"))
+    parser.add_argument(
+        "mode",
+        choices=(
+            "preflight",
+            "arm",
+            "recover-preflight",
+            "recover",
+            "launch",
+            "reconcile",
+        ),
+    )
     parser.add_argument("--expected-head")
     parser.add_argument("--expected-tree")
     parser.add_argument("--arm", choices=(overnight.ARM_INTERLOCK,))
+    parser.add_argument("--recover", choices=(overnight.RECOVERY_INTERLOCK,))
     return parser
 
 
@@ -210,16 +221,17 @@ def _current_identity() -> tuple[str, str]:
 def main(argv: list[str] | None = None) -> int:
     try:
         args = build_parser().parse_args(argv)
-        if args.mode in {"preflight", "arm"}:
+        if args.mode in {"preflight", "arm", "recover-preflight", "recover"}:
             if (
                 not args.expected_head
                 or not args.expected_tree
                 or (args.mode == "arm") != (args.arm is not None)
+                or (args.mode == "recover") != (args.recover is not None)
             ):
                 raise ValueError("explicit authority required")
             head, tree = args.expected_head, args.expected_tree
         else:
-            if args.expected_head or args.expected_tree or args.arm:
+            if args.expected_head or args.expected_tree or args.arm or args.recover:
                 raise ValueError("launch arguments forbidden")
             head, tree = _current_identity()
         runtime = _WindowsRuntime()
@@ -228,6 +240,13 @@ def main(argv: list[str] | None = None) -> int:
         if args.mode == "preflight":
             overnight.preflight(runtime, head, tree)
             result = {"disposition": "READY"}
+        elif args.mode == "recover-preflight":
+            overnight.recover_preflight(runtime, head, tree)
+            result = {"disposition": "RECOVERY_READY"}
+        elif args.mode == "recover":
+            result = {
+                "disposition": overnight.recover(runtime, head, tree, args.recover)
+            }
         elif args.mode == "arm":
             result = {"disposition": overnight.arm(runtime, head, tree, args.arm)}
         else:
@@ -238,7 +257,10 @@ def main(argv: list[str] | None = None) -> int:
             ).decode()
         )
         return (
-            0 if result["disposition"] in {"READY", "ARMED", "PASS", "PENDING"} else 1
+            0
+            if result["disposition"]
+            in {"READY", "ARMED", "RECOVERY_READY", "RECOVERED", "PASS", "PENDING"}
+            else 1
         )
     except (Exception, KeyboardInterrupt):
         print("D1R6_HOST_BLOCKED", file=sys.stderr)

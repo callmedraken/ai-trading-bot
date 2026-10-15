@@ -790,6 +790,7 @@ def test_static_capability_closure_and_fixed_transport():
         "__future__",
         "argparse",
         "json",
+        "hashlib",
         "os",
         "re",
         "stat",
@@ -1220,3 +1221,784 @@ def test_scheduler_transport_keyword_closure_is_binary_only():
         "timeout",
         "check",
     }
+
+
+# All incident files below are synthetic and live only under pytest's external
+# temporary root. Never read the real host journal or invoke native host modes.
+INCIDENT_PRINCIPAL = q.Principal(
+    r"DESKTOP-I4DOKM7\John", "S-1-5-21-1397534616-3988210162-180023805-1005"
+)
+
+
+def incident_records():
+    value = q.Plan(
+        q.RECOVERY_PREDECESSOR_HEAD,
+        q.RECOVERY_PREDECESSOR_TREE,
+        OBSERVED,
+        INCIDENT_PRINCIPAL,
+    )
+    records = tuple(
+        {
+            "schema": q.SCHEMA,
+            "event": event,
+            "facts": value.facts,
+            "effects": dict.fromkeys(q.ZERO_EFFECTS, 0),
+            "scheduler_task_create_calls": int(index >= 4),
+            "classification": "INDETERMINATE" if event == "FINAL" else None,
+        }
+        for index, event in enumerate((*q.EVENTS[:6], "FINAL"))
+    )
+    return value, records
+
+
+def pin_synthetic_journal(monkeypatch, payload):
+    # Only synthetic bytes are admitted in tests, without possessing real evidence.
+    monkeypatch.setattr(q, "RECOVERY_PREDECESSOR_ARM_BYTES", len(payload))
+    monkeypatch.setattr(
+        q, "RECOVERY_PREDECESSOR_ARM_SHA256", hashlib.sha256(payload).hexdigest()
+    )
+
+
+@pytest.fixture
+def consumed(fake, monkeypatch):
+    value, records = incident_records()
+    payload = q.serialize_arm(records)
+    pin_synthetic_journal(monkeypatch, payload)
+    (fake.parent / q.RECOVERY_PREDECESSOR_ARM_NAME).write_bytes(payload)
+    fake.identity = INCIDENT_PRINCIPAL
+    fake.task = {
+        "status": "PRESENT",
+        "task": value.task,
+        "state": 3,
+        "last_result": 267011,
+    }
+    return fake, value, payload
+
+
+def recovered(consumed):
+    fake, value, payload = consumed
+    assert q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK) == "RECOVERED"
+    assert (fake.parent / value.arm_name).read_bytes() == payload
+    return fake, value
+
+
+def test_frozen_real_incident_constants():
+    assert q.RECOVERY_PREDECESSOR_HEAD == "3cf4284d017e362eee58a2f27526ab4de8f292a2"
+    assert q.RECOVERY_PREDECESSOR_TREE == "16a48a12756bb6d810799444859334ce6305001d"
+    assert q.RECOVERY_PREDECESSOR_ARM_BYTES == 16917
+    assert q.RECOVERY_PREDECESSOR_ARM_SHA256 == (
+        "b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c"
+    )
+    assert q.RECOVERY_TARGET_SESSION == "2026-10-15"
+    value, _ = incident_records()
+    assert value.arm_name == q.RECOVERY_PREDECESSOR_ARM_NAME
+    assert q.RECOVERY_INTERLOCK == "AUTHORIZE_ARCH134_D1R6_ONE_CONSUMED_ARM_RECOVERY"
+
+
+def test_consumed_predecessor_exact_and_readonly(consumed):
+    fake, value, payload = consumed
+    path = fake.parent / value.arm_name
+    before = path.stat()
+    assert q.read_consumed_predecessor(path) == value
+    assert path.read_bytes() == payload
+    assert path.stat().st_mtime_ns == before.st_mtime_ns
+    with pytest.raises(ValueError):
+        q.load_armed(fake, HEAD, TREE)
+    with pytest.raises(ValueError):
+        q.launch(fake, HEAD, TREE)
+    assert q.reconcile(fake, HEAD, TREE)["evidence"] == "ARM_EVIDENCE_INVALID"
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize("kind", ["filename", "bytes", "sha", "directory", "hardlink"])
+def test_predecessor_file_identity_rejected(consumed, monkeypatch, kind):
+    fake, value, payload = consumed
+    path = fake.parent / value.arm_name
+    if kind == "filename":
+        path = fake.parent / "wrong.jsonl"
+        path.write_bytes(payload)
+    elif kind == "bytes":
+        monkeypatch.setattr(q, "RECOVERY_PREDECESSOR_ARM_BYTES", len(payload) + 1)
+    elif kind == "sha":
+        monkeypatch.setattr(q, "RECOVERY_PREDECESSOR_ARM_SHA256", "0" * 64)
+    elif kind == "directory":
+        path.unlink()
+        path.mkdir()
+    else:
+        (fake.parent / "linked.jsonl").hardlink_to(path)
+    with pytest.raises(ValueError):
+        q.read_consumed_predecessor(path)
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "missing",
+        "extra",
+        "event",
+        "returned",
+        "blocked",
+        "armed",
+        "session",
+        "head",
+        "tree",
+        "target",
+        "facts",
+        "effects",
+        "create",
+    ],
+)
+def test_predecessor_structural_drift_rejected(consumed, monkeypatch, kind):
+    fake, value, _ = consumed
+    _, raw = incident_records()
+    records = list(copy.deepcopy(raw))
+    if kind == "missing":
+        records.pop(5)
+    elif kind == "extra":
+        records.insert(6, dict(records[5]))
+    elif kind in {"event", "returned"}:
+        records[5 if kind == "returned" else 1]["event"] = "TASK_CONFIRMED"
+    elif kind in {"blocked", "armed"}:
+        records[-1]["classification"] = kind.upper()
+    elif kind == "effects":
+        records[2]["effects"][q.ZERO_EFFECTS[0]] = 1
+    elif kind == "create":
+        records[4]["scheduler_task_create_calls"] = 0
+    else:
+        field = {
+            "session": "target_session",
+            "head": "source_head",
+            "tree": "source_tree",
+            "target": "target_head",
+            "facts": "observed_at",
+        }[kind]
+        for record in records:
+            record["facts"][field] = {
+                "session": "2026-10-16",
+                "head": HEAD,
+                "tree": TREE,
+                "target": HEAD,
+                "facts": "2026-10-15T04:00:00+00:00",
+            }[kind]
+    payload = b"".join(q.canonical(r) + b"\n" for r in records)
+    # Exercise structure independently of the real incident's byte/hash fence.
+    pin_synthetic_journal(monkeypatch, payload)
+    (fake.parent / value.arm_name).write_bytes(payload)
+    if kind == "facts":
+        # A self-consistent changed observation is rejected by the frozen hash.
+        monkeypatch.setattr(q, "RECOVERY_PREDECESSOR_ARM_SHA256", "0" * 64)
+    with pytest.raises(ValueError):
+        q.read_consumed_predecessor(fake.parent / value.arm_name)
+
+
+def test_recovery_preflight_ready_zero_writes(consumed):
+    fake, value, payload = consumed
+    assert q.recover_preflight(fake, HEAD, TREE) == value
+    assert list(fake.parent.iterdir()) == [fake.parent / value.arm_name]
+    assert (fake.parent / value.arm_name).read_bytes() == payload
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "state",
+        "result",
+        "task",
+        "principal",
+        "time",
+        "backward",
+        "result_file",
+        "fence",
+        "recovery",
+        "other_arm",
+        "source",
+        "target",
+    ],
+)
+def test_recovery_preflight_every_drift_blocks(consumed, monkeypatch, kind):
+    fake, value, payload = consumed
+    if kind == "state":
+        fake.task["state"] = 4
+    elif kind == "result":
+        fake.task["last_result"] = 0
+    elif kind == "task":
+        fake.task["task"]["start_when_available"] = True
+    elif kind == "principal":
+        fake.identity = PRINCIPAL
+    elif kind == "time":
+        fake.now = value.trigger
+    elif kind == "backward":
+        fake.now = OBSERVED - timedelta(seconds=1)
+    elif kind in {"source", "target"}:
+        monkeypatch.setattr(fake, kind, lambda *a: (_ for _ in ()).throw(ValueError()))
+    else:
+        name = {
+            "result_file": value.result_name,
+            "fence": value.arm_name.replace(".jsonl", "-launch.jsonl"),
+            "recovery": q.recovery_name(HEAD, TREE),
+            "other_arm": value.arm_prefix + "other.jsonl",
+        }[kind]
+        (fake.parent / name).write_bytes(b"")
+    with pytest.raises(ValueError):
+        q.recover_preflight(fake, HEAD, TREE)
+    assert fake.creates == fake.children == 0
+    assert (fake.parent / value.arm_name).read_bytes() == payload
+
+
+@pytest.mark.parametrize("state", [0, 1, 2, 4, True, "3", None])
+def test_recovery_only_ready_state(consumed, state):
+    fake, _, _ = consumed
+    fake.task["state"] = state
+    with pytest.raises(ValueError):
+        q.recover_preflight(fake, HEAD, TREE)
+
+
+@pytest.mark.parametrize("result", [0, 1, 267009, 267010, True, "267011", None])
+def test_recovery_only_has_not_run_result(consumed, result):
+    fake, _, _ = consumed
+    fake.task["last_result"] = result
+    with pytest.raises(ValueError):
+        q.recover_preflight(fake, HEAD, TREE)
+
+
+@pytest.mark.parametrize(
+    "interlock", [None, "", True, q.ARM_INTERLOCK, q.RECOVERY_INTERLOCK[:-1]]
+)
+def test_recovery_exact_interlock(consumed, interlock):
+    fake, _, _ = consumed
+    with pytest.raises(ValueError):
+        q.recover(fake, HEAD, TREE, interlock)
+    assert (
+        fake.sources == fake.targets == fake.reads == fake.creates == fake.children == 0
+    )
+
+
+def test_recovery_exclusive_durable_reread(consumed, monkeypatch):
+    fake, value, _ = consumed
+    events = []
+    original_open, original_read, original_fsync = (
+        Path.open,
+        q._read_recovery_file,
+        q.os.fsync,
+    )
+    destination = fake.parent / q.recovery_name(HEAD, TREE)
+
+    class Output:
+        def __enter__(self):
+            self.stream = original_open(destination, "xb")
+            return self
+
+        def __exit__(self, *args):
+            self.stream.close()
+
+        def write(self, payload):
+            events.append("write")
+            return self.stream.write(payload)
+
+        def flush(self):
+            events.append("flush")
+            self.stream.flush()
+
+        def fileno(self):
+            return self.stream.fileno()
+
+    def opening(path, mode="r", *args, **kwargs):
+        if path == destination and mode == "xb":
+            events.append("xb")
+            return Output()
+        return original_open(path, mode, *args, **kwargs)
+
+    def reading(path, maximum):
+        if path == destination:
+            events.append("reread")
+        return original_read(path, maximum)
+
+    monkeypatch.setattr(Path, "open", opening)
+    monkeypatch.setattr(q, "_read_recovery_file", reading)
+    monkeypatch.setattr(
+        q.os, "fsync", lambda fd: (events.append("fsync"), original_fsync(fd))
+    )
+    recovered(consumed)
+    assert events == ["xb", "write", "flush", "fsync", "reread"]
+    assert fake.reads == 3 and fake.sources == fake.targets == 3
+    q.parse_recovery(destination.read_bytes(), HEAD, TREE, value)
+    with pytest.raises(ValueError):
+        q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK)
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize(
+    "boundary", ["source", "target", "principal", "clock", "observe"]
+)
+@pytest.mark.parametrize("point", [2, 3])
+def test_final_recovery_readmissions_block_publication(
+    consumed, monkeypatch, boundary, point
+):
+    fake, value, payload = consumed
+    original = getattr(fake, boundary)
+    calls = 0
+
+    def changing(*args):
+        nonlocal calls
+        calls += 1
+        if calls == point:
+            raise ValueError("drift")
+        return original(*args)
+
+    monkeypatch.setattr(fake, boundary, changing)
+    with pytest.raises(ValueError):
+        q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK)
+    assert not (fake.parent / q.recovery_name(HEAD, TREE)).exists()
+    assert (fake.parent / value.arm_name).read_bytes() == payload
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize(
+    "point", ["write", "short", "flush", "fsync", "close", "reread", "parse"]
+)
+def test_recovery_publication_ambiguity_consumed(consumed, monkeypatch, point):
+    fake, value, payload = consumed
+    destination = fake.parent / q.recovery_name(HEAD, TREE)
+    original_open, original_read, original_parse = (
+        Path.open,
+        q._read_recovery_file,
+        q.parse_recovery,
+    )
+
+    class Output:
+        def __enter__(self):
+            self.stream = original_open(destination, "xb")
+            return self
+
+        def __exit__(self, *args):
+            self.stream.close()
+            if point == "close":
+                raise OSError("close")
+
+        def write(self, data):
+            if point == "write":
+                raise OSError("write")
+            if point == "short":
+                return self.stream.write(data[:30])
+            return self.stream.write(data)
+
+        def flush(self):
+            if point == "flush":
+                raise OSError("flush")
+            self.stream.flush()
+
+        def fileno(self):
+            return self.stream.fileno()
+
+    def opening(path, mode="r", *args, **kwargs):
+        if path == destination and mode == "xb":
+            return Output()
+        return original_open(path, mode, *args, **kwargs)
+
+    def reading(path, maximum):
+        if path == destination and point == "reread":
+            raise OSError("reread")
+        return original_read(path, maximum)
+
+    monkeypatch.setattr(Path, "open", opening)
+    monkeypatch.setattr(q, "_read_recovery_file", reading)
+    if point == "fsync":
+        monkeypatch.setattr(q.os, "fsync", lambda fd: (_ for _ in ()).throw(OSError()))
+    if point == "parse":
+        monkeypatch.setattr(
+            q, "parse_recovery", lambda *a: (_ for _ in ()).throw(ValueError())
+        )
+    with pytest.raises((ValueError, OSError)):
+        q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK)
+    assert destination.exists()
+    monkeypatch.setattr(q, "parse_recovery", original_parse)
+    with pytest.raises(ValueError):
+        q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK)
+    assert (fake.parent / value.arm_name).read_bytes() == payload
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize("field", list(incident_records()[0].task))
+def test_recovered_launch_every_task_drift_blocks(consumed, field):
+    fake, value = recovered(consumed)
+    fake.task["task"][field] = None
+    with pytest.raises(ValueError):
+        q.launch(fake, HEAD, TREE)
+    assert not (
+        fake.parent / value.arm_name.replace(".jsonl", "-launch.jsonl")
+    ).exists()
+    assert fake.creates == fake.children == 0
+
+
+def test_recovered_launch_once_and_reconcile(consumed):
+    fake, value = recovered(consumed)
+    assert q.reconcile(fake, HEAD, TREE) == {
+        "disposition": "PENDING",
+        "evidence": "PENDING",
+        "task": "MATCH",
+    }
+    fake.now = value.trigger
+    assert q.launch(fake, HEAD, TREE) == 7
+    assert fake.children == 1 and fake.creates == 0
+    with pytest.raises(ValueError):
+        q.launch(fake, HEAD, TREE)
+    assert fake.children == 1
+    fake.task["last_result"] = 0
+    fake.now = value.end + timedelta(minutes=21)
+    assert q.reconcile(fake, HEAD, TREE)["evidence"] == "NO_D1R5_EVIDENCE"
+    d1r5_result(fake)
+    assert q.reconcile(fake, HEAD, TREE)["evidence"] == "PASS"
+    fake.task["task"]["wake_to_run"] = False
+    assert q.reconcile(fake, HEAD, TREE) == {
+        "disposition": "TASK_DRIFT_OR_MISSING",
+        "evidence": "PASS",
+        "task": "TASK_DRIFT_OR_MISSING",
+    }
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "source",
+        "target",
+        "principal",
+        "result",
+        "fence",
+        "malformed",
+        "duplicate",
+        "predecessor",
+        "recovery_source",
+        "other_arm",
+    ],
+)
+def test_recovered_launch_authority_drift_blocks(consumed, monkeypatch, kind):
+    fake, value = recovered(consumed)
+    if kind in {"source", "target"}:
+        monkeypatch.setattr(fake, kind, lambda *a: (_ for _ in ()).throw(ValueError()))
+    elif kind == "principal":
+        fake.identity = PRINCIPAL
+    elif kind == "predecessor":
+        (fake.parent / value.arm_name).write_bytes(b"changed")
+    elif kind == "recovery_source":
+        monkeypatch.setattr(
+            fake, "source", lambda *a: (fake.parent.parent / "repository",)
+        )
+        with pytest.raises(ValueError):
+            q.launch(fake, "c" * 40, "d" * 40)
+        assert fake.children == 0
+        return
+    else:
+        name = {
+            "result": value.result_name,
+            "fence": value.arm_name.replace(".jsonl", "-launch.jsonl"),
+            "malformed": q.recovery_name(HEAD, TREE),
+            "duplicate": q.recovery_name("c" * 40, TREE),
+            "other_arm": value.arm_prefix + "other.jsonl",
+        }[kind]
+        (fake.parent / name).write_bytes(b"bad")
+    with pytest.raises(ValueError):
+        q.launch(fake, HEAD, TREE)
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize("kind", ["duplicate", "malformed", "principal", "source"])
+def test_reconciliation_recovery_fail_closed(consumed, monkeypatch, kind):
+    fake, _ = recovered(consumed)
+    if kind == "principal":
+        fake.identity = PRINCIPAL
+    elif kind == "source":
+        monkeypatch.setattr(
+            fake, "source", lambda *a: (_ for _ in ()).throw(ValueError())
+        )
+    else:
+        (
+            fake.parent
+            / q.recovery_name("c" * 40 if kind == "duplicate" else HEAD, TREE)
+        ).write_bytes(b"bad")
+    assert q.reconcile(fake, HEAD, TREE)["disposition"] == "ARM_EVIDENCE_INVALID"
+    assert fake.creates == fake.children == 0
+
+
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "extra",
+        "source",
+        "facts",
+        "budget",
+        "effects",
+        "classification",
+        "event",
+        "duplicate",
+        "crlf",
+        "bytes",
+        "hash",
+    ],
+)
+def test_recovery_parser_closed(consumed, kind):
+    fake, value = recovered(consumed)
+    payload = (fake.parent / q.recovery_name(HEAD, TREE)).read_bytes()
+    import json
+
+    record = json.loads(payload)
+    if kind == "extra":
+        record["extra"] = 0
+    elif kind == "source":
+        record["source_head"] = "c" * 40
+    elif kind == "facts":
+        record["facts"]["principal_sid"] = PRINCIPAL.sid
+    elif kind == "budget":
+        record["budgets"]["SCHEDULER_CREATE_BUDGET"] = 1
+    elif kind == "effects":
+        record["effects"][q.ZERO_EFFECTS[0]] = False
+    elif kind in {"classification", "event"}:
+        record[kind] = "ARMED"
+    elif kind == "bytes":
+        record["predecessor_bytes"] += 1
+    elif kind == "hash":
+        record["predecessor_sha256"] = "0" * 64
+    payload = q.canonical(record) + b"\n"
+    if kind == "duplicate":
+        payload = payload.replace(b'"schema":', b'"schema":"x","schema":')
+    elif kind == "crlf":
+        payload = payload.replace(b"\n", b"\r\n")
+    with pytest.raises(ValueError):
+        q.parse_recovery(payload, HEAD, TREE, value)
+
+
+def test_recovery_authority_effect_closure():
+    tree = ast.parse(Path(q.__file__).read_text(encoding="utf-8"))
+    protected = {
+        "recover",
+        "recover_preflight",
+        "read_consumed_predecessor",
+        "load_launch_authority",
+        "parse_recovery",
+        "_recovery_ready",
+    }
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in protected:
+            calls = [n for n in ast.walk(node) if isinstance(n, ast.Call)]
+            assert not any(
+                isinstance(n.func, ast.Attribute)
+                and n.func.attr
+                in {"create", "child", "unlink", "rename", "replace", "chmod"}
+                or isinstance(n.func, ast.Name)
+                and n.func.id == "arm"
+                for n in calls
+            )
+    assert q.RECOVERY_ZERO_BUDGETS == (
+        "SCHEDULER_CREATE_BUDGET",
+        "SCHEDULER_UPDATE_BUDGET",
+        "SCHEDULER_DELETE_BUDGET",
+        "TASK_RUN_BUDGET",
+        "D1R5_EXECUTION_BUDGET",
+    )
+
+
+@pytest.mark.parametrize("mode", ["recover", "recover-preflight"])
+@pytest.mark.parametrize("missing", ["head", "tree", "interlock", "arm"])
+def test_host_recovery_argument_authority(monkeypatch, mode, missing):
+    argv = [mode, "--expected-head", HEAD, "--expected-tree", TREE]
+    if mode == "recover":
+        argv += ["--recover", q.RECOVERY_INTERLOCK]
+    if missing in {"head", "tree"}:
+        index = argv.index("--expected-" + missing)
+        del argv[index : index + 2]
+    elif missing == "interlock":
+        if mode == "recover":
+            del argv[-2:]
+        else:
+            argv += ["--recover", q.RECOVERY_INTERLOCK]
+    else:
+        argv += ["--arm", q.ARM_INTERLOCK]
+    monkeypatch.setattr(host, "_WindowsRuntime", lambda: pytest.fail("runtime reached"))
+    assert host.main(argv) == 2
+
+
+@pytest.mark.parametrize(
+    "mode,expected", [("recover-preflight", "RECOVERY_READY"), ("recover", "RECOVERED")]
+)
+def test_host_recovery_modes_fake_only(consumed, monkeypatch, capsys, mode, expected):
+    fake, _, _ = consumed
+    monkeypatch.setattr(host, "_WindowsRuntime", lambda: fake)
+    argv = [mode, "--expected-head", HEAD, "--expected-tree", TREE]
+    if mode == "recover":
+        argv += ["--recover", q.RECOVERY_INTERLOCK]
+    assert host.main(argv) == 0
+    assert expected in capsys.readouterr().out
+    assert fake.creates == fake.children == 0
+
+
+def modeled_scheduler_projection(task):
+    # A fixture model of the PS read-only projection; native resolution is never
+    # called. The static test below anchors every production conversion step.
+    import re
+
+    projected = copy.deepcopy(task)
+    for key in ("start_boundary", "end_boundary"):
+        text = projected[key]
+        if not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,7})?(?:Z|[+-][0-9]{2}:[0-9]{2})",
+            text,
+        ):
+            raise ValueError("boundary unavailable")
+        instant = datetime.fromisoformat(text)
+        fraction = text.split(".", 1)[1] if "." in text else ""
+        fraction = re.split(r"Z|[+-]", fraction)[0]
+        if instant.microsecond or any(c != "0" for c in fraction):
+            raise ValueError("boundary precision drift")
+        projected[key] = instant.astimezone(UTC).isoformat(timespec="seconds")
+    user = projected["principal_sid"]
+    if user not in {"John", INCIDENT_PRINCIPAL.sid}:
+        raise ValueError("principal unavailable")
+    projected["principal_sid"] = INCIDENT_PRINCIPAL.sid
+    return projected
+
+
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        ("2026-10-15T06:20:00-07:00", "2026-10-15T06:35:00-07:00"),
+        ("2026-10-15T13:20:00+00:00", "2026-10-15T13:35:00+00:00"),
+        ("2026-10-15T15:20:00+02:00", "2026-10-15T09:35:00-04:00"),
+        ("2026-10-15T13:20:00Z", "2026-10-15T13:35:00.0000000Z"),
+    ],
+)
+@pytest.mark.parametrize("user", ["John", INCIDENT_PRINCIPAL.sid])
+def test_modeled_real_host_projection_exact(start, end, user):
+    value, _ = incident_records()
+    raw = value.task | {
+        "start_boundary": start,
+        "end_boundary": end,
+        "principal_sid": user,
+    }
+    assert modeled_scheduler_projection(raw) == value.task
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("start_boundary", "2026-10-15T13:20:00"),
+        ("end_boundary", "2026-10-15T13:35:00"),
+        ("start_boundary", "bad"),
+        ("end_boundary", "2026-02-30T13:35:00Z"),
+        ("start_boundary", "2026-10-15T13:20:00.1Z"),
+        ("end_boundary", "2026-10-15T13:35:00.0000001Z"),
+        ("end_boundary", "2026-10-15T13:35:00+24:00"),
+        ("principal_sid", "missing-user"),
+        ("principal_sid", "S-bad"),
+    ],
+)
+def test_modeled_projection_fail_closed(field, value):
+    task = incident_records()[0].task | {field: value}
+    with pytest.raises(ValueError):
+        modeled_scheduler_projection(task)
+
+
+def test_native_projection_conversion_source_contract():
+    text = (ROOT / "scripts/arch134_d1r6_scheduler_create.ps1").read_text(
+        encoding="utf-8"
+    )
+    boundary = text.split("function Convert-ObservedBoundary", 1)[1].split(
+        "function Convert-ObservedPrincipalSid", 1
+    )[0]
+    assert (
+        "[DateTimeOffset]::Parse($Value, "
+        "[Globalization.CultureInfo]::InvariantCulture, "
+        "[Globalization.DateTimeStyles]::None)" in boundary
+    )
+    assert "(?:Z|[+-][0-9]{2}:[0-9]{2})$" in boundary
+    assert "TicksPerSecond" in boundary
+    assert (
+        ".ToUniversalTime().ToString(\"yyyy-MM-dd'T'HH:mm:sszzz\", "
+        "[Globalization.CultureInfo]::InvariantCulture)" in boundary
+    )
+    principal = text.split("function Convert-ObservedPrincipalSid", 1)[1].split(
+        "function Get-TaskObservation", 1
+    )[0]
+    assert "[Security.Principal.SecurityIdentifier]::new($Value).Value" in principal
+    assert "[Security.Principal.NTAccount]::new($Value)" in principal
+    assert ".Translate([Security.Principal.SecurityIdentifier]).Value" in principal
+    projection = text.split("$projected = @{", 1)[1].split("# COM", 1)[0]
+    assert (
+        "start_boundary=(Convert-ObservedBoundary ([string]$trigger.StartBoundary))"
+        in projection
+    )
+    assert (
+        "end_boundary=(Convert-ObservedBoundary ([string]$trigger.EndBoundary))"
+        in projection
+    )
+    assert (
+        "principal_sid=(Convert-ObservedPrincipalSid ([string]$principal.UserId))"
+        in projection
+    )
+
+
+@pytest.mark.parametrize("with_recovery", [False, True])
+def test_competing_current_source_arm_blocks_recovery(consumed, with_recovery):
+    fake, value, _ = consumed
+    if with_recovery:
+        recovered(consumed)
+    # A competing source/session authority must never be silently preferred.
+    (fake.parent / plan().arm_name).write_bytes(b"invalid")
+    with pytest.raises(ValueError):
+        if with_recovery:
+            q.launch(fake, HEAD, TREE)
+        else:
+            q.recover_preflight(fake, HEAD, TREE)
+    assert fake.creates == fake.children == 0
+    assert q.reconcile(fake, HEAD, TREE)["evidence"] == "ARM_EVIDENCE_INVALID"
+
+
+def test_nonincident_ordinary_arm_unchanged_with_historical_predecessor(fake):
+    # A historical consumed incident is never used as ordinary launch authority.
+    fake.now = datetime(2026, 10, 16, 3, tzinfo=UTC)
+    value = q.Plan(HEAD, TREE, fake.now, fake.identity)
+    assert q.arm(fake, HEAD, TREE, q.ARM_INTERLOCK) == "ARMED"
+    (fake.parent / q.RECOVERY_PREDECESSOR_ARM_NAME).write_bytes(b"historical")
+    assert q.load_launch_authority(fake, HEAD, TREE) == value
+    assert q.launch(fake, HEAD, TREE) == 7
+    assert fake.children == 1
+
+
+@pytest.mark.parametrize("kind", ["recovery", "predecessor"])
+def test_artifact_change_during_final_launch_readmission_blocks(
+    consumed, monkeypatch, kind
+):
+    fake, value = recovered(consumed)
+    original = fake.source
+    calls = 0
+
+    def source(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            name = q.recovery_name(HEAD, TREE) if kind == "recovery" else value.arm_name
+            (fake.parent / name).write_bytes(b"changed")
+        return original(*args)
+
+    monkeypatch.setattr(fake, "source", source)
+    with pytest.raises(ValueError):
+        q.launch(fake, HEAD, TREE)
+    assert fake.children == fake.creates == 0
+
+
+def test_predecessor_change_at_final_recovery_admission_blocks(consumed, monkeypatch):
+    fake, value, _ = consumed
+    original = fake.source
+    calls = 0
+
+    def source(*args):
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            (fake.parent / value.arm_name).write_bytes(b"changed")
+        return original(*args)
+
+    monkeypatch.setattr(fake, "source", source)
+    with pytest.raises(ValueError):
+        q.recover(fake, HEAD, TREE, q.RECOVERY_INTERLOCK)
+    assert not (fake.parent / q.recovery_name(HEAD, TREE)).exists()
+    assert fake.children == fake.creates == 0

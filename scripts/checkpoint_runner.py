@@ -11463,27 +11463,27 @@ ARCH134_D1R6_ADDITIONAL_PREDECESSOR_SHA256: Final = (
 
 ARCH134_D1R6_SOURCE_PINS: Final = {
     "src/trading_bot/review_paper/pre_market_wake_overnight.py": (
-        "651738caad07492671833c0df0bb691dc2383324"
+        "666d43948fa812050bb0bd4d761c387e41b766e6"
     ),
     "src/trading_bot/review_paper/pre_market_wake_overnight_host.py": (
-        "379ef4492b95f5a4b09fdc8bca1248454c19502b"
+        "b64a1c2a580b895450fe6d3c0245728ed1df63a3"
     ),
     "scripts/run_arch134_d1r6.py": ("593eacf9495fcc4fe75a51f54f8947266a93b676"),
     "scripts/arch134_d1r6_d1r5_child.py": ("c03f163f5bbc1cb4a6c78428298f16ebc5f71368"),
     "scripts/arch134_d1r6_scheduler_create.ps1": (
-        "2e7ccf8c1e440b13b8d45218d433f9b452c93dd6"
+        "827a3798e6ca0f6c3d3fe76a75f9feadbabc1976"
     ),
     "scripts/arch134_d1r6_task_launcher.ps1": (
         "62072df35376c5abb6adb4ff7ec764199621cb7c"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
-        "ff755f0fcb497457c74eb5e6a218f045688ef2e0"
+        "99efdaa678ef63541f3c583d7c3bcb5f965c357b"
     ),
     "docs/architecture/134-d1r6-overnight-pre-market-wake-arming.md": (
-        "e72101e919e270647e8d7cf9ab91e27c683e926d"
+        "1cb021dd04deddc9c932156db57413145ae8fae4"
     ),
     "docs/validation/arch134-d1r6-overnight-pre-market-wake-arming.md": (
-        "0d3b04e12e3320d2e101331c43ac059056467823"
+        "a7a7045cb1c308ac9f69870dae7a1beaa81b86e1"
     ),
 }
 ARCH134_D1R6_TESTS: Final = (

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -28,6 +29,29 @@ SCHEMA = "arch134-d1r6-overnight-wake-arming/v1"
 ARM_INTERLOCK = "AUTHORIZE_ARCH134_D1R6_ONE_OVERNIGHT_WAKE_ARMING"
 TARGET_HEAD = "7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343"
 TARGET_TREE = "c826c2a71e6d907866ce3f80afce479d38ab7842"
+# One consumed real-host incident only. These pins are never inferred from input.
+RECOVERY_PREDECESSOR_HEAD = "3cf4284d017e362eee58a2f27526ab4de8f292a2"
+RECOVERY_PREDECESSOR_TREE = "16a48a12756bb6d810799444859334ce6305001d"
+RECOVERY_PREDECESSOR_ARM_SHA256 = (
+    "b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c"
+)
+RECOVERY_PREDECESSOR_ARM_BYTES = 16917
+RECOVERY_TARGET_SESSION = "2026-10-15"
+RECOVERY_PREDECESSOR_ARM_NAME = (
+    "arch134-d1r6-2026-10-15-7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343-"
+    "3cf4284d017e362eee58a2f27526ab4de8f292a2-"
+    "16a48a12756bb6d810799444859334ce6305001d.jsonl"
+)
+RECOVERY_SCHEMA = "arch134-d1r6-consumed-arm-recovery/v1"
+RECOVERY_INTERLOCK = "AUTHORIZE_ARCH134_D1R6_ONE_CONSUMED_ARM_RECOVERY"
+RECOVERY_GLOB = "arch134-d1r6-consumed-arm-recovery-*.json"
+RECOVERY_ZERO_BUDGETS = (
+    "SCHEDULER_CREATE_BUDGET",
+    "SCHEDULER_UPDATE_BUDGET",
+    "SCHEDULER_DELETE_BUDGET",
+    "TASK_RUN_BUDGET",
+    "D1R5_EXECUTION_BUDGET",
+)
 TASK_PATH = r"\AITradingBot-Arch134-D1R6-OvernightWake-v1"
 WORKTREE = PureWindowsPath(
     r"F:\AI\worktrees\ai-trading-bot-production-paper-overnight-wake-arming"
@@ -533,9 +557,238 @@ def load_armed(runtime: Runtime, head: str, tree: str) -> Plan:
     return plan
 
 
+def _present(path: Path) -> bool:
+    # Include dangling symlinks/junctions and all nonregular collisions.
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _launch_fence(runtime: Runtime, plan: Plan) -> Path:
+    return runtime.parent / plan.arm_name.replace(".jsonl", "-launch.jsonl")
+
+
+def _read_recovery_file(path: Path, maximum: int) -> bytes:
+    """Strict recovery-only file admission, including opened file identity."""
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or getattr(metadata, "st_file_attributes", 0) & 0x400
+        or metadata.st_size > maximum
+    ):
+        raise ValueError("evidence file rejected")
+    with path.open("rb") as stream:
+        opened = os.fstat(stream.fileno())
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_nlink != 1
+            or (opened.st_dev, opened.st_ino) != (metadata.st_dev, metadata.st_ino)
+            or getattr(opened, "st_file_attributes", 0) & 0x400
+        ):
+            raise ValueError("evidence file changed")
+        result = stream.read(maximum + 1)
+    if len(result) > maximum:
+        raise ValueError("evidence file oversized")
+    return result
+
+
+def read_consumed_predecessor(path: Path) -> Plan:
+    """Read only the exact immutable seven-record consumed incident."""
+    if path.name != RECOVERY_PREDECESSOR_ARM_NAME:
+        raise ValueError("recovery predecessor filename rejected")
+    metadata = path.lstat()
+    if (
+        not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_nlink != 1
+        or getattr(metadata, "st_file_attributes", 0) & 0x400
+        or metadata.st_size != RECOVERY_PREDECESSOR_ARM_BYTES
+    ):
+        raise ValueError("recovery predecessor file rejected")
+    payload = _read_recovery_file(path, RECOVERY_PREDECESSOR_ARM_BYTES)
+    if (
+        len(payload) != RECOVERY_PREDECESSOR_ARM_BYTES
+        or hashlib.sha256(payload).hexdigest() != RECOVERY_PREDECESSOR_ARM_SHA256
+    ):
+        raise ValueError("recovery predecessor bytes rejected")
+    records = parse_arm(payload)
+    if (
+        len(records) != 7
+        or tuple(r["event"] for r in records) != (*EVENTS[:6], "FINAL")
+        or records[4]["scheduler_task_create_calls"] != 1
+        or records[5]["scheduler_task_create_calls"] != 1
+        or records[-1]["classification"] != "INDETERMINATE"
+    ):
+        raise ValueError("recovery predecessor consumption rejected")
+    plan = plan_from_facts(records[0]["facts"])
+    if (
+        plan.source_head != RECOVERY_PREDECESSOR_HEAD
+        or plan.source_tree != RECOVERY_PREDECESSOR_TREE
+        or plan.schedule.session_date.isoformat() != RECOVERY_TARGET_SESSION
+        or plan.arm_name != RECOVERY_PREDECESSOR_ARM_NAME
+    ):
+        raise ValueError("recovery predecessor identity rejected")
+    return plan
+
+
+def recovery_name(head: str, tree: str) -> str:
+    """Deterministic separate destination, with no caller-selected path."""
+    validate_source_identity(head)
+    validate_source_identity(tree)
+    return (
+        f"arch134-d1r6-consumed-arm-recovery-{RECOVERY_TARGET_SESSION}-"
+        f"{head}-{tree}.json"
+    )
+
+
+def _recovery_record(plan: Plan, head: str, tree: str) -> dict[str, object]:
+    recovery_name(head, tree)
+    return {
+        "schema": RECOVERY_SCHEMA,
+        "event": "FINAL",
+        "classification": "RECOVERED",
+        "source_head": head,
+        "source_tree": tree,
+        "predecessor_head": RECOVERY_PREDECESSOR_HEAD,
+        "predecessor_tree": RECOVERY_PREDECESSOR_TREE,
+        "predecessor_journal": RECOVERY_PREDECESSOR_ARM_NAME,
+        "predecessor_bytes": RECOVERY_PREDECESSOR_ARM_BYTES,
+        "predecessor_sha256": RECOVERY_PREDECESSOR_ARM_SHA256,
+        "target_head": TARGET_HEAD,
+        "target_tree": TARGET_TREE,
+        "target_session": RECOVERY_TARGET_SESSION,
+        "facts": plan.facts,
+        "task": plan.task,
+        "principal_sid": plan.principal.sid,
+        "budgets": dict.fromkeys(RECOVERY_ZERO_BUDGETS, 0),
+        "additional_native_task_create_attempts": 0,
+        "scheduler_mutations": 0,
+        "task_runs": 0,
+        "d1r5_executions": 0,
+        "effects": dict.fromkeys(ZERO_EFFECTS, 0),
+    }
+
+
+def parse_recovery(payload: bytes, head: str, tree: str, plan: Plan) -> None:
+    """Closed canonical validation against independently reconstructed facts."""
+    try:
+        if type(payload) is not bytes or not 0 < len(payload) <= MAX_BYTES:
+            raise ValueError
+        record = json.loads(payload, object_pairs_hook=_pairs)
+        if canonical(record) + b"\n" != payload or canonical(record) != canonical(
+            _recovery_record(plan, head, tree)
+        ):
+            raise ValueError
+    except Exception:
+        raise ValueError("recovery evidence rejected") from None
+
+
+def _recovery_candidates(runtime: Runtime) -> tuple[Path, ...]:
+    return tuple(runtime.parent.glob(RECOVERY_GLOB))
+
+
+def _unlaunched(runtime: Runtime, plan: Plan) -> None:
+    if _present(runtime.parent / plan.result_name) or _present(
+        _launch_fence(runtime, plan)
+    ):
+        raise ValueError("recovery or launch destination consumed")
+
+
+def _recovery_ready(observation: dict[str, object], plan: Plan) -> None:
+    if (
+        not task_matches(observation, plan)
+        or observation["state"] != 3
+        or observation["last_result"] != 267011
+    ):
+        raise ValueError("recovery task not ready")
+
+
+def recover_preflight(runtime: Runtime, head: str, tree: str) -> Plan:
+    """Read-only incident admission; no scheduler/child/publication authority."""
+    roots = (*runtime.source(head, tree), *runtime.target())
+    checked_parent(runtime.parent, roots)
+    plan = read_consumed_predecessor(runtime.parent / RECOVERY_PREDECESSOR_ARM_NAME)
+    if runtime.principal() != plan.principal:
+        raise ValueError("recovery principal rejected")
+    _recovery_ready(runtime.observe(), plan)
+    now = utc(runtime.clock())
+    if now < utc(plan.observed_at) or now >= plan.trigger:
+        raise ValueError("recovery clock rejected")
+    _unlaunched(runtime, plan)
+    if (
+        _recovery_candidates(runtime)
+        or any(runtime.parent.glob(f"arch134-d1r6-*-{TARGET_HEAD}-{head}-{tree}.jsonl"))
+        or any(
+            path.name != plan.arm_name
+            for path in runtime.parent.glob(plan.arm_prefix + "*.jsonl")
+        )
+    ):
+        raise ValueError("recovery evidence collision")
+    return plan
+
+
+def recover(runtime: Runtime, head: str, tree: str, interlock: str) -> str:
+    """Publish one separate artifact; an opened ambiguous file is consumed."""
+    if type(interlock) is not str or interlock != RECOVERY_INTERLOCK:
+        raise ValueError("recovery interlock required")
+    plan = recover_preflight(runtime, head, tree)
+    payload = canonical(_recovery_record(plan, head, tree)) + b"\n"
+    # Re-admit every mutable input twice immediately before exclusive publication.
+    # Each observation independently requires the exact task, READY and HAS_NOT_RUN.
+    if (
+        recover_preflight(runtime, head, tree) != plan
+        or recover_preflight(runtime, head, tree) != plan
+    ):
+        raise ValueError("recovery final admission rejected")
+    path = runtime.parent / recovery_name(head, tree)
+    with path.open("xb") as output:
+        try:
+            if output.write(payload) != len(payload):
+                raise OSError
+            output.flush()
+            os.fsync(output.fileno())
+        except (Exception, KeyboardInterrupt):
+            raise JournalError("recovery publication consumed") from None
+    # No repair, removal or retry on close, reread or validation ambiguity.
+    parse_recovery(_read_recovery_file(path, MAX_BYTES), head, tree, plan)
+    return "RECOVERED"
+
+
+def load_launch_authority(runtime: Runtime, head: str, tree: str) -> Plan:
+    """Select exactly ordinary ARMED authority or the sole incident recovery."""
+    roots = (*runtime.source(head, tree), *runtime.target())
+    checked_parent(runtime.parent, roots)
+    candidates = _recovery_candidates(runtime)
+    predecessor = runtime.parent / RECOVERY_PREDECESSOR_ARM_NAME
+    if not candidates:
+        plan = load_armed(runtime, head, tree)
+        if (
+            plan.schedule.session_date.isoformat() == RECOVERY_TARGET_SESSION
+            and _present(predecessor)
+        ):
+            raise ValueError("competing incident arm authority")
+        return plan
+    if len(candidates) != 1 or candidates[0].name != recovery_name(head, tree):
+        raise ValueError("recovery authority absent or ambiguous")
+    plan = read_consumed_predecessor(predecessor)
+    if any(runtime.parent.glob(f"arch134-d1r6-*-{TARGET_HEAD}-{head}-{tree}.jsonl")):
+        raise ValueError("competing current-source arm authority")
+    if any(
+        path.name != plan.arm_name and path != _launch_fence(runtime, plan)
+        for path in runtime.parent.glob(plan.arm_prefix + "*.jsonl")
+    ):
+        raise ValueError("ambiguous incident arm authority")
+    parse_recovery(_read_recovery_file(candidates[0], MAX_BYTES), head, tree, plan)
+    if runtime.principal() != plan.principal:
+        raise ValueError("recovered principal rejected")
+    return plan
+
+
 def launch(runtime: Runtime, head: str, tree: str) -> int:
     """Delegate once to the external accepted D1R5 host; no trading continuation."""
-    plan = load_armed(runtime, head, tree)
+    plan = load_launch_authority(runtime, head, tree)
     runtime.source(head, tree)
     runtime.target()
     if runtime.principal() != plan.principal:
@@ -543,8 +796,14 @@ def launch(runtime: Runtime, head: str, tree: str) -> int:
     result = runtime.parent / plan.result_name
     if result.exists() or result.is_symlink():
         raise ValueError("result consumed")
+    if plan.source_head != head or plan.source_tree != tree:
+        if load_launch_authority(runtime, head, tree) != plan:
+            raise ValueError("recovered launch authority changed")
+        if not task_matches(runtime.observe(), plan):
+            raise ValueError("recovered launch task rejected")
+        _unlaunched(runtime, plan)
     # D1R5 may reject before reserving its result. Fence delegation independently.
-    fence = runtime.parent / plan.arm_name.replace(".jsonl", "-launch.jsonl")
+    fence = _launch_fence(runtime, plan)
     payload = (
         canonical(
             {
@@ -568,7 +827,7 @@ def launch(runtime: Runtime, head: str, tree: str) -> int:
 def reconcile(runtime: Runtime, head: str, tree: str) -> dict[str, str]:
     """Read-only evidence assessment; scheduler observations cannot confer PASS."""
     try:
-        plan = load_armed(runtime, head, tree)
+        plan = load_launch_authority(runtime, head, tree)
     except Exception:
         return {
             "disposition": "ARM_EVIDENCE_INVALID",

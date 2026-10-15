@@ -179,3 +179,86 @@ shell override is accepted. The PowerShell helper retains its strict LF/EOF
 framing unchanged, as do scheduled-action source and all scheduler semantics.
 Source verification uses mocked subprocesses only; no real helper, preflight,
 Principal/Observe/Create mode or qualification is invoked. Stop for exact review.
+
+
+## D1R6R3 — canonical observation and exact consumed-arm recovery
+
+This is source only. One real-host arm consumed its sole TASK_CREATE attempt
+and terminated INDETERMINATE after TASK_CREATE_RETURNED. The registration must
+remain immutable. Native start/end offsets and a short principal account name
+were independently proven to represent the original plan's exact instants/SID.
+R3 changes only the observer projection, never registration behavior:
+
+- Require explicit ISO offset (or Z), parse DateTimeOffset with invariant culture
+  and no local-time assumption, reject nonzero fractional seconds, normalize UTC,
+  serialize yyyy-MM-ddTHH:mm:ss+00:00. Parse failures stop observation.
+- Resolve definition.Principal.UserId as SecurityIdentifier when already SID;
+  otherwise NTAccount.Translate(SecurityIdentifier), returning only canonical SID.
+  Failed resolution stops observation. No caller lookup input is introduced.
+- All other task fields and the sole TASK_CREATE=2 registration remain frozen.
+
+The incident pins are literal source constants:
+
+```text
+RECOVERY_PREDECESSOR_HEAD 3cf4284d017e362eee58a2f27526ab4de8f292a2
+RECOVERY_PREDECESSOR_TREE 16a48a12756bb6d810799444859334ce6305001d
+RECOVERY_PREDECESSOR_ARM_BYTES 16917
+RECOVERY_PREDECESSOR_ARM_SHA256 b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
+RECOVERY_TARGET_SESSION 2026-10-15
+RECOVERY_PREDECESSOR_ARM_NAME arch134-d1r6-2026-10-15-7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343-3cf4284d017e362eee58a2f27526ab4de8f292a2-16a48a12756bb6d810799444859334ce6305001d.jsonl
+```
+
+Only that ordinary regular file with no links/reparse attribute, exact byte count
+and SHA-256, canonical parse_arm and exactly seven events is admissible:
+ARMING_RESERVED, D1R6_SOURCE_ADMITTED, D1R5_TARGET_ADMITTED,
+TASK_ABSENCE_CONFIRMED, TASK_CREATE_INTENT (one reserved create),
+TASK_CREATE_RETURNED (one create), FINAL/INDETERMINATE (one create).
+All effects remain zero. Reconstruct the exact frozen source/session/D1R5 facts;
+no arbitrary indeterminate journal grants recovery. Never write/append/rename/
+replace/delete/chmod the predecessor. Its historical classification stays intact.
+
+recover-preflight requires explicit current --expected-head/--expected-tree.
+It admits current source, frozen D1R5, external qualification parent, exact
+predecessor, current principal, normalized task, state 3, LastTaskResult 267011,
+clock before original trigger (and not before original observation), no D1R5
+result, no original launch fence, no recovery artifact and no competing arm.
+RECOVERY_READY grants no effect authority.
+
+recover additionally requires --recover with the exact literal
+AUTHORIZE_ARCH134_D1R6_ONE_CONSUMED_ARM_RECOVERY. It performs preflight then two
+complete independent final readmissions, each observing the exact ready task.
+It may publish exactly one separate file, exclusively with xb, complete canonical
+UTF-8 JSON + LF, flush/fsync, close and independent bounded reread/parse. Any
+post-open ambiguity consumes that destination and stops without repair/retry.
+No scheduler mutation, task run or child is callable from recovery. Its explicit
+budgets SCHEDULER_CREATE_BUDGET, SCHEDULER_UPDATE_BUDGET,
+SCHEDULER_DELETE_BUDGET, TASK_RUN_BUDGET and D1R5_EXECUTION_BUDGET are all zero.
+
+Schema: arch134-d1r6-consumed-arm-recovery/v1, event FINAL, classification
+RECOVERED. The deterministic external filename is
+arch134-d1r6-consumed-arm-recovery-2026-10-15-{current HEAD}-{current TREE}.json.
+The closed object binds current and predecessor source, exact journal name/size/
+hash, frozen D1R5/session, all reconstructed original facts, exact canonical task,
+principal SID, zero budgets/additional creates/mutations/runs/delegations/effects.
+There is no caller-selected evidence location or generic recovery authority.
+
+Launch authority selection is closed: ordinary current-source FINAL/ARMED stays
+available when no recovery candidate or competing same-session incident exists. Otherwise exactly one
+canonical current-source recovery and its exact consumed predecessor are required;
+missing/malformed/duplicate/cross-source artifacts or competing arms block. The
+consumed journal alone is permanently non-authoritative. Recovered launch
+re-admits current source, target, both artifacts, principal and exact observed task
+immediately before result/fence absence and the unchanged exclusive launch fence.
+Only then may the unchanged fixed D1R5 child be delegated once. No scheduler
+create/update/delete/run is reachable from launch. Reconciliation uses the same
+recovery loader and exact task projection; before D1R5 evidence it may report
+PENDING. Scheduler state/result never proves PASS; only canonical D1R5 does.
+
+Implementation/commit/push uses a separate detached build at the exact accepted
+3cf4284 parent. The live registered-task worktree stays at that parent/tree through
+CI and review. Push detached HEAD once to the existing branch only after proving
+its exact expected predecessor. Do not fast-forward the live worktree. Source
+acceptance, docs closeout, guarded live fast-forward, real recovery preflight and
+recovery evidence publication remain later boundaries. No real host probe, arm,
+scheduler observation/mutation, D1R5, credential/provider/paper/broker/SQLite/ACL,
+D1/D2 or live effect occurs in this checkpoint.

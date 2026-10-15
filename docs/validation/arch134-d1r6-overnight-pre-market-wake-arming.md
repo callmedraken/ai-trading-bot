@@ -87,3 +87,42 @@ Only the host, existing D1R6 test module, these two docs and four associated
 D1R6 source pins change. Inventory/checkpoint mapping and all R1 scheduled-
 action/launcher, D1R5 and workflow blobs stay frozen. Follow the existing focused
 checks and attempt-1 mapped CI gate, then stop for ChatGPT exact source review.
+
+
+## D1R6R3 incident recovery source verification
+
+Use the existing D1R6 module only. Synthetic external temporary evidence uses
+explicit test-only byte/hash pins; it never reads or writes the real incident.
+Separately assert every production incident pin literally. Modeled native
+projection fixtures cover both equivalent offsets, both boundaries, John/SID,
+malformed/offset-less/nonintegral timestamps and unresolvable accounts. Static
+conversion assertions anchor the actual PowerShell algorithms; parser syntax
+validation must not invoke any helper statements or real Principal/Observe/Create.
+
+Cover exact seven-record consumption and reject name/size/hash/link/type/event/
+count/classification/session/source/target/fact/effect/budget drift. Require every
+recovery-ready predicate individually. Assert no scheduler create or child entry
+in preflight/recovery, interlock exactness, two final observations/readmissions,
+deterministic separate xb path, flush/fsync/reread validation, second recovery
+rejection and consumed write/flush/fsync/close/reread/parse ambiguity. The original
+journal bytes remain unchanged throughout modeled recovery and launch.
+
+Prove predecessor alone cannot launch; valid recovery delegates exactly once;
+source/target/artifact/task/principal/result/fence drift blocks. Reconciliation
+requires valid recovery and exact task but only canonical D1R5 evidence grants
+PASS. Retain ordinary ARMED, launch fence, one-create/no-retry, fixed argv/raw-LF,
+source-pins/inventory and all frozen D1R5 coverage. No new checkpoint/module or
+workflow change. Inventory FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
+
+Run focused D1R6/D1R5/NYSE/runner/profile/lane/predecessor tests, combined Ruff
+check/format diagnostics, PowerShell parser only and git diff --check. Commit
+exactly the seven intended paths from the detached build and ordinary-push
+HEAD explicitly after exact predecessor verification. Require exact-head attempt-1
+source-static/active-tests/certification-tests (ROBINHOOD)/source-gates SUCCESS,
+full-tests SKIPPED and canonical wall <300 seconds. No blind CI retry. Stop for
+ChatGPT source review without live fast-forward or real recovery.
+
+Implementation counters remain zero: REAL_D1R6_PREFLIGHTS, REAL_D1R6_ARMS,
+REAL_RECOVERY_PREFLIGHTS, REAL_RECOVERY_EVIDENCE_WRITES, REAL_SCHEDULER_READS,
+REAL_SCHEDULER_MUTATIONS, REAL_TASK_CREATE_ATTEMPTS, REAL_TASK_RUNS,
+REAL_D1R5_EXECUTIONS, D1_OPERATIONS, D2_OPERATIONS and LIVE_EFFECTS.

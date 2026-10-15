@@ -146,97 +146,148 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The October 15 D1R6 incident is now **POST-TRIGGER RECONCILED FAIL-CLOSED**.
+Architecture **134-D1R7R1 exact stale-wake retirement is SOURCE ACCEPTED**.
 
-Read-only reconciliation proved:
+Accepted source:
 
 ```text
-live local HEAD       3cf4284d017e362eee58a2f27526ab4de8f292a2
-live local TREE       16a48a12756bb6d810799444859334ce6305001d
-remote branch HEAD    a72d1f4f3e84ff7682dbea5ba0c6851714547483
-source divergence     YES
-
-consumed journal      16917 bytes
-journal SHA-256       b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
-launch fence          ABSENT
-D1R5 result           ABSENT
-recovery artifacts    0
-
-task state            3 / READY
-LastTaskResult         2
-LastRunTime            2026-10-15 06:20 Pacific
-NextRunTime            none / 1899-12-30 sentinel
+branch  feature/robinhood-production-paper-stale-wake-retirement
+HEAD    768da215977a3553dcfb76cdc903bada002f8684
+TREE    160fbd44a198e4563797ccf37c4b63c9a277ab0d
+parent  2ec415c15c83b752be4c0e1fc20291e0f9280b3f
+commit  fix: correct D1R7 production worktree literal
+CI      #578 / 38809542455 / SUCCESS / attempt 1
 ```
 
-The scheduled task fired exactly once at the intended 06:20 Pacific trigger and
-returned exit code 2. The frozen predecessor launcher first performs exact source
-admission, including a live `ls-remote` equality check. The remote branch had
-already moved to R3 while the live task worktree intentionally remained frozen
-at `3cf4284d...`; therefore the scheduled launch failed source admission before
-the consumed FINAL/INDETERMINATE journal could be considered and before any D1R5
-launch fence could be created.
+D1R7R1 corrected the only blocker found during exact source review: the production
+retirement WORKTREE literal had contained a U+0007/BEL byte. The accepted blob now
+pins exactly:
 
-This is independently confirmed by the absent launch fence and absent D1R5
-result. No D1R5 delegation occurred. The historical consumed journal remains
-byte-identical and no recovery artifact was created.
+```text
+F:\AI\worktrees\ai-trading-bot-production-paper-stale-wake-retirement
+```
 
-The immediate next boundary is **not recovery** and **not another arm**. The
-stale one-time task is still present/enabled but has no next run. A new,
-separately reviewed cleanup/replacement authority is required before any future
-session can use the fixed task path again.
+and the D1R7 tests independently assert that exact literal and reject
+non-whitespace C0 control bytes in the production module.
+
+The accepted D1R7 retirement remains a closed one-effect surface:
+
+```text
+TASK_DELETE_BUDGET      1
+TASK_CREATE_BUDGET      0
+TASK_UPDATE_BUDGET      0
+TASK_RUN_BUDGET         0
+D1R5_EXECUTION_BUDGET   0
+D1_OPERATIONS           0
+D2_OPERATIONS           0
+LIVE_EFFECTS            0
+```
+
+The fixed helper supports only Observe/Delete, contains exactly one
+`.DeleteTask(`, and contains no RegisterTaskDefinition/Run/Stop/NewTask/Create
+authority. The delete target is fixed to
+`\AITradingBot-Arch134-D1R6-OvernightWake-v1`. Retirement intent is durably
+consumed before native effect entry; ambiguity after intent is non-retryable and
+becomes INDETERMINATE. RETIRED requires the single returned delete plus two
+independent ABSENT observations and durable FINAL/RETIRED evidence.
+
+The October 15 consumed incident remains frozen:
+
+```text
+D1R6 predecessor HEAD   3cf4284d017e362eee58a2f27526ab4de8f292a2
+D1R6 predecessor TREE   16a48a12756bb6d810799444859334ce6305001d
+arm bytes                16917
+arm SHA-256              b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
+task LastRunTime         2026-10-15 06:20 Pacific
+task LastTaskResult      2
+launch fence             ABSENT
+D1R5 result              ABSENT
+recovery artifacts       0
+```
+
+The #575/#576 failures were diagnosed source-correction events, not retries.
+#575 exposed stale active-checkpoint registration expectations; #576 exposed one
+remaining predecessor-overlay assertion. Each was corrected by a new commit.
+#577 passed but was not accepted because exact review found the BEL path defect.
+#578 is the new exact-head attempt-1 acceptance run.
+
+#578 independently passed:
+
+```text
+source-static         SUCCESS
+active-tests          SUCCESS   2,770 / 2,770
+certification-tests   SUCCESS   ROBINHOOD
+full-tests            SKIPPED
+source-gates          SUCCESS
+
+ROBINHOOD
+cases                 9,737
+passed                9,736
+skipped               1
+failed/errors         0 / 0
+canonical wall        260.394 s
+```
+
+No real D1R7 preflight, retirement journal, scheduler delete, D1R5 execution,
+D1 operation, D2 operation, live effect, or October 16 arm has occurred.
+
+The live D1R6 task worktree remains intentionally preserved at the consumed
+predecessor identity. Source acceptance does not authorize changing it.
 
 ## Current blocker / protected boundary
 
-The stale October 15 Task Scheduler registration is the current protected
-boundary.
+The immediate protected boundary is now the **first real D1R7 read-only retirement
+preflight**.
 
-It must not be deleted, updated, rerun or reused ad hoc. Its single native create
-attempt is consumed, and the October 15 R3 recovery path is expired.
+Source acceptance alone does **not** authorize scheduler deletion.
 
-A successor checkpoint should provide an **exact stale-task retirement** path
-that:
+Before any host action:
 
-- admits accepted R3/current source and frozen D1R5 source;
-- pins the consumed journal name/size/SHA exactly;
-- requires launch fence absent, D1R5 result absent and recovery artifact absent;
-- requires the exact registered task definition after R3 canonical observation;
-- requires LastRunTime = 2026-10-15 06:20 Pacific and LastTaskResult = 2;
-- requires no next run;
-- permits at most one native TASK_DELETE attempt;
-- never runs/updates/recreates the task in the same operation;
-- durably records intent/result/confirmation in separate retirement evidence;
-- treats deletion ambiguity as consumed and non-retryable;
-- has zero D1R5/D1/paper/broker/provider/credential/live authority.
+- preserve the live D1R6 worktree at exact HEAD
+  `3cf4284d017e362eee58a2f27526ab4de8f292a2` / TREE
+  `16a48a12756bb6d810799444859334ce6305001d`;
+- preserve the consumed October 15 arm journal byte-for-byte;
+- do not fast-forward, modify, run or delete the D1R6 task;
+- do not create retirement evidence during read-only preflight;
+- do not invoke D1R5;
+- do not arm a future wake.
 
-Only after independently accepted retirement may a fresh next-session D1R6
-preflight/arming generation be considered.
+A separately authorized D1R7 preflight may only observe/admit source, frozen
+predecessor/target, consumed incident, current principal and the exact stale task
+fingerprint. If that preflight passes, a second explicit authorization is still
+required for the one-shot retirement effect.
+
+Any future retirement attempt has one native DeleteTask budget total. No blind
+retry is authorized after TASK_DELETE_INTENT or any ambiguous native entry.
 
 ## Roadmap
 
 ### Now
 
-- Preserve D1R6R3 accepted source and the immutable October 15 consumed journal.
-- Treat October 15 as conclusively fail-closed: task fired, exit 2, no launch
-  fence, no D1R5 evidence, no recovery artifact.
-- Do not run R3 recover/recover-preflight for the expired incident.
-- Do not manually delete/update/run the stale task.
-- Design and source-review the next checkpoint for exact stale-task retirement.
+- Preserve accepted D1R7R1 source at
+  `768da215977a3553dcfb76cdc903bada002f8684`.
+- Preserve the live D1R6 worktree at its frozen October 15 predecessor identity.
+- Run no host action until a separately authorized read-only D1R7 preflight.
+- Keep scheduler mutation, D1R5, D1, PREPARE, EXECUTE, paper/broker, D2 and live
+  authority at zero.
 
 ### Next
 
-- Execute one separately authorized stale-task retirement after source acceptance
-  and a read-only retirement preflight.
-- Reconcile deletion independently; no blind retry.
-- Only after confirmed retirement, prepare a fresh next-session wake authority
-  with new session/evidence identity and a fresh read-only preflight.
-- Keep the D1R5 target unchanged unless separately reviewed.
+- Run one read-only D1R7 retirement preflight under an explicit host boundary.
+- If and only if it passes, separately authorize one exact stale-task retirement.
+- Reconcile the retirement read-only; never automatically retry an
+  INDETERMINATE deletion.
+- Only after canonical RETIRED evidence plus independently observed task absence
+  may the no-longer-referenced D1R6 worktree be fast-forwarded.
+- Then prepare a fresh future-session D1R6 wake generation with new evidence
+  identity; never reuse the consumed October 15 arm/recovery/retirement authority.
 
 ### Later
 
 - Only after a future canonical D1R5 PASS is independently accepted may a fresh
   D1-session authorization be considered.
 - Keep PREPARE/EXECUTE, paper/broker, D2 and real-money trading behind their own
-  reviewed authority boundaries.
+  separately reviewed authority boundaries.
 
 ## History and deep-reference pointers
 

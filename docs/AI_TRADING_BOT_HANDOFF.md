@@ -162,36 +162,81 @@ live-trading authority.
 
 ## Current protected boundary
 
-The October 15 wake incident is post-trigger reconciled and fail-closed.
+Architecture **134-D1R7R1 is SOURCE ACCEPTED**.
 
-The one-time task fired at 06:20 Pacific and returned exit code 2. Its frozen
-launcher was still sourced from local HEAD
-`3cf4284d017e362eee58a2f27526ab4de8f292a2`, while the live remote branch had
-already advanced. The accepted predecessor host's exact source admission checks
-`ls-remote` against local HEAD before loading arm authority, so the scheduled
-launch necessarily stopped at source admission.
-
-Durable external facts:
+Accepted source:
 
 ```text
-consumed arm journal bytes/SHA exact      YES
-launch fence                              ABSENT
-D1R5 result                               ABSENT
-recovery artifact count                   0
-task LastRunTime                           2026-10-15 06:20 Pacific
-task LastTaskResult                        2
-task current state                         READY
-task next run                              none
+branch  feature/robinhood-production-paper-stale-wake-retirement
+HEAD    768da215977a3553dcfb76cdc903bada002f8684
+TREE    160fbd44a198e4563797ccf37c4b63c9a277ab0d
+parent  2ec415c15c83b752be4c0e1fc20291e0f9280b3f
+CI      #578 / 38809542455 / SUCCESS / attempt 1
 ```
 
-Therefore D1R5 was not delegated and the October 15 incident grants no D1
-authority.
+Exact review of D1R7 originally blocked acceptance because
+`pre_market_wake_retirement.py` contained a U+0007/BEL byte in its production
+WORKTREE literal. D1R7R1 fixes only that path, adds an independent literal
+assertion plus a non-whitespace-C0 scan, refreshes the three affected source pins,
+and records the correction in validation. #577 was not rerun.
 
-Do not run arm, recover, recover-preflight, manual task run, update or deletion.
-The next protected boundary is a new source-reviewed stale-task retirement
-checkpoint with one exact delete budget and zero recreation/delegation/trading
-authority. After retirement is independently reconciled, a fresh next-session
-wake generation may be planned.
+#578 passes the exact corrected source:
+
+```text
+active                 2,770 passed
+ROBINHOOD              9,737 cases / 9,736 passed / 1 skipped
+failures/errors        0 / 0
+canonical wall         260.394 s
+source-static          SUCCESS
+source-gates           SUCCESS
+full-tests             SKIPPED
+```
+
+D1R7 is a closed stale-task retirement surface. It permits at most one fixed
+DeleteTask call after durable intent and repeated admission. It has zero
+task-create/update/run, D1R5, credential/provider, paper/broker, D1, D2 or live
+authority. RETIRED requires durable FINAL/RETIRED evidence and independently
+observed scheduler absence; scheduler absence alone never confers PASS.
+
+Frozen October 15 incident pins remain:
+
+```text
+D1R6 live predecessor HEAD
+3cf4284d017e362eee58a2f27526ab4de8f292a2
+
+D1R6 live predecessor TREE
+16a48a12756bb6d810799444859334ce6305001d
+
+consumed arm bytes
+16917
+
+consumed arm SHA-256
+b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
+
+launch fence
+ABSENT
+
+D1R5 result
+ABSENT
+
+recovery artifact count
+0
+
+stale task LastRunTime / LastTaskResult
+2026-10-15 06:20 Pacific / 2
+```
+
+The live D1R6 worktree remains deliberately frozen and must not be fast-forwarded
+before retirement is canonically complete.
+
+**Next protected boundary:** separately authorize one real **read-only D1R7
+retirement preflight**. That preflight may observe the exact stale task and
+incident state but may not create retirement evidence or delete anything.
+A passing preflight still does not authorize retirement; the one-shot DeleteTask
+boundary requires a separate explicit authorization.
+
+Do not run D1R5, D1, PREPARE, EXECUTE, paper/broker, D2, live trading or a future
+wake arm as part of D1R7 preflight/retirement.
 
 ## Standing safety and effect invariants
 

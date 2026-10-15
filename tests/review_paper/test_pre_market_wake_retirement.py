@@ -102,6 +102,19 @@ def fake(tmp_path, monkeypatch):
     return Fake(parent, plan)
 
 
+def test_fixed_production_worktree_literal():
+    assert str(q.WORKTREE) == (
+        r"F:\AI\worktrees\ai-trading-bot-production-paper-stale-wake-retirement"
+    )
+
+
+def test_production_source_has_no_non_whitespace_c0_controls():
+    source = (
+        ROOT / "src/trading_bot/review_paper/pre_market_wake_retirement.py"
+    ).read_bytes()
+    assert not [value for value in source if value < 32 and value not in b"\t\n\v\f\r"]
+
+
 def test_literal_incident_pins():
     assert old.RECOVERY_PREDECESSOR_HEAD == "3cf4284d017e362eee58a2f27526ab4de8f292a2"
     assert old.RECOVERY_PREDECESSOR_TREE == "16a48a12756bb6d810799444859334ce6305001d"

@@ -85,3 +85,20 @@ the exact successor after value. The frozen predecessor maps/digests are unchang
 Run the full D1R6 and D1R7 modules and predecessor-pin checks before normal
 publication. No CI attempt is rerun; each diagnosed correction is a new source
 commit. Retirement executable/PowerShell blobs remain those of the first commit.
+
+
+## D1R7R1 - exact production worktree literal
+
+Exact source review blocked D1R7 despite green #577: the production WORKTREE
+literal contained a BEL byte (0x07) in place of the path's backslash-a sequence.
+R1 replaces it with the exact raw Windows path
+F:\AI\worktrees\ai-trading-bot-production-paper-stale-wake-retirement.
+Independent regression assertions pin the literal expected path without deriving
+it from WORKTREE and reject non-whitespace C0 bytes in the production module.
+
+Refresh only the changed production/test/validation blobs in the D1R7 source
+pins. Keep inventories and all other authority unchanged. Run focused source-only
+checks, then a new exact-head attempt-1 source-gate event; never rerun #577.
+Source acceptance and canonical status/handoff closeout remain pending re-review.
+No real preflight, retirement, task deletion, D1R5, October 16 arm or other host
+effect is authorized. Preserve the frozen D1R6 worktree.

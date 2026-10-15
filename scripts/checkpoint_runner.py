@@ -11608,7 +11608,7 @@ ARCH134_D1R7_PATHS: Final = (
 )
 ARCH134_D1R7_SOURCE_PINS: Final = {
     "src/trading_bot/review_paper/pre_market_wake_retirement.py": (
-        "e9beca8cb483752998a967873bf75395ed84dd43"
+        "4d8cb8ebb67d84c15dc6efad6e900d7d6aca17b7"
     ),
     "src/trading_bot/review_paper/pre_market_wake_retirement_host.py": (
         "3e83e0fcc98cddcab13d1c6ca773d78dca2889a0"
@@ -11618,13 +11618,13 @@ ARCH134_D1R7_SOURCE_PINS: Final = {
         "0350404e1b19f2acdc263d3c8a9ec289f79dcca8"
     ),
     "tests/review_paper/test_pre_market_wake_retirement.py": (
-        "d6f59f8418ddc5701300fa80c4f24d95393b9573"
+        "06cfaad6c9c51666746cc6dd01c998cff22ed1d5"
     ),
     "docs/architecture/134-d1r7-stale-wake-retirement.md": (
         "58b7cba899ff8f41ceb058be51e743ca4a87becd"
     ),
     "docs/validation/arch134-d1r7-stale-wake-retirement.md": (
-        "712fab29d96bc903469b15178ac3c6b54c7e6987"
+        "a779f4f2eb2243730a68f2cf6effb75ae8725ea6"
     ),
 }
 ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {

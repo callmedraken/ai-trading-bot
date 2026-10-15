@@ -17,7 +17,7 @@ from trading_bot.review_paper.pre_market_wake_qualification import (
 SCHEMA = "arch134-d1r7-stale-wake-retirement/v1"
 INTERLOCK = "AUTHORIZE_ARCH134_D1R7_ONE_STALE_WAKE_RETIREMENT"
 WORKTREE = PureWindowsPath(
-    r"F:\AI\worktreesi-trading-bot-production-paper-stale-wake-retirement"
+    r"F:\AI\worktrees\ai-trading-bot-production-paper-stale-wake-retirement"
 )
 EVIDENCE_NAME = "arch134-d1r7-stale-wake-retirement-2026-10-15.jsonl"
 EVIDENCE_GLOB = "arch134-d1r7-stale-wake-retirement-*"

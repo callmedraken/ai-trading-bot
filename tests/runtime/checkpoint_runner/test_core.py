@@ -205,6 +205,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-armed-paper-mvp",
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
+        "arch134-d1r7-stale-wake-retirement",
         "arch134-d1r6-overnight-wake-arming",
         "arch134-d1r5-pre-market-wake-qualification",
         "arch134-alpaca-authentication-qualification",
@@ -351,6 +352,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = (
                 "feature/robinhood-production-paper-alpaca-auth-qualification"
             )
+        if spec.name == "arch134-d1r7-stale-wake-retirement":
+            expected_branch = "feature/robinhood-production-paper-stale-wake-retirement"
         if spec.name == "arch134-d1r6-overnight-wake-arming":
             expected_branch = "feature/robinhood-production-paper-overnight-wake-arming"
         if spec.name == "arch134-d1r5-pre-market-wake-qualification":
@@ -870,6 +873,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
         not in {
             runner.ARCH134_AUTH_NAME,
             runner.ARCH134_D1R5_NAME,
+            runner.ARCH134_D1R7_NAME,
             runner.ARCH134_D1R6_NAME,
         }
     )
@@ -1325,6 +1329,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                "arch134-d1r7-stale-wake-retirement",
                 "arch134-d1r6-overnight-wake-arming",
                 "arch134-d1r5-pre-market-wake-qualification",
                 "arch134-alpaca-authentication-qualification",

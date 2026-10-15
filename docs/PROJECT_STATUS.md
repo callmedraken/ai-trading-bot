@@ -2,31 +2,43 @@
 
 ## Current phase
 
-Architecture 134-D1R6 overnight D1R5 wake arming is **SOURCE ACCEPTED**. The
-next protected step is one separately reviewed **read-only real-host D1R6
-preflight**. No real Task Scheduler mutation or D1R5 qualification has run.
+Architecture 134-D1R6R1 process-scoped PowerShell transport correction is
+**SOURCE ACCEPTED**. The next protected step is a fresh, separately reviewed
+**read-only real-host D1R6 preflight**. No Task Scheduler mutation or D1R5
+qualification has run.
 
-Accepted D1R6 executable/test source:
+Accepted corrected D1R6 executable/test source:
 
 ```text
 branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    c92afc582064aaeff1bde4fd97205ca65a960ba2
-TREE    28b590760185f5359c979a36984c800c447b530a
-CI      #566 / 38712458146 / SUCCESS / attempt 1
+HEAD    d02510b9dbe6e8d7f803ebadee22f36c51eba929
+TREE    8373086ebee2dc6b304d01f67261296a32bffa5a
+CI      #568 / 38716877077 / SUCCESS / attempt 1
 ```
 
-Checkpoint #566 independently passed source-static, 2,414 active tests, and
-canonical ROBINHOOD certification with 9,380 passed / 1 skipped / 0 failed /
-0 errors in 225.385 seconds. Current inventory is FULL 176 / ROBINHOOD 99 /
+Checkpoint #568 independently passed source-static, 2,429 active tests, and
+canonical ROBINHOOD certification with 9,395 passed / 1 skipped / 0 failed /
+0 errors in 257.789 seconds. Current inventory remains FULL 176 / ROBINHOOD 99 /
 LEGACY 215 / EXHAUSTIVE 391.
 
-D1R6 preserves the accepted D1R5 qualifier byte-for-byte and changes the
-operator workflow from a narrow manual morning start to a one-session
-before-bed arm. Windows Task Scheduler is only an untrusted wake signal:
-the intended one-time task fires at regular open minus ten minutes,
-`WakeToRun=true`, `StartWhenAvailable=false`, with no repetition, restart,
-demand start, retry, D1, PREPARE, EXECUTE, paper, broker, or live authority.
-The unchanged D1R5 host still independently proves actual timing and source.
+The first real-host D1R6 preflight attempt was **read-only and BLOCKED before
+principal/Task Scheduler observation** because the host invoked its fixed
+PowerShell helper under the machine's default process execution policy. All
+D1R6/D1R5 Git identities had matched exactly; no task was created or modified,
+no D1R5 execution occurred, and no qualification evidence was consumed.
+
+D1R6R1 corrects only that transport defect. Both the Python-to-scheduler-helper
+argv and the future Task-Scheduler-to-launcher action now use the fixed
+process-scoped sequence `-NoProfile -NonInteractive -ExecutionPolicy Bypass
+-File` against fixed reviewed script paths. It does not use
+`Set-ExecutionPolicy`, does not change persistent machine/user policy, and
+does not widen scheduler or trading authority.
+
+D1R6 otherwise preserves the accepted D1R5 qualifier and one-session overnight
+contract: next eligible published NYSE session within 18 hours, trigger at
+regular open minus ten minutes, `WakeToRun=true`,
+`StartWhenAvailable=false`, no repetition/restart/demand start/automatic
+retry, and no D1/PREPARE/EXECUTE/paper/broker/live continuation.
 
 The fixed external D1R5 target remains:
 
@@ -36,16 +48,15 @@ HEAD    7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
 TREE    c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-Its accepted executable D1R5 source remains
+The accepted executable D1R5 source remains
 `a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a` /
-`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. The real D1R5
-`WAITING_FOR_MARKET` / wake / source-readmission qualification remains
-unrun.
+`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. Real D1R5
+`WAITING_FOR_MARKET` / wake / source-readmission qualification remains unrun.
 
 The canonical bounded history branch remains
 `feature/project-history-storage-foundation` at the accepted product-line
-boundary; D1R6 is a separately reviewed protected-source successor and does not
-move product/history authority by itself.
+boundary; this D1R6/D1R6R1 protected-source lineage does not move product/history
+authority by itself.
 
 No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or live
 trading is authorized.
@@ -123,15 +134,22 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The immediate boundary is now D1R6's **read-only real-host preflight**. It may
-inspect exact D1R6 and D1R5 Git identities, the frozen NYSE calendar, current
-clock, current interactive Windows principal, the fixed qualification parent,
-derived evidence absence, and the fixed Task Scheduler identity read-only.
+The immediate boundary is a fresh D1R6 **read-only real-host preflight** against
+the corrected D1R6R1 source. It may inspect exact D1R6 and D1R5 Git identities,
+the frozen NYSE calendar, current clock, current interactive Windows principal,
+the fixed qualification parent, derived evidence absence, and the fixed Task
+Scheduler identity read-only.
 
-A preflight PASS does not create or alter a task and does not invoke D1R5. After
-ChatGPT reviews the real preflight, the next separate effect may authorize at
-most one fixed Task Scheduler `TASK_CREATE` attempt for the selected one-session
-overnight wake. Any mutation-entry ambiguity is consumed and never retried.
+The earlier preflight failure is not a consumed protected attempt: it stopped at
+the PowerShell execution-policy boundary before principal/scheduler observation
+and before any scheduler mutation, D1R5 invocation, or evidence reservation.
+D1R6R1 fixes only the process-scoped helper/action invocation needed to cross
+that read-only transport boundary.
+
+A corrected preflight PASS still does not create or alter a task and does not
+invoke D1R5. Only after ChatGPT reviews that output may a later separate
+checkpoint authorize at most one fixed Task Scheduler `TASK_CREATE` attempt.
+Any mutation-entry ambiguity remains consumed and never retried.
 
 D1R4 authentication remains PASS / consumed. D1R5 remains unrun and grants no
 D1 authority until its future canonical result is independently reconciled and
@@ -178,19 +196,22 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Now
 
-- Preserve D1R6 accepted source at `c92afc582064aaeff1bde4fd97205ca65a960ba2`
-  and its frozen D1R5 predecessor/workflow blobs.
-- Run exactly one **read-only real-host D1R6 preflight** from the final accepted
-  docs descendant and review its output.
+- Preserve D1R6R1 accepted source at
+  `d02510b9dbe6e8d7f803ebadee22f36c51eba929` and its frozen D1R5
+  predecessor/workflow blobs.
+- Run exactly one fresh **read-only real-host D1R6 preflight** from the final
+  accepted docs descendant and review its output.
 - Keep Task Scheduler mutation, D1R5 execution, D1, PREPARE, EXECUTE, paper,
   broker, D2, and live effects stopped during preflight.
+- Keep persistent Windows execution policy unchanged; D1R6R1 uses only the
+  reviewed process-scoped `-ExecutionPolicy Bypass` child invocation.
 - Keep `feature/project-history-storage-foundation` on the accepted product
   lineage until a separately reviewed integration/replay boundary.
 
 ### Next
 
-- If preflight is accepted, separately authorize one D1R6 one-session task
-  creation before bed.
+- If corrected preflight is accepted, separately authorize one D1R6 one-session
+  task creation before bed.
 - Let the fixed task act only as a wake signal; the accepted D1R5 host must
   independently re-admit source/timing and produce its canonical journal.
 - After waking, run read-only D1R6 reconciliation and independently review the

@@ -42,41 +42,54 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-Architecture 134-D1R6 **Overnight D1R5 Wake Arming** is SOURCE ACCEPTED on:
+Architecture 134-D1R6R1 **process-scoped PowerShell transport correction** is
+SOURCE ACCEPTED on:
 
 ```text
 branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    c92afc582064aaeff1bde4fd97205ca65a960ba2
-TREE    28b590760185f5359c979a36984c800c447b530a
-CI      #566 / 38712458146 / SUCCESS / attempt 1
+HEAD    d02510b9dbe6e8d7f803ebadee22f36c51eba929
+TREE    8373086ebee2dc6b304d01f67261296a32bffa5a
+CI      #568 / 38716877077 / SUCCESS / attempt 1
 ```
 
-Independent GitHub review confirmed exactly one commit over D1R5 docs base
-`7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343`, with no D1R5 or workflow
-byte drift. Source-static passed; active JUnit is 2,414 / 2,414; canonical
-ROBINHOOD is 9,380 passed / 1 skipped / 0 failed / 0 errors, wall 225.385 s.
-Inventory is FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
+Independent GitHub review confirmed exactly one seven-file correction commit over
+the accepted D1R6 docs descendant `893bcbc397077a2d86807c774c025f923821a824`.
+Production behavior changed only by adding the fixed process-scoped
+`-ExecutionPolicy Bypass` tokens to the Python scheduler-helper argv and the
+future scheduled launcher action. Six corresponding D1R6 source pins changed;
+D1R5 and the source-gate workflow remained byte-for-byte frozen.
 
-D1R6 does not widen D1R5. It adds a one-session before-bed arming layer:
-derive the next eligible published NYSE session within 18 hours, target regular
-open minus ten minutes, request `WakeToRun=true`, forbid late catch-up with
-`StartWhenAvailable=false`, and allow no repetition, restart, demand start, or
-automatic retry. Task Scheduler is not trading authority.
+Source-static passed with zero authority failures and no scheduler/provider/
+production/broker effects. Active JUnit is 2,429 / 2,429. Canonical ROBINHOOD
+is 9,395 passed / 1 skipped / 0 failed / 0 errors, wall 257.789 seconds.
+Inventory remains FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
 
-The fixed D1R5 target remains the external branch/worktree at:
+The preceding real-host preflight attempt had already passed exact D1R6/D1R5
+Git identity checks, then Windows blocked the fixed scheduler helper before
+principal/Task Scheduler observation because scripts were disabled under the
+default process policy. It therefore performed no scheduler mutation, no task
+run, no D1R5 execution, and no qualification-evidence reservation.
+
+D1R6R1 does not change persistent Windows execution policy. The corrected fixed
+transport is:
+
+```text
+-NoProfile -NonInteractive -ExecutionPolicy Bypass -File <fixed reviewed script>
+```
+
+No caller-selected policy/path is accepted, and `Set-ExecutionPolicy`,
+registry/Group Policy/profile/environment policy mutation remain forbidden.
+
+The fixed D1R5 target remains:
 
 ```text
 HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
 TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-The accepted D1R5 executable bytes remain the source accepted at
-`a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a` /
-`9fcbc170e8339e0b4a93844466e8924ff8ef7f36`. Real D1R5 qualification,
-real scheduler mutation, and D1 remain unrun.
-
-The next protected boundary is one read-only real-host D1R6 preflight. A PASS
-does not authorize task creation.
+Real D1R5 qualification, real scheduler mutation, and D1 remain unrun. The next
+protected boundary is one fresh read-only real-host D1R6 preflight against the
+corrected source. A PASS does not authorize task creation.
 
 ## Exact D1R4 state
 
@@ -146,27 +159,32 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R4 authentication is complete and consumed. D1R6 source is accepted, but all
-real D1R6/D1R5 effects remain closed.
+D1R4 authentication is complete and consumed. D1R6R1 source is accepted, but
+all real D1R6/D1R5 effects remain closed.
 
-The immediate step is exactly one **read-only D1R6 preflight**. It may verify
-the final D1R6 source, fixed D1R5 target source, frozen NYSE session derivation,
-qualification-parent/evidence absence, current logged-in Windows principal, and
-fixed task absence/definition read-only. It must not create evidence, register
-or alter a task, sleep, invoke D1R5, read credentials/providers, touch paper or
-production SQLite, mutate ACLs, or enter D1.
+The immediate step is exactly one fresh **read-only D1R6 preflight**. It may
+verify the final D1R6 source, fixed D1R5 target source, frozen NYSE session
+derivation, qualification-parent/evidence absence, current logged-in Windows
+principal, and fixed task absence/definition read-only. Its fixed PowerShell
+helper is now launched with process-scoped `-ExecutionPolicy Bypass`; no
+persistent policy mutation is authorized.
 
-Only after that preflight is independently reviewed may one later checkpoint
-authorize at most one fixed `TASK_CREATE` attempt. The eventual scheduled launch
-is an untrusted wake signal and must still pass the unchanged D1R5 host's exact
-timing/source admission. D1R5 then stops after canonical wake/source evidence;
-there is no automatic continuation into D1.
+The prior blocked preflight is diagnostic only and not a consumed scheduler/D1R5
+attempt: it failed before principal/Task Scheduler observation and performed no
+task creation, evidence reservation, sleep, D1R5 invocation, credential/provider
+access, paper/SQLite mutation, ACL mutation, or D1 operation.
 
-Morning reconciliation is read-only. Canonical D1R5 evidence, not Task Scheduler
-state or LastTaskResult, determines PASS/failure/incomplete status. Ambiguity or
-partial consumption is never retried.
+Only after a corrected preflight is independently reviewed may one later
+checkpoint authorize at most one fixed `TASK_CREATE` attempt. The eventual
+scheduled launch is an untrusted wake signal and must still pass the unchanged
+D1R5 host's exact timing/source admission. D1R5 then stops after canonical
+wake/source evidence; there is no automatic continuation into D1.
 
-No fresh D1 launch is authorized by D1R4, D1R6 source acceptance, a future
+Morning reconciliation remains read-only. Canonical D1R5 evidence, not Task
+Scheduler state or LastTaskResult, determines PASS/failure/incomplete status.
+Ambiguity or partial consumption is never retried.
+
+No fresh D1 launch is authorized by D1R4, D1R6R1 source acceptance, a corrected
 preflight PASS, or task creation alone.
 
 ## Standing safety and effect invariants

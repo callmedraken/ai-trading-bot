@@ -1,6 +1,6 @@
 # Architecture 139 — current-lineage binding and SHADOW validation
 
-Status: **SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. That accepted identity covers 139-A. B1 implementation is pending exact-source review; B2 implementation is pending exact-source review below.
+Status: **Architecture 139-B / RCL-3B SOURCE ACCEPTED**. 139-A remains accepted at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`, CI #562 / `38640090298`. B1 is accepted at HEAD `3bf604f407445da0c587cfd91545c113c99e341f`, TREE `732f75cc09c8296ce09f244edc36ca8bda61e7b7`, CI #563 / `38664134287`. B2 is accepted at HEAD `bf98553592d2ef740d6a6ffdc104c6cd28023379`, TREE `34627f90f3ad8fc441346cc3d567a3f15495219b`, CI #564 / `38665480838`.
 
 ## Terminal acceptance evidence
 
@@ -164,89 +164,38 @@ D1R5_OPERATIONS=0
 D2_SUPERVISOR_EXECUTIONS=0
 ```
 
-Synthetic fixtures/in-memory validation grant no operational authority. The accepted 139-A checkpoint added no
-SHADOW stage, live observation, production compatibility/conversion, promotion,
-D1/D2 or live-money capability is added. Real-money placement remains **NO-GO**.
+Synthetic fixtures/in-memory validation grant no operational authority. The accepted 139-A checkpoint added no SHADOW stage; accepted 139-B adds only a deterministic in-memory SHADOW research model and qualification path. It adds no live observation acquisition, production compatibility/conversion, promotion, D1/D2 or live-money capability. Real-money placement remains **NO-GO**.
 
 ## 139-B1 / 139-B2 guarded validation contract
 
 The [architecture contract](../architecture/139-research-candidate-shadow.md)
-freezes both pure in-memory stages before B1 implementation. Actual observation
-acquisition is excluded. B1 is implemented, pending ChatGPT source acceptance.
-Its inventory is ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
-EXHAUSTIVE 393 / GUI 44. B2 must add exactly one FULL/EXHAUSTIVE test.
+froze both pure in-memory stages before B1 implementation. Actual observation
+acquisition was excluded and remains excluded. B1 and B2 are now canonically
+SOURCE ACCEPTED after separate exact commits, separate terminal source-gate
+runs, and final independent ChatGPT review.
 
-Focused B1 domain verification: 673 cases passed, including 125 new B1 cases
-and 548 accepted predecessor cases. Coverage includes all semantic identities,
-nine mandatory zero counters, exact types/bounds, canonical timestamps/JSON,
-ordering/duplicates, complete external-chain builder/verifier, immutability and
-no acquisition/execution/private-import capability. Existing synthetic fixture
-factories produce only in-memory completed evidence; no real research executes.
+B1 inventory is ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 393 / GUI 44. Its focused domain verification passed 673 cases,
+including 125 new B1 cases and 548 accepted predecessor cases. B1's exact
+seven-path successor overlay, all frozen predecessor dictionaries, D1Q/D1R3/
+D1R4/D1R4R/D1R5 authority, accepted 137/138/139-A blobs, ACTIVE definition
+and workflow bytes were independently re-proven before its internal continuation
+gate. CI #563 / `38664134287` was workflow_dispatch attempt 1 terminal
+SUCCESS. `139_B1_CONTINUATION_GATE=PASS` authorized B2 only; it was never
+canonical source acceptance.
 
-Affected inventory/authority tests additionally cover all seven successor paths,
-missing/extra/source/wrong successor blobs, every frozen predecessor dictionary,
-and D1Q/D1R3/D1R4/D1R4R/D1R5 authority. All prior 137/138/139-A domain/test
-blobs, B1 package exports, predecessor dictionary values, executable/native/AST
-pins, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
+B2 then added exactly one FULL/EXHAUSTIVE test module, producing final inventory
+ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 / EXHAUSTIVE 394 / GUI 44.
+It preserved B1 and all older source/test/dictionary authority, added its own
+seven-path overlay after B1, and completed one separate exact commit and one
+fresh source-gate run. CI #564 / `38665480838` was workflow_dispatch attempt
+1 terminal SUCCESS. Final SOURCE ACCEPTED status for both checkpoints is the
+ChatGPT decision recorded here and in the architecture record.
 
-Use fresh purpose/GUID basetemp under F:\AI\temp\pytest, -B,
--p no:cacheprovider, -q --tb=short. Cheap static/Ruff/diff checks precede pytest;
-both Ruff phases and final checks are mandatory. No local broad profile runs.
-
-Publish B1 as one exact-file normal commit/ordinary push, then dispatch exactly
-one fresh Checkpoint Source Gates run. Require exact HEAD/tree, attempt 1,
-source-static and four broad shards SUCCESS, each under 300 seconds, and
-terminal source-gates SUCCESS. Active/certification tests skip as expected for
-an unmapped research dispatch. No second dispatch or blind retry.
-
-Re-prove exact remote parent/tree/diff/blobs, predecessor digests, inventory,
-CI and clean worktree/index; review B1 against the frozen contract. Only an
-unqualified `139_B1_CONTINUATION_GATE=PASS` permits B2 immediately within this
-task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
-stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
-gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
-Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
-counters recorded above remain zero. No real observation or post-SHADOW stage is added.
-
-## 139-B1 / 139-B2 guarded validation contract
-
-The [architecture contract](../architecture/139-research-candidate-shadow.md)
-freezes both pure in-memory stages before B1 implementation. Actual observation
-acquisition is excluded. B1 is implemented, pending ChatGPT source acceptance.
-Its inventory is ACTIVE 64 / FULL 178 / ROBINHOOD 98 / LEGACY 215 /
-EXHAUSTIVE 393 / GUI 44. B2 must add exactly one FULL/EXHAUSTIVE test.
-
-Focused B1 domain verification: 673 cases passed, including 125 new B1 cases
-and 548 accepted predecessor cases. Coverage includes all semantic identities,
-nine mandatory zero counters, exact types/bounds, canonical timestamps/JSON,
-ordering/duplicates, complete external-chain builder/verifier, immutability and
-no acquisition/execution/private-import capability. Existing synthetic fixture
-factories produce only in-memory completed evidence; no real research executes.
-
-Affected inventory/authority tests additionally cover all seven successor paths,
-missing/extra/source/wrong successor blobs, every frozen predecessor dictionary,
-and D1Q/D1R3/D1R4/D1R4R/D1R5 authority. All prior 137/138/139-A domain/test
-blobs, B1 package exports, predecessor dictionary values, executable/native/AST
-pins, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
-
-Use fresh purpose/GUID basetemp under F:\AI\temp\pytest, -B,
--p no:cacheprovider, -q --tb=short. Cheap static/Ruff/diff checks precede pytest;
-both Ruff phases and final checks are mandatory. No local broad profile runs.
-
-Publish B1 as one exact-file normal commit/ordinary push, then dispatch exactly
-one fresh Checkpoint Source Gates run. Require exact HEAD/tree, attempt 1,
-source-static and four broad shards SUCCESS, each under 300 seconds, and
-terminal source-gates SUCCESS. Active/certification tests skip as expected for
-an unmapped research dispatch. No second dispatch or blind retry.
-
-Re-prove exact remote parent/tree/diff/blobs, predecessor digests, inventory,
-CI and clean worktree/index; review B1 against the frozen contract. Only an
-unqualified `139_B1_CONTINUATION_GATE=PASS` permits B2 immediately within this
-task. It is internal continuation, not canonical ChatGPT acceptance. Any concern
-stops before B2. B2 has a separate normal commit/push and one fresh terminal CI
-gate, then STOP for ChatGPT to review both exact sources and close bounded docs.
-Neither stage may update PROJECT_STATUS or AI_TRADING_BOT_HANDOFF. All 17 effect
-counters recorded above remain zero. No real observation or post-SHADOW stage is added.
+All B1/B2 observations used by tests are synthetic in-memory evidence. No real
+research, walk-forward execution, live SHADOW observation, provider/credential/
+broker/paper/runtime operation, production conversion, promotion, D1/D1R5/D2
+operation, or live-money effect occurred.
 
 ### B1 focused result
 
@@ -258,7 +207,7 @@ tests and restored original diagnostic behavior. The affected three-module
 rerun passed 323 cases in 26.15 seconds. Failed evidence is preserved; no broad
 certification or CI retry occurred. Both Ruff phases pass on all ten touched
 Python paths; diff check, all five authority boundaries and predecessor/blob/
-workflow/ACTIVE checks pass. Exact source acceptance remains pending.
+workflow/ACTIVE checks pass. B1 canonical source acceptance is now complete as part of final Architecture 139-B review.
 
 ## B2 validation scope
 
@@ -273,7 +222,7 @@ bindings/batches/qualifications, forged IDs/stage, prior parser exclusion, calle
 immutability, package exports and closed AST capability. Both Ruff phases, diff
 checks and all predecessor authorities are required before one normal B2 commit/
 push and exactly one fresh terminal CI gate. No local broad profile or real
-observation acquisition. Final ChatGPT source acceptance remains pending.
+observation acquisition. Final ChatGPT source acceptance is now complete.
 
 ### B2 focused result and final implementation stop
 
@@ -293,10 +242,34 @@ B2 adds its own overlay at the same five sites for the same seven paths. All
 self-consistent successor-linkage verification remain distinct public checks;
 canonical parsing never claims external evidence or source acceptance.
 
-Publish B2 as one exact-file normal commit and ordinary push, then exactly one
-fresh CI dispatch. Require exact HEAD/tree and parent B1, attempt 1, static and
-four broad shards SUCCESS, each under 300 s, terminal source-gates SUCCESS and
-clean final local/remote state. Preserve evidence and do not retry. STOP for
-ChatGPT to review both exact commits/trees/diffs/CI runs and perform bounded
-status/handoff closeout. No real observation acquisition or Architecture 140.
-All seventeen operational effect counters remain zero.
+B2 was published as one exact-file normal commit and ordinary push. Checkpoint Source Gates #564 / `38665480838` mapped to exact B2 HEAD/tree and parent B1, workflow_dispatch attempt 1, with source-static, all four broad shards and terminal source-gates SUCCESS; every broad shard stayed below 300 seconds and no retry occurred. ChatGPT then independently reviewed both exact commits/trees/diffs/blobs/overlays/dictionaries/inventories/CI runs and granted canonical SOURCE ACCEPTED status. No real observation acquisition, protected effect, integration, promotion or successor architecture was started. All seventeen operational effect counters remain zero.
+
+## Final 139-B acceptance record
+
+Final exact accepted source:
+
+```text
+B1 HEAD  3bf604f407445da0c587cfd91545c113c99e341f
+B1 TREE  732f75cc09c8296ce09f244edc36ca8bda61e7b7
+B1 CI    #563 / 38664134287 / workflow_dispatch / attempt 1 / SUCCESS
+
+B2 HEAD  bf98553592d2ef740d6a6ffdc104c6cd28023379
+B2 TREE  34627f90f3ad8fc441346cc3d567a3f15495219b
+B2 CI    #564 / 38665480838 / workflow_dispatch / attempt 1 / SUCCESS
+```
+
+B1 broad-shard execution times were 65.099 / 73.371 / 94.362 / 107.566
+seconds. B2 broad-shard execution times were 107.140 / 128.331 / 101.647 /
+72.901 seconds. Both static jobs reported `GIT_DIFF_CHECK=0`,
+`RUFF_CHECK=0`, and `RUFF_FORMAT=0`; every broad shard reported `PYTEST=0`.
+
+B1 source/test blobs are
+`61a4f9bc67ad0c05f961a523c231e64e6fb55732` /
+`7027ae2274cf49e3963c7511ac06637de708811b`. B2 source/test blobs are
+`75cc22d16d65f51ce75921ab66c6dcabfbfa119b` /
+`197fff05c6d8c948529052eb9b68cb0c578902cd`; the additive package-export
+blob is `a7d3104adb5b1f00448c1559c6efe55ad3a3256c`.
+
+The implementation-time duplicate guarded-contract section in this validation
+record is removed by the bounded documentation closeout; no executable/test
+bytes are changed. The product and canonical-history branches remain untouched.

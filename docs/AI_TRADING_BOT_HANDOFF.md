@@ -221,44 +221,72 @@ Architecture 138 / RCL-2 is SOURCE ACCEPTED at
 `a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1` / tree
 `55841f5119228dbf302747256326d43ff7d32e23`, CI #561 / `38634855492`.
 
-Architecture 139-A / RCL-3A is SOURCE ACCEPTED on
-`feature/research-candidate-shadow-variant-binding-current`:
+Architecture 139-A / RCL-3A remains SOURCE ACCEPTED at
+`bf500ffecefe0a8be8117e315228e3bc07ffdf54` / tree
+`69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`, CI #562 / `38640090298`.
+
+Architecture 139-B / RCL-3B is now SOURCE ACCEPTED on
+`feature/research-candidate-shadow-qualification-current` as two separately
+gated exact source checkpoints:
 
 ```text
-HEAD  bf500ffecefe0a8be8117e315228e3bc07ffdf54
-TREE  69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd
-CI    #562 / 38640090298 / SUCCESS
+B1 HEAD  3bf604f407445da0c587cfd91545c113c99e341f
+B1 TREE  732f75cc09c8296ce09f244edc36ca8bda61e7b7
+B1 CI    #563 / 38664134287 / attempt 1 / SUCCESS
+
+B2 HEAD  bf98553592d2ef740d6a6ffdc104c6cd28023379
+B2 TREE  34627f90f3ad8fc441346cc3d567a3f15495219b
+B2 CI    #564 / 38665480838 / attempt 1 / SUCCESS
 ```
 
-139-A binds a WALK_FORWARD_PASSED research candidate to the exact retained
-historical experiment variant and can resolve only that exact original variant
-from independently validated evidence. Its domain/test/export blobs match the
-historically accepted 139-A checkpoint exactly; current-lineage reconciliation
-is limited to live inventory assertions and the seven-test successor overlay.
-All effect counters are zero. It creates no SHADOW stage, observation,
-qualification, production compatibility, promotion, D1/D2, provider, broker or
-live authority.
+B1 provides canonical, caller-supplied, no-effect observation evidence tied to
+the exact accepted 139-A binding and complete external predecessor chain. B2
+provides deterministic coverage qualification plus an immutable
+`ResearchCandidateStage.SHADOW` successor. Canonical parsers prove
+self-consistency only; the public external verifiers rebuild against the exact
+independently supplied chain. The B1 continuation PASS was internal permission
+for B2, not final acceptance; ChatGPT independently reviewed both exact GitHub
+commits, trees, diffs, blobs, overlays, dictionaries, inventories and CI runs
+before granting this SOURCE ACCEPTED status.
+
+Final research inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 394 / GUI 44. All seventeen recorded operational effect counters
+remain zero. No real SHADOW observation occurred.
 
 To preserve the canonical handoff invariant, do not move
-`feature/project-history-storage-foundation` onto either research executable
-branch. Keep it on the active product lineage until a later reviewed integration
-or replay makes the accepted research source part of that lineage.
+`feature/project-history-storage-foundation` onto this research branch. The
+canonical history branch and active product branch remain at
+`7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343` / tree
+`c826c2a71e6d907866ce3f80afce479d38ab7842` until a later separately
+reviewed product-lineage integration/replay says otherwise.
 
 ## Next safe-side boundary
 
-Architecture 139-B is now the first genuinely new research checkpoint. It may
-define deterministic no-effect observation provenance, minimum observation /
-session policy, failure semantics, no-effect enforcement, SHADOW qualification
-and an immutable SHADOW successor. Any real provider/live observation remains a
-separate protected boundary; source work must stay deterministic and effect-free.
+Architecture 139-B is the accepted safe-side stop boundary for this handoff.
+It does **not** acquire observations and it grants no provider, credential,
+broker, paper, runtime, production compatibility, promotion, D1/D2, or live
+authority.
+
+Any future real-market/provider SHADOW observation acquisition is a separate
+protected architecture/effect boundary requiring a new explicit contract,
+source admission, effect accounting, and review. No such acquisition,
+integration, promotion, or successor architecture is authorized or started by
+this closeout.
 
 ## Immediate next step
 
-D1R4 authentication is accepted and consumed, and D1R5 source is accepted.
-The immediate safe next step is the **separately reviewed real bounded D1R5
-clock/sleep/external-evidence qualification** on the exact accepted source.
-Do not invoke a fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect,
-broker action, D2, or live trading until that real qualification is accepted.
+For the product line, D1R4 authentication is accepted and consumed and D1R5
+source is accepted. The next operational boundary remains the **separately
+reviewed real bounded D1R5 clock/sleep/external-evidence qualification** on the
+exact accepted product source; this closeout does not execute it.
+
+For the parallel safe-side line, stop at accepted Architecture 139-B. Do not
+invoke real SHADOW acquisition, integrate into the product/history lineage,
+materialize a post-SHADOW stage, convert to production, promote a strategy, or
+begin a later research architecture from this handoff alone.
+
+No fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect, broker action,
+D2, or live trading is authorized.
 
 ## Historical reconstruction
 

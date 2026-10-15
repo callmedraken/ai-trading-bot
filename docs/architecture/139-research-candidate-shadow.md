@@ -1,6 +1,6 @@
 # Architecture 139 — exact variant binding and deterministic SHADOW evidence
 
-Status: **139-A SOURCE ACCEPTED** at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`; Checkpoint Source Gates #562 / `38640090298` SUCCESS. 139-B1 is implemented pending exact-source review; 139-B2 is implemented pending exact-source review.
+Status: **Architecture 139-B / RCL-3B SOURCE ACCEPTED**. 139-A remains accepted at HEAD `bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE `69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`, CI #562 / `38640090298`. 139-B1 is accepted at HEAD `3bf604f407445da0c587cfd91545c113c99e341f`, TREE `732f75cc09c8296ce09f244edc36ca8bda61e7b7`, CI #563 / `38664134287`. 139-B2 is accepted at HEAD `bf98553592d2ef740d6a6ffdc104c6cd28023379`, TREE `34627f90f3ad8fc441346cc3d567a3f15495219b`, CI #564 / `38665480838`.
 
 ## Acceptance evidence
 
@@ -249,11 +249,12 @@ production compatibility or authority. Real-money trading remains **NO-GO**.
 
 ## Architecture 139-B frozen source-only extension
 
-139-A remains SOURCE ACCEPTED at its exact recorded identity. 139-B is pending
-ChatGPT exact-source review. It consists of two independent implementation
-commits and one fresh workflow_dispatch per commit. No production/history branch
-is advanced. B1 terminal CI plus exact continuation self-review authorizes B2
-only; `139_B1_CONTINUATION_GATE=PASS` is not canonical source acceptance.
+139-A remains SOURCE ACCEPTED at its exact recorded identity. 139-B is now
+SOURCE ACCEPTED after independent ChatGPT review of both exact implementation
+commits and their separate workflow_dispatch runs. No production/history branch
+is advanced. B1 terminal CI plus exact continuation self-review authorized B2
+only; `139_B1_CONTINUATION_GATE=PASS` was internal continuation permission and
+never substituted for this final canonical acceptance.
 
 139-B1 adds canonical caller-supplied observation evidence only. Exact frozen/
 slotted Observation and ObservationBatch models live in
@@ -315,7 +316,7 @@ profile runs. Each dispatch must have exact HEAD, attempt 1, source-static and
 four broad shards SUCCESS, each below 300 seconds, terminal source-gates SUCCESS;
 active/certification jobs skip as expected for unmapped research dispatch.
 No second dispatch or blind retry. Any gate concern stops before B2.
-Final source acceptance and bounded status/handoff closeout belong to ChatGPT.
+Final source acceptance and bounded status/handoff closeout are completed by ChatGPT in this documentation-only descendant.
 
 
 ### B1 public source surface and verification
@@ -339,9 +340,8 @@ B1 passed its internal continuation gate at HEAD
 `3bf604f407445da0c587cfd91545c113c99e341f`, TREE
 `732f75cc09c8296ce09f244edc36ca8bda61e7b7`, CI #563 / 38664134287,
 attempt 1, terminal SUCCESS. Four shard job walls: 97 / 132 / 136 / 141 s,
-all below 300 s. This is internal continuation only; ChatGPT acceptance of
-both exact source checkpoints remains pending. B1 source/test and overlay are
-frozen. B2 is a separate normal commit and one fresh CI dispatch on the same
+all below 300 s. This was internal continuation only; final ChatGPT acceptance of both exact
+source checkpoints is now complete. B1 source/test and overlay remain frozen. B2 is a separate normal commit and one fresh CI dispatch on the same
 research branch. Operational and canonical-history branches stay unchanged.
 
 The three policy minima are mandatory exact positive ints bounded at 100,000,
@@ -432,4 +432,101 @@ touched Python paths; diff and all five authority boundaries pass. B1 source/
 test blobs and overlay, all older dictionaries, accepted 137/138/139-A source/
 tests, ACTIVE definition, workflow bytes and bounded status/handoff stay frozen.
 The package export surface is extended additively in B2; existing public names
-and their order are preserved. Final ChatGPT source acceptance is pending.
+and their order are preserved. Final ChatGPT source acceptance is complete.
+
+## 139-B final exact-source acceptance
+
+ChatGPT independently re-fetched and reviewed both exact GitHub checkpoints
+before this bounded closeout. B1 is canonically SOURCE ACCEPTED at
+`3bf604f407445da0c587cfd91545c113c99e341f` / tree
+`732f75cc09c8296ce09f244edc36ca8bda61e7b7`; its sole parent is the
+accepted 139-A docs descendant
+`30036d4adcea7535f5fcc9bb46d91ce2c00e4bb5`. B2 is canonically SOURCE
+ACCEPTED at `bf98553592d2ef740d6a6ffdc104c6cd28023379` / tree
+`34627f90f3ad8fc441346cc3d567a3f15495219b`; its sole parent is B1.
+
+Exact new domain/test blobs are:
+
+| Checkpoint | Path | Git blob |
+| --- | --- | --- |
+| B1 | `src/trading_bot/experiments/research_candidate_shadow_observation.py` | `61a4f9bc67ad0c05f961a523c231e64e6fb55732` |
+| B1 | `tests/experiments/test_research_candidate_shadow_observation.py` | `7027ae2274cf49e3963c7511ac06637de708811b` |
+| B2 | `src/trading_bot/experiments/research_candidate_shadow_qualification.py` | `75cc22d16d65f51ce75921ab66c6dcabfbfa119b` |
+| B2 | `tests/experiments/test_research_candidate_shadow_qualification.py` | `197fff05c6d8c948529052eb9b68cb0c578902cd` |
+| B2 | `src/trading_bot/experiments/__init__.py` | `a7d3104adb5b1f00448c1559c6efe55ad3a3256c` |
+
+The accepted 137/138/139-A domain/test blobs remain byte-identical:
+`5e617d976278a9a97b990284dfd17fd2abc87f18`,
+`41d11dfb3b04a804d1d69e91ca918157026ca72e`,
+`b068100e27c290769dc3d8dd4b475edef3d9cfe8`,
+`d26aac7c04a311fc82a2f1b7e12f961353504654`,
+`ff1f76c5309ab8ed2e2e48d487365600633b1c0d`, and
+`0b78cd52d555077f98009720157f230fed9cebd3`. The source-gate workflow blob
+also remains `fe6aceac62721338eba4fcb40e2e7fde0d976e18`.
+
+B1's seven-path successor overlay matches the exact B1 test blobs. B2's
+seven-path overlay matches the exact B2 test blobs and resolves immediately
+after B1 at all five live inventory resolution sites. The final chain is:
+
+```text
+historical -> HIST2 -> D1R5 -> 138 -> 139-A -> 139-B1 -> 139-B2
+-> actual Git blob
+```
+
+B1 freezes 32 predecessor dictionary digests; B2 freezes all 33, including the
+B1 overlay SHA-256
+`d66e134a5491e1e2966728e27558f05c51946c5e89930707e1471f339324634c`.
+Final inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 394 / GUI 44.
+
+Checkpoint Source Gates #563 / `38664134287` mapped exactly to B1 HEAD/tree,
+workflow_dispatch attempt 1, terminal SUCCESS. Static gates reported
+`GIT_DIFF_CHECK=0`, `RUFF_CHECK=0`, `RUFF_FORMAT=0`; all four broad
+shards reported `PYTEST=0` in 65.099 / 73.371 / 94.362 / 107.566 seconds.
+Checkpoint Source Gates #564 / `38665480838` mapped exactly to B2 HEAD/tree,
+workflow_dispatch attempt 1, terminal SUCCESS. Static gates again reported
+`GIT_DIFF_CHECK=0`, `RUFF_CHECK=0`, `RUFF_FORMAT=0`; all four broad
+shards reported `PYTEST=0` in 107.140 / 128.331 / 101.647 / 72.901 seconds.
+Both terminal `source-gates` jobs passed with FULL routing; active and
+certification jobs skipped as expected for this unmapped research dispatch.
+
+The strict frozen/slotted models, UUID5 length-framed identities, compact sorted
+canonical JSON, duplicate/unknown/missing field rejection, exact bool/int and
+UTC handling, ordered failure reasons, and derived stage/status/IDs were reviewed
+against the frozen contract. B1's public verifier re-runs the complete 139-A
+external binding verification, resolves the exact historical variant, rebuilds
+the batch from independently supplied observations/source identity, and requires
+exact equality. B2's qualification verifier independently rebuilds from the
+complete predecessor chain, exact binding, B1 batch, policy, observations and
+source identities. The separate SHADOW successor verifier rebuilds exact
+self-consistent linkage; it does not replace the full external qualification
+verifier.
+
+Final 139-B effect accounting is:
+
+```text
+PRODUCTION_SQLITE_READS=0
+PRODUCTION_SQLITE_WRITES=0
+CREDENTIAL_READS=0
+PROVIDER_CALLS=0
+ROBINHOOD_READS=0
+BROKER_CALLS=0
+SCHEDULER_CALLS=0
+ACL_MUTATIONS=0
+PAPER_MUTATIONS=0
+REAL_RESEARCH_EXECUTIONS=0
+REAL_WALK_FORWARD_EXECUTIONS=0
+SHADOW_LIVE_OBSERVATIONS=0
+STRATEGY_PROMOTIONS=0
+PRODUCTION_CONTRACTS_CREATED=0
+D1_OPERATIONS=0
+D1R5_OPERATIONS=0
+D2_SUPERVISOR_EXECUTIONS=0
+```
+
+This acceptance is source-only. Real observation acquisition, product/history
+integration, production compatibility, `PAPER_CANDIDATE`,
+`AWAITING_HUMAN_PROMOTION`, promotion, protected execution and any successor
+architecture remain outside this checkpoint. The active product and canonical
+history branches remain on their existing product-lineage descendant and are not
+advanced by this research closeout.

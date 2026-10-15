@@ -2,16 +2,52 @@
 
 ## Current phase
 
-Architecture 134-D1R5 source is accepted and the project is waiting on the
-separately protected real pre-market `WAITING_FOR_MARKET` / wake /
-source-readmission qualification.
+Architecture 134-D1R5 operational source remains accepted and the product line
+is still waiting on the separately protected real pre-market
+`WAITING_FOR_MARKET` / wake / source-readmission qualification. No protected
+product effect is authorized by this documentation closeout.
 
-The canonical bounded new-chat handoff/history branch is
-`feature/project-history-storage-foundation`. It is maintained only as a
-fast-forward mirror of the latest accepted bounded-docs descendant and is not
-trading or executable-source authority.
+Parallel safe-side research is now **SOURCE ACCEPTED through Architecture
+139-B / RCL-3B** on
+`feature/research-candidate-shadow-qualification-current`. The two independently
+reviewed source checkpoints are:
 
-Current accepted product/source identity:
+```text
+139-B1  HEAD 3bf604f407445da0c587cfd91545c113c99e341f
+        TREE 732f75cc09c8296ce09f244edc36ca8bda61e7b7
+        CI   #563 / 38664134287 / workflow_dispatch / attempt 1 / SUCCESS
+
+139-B2  HEAD bf98553592d2ef740d6a6ffdc104c6cd28023379
+        TREE 34627f90f3ad8fc441346cc3d567a3f15495219b
+        CI   #564 / 38665480838 / workflow_dispatch / attempt 1 / SUCCESS
+```
+
+The B1 continuation PASS was internal permission to begin B2 only. Canonical
+SOURCE ACCEPTED status for both exact commits is established by the final
+independent ChatGPT GitHub review recorded in the Architecture-139 documents.
+
+139-B is deterministic source-only research. B1 canonically models
+caller-supplied, zero-effect SHADOW observations and independently reconciles
+them to the accepted 139-A binding chain. B2 deterministically qualifies
+coverage/provenance/no-effect integrity and may materialize only an immutable
+`SHADOW` research successor. It adds no observation acquisition, provider,
+credential, broker, paper, runtime, production compatibility, promotion,
+`PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, D1/D1R5/D2, or live-trading
+authority.
+
+The canonical bounded new-chat handoff/history branch remains
+`feature/project-history-storage-foundation` on the active product lineage.
+It and the active product branch currently remain at the bounded docs descendant:
+
+```text
+HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
+TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
+```
+
+Do **not** move that canonical history branch onto this parallel research
+lineage absent a separately reviewed integration/replay.
+
+Current accepted operational executable identity remains:
 
 ```text
 branch  feature/robinhood-production-paper-premarket-wake-qualification
@@ -20,17 +56,9 @@ TREE    9fcbc170e8339e0b4a93844466e8924ff8ef7f36
 CI      #557 / 38549244176 / SUCCESS
 ```
 
-Current accepted docs descendant before this canonical-branch designation:
-
-```text
-HEAD    ed2eb3ef60e9c04ed9cfa89061fb28d2dfcc562c
-TREE    c3831fb1508e254c464470db8d67ae14ac4c4985
-CI      #559 / 38550603841 / SUCCESS
-```
-
-Exact active product HEAD/tree must still be re-proven before protected source
-admission. No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2, or
-live trading is authorized.
+Exact active product HEAD/tree must still be re-proven before any future
+protected source admission. No fresh D1 session, PREPARE, EXECUTE, paper/broker
+mutation, D2, real SHADOW acquisition, or live trading is authorized.
 
 ## Operational checkpoint
 
@@ -105,25 +133,33 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The immediate product boundary is now the real pre-market start /
-`WAITING_FOR_MARKET` / wake qualification. The independent Architecture 134-D1R5
-source checkpoint is accepted at HEAD
+The immediate product boundary remains the real pre-market start /
+`WAITING_FOR_MARKET` / wake qualification. The independent Architecture
+134-D1R5 source checkpoint is accepted at HEAD
 `a7f985c6e4c723fdd4c4a1c49798531ddabe9e4a`, TREE
 `9fcbc170e8339e0b4a93844466e8924ff8ef7f36`, but its real bounded
-clock/sleep/external-evidence qualification has not yet run.
+clock/sleep/external-evidence qualification has not run.
 
-Parallel safe-side research has also advanced without changing that product
-boundary. Architecture 138 / RCL-2 is SOURCE ACCEPTED at
+Parallel safe-side research is closed through Architecture 139-B. Architecture
+138 / RCL-2 remains SOURCE ACCEPTED at
 `a9c3682231f8540be6e9dc6f2bfecd06ecf1a8b1` / tree
 `55841f5119228dbf302747256326d43ff7d32e23`, CI #561 / `38634855492`.
-Architecture 139-A / RCL-3A is now SOURCE ACCEPTED on
-`feature/research-candidate-shadow-variant-binding-current` at HEAD
-`bf500ffecefe0a8be8117e315228e3bc07ffdf54`, TREE
-`69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`, CI #562 /
-`38640090298` SUCCESS. The 139-A branch inventory is FULL 177 /
-EXHAUSTIVE 392 while ACTIVE 64 / ROBINHOOD 98 / LEGACY 215 / GUI 44 are
-unchanged. These research checkpoints grant no production authority and are not
-integrated into the active D1R5 product lineage.
+Architecture 139-A / RCL-3A remains SOURCE ACCEPTED at
+`bf500ffecefe0a8be8117e315228e3bc07ffdf54` / tree
+`69d4ee1d6e7b3c2ca095b3ddf3cf05fdb7e3babd`, CI #562 / `38640090298`.
+Architecture 139-B1 and 139-B2 are SOURCE ACCEPTED at the exact identities
+recorded above.
+
+Final 139-B inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 394 / GUI 44. B1 and B2 use separate seven-path successor overlays;
+all predecessor dictionaries, accepted 137/138/139-A domain/test blobs,
+executable/native/AST pins, ACTIVE membership, and workflow bytes remain
+frozen. No research checkpoint is integrated into the active D1R5 product
+lineage.
+
+The 139-B source boundary is complete. No real SHADOW observation acquisition,
+integration, promotion, production conversion, or later research architecture
+is started by this closeout.
 
 The D1R4 authentication PASS grants no PREPARE, EXECUTE, paper mutation, broker
 placement, scheduler/ACL mutation, D1 launch, D2 invocation, or live-trading
@@ -170,35 +206,34 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 ### Now
 
-- Keep the bounded status and handoff aligned with the accepted D1R5/current
-  protected-boundary state, and keep
-  `feature/project-history-storage-foundation` fast-forwarded to each accepted
-  bounded-docs descendant.
+- Preserve the exact accepted Architecture 139-B1/B2 research identities,
+  deterministic models, verifiers, seven-path successor overlays, and zero-effect
+  boundary.
+- Keep `feature/project-history-storage-foundation` on the accepted active
+  product-lineage bounded-docs descendant. Do not fast-forward it to the
+  parallel research branch.
 - Keep the immutable HIST-2B snapshot unchanged.
-- Record and preserve the consumed D1R4 authentication evidence and fenced
-  generation journal.
-- Preserve the accepted [D1R5 timing/source qualifier](validation/arch134-d1r5-pre-market-wake-qualification.md)
-  and its Architecture 132-R3H certification-hygiene proof.
-- Review only the separate real bounded clock/sleep/external-evidence D1R5
-  qualification next; it stops after wake/source proof and grants no D1 authority.
-- Keep all D1/PREPARE/EXECUTE/paper/broker effects stopped until that source and
-  operator boundary are separately accepted.
+- Preserve the consumed D1R4 authentication evidence and fenced generation
+  journal.
+- Preserve the accepted D1R5 source qualifier without executing its protected
+  real clock/sleep/external-evidence qualification in this closeout.
+- Keep all D1/PREPARE/EXECUTE/paper/broker effects and all real SHADOW
+  acquisition stopped unless a later prompt separately reviews and authorizes
+  the exact boundary.
 
 ### Next
 
-- Production: qualify pre-market start, durable `WAITING_FOR_MARKET`, wake
-  timing, and exact source re-admission; only after acceptance review a fresh D1
-  session authorization boundary.
-- Safe-side: Architecture 139-B may now define deterministic no-effect
-  observation provenance and SHADOW qualification on top of accepted 139-A, or
-  GUI may expose the accepted BACKTESTED -> WALK_FORWARD_PASSED -> exact
-  variant-binding chain read-only. Neither path may imply promotion, D1/D2,
-  provider, broker, or live authority.
+- Production remains gated on the separately reviewed real D1R5 pre-market /
+  `WAITING_FOR_MARKET` / wake / exact source re-admission qualification.
+- Safe-side research stops at accepted Architecture 139-B. No acquisition,
+  integration, production compatibility, promotion, or successor architecture
+  is implied or authorized by this acceptance.
 
 ### Later
 
-- Consider D1, paper, broker-paper, and later live-readiness gates only through
-  their own reviewed authority boundaries and reconciliation requirements.
+- Consider protected product or research effects only through their own explicit
+  reviewed contracts, exact source admission, effect accounting, and
+  reconciliation requirements.
 - Keep live trading unavailable until every explicit production/live gate is
   implemented, accepted, and separately enabled.
 

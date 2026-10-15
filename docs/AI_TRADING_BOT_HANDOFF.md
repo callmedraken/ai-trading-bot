@@ -249,9 +249,29 @@ for B2, not final acceptance; ChatGPT independently reviewed both exact GitHub
 commits, trees, diffs, blobs, overlays, dictionaries, inventories and CI runs
 before granting this SOURCE ACCEPTED status.
 
-Final research inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
-EXHAUSTIVE 394 / GUI 44. All seventeen recorded operational effect counters
-remain zero. No real SHADOW observation occurred.
+The accepted 139-B research-domain inventory remains ACTIVE 64 / FULL 179 /
+ROBINHOOD 98 / LEGACY 215 / EXHAUSTIVE 394 / GUI 44 at that checkpoint. All
+seventeen recorded 139-B operational effect counters remain zero. No real SHADOW
+observation occurred.
+
+Architecture 140 / GUI-A16 is SOURCE ACCEPTED on
+`feature/gui-research-candidate-lifecycle-current`:
+
+```text
+HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
+TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
+GUI   #8 / 38684121623 / push / attempt 1 / SUCCESS / 880 passed
+CI    #565 / 38684312270 / workflow_dispatch / attempt 1 / SUCCESS
+```
+
+It presents one explicitly supplied five-artifact SHADOW lifecycle set using
+strict accepted canonical parsers and `verify_shadow_research_candidate` for
+local successor linkage. The GUI visibly states that complete historical
+external-chain qualification was not re-run. No real SHADOW acquisition,
+provider/network/credential/broker/paper/runtime effect, production compatibility,
+promotion, post-SHADOW materialization, D1/D1R5/D2 operation, or live authority
+was added. Current parallel-line inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
+LEGACY 220 / EXHAUSTIVE 399 / GUI 49.
 
 To preserve the canonical handoff invariant, do not move
 `feature/project-history-storage-foundation` onto this research branch. The
@@ -262,16 +282,17 @@ reviewed product-lineage integration/replay says otherwise.
 
 ## Next safe-side boundary
 
-Architecture 139-B is the accepted safe-side stop boundary for this handoff.
-It does **not** acquire observations and it grants no provider, credential,
-broker, paper, runtime, production compatibility, promotion, D1/D2, or live
-authority.
+The research lifecycle domain remains stopped at accepted Architecture 139-B.
+Architecture 140 / GUI-A16 is the accepted safe-side **presentation** descendant:
+it inspects explicit local artifacts and grants no provider, credential, broker,
+paper, runtime, production compatibility, promotion, D1/D2, or live authority.
 
-Any future real-market/provider SHADOW observation acquisition is a separate
+Any future real-market/provider SHADOW observation acquisition remains a separate
 protected architecture/effect boundary requiring a new explicit contract,
-source admission, effect accounting, and review. No such acquisition,
-integration, promotion, or successor architecture is authorized or started by
-this closeout.
+source admission, effect accounting, and review. Further GUI-only work may be
+designed separately from this accepted presentation surface, but A16 itself
+starts no acquisition, integration, promotion, post-SHADOW materialization, or
+successor research lifecycle architecture.
 
 ## Immediate next step
 
@@ -280,10 +301,12 @@ source is accepted. The next operational boundary remains the **separately
 reviewed real bounded D1R5 clock/sleep/external-evidence qualification** on the
 exact accepted product source; this closeout does not execute it.
 
-For the parallel safe-side line, stop at accepted Architecture 139-B. Do not
-invoke real SHADOW acquisition, integrate into the product/history lineage,
-materialize a post-SHADOW stage, convert to production, promote a strategy, or
-begin a later research architecture from this handoff alone.
+For the parallel safe-side line, preserve accepted Architecture 139-B domain
+semantics and Architecture 140 / GUI-A16 presentation semantics. Do not invoke
+real SHADOW acquisition, integrate into the product/history lineage, materialize
+a post-SHADOW stage, convert to production, or promote a strategy from this
+handoff alone. Any next GUI milestone must remain a separately frozen read-only
+contract unless the user explicitly selects a protected boundary.
 
 No fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect, broker action,
 D2, or live trading is authorized.

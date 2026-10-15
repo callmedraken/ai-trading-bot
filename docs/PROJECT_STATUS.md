@@ -35,6 +35,26 @@ credential, broker, paper, runtime, production compatibility, promotion,
 `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, D1/D1R5/D2, or live-trading
 authority.
 
+Parallel safe-side GUI presentation is now **SOURCE ACCEPTED through Architecture
+140 / GUI-A16** on `feature/gui-research-candidate-lifecycle-current`:
+
+```text
+HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
+TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
+GUI   #8 / 38684121623 / push / attempt 1 / SUCCESS / 880 passed
+CI    #565 / 38684312270 / workflow_dispatch / attempt 1 / SUCCESS
+```
+
+A16 adds a read-only Research Lifecycle page over one explicit five-artifact
+WALK_FORWARD_PASSED -> 139-A -> 139-B1 -> 139-B2 -> SHADOW chain. It uses the
+accepted canonical parsers and exact local SHADOW successor-linkage verifier,
+but explicitly does **not** re-run or claim complete historical/external-chain
+qualification. It adds no observation acquisition, production compatibility,
+promotion, post-SHADOW stage, provider/credential/broker/paper/runtime effect,
+D1/D1R5/D2 operation, or live-trading authority. Current parallel-line
+inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 220 / EXHAUSTIVE 399 /
+GUI 49.
+
 The canonical bounded new-chat handoff/history branch remains
 `feature/project-history-storage-foundation` on the active product lineage.
 It and the active product branch currently remain at the bounded docs descendant:
@@ -150,8 +170,10 @@ Architecture 139-A / RCL-3A remains SOURCE ACCEPTED at
 Architecture 139-B1 and 139-B2 are SOURCE ACCEPTED at the exact identities
 recorded above.
 
-Final 139-B inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
-EXHAUSTIVE 394 / GUI 44. B1 and B2 use separate seven-path successor overlays;
+The accepted 139-B domain boundary remains ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 215 /
+EXHAUSTIVE 394 / GUI 44 at its source checkpoint. Architecture 140 adds five
+LEGACY GUI modules, so the current parallel-line inventory is ACTIVE 64 / FULL 179 /
+ROBINHOOD 98 / LEGACY 220 / EXHAUSTIVE 399 / GUI 49. B1 and B2 use separate seven-path successor overlays;
 all predecessor dictionaries, accepted 137/138/139-A domain/test blobs,
 executable/native/AST pins, ACTIVE membership, and workflow bytes remain
 frozen. No research checkpoint is integrated into the active D1R5 product
@@ -209,6 +231,10 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Preserve the exact accepted Architecture 139-B1/B2 research identities,
   deterministic models, verifiers, seven-path successor overlays, and zero-effect
   boundary.
+- Preserve accepted Architecture 140 / GUI-A16 as presentation-only: explicit
+  local artifacts, canonical parsing plus local SHADOW linkage, no external-chain
+  acceptance claim, discovery, acquisition, promotion, production conversion, or
+  operational authority.
 - Keep `feature/project-history-storage-foundation` on the accepted active
   product-lineage bounded-docs descendant. Do not fast-forward it to the
   parallel research branch.
@@ -225,9 +251,11 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 
 - Production remains gated on the separately reviewed real D1R5 pre-market /
   `WAITING_FOR_MARKET` / wake / exact source re-admission qualification.
-- Safe-side research stops at accepted Architecture 139-B. No acquisition,
-  integration, production compatibility, promotion, or successor architecture
-  is implied or authorized by this acceptance.
+- The research lifecycle domain still stops at accepted Architecture 139-B.
+  GUI presentation is accepted through Architecture 140 / GUI-A16. Further
+  source-only GUI work requires its own bounded contract; no acquisition,
+  integration, production compatibility, promotion, or post-SHADOW lifecycle
+  progression is implied by A16.
 
 ### Later
 

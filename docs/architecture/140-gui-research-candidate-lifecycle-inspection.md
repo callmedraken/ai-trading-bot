@@ -1,7 +1,8 @@
 # Architecture 140 / GUI-A16 — Read-Only Research Candidate Lifecycle Inspection
 
-Status: implementation contract frozen before source work; pending exact GitHub
-review. No canonical SOURCE ACCEPTED claim is made by this checkpoint.
+Status: **SOURCE ACCEPTED** after independent ChatGPT GitHub review of exact
+implementation source `6d092b8e05372d241dc4183b7b392f0eb83b4500` / tree
+`fd17ccfd338266c04d24dd03e303ee36dd72b0ca`.
 
 ## Admission and scope
 
@@ -171,3 +172,75 @@ Gates dispatch. No retries/duplicate dispatch; failure is STOP. Independently
 review/refetch exact remote source, blobs, dictionaries, inventory, CI and clean
 state. Stop for ChatGPT exact GitHub review. Do not update PROJECT_STATUS or
 AI_TRADING_BOT_HANDOFF or integrate product/history refs.
+
+
+## Final exact-source acceptance
+
+ChatGPT independently reviewed the exact GitHub implementation commit before this
+bounded closeout. Architecture 140 / GUI-A16 is canonically **SOURCE ACCEPTED** at:
+
+```text
+HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
+TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
+parent 5889f83ea5a4baefc154283266d645a555ed2d5c
+commit feat: add read-only research candidate lifecycle GUI
+```
+
+The base is the accepted Architecture-139-B docs descendant and the implementation
+is exactly one commit ahead with that exact merge base. The branch ref resolves to
+the accepted HEAD. Product and canonical history refs remain independently at
+`7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343`; no integration/replay occurred.
+
+Key exact accepted blobs are:
+
+| Path | Git blob |
+| --- | --- |
+| `src/trading_bot/gui/research_candidate_lifecycle_models.py` | `19ca4f9e4e75b4a061e0d8ec8d6515cf35a53352` |
+| `src/trading_bot/gui/research_candidate_lifecycle_service.py` | `62da586b13a399b5c806cf159b33e47b21ffc56b` |
+| `src/trading_bot/gui/research_candidate_lifecycle_page.py` | `8a13ed7e5a7351f1a0bca35a3aaf2741d6991790` |
+| `tests/gui/test_gui_a16_research_candidate_lifecycle_models.py` | `3c85eab11d14aceafe22c5a0ef00c0fad54385bb` |
+| `tests/gui/test_gui_a16_research_candidate_lifecycle_service.py` | `77ee72939af5a5df6ddba6aa3640db1102bfad91` |
+| `tests/gui/test_gui_a16_research_candidate_lifecycle_page_qt.py` | `3ab95f58f8553dbcdc30fdaeba459a5f7aa1b2df` |
+| `tests/gui/test_gui_a16_research_candidate_lifecycle_composition.py` | `fb00d23a87bfc9736d38131adae0908b560dbf6c` |
+| `tests/gui/test_gui_a16_research_candidate_lifecycle_startup.py` | `95ce8c4be0e29aefc348d53e25302a51b76a3476` |
+| `scripts/checkpoint_runner.py` | `6c108d1691eb70daa3cae5352ad7d6f211cd27d4` |
+
+The accepted 137/138/139 domain/test blobs remain byte-identical, including B1
+observation source `61a4f9bc67ad0c05f961a523c231e64e6fb55732` and B2 qualification source
+`75cc22d16d65f51ce75921ab66c6dcabfbfa119b`. Workflow blobs remain exactly
+`ff019356795e508b3b2e7a065871edd2d6bad5bd` (GUI) and
+`fe6aceac62721338eba4fcb40e2e7fde0d976e18` (Checkpoint Source Gates).
+
+The Architecture-140 seven-path overlay matches the actual seven current test
+blobs and resolves immediately after 139-B2 at all five live authority sites.
+The frozen 139-B2 overlay digest is
+`32ef60967164da03e02c8cfe40928b8839f89a2c4bb90074e967bb08213d6458`;
+A16 tests freeze 34 predecessor dictionaries. Current inventory is ACTIVE 64 /
+FULL 179 / ROBINHOOD 98 / LEGACY 220 / EXHAUSTIVE 399 / GUI 49.
+
+Dedicated GUI Source Gates #8 / `38684121623` is push-triggered, attempt 1,
+terminal SUCCESS on the exact accepted HEAD with PySide6 6.10.3, **880 passed**,
+Ruff check/format PASS and diff PASS. Checkpoint Source Gates #565 /
+`38684312270` is workflow_dispatch, attempt 1, terminal SUCCESS on the same HEAD:
+source-static passed all 64 current authorities with CHECKPOINTS=64,
+TEST_PATHS=88, RUFF_PATHS=372, GIT_DIFF_CHECK=0, RUFF_CHECK=0,
+RUFF_FORMAT=0 and PYTEST=SKIP; broad shards passed with PYTEST=0 in
+99.178 / 94.690 / 85.018 / 109.033 seconds; active/certification jobs skipped
+as expected for the unmapped GUI route; terminal source-gates passed.
+
+Independent source review confirms the five explicit paths are all-or-none,
+prevalidated before opening, read only in binary mode with the fixed 8 MiB + 1
+bound, decoded strict UTF-8 and passed unmodified to the five accepted parsers.
+Success/failure are cached; presentation state retains no path/raw JSON/raw
+exception/domain object. The public `verify_shadow_research_candidate` establishes
+only local successor linkage. The page truthfully states that complete historical
+external-chain qualification was not re-run and exposes no effect controls.
+Supervisor/System/Evidence composition uses the already-acquired state and adds
+zero rereads.
+
+All requested A16 operational/production effect counters remain zero. Filesystem
+and latest-artifact discovery remain false. No real SHADOW observation,
+research/walk-forward execution, provider/credential/broker/paper/production
+store/scheduler/ACL effect, strategy promotion, production-contract creation,
+D1/D1R5/D2 operation, production compatibility, PAPER_CANDIDATE,
+AWAITING_HUMAN_PROMOTION or Architecture 141 is authorized by this acceptance.

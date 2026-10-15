@@ -1,9 +1,9 @@
 # GUI-A16 — Read-only Research Candidate Lifecycle validation
 
 Architecture 140 freezes the normative contract before source implementation.
-Status: local verification passed; pending publication and independent ChatGPT
-review. Publication evidence is returned with the implementation handoff rather
-than advancing the branch with a second documentation commit.
+Status: **SOURCE ACCEPTED** after terminal publication gates and independent
+ChatGPT GitHub review of exact source `6d092b8e05372d241dc4183b7b392f0eb83b4500` / tree
+`fd17ccfd338266c04d24dd03e303ee36dd72b0ca`.
 
 ## Required local gates
 
@@ -106,3 +106,47 @@ promotion, production contract, D1/D1R5/D2 operation occurred. Filesystem and
 latest-artifact discovery remain false. The GUI verifies local canonical parser
 self-consistency and exact SHADOW successor linkage only; full external-chain
 qualification remains false.
+
+
+## Terminal publication and acceptance evidence
+
+Exact accepted source:
+
+```text
+HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
+TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
+parent 5889f83ea5a4baefc154283266d645a555ed2d5c
+```
+
+GUI Source Gates #8 / `38684121623` was the single automatic push run, attempt 1,
+terminal SUCCESS on the exact HEAD. Windows CI installed PySide6 6.10.3 and ran
+**880 passed** with Ruff check, Ruff format and diff checks PASS.
+
+Checkpoint Source Gates #565 / `38684312270` was the single subsequent
+workflow_dispatch, attempt 1, terminal SUCCESS on the same HEAD. Source-static
+reported CHECKPOINTS=64 / TEST_PATHS=88 / RUFF_PATHS=372,
+GIT_DIFF_CHECK=0 / RUFF_CHECK=0 / RUFF_FORMAT=0 / PYTEST=SKIP and all current
+authorities PASS. Broad shards passed with PYTEST=0 and wall times:
+
+- shard 0: 99.178 s
+- shard 1: 94.690 s
+- shard 2: 85.018 s
+- shard 3: 109.033 s
+
+All remain below 300 seconds. Active and certification jobs skipped as expected
+for the unmapped GUI dispatch; terminal source-gates passed. No retry occurred.
+
+Independent GitHub review confirmed all 42 changed paths, the exact new GUI and
+test blobs, the seven Architecture-140 successor blobs, five resolver sites,
+34 frozen predecessor dictionaries, frozen 139-B2 overlay digest, final inventory
+ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 220 / EXHAUSTIVE 399 / GUI 49,
+unchanged 137–139 domain bytes, unchanged workflow bytes, and unchanged
+product/history refs. The visible verification-scope statement is accurate:
+canonical local artifacts and SHADOW successor linkage are verified; full
+historical external-chain qualification is not re-run by this GUI.
+
+All eighteen requested A16 effect counters remain zero, including real production
+evidence reads during tests. Only explicit synthetic temporary artifacts were
+read by A16 tests. No protected effect, product/history integration, acquisition,
+promotion, production conversion, post-SHADOW materialization or Architecture 141
+work is part of this acceptance.

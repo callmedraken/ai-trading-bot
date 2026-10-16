@@ -85,7 +85,8 @@ def test_arch138_successor_preserves_unmodified_d1r5_pins() -> None:
     overrides = checkpoint_runner.ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
         if relative not in overrides:
-            assert checkpoint_runner._git_blob_sha1(root / relative) == pin
+            expected = checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            assert checkpoint_runner._git_blob_sha1(root / relative) == expected
     assert checkpoint_runner._arch134_d1r5_authority_check(root) == ()
 
 
@@ -121,10 +122,12 @@ def test_arch140a18_successor_pins_match_and_preserve_unmodified_d1r5_pins():
     overrides = checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     assert set(overrides) == set(predecessor)
     for relative, pin in overrides.items():
-        assert checkpoint_runner._git_blob_sha1(root / relative) == pin
+        current = checkpoint_runner._canonical_current_inventory_test_pin(relative, pin)
+        assert checkpoint_runner._git_blob_sha1(root / relative) == current
     for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
         if relative not in predecessor:
-            assert checkpoint_runner._git_blob_sha1(root / relative) == pin
+            expected = checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            assert checkpoint_runner._git_blob_sha1(root / relative) == expected
     for check in (
         checkpoint_runner._arch134_production_paper_runtime_authority_check,
         checkpoint_runner._arch134_authentication_authority_check,

@@ -11867,10 +11867,10 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
 # are the only files whose current bytes must combine D1R6 and GUI-A18 state.
 CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
     "tests/scripts/certification_runner/test_profiles.py": (
-        "9b512e25aa6968dc9f8538c5e911c2439fe1b217"
+        "6d5a7eaa49cbe6a9c67900d8e0ae99476cded215"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "ae05fd091ea1a1ce0e4c728bcdfc7a9ef8f53adf"
+        "4fae6dc080f6b9080025cc4dc2860725cbbaa1f8"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
         "d608cad8d3b5c4d52373e7b4ea4d5b0b23ad7748"
@@ -11889,7 +11889,7 @@ CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
     ),
 }
 CANONICAL_CURRENT_INVENTORY_TEST_PINS_SHA256: Final = (
-    "38057076938294e3e13d0e28d790df84afd275c1458edd9b3f6a61e08893664c"
+    "0683b8810167b83d95275bf2173e3431ba28fcca022e3572be90f8c64be48c96"
 )
 
 

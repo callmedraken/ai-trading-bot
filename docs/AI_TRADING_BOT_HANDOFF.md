@@ -283,16 +283,28 @@ reviewed product-lineage integration/replay says otherwise.
 ## Next safe-side boundary
 
 The research lifecycle domain remains stopped at accepted Architecture 139-B.
-Architecture 140 / GUI-A16 is the accepted safe-side **presentation** descendant:
-it inspects explicit local artifacts and grants no provider, credential, broker,
-paper, runtime, production compatibility, promotion, D1/D2, or live authority.
+Architecture 140 / GUI-A17 is now the accepted safe-side **presentation**
+descendant:
+
+```text
+HEAD  56f3e8ef73f8aa62e2444c7fc9c75dfb212ff246
+TREE  5de6706064424aa4734b53cad4efffe5011284f4
+GUI   #10 / 38848617395 / SUCCESS / attempt 1 / 984 passed
+CI    #580 / 38848782422 / SUCCESS / attempt 1
+```
+
+A16 remains the only explicit local five-artifact acquisition and local SHADOW
+successor-linkage boundary. A17 uses only the immutable A16 page state and adds
+presentation-only provenance, policy-vs-recorded coverage/margin comparison,
+zero-effect audit and fixed governance. It adds no lifecycle file read, tenth
+service getter, domain parser/verifier, external lookup, provider, credential,
+broker, paper, scheduler/ACL, production compatibility, promotion, D1/D1R5/D2,
+or live authority.
 
 Any future real-market/provider SHADOW observation acquisition remains a separate
 protected architecture/effect boundary requiring a new explicit contract,
-source admission, effect accounting, and review. Further GUI-only work may be
-designed separately from this accepted presentation surface, but A16 itself
-starts no acquisition, integration, promotion, post-SHADOW materialization, or
-successor research lifecycle architecture.
+source admission, effect accounting, and review. Further GUI-only work may
+continue from A17 only as a separately frozen read-only presentation contract.
 
 ## Immediate next step
 
@@ -302,11 +314,15 @@ reviewed real bounded D1R5 clock/sleep/external-evidence qualification** on the
 exact accepted product source; this closeout does not execute it.
 
 For the parallel safe-side line, preserve accepted Architecture 139-B domain
-semantics and Architecture 140 / GUI-A16 presentation semantics. Do not invoke
-real SHADOW acquisition, integrate into the product/history lineage, materialize
-a post-SHADOW stage, convert to production, or promote a strategy from this
-handoff alone. Any next GUI milestone must remain a separately frozen read-only
-contract unless the user explicitly selects a protected boundary.
+semantics, GUI-A16 acquisition/linkage semantics and GUI-A17 audit-presentation
+semantics. A17's current inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
+LEGACY 221 / EXHAUSTIVE 400 / GUI 50.
+
+Do not invoke real SHADOW acquisition, integrate into the product/history lineage,
+materialize a post-SHADOW stage, convert to production, or promote a strategy from
+this handoff alone. The next GUI milestone may proceed automatically only as
+another separately frozen, read-only, already-acquired-state presentation
+contract.
 
 No fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect, broker action,
 D2, or live trading is authorized.

@@ -435,25 +435,18 @@ def test_exact_successor_pins_and_frozen_a16_digest():
     assert sha256(json.dumps(before, sort_keys=True).encode()).hexdigest() == A16_DIGEST
     assert sha256(json.dumps(a17, sort_keys=True).encode()).hexdigest() == A17_DIGEST
     assert set(before) == set(a17) and len(a17) == 7
-    assert set(after) == {"tests/scripts/certification_runner/test_profiles.py"}
+    assert set(after) == set(a17)
     for path, pin in before.items():
         assert (
             checkpoint_runner._arch140a17_current_inventory_test_pin(path, pin)
             == a17[path]
         )
-    assert (
-        checkpoint_runner._arch140a18_current_inventory_test_pin(
-            "tests/scripts/certification_runner/test_profiles.py",
-            before["tests/scripts/certification_runner/test_profiles.py"],
+    for path, pin in before.items():
+        assert (
+            checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
+            == after[path]
         )
-        == after["tests/scripts/certification_runner/test_profiles.py"]
-    )
-    assert (
-        checkpoint_runner._git_blob_sha1(
-            ROOT / "tests/scripts/certification_runner/test_profiles.py"
-        )
-        == after["tests/scripts/certification_runner/test_profiles.py"]
-    )
+        assert checkpoint_runner._git_blob_sha1(ROOT / path) == after[path]
     assert (
         checkpoint_runner._arch140a17_current_inventory_test_pin("other", "a" * 40)
         == "a" * 40

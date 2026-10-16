@@ -11591,10 +11591,28 @@ def _arch140a17_current_inventory_test_pin(relative: str, predecessor: str) -> s
     return ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
 
 
-# GUI-A18 succeeds A17 for the one current inventory assertion it updates.
+# GUI-A18 succeeds A17 for the same seven current inventory tests.
 ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
     "tests/scripts/certification_runner/test_profiles.py": (
         "e1d74224317534373f2374bb0b90d927e80e8247"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "86983548335e090751e14cd7632c0132032a1e88"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "1af48ae395c03801a7fdbe86804cf4845d141427"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "8630a2da95dca4580fbfc0ececc7021b6b3d0b07"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "0b4e8c07e7dd8cce9f9c132224a6c5cbed0288da"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "ec3421cd69257778e45f908ff65e607407b1b9f0"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "14df3fad18150a48c12114d4e902ed62c17d5efa"
     ),
 }
 
@@ -11608,9 +11626,9 @@ def _arch140a18_current_inventory_test_pin(relative: str, predecessor: str) -> s
         != "dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3"
     ):
         raise ValueError("140-A18 frozen A17 predecessor drift")
-    if set(ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
-        "tests/scripts/certification_runner/test_profiles.py"
-    }:
+    if set(ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != set(
+        ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    ):
         raise ValueError("140-A18 unreviewed current inventory override")
     predecessor = _arch140a17_current_inventory_test_pin(relative, predecessor)
     if relative in ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:

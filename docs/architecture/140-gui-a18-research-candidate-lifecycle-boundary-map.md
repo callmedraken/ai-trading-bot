@@ -75,12 +75,11 @@ A18 preserves the A16 overlay digest
 `887064885ca3be46514075efed384ccf1c6eb778d78dcc3f06bc402bff1a4e4f` and the
 A17 overlay digest
 `dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3`.
-Because the current inventory-count test records the new GUI test module, the
-checkpoint runner adds one A18 overlay entry for
-`tests/scripts/certification_runner/test_profiles.py`, pinned to its exact
-current blob. The A18 overlay digest is
-`ac7096dc95df837940573ce646cd2143fc4c1d901d8e10fbdc7cb9d69c218328`, and its
-resolver validates the A17 predecessor before returning the current blob.
+Because the current inventory-count assertions record the new GUI test module,
+the checkpoint runner adds an A18 overlay for the same seven current inventory
+test paths as A17, pinned to their exact current blobs. The A18 overlay digest
+is `d32e6ddc279e85277264d94a55ecae5cb63aaedd8d684011dca57bf36d008624`, and
+its resolver validates the A17 predecessor before returning current blobs.
 
 The resulting source inventory is:
 

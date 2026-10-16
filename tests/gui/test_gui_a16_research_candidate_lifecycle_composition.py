@@ -452,7 +452,7 @@ def test_arch140_exact_seven_successor_blobs():
     assert set(predecessor) == set(
         checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     )
-    assert set(pins) == {"tests/scripts/certification_runner/test_profiles.py"}
+    assert set(pins) == set(predecessor)
     for (
         path,
         pin,
@@ -460,12 +460,6 @@ def test_arch140_exact_seven_successor_blobs():
         assert checkpoint_runner._git_blob_sha1(ROOT / path) == (
             checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
         )
-    assert (
-        checkpoint_runner._git_blob_sha1(
-            ROOT / "tests/scripts/certification_runner/test_profiles.py"
-        )
-        == pins["tests/scripts/certification_runner/test_profiles.py"]
-    )
 
 
 def test_arch140_frozen_139b2_overlay():

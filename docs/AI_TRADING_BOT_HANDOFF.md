@@ -12,12 +12,13 @@ journal.
 authority. Detailed architecture, validation, and closed chronology belong in
 their authoritative records and in `docs/history/`.
 
-The repository default/integration branch is `develop`. The bounded
-new-chat/current-state mirror remains
-`feature/project-history-storage-foundation`; after an accepted integration
-they must converge to the same accepted descendant rather than forming parallel
-source histories. Neither branch name grants provider, scheduler, broker,
-production-effect, or trading authority.
+Current remote `develop` is the primary/default startup integration reference.
+`feature/project-history-storage-foundation` may remain a synchronized
+compatibility/history mirror, never a required first startup hop or independent
+development lineage. Any divergence from accepted integration ancestry is a
+STOP/reconciliation condition; never manufacture convergence with merge, rebase,
+cherry-pick, or force-push. Neither branch name grants provider, scheduler,
+broker, production-effect, or trading authority.
 
 The protected operational D1R6 source that produced the accepted October 16
 wake evidence remains `feature/robinhood-production-paper-overnight-wake-arming`
@@ -27,15 +28,15 @@ re-proven before any later protected operation. Real-money trading remains
 
 ## New-session reading order
 
-Resolve `feature/project-history-storage-foundation` and read, in order:
+Resolve current remote `develop` and read, in order:
 
 1. its `AGENTS.md`;
 2. its `docs/AI_DEVELOPMENT_WORKFLOW.md`;
 3. its `docs/PROJECT_STATUS.md`;
-4. this file from the same canonical branch;
-5. the relevant current architecture or validation document;
-6. then verify the separately named active product branch, exact HEAD/tree,
-   recent diff and applicable CI before source/protected work.
+4. this bounded handoff from the same integration reference;
+5. the relevant current architecture or validation documents;
+6. then separately verify the active remote product branch, exact executable
+   HEAD/tree, recent diff and applicable CI before source/protected work.
 
 Read `docs/history/INDEX.md` or an immutable legacy snapshot only when older
 provenance, incident reconstruction, predecessor semantics, or disputed
@@ -283,14 +284,18 @@ safe-side test bytes legitimately meet.
 
 ## Immediate next step
 
-After the atomic `develop` merge reaches terminal-green GitHub source-gate CI,
-fast-forward `feature/project-history-storage-foundation` to the exact same
-merge descendant without creating a second implementation state or a new
-docs-only commit merely to synchronize branch names.
+The accepted post-history-merge integration and mirror synchronization are
+complete at HEAD `ec3572994558abed1c354766d65ec0a8aad14aa0`, TREE
+`5041c469c6d22c11bc465bdbe0ed330cae9aa8c8`. Current-state reconstruction starts
+from remote `develop`; mirror synchronization is not a pending next action.
+This bounded workflow reconciliation does not move either ref or the frozen
+D1R6 operational branch.
 
-For product progression, the next protected milestone is the separately designed
-D1-session-authorization checkpoint that may consume the accepted D1R5 PASS
-without implicitly granting PREPARE/EXECUTE or scheduler mutation.
+The next product milestone is **ChatGPT/Sol High architecture freeze and
+source/design review of a separate D1-session authorization checkpoint** that
+may consume the accepted D1R5 PASS without implicitly granting PREPARE/EXECUTE
+or scheduler mutation. Freeze that contract before implementation; no D1-session
+implementation or operational effect belongs to this workflow checkpoint.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

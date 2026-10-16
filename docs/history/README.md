@@ -22,22 +22,24 @@ Current-state documents must remain bounded. Cumulative chronological
 narratives must not grow back into them. Closed detail belongs once in the
 relevant architecture, validation, or history record.
 
-## Canonical bounded handoff branch
+## Default startup reference and compatibility/history mirror
 
-The ongoing canonical new-chat handoff/history branch is:
+Current remote `develop` is the primary/default startup integration reference
+for bounded reconstruction. `feature/project-history-storage-foundation` may
+remain a synchronized compatibility/history mirror; it is not a required first
+startup hop. Its accepted fast-forward to
+`ec3572994558abed1c354766d65ec0a8aad14aa0` is complete, not a pending action.
 
-`feature/project-history-storage-foundation`
+The mirror must never become an independent development lineage. Any divergence
+from accepted integration ancestry is a STOP/reconciliation condition; never
+manufacture convergence with merge, rebase, cherry-pick, or force-push. Any
+separately authorized synchronization must be fast-forward-only to an exact
+accepted integration descendant, with no mirror-only source or handoff commits.
+Pending feature checkpoints do not move either integration or mirror ref.
 
-It is maintained as a **fast-forward mirror of the latest accepted bounded-docs
-descendant of the active product lineage**. It must not become an independent
-source line. Accepted checkpoint docs close on the active product lineage first;
-only after that descendant is accepted may this branch fast-forward to the same
-commit. A non-fast-forward relationship is a STOP for reconciliation.
-
-This branch is the routine startup surface for bounded status/handoff and
-history routing. It is not executable-source, provider, broker, or trading
-authority; protected source admission must independently verify the active
-product branch and exact HEAD/tree.
+Startup documentation is not executable-source, provider, broker, or trading
+authority; independently verify the active product branch and exact executable
+HEAD/tree before source or protected work.
 
 ## HIST-2B exact snapshot and cutover
 
@@ -93,11 +95,10 @@ credential values, private keys, or tokens into history.
 
 ## Retrieval rule
 
-New sessions normally resolve
-`feature/project-history-storage-foundation` and read its `AGENTS.md`,
-`docs/AI_DEVELOPMENT_WORKFLOW.md`, `docs/PROJECT_STATUS.md`,
-`docs/AI_TRADING_BOT_HANDOFF.md`, and the relevant architecture or validation
-document. Then independently verify the active product branch and exact
-HEAD/tree before source or protected work. Read [INDEX.md](INDEX.md) or a
-specific legacy snapshot only for targeted reconstruction. This keeps routine
+New sessions resolve current remote `develop` and read, in order, its
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded `docs/PROJECT_STATUS.md`,
+bounded `docs/AI_TRADING_BOT_HANDOFF.md`, then relevant architecture/validation
+documents. Separately verify the active remote product branch and exact
+executable HEAD/tree before source or protected work. Read [INDEX.md](INDEX.md)
+or a specific legacy snapshot only for targeted reconstruction. This keeps routine
 handoffs bounded while retaining the full audit trail.

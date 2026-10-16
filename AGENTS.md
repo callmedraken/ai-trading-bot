@@ -33,17 +33,19 @@ remain unavailable until the separately reviewed brokerage, credential,
 reconciliation, operator-control, and live-readiness gates are implemented and
 accepted. Paper trading remains the default operating mode.
 
-The canonical bounded new-chat handoff branch is
-`feature/project-history-storage-foundation`. Its
-`docs/PROJECT_STATUS.md` is the bounded current high-level source for the
-current milestone, completed foundations, roadmap, and production status, and
-its `docs/AI_TRADING_BOT_HANDOFF.md` is the bounded active-session/current-
-boundary handoff. This branch is documentation/history authority only; it is
-not executable-source, provider, broker, or trading authority. The active
-product branch and exact source HEAD/tree must always be verified separately.
+Current remote `develop` is the primary/default startup integration reference
+for bounded new-chat reconstruction. Its `docs/PROJECT_STATUS.md` is the bounded
+current high-level source for the milestone, foundations, roadmap, and production
+status; its `docs/AI_TRADING_BOT_HANDOFF.md` is the bounded active-session/current-
+boundary handoff. Startup documentation never grants executable-source,
+provider, broker, scheduler, or trading authority. The active product branch and
+exact executable HEAD/tree must always be verified separately.
 
-Read the two bounded current documents from the canonical handoff branch before
-starting a new milestone or preparing a broad implementation plan.
+Read `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, then the two bounded current
+documents from current remote `develop`, followed by relevant architecture/
+validation documents, before starting a new milestone or broad implementation
+plan. `feature/project-history-storage-foundation` may remain a synchronized
+compatibility/history mirror; it is not a required first startup hop.
 `docs/history/INDEX.md` and immutable legacy snapshots are historical retrieval
 surfaces, not routine startup material. Historical detail belongs once in the
 relevant architecture, validation, or history record rather than being
@@ -224,14 +226,15 @@ PROTECTED is authorized within the exact reviewed bounds under the standing rule
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. First resolve
-`feature/project-history-storage-foundation` and read its current Git-tracked
-`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
-`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
-relevant current architecture/validation documents. Then verify the separately
-named active product branch/HEAD/tree, recent commits/diff and CI through GitHub
-when material. The canonical handoff branch is current-state/history authority,
-not executable-source authority. Read `docs/history/INDEX.md` or an immutable
+state before recommending or authorizing work. First resolve current remote
+`develop` and read, in order, its current Git-tracked `AGENTS.md`,
+`docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded `docs/PROJECT_STATUS.md`, bounded
+`docs/AI_TRADING_BOT_HANDOFF.md`, and relevant current architecture/validation
+documents. Then separately verify the active remote product branch and exact
+executable HEAD/tree, recent commits/diff and CI through GitHub when material.
+The compatibility/history mirror is optional and never a required startup hop;
+startup documentation does not substitute for executable-source authority.
+Read `docs/history/INDEX.md` or an immutable
 legacy snapshot only when older provenance, incident reconstruction,
 predecessor semantics, or disputed historical evidence is actually necessary.
 Git-tracked canonical docs outrank uploaded mirrors or older chat summaries
@@ -274,7 +277,7 @@ standing rule; never present a protected effect as ordinary verification.
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
-- After the accepted checkpoint's bounded docs closeout is terminal, ChatGPT must keep `feature/project-history-storage-foundation` as the canonical handoff/history branch by fast-forwarding it to that exact accepted docs descendant. Never create an independent handoff-only lineage, merge/rebase it, or let it carry executable-source changes not already present in the accepted product ancestry. If the canonical branch cannot fast-forward cleanly, STOP for reconciliation.
+- `develop` remains the primary/default startup integration reference. `feature/project-history-storage-foundation` may remain a synchronized compatibility/history mirror, never an independent development lineage or required startup hop. Any divergence from accepted integration ancestry is a STOP/reconciliation condition; never manufacture convergence with merge, rebase, cherry-pick, or force-push. Any separately authorized mirror synchronization must be fast-forward-only to an exact accepted integration descendant, with no mirror-only source or handoff commits. A pending feature checkpoint does not move either integration or mirror ref.
 - After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority never implies merge/rebase/amend/force-push or PR mutation authority.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
 - Codex is primarily a bounded implementation agent for changes already scoped and discussed.

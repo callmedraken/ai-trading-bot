@@ -131,14 +131,14 @@ more detail.
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. Resolve the canonical bounded
-handoff/history branch `feature/project-history-storage-foundation` first and
-read, in order, its `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
-`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
-relevant current architecture/validation document. Then verify the separately
-named active remote product branch/HEAD/tree, recent commits/diff and CI through
-GitHub when material. The canonical handoff branch is documentation/current-
-state authority only; it never substitutes for exact executable-source
+state before recommending or authorizing work. Resolve current remote `develop`,
+the primary/default startup integration reference, and read, in order, its
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded `docs/PROJECT_STATUS.md`,
+bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and relevant current architecture/
+validation documents. Then separately verify the active remote product branch
+and exact executable HEAD/tree, recent commits/diff and CI through GitHub when
+material. The compatibility/history mirror is optional, never a required first
+startup hop. Startup documentation never substitutes for exact executable-source
 admission. Read `docs/history/INDEX.md` or an immutable legacy snapshot only
 when older provenance, incident reconstruction, predecessor semantics, or
 disputed historical evidence is actually necessary. Git-tracked canonical docs
@@ -521,29 +521,35 @@ branch has already moved unexpectedly or a partial remote state exists, STOP,
 review that state explicitly, and reconcile it before any further update. Never
 continue by serially appending the remaining files.
 
-## Canonical bounded handoff/history branch
+## Default startup integration reference and optional history mirror
 
-`feature/project-history-storage-foundation` is the ongoing canonical branch
-for bounded new-chat reconstruction. It must remain ancestry-compatible with
-the accepted product lineage:
+Current remote `develop` is the primary/default reference for bounded new-chat
+reconstruction. Read its standing rules and bounded status/handoff in the order
+above, then relevant architecture/validation documents. Executable-source
+authority always comes from the separately verified active product branch and
+exact executable HEAD/tree. Immutable legacy megafiles remain targeted-retrieval
+only.
 
-1. close an accepted checkpoint's bounded status/handoff/docs on the active
-   product lineage first;
-2. require that docs descendant to be terminal/accepted under its applicable
-   gate;
-3. fast-forward `feature/project-history-storage-foundation` to that exact same
-   descendant;
-4. do not create independent source or handoff commits only on the canonical
-   branch;
-5. never merge, rebase, cherry-pick, force-update, or resolve divergence merely
-   to make the canonical branch look current; a non-fast-forward state is a
-   reconciliation STOP.
+`feature/project-history-storage-foundation` may remain a synchronized
+compatibility/history mirror; it is not a required first startup hop. The
+post-history-merge fast-forward to `ec3572994558abed1c354766d65ec0a8aad14aa0`
+is complete, not a pending action.
 
-The canonical branch is optimized for new-chat startup: routine reconstruction
-uses its bounded status/handoff documents and current architecture pointers,
-while immutable legacy megafiles remain targeted-retrieval only. Executable
-source authority always comes from the separately verified active product
-branch and exact HEAD/tree.
+The mirror must never become an independent development lineage:
+
+1. close accepted checkpoint documentation on its reviewed product/integration
+   lineage, with the applicable gate terminal and accepted;
+2. integrate only under separate repository-control authority; a pending feature
+   checkpoint does not move `develop` or the mirror;
+3. any separately authorized mirror synchronization must be fast-forward-only
+   to an exact accepted integration descendant, without mirror-only commits;
+4. any divergence from accepted integration ancestry is a STOP/reconciliation
+   condition; never manufacture convergence with merge, rebase, cherry-pick, or
+   force-push.
+
+Mirror maintenance does not replace automatic next-step continuation after
+checkpoint acceptance or create a second implementation state, cleanup commit,
+or planned push-triggered CI attempt for the same logical checkpoint.
 
 ## ChatGPT-direct bounded-commit local catch-up
 

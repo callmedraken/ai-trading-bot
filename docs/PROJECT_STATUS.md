@@ -202,10 +202,18 @@ not a side effect of accepting D1R5 PASS.
 
 ### Now
 
-- Keep repository-default `develop` and
-  `feature/project-history-storage-foundation` synchronized to the same
-  accepted merge descendant after terminal CI; the handoff ref update must not
-  create a second implementation/source state or another planned CI cycle.
+- Use current remote `develop` as the primary/default startup integration
+  reference. Read `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+  status and handoff, then relevant architecture/validation documents; separately
+  verify the active product branch and exact executable HEAD/tree.
+- The accepted integration and mirror synchronization are complete at HEAD
+  `ec3572994558abed1c354766d65ec0a8aad14aa0`, TREE
+  `5041c469c6d22c11bc465bdbe0ed330cae9aa8c8`.
+  `feature/project-history-storage-foundation` may remain a synchronized
+  compatibility/history mirror, never a required first startup hop or independent
+  development lineage. Any divergence from accepted integration ancestry is a
+  STOP/reconciliation condition; never manufacture convergence with merge,
+  rebase, cherry-pick, or force-push. This feature checkpoint moves neither ref.
 - Enforce the one-checkpoint/one-atomic-push/one-push-triggered-CI rule. GitHub
   CI is admission, not the normal debugging loop; any later correction after a
   terminal failure is a separately declared corrective checkpoint.
@@ -221,8 +229,10 @@ not a side effect of accepting D1R5 PASS.
 
 ### Next
 
-- Design and source-review the exact D1-session authorization boundary that may
-  consume the accepted D1R5 PASS without expanding authority implicitly.
+- ChatGPT/Sol High should freeze the architecture and source/design-review the
+  separate D1-session authorization checkpoint that may consume the accepted
+  D1R5 PASS without expanding authority implicitly. Freeze the contract before
+  implementation; this workflow checkpoint has no D1-session implementation.
 - Define any scheduler retirement/replacement operation separately if it is
   still needed; require its own effect budget, durable fencing and independent
   reconciliation.

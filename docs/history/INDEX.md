@@ -9,21 +9,23 @@ part of routine startup. Current state belongs in:
 - `docs/AI_TRADING_BOT_HANDOFF.md`;
 - the relevant current architecture or validation document.
 
-## Canonical new-chat handoff branch
+## Default startup reference and compatibility/history mirror
 
-The ongoing canonical bounded handoff/history branch is:
+Current remote `develop` is the primary/default startup integration reference.
+New chats read, in order, its `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`,
+bounded `docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, then
+relevant architecture/validation documents. Separately verify the active remote
+product branch and exact executable HEAD/tree/CI before source or protected work.
+Startup documentation grants no executable-source or trading authority.
 
-`feature/project-history-storage-foundation`
-
-New chats should resolve that branch first for `AGENTS.md`,
-`docs/AI_DEVELOPMENT_WORKFLOW.md`, `docs/PROJECT_STATUS.md`, and
-`docs/AI_TRADING_BOT_HANDOFF.md`. The branch must remain a fast-forward mirror
-of the latest accepted bounded-docs descendant of the active product lineage;
-it must not carry an independent source history.
-
-This branch does not grant executable-source or trading authority. After reading
-it, separately verify the active product branch and exact HEAD/tree/CI before
-source or protected work.
+`feature/project-history-storage-foundation` may remain a synchronized
+compatibility/history mirror, never a required first startup hop or independent
+development lineage. The accepted fast-forward to
+`ec3572994558abed1c354766d65ec0a8aad14aa0` is complete. Any divergence from
+accepted integration ancestry is a STOP/reconciliation condition; never
+manufacture convergence with merge, rebase, cherry-pick, or force-push. Any
+separately authorized synchronization must be fast-forward-only to an exact
+accepted integration descendant, without mirror-only commits.
 
 ## Immutable HIST-2B snapshot
 
@@ -70,7 +72,7 @@ Use the authoritative contract rather than copying its historical narrative:
 
 For a historical question, use this order:
 
-1. current status and handoff from the canonical handoff branch;
+1. bounded current status and handoff from current remote `develop`;
 2. this index for historical routing;
 3. the referenced architecture or validation document;
 4. the legacy snapshot only when deeper chronological reconstruction is

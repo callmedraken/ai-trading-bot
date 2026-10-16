@@ -10816,7 +10816,7 @@ def _arch134_production_paper_runtime_authority_check(
             expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
-            expected_pin = _arch140a17_current_inventory_test_pin(
+            expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
             if _git_blob_sha1(path) != expected_pin:
@@ -11591,6 +11591,34 @@ def _arch140a17_current_inventory_test_pin(relative: str, predecessor: str) -> s
     return ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
 
 
+# GUI-A18 succeeds A17 for the one current inventory assertion it updates.
+ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "e1d74224317534373f2374bb0b90d927e80e8247"
+    ),
+}
+
+
+def _arch140a18_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    material = json.dumps(
+        ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(material).hexdigest()
+        != "dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3"
+    ):
+        raise ValueError("140-A18 frozen A17 predecessor drift")
+    if set(ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py"
+    }:
+        raise ValueError("140-A18 unreviewed current inventory override")
+    predecessor = _arch140a17_current_inventory_test_pin(relative, predecessor)
+    if relative in ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]:
+            raise ValueError("140-A18 wrong before pin")
+    return ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
 def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
     if set(ARCH134_D1R5_TEST_PIN_OVERRIDES) != {
         "tests/scripts/certification_runner/test_profiles.py",
@@ -11624,7 +11652,7 @@ def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
-            expected_pin = _arch140a17_current_inventory_test_pin(
+            expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
             if _git_blob_sha1(repo_root / relative) != expected_pin:
@@ -11740,7 +11768,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
-            expected_pin = _arch140a17_current_inventory_test_pin(
+            expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
             if _git_blob_sha1(repo_root / relative) != expected_pin:
@@ -11754,7 +11782,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
-            expected_pin = _arch140a17_current_inventory_test_pin(
+            expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
             if _git_blob_sha1(repo_root / relative) != expected_pin:
@@ -11777,7 +11805,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
-            expected_pin = _arch140a17_current_inventory_test_pin(
+            expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
             if _git_blob_sha1(repo_root / relative) != expected_pin:

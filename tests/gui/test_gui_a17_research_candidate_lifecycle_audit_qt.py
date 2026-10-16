@@ -418,11 +418,11 @@ def test_actual_inventory_and_gui_stays_legacy():
     } == {
         "full": 179,
         "robinhood": 98,
-        "legacy": 221,
-        "exhaustive": 400,
+        "legacy": 222,
+        "exhaustive": 401,
     }
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 64
-    assert len([path for path in inventory if path.startswith("tests/gui/")]) == 50
+    assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51
     relative = Path(__file__).relative_to(ROOT).as_posix()
     assert relative in run_test_certification.select_inventory(inventory, "legacy")
     assert relative not in run_test_certification.select_inventory(inventory, "full")
@@ -430,16 +430,30 @@ def test_actual_inventory_and_gui_stays_legacy():
 
 def test_exact_successor_pins_and_frozen_a16_digest():
     before = checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
-    after = checkpoint_runner.ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    a17 = checkpoint_runner.ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    after = checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     assert sha256(json.dumps(before, sort_keys=True).encode()).hexdigest() == A16_DIGEST
-    assert sha256(json.dumps(after, sort_keys=True).encode()).hexdigest() == A17_DIGEST
-    assert set(before) == set(after) and len(after) == 7
+    assert sha256(json.dumps(a17, sort_keys=True).encode()).hexdigest() == A17_DIGEST
+    assert set(before) == set(a17) and len(a17) == 7
+    assert set(after) == {"tests/scripts/certification_runner/test_profiles.py"}
     for path, pin in before.items():
         assert (
             checkpoint_runner._arch140a17_current_inventory_test_pin(path, pin)
-            == after[path]
+            == a17[path]
         )
-        assert checkpoint_runner._git_blob_sha1(ROOT / path) == after[path]
+    assert (
+        checkpoint_runner._arch140a18_current_inventory_test_pin(
+            "tests/scripts/certification_runner/test_profiles.py",
+            before["tests/scripts/certification_runner/test_profiles.py"],
+        )
+        == after["tests/scripts/certification_runner/test_profiles.py"]
+    )
+    assert (
+        checkpoint_runner._git_blob_sha1(
+            ROOT / "tests/scripts/certification_runner/test_profiles.py"
+        )
+        == after["tests/scripts/certification_runner/test_profiles.py"]
+    )
     assert (
         checkpoint_runner._arch140a17_current_inventory_test_pin("other", "a" * 40)
         == "a" * 40
@@ -480,6 +494,18 @@ def test_wrong_before_pin_rejected():
         checkpoint_runner._arch140a17_current_inventory_test_pin(
             "tests/scripts/certification_runner/test_profiles.py",
             "0" * 40,
+        )
+
+
+def test_a18_overlay_rejects_a17_predecessor_drift(monkeypatch):
+    pins = dict(checkpoint_runner.ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
+    pins["tests/scripts/certification_runner/test_profiles.py"] = "0" * 40
+    monkeypatch.setattr(
+        checkpoint_runner, "ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES", pins
+    )
+    with pytest.raises(ValueError, match="140-A18 frozen A17 predecessor drift"):
+        checkpoint_runner._arch140a18_current_inventory_test_pin(
+            "tests/scripts/certification_runner/test_profiles.py", "0" * 40
         )
 
 
@@ -560,7 +586,7 @@ def test_workflow_bytes_and_five_resolver_sites_unchanged():
         sum(
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)
-            and node.func.id == "_arch140a17_current_inventory_test_pin"
+            and node.func.id == "_arch140a18_current_inventory_test_pin"
             for node in ast.walk(tree)
         )
         == 5

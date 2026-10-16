@@ -447,14 +447,25 @@ def test_arch140_successor_override_fails_closed(monkeypatch, mutation, check):
 
 
 def test_arch140_exact_seven_successor_blobs():
-    pins = checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
-    assert set(pins) == set(
-        checkpoint_runner.ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    predecessor = checkpoint_runner.ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    pins = checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    assert set(predecessor) == set(
+        checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     )
-    for path, pin in pins.items():
+    assert set(pins) == {"tests/scripts/certification_runner/test_profiles.py"}
+    for (
+        path,
+        pin,
+    ) in checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.items():
         assert checkpoint_runner._git_blob_sha1(ROOT / path) == (
-            checkpoint_runner._arch140a17_current_inventory_test_pin(path, pin)
+            checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
         )
+    assert (
+        checkpoint_runner._git_blob_sha1(
+            ROOT / "tests/scripts/certification_runner/test_profiles.py"
+        )
+        == pins["tests/scripts/certification_runner/test_profiles.py"]
+    )
 
 
 def test_arch140_frozen_139b2_overlay():

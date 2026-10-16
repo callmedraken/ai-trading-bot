@@ -18,6 +18,9 @@ from trading_bot.gui.research_candidate_lifecycle_audit import (
     ZERO_EFFECT_NOTICE,
     compose_lifecycle_audit,
 )
+from trading_bot.gui.research_candidate_lifecycle_boundary_map import (
+    compose_lifecycle_boundary_map,
+)
 from trading_bot.gui.research_candidate_lifecycle_models import (
     RANK_NOTICE,
     ResearchCandidateLifecyclePageState,
@@ -33,6 +36,7 @@ class ResearchCandidateLifecyclePage(QWidget):
             raise TypeError("Exact lifecycle page state required")
         self._state = state
         audit = compose_lifecycle_audit(state)
+        boundary_map = compose_lifecycle_boundary_map(audit)
         self.setObjectName("researchCandidateLifecyclePage")
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -79,6 +83,25 @@ class ResearchCandidateLifecyclePage(QWidget):
         )
         evidence = state.evidence
         if evidence is not None:
+            section("Lifecycle boundary map")
+            grid = QGridLayout()
+            target.addLayout(grid)
+            for column, heading in enumerate(
+                ("Boundary", "Recorded status", "Authority meaning")
+            ):
+                widget = label(heading, "researchLifecycleBoundaryHeading")
+                target.removeWidget(widget)
+                grid.addWidget(widget, 0, column)
+            grid.setColumnStretch(0, 2)
+            grid.setColumnStretch(1, 1)
+            grid.setColumnStretch(2, 4)
+            for index, row in enumerate(boundary_map.rows, start=1):
+                for column, value in enumerate(
+                    (row.boundary, row.recorded_status, row.authority_meaning)
+                ):
+                    widget = label(str(value), "researchLifecycleBoundaryValue")
+                    target.removeWidget(widget)
+                    grid.addWidget(widget, index, column)
             section("Governance / authority boundary")
             for row in audit.governance:
                 label(f"{row.label}: {row.value}")

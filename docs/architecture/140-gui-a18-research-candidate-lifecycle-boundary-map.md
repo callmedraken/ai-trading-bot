@@ -78,7 +78,7 @@ A17 overlay digest
 Because the current inventory-count assertions record the new GUI test module,
 the checkpoint runner adds an A18 overlay for the same seven current inventory
 test paths as A17, pinned to their exact current blobs. The A18 overlay digest
-is `d32e6ddc279e85277264d94a55ecae5cb63aaedd8d684011dca57bf36d008624`, and
+is `a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`, and
 its resolver validates the A17 predecessor before returning current blobs.
 
 The resulting source inventory is:

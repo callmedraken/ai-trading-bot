@@ -11597,7 +11597,7 @@ ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
         "e1d74224317534373f2374bb0b90d927e80e8247"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "86983548335e090751e14cd7632c0132032a1e88"
+        "7812c989b5c358ca0788bdaabd8febc664fa835f"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
         "1af48ae395c03801a7fdbe86804cf4845d141427"

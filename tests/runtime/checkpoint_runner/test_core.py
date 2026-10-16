@@ -205,6 +205,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-armed-paper-mvp",
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
+        "arch134-d1r7-d1-session-authorization",
         "arch134-d1r6-overnight-wake-arming",
         "arch134-d1r5-pre-market-wake-qualification",
         "arch134-alpaca-authentication-qualification",
@@ -350,6 +351,10 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         if spec.name == "arch134-alpaca-authentication-qualification":
             expected_branch = (
                 "feature/robinhood-production-paper-alpaca-auth-qualification"
+            )
+        if spec.name == "arch134-d1r7-d1-session-authorization":
+            expected_branch = (
+                "feature/robinhood-production-paper-d1-session-authorization"
             )
         if spec.name == "arch134-d1r6-overnight-wake-arming":
             expected_branch = "feature/robinhood-production-paper-overnight-wake-arming"
@@ -871,6 +876,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_AUTH_NAME,
             runner.ARCH134_D1R5_NAME,
             runner.ARCH134_D1R6_NAME,
+            runner.ARCH134_D1R7_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
@@ -1325,6 +1331,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                "arch134-d1r7-d1-session-authorization",
                 "arch134-d1r6-overnight-wake-arming",
                 "arch134-d1r5-pre-market-wake-qualification",
                 "arch134-alpaca-authentication-qualification",

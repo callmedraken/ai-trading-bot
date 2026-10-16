@@ -459,7 +459,10 @@ def test_arch140_exact_seven_successor_blobs():
     ) in checkpoint_runner.ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.items():
         a18_pin = checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
         assert checkpoint_runner._git_blob_sha1(ROOT / path) == (
-            checkpoint_runner._canonical_current_inventory_test_pin(path, a18_pin)
+            checkpoint_runner._arch134_d1r7_test_pin(
+                path,
+                checkpoint_runner._canonical_current_inventory_test_pin(path, a18_pin),
+            )
         )
 
 

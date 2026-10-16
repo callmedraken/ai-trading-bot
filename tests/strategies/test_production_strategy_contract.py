@@ -85,7 +85,9 @@ def test_arch138_successor_preserves_unmodified_d1r5_pins() -> None:
     overrides = checkpoint_runner.ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
         if relative not in overrides:
-            expected = checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            expected = checkpoint_runner._arch134_d1r7_test_pin(
+                relative, checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            )
             assert checkpoint_runner._git_blob_sha1(root / relative) == expected
     assert checkpoint_runner._arch134_d1r5_authority_check(root) == ()
 
@@ -122,11 +124,16 @@ def test_arch140a18_successor_pins_match_and_preserve_unmodified_d1r5_pins():
     overrides = checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     assert set(overrides) == set(predecessor)
     for relative, pin in overrides.items():
-        current = checkpoint_runner._canonical_current_inventory_test_pin(relative, pin)
+        current = checkpoint_runner._arch134_d1r7_test_pin(
+            relative,
+            checkpoint_runner._canonical_current_inventory_test_pin(relative, pin),
+        )
         assert checkpoint_runner._git_blob_sha1(root / relative) == current
     for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
         if relative not in predecessor:
-            expected = checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            expected = checkpoint_runner._arch134_d1r7_test_pin(
+                relative, checkpoint_runner._arch134_d1r6_test_pin(relative, pin)
+            )
             assert checkpoint_runner._git_blob_sha1(root / relative) == expected
     for check in (
         checkpoint_runner._arch134_production_paper_runtime_authority_check,
@@ -388,7 +395,7 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         NAME,
         "arch134-production-strategy-decision",
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 65
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 66
 
     root = Path(certification.__file__).resolve().parents[1]
     inventory = certification.discover_inventory(root)
@@ -397,10 +404,10 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 180,
-        "robinhood": 99,
+        "full": 181,
+        "robinhood": 100,
         "legacy": 222,
-        "exhaustive": 402,
+        "exhaustive": 403,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

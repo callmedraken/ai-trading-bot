@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "ff89ddae999860ebcea1513aee3116d0df7988285731ec7c16222f0448118424"
+    "2b9e0aab0b9c113b1836d231ebd55628fc4d50d0e586d79981cef5c7e338bb0d"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -196,6 +196,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-d1r7-d1-session-authorization",
     "arch134-d1r6-overnight-wake-arming",
     "arch134-d1r5-pre-market-wake-qualification",
     "arch134-alpaca-authentication-qualification",
@@ -211,6 +212,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-d1r7-d1-session-authorization": "robinhood",
     "arch134-d1r6-overnight-wake-arming": "robinhood",
     "arch134-d1r5-pre-market-wake-qualification": "robinhood",
     "arch134-alpaca-authentication-qualification": "robinhood",
@@ -322,9 +324,11 @@ def resolve_ci_certification_profile(checkpoint: str | None) -> str | None:
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze active routing, CI-owned certification, broad fallback and aggregation.
-    # The frozen workflow lists the D1R5 baseline; D1R6 routes dynamically.
+    # The frozen D1R5 fallback stays unchanged; D1R6 and D1R7 route dynamically.
     workflow_active = tuple(
-        name for name in ACTIVE_CI_CHECKPOINTS if name != ARCH134_D1R6_NAME
+        name
+        for name in ACTIVE_CI_CHECKPOINTS
+        if name not in {ARCH134_D1R6_NAME, ARCH134_D1R7_NAME}
     )
     checkpoint_block = (
         "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
@@ -10826,6 +10830,7 @@ def _arch134_production_paper_runtime_authority_check(
                 relative, expected_pin
             )
             expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11828,6 +11833,7 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
         if set(ARCH134_D1R6_SOURCE_PINS) != set(ARCH134_D1R6_PATHS):
             failures.append("134-D1R6 unreviewed source override")
         for relative, pin in ARCH134_D1R6_SOURCE_PINS.items():
+            pin = _arch134_d1r7_test_pin(relative, pin)
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R6 source drift: " + relative)
         for relative in ARCH134_D1R6_TEST_PIN_OVERRIDES:
@@ -11837,7 +11843,12 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
                     relative, ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS.get(relative)
                 ),
             )
-            expected = _canonical_current_inventory_test_pin(relative, expected)
+            # D1R6 has already resolved these pins. Only the seven integrated
+            # inventory paths have a further canonical successor; the fallback
+            # must not pass a resolved pin into D1R6's strict predecessor gate.
+            if relative in CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+                expected = _canonical_current_inventory_test_pin(relative, expected)
+            expected = _arch134_d1r7_test_pin(relative, expected)
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("134-D1R6 successor drift: " + relative)
         if (
@@ -11959,6 +11970,7 @@ def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R5 source drift: " + relative)
         for relative, allowed in ARCH134_D1R5_IMPORTS.items():
@@ -12076,6 +12088,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
@@ -12091,6 +12104,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
@@ -12115,6 +12129,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
@@ -12642,6 +12657,275 @@ def _arch134_runtime_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# D1R7 is a final bounded successor overlay; every earlier dictionary stays frozen.
+ARCH134_D1R7_NAME: Final = "arch134-d1r7-d1-session-authorization"
+ARCH134_D1R7_BRANCH: Final = (
+    "feature/robinhood-production-paper-d1-session-authorization"
+)
+ARCH134_D1R7_PATHS: Final = (
+    "src/trading_bot/review_paper/d1_session_authorization.py",
+    "src/trading_bot/review_paper/d1_session_authorization_host.py",
+    "scripts/run_arch134_d1r7.py",
+    "tests/review_paper/test_d1_session_authorization.py",
+    "docs/architecture/134-d1r7-d1-session-authorization.md",
+    "docs/validation/arch134-d1r7-d1-session-authorization.md",
+)
+ARCH134_D1R7_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/d1_session_authorization.py": (
+        "acb7b549160737343020603faf094e65f477bc86"
+    ),
+    "src/trading_bot/review_paper/d1_session_authorization_host.py": (
+        "dee1f1d978ddb72f9c3e78268c1401cfa91908c1"
+    ),
+    "scripts/run_arch134_d1r7.py": ("9e10464dacfe49c186b683fa107fc0fa1eb06dd8"),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "89985d9c7caf4275f14a23b9bae177f1d5d6bc35"
+    ),
+    "docs/architecture/134-d1r7-d1-session-authorization.md": (
+        "7d8aeadc2dc983628026d89e813531191952a197"
+    ),
+    "docs/validation/arch134-d1r7-d1-session-authorization.md": (
+        "80ba625fa95d991b09ce7640ea1477c783380e79"
+    ),
+}
+ARCH134_D1R7_PREDECESSOR_TEST_PINS: Final = {
+    "tests/gui/test_gui_a16_research_candidate_lifecycle_composition.py": (
+        "29acabcaeed972637eccd8deae3d18983418292d"
+    ),
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "90dabcf4aa057a0e1a9bf83c60b36d41e20d695f"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "a22e1cdbc48e76040082d9b21da72b1e4909c661"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "de7a77d3b0cf58fd9d5d58450181f8a1957fc7b2"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "e3a85fd7a71e9e83c89faf60bf25dea6d26a49d2"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "127db46d0211570727c2a9fb6118bb8f6a3b45d2"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "3c1fafd75920ba3346918fd3c44fb3a390e73678"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "292f4b3fa8fc3b667f6b60c6498da99aa8b687b5"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "99efdaa678ef63541f3c583d7c3bcb5f965c357b"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "b189e5ba3a792f7f0375b1df228cb706134e6fb6"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "ae8df8b5b3e32c84028ace2103f5b932635edea1"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "588d9d71bf2e6513754e7a0ec8e2c2627b435458"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "ea7ca9f8a0ec33449f70101e2e27aa72d2f27a39"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "36f5849f5df62682713860f053b87879b97d37cc"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "0093fdf868065d4dff932427b037b21f74f1bbff"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "4721a9ba5e2fc6a052ab7c6f1066b9ef924a7117"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "1b6447063b1401cf1d930b71e0ec703287623b77"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "6d5a7eaa49cbe6a9c67900d8e0ae99476cded215"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "4fae6dc080f6b9080025cc4dc2860725cbbaa1f8"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "d608cad8d3b5c4d52373e7b4ea4d5b0b23ad7748"
+    ),
+}
+ARCH134_D1R7_TEST_PIN_OVERRIDES: Final = {
+    "tests/gui/test_gui_a16_research_candidate_lifecycle_composition.py": (
+        "cc08251a8d4738ddb03ab8e89e7a18d2efd35039"
+    ),
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "b8cf5ec928475f95c657dd25f7b66ff4f9e0fa5a"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "47d3314696b0c3669dee26fe23faaaeb13b25b63"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "29b5b9a865021ddc55d45661cdeec3d344076856"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "cfe36905819f4cc0eb2272b8f4f0eb615905081d"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "712cd081e20442a0a83ad41c362ccc467283a5cc"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "76dd6c121c0e5cf3e83540bb08dce76a5ec04944"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "6847395a4bf937d64ef4d4cbf639706ae8dea97b"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "06206b41712a332cba80562f761fb2a5b9fdb272"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "e14511f1647628c95bccf44341d2760c5cd00e87"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "41be1b2eac4cff05298d8320761bb306157f7835"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "374edb6bd516e8d726eef71e9ce8d74797879b81"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "a5b36071b80c09abd6f5728e633cf09fd5e1230f"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "695a690c83bb6406688f9986314cab038bd3fff7"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "10fac0222eeac1d15487952f874735f171cdc7e0"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "1c27d44ce445d2cc17f8690196350c3972a01236"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "7bb200a28c2b46549550ba3a528ac43611c593c2"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "4fd45c4ddc734fbe0bc023ac05f84dbe9ec5c1ac"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "6acf5524e7a113d45e43a3e4d0d41e4495d4854a"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "c8f4911b0dc22f7daf0f71ef36de032ae7d9be44"
+    ),
+}
+ARCH134_D1R7_PREDECESSOR_DIGESTS: Final = {
+    "ARCH134_D1R5_TEST_PIN_OVERRIDES": (
+        "6a95f4afc8640dfa0c672f5d77cda06ae57171c0199128a3ddd1d8b0debaac4a"
+    ),
+    "ARCH134_D1R5_SOURCE_PINS": (
+        "370e14ff9a9453b4e001278921c3d1084c6ff94c8e34be76d430cb2b2adae575"
+    ),
+    "ARCH134_D1R5_IMPORTS": (
+        "1e00ebdb9916d624591ecf41818a458dabf545cb8654c5e93f1e4e6e35402f03"
+    ),
+    "ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "00a2195aca3ca844209f27437ebce3e179cc2060aaa8c334999180c7b5b4094f"
+    ),
+    "ARCH134_D1R6_TEST_PIN_OVERRIDES": (
+        "dfe1999400e0a6fdea245ccdd7d77a62e49aa1a169dbd42c0f89e2e88868ef4b"
+    ),
+    "ARCH134_D1R6_PREDECESSOR_DIGESTS": (
+        "f17583c1a1e519c001acb9d3751ec3c0cdcbe1974589580c1836e75c3ac2e3bf"
+    ),
+    "ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS": (
+        "572d83c4a3938678894c0cb9072c182373fbce4f596c4b66c26b51f07e2089ab"
+    ),
+    "ARCH134_D1R6_SOURCE_PINS": (
+        "bbf14101519464b7cd4495e32b5b402a845befd89e2ef1e9a1597efb0e236425"
+    ),
+    "CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "1e00670b28dfbad915c34ec4657143deb40a0b7932207c302f9ea87ab12c7d51"
+    ),
+}
+ARCH134_D1R7_PREDECESSOR_TEST_PINS_SHA256: Final = (
+    "a07ac0ce7dbb1ae2ddab299f3839a778bd469b5e7aa3ff65f044942a7f895aaa"
+)
+ARCH134_D1R7_REVIEWED_TEST_PINS_SHA256: Final = (
+    "15925f6d9c6e3e9407ac8893b36be95a1eb53b5704430ac94ac5471c5bfabb37"
+)
+ARCH134_D1R7_TESTS: Final = (
+    "tests/review_paper/test_d1_session_authorization.py",
+    *ARCH134_D1R6_TESTS,
+)
+ARCH134_D1R7_RUFF_PATHS: Final = (
+    *(p for p in ARCH134_D1R7_PATHS if p.endswith(".py")),
+    *ARCH134_D1R7_TEST_PIN_OVERRIDES,
+    *ARCH134_D1R6_RUFF_PATHS,
+)
+
+
+def _arch134_d1r7_test_pin(relative: str, predecessor: str) -> str:
+    """Apply only after historical/canonical resolution; reject all drift."""
+
+    def digest(value: object) -> str:
+        return hashlib.sha256(
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    if (
+        set(ARCH134_D1R7_TEST_PIN_OVERRIDES) != set(ARCH134_D1R7_PREDECESSOR_TEST_PINS)
+        or any(
+            not p.startswith("tests/") or not p.endswith(".py")
+            for p in ARCH134_D1R7_TEST_PIN_OVERRIDES
+        )
+        or digest(ARCH134_D1R7_TEST_PIN_OVERRIDES)
+        != ARCH134_D1R7_REVIEWED_TEST_PINS_SHA256
+        or digest(ARCH134_D1R7_PREDECESSOR_TEST_PINS)
+        != ARCH134_D1R7_PREDECESSOR_TEST_PINS_SHA256
+    ):
+        raise ValueError("D1R7 successor overlay drift")
+    for name, expected in ARCH134_D1R7_PREDECESSOR_DIGESTS.items():
+        if digest(globals()[name]) != expected:
+            raise ValueError("D1R7 frozen predecessor drift")
+    if relative in ARCH134_D1R7_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH134_D1R7_PREDECESSOR_TEST_PINS[relative]:
+            raise ValueError("D1R7 predecessor resolution drift")
+        return ARCH134_D1R7_TEST_PIN_OVERRIDES[relative]
+    return predecessor
+
+
+def _arch134_d1r7_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only successor: real publication/effects have no runner surface."""
+    failures = list(_arch134_d1r6_authority_check(repo_root))
+    try:
+        if set(ARCH134_D1R7_SOURCE_PINS) != set(ARCH134_D1R7_PATHS):
+            failures.append("D1R7 source pin set drift")
+        for relative, pin in ARCH134_D1R7_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("D1R7 source drift: " + relative)
+        for relative, predecessor in ARCH134_D1R7_PREDECESSOR_TEST_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1r7_test_pin(
+                relative, predecessor
+            ):
+                failures.append("D1R7 successor drift: " + relative)
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("D1R7 workflow fallback drift")
+        spec = _checkpoint_specs()[ARCH134_D1R7_NAME]
+        if (
+            spec.remote_branch != ARCH134_D1R7_BRANCH
+            or spec.tests != ARCH134_D1R7_TESTS
+            or spec.ruff_paths != ARCH134_D1R7_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1r7_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_D1R7_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_D1R7_NAME) != "robinhood"
+        ):
+            failures.append("D1R7 source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("D1R7 authority unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -12755,6 +13039,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_D1R7_NAME: CheckpointSpec(
+            name=ARCH134_D1R7_NAME,
+            description="Architecture 134-D1R7 prerequisite evidence source only",
+            tests=ARCH134_D1R7_TESTS,
+            ruff_paths=ARCH134_D1R7_RUFF_PATHS,
+            authority_check=_arch134_d1r7_authority_check,
+            remote_branch=ARCH134_D1R7_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         ARCH134_D1R6_NAME: CheckpointSpec(
             name=ARCH134_D1R6_NAME,
             description="Architecture 134-D1R6 source-only overnight wake arming",

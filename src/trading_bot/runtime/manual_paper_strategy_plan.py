@@ -9,15 +9,12 @@ from datetime import UTC, datetime
 from decimal import Context, Decimal, InvalidOperation, localcontext
 from enum import StrEnum
 from hashlib import sha256
-from types import MappingProxyType
 from typing import Any
 from uuid import UUID, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from trading_bot.backtesting import BacktestContext
-from trading_bot.domain import OrderSide, Position, Symbol, TradeProposal
+from trading_bot.domain import OrderSide, Symbol, TradeProposal
 from trading_bot.ledger import (
-    AccountSnapshot,
     CompactPaperLedgerPosition,
     CompactPaperLedgerState,
 )
@@ -80,7 +77,11 @@ from trading_bot.runtime.verified_snapshot_preparation import (
 )
 from trading_bot.strategies import (
     MovingAverageCrossoverConfig,
-    MovingAverageCrossoverStrategy,
+    MovingAverageCrossoverStrategy,  # noqa: F401 - retained compatibility test seam
+)
+from trading_bot.strategies.daily_decision import (
+    DailyStrategyDecisionError,
+    evaluate_daily_strategy_decision,
 )
 
 MANUAL_PAPER_STRATEGY_PLAN_SCHEMA = "manual-paper-strategy-plan/v1"
@@ -1173,18 +1174,18 @@ def _prepare_decision_from_evidence(
     )
     run_id = uuid5(MANUAL_PAPER_STRATEGY_CONTEXT_NAMESPACE, context_material)
     step_index = prior.sequence
-    context = _strategy_context(
-        run_id,
-        step_index,
-        current.bar,
-        replay.target_session,
-        verified_seed.seed.bars,
-        prior.compact_state,
-    )
-    # Architecture 94 requires exactly one existing strategy evaluation per plan.
-    strategy_proposal = MovingAverageCrossoverStrategy(strategy_config).evaluate(
-        context
-    )
+    try:
+        strategy_proposal = evaluate_daily_strategy_decision(
+            run_id=run_id,
+            step_index=step_index,
+            current_bar=current.bar,
+            target_session=replay.target_session,
+            seed_bars=verified_seed.seed.bars,
+            compact=prior.compact_state,
+            strategy_config=strategy_config,
+        )
+    except DailyStrategyDecisionError as error:
+        raise ManualPaperStrategyPlanValidationError(str(error)) from error
     signal_status = (
         ManualPaperStrategySignalStatus.NO_SIGNAL
         if strategy_proposal is None
@@ -1446,56 +1447,6 @@ def _validate_prepared_chronology(
         raise ManualPaperStrategyPlanValidationError(
             "filled_at must name the intended execution session"
         )
-
-
-def _strategy_context(
-    run_id: UUID,
-    step_index: int,
-    current_bar,
-    target_session,
-    seed_bars,
-    compact: CompactPaperLedgerState,
-) -> BacktestContext:
-    positions = {
-        item.symbol: Position(item.symbol, item.quantity, item.average_cost)
-        for item in compact.positions
-    }
-    with localcontext(_ARITHMETIC_CONTEXT):
-        market_value = sum(
-            (item.quantity * current_bar.close for item in compact.positions),
-            start=_ZERO,
-        )
-        unrealized = sum(
-            (
-                (current_bar.close - item.average_cost) * item.quantity
-                for item in compact.positions
-            ),
-            start=_ZERO,
-        )
-        equity = compact.cash + market_value
-    if equity <= _ZERO:
-        raise ManualPaperStrategyPlanValidationError(
-            "verified marked account equity must be positive"
-        )
-    account = AccountSnapshot(
-        current_bar.timestamp,
-        compact.cash,
-        market_value,
-        equity,
-        compact.cash,
-        compact.realized_profit_loss,
-        unrealized,
-    )
-    history = tuple(item.bar for item in seed_bars) + (current_bar,)
-    return BacktestContext(
-        run_id,
-        step_index,
-        target_session,
-        current_bar,
-        history,
-        account,
-        MappingProxyType(positions),
-    )
 
 
 def _bridge_target(

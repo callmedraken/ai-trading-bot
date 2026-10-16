@@ -1,5 +1,13 @@
 # GUI-A13 Read-Only Evidence -> Source Page Navigation Validation Plan
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Purpose
 
 Validate Architecture 120,
@@ -14,7 +22,7 @@ Add the Qt-free closed source-page enum/target and mapper.
 Verify:
 
 - exact enum validation;
-- exact closed mapping for all five Evidence sources;
+- exact closed mapping for all six Evidence sources;
 - mismatched source/page pairs fail explicitly;
 - target retains no identifier/hash/path/runtime object;
 - mapper performs no I/O.
@@ -42,7 +50,8 @@ Verify:
 - Paper Account target selects `paper-account`;
 - Market Data target selects `market-data`;
 - Operations target selects `operations`;
-- service call count remains exactly six.
+- Runtime target selects `runtime` without any evidence reread;
+- service acquisition count remains exactly eight.
 
 Do not add destination-page rereads or exact-row-selection claims.
 

@@ -12,9 +12,11 @@ import ast
 import hashlib
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -65,16 +67,62 @@ class CommandOutcome:
     stderr_sha256: str
     stdout_path: str
     stderr_path: str
+    elapsed_seconds: float = 0.0
 
 
-COMMON_TESTS: Final = ("tests/runtime/test_checkpoint_runner.py",)
+COMMON_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+)
 COMMON_RUFF_PATHS: Final = (
     "scripts/checkpoint_runner.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/helpers.py",
+    "tests/runtime/checkpoint_runner/__init__.py",
+)
+ARCH131_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+)
+ARCH131_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+)
+ARCH133_A_G_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+)
+ARCH133_A_G_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+)
+ARCH133_H_K_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+)
+ARCH133_H_K_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+)
+ARCH133_L_M_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+)
+ARCH133_L_M_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+)
+RETAINED_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
+)
+RETAINED_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
 )
 
 
-CI_CHECKPOINTS: Final = (
+RETAINED_CHECKPOINTS: Final = (
     "arch128-parent-acl-repair",
     "arch128-r4",
     "arch128-r5-substrate",
@@ -83,6 +131,22 @@ CI_CHECKPOINTS: Final = (
     "arch128-r7",
     "arch128-r8-terminal-halt",
     "arch130-r8i-d1",
+)
+
+# Reviewed pin of the complete active tuple AST; refresh only with topology review.
+REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    "ff89ddae999860ebcea1513aee3116d0df7988285731ec7c16222f0448118424"
+)
+
+# Registered historical recovery remains closed; it is excluded from active CI.
+ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch133-robinhood-supervised-release-installation-operator",
+    "arch133-robinhood-supervised-deployment-qualification",
+    "arch133-robinhood-supervised-runtime-host-admission",
+    "arch133-robinhood-supervised-maintenance-rebind",
+    "arch133-robinhood-supervised-release-installation",
+    "arch133-robinhood-supervised-release-build-verification",
+    "arch133-robinhood-supervised-release-foundation",
     "arch131-robinhood-review-paper",
     "arch131-robinhood-mcp-schema",
     "arch131-robinhood-paper-cycle",
@@ -112,26 +176,353 @@ CI_CHECKPOINTS: Final = (
     "arch133-robinhood-unattended-one-wake-composition",
     "arch133-robinhood-unattended-review-paper-execution",
     "arch133-robinhood-unattended-host-scheduler-surface",
+    "arch133-robinhood-unattended-host-bootstrap",
+    "arch133-robinhood-unattended-host-publication",
+    "arch133-robinhood-scratch-root-acl-qualification",
+    "arch133-robinhood-retained-root-diagnostic",
+    "arch133-robinhood-retained-root-acl-recovery",
+    "arch133-robinhood-post-publication-verifier",
+    "arch133-robinhood-post-publication-stage-diagnostic",
+    "arch133-robinhood-publication-state-paper-diagnostic",
+    "arch133-robinhood-publication-state-paper-corrected",
+    "arch133-robinhood-single-session-scheduler-installation",
+    "arch133-robinhood-fresh-activation-reprovision",
+    "arch133-robinhood-reprovision-admission-diagnostic",
+    "arch133-robinhood-reprovision-parent-security-diagnostic",
+    "arch133-robinhood-reprovision-parent-policy-diagnostic",
+    "arch133-robinhood-fresh-activation-reprovision-corrected",
+    "arch133-robinhood-reprovision-indeterminate-reconciliation",
+    "arch133-robinhood-reprovision-sealed-predecessor-recovery",
+    "arch133-robinhood-reprovision-recovery-reconciliation",
+    "arch133-robinhood-windows-rename-qualification",
+    "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-d1r6-overnight-wake-arming",
+    "arch134-d1r5-pre-market-wake-qualification",
+    "arch134-alpaca-authentication-qualification",
+    "arch134-armed-paper-mvp",
+    "arch134-production-strategy-contract",
+    "arch134-production-strategy-decision",
+    "arch134-production-strategy-live-paper",
+    "arch134-production-paper-runtime",
+    "arch134-production-paper-runtime-acl",
 )
 
 
+# Canonical certification profiles that GitHub owns for exact active checkpoints.
+# Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
+CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-d1r6-overnight-wake-arming": "robinhood",
+    "arch134-d1r5-pre-market-wake-qualification": "robinhood",
+    "arch134-alpaca-authentication-qualification": "robinhood",
+    "arch134-armed-paper-mvp": "robinhood",
+    "arch134-production-paper-runtime": "robinhood",
+    "arch134-production-paper-runtime-acl": "robinhood",
+}
+CI_CERTIFICATION_PROFILE_VALUES: Final = frozenset({"robinhood", "full"})
+
+
+CI_TEST_DURATION_WEIGHTS: Final = {
+    # Frozen from successful source gate #422 (2026-10-10); unknown tests use 1s.
+    "tests/execution/test_execution_models.py": 0.002,
+    "tests/execution/test_order_engine.py": 0.019,
+    "tests/ledger/test_ledger.py": 0.004,
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": 12.464,
+    "tests/review_paper/test_arch133_fresh_activation_reprovision.py": 7.501,
+    "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py": 8.189,
+    "tests/review_paper/test_arch133_parent_policy_diagnostic.py": 1.474,
+    "tests/review_paper/test_arch133_parent_security_diagnostic.py": 1.054,
+    "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py": 0.295,
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": 6.222,
+    "tests/review_paper/test_arch133_reprovision_recovery.py": 9.650,
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": 6.140,
+    "tests/review_paper/test_arch133_scheduler_installation.py": 25.803,
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": 10.021,
+    "tests/review_paper/test_forward_preview.py": 0.405,
+    "tests/review_paper/test_intent_bridge.py": 0.034,
+    "tests/review_paper/test_nyse_published_regular_sessions.py": 0.065,
+    "tests/review_paper/test_performance.py": 0.106,
+    "tests/review_paper/test_post_publication_stage_diagnostic.py": 2.494,
+    "tests/review_paper/test_post_publication_verifier.py": 1.479,
+    "tests/review_paper/test_prepare_qualification.py": 0.356,
+    "tests/review_paper/test_publication_state_paper_corrected.py": 2.944,
+    "tests/review_paper/test_publication_state_paper_diagnostic.py": 2.726,
+    "tests/review_paper/test_published_session_prepare.py": 0.265,
+    "tests/review_paper/test_retained_root_acl_recovery.py": 0.281,
+    "tests/review_paper/test_retained_root_diagnostic.py": 0.220,
+    "tests/review_paper/test_risk_context.py": 0.267,
+    "tests/review_paper/test_risk_price_acquisition.py": 0.209,
+    "tests/review_paper/test_risk_prices.py": 0.145,
+    "tests/review_paper/test_scratch_root_acl.py": 0.309,
+    "tests/review_paper/test_session_admission.py": 0.111,
+    "tests/review_paper/test_store.py": 0.077,
+    "tests/review_paper/test_supervised_deployment_qualification.py": 8.361,
+    "tests/review_paper/test_supervised_forward_paper.py": 0.438,
+    "tests/review_paper/test_supervised_maintenance_rebind.py": 3.949,
+    "tests/review_paper/test_supervised_release_bundle.py": 20.551,
+    "tests/review_paper/test_supervised_release_foundation.py": 0.538,
+    "tests/review_paper/test_supervised_release_installation.py": 1.782,
+    "tests/review_paper/test_supervised_release_installation_operator.py": 13.822,
+    "tests/review_paper/test_supervised_runtime_host_admission.py": 2.087,
+    "tests/review_paper/test_unattended_activation.py": 0.240,
+    "tests/review_paper/test_unattended_execution.py": 2.264,
+    "tests/review_paper/test_unattended_host.py": 1.256,
+    "tests/review_paper/test_unattended_one_wake.py": 1.923,
+    "tests/review_paper/test_unattended_publication.py": 1.204,
+    "tests/review_paper/test_unattended_state_store.py": 1.437,
+    "tests/risk/test_manager.py": 0.013,
+    "tests/risk/test_risk_models.py": 0.012,
+    "tests/robinhood_mcp/test_account_resolution.py": 0.027,
+    "tests/robinhood_mcp/test_adapter.py": 0.004,
+    "tests/robinhood_mcp/test_sdk_transport.py": 0.010,
+    "tests/robinhood_mcp/test_windows_oauth.py": 0.575,
+    "tests/runtime/checkpoint_runner/test_arch131.py": 25.801,
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py": 5.962,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 34.414,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 72.117,
+    "tests/runtime/checkpoint_runner/test_ci.py": 6.567,
+    "tests/runtime/checkpoint_runner/test_core.py": 0.113,
+    "tests/scripts/certification_runner/test_profiles.py": 1.662,
+    "tests/test_robinhood_forward_paper_cycle.py": 0.173,
+    "tests/test_robinhood_live_qualification_verifier.py": 0.360,
+    "tests/test_robinhood_paper_cycle.py": 0.145,
+    "tests/test_robinhood_paper_operator.py": 0.404,
+    "tests/test_robinhood_paper_pipeline.py": 0.047,
+    "tests/test_robinhood_prepare_operator.py": 0.102,
+    "tests/test_robinhood_prepare_qualification_verifier.py": 1.121,
+    "tests/test_robinhood_supervised_qualification.py": 3.394,
+}
+SOURCE_GATE_PHASE_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_PHASE"
+SOURCE_GATE_SHARD_INDEX_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX"
+SOURCE_GATE_SHARD_COUNT_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT"
+
+
+def resolve_ci_checkpoint(
+    specs: Mapping[str, CheckpointSpec],
+    branch: str,
+    event_name: str,
+) -> str | None:
+    """Use exactly one registered active branch on push; otherwise fail broad."""
+    if event_name != "push" or type(branch) is not str or not branch:
+        return None
+    matches = [spec.name for spec in specs.values() if spec.remote_branch == branch]
+    if len(matches) != 1 or matches[0] not in ACTIVE_CI_CHECKPOINTS:
+        return None
+    return matches[0]
+
+
+def resolve_ci_certification_profile(checkpoint: str | None) -> str | None:
+    """Return the reviewed GitHub-owned certification profile for one checkpoint."""
+    if checkpoint is None:
+        return None
+    profile = CI_CERTIFICATION_PROFILES.get(checkpoint)
+    if profile is not None and profile not in CI_CERTIFICATION_PROFILE_VALUES:
+        raise RuntimeError(f"Unsupported CI certification profile: {profile}")
+    return profile
+
+
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
-    # Freeze the executable batch command, all 37 participants and their order,
-    # and exit propagation. Comments, duplicates and missing phases must drift.
-    invocation = (
-        "          & powershell.exe -NoProfile -ExecutionPolicy Bypass "
-        "-File .\\ops.ps1 `\n"
-        "            verify-batch `\n"
-        + "".join(
-            f"              {name}"
-            + (" `\n" if index < len(CI_CHECKPOINTS) - 1 else "\n")
-            for index, name in enumerate(CI_CHECKPOINTS)
-        )
-        + "          exit $LASTEXITCODE\n"
+    # Freeze active routing, CI-owned certification, broad fallback and aggregation.
+    # The frozen workflow lists the D1R5 baseline; D1R6 routes dynamically.
+    workflow_active = tuple(
+        name for name in ACTIVE_CI_CHECKPOINTS if name != ARCH134_D1R6_NAME
+    )
+    checkpoint_block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(f"              {name} `\n" for name in workflow_active[:-1])
+        + f"              {workflow_active[-1]}\n"
+    )
+    local_active = 'verify "${{ steps.route.outputs.checkpoint }}"'
+    needs_active = 'verify "${{ needs.source-static.outputs.checkpoint }}"'
+    batch = "verify-batch @Checkpoints"
+    active_job = workflow.partition("  active-tests:\n")[2].partition(
+        "\n  full-tests:\n"
+    )[0]
+    full_job = workflow.partition("  full-tests:\n")[2].partition(
+        "\n  certification-tests:\n"
+    )[0]
+    certification_job = workflow.partition("  certification-tests:\n")[2].partition(
+        "\n  source-gates:\n"
+    )[0]
+    aggregate_job = workflow.partition("  source-gates:\n")[2]
+
+    active_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.route == 'ACTIVE'\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
+    )
+    full_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.certification_profile == ''\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
+        "    strategy:\n"
+        "      fail-fast: false\n"
+        "      matrix:\n"
+        "        shard: [0, 1, 2, 3]\n"
+    )
+    certification_header = (
+        "    needs: source-static\n"
+        "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
+        "needs.source-static.outputs.certification_profile != ''\n"
+        "    runs-on: windows-latest\n"
+        "    timeout-minutes: 20\n"
+    )
+    broad_start = (
+        "      - name: Record broad test shard start\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
+        '          "AI_TRADING_BOT_BROAD_SHARD_STARTED_MS=$Started" |\n'
+        "            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append\n"
+        "\n"
+    )
+    broad_execution = (
+        "      - name: Verify full batch test shard\n"
+        "        env:\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX: ${{ matrix.shard }}\n"
+        "          AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT: 4\n"
+        "          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ "
+        "runner.temp }}/ai-trading-bot-checkpoints\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Checkpoints = @(\n"
+        "            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\\s+' |\n"
+        "              Where-Object { $_ -like 'arch*' }\n"
+        "          )\n"
+        "          & powershell.exe -NoProfile -ExecutionPolicy "
+        "Bypass -File .\\ops.ps1 verify-batch @Checkpoints\n"
+        "          exit $LASTEXITCODE\n"
+        "\n"
+    )
+    broad_hygiene = (
+        "      - name: Enforce broad test hygiene budget\n"
+        "        if: always()\n"
+        "        shell: powershell\n"
+        "        run: |\n"
+        "          $Started = [int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS\n"
+        "          $Finished = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()\n"
+        "          $Seconds = [math]::Round(($Finished - $Started) / 1000.0, 3)\n"
+        '          Write-Host "BROAD_TEST_SHARD_SECONDS=$Seconds"\n'
+        "          if ($Seconds -ge 300) {\n"
+        '            Write-Host "::error::Broad test shard exceeded '
+        "the 300-second hygiene threshold ($Seconds s). Run a test "
+        'topology/hygiene audit before accepting this source."\n'
+        "            exit 86\n"
+        "          }\n"
+        "\n"
+    )
+    certification_run_marker = (
+        "      - name: Run canonical certification profile\n"
+        "        env:\n"
+        "          CERT_PROFILE: "
+        "${{ needs.source-static.outputs.certification_profile }}\n"
+    )
+    certification_hygiene_marker = (
+        "      - name: Enforce canonical certification hygiene budget\n"
+        "        if: always()\n"
+    )
+    aggregate_policy = (
+        "    needs: [source-static, active-tests, full-tests, "
+        "certification-tests]\n"
+        "    if: always()\n"
+        "    runs-on: ubuntu-latest\n"
+        "    timeout-minutes: 5\n"
+        "\n"
+        "    steps:\n"
+        "      - name: Require source gate success\n"
+        "        shell: bash\n"
+        "        env:\n"
+        "          STATIC_RESULT: ${{ needs.source-static.result }}\n"
+        "          ACTIVE_RESULT: ${{ needs.active-tests.result }}\n"
+        "          FULL_RESULT: ${{ needs.full-tests.result }}\n"
+        "          CERT_RESULT: ${{ needs.certification-tests.result }}\n"
+        "          MODE: ${{ needs.source-static.outputs.mode }}\n"
+        "          ROUTE: ${{ needs.source-static.outputs.route }}\n"
+        "          CERT_PROFILE: "
+        "${{ needs.source-static.outputs.certification_profile }}\n"
+        "        run: |\n"
+        "          set -euo pipefail\n"
+        '          test "$STATIC_RESULT" = "success"\n'
+        "\n"
+        '          if [ "$MODE" = "DOCS_ONLY" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "skipped"\n'
+        '            test "$FULL_RESULT" = "skipped"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
+        '          elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "success"\n'
+        '            test "$FULL_RESULT" = "skipped"\n'
+        '            test "$CERT_RESULT" = "success"\n'
+        '          elif [ "$ROUTE" = "ACTIVE" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "success"\n'
+        '            test "$FULL_RESULT" = "success"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
+        "          else\n"
+        '            test "$ACTIVE_RESULT" = "skipped"\n'
+        '            test "$FULL_RESULT" = "success"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
+        "          fi\n"
     )
     return (
-        workflow.count("verify-batch") == 1
-        and workflow.count(invocation) == 1
+        active_job.startswith(active_header + "\n    steps:\n")
+        and full_job.startswith(full_header + "\n    steps:\n")
+        and certification_job.startswith(certification_header + "\n    steps:\n")
+        and workflow.count("  active-tests:\n") == 1
+        and workflow.count("  full-tests:\n") == 1
+        and workflow.count("  certification-tests:\n") == 1
+        and aggregate_job == aggregate_policy
+        and full_job.count(broad_start) == 1
+        and full_job.count(broad_hygiene) == 1
+        and full_job.count(broad_execution) == 1
+        and full_job.count("      - name: Upload full test evidence\n") == 1
+        and full_job.index(broad_start)
+        < full_job.index(broad_execution)
+        < full_job.index(broad_hygiene)
+        < full_job.index("      - name: Upload full test evidence\n")
+        and certification_job.count(certification_run_marker) == 1
+        and certification_job.count(certification_hygiene_marker) == 1
+        and certification_job.count(
+            ".\\scripts\\run_test_certification.py `\n"
+            "              --profile $env:CERT_PROFILE"
+        )
+        == 1
+        and certification_job.count(
+            'Write-Host "CANONICAL_CERTIFICATION_WALL_SECONDS=$Wall"'
+        )
+        == 1
+        and certification_job.count("if ($Wall -ge 300)") == 1
+        and certification_job.count("exit 86") == 1
+        and certification_job.count(
+            "      - name: Upload canonical certification evidence\n"
+        )
+        == 1
+        and workflow.count(checkpoint_block) == 1
+        and workflow.count(batch) == 2
+        and workflow.count(batch + "\n          exit $LASTEXITCODE") == 2
+        and workflow.count(local_active) == 1
+        and workflow.count(local_active + "\n          exit $LASTEXITCODE") == 1
+        and workflow.count(needs_active) == 1
+        and workflow.count(needs_active + "\n          exit $LASTEXITCODE") == 1
+        and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: static") == 2
+        and workflow.count("AI_TRADING_BOT_SOURCE_GATE_PHASE: tests") == 2
+        and "resolve_ci_checkpoint(" in workflow
+        and "resolve_ci_certification_profile(" in workflow
+        and "shard: [0, 1, 2, 3]" in workflow
+        and "group: ${{ github.workflow }}-${{ github.ref }}" in workflow
+        and "cancel-in-progress: true" in workflow
+        and "workflow_dispatch:" in workflow
+        and workflow.count(
+            "  source-gates:\n"
+            "    needs: [source-static, active-tests, full-tests, "
+            "certification-tests]\n"
+            "    if: always()\n"
+        )
+        == 1
+        and workflow.count("  source-static:\n") == 1
+        and workflow.count("- name: Require source gate success") == 1
         and "verify arch" not in workflow
     )
 
@@ -443,10 +834,10 @@ R8_HALT_RUNNER_PINS: Final = {
         "f0a9c6388f63b1184426f6b7072213e3e7af4bb16f27435d81f98ad0566c97ef"
     ),
     "execute_checkpoint": (
-        "031c22f037b6704ca50d68fc4445330edc0e38f1cd575f85e8dd9b3d81250eda"
+        "35164fc0985154d41a9f35f7b6b144df6ce86658941a083e7f5705fcee9366ed"
     ),
     "preflight_checkpoint": (
-        "686c25f4de2d3c01cbb146efc181c6ca295de766b19d8436bd427431cbc930ca"
+        "a5e63c447cb53e2998b4234dc0ecb2f81c2954b7677bc78d8414f6d278b8b15f"
     ),
     "_remote_branch_head": (
         "46ea1a2afa1e52622b257c9d635bb115529ae99b1c09aa6bb18ede99a5c2d27e"
@@ -455,7 +846,7 @@ R8_HALT_RUNNER_PINS: Final = {
     "_write_json": ("bd3cabc882528e471e226c434eb3657c3f461b520112f60782eb0bda4b3d5f82"),
 }
 R8_HALT_REGISTRATION_PIN: Final = (
-    "cde19fec3d2899be468ae96247f8b4b7794cd176cbe79915a4adb33a331f9ee9"
+    "d610b7fc74b3c670d83188641d7f0e00425c1c83e052d32b08cf76b87bf1b991"
 )
 
 ARCH130_R8I_D1_SOURCE_BLOB_SHA1: Final = "4dece99d8993934e9747f091415927353b70a2e3"
@@ -730,7 +1121,7 @@ def _arch131_forward_paper_cycle_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "8cf69056ebee325d28c2487709f121ca09796a1c6b301bec0e099b581a9ff67d"
+            != "15be2da1498de847845d155f0f0b5e65544fa6c307b9a5a3727a59250f976e07"
         ):
             failures.append("131-L source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -751,13 +1142,13 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         pins = {
             "src/trading_bot/review_paper/unattended_host_identity.py": (
-                "d68c995e9812b9b797f62f60ccdba894aa702dae"
+                "cb8b624c70f0792f8eba0336cf6e372d3b78f612"
             ),
             "src/trading_bot/review_paper/unattended_scheduler.py": (
-                "1a622fd86c29f8e05d1b01d7f6b47979342e6ce9"
+                "153395ce66ff11f7d0978541cbf9193ae4df3f30"
             ),
             "src/trading_bot/review_paper/unattended_host.py": (
-                "54a109931d27f6edf19d70bcb3947dbe3238898a"
+                "eb41d518af9ead0e4260b081af63d48b11560023"
             ),
             "scripts/run_arch133_unattended_review_paper.py": (
                 "661023c46a3e088d338b67282effb7f35b00a93d"
@@ -788,7 +1179,7 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "a56111bf9d6e7bf6c8044082949b2b52fc4dc3f71199923803ee226d8069e02c"
+            != "9b526e5cca493208ec999ce427c09df0d731b039a897382f1b085d07f7481cbb"
         ):
             failures.append("133-E source-only registration drift")
         assignments = [
@@ -796,15 +1187,15 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-E batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -816,25 +1207,29 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_host_scheduler_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-E source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-review-paper-execution")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-review-paper-execution"
+            )
             + 1
         ):
             failures.append("133-E checkpoint ordering drift")
@@ -845,6 +1240,2726 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("133-E workflow invocation/order drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("133-E source or structural boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133_RETAINED_SOURCES: Final = (
+    "src/trading_bot/arch133_acl/__init__.py",
+    "src/trading_bot/arch133_acl/read_only.py",
+    "src/trading_bot/arch133_acl/retained_reads.py",
+    "src/trading_bot/arch133_acl/retained_diagnostic.py",
+    "scripts/run_arch133_retained_root_diagnostic.py",
+)
+ARCH133_RETAINED_PINS: Final = {
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/retained_reads.py": (
+        "98fdab5017615be21bd95ec3f0ca25f792018f6325e20d11736df8842e47cbbb"
+    ),
+    "src/trading_bot/arch133_acl/retained_diagnostic.py": (
+        "0ee93781d97db0b4377bbb0f724cf87d4329b05d18467d4687e965ee7eb72da6"
+    ),
+    "scripts/run_arch133_retained_root_diagnostic.py": (
+        "cd35722017eca8560ccf0ca22a6be632e5581705db09441150d296ea87f2d0e9"
+    ),
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+}
+ARCH133_RETAINED_REGISTRATION_PIN: Final = (
+    "f800d31cde47819f296db53593130d21b122139ca95383444f0debb7dd858246"
+)
+
+
+ARCH133_RECOVERY_SOURCES: Final = (
+    "src/trading_bot/arch133_acl/__init__.py",
+    "src/trading_bot/arch133_acl/read_only.py",
+    "src/trading_bot/arch133_acl/retained_reads.py",
+    "src/trading_bot/arch133_acl/root_policy_apply.py",
+    "src/trading_bot/arch133_acl/administrator.py",
+    "src/trading_bot/arch133_acl/recovery.py",
+    "scripts/run_arch133_retained_root_acl_recovery.py",
+)
+ARCH133_RECOVERY_PINS: Final = {
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/retained_reads.py": (
+        "98fdab5017615be21bd95ec3f0ca25f792018f6325e20d11736df8842e47cbbb"
+    ),
+    "src/trading_bot/arch133_acl/root_policy_apply.py": (
+        "d3777322118c9fb1353102fd083251c4b59ac9ee552572818a87546a0cf41dde"
+    ),
+    "src/trading_bot/arch133_acl/administrator.py": (
+        "286d4ab228fdad27b719a0673a19583bfe3cc667dcec958fa34bad30e8742611"
+    ),
+    "src/trading_bot/arch133_acl/recovery.py": (
+        "7a7c8c058229665c89c7a3a8e736eb2d7cd141feee00812a27c03f8c391e4386"
+    ),
+    "scripts/run_arch133_retained_root_acl_recovery.py": (
+        "524e622ae9653ed2c6f30fd056b97974c96aff04e485722ce8879e3ce58af75b"
+    ),
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+}
+ARCH133_RECOVERY_REGISTRATION_PIN: Final = (
+    "825e732a03cf568a9b4be81e9ecd6d2b0707028a1fe7a2cb27f226888477d66c"
+)
+
+
+ARCH133_VERIFIER_MODULES: Final = (
+    "trading_bot",
+    "trading_bot.config",
+    "trading_bot.arch133_acl",
+    "trading_bot.arch133_acl.read_only",
+    "trading_bot.arch133_acl.retained_reads",
+    "trading_bot.arch133_verifier",
+    "trading_bot.arch133_verifier.activation",
+    "trading_bot.arch133_verifier.binding",
+    "trading_bot.arch133_verifier.credentials",
+    "trading_bot.arch133_verifier.file_policy",
+    "trading_bot.arch133_verifier.operator",
+    "trading_bot.arch133_verifier.scheduler",
+    "trading_bot.arch133_verifier.sessions",
+    "trading_bot.arch133_verifier.state",
+    "trading_bot.arch133_verifier.state_schema",
+    "trading_bot.arch133_verifier.token",
+    "trading_bot.domain",
+    "trading_bot.domain._validation",
+    "trading_bot.domain.enums",
+    "trading_bot.domain.market",
+    "trading_bot.domain.orders",
+    "trading_bot.domain.positions",
+    "trading_bot.domain.proposals",
+)
+ARCH133_VERIFIER_PINS: Final = {
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/retained_reads.py": (
+        "98fdab5017615be21bd95ec3f0ca25f792018f6325e20d11736df8842e47cbbb"
+    ),
+    "src/trading_bot/arch133_verifier/__init__.py": (
+        "ece882f6a0f8605cae553bd80be524421a98f25c3d6fd2276c44558612cfc980"
+    ),
+    "src/trading_bot/arch133_verifier/activation.py": (
+        "3e842e244576abcc5d560e942cd355c598ce42df5c2ffea71e120d1e254482b5"
+    ),
+    "src/trading_bot/arch133_verifier/binding.py": (
+        "f24ee022779619e3a19915835ac3fd766135b1fba4f90f94a9e8b65764835262"
+    ),
+    "src/trading_bot/arch133_verifier/credentials.py": (
+        "6896de10afc779a847a63640ffcf6fd5e9e634ba4199159599038e644de5c213"
+    ),
+    "src/trading_bot/arch133_verifier/file_policy.py": (
+        "628d121da26a0474fc98e7f7556ce8d3dbc8c189d04a7ecc6b4ec47eb7bd6a08"
+    ),
+    "src/trading_bot/arch133_verifier/operator.py": (
+        "a574acf2fa95e7623e8e8530728f33a82e9c273dec1006ce20c809eb54860572"
+    ),
+    "src/trading_bot/arch133_verifier/scheduler.py": (
+        "327d092c852e762719e0c1d27eb9be0d1c470b6ffa5b7dd7a113352c1cf4946a"
+    ),
+    "src/trading_bot/arch133_verifier/sessions.py": (
+        "278c43c61461c7163e8a641b27aaea8e2b9a6782b77ad805144c7137aa75b503"
+    ),
+    "src/trading_bot/arch133_verifier/state.py": (
+        "0753b532ef58cc7699863e3114e1e3dd2caaa0e1aab7b48b2d546a7f8142d5e4"
+    ),
+    "src/trading_bot/arch133_verifier/state_schema.py": (
+        "902525afadbaabd0afc997b7702de06b5160a7df61f8f97e6d38ec351b74c7d3"
+    ),
+    "src/trading_bot/arch133_verifier/token.py": (
+        "b93236774ee2509947024786fd54ed6a9e702e8d68ef10a8a0ad6376706c5cb6"
+    ),
+    "src/trading_bot/domain/__init__.py": (
+        "5d0baf9be17341641d07504176366c5041be9d73e17230377b8167e012f082ee"
+    ),
+    "src/trading_bot/domain/_validation.py": (
+        "b94d183b2dceff5c844bf3584fabf4a21b4a58cabb0b3088e78099c0dbd7c101"
+    ),
+    "src/trading_bot/domain/enums.py": (
+        "c47b5894f80cb271573e0be4869dde81a4b2a0cf9dc97019864f19f96712cd39"
+    ),
+    "src/trading_bot/domain/market.py": (
+        "eb82f9727ce3fd83f41b96411f49b77e34ff5f75d39372bdb97ce94a3efc7040"
+    ),
+    "src/trading_bot/domain/orders.py": (
+        "3f21c1f9ad197b187ac6a4588ef470ef7266a3b30e026df6288b7b2337a0070a"
+    ),
+    "src/trading_bot/domain/positions.py": (
+        "e9a8d7615a6bd86ed206196d03ced50ae8aee273f632a56bece4427b212c68a9"
+    ),
+    "src/trading_bot/domain/proposals.py": (
+        "eb47d71dcfab0ce64ff03a0d5b8a4091e6dca6d7a53c134f6f842ea40672d738"
+    ),
+    "scripts/run_arch133_post_publication_verifier.py": (
+        "3503070f151862f9f11f3994003390ece6fbdf4205afd602975c8607f95c00e3"
+    ),
+}
+ARCH133_VERIFIER_SOURCES: Final = tuple(ARCH133_VERIFIER_PINS)
+ARCH133_VERIFIER_REGISTRATION_PIN: Final = (
+    "478391462b59486e3a5432ec859eb8ec0bd867dbf8634c84df57e0043c7e4bb2"
+)
+
+
+ARCH133_DIAGNOSTIC_MODULES: Final = tuple(
+    module
+    for module in ARCH133_VERIFIER_MODULES
+    if module
+    not in {
+        "trading_bot.arch133_verifier.credentials",
+        "trading_bot.arch133_verifier.operator",
+    }
+) + ("trading_bot.arch133_diagnostic", "trading_bot.arch133_diagnostic.operator")
+ARCH133_DIAGNOSTIC_PINS: Final = {
+    path: digest
+    for path, digest in ARCH133_VERIFIER_PINS.items()
+    if path
+    not in {
+        "src/trading_bot/arch133_verifier/credentials.py",
+        "src/trading_bot/arch133_verifier/operator.py",
+        "scripts/run_arch133_post_publication_verifier.py",
+    }
+} | {
+    "src/trading_bot/arch133_diagnostic/__init__.py": (
+        "39dc89385e9450efec209706797f62de72d0e5a424dabf5edec0c2b1134dfb3e"
+    ),
+    "src/trading_bot/arch133_diagnostic/operator.py": (
+        "61adcee90d2691bcaabaa85cf0329e8093e3570dd361d67f86532eff6613a78c"
+    ),
+    "scripts/run_arch133_post_publication_stage_diagnostic.py": (
+        "6d8a6b54df85320eedb84bb1f6a15d218ab6f6260ab2dce620a2ec9f44aadce3"
+    ),
+}
+ARCH133_DIAGNOSTIC_SOURCES: Final = tuple(ARCH133_DIAGNOSTIC_PINS)
+ARCH133_DIAGNOSTIC_REGISTRATION_PIN: Final = (
+    "3d91876e57fb5bfe7f2ce7ffb62040fe9f0953e9a5b33337692d2b1c4fe9653f"
+)
+
+
+ARCH133_PUBLICATION_DIAGNOSTIC_MODULES: Final = tuple(
+    module
+    for module in ARCH133_DIAGNOSTIC_MODULES
+    if module
+    not in {
+        "trading_bot.arch133_verifier.scheduler",
+        "trading_bot.arch133_verifier.sessions",
+        "trading_bot.arch133_diagnostic",
+        "trading_bot.arch133_diagnostic.operator",
+    }
+) + (
+    "trading_bot.arch133_publication_diagnostic",
+    "trading_bot.arch133_publication_diagnostic.operator",
+)
+ARCH133_PUBLICATION_DIAGNOSTIC_PINS: Final = {
+    path: digest
+    for path, digest in ARCH133_DIAGNOSTIC_PINS.items()
+    if path
+    not in {
+        "src/trading_bot/arch133_verifier/scheduler.py",
+        "src/trading_bot/arch133_verifier/sessions.py",
+        "src/trading_bot/arch133_diagnostic/__init__.py",
+        "src/trading_bot/arch133_diagnostic/operator.py",
+        "scripts/run_arch133_post_publication_stage_diagnostic.py",
+    }
+} | {
+    "src/trading_bot/arch133_publication_diagnostic/__init__.py": (
+        "be2ef19da93cb7ea14b040db8fb7c97572ee7218f75699350f420570d0d4b692"
+    ),
+    "src/trading_bot/arch133_publication_diagnostic/operator.py": (
+        "5eb8825eb4dc4aeb4d691efea5bb0fc7e50af4efbdac07e505c3c33d99331fb6"
+    ),
+    "scripts/run_arch133_publication_state_paper_diagnostic.py": (
+        "8611b042fea0b8c925746593a30c2799652597c9be9b9ff9736b22ba029971e6"
+    ),
+}
+ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES: Final = tuple(
+    ARCH133_PUBLICATION_DIAGNOSTIC_PINS
+)
+ARCH133_PUBLICATION_DIAGNOSTIC_REGISTRATION_PIN: Final = (
+    "03f1c492c51dd6ca6e74f12bd6fb0fdf6f43464b8d815304b1aee98dd3e83c98"
+)
+
+
+ARCH133_PUBLICATION_CORRECTED_MODULES: Final = tuple(
+    module
+    for module in ARCH133_PUBLICATION_DIAGNOSTIC_MODULES
+    if not module.startswith("trading_bot.arch133_publication_diagnostic")
+) + (
+    "trading_bot.arch133_publication_state_paper_corrected",
+    "trading_bot.arch133_publication_state_paper_corrected.operator",
+)
+ARCH133_PUBLICATION_CORRECTED_PINS: Final = {
+    path: digest
+    for path, digest in ARCH133_PUBLICATION_DIAGNOSTIC_PINS.items()
+    if "/arch133_publication_diagnostic/" not in path
+    and path != "scripts/run_arch133_publication_state_paper_diagnostic.py"
+} | {
+    "src/trading_bot/arch133_publication_state_paper_corrected/__init__.py": (
+        "819ac91ea5e47f258100c45c10f1c92f9624bfd23c9a04e608eebd1620a2ea5e"
+    ),
+    "src/trading_bot/arch133_publication_state_paper_corrected/operator.py": (
+        "57743791949781089e2aa7f83d9b36d9a2aa10efcaba161cb941b84dbf055484"
+    ),
+    "scripts/run_arch133_publication_state_paper_corrected.py": (
+        "353dea7dff0d0a2bffd85841e1c87bd8bd63aa4f2f7fe9ac2e9c0ac16bce75e4"
+    ),
+}
+ARCH133_PUBLICATION_CORRECTED_SOURCES: Final = tuple(ARCH133_PUBLICATION_CORRECTED_PINS)
+ARCH133_PUBLICATION_CORRECTED_REGISTRATION_PIN: Final = (
+    "1e19a84ed6ae2a4be90b2245bee1ad38b7beceb1b4613b94c1201252472e6d5d"
+)
+
+
+ARCH133_SCHEDULER_MODULES: Final = (
+    "trading_bot",
+    "trading_bot.arch133_acl",
+    "trading_bot.arch133_acl.read_only",
+    "trading_bot.arch133_acl.retained_reads",
+    "trading_bot.arch133_scheduler_installation",
+    "trading_bot.arch133_scheduler_installation.admission",
+    "trading_bot.arch133_scheduler_installation.operator",
+    "trading_bot.arch133_scheduler_installation.specification",
+    "trading_bot.arch133_verifier",
+    "trading_bot.arch133_verifier.activation",
+    "trading_bot.arch133_verifier.binding",
+    "trading_bot.arch133_verifier.file_policy",
+    "trading_bot.arch133_verifier.scheduler",
+    "trading_bot.arch133_verifier.sessions",
+    "trading_bot.arch133_verifier.state",
+    "trading_bot.arch133_verifier.state_schema",
+    "trading_bot.arch133_verifier.token",
+    "trading_bot.config",
+    "trading_bot.domain",
+    "trading_bot.domain._validation",
+    "trading_bot.domain.enums",
+    "trading_bot.domain.market",
+    "trading_bot.domain.orders",
+    "trading_bot.domain.positions",
+    "trading_bot.domain.proposals",
+)
+ARCH133_SCHEDULER_PINS: Final = {
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/retained_reads.py": (
+        "98fdab5017615be21bd95ec3f0ca25f792018f6325e20d11736df8842e47cbbb"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/__init__.py": (
+        "67726876bbccbf569d95cc6e9c7dca42ca5d3cc50601cbbfd2f848bf98e08d21"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/admission.py": (
+        "2c426ea952ee109f26481003e53670f36054b09781385aec078bb60746ff931b"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/operator.py": (
+        "b6db26e036e52d688257e27723509c6e541f462a789c2044d0b6d01f80fcd27c"
+    ),
+    "src/trading_bot/arch133_scheduler_installation/specification.py": (
+        "bdd841b4d2acfd7dec09cb9c7df16f14082602fd63f59e0351dac505cbd6d985"
+    ),
+    "src/trading_bot/arch133_verifier/__init__.py": (
+        "ece882f6a0f8605cae553bd80be524421a98f25c3d6fd2276c44558612cfc980"
+    ),
+    "src/trading_bot/arch133_verifier/activation.py": (
+        "3e842e244576abcc5d560e942cd355c598ce42df5c2ffea71e120d1e254482b5"
+    ),
+    "src/trading_bot/arch133_verifier/binding.py": (
+        "f24ee022779619e3a19915835ac3fd766135b1fba4f90f94a9e8b65764835262"
+    ),
+    "src/trading_bot/arch133_verifier/file_policy.py": (
+        "628d121da26a0474fc98e7f7556ce8d3dbc8c189d04a7ecc6b4ec47eb7bd6a08"
+    ),
+    "src/trading_bot/arch133_verifier/scheduler.py": (
+        "327d092c852e762719e0c1d27eb9be0d1c470b6ffa5b7dd7a113352c1cf4946a"
+    ),
+    "src/trading_bot/arch133_verifier/sessions.py": (
+        "278c43c61461c7163e8a641b27aaea8e2b9a6782b77ad805144c7137aa75b503"
+    ),
+    "src/trading_bot/arch133_verifier/state.py": (
+        "0753b532ef58cc7699863e3114e1e3dd2caaa0e1aab7b48b2d546a7f8142d5e4"
+    ),
+    "src/trading_bot/arch133_verifier/state_schema.py": (
+        "902525afadbaabd0afc997b7702de06b5160a7df61f8f97e6d38ec351b74c7d3"
+    ),
+    "src/trading_bot/arch133_verifier/token.py": (
+        "b93236774ee2509947024786fd54ed6a9e702e8d68ef10a8a0ad6376706c5cb6"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+    "src/trading_bot/domain/__init__.py": (
+        "5d0baf9be17341641d07504176366c5041be9d73e17230377b8167e012f082ee"
+    ),
+    "src/trading_bot/domain/_validation.py": (
+        "b94d183b2dceff5c844bf3584fabf4a21b4a58cabb0b3088e78099c0dbd7c101"
+    ),
+    "src/trading_bot/domain/enums.py": (
+        "c47b5894f80cb271573e0be4869dde81a4b2a0cf9dc97019864f19f96712cd39"
+    ),
+    "src/trading_bot/domain/market.py": (
+        "eb82f9727ce3fd83f41b96411f49b77e34ff5f75d39372bdb97ce94a3efc7040"
+    ),
+    "src/trading_bot/domain/orders.py": (
+        "3f21c1f9ad197b187ac6a4588ef470ef7266a3b30e026df6288b7b2337a0070a"
+    ),
+    "src/trading_bot/domain/positions.py": (
+        "e9a8d7615a6bd86ed206196d03ced50ae8aee273f632a56bece4427b212c68a9"
+    ),
+    "src/trading_bot/domain/proposals.py": (
+        "eb47d71dcfab0ce64ff03a0d5b8a4091e6dca6d7a53c134f6f842ea40672d738"
+    ),
+    "scripts/run_arch133_scheduler_installation.py": (
+        "64f50e19cf72a234ae8cd76c01704fdea9a9d2ed10728545e30d72d62544800a"
+    ),
+    "scripts/arch133_scheduler_definition.ps1": (
+        "e705dbd03ad10bbcd619538156d6f88c961fb074d35c9f7956b4fb04efa8e88e"
+    ),
+    "scripts/arch133_scheduler_observe.ps1": (
+        "45e1c9dbf62738ff2667969ed3716b39313c1977ee7693572a17c078616c0a2a"
+    ),
+    "scripts/arch133_scheduler_install.ps1": (
+        "9764b40dc6953b3fda2028e35f6e68a39d71c8b052dde9710fe60ce9bd4eaa8f"
+    ),
+    "src/trading_bot/review_paper/unattended_scheduler.py": (
+        "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"
+    ),
+}
+ARCH133_SCHEDULER_SOURCES: Final = tuple(ARCH133_SCHEDULER_PINS)
+ARCH133_SCHEDULER_REGISTRATION_PIN: Final = (
+    "e6f119c53e5ecc7ea2d56fba3b0da9d661823f553b80bb64a5913877cb57206a"
+)
+
+
+ARCH133_REPROVISION_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision/__init__.py",
+    "src/trading_bot/arch133_reprovision/predecessor.py",
+    "src/trading_bot/arch133_reprovision/reads.py",
+    "src/trading_bot/arch133_reprovision/material.py",
+    "src/trading_bot/arch133_reprovision/generation.py",
+    "src/trading_bot/arch133_reprovision/namespace.py",
+    "src/trading_bot/arch133_reprovision/native.py",
+    "src/trading_bot/arch133_reprovision/operator.py",
+    "scripts/run_arch133_fresh_activation_reprovision.py",
+)
+ARCH133_REPROVISION_PINS: Final = {
+    "src/trading_bot/arch133_reprovision/__init__.py": (
+        "4a6c81929bd649707d26db3b7751e76c3fe6977be98fece1be65b6daae95fbfa"
+    ),
+    "src/trading_bot/arch133_reprovision/predecessor.py": (
+        "22fa7166311b669314aabf76499ada463dd40290a23de8694e2f4668f4f9f59a"
+    ),
+    "src/trading_bot/arch133_reprovision/reads.py": (
+        "48b42cb5d9fac1b88b5a532e4f4ad4e180556d222bc8da21c78be2ef3068bad7"
+    ),
+    "src/trading_bot/arch133_reprovision/material.py": (
+        "fd6c2c3dd321e0b47cf0d344636a5b2ec4f2aec7feb981c0426b672eb19c0212"
+    ),
+    "src/trading_bot/arch133_reprovision/generation.py": (
+        "8936195c3692f7654a5c692715ce9511a238a91019e06b67ca7c42ed5e47bfbe"
+    ),
+    "src/trading_bot/arch133_reprovision/namespace.py": (
+        "b4afbba5d22e2874df2e3345f89c0764103b86ffb3729cc7a6e59380996e38d7"
+    ),
+    "src/trading_bot/arch133_reprovision/native.py": (
+        "de93039a5a04053a51da6dd88e83aed121ca6debb4bcbbaa7e2f5b7246bf3bc8"
+    ),
+    "src/trading_bot/arch133_reprovision/operator.py": (
+        "aa9eedd322bef79f61241864e954f281aefd6f9ea484b9907dca399a32c8a6a0"
+    ),
+    "scripts/run_arch133_fresh_activation_reprovision.py": (
+        "d1824adb159ff11a171040ebab43c380ad27de13d897bff9cbe457c19f4d99df"
+    ),
+}
+ARCH133_REPROVISION_REGISTRATION_PIN: Final = (
+    "54882c9d46d181d465e03fdff642317c4af373c6bda759685c6dff745404df1b"
+)
+
+
+ARCH133U_REPROVISION_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_corrected/__init__.py",
+    "src/trading_bot/arch133_reprovision_corrected/admission.py",
+    "src/trading_bot/arch133_reprovision_corrected/operator.py",
+    "scripts/run_arch133_fresh_activation_reprovision_corrected.py",
+)
+ARCH133U_REPROVISION_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_corrected/__init__.py": (
+        "cc04b3a697950ac1d02ea39c1f57e5c2747430a2a0b9bbbd1f753d2ea4bba8f8"
+    ),
+    "src/trading_bot/arch133_reprovision_corrected/admission.py": (
+        "62935b26f9cd2624ed89059987eeb38996d1c3288d2744640e0c84947531f349"
+    ),
+    "src/trading_bot/arch133_reprovision_corrected/operator.py": (
+        "7d439154bd4c7713ee3a9c366f3c7c6db47438785f1796168c512b9fadbc665b"
+    ),
+    "scripts/run_arch133_fresh_activation_reprovision_corrected.py": (
+        "03d61973408c4039e119ea4d06670c728cde411df05427cda9824127b90f8086"
+    ),
+}
+ARCH133U_REPROVISION_REGISTRATION_PIN: Final = (
+    "f8e25032969974459fd99e589831daaf8d30e0150656dd06c30f28a198297a60"
+)
+
+
+ARCH133_REPROVISION_DIAGNOSTIC_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py",
+    "src/trading_bot/arch133_reprovision_diagnostic/operator.py",
+    "scripts/run_arch133_reprovision_admission_diagnostic.py",
+)
+ARCH133_REPROVISION_DIAGNOSTIC_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_diagnostic/__init__.py": (
+        "a161e6533bcdc3bb7c9caa29cc27422fc2120b2d"
+    ),
+    "src/trading_bot/arch133_reprovision_diagnostic/operator.py": (
+        "4699aac0761df76c2c9ed67f7c4810c98dabb8b0"
+    ),
+    "scripts/run_arch133_reprovision_admission_diagnostic.py": (
+        "6479389ccbfc3da4401e38b338f979376a5f418f"
+    ),
+}
+
+
+ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES: Final = (
+    "src/trading_bot/arch133_parent_security_diagnostic/__init__.py",
+    "src/trading_bot/arch133_parent_security_diagnostic/admission.py",
+    "src/trading_bot/arch133_parent_security_diagnostic/operator.py",
+    "scripts/run_arch133_parent_security_diagnostic.py",
+)
+ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS: Final = {
+    "src/trading_bot/arch133_parent_security_diagnostic/__init__.py": (
+        "c59623e697cd19f3fd9c6cc0d9b0774dfcc22bdd"
+    ),
+    "src/trading_bot/arch133_parent_security_diagnostic/admission.py": (
+        "2b6039da799db0a4f15a883782858bfc87f1a492"
+    ),
+    "src/trading_bot/arch133_parent_security_diagnostic/operator.py": (
+        "1659266adf9e1f82d338fba601810e6edd491dec"
+    ),
+    "scripts/run_arch133_parent_security_diagnostic.py": (
+        "5e0c64b9fe4b627110deba75f5572cca0a7e1afc"
+    ),
+}
+ARCH133_PARENT_SECURITY_DIAGNOSTIC_REGISTRATION_PIN: Final = (
+    "f78ba2bfee91356acbc077cdddd1a52102a0d45a5a49058836ae1195390493e4"
+)
+
+
+def _arch133_parent_security_diagnostic_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the separate 133-S read-only surface and retained predecessor chain."""
+    failures = list(_arch133_reprovision_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-S diagnostic source drift: {relative}")
+        if (
+            tuple(ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS)
+            != ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES
+        ):
+            failures.append("133-S diagnostic inventory drift")
+        name = "arch133-robinhood-reprovision-parent-security-diagnostic"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if (
+            len(inventories) != 1
+            or ast.literal_eval(inventories[0]) != ACTIVE_CI_CHECKPOINTS
+        ):
+            failures.append("133-S diagnostic active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_PARENT_SECURITY_DIAGNOSTIC_REGISTRATION_PIN
+        ):
+            failures.append("133-S diagnostic source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_parent_security_diagnostic_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133s"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-S diagnostic registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 1
+            ]
+            != (
+                "arch133-robinhood-reprovision-admission-diagnostic",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-S diagnostic ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-S diagnostic workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-S diagnostic boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133_PARENT_POLICY_DIAGNOSTIC_SOURCES: Final = (
+    "src/trading_bot/arch133_parent_policy_diagnostic/__init__.py",
+    "src/trading_bot/arch133_parent_policy_diagnostic/admission.py",
+    "src/trading_bot/arch133_parent_policy_diagnostic/operator.py",
+    "scripts/run_arch133_parent_policy_diagnostic.py",
+)
+ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS: Final = {
+    "src/trading_bot/arch133_parent_policy_diagnostic/__init__.py": (
+        "37a59becbfb288ed9ba61d2d30ee9ad4548acb1a"
+    ),
+    "src/trading_bot/arch133_parent_policy_diagnostic/admission.py": (
+        "fa7d762d5699ec5fc19ed1948ebc1c328f2c1931"
+    ),
+    "src/trading_bot/arch133_parent_policy_diagnostic/operator.py": (
+        "c06b3d575443ead6624b27cca5c95a3ce10d4206"
+    ),
+    "scripts/run_arch133_parent_policy_diagnostic.py": (
+        "9e8d7aa959d40bc689cd1c3ae17506bdbddb16ba"
+    ),
+}
+ARCH133_PARENT_POLICY_DIAGNOSTIC_REGISTRATION_PIN: Final = (
+    "33753d52734b0358250e79b442ef6d5759fab043709154299a919aee594370b8"
+)
+
+
+def _arch133_parent_policy_diagnostic_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the separate 133-T read-only surface and retained predecessor chain."""
+    failures = list(_arch133_parent_security_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-T diagnostic source drift: {relative}")
+        if (
+            tuple(ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS)
+            != ARCH133_PARENT_POLICY_DIAGNOSTIC_SOURCES
+        ):
+            failures.append("133-T diagnostic inventory drift")
+        name = "arch133-robinhood-reprovision-parent-policy-diagnostic"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if (
+            len(inventories) != 1
+            or ast.literal_eval(inventories[0]) != ACTIVE_CI_CHECKPOINTS
+        ):
+            failures.append("133-T diagnostic active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_PARENT_POLICY_DIAGNOSTIC_REGISTRATION_PIN
+        ):
+            failures.append("133-T diagnostic source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_parent_policy_diagnostic_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133t"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PARENT_POLICY_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-T diagnostic registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 1
+            ]
+            != (
+                "arch133-robinhood-reprovision-parent-security-diagnostic",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-T diagnostic ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-T diagnostic workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-T diagnostic boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_reprovision_corrected_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the corrected 133-U source surface and the complete T authority chain."""
+    failures = list(_arch133_parent_policy_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133U_REPROVISION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-U reprovision source drift: {relative}")
+        name = "arch133-robinhood-fresh-activation-reprovision-corrected"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133U_REPROVISION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "4759c440268cdb3a7d96b7449b1219a1dc4e6e8afa070d9ad098268257dad319"
+            or tuple(ARCH133U_REPROVISION_PINS) != ARCH133U_REPROVISION_SOURCES
+        ):
+            failures.append("133-U source inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133U_REPROVISION_REGISTRATION_PIN
+        ):
+            failures.append("133-U registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_reprovision_corrected_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133u"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133U_REPROVISION_SOURCES,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-U registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-reprovision-parent-policy-diagnostic",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-U ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-U workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-U source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133V_RECONCILIATION_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_reconciliation/__init__.py",
+    "src/trading_bot/arch133_reprovision_reconciliation/operator.py",
+    "scripts/run_arch133_reprovision_reconciliation.py",
+)
+ARCH133V_RECONCILIATION_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_reconciliation/__init__.py": (
+        "292384cf303c6a68144ecebd4d3f51606c1427f1e647834688a08dc3e7b183fb"
+    ),
+    "src/trading_bot/arch133_reprovision_reconciliation/operator.py": (
+        "260f337c627a195046eadfa0b00bdd131d51bb393cbbda2277a796442fa78f05"
+    ),
+    "scripts/run_arch133_reprovision_reconciliation.py": (
+        "ea5730bb29cefac8b7355f8d5041d938bc39ab4937c20bf5cf58dcbe6b36e16f"
+    ),
+}
+ARCH133V_RECONCILIATION_REGISTRATION_PIN: Final = (
+    "ecfb923f10ce676138b34e422d28d2f387dd5f33f59116a69fabba6e58ede741"
+)
+
+
+def _arch133_reprovision_reconciliation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the read-only 133-V surface and complete consumed U authority chain."""
+    failures = list(_arch133_reprovision_corrected_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133V_RECONCILIATION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-V reprovision source drift: {relative}")
+        name = "arch133-robinhood-reprovision-indeterminate-reconciliation"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133V_RECONCILIATION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "f9ef00b1314c337868a49894c201e936df01cf1ce549695b8812a7b2f9923394"
+            or tuple(ARCH133V_RECONCILIATION_PINS) != ARCH133V_RECONCILIATION_SOURCES
+        ):
+            failures.append("133-V source inventory drift")
+        active = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if len(active) != 1 or ast.literal_eval(active[0]) != ACTIVE_CI_CHECKPOINTS:
+            failures.append("133-V active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133V_RECONCILIATION_REGISTRATION_PIN
+        ):
+            failures.append("133-V registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_reprovision_reconciliation_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133v"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133V_RECONCILIATION_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-V registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-fresh-activation-reprovision-corrected",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-V ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-V workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-V source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133W_RECOVERY_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_recovery/__init__.py",
+    "src/trading_bot/arch133_reprovision_recovery/admission.py",
+    "src/trading_bot/arch133_reprovision_recovery/native.py",
+    "src/trading_bot/arch133_reprovision_recovery/operator.py",
+    "scripts/run_arch133_reprovision_recovery.py",
+)
+ARCH133W_RECOVERY_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_recovery/__init__.py": (
+        "61104f164e26ce56f30f981ac1263e817bc2e38643a5a27d84fddb6bd5445c08"
+    ),
+    "src/trading_bot/arch133_reprovision_recovery/admission.py": (
+        "d974c87e07c081396ecad04ea7ef0ba1b39653d5ce6f8f820f7e64fae3693a64"
+    ),
+    "src/trading_bot/arch133_reprovision_recovery/native.py": (
+        "0553efac4da5258b2fc8c9b5534d5aaee3aae52f4baa856182592d2747837d97"
+    ),
+    "src/trading_bot/arch133_reprovision_recovery/operator.py": (
+        "fe8e57cb4b936b0552708801112a139a411e1c3aa3d76e412777475e6536cdb2"
+    ),
+    "scripts/run_arch133_reprovision_recovery.py": (
+        "404912297cc3ff595491d38d8f3c746f0bf5e39086a2b08e79657e19723db194"
+    ),
+}
+ARCH133W_RECOVERY_REGISTRATION_PIN: Final = (
+    "5061f8dbbbff58794c7ee4f3b1266988fab1f7313c3e3570e1f2c7e1908b8736"
+)
+
+
+def _arch133_reprovision_recovery_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the read-only 133-W surface and complete accepted V authority chain."""
+    failures = list(_arch133_reprovision_reconciliation_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133W_RECOVERY_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-W reprovision source drift: {relative}")
+        name = "arch133-robinhood-reprovision-sealed-predecessor-recovery"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133W_RECOVERY_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "3d78d2447e55f43ada40c18aad6700d965158f34f33b87efdd8358c118f823af"
+            or tuple(ARCH133W_RECOVERY_PINS) != ARCH133W_RECOVERY_SOURCES
+        ):
+            failures.append("133-W source inventory drift")
+        active = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if len(active) != 1 or ast.literal_eval(active[0]) != ACTIVE_CI_CHECKPOINTS:
+            failures.append("133-W active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133W_RECOVERY_REGISTRATION_PIN
+        ):
+            failures.append("133-W registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check is not _arch133_reprovision_recovery_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133w"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_recovery.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133W_RECOVERY_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_recovery.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-W registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-reprovision-indeterminate-reconciliation",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-W ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-W workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-W source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133X_RECONCILIATION_SOURCES: Final = (
+    "src/trading_bot/arch133_reprovision_recovery_reconciliation/__init__.py",
+    "src/trading_bot/arch133_reprovision_recovery_reconciliation/operator.py",
+    "scripts/run_arch133_reprovision_recovery_reconciliation.py",
+)
+ARCH133X_RECONCILIATION_PINS: Final = {
+    "src/trading_bot/arch133_reprovision_recovery_reconciliation/__init__.py": (
+        "ce48f46c0ee51292736cd61a658d8da43cc3ea0683a5b325a31a560deefc0b3d"
+    ),
+    "src/trading_bot/arch133_reprovision_recovery_reconciliation/operator.py": (
+        "4ad752d4634075244ebe614a2da271741deeb759b59de801788d92e6ddf188b5"
+    ),
+    "scripts/run_arch133_reprovision_recovery_reconciliation.py": (
+        "fad91e7fad8f1c9c52adc4e1b5ba8f7d79f382afc0fd8f0c8dbc9ecbf3c34b89"
+    ),
+}
+ARCH133X_RECONCILIATION_REGISTRATION_PIN: Final = (
+    "0a9ea47f85b1f5feca156c8720377c4a2ae9476ac474c5b9dc0739522906d710"
+)
+
+
+def _arch133_reprovision_recovery_reconciliation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the read-only 133-X surface and complete accepted W authority chain."""
+    failures = list(_arch133_reprovision_recovery_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133X_RECONCILIATION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-X reprovision source drift: {relative}")
+        name = "arch133-robinhood-reprovision-recovery-reconciliation"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133X_RECONCILIATION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "a8510efa09c2293c965f6ce998f6be79850864859ad3bf67a76f26e5a6c78160"
+            or tuple(ARCH133X_RECONCILIATION_PINS) != ARCH133X_RECONCILIATION_SOURCES
+        ):
+            failures.append("133-X source inventory drift")
+        active = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if len(active) != 1 or ast.literal_eval(active[0]) != ACTIVE_CI_CHECKPOINTS:
+            failures.append("133-X active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133X_RECONCILIATION_REGISTRATION_PIN
+        ):
+            failures.append("133-X registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_reprovision_recovery_reconciliation_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133x"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133X_RECONCILIATION_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-X registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-reprovision-sealed-predecessor-recovery",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-X ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-X workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-X source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133Y_QUALIFICATION_SOURCES: Final = (
+    "src/trading_bot/arch133_windows_rename_qualification/__init__.py",
+    "src/trading_bot/arch133_windows_rename_qualification/native.py",
+    "src/trading_bot/arch133_windows_rename_qualification/operator.py",
+    "scripts/run_arch133_windows_rename_qualification.py",
+)
+ARCH133Y_QUALIFICATION_PINS: Final = {
+    "src/trading_bot/arch133_windows_rename_qualification/__init__.py": (
+        "f0662e01d82fed62613c366bf4b83e351e5faa792ea5af4315f6493cb4ca8dec"
+    ),
+    "src/trading_bot/arch133_windows_rename_qualification/native.py": (
+        "df75e8bbb291a01484510f1a3d373a3236e6ecd764fb06e7e821c8800ebc4b2f"
+    ),
+    "src/trading_bot/arch133_windows_rename_qualification/operator.py": (
+        "65c30f88ac91bd2fbf816da02d8fce6a64b8d95d205dde40c74737c6b5ec0296"
+    ),
+    "scripts/run_arch133_windows_rename_qualification.py": (
+        "d9ec4f0dfbf62ac373e9e6db159f1089d78372925f148d695b7067bbca16c89c"
+    ),
+}
+ARCH133Y_QUALIFICATION_REGISTRATION_PIN: Final = (
+    "1e923b6612c5abb15763dfe19281e02f8515287f654d2fbf577fbf1bc4511fde"
+)
+
+
+def _arch133_windows_rename_qualification_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the scratch-only 133-Y surface and complete accepted X authority chain."""
+    failures = list(
+        _arch133_reprovision_recovery_reconciliation_authority_check(repo_root)
+    )
+    try:
+        for relative, expected in ARCH133Y_QUALIFICATION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-Y reprovision source drift: {relative}")
+        name = "arch133-robinhood-windows-rename-qualification"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133Y_QUALIFICATION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "ff3b2b1ad278beaad14d996c5d523982edb419025e73728a29050ebaede9001a"
+            or tuple(ARCH133Y_QUALIFICATION_PINS) != ARCH133Y_QUALIFICATION_SOURCES
+        ):
+            failures.append("133-Y source inventory drift")
+        active = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if len(active) != 1 or ast.literal_eval(active[0]) != ACTIVE_CI_CHECKPOINTS:
+            failures.append("133-Y active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133Y_QUALIFICATION_REGISTRATION_PIN
+        ):
+            failures.append("133-Y registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_windows_rename_qualification_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133y"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_windows_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133Y_QUALIFICATION_SOURCES,
+                "tests/review_paper/test_arch133_windows_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-Y registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-reprovision-recovery-reconciliation",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-Y ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-Y workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-Y source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133Z_QUALIFICATION_SOURCES: Final = (
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/__init__.py",
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/native.py",
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/operator.py",
+    "scripts/run_arch133_closed_descendant_rename_qualification.py",
+)
+ARCH133Z_QUALIFICATION_PINS: Final = {
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/__init__.py": (
+        "0600fc6ebb08096c191f7bb3e1c740e3e5e51bd513bc17fd9a7541b3cba18ad3"
+    ),
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/native.py": (
+        "b252da668fdffd24038307b0ca2849b15caa735a380d9b160a5b8ab40a624c6e"
+    ),
+    "src/trading_bot/arch133_closed_descendant_rename_qualification/operator.py": (
+        "f9bb8a867a9afe1c20aed6b0387dffd6adc8eea17eee4ec391395cae8c07aeec"
+    ),
+    "scripts/run_arch133_closed_descendant_rename_qualification.py": (
+        "bfd8a858a224ce7779ad16bba13585443f845cd2b1eb754d810f408e824761b9"
+    ),
+}
+ARCH133Z_QUALIFICATION_REGISTRATION_PIN: Final = (
+    "a9b6d9a36abd32929f33285065e9cfdc96c876e876b822bfac08a0c3347d9c23"
+)
+
+
+def _arch133_closed_descendant_rename_qualification_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Pin the scratch-only 133-Z surface and complete accepted Y authority chain."""
+    failures = list(_arch133_windows_rename_qualification_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133Z_QUALIFICATION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-Z reprovision source drift: {relative}")
+        name = "arch133-robinhood-closed-descendant-rename-qualification"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ARCH133Z_QUALIFICATION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "f6d0914d71238b1d7a3c06a36240eb988918882246dc88cd473b78e568e5c967"
+            or tuple(ARCH133Z_QUALIFICATION_PINS) != ARCH133Z_QUALIFICATION_SOURCES
+        ):
+            failures.append("133-Z source inventory drift")
+        active = [
+            node.value
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if len(active) != 1 or ast.literal_eval(active[0]) != ACTIVE_CI_CHECKPOINTS:
+            failures.append("133-Z active inventory drift")
+        registrations = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                key.arg == "name"
+                and isinstance(key.value, ast.Constant)
+                and key.value.value == name
+                for key in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133Z_QUALIFICATION_REGISTRATION_PIN
+        ):
+            failures.append("133-Z registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_closed_descendant_rename_qualification_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133z"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133Z_QUALIFICATION_SOURCES,
+                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-Z registration drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != (
+                "arch133-robinhood-windows-rename-qualification",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-Z ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-Z workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-Z source boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_reprovision_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the 133-R zero-effect staged admission diagnostic."""
+    failures = list(_arch133_reprovision_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_REPROVISION_DIAGNOSTIC_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-R diagnostic source drift: {relative}")
+        if (
+            tuple(ARCH133_REPROVISION_DIAGNOSTIC_PINS)
+            != ARCH133_REPROVISION_DIAGNOSTIC_SOURCES
+        ):
+            failures.append("133-R diagnostic inventory drift")
+        name = "arch133-robinhood-reprovision-admission-diagnostic"
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check
+            is not _arch133_reprovision_diagnostic_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133r"
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_REPROVISION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-R diagnostic registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 1
+            ]
+            != (
+                "arch133-robinhood-fresh-activation-reprovision",
+                name,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-R diagnostic ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-R diagnostic workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-R diagnostic boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_reprovision_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin new source, workflow and registration; preserve consumed sources."""
+    failures = list(_arch133_scheduler_installation_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_REPROVISION_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8-sig")
+            if (
+                hashlib.sha256(
+                    ast.dump(ast.parse(source), include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-Q reprovision source drift: {relative}")
+        name = "arch133-robinhood-fresh-activation-reprovision"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        inventories = [
+            n.value
+            for n in tree.body
+            if isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and n.target.id == "ARCH133_REPROVISION_SOURCES"
+        ]
+        if (
+            len(inventories) != 1
+            or hashlib.sha256(
+                ast.dump(inventories[0], include_attributes=False).encode()
+            ).hexdigest()
+            != "e8b866d14b9914dad4920ec6fb049c68f8aa5f4a0b0cb39f26dc65444a2edf21"
+            or tuple(ARCH133_REPROVISION_PINS) != ARCH133_REPROVISION_SOURCES
+        ):
+            failures.append("133-Q source inventory drift")
+        registrations = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_REPROVISION_REGISTRATION_PIN
+        ):
+            failures.append("133-Q registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.authority_check is not _arch133_reprovision_authority_check
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133q"
+        ):
+            failures.append("133-Q source-only capability drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != ("arch133-robinhood-single-session-scheduler-installation", name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-Q ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-Q workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-Q source boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_scheduler_installation_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin full inert closure, canonical builder and native transport; no invocation."""
+    failures = list(_arch133_publication_corrected_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_SCHEDULER_PINS.items():
+            source = (repo_root / relative).read_text(encoding="utf-8")
+            material = (
+                ast.dump(ast.parse(source), include_attributes=False)
+                if relative.endswith(".py")
+                else source
+            )
+            if hashlib.sha256(material.encode()).hexdigest() != expected:
+                failures.append(f"133-P installation boundary drift: {relative}")
+        name = "arch133-robinhood-single-session-scheduler-installation"
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        registrations = [
+            n
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_SCHEDULER_REGISTRATION_PIN
+        ):
+            failures.append("133-P source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133p"
+            or spec.authority_check
+            is not _arch133_scheduler_installation_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *(p for p in ARCH133_SCHEDULER_SOURCES if p.endswith(".py")),
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-P source-only capability drift")
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1]
+            != ("arch133-robinhood-publication-state-paper-corrected", name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-P checkpoint ordering drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("133-P source workflow drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-P installation boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_publication_corrected_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the exact read-only import closure; never import/invoke the operator."""
+    failures = list(_arch133_publication_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_PUBLICATION_CORRECTED_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-O verifier boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-publication-state-paper-corrected"
+        registrations = [
+            n
+            for n in ast.walk(runner_tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_PUBLICATION_CORRECTED_REGISTRATION_PIN
+        ):
+            failures.append("133-O source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133o"
+            or spec.authority_check
+            is not _arch133_publication_corrected_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_publication_state_paper_corrected.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_CORRECTED_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_publication_state_paper_corrected.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-O source-only capability drift")
+        predecessor = "arch133-robinhood-publication-state-paper-diagnostic"
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 1 : index + 1] != (predecessor, name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-O checkpoint ordering drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-O verifier boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_publication_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the exact read-only import closure; never import/invoke the operator."""
+    failures = list(_arch133_diagnostic_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_PUBLICATION_DIAGNOSTIC_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-N verifier boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-publication-state-paper-diagnostic"
+        registrations = [
+            n
+            for n in ast.walk(runner_tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_PUBLICATION_DIAGNOSTIC_REGISTRATION_PIN
+        ):
+            failures.append("133-N source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133n"
+            or spec.authority_check
+            is not _arch133_publication_diagnostic_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-N source-only capability drift")
+        predecessor = "arch133-robinhood-post-publication-verifier"
+        prior = "arch133-robinhood-post-publication-stage-diagnostic"
+        index = ACTIVE_CI_CHECKPOINTS.index(name)
+        if (
+            ACTIVE_CI_CHECKPOINTS[index - 2 : index + 1] != (predecessor, prior, name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-N checkpoint ordering drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-N verifier boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_diagnostic_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the exact read-only import closure; never import/invoke the operator."""
+    failures = list(_arch133_verifier_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_DIAGNOSTIC_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-M verifier boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-post-publication-stage-diagnostic"
+        registrations = [
+            n
+            for n in ast.walk(runner_tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_DIAGNOSTIC_REGISTRATION_PIN
+        ):
+            failures.append("133-M source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133m"
+            or spec.authority_check is not _arch133_diagnostic_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_post_publication_stage_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_post_publication_stage_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-M source-only capability drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 1
+            ]
+            != ("arch133-robinhood-post-publication-verifier", name)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-M checkpoint ordering drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-M verifier boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_verifier_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the exact read-only import closure; never import/invoke the operator."""
+    failures = list(_arch133_recovery_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_VERIFIER_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-L verifier boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-post-publication-verifier"
+        registrations = [
+            n
+            for n in ast.walk(runner_tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in n.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_VERIFIER_REGISTRATION_PIN
+        ):
+            failures.append("133-L source registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133l"
+            or spec.authority_check is not _arch133_verifier_authority_check
+            or spec.tests
+            != (
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_VERIFIER_SOURCES,
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-L source-only capability drift")
+        predecessor = "arch133-robinhood-retained-root-acl-recovery"
+        successor = "arch133-robinhood-post-publication-stage-diagnostic"
+        if (
+            ACTIVE_CI_CHECKPOINTS[
+                ACTIVE_CI_CHECKPOINTS.index(name) - 1 : ACTIVE_CI_CHECKPOINTS.index(
+                    name
+                )
+                + 2
+            ]
+            != (predecessor, name, successor)
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-L checkpoint ordering drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("133-L verifier boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_recovery_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only pins; never import or invoke either recovery operator mode."""
+    failures = list(_arch133_retained_root_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_RECOVERY_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-K recovery boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-retained-root-acl-recovery"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_RECOVERY_REGISTRATION_PIN
+        ):
+            failures.append("133-K source-only registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133k"
+            or spec.authority_check is not _arch133_recovery_authority_check
+            or spec.tests
+            != (
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_RECOVERY_SOURCES,
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+            )
+        ):
+            failures.append("133-K runtime capability drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) + 1]
+            != "arch133-robinhood-post-publication-verifier"
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
+            != "arch133-robinhood-retained-root-diagnostic"
+        ):
+            failures.append("133-K batch successor registration drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-K recovery boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_retained_root_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only pins; never import or invoke the operator diagnostic."""
+    failures = list(_arch133_scratch_root_acl_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_RETAINED_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append(f"133-J read-only boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-retained-root-diagnostic"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_RETAINED_REGISTRATION_PIN
+        ):
+            failures.append("133-J source-only registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133j"
+            or spec.authority_check is not _arch133_retained_root_authority_check
+            or spec.tests
+            != (
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_RETAINED_SOURCES,
+                "tests/review_paper/test_retained_root_diagnostic.py",
+            )
+        ):
+            failures.append("133-J runtime capability drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
+            != "arch133-robinhood-scratch-root-acl-qualification"
+        ):
+            failures.append("133-J batch successor registration drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-J read-only boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133_SCRATCH_SOURCES: Final = (
+    "src/trading_bot/arch133_acl/__init__.py",
+    "src/trading_bot/arch133_acl/primitive.py",
+    "src/trading_bot/arch133_acl/read_only.py",
+    "src/trading_bot/arch133_acl/qualification.py",
+    "scripts/run_arch133_scratch_root_acl.py",
+    "src/trading_bot/arch133_acl/root_policy_apply.py",
+    "src/trading_bot/arch133_acl/administrator.py",
+)
+ARCH133_SCRATCH_PINS: Final = {
+    "src/trading_bot/arch133_acl/root_policy_apply.py": (
+        "d3777322118c9fb1353102fd083251c4b59ac9ee552572818a87546a0cf41dde"
+    ),
+    "src/trading_bot/arch133_acl/administrator.py": (
+        "286d4ab228fdad27b719a0673a19583bfe3cc667dcec958fa34bad30e8742611"
+    ),
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/primitive.py": (
+        "f68c54990fefc2f82eaf7758b41193b9450123cbb7fb13458576c8d427e3cd13"
+    ),
+    "src/trading_bot/arch133_acl/qualification.py": (
+        "c798ee76ea0680395a0bb32223250fcb58c810afad4c771a5822157e4c47e7f1"
+    ),
+    "scripts/run_arch133_scratch_root_acl.py": (
+        "6ef171aa76609dc48a4f3632b7e29845e1f5fe7e6cfadb6db946fb774252db73"
+    ),
+    # Pin package initializers too: fresh-process import closure is effect-free.
+    "src/trading_bot/__init__.py": (
+        "730b3821629d6650b3b3bcde8969d18fdcdc8061d1c023a810b3d0dbc266decb"
+    ),
+    "src/trading_bot/config.py": (
+        "fde1712ad80a4b9c734397dcb6615d2edbd227fd1b0be6b567b1f2bbf3ca2304"
+    ),
+}
+ARCH133_SCRATCH_REGISTRATION_PIN: Final = (
+    "93e30428d22ce71372e9cd9d29b7511feb9875b1bd5830186404a8c307092afa"
+)
+
+
+def _arch133_scratch_root_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """133-I is SOURCE ONLY: no preflight/execute callback or production import."""
+    failures = list(_arch133_host_publication_authority_check(repo_root))
+    try:
+        for relative, expected in ARCH133_SCRATCH_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            actual = hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode()
+            ).hexdigest()
+            if actual != expected:
+                failures.append(f"133-I scratch boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-scratch-root-acl-qualification"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != ARCH133_SCRATCH_REGISTRATION_PIN
+        ):
+            failures.append("133-I source-only registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133i"
+            or spec.authority_check is not _arch133_scratch_root_acl_authority_check
+            or spec.tests
+            != (
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_SCRATCH_SOURCES,
+                "src/trading_bot/review_paper/unattended_publication_windows.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            )
+        ):
+            failures.append("133-I runtime capability drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
+            != "arch133-robinhood-unattended-host-publication"
+        ):
+            failures.append("133-I batch successor registration drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-I scratch boundary unavailable")
+    return tuple(failures)
+
+
+def _arch133_host_publication_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin all 133-H operator/native composition and reused security boundaries."""
+    failures: list[str] = []
+    try:
+        for relative, expected in ARCH133_PUBLICATION_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            actual = hashlib.sha256(
+                ast.dump(tree, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            if actual != expected:
+                failures.append(f"133-H closed publication boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-host-publication"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                k.arg == "name"
+                and isinstance(k.value, ast.Constant)
+                and k.value.value == name
+                for k in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != ARCH133_PUBLICATION_REGISTRATION_PIN
+        ):
+            failures.append("133-H source-only registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133h"
+            or spec.authority_check is not _arch133_host_publication_authority_check
+            or spec.tests
+            != (*ARCH133_H_K_TESTS, "tests/review_paper/test_unattended_publication.py")
+            or spec.ruff_paths
+            != (
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_PUBLICATION_SOURCES,
+                "tests/review_paper/test_unattended_publication.py",
+            )
+        ):
+            failures.append("133-H runtime source-only registration drift")
+        ci = next(
+            n
+            for n in runner_tree.body
+            if isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and n.target.id == "ACTIVE_CI_CHECKPOINTS"
+        )
+        if (
+            tuple(ast.literal_eval(ci.value)) != ACTIVE_CI_CHECKPOINTS
+            or ACTIVE_CI_CHECKPOINTS[ACTIVE_CI_CHECKPOINTS.index(name) - 1]
+            != "arch133-robinhood-unattended-host-bootstrap"
+            or ACTIVE_CI_CHECKPOINTS.count(name) != 1
+        ):
+            failures.append("133-H batch registration drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-H workflow invocation drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        StopIteration,
+    ):
+        failures.append("133-H source or structural boundary unavailable")
+    return tuple(failures)
+
+
+ARCH133_PUBLICATION_SOURCES: Final = (
+    "src/trading_bot/review_paper/unattended_publication.py",
+    "src/trading_bot/review_paper/unattended_publication_windows.py",
+    "scripts/run_arch133_host_publication.py",
+    "src/trading_bot/arch133_acl/__init__.py",
+    "src/trading_bot/arch133_acl/primitive.py",
+    "src/trading_bot/arch133_acl/read_only.py",
+    "src/trading_bot/arch133_acl/root_policy_apply.py",
+    "src/trading_bot/arch133_acl/administrator.py",
+)
+ARCH133_PUBLICATION_PINS: Final = {
+    "src/trading_bot/arch133_acl/root_policy_apply.py": (
+        "d3777322118c9fb1353102fd083251c4b59ac9ee552572818a87546a0cf41dde"
+    ),
+    "src/trading_bot/arch133_acl/administrator.py": (
+        "286d4ab228fdad27b719a0673a19583bfe3cc667dcec958fa34bad30e8742611"
+    ),
+    # 133-I successor owns the extracted native leaf; all other 133-H pins remain.
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "7d6b3b0876d48dcc83a686c48b0baea181339b62006ee312e2f4a1773b87f1d7"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "3cfc44181b7dec97f0308c5ff87070992add05bbd3e84648658326d298061d8f"
+    ),
+    "src/trading_bot/arch133_acl/primitive.py": (
+        "f68c54990fefc2f82eaf7758b41193b9450123cbb7fb13458576c8d427e3cd13"
+    ),
+    "src/trading_bot/review_paper/unattended_publication.py": (
+        "820b6d0f86f56c22a03bbd734b6a3a98d0042d8ac167f28b39230d99d89da128"
+    ),
+    "src/trading_bot/review_paper/unattended_publication_windows.py": (
+        "44397d1ba3594c12ab85e76d4bf891a424e646c67f12f20f67a9c36c2cce7756"
+    ),
+    "scripts/run_arch133_host_publication.py": (
+        "5b5bb84080d916d18383657d8d6c2f96e7fa3a47d4e74b137cbe42b5ff7df5d1"
+    ),
+    "src/trading_bot/runtime/windows_authority_security.py": (
+        "1b034fc0ca0e066a0a9c8baf67c30415059141744ac0f981b1f35f1366f63f22"
+    ),
+    "src/trading_bot/runtime/personal_desktop_paper_account_security.py": (
+        "8e81affbb85f98f6a6b11e65e9a97f6e66b9113a5aca22080d3fb4183748d95d"
+    ),
+    "src/trading_bot/review_paper/unattended_host_identity.py": (
+        "987ea024d33025e3da26993df7768435e5a031666d72cdc73613f9b69a24a27c"
+    ),
+    "src/trading_bot/review_paper/unattended_activation.py": (
+        "7fc65af97b2465d82b907a67365d898a028226c2145b4cc77f6cdc6634f60b27"
+    ),
+    "src/trading_bot/review_paper/unattended_state_schema.py": (
+        "02859147d4d476c3b23b56f3c63f0ae5857caa372eaaf8cc9eeb230d88e34b77"
+    ),
+    "src/trading_bot/review_paper/unattended_scheduler.py": (
+        "79fe37f5e4c36c70096f86414f5e32151556c617b82bc086742a44470c7dde29"
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "02c546abd42849bee94b5c08e00c54cfb726d6ffddf235fa844d21471ce965c9"
+    ),
+    "src/trading_bot/review_paper/unattended_state_store.py": (
+        "93ffd82253c22803ff318721779e892f5f20dd9f996c8a2cdf3ba8f154ced822"
+    ),
+    "src/trading_bot/review_paper/unattended_state_verifier.py": (
+        "95e20d01781879a8c0637973fdc0a6b5efaff17d8377ffa59dbe865cb9c14d1c"
+    ),
+    "src/trading_bot/robinhood_execute_qualification_verifier.py": (
+        "e978006d124ff8945065b5e1ae240914068a80ce1ac3043174eb2e887e4043ff"
+    ),
+}
+ARCH133_PUBLICATION_REGISTRATION_PIN: Final = (
+    "14b2fabf7c5c7bcbc029bea006456f8dcc7ff54e329aaa09e3b389782d74c74a"
+)
+
+
+def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        pins = {
+            "src/trading_bot/review_paper/unattended_host_identity.py": (
+                "cb8b624c70f0792f8eba0336cf6e372d3b78f612"
+            ),
+            "src/trading_bot/review_paper/unattended_scheduler.py": (
+                "153395ce66ff11f7d0978541cbf9193ae4df3f30"
+            ),
+            "src/trading_bot/review_paper/unattended_host.py": (
+                "eb41d518af9ead0e4260b081af63d48b11560023"
+            ),
+            "src/trading_bot/review_paper/unattended_host_bootstrap.py": (
+                "54623c8c1933b227194532ca9d1ed702d3797279"
+            ),
+            "scripts/run_arch133_unattended_review_paper.py": (
+                "661023c46a3e088d338b67282effb7f35b00a93d"
+            ),
+            "scripts/run_arch133_unattended_host_preflight.py": (
+                "7916c2a9c90e33302e9313e5d35d9a282b90b149"
+            ),
+        }
+        for relative, expected in pins.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append(f"133-G closed bootstrap boundary drift: {relative}")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        name = "arch133-robinhood-unattended-host-bootstrap"
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                item.arg == "name"
+                and isinstance(item.value, ast.Constant)
+                and item.value.value == name
+                for item in node.keywords
+            )
+        ]
+        assignments = [
+            node
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or hashlib.sha256(
+                ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
+            ).hexdigest()
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
+        ):
+            failures.append("133-G batch registration drift")
+        spec = _checkpoint_specs()[name]
+        if (
+            len(registrations) != 1
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-unattended-review-paper-133g"
+            or spec.authority_check is not _arch133_host_bootstrap_authority_check
+            or spec.tests
+            != (
+                *ARCH133_A_G_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+            or spec.ruff_paths
+            != (
+                *ARCH133_A_G_RUFF_PATHS,
+                *pins,
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            )
+        ):
+            failures.append("133-G source-only coverage/authority drift")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-host-scheduler-surface"
+            )
+            + 1
+        ):
+            failures.append("133-G checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("133-G workflow invocation/order drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("133-G source or structural boundary unavailable")
     return tuple(failures)
 
 
@@ -881,7 +3996,7 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "ee37045e518b8996918d3a8009a48fa531f833f0ac79080a16937558290831f5"
+            != "2ceac689f87333f29d7389a315199bd580fc250a45d00856efd3829e554475e9"
         ):
             failures.append("133-D source-only registration drift")
         assignments = [
@@ -889,15 +4004,15 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-D batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -909,26 +4024,30 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_execution_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/test_robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_execution.py",
                 "src/trading_bot/robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-D source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-one-wake-composition")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch133-robinhood-unattended-one-wake-composition"
+            )
             + 1
         ):
             failures.append("133-D checkpoint ordering drift")
@@ -975,7 +4094,7 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f27e9f8bae3b05bf9157138c3a394092cdd615af00a30e0faf6b09f4104382ba"
+            != "4cefb0203b851fde16f5ee5f35cbff4e54f3fae04df508bfe84a4341c460a10c"
         ):
             failures.append("133-C source-only registration drift")
         assignments = [
@@ -983,15 +4102,15 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-C batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -1003,23 +4122,25 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             or spec.authority_check is not _arch133_one_wake_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             )
         ):
             failures.append("133-C source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-state-store") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch133-robinhood-unattended-state-store") + 1
         ):
             failures.append("133-C checkpoint ordering drift")
         workflow = (
@@ -1077,7 +4198,7 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "9c4545b38e5ac5a22d134c4675be76fbfcde36904a8b507ead63f2f3aa01a008"
+            != "33a9e39be9c3094ee8cdd31c2b11b00e0a5bc3e7dfd6770a54f867f322fed594"
         ):
             failures.append("133-B source-only registration drift")
         assignments = [
@@ -1085,15 +4206,15 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(assignments) != 1
             or hashlib.sha256(
                 ast.dump(assignments[0].value, include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-B batch registration drift")
         spec = _checkpoint_specs()[name]
@@ -1105,20 +4226,23 @@ def _arch133_unattended_state_authority_check(repo_root: Path) -> tuple[str, ...
             or spec.authority_check is not _arch133_unattended_state_authority_check
             or spec.tests
             != (
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
             )
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 *pins,
                 "tests/review_paper/test_unattended_state_store.py",
             )
         ):
             failures.append("133-B source-only coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch133-robinhood-unattended-activation-core") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch133-robinhood-unattended-activation-core")
+            + 1
         ):
             failures.append("133-B checkpoint ordering drift")
         workflow = (
@@ -1170,7 +4294,7 @@ def _arch133_unattended_activation_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "e211daf645d1cfa4ef74d7556c7c870d54dc61b8729ec3de4ccd78f67c4546d7"
+            != "fc97901789ef914ecc1550919cab9a04ab3f8969ea3a380a20b522d99b53221e"
         ):
             failures.append("133-A source-only checkpoint registration drift")
 
@@ -1179,7 +4303,7 @@ def _arch133_unattended_activation_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1188,8 +4312,8 @@ def _arch133_unattended_activation_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("133-A checkpoint batch registration drift")
 
@@ -1200,10 +4324,10 @@ def _arch133_unattended_activation_authority_check(
             failures.append("133-A checkpoint remote branch drift")
         if (
             spec.tests
-            != (*COMMON_TESTS, "tests/review_paper/test_unattended_activation.py")
+            != (*ARCH133_A_G_TESTS, "tests/review_paper/test_unattended_activation.py")
             or spec.ruff_paths
             != (
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_activation.py",
                 "tests/review_paper/test_unattended_activation.py",
             )
@@ -1211,8 +4335,11 @@ def _arch133_unattended_activation_authority_check(
             is not _arch133_unattended_activation_authority_check
         ):
             failures.append("133-A checkpoint coverage/authority drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-qualification") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-qualification")
+            + 1
         ):
             failures.append("133-A checkpoint ordering drift")
 
@@ -1268,7 +4395,7 @@ def _arch131_nyse_published_regular_session_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "ea64c087a1bc95927e3cb2859ca96c5b4bef76fdc4b560618aa359a2fab50e93"
+            != "0016427c31d574f73132803031404ff293ffdda00ef7f113d5bbb238177b1a71"
         ):
             failures.append("131-S source-only checkpoint registration drift")
 
@@ -1291,7 +4418,7 @@ def _arch131_nyse_published_regular_session_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1300,8 +4427,8 @@ def _arch131_nyse_published_regular_session_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-S checkpoint batch registration drift")
 
@@ -1310,8 +4437,11 @@ def _arch131_nyse_published_regular_session_authority_check(
             failures.append("131-S checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-S checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-verifier")
+            + 1
         ):
             failures.append("131-S checkpoint ordering drift")
 
@@ -1375,7 +4505,7 @@ def _arch131_published_session_prepare_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "96c920b26ef94304732b07eaf4df2f7ff18dcac2a2ddd1cab7b4de6dd6d540b0"
+            != "0c83b9828c88cb93dce677e6bc229cff6070457146e659c344aa062b9db84a82"
         ):
             failures.append("131-T source-only checkpoint registration drift")
 
@@ -1398,7 +4528,7 @@ def _arch131_published_session_prepare_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1407,8 +4537,8 @@ def _arch131_published_session_prepare_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-T checkpoint batch registration drift")
 
@@ -1417,8 +4547,13 @@ def _arch131_published_session_prepare_authority_check(
             failures.append("131-T checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-T checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-nyse-published-regular-session-authority") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-nyse-published-regular-session-authority"
+            )
+            + 1
         ):
             failures.append("131-T checkpoint ordering drift")
 
@@ -1485,7 +4620,7 @@ def _arch131_supervised_qualification_authority_check(
             or hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode()
             ).hexdigest()
-            != "e42577ccd29ef09c30aae31e0f8e624328ac0f0a879b47181e9c0058aee9f0b7"
+            != "66d7c5b592b044a3e6803c48d927d58688792df3fe7fa0c0da82617298972993"
         ):
             failures.append("131-V source-only registration drift")
         ci = [
@@ -1493,15 +4628,15 @@ def _arch131_supervised_qualification_authority_check(
             for node in tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci) != 1
             or hashlib.sha256(
                 ast.dump(ci[0].value, include_attributes=False).encode()
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-V checkpoint batch drift")
         spec = _checkpoint_specs()[name]
@@ -1512,9 +4647,12 @@ def _arch131_supervised_qualification_authority_check(
         ):
             failures.append("131-V source-only capability drift")
         if (
-            CI_CHECKPOINTS.count(name) != 1
-            or CI_CHECKPOINTS.index(name)
-            != CI_CHECKPOINTS.index("arch131-robinhood-published-prepare-operator") + 1
+            ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            or ACTIVE_CI_CHECKPOINTS.index(name)
+            != ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-robinhood-published-prepare-operator"
+            )
+            + 1
         ):
             failures.append("131-V checkpoint ordering drift")
         if not _batch_workflow_is_reviewed(
@@ -1567,7 +4705,7 @@ def _arch131_published_prepare_operator_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "175474f9594995f68ee317ba21635d3a6aa193a2c878898e1c41cec1740d4168"
+            != "284134d18999c57e6804b38aed32fe314a55997f64a4d2d398cec172bec892ed"
         ):
             failures.append("131-U source-only checkpoint registration drift")
 
@@ -1590,7 +4728,7 @@ def _arch131_published_prepare_operator_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1599,8 +4737,8 @@ def _arch131_published_prepare_operator_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-U checkpoint batch registration drift")
 
@@ -1609,8 +4747,11 @@ def _arch131_published_prepare_operator_authority_check(
             failures.append("131-U checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-U checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-published-session-prepare")
+            + 1
         ):
             failures.append("131-U checkpoint ordering drift")
 
@@ -1663,7 +4804,7 @@ def _arch131_session_admission_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "d2c29698ef6cff2d52c65f4f6a880c758384900c23b91eb48e247983aa5ae593"
+            != "1bc810681800fe4ee34053bb0dde0458f916ad1e445e2c8996a09e7754e8d95f"
         ):
             failures.append("131-M source-only checkpoint registration drift")
 
@@ -1686,7 +4827,7 @@ def _arch131_session_admission_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1695,8 +4836,8 @@ def _arch131_session_admission_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-M checkpoint batch registration drift")
 
@@ -1705,8 +4846,11 @@ def _arch131_session_admission_authority_check(
             failures.append("131-M checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-M checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-live-qualification-verifier")
+            + 1
         ):
             failures.append("131-M checkpoint ordering drift")
 
@@ -1759,7 +4903,7 @@ def _arch131_risk_price_snapshot_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "7856aa4f4bdf47bd73213ae4aac577f1c35b0a0b4e419f86e7669544a76779ff"
+            != "8ce08250dfb33311c8755a086c93a5ef72618834c100b326662af1b50f6fa6cd"
         ):
             failures.append("131-N source-only checkpoint registration drift")
 
@@ -1782,7 +4926,7 @@ def _arch131_risk_price_snapshot_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1791,8 +4935,8 @@ def _arch131_risk_price_snapshot_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-N checkpoint batch registration drift")
 
@@ -1801,9 +4945,9 @@ def _arch131_risk_price_snapshot_authority_check(
             failures.append("131-N checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-N checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-session-admission") + 1):
             failures.append("131-N checkpoint ordering drift")
 
         workflow = (
@@ -1855,7 +4999,7 @@ def _arch131_forward_paper_preview_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "14158ca87e328e2bd990251c4adf729b3f83fba647adcf02163b128888ae8226"
+            != "aea7a5069b96a9d9467751fe4fb2a6a894967bb9115969bdda3f2cd9c02e8408"
         ):
             failures.append("131-O source-only checkpoint registration drift")
 
@@ -1878,7 +5022,7 @@ def _arch131_forward_paper_preview_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1887,8 +5031,8 @@ def _arch131_forward_paper_preview_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-O checkpoint batch registration drift")
 
@@ -1897,9 +5041,9 @@ def _arch131_forward_paper_preview_authority_check(
             failures.append("131-O checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-O checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-snapshot") + 1):
             failures.append("131-O checkpoint ordering drift")
 
         workflow = (
@@ -1951,7 +5095,7 @@ def _arch131_risk_price_acquisition_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "c247d2cf1a8a6b2892a73db3a99f904102c7eb97f663f7bada586b3cceeab256"
+            != "bdbab6decc92b66f3e7973910b4c0f8e4d6f552249ac5562dacaf1e5cd7b58a5"
         ):
             failures.append("131-P source-only checkpoint registration drift")
 
@@ -1974,7 +5118,7 @@ def _arch131_risk_price_acquisition_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -1983,8 +5127,8 @@ def _arch131_risk_price_acquisition_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-P checkpoint batch registration drift")
 
@@ -1993,8 +5137,10 @@ def _arch131_risk_price_acquisition_authority_check(
             failures.append("131-P checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-P checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-preview") + 1
         ):
             failures.append("131-P checkpoint ordering drift")
 
@@ -2047,7 +5193,7 @@ def _arch131_supervised_forward_paper_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "267ef22d26c6fcb154a386872fb61967f19406ead279f1cf971a40e7edd1ed1f"
+            != "883effee55b5a3e0ac0888575d0a3079ae33c0df22add5e8f9e46f651e5f696e"
         ):
             failures.append("131-Q source-only checkpoint registration drift")
 
@@ -2070,7 +5216,7 @@ def _arch131_supervised_forward_paper_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2079,8 +5225,8 @@ def _arch131_supervised_forward_paper_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-Q checkpoint batch registration drift")
 
@@ -2089,8 +5235,10 @@ def _arch131_supervised_forward_paper_authority_check(
             failures.append("131-Q checkpoint has host/effect capability")
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-Q checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-risk-price-acquisition") + 1
         ):
             failures.append("131-Q checkpoint ordering drift")
 
@@ -2143,7 +5291,7 @@ def _arch131_prepare_qualification_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "00e856b35a66e8a84959411aed0feeb20a47304639a0c1e68838dc8c5d9d7071"
+            != "609db74ff7dc0436e06dfec6a2127ccd248882b1d4c1d5dcb722081c95769fbe"
         ):
             failures.append(
                 "131-R PREPARE qualification source-only checkpoint registration drift"
@@ -2168,7 +5316,7 @@ def _arch131_prepare_qualification_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2177,8 +5325,8 @@ def _arch131_prepare_qualification_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
                 "131-R PREPARE qualification checkpoint batch registration drift"
@@ -2193,8 +5341,11 @@ def _arch131_prepare_qualification_authority_check(
             failures.append(
                 "131-R PREPARE qualification checkpoint remote branch drift"
             )
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-forward-paper") + 1
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-supervised-forward-paper")
+            + 1
         ):
             failures.append("131-R PREPARE qualification checkpoint ordering drift")
 
@@ -2248,7 +5399,7 @@ def _arch131_prepare_verifier_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "9698532930293c76c29055fef6a32cbc80eca11217b59d6c465e4fa66dcb8a63"
+            != "b9efd873a9705fea3130b8d74e45d6d2628d499c85507504645b5bc5cf1a5a89"
         ):
             failures.append(
                 "131-R PREPARE verifier source-only checkpoint registration drift"
@@ -2273,7 +5424,7 @@ def _arch131_prepare_verifier_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
@@ -2282,8 +5433,8 @@ def _arch131_prepare_verifier_authority_check(
                     "utf-8"
                 )
             ).hexdigest()
-            != "f1d1c88655aba16411e5b64f4e6f872dd697ce5071301fe8755cd73dc1671684"
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append(
                 "131-R PREPARE verifier checkpoint batch registration drift"
@@ -2296,8 +5447,12 @@ def _arch131_prepare_verifier_authority_check(
             )
         if spec.remote_branch != ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH:
             failures.append("131-R PREPARE verifier checkpoint remote branch drift")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-supervised-prepare-qualification")
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (
+            ACTIVE_CI_CHECKPOINTS.index(
+                "arch131-robinhood-supervised-prepare-qualification"
+            )
             + 1
         ):
             failures.append("131-R PREPARE verifier checkpoint ordering drift")
@@ -2350,7 +5505,7 @@ def _arch131_live_qualification_verifier_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "2c436c254f013788cb0a5f238687a386e6030e240047883695a3d07d598219ba"
+            != "e122534ab36defb989812bdf1575806a0eeada2c9a1db286b58d22fce848339c"
         ):
             failures.append("131-LQ source-only checkpoint registration drift")
 
@@ -2373,20 +5528,20 @@ def _arch131_live_qualification_verifier_authority_check(
             for node in runner_tree.body
             if isinstance(node, ast.AnnAssign)
             and isinstance(node.target, ast.Name)
-            and node.target.id == "CI_CHECKPOINTS"
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
         ]
         if (
             len(ci_assignments) != 1
-            or tuple(ast.literal_eval(ci_assignments[0].value)) != CI_CHECKPOINTS
+            or tuple(ast.literal_eval(ci_assignments[0].value)) != ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("131-LQ checkpoint batch registration drift")
 
         spec = _checkpoint_specs()[name]
         if spec.preflight is not None or spec.execute is not None:
             failures.append("131-LQ checkpoint has host/effect capability")
-        if CI_CHECKPOINTS.count(name) != 1 or CI_CHECKPOINTS.index(name) != (
-            CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1
-        ):
+        if ACTIVE_CI_CHECKPOINTS.count(name) != 1 or ACTIVE_CI_CHECKPOINTS.index(
+            name
+        ) != (ACTIVE_CI_CHECKPOINTS.index("arch131-robinhood-forward-paper-cycle") + 1):
             failures.append("131-LQ checkpoint ordering drift")
 
         workflow = (
@@ -2442,7 +5597,7 @@ def _arch131_virtual_risk_context_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "58e753d8d40f6323289a609960ec36e9abf68cb56207b5d205b1ac5ec8473b67"
+            != "94fc142aa4272e37708964b62244b280213a9a26b63fa3520c5d262a9b9f6cec"
         ):
             failures.append("131-K source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -2505,7 +5660,7 @@ def _arch131_deterministic_paper_pipeline_authority_check(
             hashlib.sha256(
                 ast.dump(registrations[0], include_attributes=False).encode("utf-8")
             ).hexdigest()
-            != "11a7b1d02f2809026c941643a380b5af23cf781f14c1a5b008e3c72373eba2f0"
+            != "59c840ae9e36569ba06afc08624d9bb8e47de59bd19d20f217866c51d3fcc8dc"
         ):
             failures.append("131-J source-only checkpoint registration drift")
         spec = _checkpoint_specs()[name]
@@ -2871,6 +6026,7 @@ def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
             if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
         }
         expected_tools = (
+            "get_equity_historicals",
             "get_equity_orders",
             "get_equity_quotes",
             "review_equity_order",
@@ -2904,6 +6060,7 @@ def _arch131_direct_mcp_authority_check(repo_root: Path) -> tuple[str, ...]:
                 and not node.name.startswith("_")
             }
             expected_public = {
+                "get_equity_historicals",
                 "for_test",
                 "review_equity_order",
                 "get_equity_quotes",
@@ -3048,6 +6205,7 @@ def _arch131_mcp_schema_authority_check(repo_root: Path) -> tuple[str, ...]:
                 node.name for node in protocol.body if isinstance(node, ast.FunctionDef)
             }
             expected = {
+                "get_equity_historicals",
                 "review_equity_order",
                 "get_equity_quotes",
                 "get_equity_orders",
@@ -4782,9 +7940,4711 @@ def _r7_execute() -> dict[str, object]:
     }
 
 
+SUPERVISED_RELEASE_SOURCES: Final = (
+    "src/trading_bot/supervised_release/__init__.py",
+    "src/trading_bot/supervised_release/model.py",
+)
+SUPERVISED_RELEASE_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_supervised_release_foundation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+SUPERVISED_RELEASE_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    *SUPERVISED_RELEASE_SOURCES,
+    "tests/review_paper/test_supervised_release_foundation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+
+
+def _supervised_release_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only structural check; no host/native/scheduler callback."""
+    failures = []
+    try:
+        spec = _checkpoint_specs()["arch133-robinhood-supervised-release-foundation"]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-supervised-release-foundation"
+            or spec.tests != SUPERVISED_RELEASE_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_RUFF_PATHS
+            or spec.authority_check is not _supervised_release_authority_check
+        ):
+            failures.append("supervised release source-only registration drift")
+        allowed = {
+            "__future__",
+            "hashlib",
+            "json",
+            "re",
+            "dataclasses",
+            "decimal",
+            "pathlib",
+            "uuid",
+            "trading_bot.strategies",
+            "trading_bot.supervised_release.model",
+        }
+        forbidden = {
+            "open",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "read_text",
+            "read_bytes",
+            "write_text",
+            "write_bytes",
+            "mkdir",
+            "resolve",
+            "exists",
+            "run",
+            "Popen",
+            "system",
+        }
+        for relative in SUPERVISED_RELEASE_SOURCES:
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    if any(alias.name not in allowed for alias in node.names):
+                        failures.append("supervised release import boundary drift")
+                if isinstance(node, ast.ImportFrom):
+                    if node.module not in allowed or (
+                        node.module == "pathlib"
+                        and [alias.name for alias in node.names] != ["PureWindowsPath"]
+                    ):
+                        failures.append("supervised release import boundary drift")
+                if isinstance(node, ast.Call):
+                    function = node.func
+                    name = (
+                        function.id
+                        if isinstance(function, ast.Name)
+                        else getattr(function, "attr", "")
+                    )
+                    if name in forbidden:
+                        failures.append("supervised release capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("supervised release workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("supervised release source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RELEASE_BUNDLE_SOURCES: Final = (
+    "src/trading_bot/supervised_release/bundle.py",
+    "src/trading_bot/supervised_release/binding.py",
+    "src/trading_bot/supervised_release/collector.py",
+)
+SUPERVISED_RELEASE_BUNDLE_PINS: Final = {
+    "src/trading_bot/supervised_release/bundle.py": (
+        "1a3edc3186da17851106810c7f34c43c17b56b7c"
+    ),
+    "src/trading_bot/supervised_release/binding.py": (
+        "acdd2dfa17398afc822e770dd18166b747514cc1"
+    ),
+    "src/trading_bot/supervised_release/collector.py": (
+        "fa914cc84d4e0c10818015b38b206ef0caf8c4e1"
+    ),
+}
+SUPERVISED_RELEASE_BUNDLE_TESTS: Final = (
+    *SUPERVISED_RELEASE_TESTS,
+    "tests/review_paper/test_supervised_release_bundle.py",
+)
+SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_RUFF_PATHS,
+    *SUPERVISED_RELEASE_BUNDLE_SOURCES,
+    "tests/review_paper/test_supervised_release_bundle.py",
+)
+
+
+def _supervised_release_bundle_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Read source only; never invoke the collector or a production observer."""
+    failures = list(_supervised_release_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[
+            "arch133-robinhood-supervised-release-build-verification"
+        ]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-build-verification"
+            or spec.tests != SUPERVISED_RELEASE_BUNDLE_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS
+            or spec.authority_check is not _supervised_release_bundle_authority_check
+        ):
+            failures.append("release bundle source-only registration drift")
+        pure = {
+            "__future__",
+            "base64",
+            "hashlib",
+            "json",
+            "dataclasses",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.bundle",
+        }
+        forbidden = {
+            "write_text",
+            "write_bytes",
+            "mkdir",
+            "unlink",
+            "rename",
+            "system",
+            "Popen",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+        }
+        for relative in SUPERVISED_RELEASE_BUNDLE_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_RELEASE_BUNDLE_PINS[relative]
+            ):
+                failures.append("release bundle reviewed source drift")
+            collector = relative.endswith("/collector.py")
+            allowed = pure | (
+                {"os", "stat", "subprocess", "pathlib"} if collector else set()
+            )
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("release bundle import boundary drift")
+                if isinstance(node, ast.ImportFrom) and node.module not in allowed:
+                    failures.append("release bundle import boundary drift")
+                if isinstance(node, ast.Call):
+                    name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    if name in forbidden or (
+                        not collector
+                        and name
+                        in {
+                            "open",
+                            "run",
+                            "read_bytes",
+                            "read_text",
+                            "lstat",
+                            "resolve",
+                        }
+                    ):
+                        failures.append("release bundle capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("release bundle workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("release bundle source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RELEASE_INSTALLATION_SOURCES: Final = (
+    "src/trading_bot/supervised_release/installation_contract.py",
+    "src/trading_bot/supervised_release/observer.py",
+    "src/trading_bot/supervised_release/installer.py",
+    "src/trading_bot/supervised_release/native_read.py",
+    "src/trading_bot/supervised_release/native_write.py",
+)
+SUPERVISED_RELEASE_INSTALLATION_PINS: Final = {
+    "src/trading_bot/supervised_release/installation_contract.py": (
+        "ffff404ed16c7a476a0a3ecb622b8bdfbd701ef1"
+    ),
+    "src/trading_bot/supervised_release/observer.py": (
+        "7b08981a06b5df123355abef678c6d17a54339ec"
+    ),
+    "src/trading_bot/supervised_release/installer.py": (
+        "de510dbec9c72fea2fd3178accf9e2a5742dabaa"
+    ),
+    "src/trading_bot/supervised_release/native_read.py": (
+        "bcbfd75043d6c31cad725425278dd7c80baff642"
+    ),
+    "src/trading_bot/supervised_release/native_write.py": (
+        "fd059cd6363583d3923d073b8be78f8d3a1519ea"
+    ),
+}
+SUPERVISED_RELEASE_INSTALLATION_TESTS: Final = (
+    *SUPERVISED_RELEASE_BUNDLE_TESTS,
+    "tests/review_paper/test_supervised_release_installation.py",
+)
+SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS,
+    *SUPERVISED_RELEASE_INSTALLATION_SOURCES,
+    "tests/review_paper/test_supervised_release_installation.py",
+)
+
+
+def _supervised_release_installation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Source-only 133-AC admission; never instantiate a native backend."""
+    failures = list(_supervised_release_bundle_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()["arch133-robinhood-supervised-release-installation"]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-supervised-release-installation"
+            or spec.tests != SUPERVISED_RELEASE_INSTALLATION_TESTS
+            or spec.ruff_paths != SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_release_installation_authority_check
+        ):
+            failures.append("release installation source-only registration drift")
+        common = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "pathlib",
+            "typing",
+            "contextlib",
+            "collections.abc",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.arch133_acl.read_only",
+        }
+        allowed_by_file = {
+            "installation_contract.py": common,
+            "observer.py": common
+            | {"hashlib", "trading_bot.supervised_release.native_read"},
+            "installer.py": common
+            | {
+                "trading_bot.supervised_release.observer",
+                "trading_bot.supervised_release.native_write",
+            },
+            "native_read.py": common | {"ctypes", "sys"},
+            "native_write.py": common
+            | {
+                "ctypes",
+                "trading_bot.arch133_acl.administrator",
+                "trading_bot.supervised_release.native_read",
+                "trading_bot.supervised_release.observer",
+            },
+        }
+        forbidden = {
+            "unlink",
+            "rmtree",
+            "rename",
+            "remove",
+            "sleep",
+            "run",
+            "Popen",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+        }
+        for relative in SUPERVISED_RELEASE_INSTALLATION_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_RELEASE_INSTALLATION_PINS[relative]
+            ):
+                failures.append("release installation reviewed source drift")
+            allowed = allowed_by_file[Path(relative).name]
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("release installation import boundary drift")
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module not in allowed or node.level
+                ):
+                    failures.append("release installation import boundary drift")
+                if isinstance(node, ast.Call):
+                    name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    if name in forbidden:
+                        failures.append(
+                            "release installation capability boundary drift"
+                        )
+        # The two reused native read/token primitives remain pinned too; no
+        # mutation-capable historical deployment module is admitted through them.
+        for relative, pin in SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("release installation native primitive source drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("release installation source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS: Final = {
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "09bdfb69953b155a1a75a9f2235456815f179b31"
+    ),
+    "src/trading_bot/arch133_acl/administrator.py": (
+        "d3498b3fc9771e0cdccee76653e20a2ecf34b4d5"
+    ),
+}
+
+
+SUPERVISED_MAINTENANCE_SOURCES: Final = (
+    "src/trading_bot/supervised_release/maintenance.py",
+)
+SUPERVISED_MAINTENANCE_PINS: Final = {
+    "src/trading_bot/supervised_release/maintenance.py": (
+        "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
+    ),
+}
+SUPERVISED_MAINTENANCE_TESTS: Final = (
+    *SUPERVISED_RELEASE_INSTALLATION_TESTS,
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_arch133_scheduler_installation.py",
+)
+SUPERVISED_MAINTENANCE_RUFF_PATHS: Final = (
+    *SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS,
+    *SUPERVISED_MAINTENANCE_SOURCES,
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+)
+
+
+def _supervised_maintenance_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """133-AD source-only closure; reuse the accepted AC pins unchanged."""
+    failures = list(_supervised_release_installation_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()["arch133-robinhood-supervised-maintenance-rebind"]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-supervised-maintenance-rebind"
+            or spec.tests != SUPERVISED_MAINTENANCE_TESTS
+            or spec.ruff_paths != SUPERVISED_MAINTENANCE_RUFF_PATHS
+            or spec.authority_check is not _supervised_maintenance_authority_check
+        ):
+            failures.append("maintenance source-only registration drift")
+        allowed = {
+            "__future__",
+            "re",
+            "dataclasses",
+            "datetime",
+            "enum",
+            "typing",
+            "xml.etree",
+            "trading_bot.arch133_acl.read_only",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "open",
+            "run",
+            "Popen",
+            "WinDLL",
+            "read_text",
+            "read_bytes",
+            "unlink",
+            "delete",
+            "remove",
+            "rename",
+            "rmtree",
+            "sleep",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "install_release",
+            "publish",
+            "enable",
+            "start",
+        }
+        for relative in SUPERVISED_MAINTENANCE_SOURCES:
+            if (
+                _git_blob_sha1(repo_root / relative)
+                != SUPERVISED_MAINTENANCE_PINS[relative]
+            ):
+                failures.append("maintenance reviewed source drift")
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("maintenance import boundary drift")
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module not in allowed or node.level
+                ):
+                    failures.append("maintenance import boundary drift")
+                if (
+                    isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    in forbidden
+                ):
+                    failures.append("maintenance capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("maintenance workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("maintenance source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_RUNTIME_ADMISSION_SOURCES: Final = (
+    "src/trading_bot/supervised_release/model.py",
+    "src/trading_bot/supervised_release/maintenance.py",
+    "src/trading_bot/supervised_release/runtime_admission.py",
+    "scripts/run_arch133_supervised_release_review_paper.py",
+)
+SUPERVISED_RUNTIME_ADMISSION_PINS: Final = {
+    "src/trading_bot/supervised_release/model.py": (
+        "1619bf29a3c0c8b262912dfaf517ae44e4b77708"
+    ),
+    "src/trading_bot/supervised_release/maintenance.py": (
+        "c06ce9728a9f5f36ef7015877ba5a6a875dd1097"
+    ),
+    "src/trading_bot/supervised_release/runtime_admission.py": (
+        "ef95b314c527d5f2e773b06c9d2a5f217ae8d09b"
+    ),
+    "scripts/run_arch133_supervised_release_review_paper.py": (
+        "89178cd8f7dd3341a4016d005f388df4c85a55dc"
+    ),
+}
+SUPERVISED_RUNTIME_ADMISSION_TESTS: Final = (
+    *SUPERVISED_MAINTENANCE_TESTS,
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+)
+SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS: Final = (
+    *SUPERVISED_MAINTENANCE_RUFF_PATHS,
+    "src/trading_bot/supervised_release/runtime_admission.py",
+    "scripts/run_arch133_supervised_release_review_paper.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+)
+
+
+def _supervised_runtime_admission_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """133-AE source-only runtime admission; no real-host observer is constructed."""
+    failures = list(_supervised_maintenance_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[
+            "arch133-robinhood-supervised-runtime-host-admission"
+        ]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-runtime-host-admission"
+            or spec.tests != SUPERVISED_RUNTIME_ADMISSION_TESTS
+            or spec.ruff_paths != SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS
+            or spec.authority_check is not _supervised_runtime_admission_authority_check
+        ):
+            failures.append("runtime admission source-only registration drift")
+        for relative, pin in SUPERVISED_RUNTIME_ADMISSION_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("runtime admission reviewed source drift")
+
+        relative = "src/trading_bot/supervised_release/runtime_admission.py"
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "pathlib",
+            "typing",
+            "trading_bot.arch133_acl.read_only",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "open",
+            "run",
+            "Popen",
+            "WinDLL",
+            "read_text",
+            "read_bytes",
+            "write_text",
+            "write_bytes",
+            "unlink",
+            "delete",
+            "remove",
+            "rename",
+            "rmtree",
+            "sleep",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "install_release",
+            "publish",
+            "enable",
+            "start",
+            "credential",
+            "provider",
+        }
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("runtime admission import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("runtime admission import boundary drift")
+            if (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                in forbidden
+            ):
+                failures.append("runtime admission capability boundary drift")
+
+        launcher = ast.parse(
+            (
+                repo_root / "scripts/run_arch133_supervised_release_review_paper.py"
+            ).read_text(encoding="utf-8")
+        )
+        launcher_imports = {
+            alias.name
+            for node in launcher.body
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        launcher_from = {
+            node.module for node in launcher.body if isinstance(node, ast.ImportFrom)
+        }
+        if launcher_imports != {"sys"} or launcher_from != {
+            "pathlib",
+            "trading_bot.supervised_release",
+        }:
+            failures.append("runtime launcher import boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("runtime admission workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("runtime admission source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE: Final = (
+    "src/trading_bot/supervised_release/qualification.py"
+)
+SUPERVISED_DEPLOYMENT_QUALIFICATION_PIN: Final = (
+    "0cfa5453657519ab2db741a95e2b187cc7c789c3"
+)
+SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS: Final = (
+    *SUPERVISED_RUNTIME_ADMISSION_TESTS,
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+)
+SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS: Final = (
+    *SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS,
+    SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE,
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+)
+
+
+def _supervised_deployment_qualification_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """133-AF inert qualification, chained to unchanged AC/AD/AE authority."""
+    failures = list(_supervised_runtime_admission_authority_check(repo_root))
+    try:
+        name = "arch133-robinhood-supervised-deployment-qualification"
+        spec = _checkpoint_specs()[name]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-deployment-qualification"
+            or spec.tests != SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS
+            or spec.ruff_paths != SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_deployment_qualification_authority_check
+            or ACTIVE_CI_CHECKPOINTS[1] != name
+        ):
+            failures.append("deployment qualification source-only registration drift")
+        path = repo_root / SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_DEPLOYMENT_QUALIFICATION_PIN:
+            failures.append("deployment qualification reviewed source drift")
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "typing",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.maintenance",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.observer",
+            "trading_bot.supervised_release.runtime_admission",
+        }
+        forbidden = {
+            "open",
+            "run",
+            "Popen",
+            "WinDLL",
+            "read_text",
+            "read_bytes",
+            "write_text",
+            "write_bytes",
+            "unlink",
+            "delete",
+            "remove",
+            "rename",
+            "rmtree",
+            "sleep",
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "install_release",
+            "publish",
+            "enable",
+            "start",
+            "credential",
+            "provider",
+            "begin",
+            "finish",
+            "repair",
+            "cleanup",
+            "retry",
+            "activate",
+            "rebind",
+        }
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("deployment qualification import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("deployment qualification import boundary drift")
+            if (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                in forbidden
+            ):
+                failures.append("deployment qualification capability boundary drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("deployment qualification workflow drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("deployment qualification source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_INSTALLATION_OPERATOR_NAME: Final = (
+    "arch133-robinhood-supervised-release-installation-operator"
+)
+SUPERVISED_INSTALLATION_OPERATOR_SOURCE: Final = (
+    "src/trading_bot/supervised_release/installation_operator.py"
+)
+SUPERVISED_INSTALLATION_OPERATOR_PIN: Final = "91d3fa845825f02b525b3f578a9f1a011c422ba6"
+SUPERVISED_INSTALLATION_REGISTRATION_PIN: Final = (
+    "d771a020f19aea6a13e39cfc78316b9037cfd8fa4d9e1c668cd732a8aebb96ce"
+)
+SUPERVISED_INSTALLATION_OPERATOR_TESTS: Final = (
+    *SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS,
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+)
+SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS: Final = (
+    *SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS,
+    SUPERVISED_INSTALLATION_OPERATOR_SOURCE,
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+    "src/trading_bot/supervised_release/installation_reconciliation.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+)
+# This fixed external latch is independent of per-invocation evidence roots,
+# release IDs, authorization tokens and source revisions. Never remove/reset it.
+SUPERVISED_INSTALLATION_ATTEMPT: Final = Path(
+    r"F:\AI\temp\arch133-ag-installation-attempt\attempt.json"
+)
+SUPERVISED_INSTALLATION_ATTEMPT_PIN: Final = (
+    "7644631afa639683c4fa1c9f87773d631373901edd3d1db63d1950406a0b47fb"
+)
+_installation_execution_admitted = False
+_installation_execution_source: tuple[str, str] | None = None
+
+
+def _supervised_installation_operator_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Read source only; chain accepted AC/AD/AE/AF and freeze the AG bridge."""
+    failures = list(_supervised_deployment_qualification_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]
+        if (
+            spec.preflight is not _supervised_installation_preflight
+            or spec.execute is not _supervised_installation_execute
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-installation-operator"
+            or spec.tests != SUPERVISED_INSTALLATION_OPERATOR_TESTS
+            or spec.ruff_paths != SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_installation_operator_authority_check
+            or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
+        ):
+            failures.append("installation operator registration drift")
+        path = repo_root / SUPERVISED_INSTALLATION_OPERATOR_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_OPERATOR_PIN:
+            failures.append("installation operator reviewed source drift")
+        allowed = {
+            "__future__",
+            "hashlib",
+            "os",
+            "re",
+            "stat",
+            "subprocess",
+            "collections.abc",
+            "dataclasses",
+            "decimal",
+            "pathlib",
+            "trading_bot.arch133_acl.administrator",
+            "trading_bot.strategies",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.collector",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.observer",
+            "trading_bot.supervised_release.installer",
+        }
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("installation operator import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("installation operator import boundary drift")
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(runner_tree)
+        latch_declarations = [
+            node.value
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "SUPERVISED_INSTALLATION_ATTEMPT"
+        ]
+        if (
+            len(latch_declarations) != 1
+            or hashlib.sha256(
+                ast.dump(latch_declarations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_INSTALLATION_ATTEMPT_PIN
+        ):
+            failures.append("installation attempt namespace source drift")
+        registrations = [
+            node
+            for node in ast.walk(runner_tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "CheckpointSpec"
+            and any(
+                keyword.arg == "name"
+                and isinstance(keyword.value, ast.Constant)
+                and keyword.value.value == SUPERVISED_INSTALLATION_OPERATOR_NAME
+                for keyword in node.keywords
+            )
+        ]
+        if (
+            len(registrations) != 1
+            or hashlib.sha256(
+                ast.dump(registrations[0], include_attributes=False).encode()
+            ).hexdigest()
+            != SUPERVISED_INSTALLATION_REGISTRATION_PIN
+        ):
+            failures.append("installation operator source registration drift")
+        if set(SUPERVISED_INSTALLATION_RUNNER_PINS) != {
+            "_supervised_installation_operator_authority_check",
+            "_supervised_installation_admission",
+            "_supervised_installation_preflight",
+            "_supervised_installation_latch_consumed",
+            "_consume_supervised_installation_attempt",
+            "_supervised_installation_execute",
+            "preflight_checkpoint",
+            "execute_checkpoint",
+            "main",
+        }:
+            failures.append("installation runner pin inventory drift")
+        for name, pin in SUPERVISED_INSTALLATION_RUNNER_PINS.items():
+            if (
+                name not in functions
+                or hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("installation runner authority drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("installation operator source unavailable")
+    return tuple(failures)
+
+
+SUPERVISED_INSTALLATION_RUNNER_PINS: Final = {
+    "_supervised_installation_operator_authority_check": (
+        "d8538e6574915327f19929256da57f94a99de33109629b38132c445bf45cac5b"
+    ),
+    "_supervised_installation_admission": (
+        "decdbd5c7afbd951a005c536ad479a63e8144d3be4e47cf46ff078e4a682dc7a"
+    ),
+    "_supervised_installation_preflight": (
+        "eb7ef3df4a4344e57b36a3507bafdbbdc481f0b2dbd4857678d915fbba304e1b"
+    ),
+    "_supervised_installation_latch_consumed": (
+        "03b801f9bd4213246b06cec716a6b95e60da5f33fa7c98c90a877a5a5d5a0376"
+    ),
+    "_consume_supervised_installation_attempt": (
+        "fb58adf0e5d0c9ee78d16995abb49b1b654050099088aab00bfa050d1286358f"
+    ),
+    "_supervised_installation_execute": (
+        "c4584e649ea5a947fe26d7ebe7db41d5a47f3b7812c2b73fc8d01faac877f9ce"
+    ),
+    "preflight_checkpoint": (
+        "a5e63c447cb53e2998b4234dc0ecb2f81c2954b7677bc78d8414f6d278b8b15f"
+    ),
+    "execute_checkpoint": (
+        "35164fc0985154d41a9f35f7b6b144df6ce86658941a083e7f5705fcee9366ed"
+    ),
+    "main": ("7327e8425a2c6b9f65250bc004b694a6f39a4c79cd654df9425ce73df0efd810"),
+}
+
+
+def _supervised_installation_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.BASE_HEAD, "HEAD")
+        != operator.BASE_HEAD
+        or _supervised_installation_operator_authority_check(repo_root)
+    ):
+        raise RuntimeError("installation source authority rejected")
+
+
+def _supervised_installation_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("installation live remote authority rejected")
+    result = operator._preflight()
+    if (
+        _supervised_installation_latch_consumed()
+        and result.get("primary", {}).get("status") != "ALREADY_INSTALLED_VERIFIED"
+    ):
+        return {
+            "status": "BLOCKED",
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "primary": {
+                "status": "INDETERMINATE",
+                "disposition": "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY",
+                "reason": "CONSUMED_ATTEMPT",
+            },
+        }
+    return result
+
+
+def _supervised_installation_latch_consumed() -> bool:
+    for path in reversed(
+        (SUPERVISED_INSTALLATION_ATTEMPT, *SUPERVISED_INSTALLATION_ATTEMPT.parents)
+    ):
+        try:
+            facts = path.lstat()
+        except FileNotFoundError:
+            return False
+        if (
+            stat.S_ISLNK(facts.st_mode)
+            or getattr(facts, "st_file_attributes", 0)
+            & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            or (
+                path != SUPERVISED_INSTALLATION_ATTEMPT
+                and not stat.S_ISDIR(facts.st_mode)
+            )
+        ):
+            raise RuntimeError("installation attempt namespace rejected")
+    return True
+
+
+def _consume_supervised_installation_attempt() -> None:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if not _installation_execution_admitted:
+        raise RuntimeError("installation runner admission required")
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_admission(_REPOSITORY_ROOT, state)
+    if (
+        state["head"],
+        state["tree"],
+    ) != _installation_execution_source or _remote_branch_head(
+        _REPOSITORY_ROOT, operator.BRANCH
+    ) != state["head"]:
+        raise RuntimeError("installation source changed before attempt fence")
+    # Exclusive creation is the cross-process one-attempt fence. A failed write
+    # or flush leaves the latch consumed; no cleanup or reset is permitted.
+    if _supervised_installation_latch_consumed():
+        raise FileExistsError("installation attempt consumed")
+    SUPERVISED_INSTALLATION_ATTEMPT.parent.mkdir(parents=True, exist_ok=True)
+    if _supervised_installation_latch_consumed():
+        raise FileExistsError("installation attempt consumed")
+    with SUPERVISED_INSTALLATION_ATTEMPT.open("x", encoding="utf-8") as handle:
+        handle.write(
+            '{"schema":"arch133-ag-installation-attempt/v1","status":"CONSUMED","automatic_retry":"NOT_AUTHORIZED"}\n'
+        )
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _supervised_installation_execute() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_operator as operator
+
+    if (
+        not _installation_execution_admitted
+        or os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE
+    ):
+        raise RuntimeError("installation authorization interlock rejected")
+    return operator._execute_once(_consume_supervised_installation_attempt)
+
+
+SUPERVISED_INSTALLATION_RECONCILIATION_NAME: Final = (
+    "arch133-robinhood-supervised-release-installation-reconciliation"
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE: Final = (
+    "src/trading_bot/supervised_release/installation_reconciliation.py"
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_PIN: Final = (
+    "ab51944d25252ccce9a0740ba5d62fc15ebea10c"
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_TESTS: Final = (
+    SUPERVISED_INSTALLATION_OPERATOR_TESTS
+)
+SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS: Final = (
+    SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS
+)
+
+
+def _supervised_installation_reconciliation_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the read-only 133-AI incident reconciliation boundary."""
+    failures = list(_supervised_installation_operator_authority_check(repo_root))
+    try:
+        from trading_bot.supervised_release import (
+            installation_reconciliation as operator,
+        )
+
+        spec = _checkpoint_specs()[SUPERVISED_INSTALLATION_RECONCILIATION_NAME]
+        if (
+            spec.preflight is not _supervised_installation_reconciliation_preflight
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-installation-reconciliation"
+            or spec.tests != SUPERVISED_INSTALLATION_RECONCILIATION_TESTS
+            or spec.ruff_paths != SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS
+            or spec.authority_check
+            is not _supervised_installation_reconciliation_authority_check
+            or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
+            or SUPERVISED_INSTALLATION_RECONCILIATION_NAME in ACTIVE_CI_CHECKPOINTS
+        ):
+            failures.append("installation reconciliation registration drift")
+
+        path = repo_root / SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE
+        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_RECONCILIATION_PIN:
+            failures.append("installation reconciliation reviewed source drift")
+
+        allowed = {
+            "__future__",
+            "json",
+            "stat",
+            "dataclasses",
+            "pathlib",
+            "typing",
+            "trading_bot.supervised_release.installation_operator",
+            "trading_bot.arch133_acl.administrator",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "delete",
+            "repair",
+            "cleanup",
+            "retry",
+            "activate",
+            "rebind",
+            "enable",
+            "start",
+            "run",
+            "Popen",
+            "provider",
+            "credential",
+            "submit",
+            "launch",
+            "wake",
+            "install_release",
+            "create_directory",
+            "write_file",
+            "seal_staging",
+            "publish",
+            "mkdir",
+            "unlink",
+            "write_text",
+            "write_bytes",
+            "rename",
+            "replace",
+            "rmtree",
+            "remove",
+            "chmod",
+        }
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import) and any(
+                alias.name not in allowed for alias in node.names
+            ):
+                failures.append("installation reconciliation import boundary drift")
+            if isinstance(node, ast.ImportFrom) and (
+                node.module not in allowed or node.level
+            ):
+                failures.append("installation reconciliation import boundary drift")
+            if (
+                isinstance(node, ast.Call)
+                and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                in forbidden
+            ):
+                failures.append("installation reconciliation capability boundary drift")
+
+        if (
+            operator.WORKTREE
+            != Path(
+                r"F:\AI\worktrees\ai-trading-bot-supervised-release-installation-reconciliation"
+            )
+            or operator.BRANCH
+            != "feature/robinhood-supervised-release-installation-reconciliation"
+            or operator.ORIGIN != "https://github.com/callmedraken/ai-trading-bot.git"
+            or operator.FAILED_AG_HEAD != "513b60029f459ad6ecb4938f8fea2d54209a29d1"
+            or operator.FAILED_AG_TREE != "14e8d161ac95e57982c576ebd19681bb204b22fd"
+            or operator.EXPECTED_RELEASE_ID
+            != "release-03c42597246752319956ab96e01ed61c"
+        ):
+            failures.append("installation reconciliation fixed incident drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("installation reconciliation source unavailable")
+    return tuple(failures)
+
+
+def _supervised_installation_reconciliation_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import installation_reconciliation as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.FAILED_AG_HEAD, "HEAD")
+        != operator.FAILED_AG_HEAD
+        or _supervised_installation_reconciliation_authority_check(repo_root)
+    ):
+        raise RuntimeError("installation reconciliation source authority rejected")
+
+
+def _supervised_installation_reconciliation_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import installation_reconciliation as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_installation_reconciliation_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("installation reconciliation live remote authority rejected")
+    return operator._preflight()
+
+
+SUPERVISED_PUBLICATION_RECOVERY_NAME: Final = (
+    "arch133-robinhood-supervised-release-publication-recovery"
+)
+SUPERVISED_PUBLICATION_RECOVERY_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_supervised_release_publication_recovery.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+)
+SUPERVISED_PUBLICATION_RECOVERY_RUFF_PATHS: Final = (
+    "tests/runtime/checkpoint_runner/helpers.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "scripts/checkpoint_runner.py",
+    "src/trading_bot/supervised_release/publication_recovery.py",
+    "src/trading_bot/supervised_release/native_publication.py",
+    "src/trading_bot/supervised_release/installation_reconciliation.py",
+    *SUPERVISED_PUBLICATION_RECOVERY_TESTS,
+)
+SUPERVISED_PUBLICATION_RECOVERY_PINS: Final = {
+    "src/trading_bot/supervised_release/publication_recovery.py": (
+        "2432d7626ad8b263cb96cda0a858ca7fe0f7d579"
+    ),
+    "src/trading_bot/supervised_release/native_publication.py": (
+        "4f9458d9d1d473d9df36ce94ca296bc8e0299acc"
+    ),
+}
+SUPERVISED_PUBLICATION_RUNNER_PINS: Final = {
+    "_supervised_publication_recovery_authority_check": (
+        "0a2edef62a5432341f769b7a9fd77e965582cdf79fa105a5b98bf5849deb653b"
+    ),
+    "_supervised_publication_admission": (
+        "914ca755f622d42784990d060816b7956955fad7a435c0a6b3091b357a967d11"
+    ),
+    "_supervised_publication_live_source": (
+        "836bbac33df7d46208cca4d305b39be9873b090297810c642624e9c39444f54d"
+    ),
+    "_supervised_publication_preflight": (
+        "c78dc33a422ef7897941f9f00ca2f3da2aa5926c2bc35338e656b96d0a05567e"
+    ),
+    "_supervised_publication_execute": (
+        "24c45ba0ccfaadc7bcb2c784b097306e7b8c89bb9469ce0ae1dc90802bada425"
+    ),
+    "execute_checkpoint": (
+        "35164fc0985154d41a9f35f7b6b144df6ce86658941a083e7f5705fcee9366ed"
+    ),
+    "preflight_checkpoint": (
+        "a5e63c447cb53e2998b4234dc0ecb2f81c2954b7677bc78d8414f6d278b8b15f"
+    ),
+    "_checkpoint_specs": (
+        "34f185a02ffa550fc497bca5d3d2a36daefbe997f1c0b0cdf511c99d40898b20"
+    ),
+}
+_publication_execution_source: tuple[str, str] | None = None
+
+
+def _supervised_publication_recovery_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures = list(_supervised_installation_reconciliation_authority_check(repo_root))
+    if set(SUPERVISED_PUBLICATION_RECOVERY_PINS) != {
+        "src/trading_bot/supervised_release/publication_recovery.py",
+        "src/trading_bot/supervised_release/native_publication.py",
+    } or set(SUPERVISED_PUBLICATION_RUNNER_PINS) != {
+        "_supervised_publication_recovery_authority_check",
+        "_supervised_publication_admission",
+        "_supervised_publication_live_source",
+        "_supervised_publication_preflight",
+        "_supervised_publication_execute",
+        "execute_checkpoint",
+        "preflight_checkpoint",
+        "_checkpoint_specs",
+    }:
+        failures.append("publication recovery source-pin inventory drift")
+    try:
+        spec = _checkpoint_specs()[SUPERVISED_PUBLICATION_RECOVERY_NAME]
+        if (
+            spec.preflight is not _supervised_publication_preflight
+            or spec.execute is not _supervised_publication_execute
+            or spec.authority_check
+            is not _supervised_publication_recovery_authority_check
+            or spec.tests != SUPERVISED_PUBLICATION_RECOVERY_TESTS
+            or spec.ruff_paths != SUPERVISED_PUBLICATION_RECOVERY_RUFF_PATHS
+            or spec.remote_branch
+            != "feature/robinhood-supervised-release-publication-recovery"
+            or spec.remote_head_env is not None
+            or ACTIVE_CI_CHECKPOINTS.count(SUPERVISED_PUBLICATION_RECOVERY_NAME) != 1
+        ):
+            failures.append("publication recovery registration drift")
+        allowed = {
+            "__future__",
+            "hashlib",
+            "json",
+            "os",
+            "stat",
+            "ctypes",
+            "collections.abc",
+            "dataclasses",
+            "pathlib",
+            "typing",
+            "trading_bot.supervised_release",
+            "trading_bot.supervised_release.binding",
+            "trading_bot.supervised_release.bundle",
+            "trading_bot.supervised_release.installation_contract",
+            "trading_bot.supervised_release.model",
+            "trading_bot.supervised_release.native_read",
+            "trading_bot.supervised_release.native_publication",
+            "trading_bot.supervised_release.observer",
+        }
+        forbidden = {
+            "exec",
+            "eval",
+            "compile",
+            "__import__",
+            "reload",
+            "delete",
+            "repair",
+            "cleanup",
+            "retry",
+            "activate",
+            "rebind",
+            "enable",
+            "start",
+            "run",
+            "Popen",
+            "provider",
+            "credential",
+            "submit",
+            "launch",
+            "wake",
+            "install_release",
+            "create_directory",
+            "write_file",
+            "seal_staging",
+            "mkdir",
+            "unlink",
+            "write_text",
+            "write_bytes",
+            "rename",
+            "replace",
+            "rmtree",
+            "remove",
+            "chmod",
+            "WindowsInstaller",
+            "WindowsWriteSession",
+        }
+        for relative, pin in SUPERVISED_PUBLICATION_RECOVERY_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("publication recovery source drift")
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and any(
+                    alias.name not in allowed for alias in node.names
+                ):
+                    failures.append("publication recovery import drift")
+                if isinstance(node, ast.ImportFrom) and (
+                    node.module not in allowed
+                    or node.level
+                    or (
+                        node.module == "trading_bot.supervised_release"
+                        and any(
+                            alias.name != "installation_reconciliation"
+                            for alias in node.names
+                        )
+                    )
+                ):
+                    failures.append("publication recovery import drift")
+                if (
+                    isinstance(node, ast.Call)
+                    and getattr(node.func, "attr", getattr(node.func, "id", ""))
+                    in forbidden
+                ):
+                    failures.append("publication recovery forbidden capability")
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for name, pin in SUPERVISED_PUBLICATION_RUNNER_PINS.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("publication recovery runner authority drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("publication recovery source unavailable")
+    return tuple(failures)
+
+
+def _supervised_publication_admission(
+    repo_root: Path, state: Mapping[str, object]
+) -> None:
+    from trading_bot.supervised_release import publication_recovery as operator
+
+    if (
+        repo_root.resolve() != operator.WORKTREE.resolve()
+        or _REPOSITORY_ROOT.resolve() != operator.WORKTREE.resolve()
+        or state["branch"] != operator.BRANCH
+        or state["porcelain"]
+        or _git_output(repo_root, "remote", "get-url", "origin") != operator.ORIGIN
+        or _git_output(repo_root, "merge-base", operator.BASE_HEAD, "HEAD")
+        != operator.BASE_HEAD
+        or _supervised_publication_recovery_authority_check(repo_root)
+    ):
+        raise RuntimeError("publication recovery source authority rejected")
+
+
+def _supervised_publication_live_source() -> tuple[str, str]:
+    from trading_bot.supervised_release import publication_recovery as operator
+
+    state = _git_state(_REPOSITORY_ROOT)
+    _supervised_publication_admission(_REPOSITORY_ROOT, state)
+    if _remote_branch_head(_REPOSITORY_ROOT, operator.BRANCH) != state["head"]:
+        raise RuntimeError("publication recovery live remote rejected")
+    return str(state["head"]), str(state["tree"])
+
+
+def _supervised_publication_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release import publication_recovery as operator
+
+    expected = _supervised_publication_live_source()
+
+    def admit_source() -> None:
+        if _supervised_publication_live_source() != expected:
+            raise RuntimeError("publication recovery source drift")
+
+    return operator.preflight(admit_source)
+
+
+def _supervised_publication_execute() -> dict[str, object]:
+    from trading_bot.supervised_release import publication_recovery as operator
+
+    if _publication_execution_source is None:
+        raise RuntimeError("publication recovery runner interlock rejected")
+
+    def admit_source() -> None:
+        if _supervised_publication_live_source() != _publication_execution_source:
+            raise RuntimeError("publication recovery source drift")
+
+    return operator.execute_once(admit_source)
+
+
+ARCH134_PRODUCTION_STRATEGY_NAME: Final = "arch134-production-strategy-contract"
+ARCH134_PRODUCTION_STRATEGY_SOURCE: Final = "src/trading_bot/strategies/production.py"
+ARCH134_PRODUCTION_STRATEGY_SOURCE_PIN: Final = (
+    "243deb4986f7a5c6d37f1d7336b6ca3d400ded03"
+)
+ARCH134_PRODUCTION_STRATEGY_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+ARCH134_PRODUCTION_STRATEGY_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    ARCH134_PRODUCTION_STRATEGY_SOURCE,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+
+
+def _arch134_production_strategy_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the inert session-scoped production strategy selection boundary."""
+    failures: list[str] = []
+    try:
+        path = repo_root / ARCH134_PRODUCTION_STRATEGY_SOURCE
+        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_SOURCE_PIN:
+            failures.append("134-A production strategy source drift")
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imported = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        } | {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        allowed = {
+            "__future__",
+            "json",
+            "re",
+            "dataclasses",
+            "datetime",
+            "decimal",
+            "uuid",
+            "trading_bot.domain",
+            "trading_bot.strategies.moving_average",
+        }
+        if not imported <= allowed:
+            failures.append(
+                "134-A production strategy import surface expanded: "
+                + repr(sorted(imported - allowed))
+            )
+        names = _qualified_names(tree)
+        forbidden = {
+            "open",
+            "eval",
+            "exec",
+            "__import__",
+            "time.sleep",
+            "datetime.now",
+            "subprocess.run",
+            "subprocess.Popen",
+            "sqlite3.connect",
+            "os.environ",
+        }
+        if names & forbidden:
+            failures.append(
+                "134-A production strategy effect surface expanded: "
+                + repr(sorted(names & forbidden))
+            )
+
+        runner_tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        assignments = [
+            node.value
+            for node in runner_tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "ACTIVE_CI_CHECKPOINTS"
+        ]
+        if (
+            len(assignments) != 1
+            or tuple(ast.literal_eval(assignments[0])) != ACTIVE_CI_CHECKPOINTS
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_STRATEGY_NAME) != 1
+            or ACTIVE_CI_CHECKPOINTS.index(ARCH134_PRODUCTION_STRATEGY_NAME) + 1
+            != ACTIVE_CI_CHECKPOINTS.index(ARCH134_PRODUCTION_STRATEGY_DECISION_NAME)
+        ):
+            failures.append("134-A active checkpoint inventory drift")
+
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_STRATEGY_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-production-strategy-contract"
+            or spec.authority_check is not _arch134_production_strategy_authority_check
+            or spec.tests != ARCH134_PRODUCTION_STRATEGY_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_STRATEGY_RUFF_PATHS
+        ):
+            failures.append("134-A source-only registration drift")
+
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-A workflow route/topology drift")
+    except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
+        failures.append("134-A production strategy boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_PRODUCTION_STRATEGY_DECISION_NAME: Final = (
+    "arch134-production-strategy-decision"
+)
+ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE: Final = (
+    "src/trading_bot/strategies/production_decision.py"
+)
+ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE_PIN: Final = (
+    "3bbd352495cd2b50b9e2557089a0b1b70a0dfce8"
+)
+ARCH134_PRODUCTION_STRATEGY_DECISION_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+ARCH134_PRODUCTION_STRATEGY_DECISION_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    ARCH134_PRODUCTION_STRATEGY_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+)
+
+
+def _arch134_production_strategy_decision_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the pure Architecture-94 -> production strategy decision bridge."""
+    failures = list(_arch134_production_strategy_authority_check(repo_root))
+    try:
+        path = repo_root / ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE
+        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE_PIN:
+            failures.append("134-B production decision source drift")
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imported = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        } | {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "enum",
+            "typing",
+            "trading_bot.strategies.daily_decision",
+            "trading_bot.strategies.history_seed",
+            "trading_bot.domain",
+            "trading_bot.market_data",
+            "trading_bot.runtime.manual_paper_strategy_plan",
+            "trading_bot.runtime.strategy_history_seed",
+            "trading_bot.strategies.production",
+        }
+        if not imported <= allowed:
+            failures.append(
+                "134-B production decision import surface expanded: "
+                + repr(sorted(imported - allowed))
+            )
+        names = _qualified_names(tree)
+        forbidden = {
+            "open",
+            "eval",
+            "exec",
+            "__import__",
+            "time.sleep",
+            "datetime.now",
+            "subprocess.run",
+            "subprocess.Popen",
+            "sqlite3.connect",
+            "os.environ",
+            "review_equity_order",
+            "place_order",
+        }
+        if names & forbidden:
+            failures.append(
+                "134-B production decision effect surface expanded: "
+                + repr(sorted(names & forbidden))
+            )
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_STRATEGY_DECISION_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-production-strategy-decision"
+            or spec.authority_check
+            is not _arch134_production_strategy_decision_authority_check
+            or spec.tests != ARCH134_PRODUCTION_STRATEGY_DECISION_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_STRATEGY_DECISION_RUFF_PATHS
+        ):
+            failures.append("134-B source-only registration drift")
+        a = ACTIVE_CI_CHECKPOINTS.index(ARCH134_PRODUCTION_STRATEGY_NAME)
+        if (
+            ACTIVE_CI_CHECKPOINTS[a : a + 2]
+            != (
+                ARCH134_PRODUCTION_STRATEGY_NAME,
+                ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_STRATEGY_DECISION_NAME)
+            != 1
+        ):
+            failures.append("134-B checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-B workflow route/topology drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("134-B production decision boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: Final = (
+    "arch134-production-strategy-live-paper"
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE: Final = (
+    "src/trading_bot/review_paper/production_strategy_cycle.py"
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN: Final = (
+    "3636889acaddf0de0a27e4dc4de0687839c59ee8"
+)
+ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE: Final = (
+    "src/trading_bot/production_strategy_prepare_operator.py"
+)
+ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN: Final = (
+    "6e13a8f1f45acd458dc0002d5cf338460b3b1d5b"
+)
+ARCH134_CURRENT_DECISION_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/production_strategy_decision.py": (
+        "3b2d0c6301d35c4800e05e5b4309b2f6d2a0d247"
+    ),
+    "src/trading_bot/review_paper/strategy_prior.py": (
+        "d358aad1cd11f4e5f8c820f08c5a7619f7960df0"
+    ),
+    "src/trading_bot/strategies/daily_decision.py": (
+        "8df232b80047d913d43814e193d7a2788fc27116"
+    ),
+    "src/trading_bot/strategies/history_seed.py": (
+        "b20e41206c3d6d2e8eca6cbbd0dfef2e701b3177"
+    ),
+    "src/trading_bot/runtime/manual_paper_strategy_plan.py": (
+        "9692d39ece0d15d3da6ca83dd8a5f4b994510b12"
+    ),
+    "src/trading_bot/runtime/strategy_history_seed.py": (
+        "6cc0670b169ed9afa430a8de87f36f2dd79fc695"
+    ),
+}
+
+
+def _arch134_current_decision_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Pin the shared pure core and reject new current-product effect capabilities."""
+    failures: list[str] = []
+    allowed_imports = {
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "enum",
+        "hashlib",
+        "json",
+        "re",
+        "types",
+        "typing",
+        "uuid",
+        "zoneinfo",
+        "trading_bot.backtesting",
+        "trading_bot.domain",
+        "trading_bot.ledger",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.market_data.daily_snapshot_identity",
+        "trading_bot.review_paper.store",
+        "trading_bot.review_paper.strategy_prior",
+        "trading_bot.strategies",
+        "trading_bot.strategies.daily_decision",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+    }
+    forbidden = {
+        "VerifiedPriorCheckpoint",
+        "_VERIFIED_PRIOR_AUTHORITY",
+        "record_market_review",
+        "ReviewPaperStore",
+        "_initialize",
+        "review_equity_order",
+        "place_order",
+        "execute",
+        "connect",
+        "sleep",
+        "now",
+        "utcnow",
+        "eval",
+        "exec",
+        "__import__",
+        "run",
+        "Popen",
+        "chmod",
+        "write_text",
+        "write_bytes",
+    }
+    try:
+        for relative, pin in ARCH134_CURRENT_DECISION_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B2 source drift: " + relative)
+            # Historical adapters retain separately validated compatibility.
+            if relative.startswith("src/trading_bot/runtime/"):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B2 import surface expanded: " + relative)
+            calls = {
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            }
+            if calls & forbidden or "_VERIFIED_PRIOR_AUTHORITY" in _qualified_names(
+                tree
+            ):
+                failures.append("134-B2 authority/effect surface expanded: " + relative)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError):
+        failures.append("134-B2 current decision boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_MARKET_HISTORY_SOURCE_PINS: Final = {
+    "src/trading_bot/robinhood_mcp/historical.py": (
+        "fda1a7fb47139a3d7e60baf76bf94126326d220f"
+    ),
+    "src/trading_bot/review_paper/strategy_market_history.py": (
+        "86d821e38e84ca0146f5808585bb33de1f8a0e4c"
+    ),
+}
+
+
+def _arch134_market_history_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Freeze B3 read/materialization authority without granting protected effects."""
+    failures = list(_arch131_direct_mcp_authority_check(repo_root))
+    failures.extend(_arch131_mcp_schema_authority_check(repo_root))
+    allowed_imports = {
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "json",
+        "re",
+        "uuid",
+        "zoneinfo",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.market_data.daily_snapshot_identity",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.store",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.historical",
+        "trading_bot.robinhood_mcp.models",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+    }
+    forbidden = {
+        "get_accounts",
+        "_get_accounts",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "review_equity_order",
+        "review_market_order",
+        "call_tool",
+        "_invoke",
+        "_request_once",
+        "record_market_review",
+        "ReviewPaperStore",
+        "connect",
+        "execute",
+        "now",
+        "utcnow",
+        "sleep",
+        "eval",
+        "exec",
+        "__import__",
+        "open",
+        "write_text",
+        "write_bytes",
+        "run",
+        "Popen",
+        "chmod",
+    }
+    try:
+        for relative, pin in ARCH134_MARKET_HISTORY_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B3 source drift: " + relative)
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B3 import surface expanded: " + relative)
+            calls = {
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            }
+            if calls & forbidden:
+                failures.append("134-B3 effect surface expanded: " + relative)
+            if relative.endswith("strategy_market_history.py"):
+                required = {
+                    "adapter.equity_daily_history",
+                    "parse_equity_historicals_response",
+                    "accept_daily_provider_response",
+                    "serialize_daily_snapshot",
+                    "verify_daily_snapshot",
+                    "create_strategy_history_seed",
+                    "serialize_strategy_history_seed",
+                    "verify_strategy_history_seed",
+                    "build_current_production_strategy_decision",
+                }
+                if not required <= _qualified_names(tree):
+                    failures.append(
+                        "134-B3 reviewed evidence/decision bindings missing"
+                    )
+                for name in (
+                    "equity_daily_history",
+                    "build_current_production_strategy_decision",
+                ):
+                    count = sum(
+                        getattr(node.func, "attr", getattr(node.func, "id", "")) == name
+                        for node in ast.walk(tree)
+                        if isinstance(node, ast.Call)
+                    )
+                    if count != 1:
+                        failures.append("134-B3 composition call is not exact: " + name)
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError):
+        failures.append("134-B3 market-history boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS: Final = {
+    "src/trading_bot/robinhood_history_qualification.py": (
+        "a50921d45e69a875afcca054b33b8362aff16d07"
+    ),
+    "scripts/qualify_robinhood_history.py": "88d3d9c6e282fb3f69e8c39cd146cd2acad15b67",
+}
+
+
+def _arch134_history_qualification_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Source-only B3Q admission; no execute registration or real provider check."""
+    failures: list[str] = []
+    allowed_imports = {
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "contextlib",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "json",
+        "logging",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "typing",
+        "warnings",
+        "zoneinfo",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.strategy_market_history",
+        "trading_bot.robinhood_history_qualification",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.historical",
+        "trading_bot.robinhood_mcp.models",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+    }
+    forbidden_calls = {
+        "get_accounts",
+        "_get_accounts",
+        "get_equity_quotes",
+        "get_equity_orders",
+        "review_equity_order",
+        "review_market_order",
+        "call_tool",
+        "_invoke",
+        "_request_once",
+        "ReviewPaperStore",
+        "record_market_review",
+        "connect",
+        "execute",
+        "Popen",
+        "sleep",
+        "eval",
+        "exec",
+        "__import__",
+        "prepare_production_strategy_paper_cycle",
+        "execute_production_strategy_paper_cycle",
+    }
+    try:
+        for relative, pin in ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-B3Q source drift: " + relative)
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if not imported <= allowed_imports:
+                failures.append("134-B3Q import surface expanded: " + relative)
+            calls = [
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            ]
+            if set(calls) & forbidden_calls:
+                failures.append("134-B3Q effect surface expanded: " + relative)
+            if relative.startswith("src/"):
+                if (
+                    calls.count("get_equity_historicals") != 1
+                    or calls.count("equity_daily_history") != 1
+                ):
+                    failures.append("134-B3Q single-history binding drift")
+                if not {
+                    "parse_equity_historicals_response",
+                    "materialize_production_strategy_history",
+                    "RobinhoodDailyHistoryRequest",
+                    "RobinhoodReviewReadAdapter",
+                    "RobinhoodMcpStreamableHttpTransport",
+                    "admit_robinhood_paper_source",
+                } <= set(calls):
+                    failures.append("134-B3Q accepted boundary binding missing")
+    except (OSError, UnicodeError, SyntaxError, TypeError, ValueError):
+        failures.append("134-B3Q source boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS: Final = (
+    "tests/review_paper/test_history_qualification.py",
+    "tests/robinhood_mcp/test_historical.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/test_robinhood_paper_operator.py",
+    *COMMON_TESTS,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_production_strategy_prepare_operator.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/runtime/test_manual_paper_strategy_plan.py",
+    "tests/runtime/test_strategy_history_seed.py",
+)
+ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS: Final = (
+    *ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS,
+    "tests/review_paper/test_history_qualification.py",
+    *ARCH134_MARKET_HISTORY_SOURCE_PINS,
+    "src/trading_bot/robinhood_mcp/adapter.py",
+    "src/trading_bot/robinhood_mcp/sdk_transport.py",
+    "tests/robinhood_mcp/test_historical.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/test_robinhood_paper_operator.py",
+    *COMMON_RUFF_PATHS,
+    ARCH134_PRODUCTION_STRATEGY_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE,
+    ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE,
+    *ARCH134_CURRENT_DECISION_SOURCE_PINS,
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_production_strategy_prepare_operator.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/runtime/test_manual_paper_strategy_plan.py",
+    "tests/runtime/test_strategy_history_seed.py",
+)
+
+
+def _arch134_production_strategy_live_paper_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Freeze the 134-C composition onto the accepted 131 PREPARE/EXECUTE path."""
+    failures = list(_arch134_production_strategy_decision_authority_check(repo_root))
+    failures.extend(_arch134_current_decision_authority_check(repo_root))
+    failures.extend(_arch134_market_history_authority_check(repo_root))
+    failures.extend(_arch134_history_qualification_authority_check(repo_root))
+    try:
+        path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
+        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:
+            failures.append("134-C production live-paper source drift")
+        operator_path = repo_root / ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE
+        if (
+            _git_blob_sha1(operator_path)
+            != ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN
+        ):
+            failures.append("134-C production shadow PREPARE operator drift")
+        source = path.read_text(encoding="utf-8")
+        tree = ast.parse(source, filename=str(path))
+        imported = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        } | {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        }
+        allowed = {
+            "__future__",
+            "dataclasses",
+            "datetime",
+            "decimal",
+            "enum",
+            "pathlib",
+            "uuid",
+            "trading_bot.execution.models",
+            "trading_bot.review_paper.session_admission",
+            "trading_bot.review_paper.store",
+            "trading_bot.review_paper.supervised_forward_paper",
+            "trading_bot.risk.models",
+            "trading_bot.robinhood_mcp.adapter",
+            "trading_bot.strategies.production_decision",
+        }
+        if not imported <= allowed:
+            failures.append(
+                "134-C production live-paper import surface expanded: "
+                + repr(sorted(imported - allowed))
+            )
+        names = _qualified_names(tree)
+        forbidden = {
+            "run_robinhood_forward_paper_cycle",
+            "record_market_review",
+            "acquire_review_paper_risk_price_snapshot",
+            "review_equity_order",
+            "place_equity_order",
+            "cancel_equity_order",
+            "place_option_order",
+            "place_crypto_order",
+            "time.sleep",
+            "subprocess.run",
+            "subprocess.Popen",
+            "os.environ",
+        }
+        if names & forbidden:
+            failures.append(
+                "134-C bypass/effect surface expanded: "
+                + repr(sorted(names & forbidden))
+            )
+
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != "feature/robinhood-production-strategy-live-paper"
+            or spec.authority_check
+            is not _arch134_production_strategy_live_paper_authority_check
+            or spec.tests != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS
+        ):
+            failures.append("134-C source-only registration drift")
+        if (
+            ACTIVE_CI_CHECKPOINTS[-5:-2]
+            != (
+                ARCH134_PRODUCTION_STRATEGY_NAME,
+                ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
+                ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
+            )
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME)
+            != 1
+        ):
+            failures.append("134-C checkpoint ordering drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-C workflow route/topology drift")
+    except (
+        OSError,
+        UnicodeError,
+        SyntaxError,
+        KeyError,
+        ValueError,
+        TypeError,
+        IndexError,
+    ):
+        failures.append("134-C production live-paper boundary unavailable")
+    return tuple(failures)
+
+
+ARCH134_ARMED_PAPER_NAME: Final = "arch134-armed-paper-mvp"
+ARCH134_ARMED_PAPER_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "945776dcb152a4c4673a3b375d235297a45f2aa4"
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "5c395cf692dd387b53688ebb25d2a9007a3a535c"
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        "94288880c8899ddee7e5d5505c69d6ad093ec559"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "221bf261c89062fdc766168daca444231d4d4bb4"
+    ),
+    "scripts/run_production_paper_session.py": (
+        "b2c99d36bfc8ee80f04a6e3a0be06e36feee547b"
+    ),
+    "src/trading_bot/market_data/alpaca_daily_snapshot.py": (
+        "82e30b6b486915acadb85c95faf538ee9d828451"
+    ),
+    "src/trading_bot/market_data/alpaca_http.py": (
+        "a45037d821460d5fa0bab937f7085250890225d7"
+    ),
+}
+ARCH134_ARMED_PAPER_TESTS: Final = (
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_supervised_forward_paper.py",
+    "tests/review_paper/test_risk_price_acquisition.py",
+    "tests/market_data/test_alpaca_daily_snapshot.py",
+    "tests/market_data/test_alpaca_http.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/review_paper/test_history_qualification.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    *COMMON_TESTS,
+)
+ARCH134_ARMED_PAPER_RUFF_PATHS: Final = (
+    *ARCH134_ARMED_PAPER_SOURCE_PINS,
+    *ARCH134_ARMED_PAPER_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+ARCH134_ARMED_PAPER_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "pathlib",
+        "trading_bot.domain",
+        "trading_bot.execution.models",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.alpaca_strategy_history",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_cycle",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.session_admission",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        "__future__",
+        "contextlib",
+        "datetime",
+        "enum",
+        "json",
+        "os",
+        "pathlib",
+        "sqlite3",
+        "uuid",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.domain",
+        "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_session",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+        "zoneinfo",
+    ),
+    "scripts/run_production_paper_session.py": (
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.armed_session_host",
+    ),
+}
+
+
+# D1R1 is an exact successor overlay; accepted predecessor material stays frozen.
+ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "ad99796a7b89ac29450047dfad9cb0e87db52cc6"
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "8133bed61cc8f6924876ce41b05ef9124bfb2701"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "0fe62babc2dafc67bca6b0c56463dce49439df6d"
+    ),
+}
+ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "pathlib",
+        "trading_bot.domain",
+        "trading_bot.execution.models",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.alpaca_strategy_history",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_cycle",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.session_admission",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.domain",
+        "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+        "zoneinfo",
+    ),
+}
+
+
+ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/armed_session.py": (
+        "f96d31447c0c25115d0f629e2cbcd47dc99ebd05"
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        "aa57fd196c24856f81af81b3ae9294362a1b01a3"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "a510ec78b984b4fcc6143176b15f35e367fd6311"
+    ),
+}
+ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES: Final = {
+    "src/trading_bot/review_paper/armed_session.py": (
+        *ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES[
+            "src/trading_bot/review_paper/armed_session.py"
+        ],
+        "json",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES[
+            "src/trading_bot/review_paper/armed_session_host.py"
+        ]
+    ),
+    "src/trading_bot/review_paper/armed_session_store.py": (
+        *ARCH134_ARMED_PAPER_IMPORTS[
+            "src/trading_bot/review_paper/armed_session_store.py"
+        ],
+        "hashlib",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.strategies.production",
+    ),
+}
+
+
+def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Exact source/AST closure; D1 gains no protected qualification authority."""
+    failures = list(_arch134_production_strategy_live_paper_authority_check(repo_root))
+    forbidden_calls = {
+        "call_tool",
+        "_invoke",
+        "equity_daily_history",
+        "get_equity_historicals",
+        "place_equity_order",
+        "cancel_equity_order",
+        "place_order",
+        "cancel_order",
+        "place_options_order",
+        "place_crypto_order",
+        "register_task",
+        "schtasks",
+        "evaluate",
+        "build_production_strategy_decision",
+        "build_manual_paper_strategy_decision",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+    }
+    try:
+        reviewed_overrides = {
+            "src/trading_bot/review_paper/alpaca_strategy_history.py",
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+        }
+        if (
+            set(ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES) != reviewed_overrides
+            or set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES) != reviewed_overrides
+        ):
+            failures.append("134-D1 unreviewed successor override")
+        recovery_overrides = {
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_store.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+        }
+        if (
+            set(ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES) != recovery_overrides
+            or set(ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES) != recovery_overrides
+        ):
+            failures.append("134-D1R2 unreviewed recovery override")
+        pins = {
+            **ARCH134_ARMED_PAPER_SOURCE_PINS,
+            **ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES,
+            **ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES,
+        }
+        imports = {
+            **ARCH134_ARMED_PAPER_IMPORTS,
+            **ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES,
+            **ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES,
+        }
+        for relative, pin in pins.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-D1 source drift: " + relative)
+            if relative not in imports:
+                continue  # unchanged reviewed concrete provider/HTTPS pins
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imported = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module is not None
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if imported != set(imports[relative]):
+                failures.append("134-D1 import closure drift: " + relative)
+            calls = [
+                getattr(node.func, "attr", getattr(node.func, "id", ""))
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+            ]
+            if set(calls) & forbidden_calls:
+                failures.append("134-D1 forbidden authority call: " + relative)
+            if relative.endswith("armed_session.py"):
+                for name in (
+                    "build_current_production_strategy_decision",
+                    "prepare_production_strategy_paper_cycle",
+                    "execute_production_strategy_paper_cycle",
+                    "acquire_current_production_strategy_history_from_alpaca",
+                ):
+                    if calls.count(name) != 1:
+                        failures.append("134-D1 exact composition drift: " + name)
+            if relative.endswith("alpaca_strategy_history.py"):
+                for name in (
+                    "fetch",
+                    "accept_daily_provider_response",
+                    "verify_daily_snapshot",
+                    "verify_strategy_history_seed",
+                ):
+                    if calls.count(name) != 1:
+                        failures.append("134-D1 exact history drift: " + name)
+        spec = _checkpoint_specs()[ARCH134_ARMED_PAPER_NAME]
+        if (
+            spec.tests != ARCH134_ARMED_PAPER_TESTS
+            or spec.ruff_paths != ARCH134_ARMED_PAPER_RUFF_PATHS
+            or spec.remote_branch != "feature/robinhood-production-paper-mvp"
+            or spec.authority_check is not _arch134_armed_paper_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_ARMED_PAPER_NAME) != 1
+        ):
+            failures.append("134-D1 registration authority drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("134-D1 source-gate workflow drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1 authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: Final = "arch134-production-paper-runtime"
+ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS: Final = {
+    **ARCH134_ARMED_PAPER_SOURCE_PINS,
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "2554a8e0d5b86d68db6a277e530005e6dae87745"
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime.py": (
+        "1771a63bca73c7a3bf82f91d7448b70a15043e59"
+    ),
+    "scripts/qualify_production_paper_runtime.py": (
+        "7772ab5495b38d87ac50d2ad54b9633115b3d5de"
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "c9875c20ec6d6b1fc788dd6649fe419aeae8fed8"
+    ),
+    "src/trading_bot/arch133_verifier/credentials.py": (
+        "a334b1bf1097477b1ff0807a07c81ffc7f7fcffb"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "863f172f271ac87a13d610fce7753b186b699c1d"
+    ),
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "82cbf0785399afd95e0065160d2a3e43245faaae"
+    ),
+    "tests/review_paper/test_store.py": ("09dffb1e0d0a1a1881d6a6f85649be6baaaba42a"),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "71903964f3bc13039d49451740f16a14470673ac"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a8470acf3f263ba8b4a9b888ce168b56c95f33a6"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "c99bb51c67ef1d0c475ebb4f58ec869c59a3c253"
+    ),
+    "src/trading_bot/review_paper/production_strategy_cycle.py": (
+        "3636889acaddf0de0a27e4dc4de0687839c59ee8"
+    ),
+    "src/trading_bot/review_paper/production_strategy_decision.py": (
+        "3b2d0c6301d35c4800e05e5b4309b2f6d2a0d247"
+    ),
+    "src/trading_bot/review_paper/supervised_forward_paper.py": (
+        "150926efd7b909a53ea897a23d2e76d37ff8c32d"
+    ),
+    "src/trading_bot/review_paper/risk_price_acquisition.py": (
+        "28d37020f26d26cc58a842eefc4e2bbe5d46fb91"
+    ),
+    "src/trading_bot/robinhood_paper_operator.py": (
+        "ebed3361c1c9d0fbfc63aab3e308c7e54b0e4d2e"
+    ),
+    "src/trading_bot/robinhood_paper_pipeline.py": (
+        "4ab15822bded9c6e76e7badb78b9e7fe0db63b40"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "529911f2dba657bcaa36596203608985168faad2"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "5dbb515c077e000fa56bb0aebc2ec2681a2e1074"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "5a124f1d02d3809a18d31b95ba1e8d52cc11baef"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS: Final = (
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/review_paper/test_store.py",
+    "tests/review_paper/test_post_publication_verifier.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    *ARCH134_ARMED_PAPER_TESTS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_RUFF_PATHS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS,
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime.py": (
+        "__future__",
+        "argparse",
+        "contextlib",
+        "decimal",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "sqlite3",
+        "stat",
+        "sys",
+        "trading_bot.arch133_verifier.credentials",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_session_host",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.store",
+    ),
+    "scripts/qualify_production_paper_runtime.py": (
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.production_paper_runtime",
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "__future__",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "pathlib",
+        "sqlite3",
+        "trading_bot.domain",
+        "trading_bot.domain._validation",
+        "trading_bot.ledger",
+        "trading_bot.review_paper.models",
+        "trading_bot.risk",
+        "uuid",
+    ),
+    "src/trading_bot/arch133_verifier/credentials.py": (
+        "__future__",
+        "ctypes",
+        "dataclasses",
+        "json",
+        "os",
+        "urllib.parse",
+    ),
+}
+
+
+# Current D1R1 runtime authority: exact changed source/tests plus one diagnostic.
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS,
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "ad99796a7b89ac29450047dfad9cb0e87db52cc6"
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "8133bed61cc8f6924876ce41b05ef9124bfb2701"
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "0fe62babc2dafc67bca6b0c56463dce49439df6d"
+    ),
+    "src/trading_bot/review_paper/armed_history_failure.py": (
+        "07265a0a2259290e6629ee9a901822c4ee49d5a2"
+    ),
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "d997fd8520be5e29a38877677b18a4c7c5b8dcd1"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "21811c26f3a5be014e5d5966da2830c0670a4076"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "bddff88dbefbe4907437080a3d6261803b30ff44"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "93da0226ad50d95602e0b3297e1f9f8acc44e3d7"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS,
+    "src/trading_bot/review_paper/alpaca_strategy_history.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.strategies.history_seed",
+        "trading_bot.strategies.production",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "decimal",
+        "hashlib",
+        "pathlib",
+        "trading_bot.domain",
+        "trading_bot.execution.models",
+        "trading_bot.market_data",
+        "trading_bot.review_paper.alpaca_strategy_history",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_strategy_cycle",
+        "trading_bot.review_paper.production_strategy_decision",
+        "trading_bot.review_paper.session_admission",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.strategies.production",
+        "trading_bot.strategies.production_decision",
+        "uuid",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_session_host.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "datetime",
+        "decimal",
+        "json",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.domain",
+        "trading_bot.market_data",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.review_paper.armed_history_failure",
+        "trading_bot.review_paper.armed_session",
+        "trading_bot.review_paper.armed_session_store",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.production_paper_runtime",
+        "trading_bot.review_paper.store",
+        "trading_bot.risk.models",
+        "trading_bot.robinhood_mcp.adapter",
+        "trading_bot.robinhood_mcp.sdk_transport",
+        "trading_bot.robinhood_mcp.windows_oauth",
+        "trading_bot.robinhood_paper_operator",
+        "trading_bot.strategies",
+        "trading_bot.strategies.production",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/armed_history_failure.py": (
+        "__future__",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.market_data",
+        "uuid",
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_TESTS,
+)
+ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS,
+    **ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES,
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "e4f799b2a002311ed448c59406765fd675707b36"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "c904cdb38e09f004c6479bdf43bdfd64cf5366e1"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "1ccfe438470886b4d1db9d1dded254bbe49e577e"
+    ),
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS: Final = {
+    **ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS,
+    **ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES,
+}
+ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS: Final = (
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS,
+    *ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_production_paper_runtime_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """D1Q exact fixed-source closure; qualification remains separately protected."""
+    failures = list(_arch134_armed_paper_authority_check(repo_root))
+    forbidden = {
+        "SetNamedSecurityInfoW",
+        "SetFileSecurityW",
+        "SetSecurityInfo",
+        "chmod",
+        "chown",
+        "icacls",
+        "takeown",
+        "CredWriteW",
+        "CredDeleteW",
+        "getenv",
+        "getenvb",
+        "call_tool",
+        "_invoke",
+        "get_equity_historicals",
+        "equity_daily_history",
+        "place_equity_order",
+        "cancel_equity_order",
+        "place_options_order",
+        "place_crypto_order",
+        "register_task",
+        "schtasks",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+    }
+    try:
+        reviewed_changes = {
+            "src/trading_bot/review_paper/alpaca_strategy_history.py",
+            "src/trading_bot/review_paper/armed_session.py",
+            "src/trading_bot/review_paper/armed_session_host.py",
+            "src/trading_bot/review_paper/armed_session_store.py",
+            "tests/review_paper/test_armed_production_paper_session.py",
+            "tests/review_paper/test_production_paper_runtime.py",
+            "tests/runtime/checkpoint_runner/test_ci.py",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        }
+        diagnostic = "src/trading_bot/review_paper/armed_history_failure.py"
+        pins = ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS
+        if set(pins) != set(ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS) | {
+            diagnostic
+        } or any(
+            pins.get(relative) != pin
+            for relative, pin in ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS.items()
+            if relative not in reviewed_changes
+        ):
+            failures.append("134-D1Q unreviewed successor source override")
+        imports = ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS
+        expected_imports = (
+            set(ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS)
+            | set(ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES)
+            | set(ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES)
+            | {diagnostic}
+        )
+        if set(imports) != expected_imports or any(
+            imports.get(relative) != value
+            for relative, value in ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS.items()
+            if relative not in ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES
+        ):
+            failures.append("134-D1Q unreviewed successor import override")
+        for (
+            relative,
+            pin,
+        ) in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS.items():
+            path = repo_root / relative
+            expected_pin = ARCH134_AUTH_CORRECTION_TEST_PINS.get(
+                relative, ARCH134_AUTH_TEST_PIN_OVERRIDES.get(relative, pin)
+            )
+            expected_pin = ARCH134_D1R4_SOURCE_PINS.get(relative, expected_pin)
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, expected_pin)
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
+            expected_pin = _arch138_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139a_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140a18_current_inventory_test_pin(
+                relative, expected_pin
+            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            if _git_blob_sha1(path) != expected_pin:
+                failures.append("134-D1Q source drift: " + relative)
+            if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports = {
+                node.module
+                for node in ast.walk(tree)
+                if isinstance(node, ast.ImportFrom) and node.module
+            } | {
+                alias.name
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if imports != set(
+                ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS[relative]
+            ):
+                failures.append("134-D1Q import closure drift: " + relative)
+            names = {
+                node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+            } | {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+            if names & (forbidden | {"environ", "environb"}):
+                failures.append("134-D1Q forbidden authority: " + relative)
+        spec = _checkpoint_specs()[ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
+        if (
+            spec.tests != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS
+            or spec.ruff_paths != ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS
+            or spec.remote_branch
+            != "feature/robinhood-production-paper-history-recovery"
+            or spec.authority_check
+            is not _arch134_production_paper_runtime_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS[-2:]
+            != (ARCH134_PRODUCTION_PAPER_RUNTIME_NAME, ARCH134_RUNTIME_ACL_NAME)
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_PRODUCTION_PAPER_RUNTIME_NAME)
+            != "robinhood"
+        ):
+            failures.append("134-D1Q registration authority drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1Q authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_AUTH_NAME: Final = "arch134-alpaca-authentication-qualification"
+ARCH134_AUTH_BRANCH: Final = (
+    "feature/robinhood-production-paper-alpaca-auth-qualification"
+)
+ARCH134_AUTH_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "171101537f96271988c35683ed22ba85a1b37661"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "f7d23b2edc2292f980970ca4deea8ce6d942925d"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "ac40ce84d910bbe93986490acaecac66c43f7dfb"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "4793e8935fa5af1c60e1bf0dfdc186956c330058"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "d3c4965c51d6ca79070af5e7319768af5d75122b"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "d495b90c6d47da6959fa539cd1f3504a4989e631"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a44e5181f33c2d52c11726477b3240da94c3ff6e"
+    ),
+}
+ARCH134_AUTH_TEST_PIN_OVERRIDES: Final = {
+    relative: ARCH134_AUTH_SOURCE_PINS[relative]
+    for relative in (
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/helpers.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+}
+# D1R3 correction: only the directly changed retained concurrency test evolves.
+# Accepted D1/R1/R2 and initial D1R3 dictionaries remain frozen.
+ARCH134_AUTH_CORRECTION_TEST_PINS: Final = {
+    "tests/review_paper/test_armed_production_paper_session.py": (
+        "4e06e2d922f6ca784681cffe8ccda6b4806bc14f"
+    ),
+}
+ARCH134_AUTH_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data.alpaca_daily_snapshot",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.market_data.daily_snapshot_models",
+        "trading_bot.market_data.daily_snapshot_provider",
+        "trading_bot.market_data.exceptions",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "uuid",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "__future__",
+        "argparse",
+        "os",
+        "pathlib",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_authentication_qualification",
+    ),
+}
+# D1R4 current overlay only. All accepted D1/D1Q/R1/R2/R3 pins above are historical.
+ARCH134_D1R4_PATHS: Final = (
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py",
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py",
+    "src/trading_bot/review_paper/alpaca_authentication_host.py",
+    "src/trading_bot/review_paper/alpaca_credential_generation.py",
+    "src/trading_bot/review_paper/alpaca_credential_native.py",
+    "src/trading_bot/review_paper/alpaca_credential_host.py",
+    "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+)
+ARCH134_D1R4_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "e01fd44cd2eec663ac5f3eab78b3a7499b6ada7e"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "331351635e522e6e05d4d2d82dc1ac25def6341b"
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "c3377e757372f9a33ddabc5ac15f1b124a49d570"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "5dbdd29a2fe64febce8ea22be9294f047e0a4f8d"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_native.py": (
+        "4c3a6857156275a443eecded5cf7915c71f05724"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "07d6dec0f73c9313e4a8c76a5eb819d9ea6fe8fb"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
+    ),
+    "tests/review_paper/test_alpaca_credential_generation.py": (
+        "c607965ea0d73d66982c3c762e4801d321fdf553"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "1162c2bfa9c548c77227971bcac38726ab0ad075"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "deb80454ffae2c7f579752b2728b2b9551a09a66"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "a8240b76945f2aef0de956eb2bd99cceda71595a"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "74527e1ad3d83bee153f82a628c202c3d6e48f43"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "a5eebc024445f4c4629876aaeb69fd9497be40fc"
+    ),
+}  # D1R4_GENERATED_PINS
+ARCH134_D1R4_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "datetime",
+        "enum",
+        "json",
+        "trading_bot.domain",
+        "trading_bot.market_calendar",
+        "trading_bot.market_data.alpaca_daily_snapshot",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.market_data.daily_snapshot_models",
+        "trading_bot.market_data.daily_snapshot_provider",
+        "trading_bot.market_data.exceptions",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "uuid",
+    ),
+    "src/trading_bot/review_paper/alpaca_authentication_host.py": (
+        "__future__",
+        "argparse",
+        "hashlib",
+        "os",
+        "pathlib",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.market_data.alpaca_http",
+        "trading_bot.review_paper.alpaca_authentication_qualification",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_native.py": (
+        "__future__",
+        "ctypes",
+        "os",
+        "threading",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "trading_bot.runtime.windows_authority_security",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "__future__",
+        "argparse",
+        "getpass",
+        "hashlib",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "warnings",
+    ),
+}  # D1R4_GENERATED_IMPORTS
+
+# D1R4R incident recovery successor; ALL predecessor dictionaries stay frozen.
+ARCH134_D1R4R_PATHS: Final = (
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py",
+    "src/trading_bot/review_paper/alpaca_credential_generation.py",
+    "src/trading_bot/review_paper/alpaca_credential_host.py",
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py",
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+)
+ARCH134_D1R4R_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "f76962b00bc9c51196d5234e03620972763e2bf7"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "ee3ea56bdd1e820663b7d4b71dd71216c2a1eccc"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "4d452bbb923e5ca5deecfa2ddaa5d514aed681d6"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py": (
+        "8af64b8007f94c530b106999084b0c8454725dc6"
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py": (
+        "1b86cf4b380f20564a17a59e83e0f228b25abac6"
+    ),
+    "tests/review_paper/test_alpaca_credential_generation.py": (
+        "e17c3bf76b12f2b2cc0fd353c0c4a0b05c6174f8"
+    ),
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py": (
+        "feb410ab64cbe6c19cbc2c86b03854e383339b42"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "30bcf0d14a78d02dd82438d532eaae26e3649f63"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "26fa20c5ab46bf20b202594f8cc973e54be532a2"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "b5eed90bbd5d468623a70efb6e61e3d61acf4c42"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "60e59e64087bd71ec27f7f372bcb8c1b64c82b64"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "6c65be330e18bbdd9a9e0e564c635948201e20f4"
+    ),
+}  # D1R4R_GENERATED_PINS
+ARCH134_D1R4R_IMPORTS: Final = {
+    "src/trading_bot/review_paper/alpaca_windows_credentials.py": (
+        "__future__",
+        "collections.abc",
+        "ctypes",
+        "os",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_generation.py": (
+        "__future__",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_host.py": (
+        "__future__",
+        "argparse",
+        "getpass",
+        "hashlib",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "warnings",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_staging_cleanup.py": (
+        "__future__",
+        "collections.abc",
+        "contextlib",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+        "typing",
+    ),
+    "src/trading_bot/review_paper/alpaca_credential_cleanup_host.py": (
+        "__future__",
+        "argparse",
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.alpaca_authentication_host",
+        "trading_bot.review_paper.alpaca_credential_generation",
+        "trading_bot.review_paper.alpaca_credential_native",
+        "trading_bot.review_paper.alpaca_credential_staging_cleanup",
+        "trading_bot.review_paper.alpaca_windows_credentials",
+    ),
+}  # D1R4R_GENERATED_IMPORTS
+
+# HIST-2 certification-inventory descendant overlay only. All D1/D1Q/R1/R2/R3/
+# D1R4/D1R4R dictionaries above remain frozen.
+ARCH134_HIST2_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "ded8139e15785ed6c05cc77a1921160f24854689"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "fe06a99bed79f6a1e6ff1b0633939d855fdcf537"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "3897e232387636f6fae29fa25989aa54dd7ae3aa"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "b1d46618abb4e8f9eef1062ff0dd978230a1b9cf"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "2925a26cc00238b6fa9675e6e68d6f6acd8fa138"
+    ),
+}
+
+# D1R5 successor only; all predecessor dictionaries remain byte-for-byte frozen.
+ARCH134_D1R5_NAME: Final = "arch134-d1r5-pre-market-wake-qualification"
+ARCH134_D1R5_BRANCH: Final = (
+    "feature/robinhood-production-paper-premarket-wake-qualification"
+)
+ARCH134_D1R5_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "a02a7c0d489fe679b69813748bc24a9800f8428e"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "577e30be94451da671d50a76c6d25882bef3a43a"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "583939144200ac633907ef80956732064648ca3c"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "d1ea3594fdb1cdec6047b51ef6ce03cc2336fa2f"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "c2199a4c64befeaba238583a3ac53fb347757ef8"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "df5497ab5193204ebcf34eb20fac203307d47948"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "5ff9ac6035cc10335fec916fb8d9fde4a6c18bae"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "2c1b28cff7f0a0812246d79b6650bd2adaad3b44"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "bc9c49ac7df48753c49b7b5df7087a9a0bc55660"
+    ),
+}
+ARCH134_D1R5_PATHS: Final = (
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py",
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py",
+    "tests/review_paper/test_pre_market_wake_qualification.py",
+    "docs/validation/arch134-d1r5-pre-market-wake-qualification.md",
+)
+ARCH134_D1R5_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py": (
+        "c751590126453a51442ae10bbaf638f0a32c92b8"
+    ),
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py": (
+        "809da0dd5f1d0fbe5fea515e51b0b6af3497ac8a"
+    ),
+    "tests/review_paper/test_pre_market_wake_qualification.py": (
+        "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
+    ),
+    "docs/validation/arch134-d1r5-pre-market-wake-qualification.md": (
+        "3449492fd680a813c1fbc59aad1f16bf6cc378fc"
+    ),
+}
+ARCH134_D1R5_IMPORTS: Final = {
+    "src/trading_bot/review_paper/pre_market_wake_qualification.py": (
+        "__future__",
+        "collections.abc",
+        "datetime",
+        "enum",
+        "json",
+        "os",
+        "pathlib",
+        "stat",
+        "trading_bot.review_paper.nyse_published_regular_sessions",
+        "trading_bot.review_paper.session_admission",
+        "typing",
+        "zoneinfo",
+    ),
+    "src/trading_bot/review_paper/pre_market_wake_qualification_host.py": (
+        "__future__",
+        "argparse",
+        "datetime",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "trading_bot.review_paper.pre_market_wake_qualification",
+    ),
+}
+ARCH134_D1R5_TESTS: Final = (
+    "tests/review_paper/test_pre_market_wake_qualification.py",
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/review_paper/test_session_admission.py",
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+    "tests/review_paper/test_supervised_release_installation.py",
+    "tests/review_paper/test_arch133_reprovision_recovery.py",
+    "tests/review_paper/test_arch133_windows_rename_qualification.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    *COMMON_TESTS,
+)
+ARCH134_D1R5_RUFF_PATHS: Final = (
+    *ARCH134_D1R5_PATHS[:3],
+    *ARCH134_D1R5_TEST_PIN_OVERRIDES,
+    *ARCH134_D1R5_TESTS,
+    "scripts/run_test_certification.py",
+    *COMMON_RUFF_PATHS,
+)
+
+
+# Architecture 138 succeeds D1R5 only for these live-discovery inventory tests.
+# Every predecessor dictionary and executable/native/AST pin remains frozen.
+ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "a3512cef7de7c2482c649f43f4e9c4b00c62c403"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "5cee9a1c55618c06b478ffb2e792a7648c6f5e4c"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "8c5330f855b44cd63c3dfc99e3b2f5565b55bd9f"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "3dab5e5f166a9fc4d7893ed20741e627a95e035c"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "f67561da61aab33d295538689c75225bbd690bc8"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "62617f9f9fbab1c90a8b2d84482220caee98796f"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "52b1fd4e3257976e3d5014d0af1aecde62da7ee0"
+    ),
+}
+
+
+def _arch138_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/strategies/test_production_strategy_decision.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+    }:
+        raise ValueError("138 unreviewed current inventory test pin override")
+    return ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# Architecture 139-A succeeds 138 only for the same live-discovery tests.
+# All predecessor dictionaries and executable/native/AST pins remain frozen.
+ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "cacc61cc25e1b6ba9db866767758b13c91f92aff"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "2f72359ba9338ea0969469de216ee602be6df4d4"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "411d18876f33ac456c5fd5efa4d73bf6294bb3ea"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "ca217d4214141bcdac7e2e7ecd1b8f7b5d058853"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "11471897d25ae60cb8bf893b2f8ce39217f2082d"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "e623a7eb9483e540f13f8e97d4b4b6c1e4a285d7"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "0d71948f511aa7cf2c2313e78cda6c9326bd6f65"
+    ),
+}
+
+
+def _arch139a_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/strategies/test_production_strategy_decision.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+    }:
+        raise ValueError("139-A unreviewed current inventory test pin override")
+    return ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# Architecture 139-B1 succeeds its predecessor only for live inventory tests.
+ARCH139B1_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "958b5d94d3b2a9b7e40d5771c25040f4cda4fa25"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "ad2e0dd1438552b96f8583f4f8a7767f6fe6787c"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "a52f921843857af48464a34d02d981226cd7c587"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "2e72b98b93195639daa5bf2ffa6ff03eb951d27a"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "376521fbce38b348bce9bc17f520b2bf979a483d"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f28f28d4afb79db9c56ca60530df4f4ab3cbeded"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "610878dbe011260d3c60855cdfb2c72ae5a105f9"
+    ),
+}
+
+
+def _arch139b1_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH139B1_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_decision.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+    }:
+        raise ValueError("139-B1 unreviewed current inventory override")
+    for name, digest in (
+        (
+            "ARCH134_HIST2_TEST_PIN_OVERRIDES",
+            "1d005a7fa62d7172d58be3a9b61443e548f0c62c92ad8652bc883b8df302d950",
+        ),
+        (
+            "ARCH134_D1R5_TEST_PIN_OVERRIDES",
+            "bcdb35cb77572df147ea12a9db54d22da2cbe8933140a6c1a7b448dba8be287b",
+        ),
+        (
+            "ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES",
+            "8a4021b92a5354cfbdb5394692eb50c14f6a13982b9a50aeb7d259553c7e5988",
+        ),
+        (
+            "ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES",
+            "9ec72c131a25b962a7d3e49124f99aa712dc2a8e0182d297f4a78507b6e0fb69",
+        ),
+    ):
+        material = json.dumps(globals()[name], sort_keys=True).encode()
+        if hashlib.sha256(material).hexdigest() != digest:
+            raise ValueError("139-B1 frozen predecessor drift: " + name)
+    return ARCH139B1_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# Architecture 139-B2 succeeds its predecessor only for live inventory tests.
+ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "3da7aea48cf0e04e0bf905b06a6720e8eb4107a5"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "c275cdc141d2692ac39cc2e7b37bccb9bd2753a1"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "852f0fb0f1f7e5dcc9dd72d927afa0ec1c0daa67"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "43530aa484e450b8c1d53f8bb971c6fac63d50b3"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "336fc83f75a3500cb6d2c65a93cd99413e9348a0"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f89d3757b29f272f917422b5806b75241d0b4c1e"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "1485933612289b843ad407f50e64d66598aeca78"
+    ),
+}
+
+
+def _arch139b2_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_decision.py",
+    }:
+        raise ValueError("139-B2 unreviewed current inventory override")
+    for name, digest in (
+        (
+            "ARCH139B1_CURRENT_INVENTORY_TEST_PIN_OVERRIDES",
+            "d66e134a5491e1e2966728e27558f05c51946c5e89930707e1471f339324634c",
+        ),
+    ):
+        material = json.dumps(globals()[name], sort_keys=True).encode()
+        if hashlib.sha256(material).hexdigest() != digest:
+            raise ValueError("139-B2 frozen predecessor drift: " + name)
+    return ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# Architecture 140 / GUI-A16 succeeds B2 for exactly seven inventory tests.
+ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "cfa0ad5b217b6493c6eab748efeff09b17e6a7d3"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "4e694f9e8ac110b422f1ae2b1eafc401ce6bbf7f"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "57d1053f46b4a86a80cdc8d575dc6ec8e8d9ddb1"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "bf9afe45f42a8d8cd6334ff295f7a76ca07697d3"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "c98d6252257ace3d8b876dc0c36fab474e089e92"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "544e0b9ac6d0276467872ce2ae0481504cd31a79"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "36e9c0802f19cec5fe0ed771be5a599fa584e84c"
+    ),
+}
+
+
+def _arch140_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/strategies/test_production_strategy_decision.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+    }:
+        raise ValueError("140 unreviewed current inventory override")
+    material = json.dumps(
+        ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(material).hexdigest()
+        != "32ef60967164da03e02c8cfe40928b8839f89a2c4bb90074e967bb08213d6458"
+    ):
+        raise ValueError("140 frozen 139-B2 predecessor drift")
+    return ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# GUI-A17 succeeds A16 only for the same seven current inventory tests.
+ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "e8212d9d29b648868472812e3b87d86ba0a52b7e"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "71a795f9a52568fd0459fbd84b0ce9c08e61d60b"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "a188f948e335a25d611991465a93c8de93b5ec3f"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "83a50eb19dc230a366a39dae293f4006b7dbef52"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8f9a142d408fcaaaa3ef55a049445859cef3377a"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "2a9d81b1cb2a4d0969251db45bff88ca114c0e3f"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "e200dc0d0357ddc654d8253fc311464d28992ff6"
+    ),
+}
+
+
+def _arch140a17_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    material = json.dumps(
+        ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(material).hexdigest()
+        != "887064885ca3be46514075efed384ccf1c6eb778d78dcc3f06bc402bff1a4e4f"
+    ):
+        raise ValueError("140-A17 frozen A16 predecessor drift")
+    if set(ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != set(
+        ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    ):
+        raise ValueError("140-A17 unreviewed current inventory override")
+    if relative in ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]:
+            raise ValueError("140-A17 wrong before pin")
+    return ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# GUI-A18 succeeds A17 for the same seven current inventory tests.
+ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "e1d74224317534373f2374bb0b90d927e80e8247"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "7812c989b5c358ca0788bdaabd8febc664fa835f"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "1af48ae395c03801a7fdbe86804cf4845d141427"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "8630a2da95dca4580fbfc0ececc7021b6b3d0b07"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "0b4e8c07e7dd8cce9f9c132224a6c5cbed0288da"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "ec3421cd69257778e45f908ff65e607407b1b9f0"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "14df3fad18150a48c12114d4e902ed62c17d5efa"
+    ),
+}
+
+
+def _arch140a18_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    material = json.dumps(
+        ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(material).hexdigest()
+        != "dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3"
+    ):
+        raise ValueError("140-A18 frozen A17 predecessor drift")
+    if set(ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != set(
+        ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    ):
+        raise ValueError("140-A18 unreviewed current inventory override")
+    predecessor = _arch140a17_current_inventory_test_pin(relative, predecessor)
+    if relative in ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]:
+            raise ValueError("140-A18 wrong before pin")
+    return ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+# D1R6 successor: only shared tests changed by registration/inventory.
+ARCH134_D1R6_NAME: Final = "arch134-d1r6-overnight-wake-arming"
+ARCH134_D1R6_BRANCH: Final = "feature/robinhood-production-paper-overnight-wake-arming"
+ARCH134_D1R6_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "30d2280bc5e031796ce06febc3562cbe5e6be982"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "1b6447063b1401cf1d930b71e0ec703287623b77"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "4721a9ba5e2fc6a052ab7c6f1066b9ef924a7117"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "0093fdf868065d4dff932427b037b21f74f1bbff"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "7e86ab4182bf21577c061836b77269066410707b"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "ecd2074d3f4e9b42f314a6556e32b57b70753a1e"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "b31d8a5055ebaa763abf1e2e6ed1a5485f1b2f31"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "9a7b88f8363b0c7c89ee6e23659b6a444679c7c4"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "de7a77d3b0cf58fd9d5d58450181f8a1957fc7b2"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "ea7ca9f8a0ec33449f70101e2e27aa72d2f27a39"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "127db46d0211570727c2a9fb6118bb8f6a3b45d2"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "292f4b3fa8fc3b667f6b60c6498da99aa8b687b5"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "3c1fafd75920ba3346918fd3c44fb3a390e73678"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "e3a85fd7a71e9e83c89faf60bf25dea6d26a49d2"
+    ),
+}
+ARCH134_D1R6_REVIEWED_TEST_PINS_SHA256: Final = (
+    "dfe1999400e0a6fdea245ccdd7d77a62e49aa1a169dbd42c0f89e2e88868ef4b"
+)
+ARCH134_D1R6_PREDECESSOR_DIGESTS: Final = {
+    "ARCH134_D1R5_TEST_PIN_OVERRIDES": (
+        "6a95f4afc8640dfa0c672f5d77cda06ae57171c0199128a3ddd1d8b0debaac4a"
+    ),
+    "ARCH134_D1R5_SOURCE_PINS": (
+        "370e14ff9a9453b4e001278921c3d1084c6ff94c8e34be76d430cb2b2adae575"
+    ),
+}
+ARCH134_D1R6_PATHS: Final = (
+    "src/trading_bot/review_paper/pre_market_wake_overnight.py",
+    "src/trading_bot/review_paper/pre_market_wake_overnight_host.py",
+    "scripts/run_arch134_d1r6.py",
+    "scripts/arch134_d1r6_d1r5_child.py",
+    "scripts/arch134_d1r6_scheduler_create.ps1",
+    "scripts/arch134_d1r6_task_launcher.ps1",
+    "tests/review_paper/test_pre_market_wake_overnight.py",
+    "docs/architecture/134-d1r6-overnight-pre-market-wake-arming.md",
+    "docs/validation/arch134-d1r6-overnight-pre-market-wake-arming.md",
+)
+ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS: Final = {
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "541637b761793075b3db7f12425beb41c4ab3c9d"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "a0eea1de674e55f547fd3f958b572484919e7566"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "aa7985c1ba7e08320665b554900ec57ca981eed7"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "8e2c645257767a306bf941e06c458050e63cd711"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "b056de4a599699b83cc6194e5ce7b34393823d52"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "1f9443823652c8931507030c60ddbdad2a4a360e"
+    ),
+}
+ARCH134_D1R6_ADDITIONAL_PREDECESSOR_SHA256: Final = (
+    "572d83c4a3938678894c0cb9072c182373fbce4f596c4b66c26b51f07e2089ab"
+)
+
+ARCH134_D1R6_SOURCE_PINS: Final = {
+    "src/trading_bot/review_paper/pre_market_wake_overnight.py": (
+        "666d43948fa812050bb0bd4d761c387e41b766e6"
+    ),
+    "src/trading_bot/review_paper/pre_market_wake_overnight_host.py": (
+        "b64a1c2a580b895450fe6d3c0245728ed1df63a3"
+    ),
+    "scripts/run_arch134_d1r6.py": ("593eacf9495fcc4fe75a51f54f8947266a93b676"),
+    "scripts/arch134_d1r6_d1r5_child.py": ("c03f163f5bbc1cb4a6c78428298f16ebc5f71368"),
+    "scripts/arch134_d1r6_scheduler_create.ps1": (
+        "827a3798e6ca0f6c3d3fe76a75f9feadbabc1976"
+    ),
+    "scripts/arch134_d1r6_task_launcher.ps1": (
+        "62072df35376c5abb6adb4ff7ec764199621cb7c"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "99efdaa678ef63541f3c583d7c3bcb5f965c357b"
+    ),
+    "docs/architecture/134-d1r6-overnight-pre-market-wake-arming.md": (
+        "1cb021dd04deddc9c932156db57413145ae8fae4"
+    ),
+    "docs/validation/arch134-d1r6-overnight-pre-market-wake-arming.md": (
+        "a7a7045cb1c308ac9f69870dae7a1beaa81b86e1"
+    ),
+}
+ARCH134_D1R6_TESTS: Final = (
+    "tests/review_paper/test_pre_market_wake_overnight.py",
+    "tests/review_paper/test_nyse_published_regular_sessions.py",
+    *ARCH134_D1R5_TESTS,
+)
+ARCH134_D1R6_RUFF_PATHS: Final = (
+    *(p for p in ARCH134_D1R6_PATHS if p.endswith(".py")),
+    *ARCH134_D1R5_RUFF_PATHS,
+)
+
+
+def _arch134_d1r6_test_pin(relative: str, predecessor: str) -> str:
+    def digest(value: object) -> str:
+        return hashlib.sha256(
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    if (
+        set(ARCH134_D1R6_TEST_PIN_OVERRIDES)
+        != {
+            "tests/scripts/certification_runner/test_profiles.py",
+            "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+            "tests/review_paper/test_supervised_release_installation.py",
+            "tests/review_paper/test_arch133_reprovision_recovery.py",
+            "tests/review_paper/test_arch133_windows_rename_qualification.py",
+            "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+            "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+            "tests/runtime/checkpoint_runner/test_ci.py",
+            "tests/runtime/checkpoint_runner/helpers.py",
+            "tests/review_paper/test_supervised_runtime_host_admission.py",
+            "tests/review_paper/test_supervised_maintenance_rebind.py",
+            "tests/runtime/checkpoint_runner/test_core.py",
+            "tests/review_paper/test_supervised_deployment_qualification.py",
+            "tests/review_paper/test_production_strategy_cycle.py",
+        }
+        or digest(ARCH134_D1R6_TEST_PIN_OVERRIDES)
+        != ARCH134_D1R6_REVIEWED_TEST_PINS_SHA256
+    ):
+        raise ValueError("134-D1R6 unreviewed successor test override")
+    for name, expected in ARCH134_D1R6_PREDECESSOR_DIGESTS.items():
+        if digest(globals()[name]) != expected:
+            raise ValueError("134-D1R6 predecessor drift")
+    if (
+        digest(ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS)
+        != ARCH134_D1R6_ADDITIONAL_PREDECESSOR_SHA256
+    ):
+        raise ValueError("134-D1R6 additional predecessor drift")
+    if (
+        relative in ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS
+        and predecessor != ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS[relative]
+    ):
+        raise ValueError("134-D1R6 additional predecessor resolution drift")
+    if (
+        relative in ARCH134_D1R5_TEST_PIN_OVERRIDES
+        and predecessor != ARCH134_D1R5_TEST_PIN_OVERRIDES[relative]
+    ):
+        raise ValueError("134-D1R6 predecessor resolution drift")
+    return ARCH134_D1R6_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_arch134_d1r5_authority_check(repo_root))
+    try:
+        if set(ARCH134_D1R6_SOURCE_PINS) != set(ARCH134_D1R6_PATHS):
+            failures.append("134-D1R6 unreviewed source override")
+        for relative, pin in ARCH134_D1R6_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R6 source drift: " + relative)
+        for relative in ARCH134_D1R6_TEST_PIN_OVERRIDES:
+            expected = _arch134_d1r6_test_pin(
+                relative,
+                ARCH134_D1R5_TEST_PIN_OVERRIDES.get(
+                    relative, ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS.get(relative)
+                ),
+            )
+            expected = _canonical_current_inventory_test_pin(relative, expected)
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append("134-D1R6 successor drift: " + relative)
+        if (
+            _git_blob_sha1(repo_root / ".github/workflows/checkpoint-source-gates.yml")
+            != "fe6aceac62721338eba4fcb40e2e7fde0d976e18"
+        ):
+            failures.append("134-D1R6 workflow drift")
+        spec = _checkpoint_specs()[ARCH134_D1R6_NAME]
+        if (
+            spec.remote_branch != ARCH134_D1R6_BRANCH
+            or spec.tests != ARCH134_D1R6_TESTS
+            or spec.ruff_paths != ARCH134_D1R6_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1r6_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_D1R6_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_D1R6_NAME) != "robinhood"
+        ):
+            failures.append("134-D1R6 source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1R6 authority unavailable")
+    return tuple(failures)
+
+
+# Canonical product + safe-side integration: the seven live-inventory tests
+# are the only files whose current bytes must combine D1R6 and GUI-A18 state.
+CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "6d5a7eaa49cbe6a9c67900d8e0ae99476cded215"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "4fae6dc080f6b9080025cc4dc2860725cbbaa1f8"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "d608cad8d3b5c4d52373e7b4ea4d5b0b23ad7748"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "b189e5ba3a792f7f0375b1df228cb706134e6fb6"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "ae8df8b5b3e32c84028ace2103f5b932635edea1"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "36f5849f5df62682713860f053b87879b97d37cc"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "588d9d71bf2e6513754e7a0ec8e2c2627b435458"
+    ),
+}
+CANONICAL_CURRENT_INVENTORY_TEST_PINS_SHA256: Final = (
+    "0683b8810167b83d95275bf2173e3431ba28fcca022e3572be90f8c64be48c96"
+)
+
+
+def _canonical_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    material = json.dumps(
+        CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        set(CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
+        != set(ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
+        or hashlib.sha256(material).hexdigest()
+        != CANONICAL_CURRENT_INVENTORY_TEST_PINS_SHA256
+    ):
+        raise ValueError("canonical integration inventory override drift")
+    a18_material = json.dumps(
+        ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(a18_material).hexdigest()
+        != "a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5"
+    ):
+        raise ValueError("canonical integration A18 predecessor drift")
+    if relative in CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        accepted = {ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]}
+        if relative in ARCH134_D1R6_TEST_PIN_OVERRIDES:
+            accepted.add(ARCH134_D1R6_TEST_PIN_OVERRIDES[relative])
+        if predecessor not in accepted:
+            raise ValueError("canonical integration predecessor resolution drift")
+        return CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]
+    return _arch134_d1r6_test_pin(relative, predecessor)
+
+
+def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH134_D1R5_TEST_PIN_OVERRIDES) != {
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/runtime/checkpoint_runner/helpers.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/scripts/certification_runner/test_lanes.py",
+    }:
+        raise ValueError("134-D1R5 unreviewed successor test pin override")
+    return ARCH134_D1R5_TEST_PIN_OVERRIDES.get(relative, predecessor)
+
+
+def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Separate source-only checkpoint; no real clock/sleep/evidence CI operation."""
+    failures = list(_arch134_authentication_authority_check(repo_root))
+    try:
+        if set(ARCH134_D1R5_SOURCE_PINS) != set(ARCH134_D1R5_PATHS):
+            failures.append("134-D1R5 unreviewed source override")
+        if set(ARCH134_D1R5_IMPORTS) != set(ARCH134_D1R5_PATHS[:2]):
+            failures.append("134-D1R5 unreviewed import override")
+        for relative, pin in {
+            **ARCH134_D1R5_SOURCE_PINS,
+            **ARCH134_D1R5_TEST_PIN_OVERRIDES,
+        }.items():
+            expected_pin = _arch138_current_inventory_test_pin(relative, pin)
+            expected_pin = _arch139a_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140a18_current_inventory_test_pin(
+                relative, expected_pin
+            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
+                failures.append("134-D1R5 source drift: " + relative)
+        for relative, allowed in ARCH134_D1R5_IMPORTS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(allowed):
+                failures.append("134-D1R5 import closure drift: " + relative)
+        spec = _checkpoint_specs()[ARCH134_D1R5_NAME]
+        if (
+            spec.remote_branch != ARCH134_D1R5_BRANCH
+            or spec.tests != ARCH134_D1R5_TESTS
+            or spec.ruff_paths != ARCH134_D1R5_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1r5_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_D1R5_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_D1R5_NAME) != "robinhood"
+        ):
+            failures.append("134-D1R5 source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1R5 authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_AUTH_TESTS: Final = (
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
+    "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/market_data/test_alpaca_daily_snapshot.py",
+    "tests/market_data/test_alpaca_http.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    *COMMON_TESTS,
+)
+ARCH134_AUTH_RUFF_PATHS: Final = (
+    *ARCH134_AUTH_SOURCE_PINS,
+    *ARCH134_D1R4_PATHS,
+    *ARCH134_D1R4R_PATHS,
+    *ARCH134_AUTH_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """D1R4 source closure; credential/provider operations are never CI gates."""
+    failures = list(_arch134_production_paper_runtime_authority_check(repo_root))
+    forbidden = {
+        "sqlite3",
+        "ReviewPaperStore",
+        "ArmedSessionStore",
+        "run_armed_production_paper_session",
+        "run",
+        "Popen",
+        "environ",
+        "getenv",
+        "CredWriteW",
+        "CredDeleteW",
+        "chmod",
+        "chown",
+        "icacls",
+        "schtasks",
+        "register_task",
+        "evaluate",
+        "prepare",
+        "place_equity_order",
+        "execute_paper",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+    }
+    try:
+        if set(ARCH134_D1R4_SOURCE_PINS) != set(ARCH134_D1R4_PATHS):
+            failures.append("134-D1R4 unreviewed source override")
+        if set(ARCH134_D1R4_IMPORTS) != {
+            p for p in ARCH134_D1R4_PATHS if p.startswith("src/")
+        }:
+            failures.append("134-D1R4 unreviewed import override")
+        if set(ARCH134_D1R4R_SOURCE_PINS) != set(ARCH134_D1R4R_PATHS):
+            failures.append("134-D1R4R unreviewed source override")
+        if set(ARCH134_D1R4R_IMPORTS) != {
+            p for p in ARCH134_D1R4R_PATHS if p.startswith("src/")
+        }:
+            failures.append("134-D1R4R unreviewed import override")
+        if set(ARCH134_HIST2_TEST_PIN_OVERRIDES) != {
+            "tests/scripts/certification_runner/test_profiles.py",
+            "tests/review_paper/test_supervised_deployment_qualification.py",
+            "tests/review_paper/test_supervised_runtime_host_admission.py",
+            "tests/review_paper/test_supervised_maintenance_rebind.py",
+            "tests/review_paper/test_production_strategy_cycle.py",
+        }:
+            failures.append("134-HIST2 unreviewed test pin override")
+        for relative, pin in ARCH134_D1R4R_SOURCE_PINS.items():
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
+            expected_pin = _arch138_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139a_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140a18_current_inventory_test_pin(
+                relative, expected_pin
+            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
+                failures.append("134-D1R4R source drift: " + relative)
+        for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, pin)
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
+            expected_pin = _arch138_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139a_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140a18_current_inventory_test_pin(
+                relative, expected_pin
+            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
+                failures.append("134-D1R4 source drift: " + relative)
+        if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
+            "tests/review_paper/test_armed_production_paper_session.py"
+        }:
+            failures.append("134-D1R3 unreviewed correction test override")
+        for relative, pin in ARCH134_AUTH_CORRECTION_TEST_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-D1R3 correction test drift: " + relative)
+        for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
+            expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(
+                relative, ARCH134_D1R4_SOURCE_PINS.get(relative, pin)
+            )
+            expected_pin = ARCH134_HIST2_TEST_PIN_OVERRIDES.get(relative, expected_pin)
+            expected_pin = _arch134_d1r5_test_pin(relative, expected_pin)
+            expected_pin = _arch138_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139a_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b1_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch139b2_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch140a18_current_inventory_test_pin(
+                relative, expected_pin
+            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
+            if _git_blob_sha1(repo_root / relative) != expected_pin:
+                failures.append("134-D1R3 source drift: " + relative)
+        for relative, allowed in {
+            **ARCH134_AUTH_IMPORTS,
+            **ARCH134_D1R4_IMPORTS,
+            **ARCH134_D1R4R_IMPORTS,
+        }.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(allowed):
+                failures.append("134-D1R3 import closure drift: " + relative)
+            names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)} | {
+                n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)
+            }
+            # The host alone needs the fixed argument-array Git admission helper.
+            disallowed = forbidden - (
+                {"run"} if relative.endswith("_host.py") else set()
+            )
+            if relative.endswith("alpaca_credential_native.py"):
+                disallowed -= {"CredWriteW", "CredDeleteW"}
+            if names & disallowed:
+                failures.append("134-D1R3 forbidden authority: " + relative)
+            if relative.endswith("alpaca_authentication_qualification.py"):
+                calls = [
+                    n
+                    for n in ast.walk(tree)
+                    if isinstance(n, ast.Call)
+                    and isinstance(n.func, ast.Attribute)
+                    and n.func.attr == "execute"
+                ]
+                if len(calls) != 1:
+                    failures.append("134-D1R3 provider call budget drift")
+        spec = _checkpoint_specs()[ARCH134_AUTH_NAME]
+        if (
+            spec.remote_branch != ARCH134_AUTH_BRANCH
+            or spec.tests != ARCH134_AUTH_TESTS
+            or spec.ruff_paths != ARCH134_AUTH_RUFF_PATHS
+            or spec.authority_check is not _arch134_authentication_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_AUTH_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_AUTH_NAME) != "robinhood"
+        ):
+            failures.append("134-D1R3 source-only registration drift")
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("134-D1R3 workflow drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1R3 authority unavailable")
+    return tuple(failures)
+
+
+ARCH134_RUNTIME_ACL_NAME: Final = "arch134-production-paper-runtime-acl"
+ARCH134_RUNTIME_ACL_SOURCE_PINS: Final = {
+    "src/trading_bot/__init__.py": ("844df369681914646c4bb522bfc2c3fda615cf87"),
+    "src/trading_bot/backtesting/__init__.py": (
+        "8dee77f6ba26af8ee3ef06bf63981fcf3547882c"
+    ),
+    "src/trading_bot/backtesting/engine.py": (
+        "f20a8fa25701f192ee6922c825281c1233f1d722"
+    ),
+    "src/trading_bot/backtesting/exceptions.py": (
+        "439824b66042a5b48e9b6843409dbac8de03716f"
+    ),
+    "src/trading_bot/backtesting/models.py": (
+        "78c5df9ee7d4181974516209962f8655695af26b"
+    ),
+    "src/trading_bot/backtesting/strategy.py": (
+        "686ffe9b0eb0898cf49f0a8e471e2cfba9b85af5"
+    ),
+    "src/trading_bot/config.py": ("2e20646923701f402cd42d71e2b64aeef804f800"),
+    "src/trading_bot/domain/__init__.py": ("646cc3901b3c83af2fbe528ca9b71d9582ad9592"),
+    "src/trading_bot/domain/_validation.py": (
+        "e6949f366e64f8c859b9bb75334f5534adf28aa3"
+    ),
+    "src/trading_bot/domain/enums.py": ("fd15367ec77cb9ac080ee1f40f9397e000b93f7b"),
+    "src/trading_bot/domain/market.py": ("d5e059b78a5a876cf36dd2e9501a1f0321bcc35d"),
+    "src/trading_bot/domain/orders.py": ("4029e1c8d2180b3a35673648339bed84aa2386f7"),
+    "src/trading_bot/domain/positions.py": ("eb992456bfb6da38fd9026ce5d74f9f366397421"),
+    "src/trading_bot/domain/proposals.py": ("4c221e2a9d4f887107cfa15e44fe1b3470eca64a"),
+    "src/trading_bot/execution/__init__.py": (
+        "143f8b481ff01e91f21f242a798ffed19a502183"
+    ),
+    "src/trading_bot/execution/engine.py": ("5c7a916901a4d2e2a35d6b9605995542b6fe004a"),
+    "src/trading_bot/execution/exceptions.py": (
+        "3f3d2836074589da6a6c66af087e9d4e1a35d2e4"
+    ),
+    "src/trading_bot/execution/models.py": ("388895fa3c193f8f7353f4ffa569b4e584f28e27"),
+    "src/trading_bot/execution/paper_fill_application.py": (
+        "1ad41675a1390a6b188620f3ad501a1134d0f47e"
+    ),
+    "src/trading_bot/execution/paper_fills.py": (
+        "f55f1a401411bb35f866e6bdaeed282bc07b642d"
+    ),
+    "src/trading_bot/execution/paper_submission.py": (
+        "f742fa1ccced5eb3a854e8a4566576eacfac16db"
+    ),
+    "src/trading_bot/execution/portfolio_orders.py": (
+        "9ceb187ff61ee902ed4c9f86deed3b96e23eb7bb"
+    ),
+    "src/trading_bot/execution/state_fingerprints.py": (
+        "1570e92c63c14e1c3c1ca7f11283a61720e45af3"
+    ),
+    "src/trading_bot/ledger/__init__.py": ("493bca4924ff88887997b8181042217c28231302"),
+    "src/trading_bot/ledger/checkpoint_state.py": (
+        "ada513596a1d30f68e45be56e2bf47b6bf8ca3c5"
+    ),
+    "src/trading_bot/ledger/exceptions.py": (
+        "5f3d2e439747a6abf22eae473b38173f15fa9dc6"
+    ),
+    "src/trading_bot/ledger/initialization.py": (
+        "e16d146e47a2c3bb7c80311aa0522259a986b50b"
+    ),
+    "src/trading_bot/ledger/ledger.py": ("ba2062cfcc87da65d90a4085bb0597eddfabd145"),
+    "src/trading_bot/ledger/models.py": ("69ee12ba4c73698c5fe6f62f17cc97261941122d"),
+    "src/trading_bot/market_calendar/__init__.py": (
+        "be7457147506cf3bb7cf3719b97546c1f5c3e9b0"
+    ),
+    "src/trading_bot/market_calendar/calendar.py": (
+        "0a9fbf47448eb3e7ae985b35f99f2c3f7568220b"
+    ),
+    "src/trading_bot/market_calendar/exceptions.py": (
+        "7d8950c729ce6bf886bd4aad115d704dc83fa4a9"
+    ),
+    "src/trading_bot/market_calendar/models.py": (
+        "1f09e0015d25651a09c8bc89dcd83d6ad0138d05"
+    ),
+    "src/trading_bot/market_calendar/nyse.py": (
+        "b93a54bb2bb7ecac36cf5a116886c7fdfb2a2038"
+    ),
+    "src/trading_bot/market_data/__init__.py": (
+        "3b5237e5f7a6bbfa34213f48db9aa8dc3f52fe66"
+    ),
+    "src/trading_bot/market_data/alpaca_daily_snapshot.py": (
+        "82e30b6b486915acadb85c95faf538ee9d828451"
+    ),
+    "src/trading_bot/market_data/alpaca_http.py": (
+        "a45037d821460d5fa0bab937f7085250890225d7"
+    ),
+    "src/trading_bot/market_data/csv_provider.py": (
+        "b636804c53a631c2e308b89b15c5dbb51090aa57"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_acceptance.py": (
+        "0c8cbc498a84c90776ccc0bac19877f721921399"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_identity.py": (
+        "80618f77b5ce8e54b817ae8ccc665d717f199425"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_models.py": (
+        "5a194695a558668baef4cc8d4c4b0062d088c580"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_provider.py": (
+        "397de9c14be6297754e49703df117a07222d2f84"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_serialization.py": (
+        "16a707c515179a1c83a6e264912ea25066a41ecf"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_verification.py": (
+        "a913ab3c2fd35a2d111f691b571f28d4d37550cd"
+    ),
+    "src/trading_bot/market_data/exceptions.py": (
+        "ce264675c48e5259cefdd58a319a0858dcef8d4d"
+    ),
+    "src/trading_bot/market_data/fingerprints.py": (
+        "677f8a46910ff8c1892ba0929b0d8fab02b0698d"
+    ),
+    "src/trading_bot/market_data/models.py": (
+        "b7eb7559eed7215e0cc3d917fc0857777093e273"
+    ),
+    "src/trading_bot/market_data/multi_provider.py": (
+        "4357ac2742791e5893a682d77bbcb453e45938bc"
+    ),
+    "src/trading_bot/market_data/provider.py": (
+        "3437be6a4a12e4641b9e75f983bd5e50385767a2"
+    ),
+    "src/trading_bot/portfolio/__init__.py": (
+        "8d0b391158b7837f0d1d4b0f4f1211d5bd11e52d"
+    ),
+    "src/trading_bot/portfolio/exceptions.py": (
+        "ca6743753b2dd7943f15953516068632fe5a7f38"
+    ),
+    "src/trading_bot/portfolio/historical_scenarios.py": (
+        "3a1120f0c0647104a0515dbb85122ada9259039a"
+    ),
+    "src/trading_bot/portfolio/mean_cvar.py": (
+        "4b97df92574797f49a454ee5196ddae29fab1d9d"
+    ),
+    "src/trading_bot/portfolio/models.py": ("3fcf379824ae4b727452aab5966da4363d463a12"),
+    "src/trading_bot/portfolio/optimized_targets.py": (
+        "4c8d617ba8d673ae04d0be70877f7e2d216e0a81"
+    ),
+    "src/trading_bot/portfolio/optimizer.py": (
+        "936ed13a8f42581b46b84ecb252e9e67a6368ad5"
+    ),
+    "src/trading_bot/portfolio/scenarios.py": (
+        "f29c94d5b2714379bca3a3765535d9a7360f03f6"
+    ),
+    "src/trading_bot/rebalancing/__init__.py": (
+        "f504b1e6a076119f05ed6ce7ecd6985004531d17"
+    ),
+    "src/trading_bot/rebalancing/exceptions.py": (
+        "124fd80fb06c477492f7b8126689899d39c890a6"
+    ),
+    "src/trading_bot/rebalancing/models.py": (
+        "b1db577d886f83670e258e3ed5d3624b5b6a4865"
+    ),
+    "src/trading_bot/rebalancing/planner.py": (
+        "659e3ab58cae4c74893660c715fd4e068ea34916"
+    ),
+    "src/trading_bot/rebalancing/proposals.py": (
+        "72c3f5aacbab25c117528e5f16ed25613dc564a6"
+    ),
+    "src/trading_bot/review_paper/__init__.py": (
+        "729418b848745fa32e43e8ed5dff108ecf545e2b"
+    ),
+    "src/trading_bot/review_paper/intent_bridge.py": (
+        "ad732415540c6cba376e1ebfacefc4cf5d724eb2"
+    ),
+    "src/trading_bot/review_paper/models.py": (
+        "e7d725c601b8a5ff16b0fffda4c31bace77f1e0a"
+    ),
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "a3e47fba3edff57c027181e985d72a17219393d3"
+    ),
+    "src/trading_bot/review_paper/risk_context.py": (
+        "05cce6037f8550a688474697a779a3655a323aa7"
+    ),
+    "src/trading_bot/review_paper/store.py": (
+        "c9875c20ec6d6b1fc788dd6649fe419aeae8fed8"
+    ),
+    "src/trading_bot/risk/__init__.py": ("2b38b6c92b0b7e2604340d56e63f91656da10f5a"),
+    "src/trading_bot/risk/exceptions.py": ("e96140eb7c16c5164d36ee35efab600ef07db68e"),
+    "src/trading_bot/risk/manager.py": ("0a13fcd15de2d46b7f76172f0f2ab541c2aa1e06"),
+    "src/trading_bot/risk/models.py": ("29f3a0294e3d29029d62d8722db18fb315be64cc"),
+    "src/trading_bot/risk/orchestration.py": (
+        "f8aefdfbcbce09c50b687d0fcd7757fd51e5258c"
+    ),
+    "src/trading_bot/runtime/__init__.py": ("cbe6afa3bc006f1dc609985ef2dccf0198bbbfab"),
+    "src/trading_bot/runtime/checkpointed_paper_cycle_report.py": (
+        "01b37772312548d6859db99b5642701e1d8a9b37"
+    ),
+    "src/trading_bot/runtime/checkpointed_verified_snapshot_execution.py": (
+        "55cad09ab18c08e37b6d5fc47d0ca4cb04afdc7e"
+    ),
+    "src/trading_bot/runtime/exceptions.py": (
+        "403c827c38e2449fd8e1c17ee6a64bfef3a80dc9"
+    ),
+    "src/trading_bot/runtime/manual_paper_selected_c3_snapshot.py": (
+        "4354c9cc0c6ec11f86e9894b8aeeb4c635a7b519"
+    ),
+    "src/trading_bot/runtime/manual_paper_strategy_plan.py": (
+        "9692d39ece0d15d3da6ca83dd8a5f4b994510b12"
+    ),
+    "src/trading_bot/runtime/paper_account_checkpoint.py": (
+        "5d6e383b4afa29945027e745ff14803c52ba653b"
+    ),
+    "src/trading_bot/runtime/paper_account_lineage_verification.py": (
+        "f05aff9cea8da0cec7c517b938fc3be40f423ac1"
+    ),
+    "src/trading_bot/runtime/paper_account_successor_checkpoint.py": (
+        "28822688addcf3346ebaafd31cc69038fffdd7ca"
+    ),
+    "src/trading_bot/runtime/paper_operation.py": (
+        "616132888c03838ff0cd751a929b952c3c43043a"
+    ),
+    "src/trading_bot/runtime/paper_operation_execution_inputs.py": (
+        "8f924181ca2725618c00b5dd72c11db8f9393abb"
+    ),
+    "src/trading_bot/runtime/paper_portfolio.py": (
+        "da21260d8c5956f94bf3e86ab994005603cd4e16"
+    ),
+    "src/trading_bot/runtime/personal_desktop_paper_account_security.py": (
+        "5604b89bf038e772518ab757ceec683c92f54711"
+    ),
+    "src/trading_bot/runtime/personal_desktop_paper_account_token.py": (
+        "bbcb246e65065978e3bbdacb6f504aed8eebe21a"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_c3_history.py": (
+        "c217ae6ea4bb7b5a748cb992cb0b69fb0a0dc301"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_daily_cycle_timing.py": (
+        "797a33afd451cb06f403af7d7d5c8d405084d2c9"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_market_data_capture.py": (
+        "48102d1ff82daf8a126d3cf49ac320bec7bdc6f4"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_paper_decision_intent.py": (
+        "c22a069a286ed86b1dbb58e4060c00a0c6af983c"
+    ),
+    (
+        "src/trading_bot/runtime/"
+        "personal_desktop_unattended_paper_decision_publication.py"
+    ): ("3d6ac4267dfe797322ec912891bee1d501808dd3"),
+    ("src/trading_bot/runtime/personal_desktop_unattended_paper_decision_storage.py"): (
+        "e74c1e389ab29aecf2208ba0fbad65941b91bf54"
+    ),
+    "src/trading_bot/runtime/personal_desktop_unattended_paper_invocation.py": (
+        "7c4d8ebc51e906821e52e84028ec37f9cfb5453d"
+    ),
+    (
+        "src/trading_bot/runtime/"
+        "personal_desktop_unattended_paper_invocation_storage.py"
+    ): ("a184158bcdde09ce0ea0f7aa9cdc5a31693535b5"),
+    "src/trading_bot/runtime/personal_desktop_unattended_scheduler_contract.py": (
+        "292b6abab453167f9803b70d7c9f0af86cbc5876"
+    ),
+    "src/trading_bot/runtime/schema/__init__.py": (
+        "0aa21da6aa4ae5b8c6d1be2a3387a3f10a9711ed"
+    ),
+    "src/trading_bot/runtime/strategy_history_seed.py": (
+        "6cc0670b169ed9afa430a8de87f36f2dd79fc695"
+    ),
+    "src/trading_bot/runtime/verified_c3_daily_bar_open.py": (
+        "13653e1664e2213a124a43253508080b8a9b06ef"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_execution.py": (
+        "278e136c99823b542de4dc36a92fcfc1e62a4447"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_preparation.py": (
+        "663ab5b16fe67f9c118f73c07286f5f52d168946"
+    ),
+    "src/trading_bot/runtime/verified_snapshot_serialization.py": (
+        "8243342acaedf9fa5d96ef1f897b31bf4e166b2d"
+    ),
+    "src/trading_bot/runtime/windows_authority.py": (
+        "ad2b219ec4953013617c2411e6ae736e9683e898"
+    ),
+    "src/trading_bot/runtime/windows_authority_mutex.py": (
+        "aa60edd9d19a0c31038fd27ffd618366f637402d"
+    ),
+    "src/trading_bot/runtime/windows_authority_schema.py": (
+        "c28ab9ba03964d9183153fee3d8523ce882ca4d1"
+    ),
+    "src/trading_bot/runtime/windows_authority_security.py": (
+        "8bb65aaee828314f3f4dc07b5d61f38c5bdea58e"
+    ),
+    "src/trading_bot/runtime/windows_authority_sqlite.py": (
+        "6f557dbfb609288d16c74925dff5cd10220ffcdb"
+    ),
+    "src/trading_bot/runtime/windows_authority_validation.py": (
+        "c4b72121b838f49749d623c8e2c2e37bce81e825"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture.py": (
+        "637145e8bb2e1b763f3852cd819a1cd7e1880ef4"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_native.py": (
+        "f4d2ea972f60f4d39f059e6d6103965cc21b72d1"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_protocol.py": (
+        "29a973aab22afeddae45454d66e8a25347b91951"
+    ),
+    "src/trading_bot/runtime/windows_effectful_capture_service.py": (
+        "44a09790af565f434f7325e9015b208aa0267a07"
+    ),
+    "src/trading_bot/runtime/windows_transactional_authority.py": (
+        "a7aa0bdf441466702ad7ef26fcb00bd904b2d35c"
+    ),
+    "src/trading_bot/strategies/__init__.py": (
+        "ce050824fd1e7dfb86a08f4ad15a607016d1afe2"
+    ),
+    "src/trading_bot/strategies/daily_decision.py": (
+        "8df232b80047d913d43814e193d7a2788fc27116"
+    ),
+    "src/trading_bot/strategies/exceptions.py": (
+        "180194bf44df19563f9586e314c437f60206241c"
+    ),
+    "src/trading_bot/strategies/history_seed.py": (
+        "b20e41206c3d6d2e8eca6cbbd0dfef2e701b3177"
+    ),
+    "src/trading_bot/strategies/moving_average.py": (
+        "2ce246a1305bf4514ee26bcb5113207e56f95cf8"
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "9a890b523f4c330b5284271a51bcca34331bdf56"
+    ),
+    "tests/review_paper/test_production_paper_runtime_acl.py": (
+        "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+    ),
+}
+ARCH134_RUNTIME_ACL_IMPORTS: Final = {
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "__future__",
+        "argparse",
+        "collections.abc",
+        "dataclasses",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "re",
+        "stat",
+        "subprocess",
+        "sys",
+        "trading_bot.runtime.windows_authority_security",
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "pathlib",
+        "sys",
+        "trading_bot.review_paper.production_paper_runtime_acl",
+    ),
+}
+ARCH134_RUNTIME_ACL_AST_PINS: Final = {
+    "src/trading_bot/review_paper/production_paper_runtime_acl.py": (
+        "39c5c8cd080d3328ee1ede03ec114893ff5acfa58f08e649ae2c9ae001225c0f"
+    ),
+    "scripts/provision_production_paper_runtime_acl.py": (
+        "6d645af95e4500c581b5b42d3f7fc9ab680dd6d8645590b7b2fb4c8cfe5d8073"
+    ),
+    "src/trading_bot/runtime/windows_authority_security.py": (
+        "1b034fc0ca0e066a0a9c8baf67c30415059141744ac0f981b1f35f1366f63f22"
+    ),
+}
+ARCH134_RUNTIME_ACL_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_production_paper_runtime_acl.py",
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+)
+ARCH134_RUNTIME_ACL_RUFF_PATHS: Final = (
+    *ARCH134_RUNTIME_ACL_SOURCE_PINS,
+    *ARCH134_RUNTIME_ACL_TESTS,
+    *COMMON_RUFF_PATHS,
+)
+
+
+def _arch134_runtime_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """R2 is isolated: exact closure plus independent structural policy pins."""
+    failures: list[str] = []
+    forbidden = {
+        "icacls",
+        "takeown",
+        "wmic",
+        "chmod",
+        "chown",
+        "walk",
+        "rglob",
+        "SetNamedSecurityInfoW",
+        "SetFileSecurityW",
+        "register_task",
+        "schtasks",
+        "CredWriteW",
+        "CredDeleteW",
+        "call_tool",
+        "place_equity_order",
+        "cancel_equity_order",
+        "connect",
+        "urlopen",
+        "eval",
+        "exec",
+        "__import__",
+        "import_module",
+        "environ",
+        "getenv",
+    }
+    try:
+        for relative, pin in ARCH134_RUNTIME_ACL_SOURCE_PINS.items():
+            path = repo_root / relative
+            if _git_blob_sha1(path) != pin:
+                failures.append("134-D1Q-R2 source drift: " + relative)
+            if relative not in ARCH134_RUNTIME_ACL_IMPORTS:
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            imports = {
+                n.module
+                for n in ast.walk(tree)
+                if isinstance(n, ast.ImportFrom) and n.module
+            } | {
+                a.name
+                for n in ast.walk(tree)
+                if isinstance(n, ast.Import)
+                for a in n.names
+            }
+            if imports != set(ARCH134_RUNTIME_ACL_IMPORTS[relative]):
+                failures.append("134-D1Q-R2 import closure drift: " + relative)
+            names = {n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)} | {
+                n.id for n in ast.walk(tree) if isinstance(n, ast.Name)
+            }
+            if names & forbidden:
+                failures.append("134-D1Q-R2 forbidden authority: " + relative)
+        for relative, pin in ARCH134_RUNTIME_ACL_AST_PINS.items():
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            if (
+                hashlib.sha256(
+                    ast.dump(tree, include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("134-D1Q-R2 structural authority drift: " + relative)
+        # Keep R1 security mutation prohibitions and accepted executable pins intact.
+        failures.extend(_arch134_production_paper_runtime_authority_check(repo_root))
+        spec = _checkpoint_specs()[ARCH134_RUNTIME_ACL_NAME]
+        if (
+            spec.tests != ARCH134_RUNTIME_ACL_TESTS
+            or spec.ruff_paths != ARCH134_RUNTIME_ACL_RUFF_PATHS
+            or spec.remote_branch != "feature/robinhood-production-paper-runtime-acl"
+            or spec.authority_check is not _arch134_runtime_acl_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or ACTIVE_CI_CHECKPOINTS[-1] != ARCH134_RUNTIME_ACL_NAME
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_RUNTIME_ACL_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_RUNTIME_ACL_NAME) != "robinhood"
+        ):
+            failures.append("134-D1Q-R2 registration authority drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("134-D1Q-R2 workflow drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-D1Q-R2 authority unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_parent_acl_repair.py",
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
@@ -4796,7 +12656,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_windows_authority.py",
     )
     parent_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_parent_acl_repair.py",
         "tests/runtime/test_d10_arch128_parent_acl_repair.py",
         "scripts/d10_arch128_r4_operator.py",
@@ -4809,7 +12669,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r4_windows.py",
     )
     r4_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_orchestration.py",
         "tests/runtime/test_d10_arch128_r4_replacement.py",
@@ -4821,7 +12681,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_protected_replacement_windows.py",
     )
     r4_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r4_operator.py",
         "tests/runtime/test_d10_arch128_r4_operator.py",
         "scripts/d10_arch128_r4_orchestration.py",
@@ -4832,33 +12692,33 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r4_windows.py",
     )
     r5_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r5_trading_child.py",
         "tests/runtime/test_d10_python_substrate_harness.py",
         "tests/runtime/test_d10_python_substrate_windows.py",
         "tests/runtime/test_personal_desktop_d10_python_substrate.py",
     )
     r5_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r5_trading_child.py",
         "tests/runtime/test_d10_arch128_r5_trading_child.py",
         "scripts/d10_python_substrate_harness.py",
         "scripts/d10_python_substrate_windows.py",
     )
     r6_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r6_reactivation.py",
         "tests/runtime/test_personal_desktop_d10_activation_lease.py",
         "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
         "tests/runtime/test_personal_desktop_unattended_scheduler_contract.py",
     )
     r6_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r6_reactivation.py",
         "tests/runtime/test_d10_arch128_r6_reactivation.py",
     )
     r7_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_protected.py",
         "tests/runtime/test_d10_arch128_r7_windows.py",
@@ -4870,7 +12730,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r3_preflight.py",
     )
     r7_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r7_readonly.py",
         "tests/runtime/test_d10_arch128_r7_readonly.py",
         "scripts/d10_arch128_r7_protected.py",
@@ -4883,23 +12743,117 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_python_substrate_windows.py",
     )
     r8_tests = (
-        *COMMON_TESTS,
+        *RETAINED_TESTS,
         "tests/runtime/test_d10_arch128_r8_readonly.py",
         "tests/runtime/test_d10_durable_wake_evidence_observe.py",
         "tests/runtime/test_personal_desktop_d10_wake_evidence_log.py",
         "tests/runtime/test_personal_desktop_d10_guard_evidence.py",
     )
     r8_ruff = (
-        *COMMON_RUFF_PATHS,
+        *RETAINED_RUFF_PATHS,
         "scripts/d10_arch128_r8_readonly.py",
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_D1R6_NAME: CheckpointSpec(
+            name=ARCH134_D1R6_NAME,
+            description="Architecture 134-D1R6 source-only overnight wake arming",
+            tests=ARCH134_D1R6_TESTS,
+            ruff_paths=ARCH134_D1R6_RUFF_PATHS,
+            authority_check=_arch134_d1r6_authority_check,
+            remote_branch=ARCH134_D1R6_BRANCH,
+        ),
+        ARCH134_D1R5_NAME: CheckpointSpec(
+            name=ARCH134_D1R5_NAME,
+            description="Architecture 134-D1R5 bounded pre-market wake source only",
+            tests=ARCH134_D1R5_TESTS,
+            ruff_paths=ARCH134_D1R5_RUFF_PATHS,
+            authority_check=_arch134_d1r5_authority_check,
+            remote_branch=ARCH134_D1R5_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_AUTH_NAME: CheckpointSpec(
+            name=ARCH134_AUTH_NAME,
+            description="Architecture 134-D1R4R incident recovery source only",
+            tests=ARCH134_AUTH_TESTS,
+            ruff_paths=ARCH134_AUTH_RUFF_PATHS,
+            authority_check=_arch134_authentication_authority_check,
+            remote_branch=ARCH134_AUTH_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_RUNTIME_ACL_NAME: CheckpointSpec(
+            name=ARCH134_RUNTIME_ACL_NAME,
+            description=(
+                "Architecture 134-D1Q-R2 fixed runtime principal ACL source only"
+            ),
+            tests=ARCH134_RUNTIME_ACL_TESTS,
+            ruff_paths=ARCH134_RUNTIME_ACL_RUFF_PATHS,
+            authority_check=_arch134_runtime_acl_authority_check,
+            remote_branch="feature/robinhood-production-paper-runtime-acl",
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_PRODUCTION_PAPER_RUNTIME_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_PAPER_RUNTIME_NAME,
+            description="Architecture 134-D1Q fixed runtime and credential readiness",
+            tests=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_RUFF_PATHS,
+            authority_check=_arch134_production_paper_runtime_authority_check,
+            remote_branch="feature/robinhood-production-paper-history-recovery",
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_ARMED_PAPER_NAME: CheckpointSpec(
+            name=ARCH134_ARMED_PAPER_NAME,
+            description=(
+                "Architecture 134-D1 current Alpaca history and armed paper session"
+            ),
+            tests=ARCH134_ARMED_PAPER_TESTS,
+            ruff_paths=ARCH134_ARMED_PAPER_RUFF_PATHS,
+            authority_check=_arch134_armed_paper_authority_check,
+            remote_branch="feature/robinhood-production-paper-mvp",
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_NAME,
+            description=(
+                "Architecture 134-C human-started production live-paper composition"
+            ),
+            tests=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_RUFF_PATHS,
+            authority_check=_arch134_production_strategy_live_paper_authority_check,
+            remote_branch="feature/robinhood-production-strategy-live-paper",
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_PRODUCTION_STRATEGY_DECISION_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_STRATEGY_DECISION_NAME,
+            description="Architecture 134-B pure production strategy decision bridge",
+            tests=ARCH134_PRODUCTION_STRATEGY_DECISION_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_STRATEGY_DECISION_RUFF_PATHS,
+            authority_check=_arch134_production_strategy_decision_authority_check,
+            remote_branch="feature/robinhood-production-strategy-decision",
+            preflight=None,
+            execute=None,
+        ),
+        ARCH134_PRODUCTION_STRATEGY_NAME: CheckpointSpec(
+            name=ARCH134_PRODUCTION_STRATEGY_NAME,
+            description="Architecture 134-A inert session production strategy contract",
+            tests=ARCH134_PRODUCTION_STRATEGY_TESTS,
+            ruff_paths=ARCH134_PRODUCTION_STRATEGY_RUFF_PATHS,
+            authority_check=_arch134_production_strategy_authority_check,
+            remote_branch="feature/robinhood-production-strategy-contract",
+            preflight=None,
+            execute=None,
+        ),
         "arch131-robinhood-paper-intent-bridge": CheckpointSpec(
             name="arch131-robinhood-paper-intent-bridge",
             description="Architecture 131-I deterministic risk-to-paper-intent bridge",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_intent_bridge.py",
                 "tests/review_paper/test_store.py",
                 "tests/risk/test_risk_models.py",
@@ -4908,7 +12862,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/execution/test_order_engine.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/intent_bridge.py",
                 "src/trading_bot/review_paper/__init__.py",
                 "tests/review_paper/test_intent_bridge.py",
@@ -4922,7 +12876,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-deterministic-paper-pipeline",
             description="Architecture 131-J one-cycle deterministic paper pipeline",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_pipeline.py",
                 "tests/review_paper/test_intent_bridge.py",
                 "tests/test_robinhood_paper_operator.py",
@@ -4931,7 +12885,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/risk/test_manager.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_pipeline.py",
                 "tests/test_robinhood_paper_pipeline.py",
             ),
@@ -4944,14 +12898,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-virtual-risk-context",
             description="Architecture 131-K durable virtual-paper risk context",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_context.py",
                 "tests/review_paper/test_store.py",
                 "tests/ledger/test_ledger.py",
                 "tests/risk/test_risk_models.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_context.py",
                 "src/trading_bot/review_paper/__init__.py",
                 "tests/review_paper/test_risk_context.py",
@@ -4965,13 +12919,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-forward-paper-cycle",
             description="Architecture 131-L human-started durable-context paper cycle",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_forward_paper_cycle.py",
                 "tests/review_paper/test_risk_context.py",
                 "tests/test_robinhood_paper_pipeline.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_forward_paper_cycle.py",
                 "tests/test_robinhood_forward_paper_cycle.py",
             ),
@@ -4984,11 +12938,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-live-qualification-verifier",
             description="Architecture 131-LQ read-only live-qualification verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_live_qualification_verifier.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_live_qualification_verifier.py",
                 "tests/test_robinhood_live_qualification_verifier.py",
             ),
@@ -5003,11 +12957,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-M explicit-schedule regular-session admission"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_session_admission.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/session_admission.py",
                 "tests/review_paper/test_session_admission.py",
             ),
@@ -5022,11 +12976,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-N canonical Robinhood quote-to-risk-price snapshot"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_prices.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_prices.py",
                 "tests/review_paper/test_risk_prices.py",
             ),
@@ -5041,11 +12995,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-O effect-free durable forward-paper risk preview"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_forward_preview.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/forward_preview.py",
                 "tests/review_paper/test_forward_preview.py",
             ),
@@ -5060,11 +13014,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-P bounded read-only Robinhood risk-price acquisition"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_risk_price_acquisition.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/risk_price_acquisition.py",
                 "tests/review_paper/test_risk_price_acquisition.py",
             ),
@@ -5080,11 +13034,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "operator composition"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_supervised_forward_paper.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/supervised_forward_paper.py",
                 "tests/review_paper/test_supervised_forward_paper.py",
             ),
@@ -5097,11 +13051,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-prepare-qualification",
             description="Architecture 131-R supervised PREPARE qualification harness",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_prepare_qualification.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/prepare_qualification.py",
                 "tests/review_paper/test_prepare_qualification.py",
             ),
@@ -5114,11 +13068,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-prepare-verifier",
             description="Architecture 131-R read-only PREPARE qualification verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_prepare_qualification_verifier.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_prepare_qualification_verifier.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
             ),
@@ -5131,11 +13085,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-nyse-published-regular-session-authority",
             description=("Architecture 131-S NYSE published regular-session authority"),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_nyse_published_regular_sessions.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/nyse_published_regular_sessions.py",
                 "tests/review_paper/test_nyse_published_regular_sessions.py",
             ),
@@ -5150,18 +13104,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 131-T explicit-date published-session PREPARE binding"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_published_session_prepare.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/published_session_prepare.py",
                 "tests/review_paper/test_published_session_prepare.py",
                 "src/trading_bot/robinhood_prepare_qualification_verifier.py",
                 "tests/test_robinhood_prepare_qualification_verifier.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch131_published_session_prepare_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
@@ -5172,17 +13126,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-published-prepare-operator",
             description="Architecture 131-U source-owned PREPARE transport composition",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_prepare_operator.py",
                 "tests/review_paper/test_published_session_prepare.py",
                 "tests/review_paper/test_prepare_qualification.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_prepare_operator.py",
                 "tests/test_robinhood_prepare_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch131_published_prepare_operator_authority_check,
             remote_branch=ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH,
@@ -5193,7 +13147,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-supervised-qualification",
             description=("Architecture 131-V supervised qualification and verifier"),
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_supervised_qualification.py",
                 "tests/review_paper/test_supervised_forward_paper.py",
                 "tests/review_paper/test_prepare_qualification.py",
@@ -5201,7 +13155,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/test_robinhood_prepare_operator.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_supervised_qualification.py",
                 "src/trading_bot/robinhood_execute_qualification_verifier.py",
                 "scripts/robinhood_supervised_qualification.py",
@@ -5219,11 +13173,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-A pure activation and wake identity/state core"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_activation.py",
                 "tests/review_paper/test_unattended_activation.py",
             ),
@@ -5236,12 +13190,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-state-store",
             description="Architecture 133-B durable wake store and read-only verifier",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_state_schema.py",
                 "src/trading_bot/review_paper/unattended_state_store.py",
                 "src/trading_bot/review_paper/unattended_state_verifier.py",
@@ -5256,17 +13210,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-one-wake-composition",
             description="Architecture 133-C effect-free one-wake composition",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_one_wake.py",
                 "tests/review_paper/test_unattended_one_wake.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_one_wake_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133c",
@@ -5277,20 +13231,20 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch133-robinhood-unattended-review-paper-execution",
             description="Architecture 133-D bounded unattended review-paper execution",
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/test_robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_execution.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "src/trading_bot/robinhood_paper_operator.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_execution_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133d",
@@ -5303,25 +13257,589 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 133-E zero-argument host and pure scheduler surface"
             ),
             tests=(
-                *COMMON_TESTS,
+                *ARCH133_A_G_TESTS,
                 "tests/review_paper/test_unattended_activation.py",
                 "tests/review_paper/test_unattended_state_store.py",
                 "tests/review_paper/test_unattended_one_wake.py",
                 "tests/review_paper/test_unattended_execution.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH133_A_G_RUFF_PATHS,
                 "src/trading_bot/review_paper/unattended_host_identity.py",
                 "src/trading_bot/review_paper/unattended_scheduler.py",
                 "src/trading_bot/review_paper/unattended_host.py",
                 "scripts/run_arch133_unattended_review_paper.py",
                 "tests/review_paper/test_unattended_host.py",
-                "tests/scripts/test_run_test_certification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
             ),
             authority_check=_arch133_host_scheduler_authority_check,
             remote_branch="feature/robinhood-unattended-review-paper-133e",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-post-publication-stage-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-post-publication-stage-diagnostic",
+            description="Architecture 133-M source-only stage diagnostic",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_post_publication_stage_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_post_publication_stage_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133m",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-publication-state-paper-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-publication-state-paper-diagnostic",
+            description=(
+                "Architecture 133-N source-only publication/state/paper diagnostic"
+            ),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_publication_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133n",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-admission-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-reprovision-admission-diagnostic",
+            description=(
+                "Architecture 133-R source-only reprovision admission diagnostic"
+            ),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_REPROVISION_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133r",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-parent-security-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-reprovision-parent-security-diagnostic",
+            description=("Architecture 133-S source-only parent-security diagnostic"),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PARENT_SECURITY_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_parent_security_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133s",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-parent-policy-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-reprovision-parent-policy-diagnostic",
+            description=("Architecture 133-T source-only parent-security diagnostic"),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PARENT_POLICY_DIAGNOSTIC_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_parent_policy_diagnostic_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133t",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-fresh-activation-reprovision": CheckpointSpec(
+            name="arch133-robinhood-fresh-activation-reprovision",
+            description="Architecture 133-Q source-only fresh activation reprovision",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_REPROVISION_SOURCES,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133q",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-fresh-activation-reprovision-corrected": CheckpointSpec(
+            name="arch133-robinhood-fresh-activation-reprovision-corrected",
+            description="Architecture 133-U source-only corrected fresh activation reprovision",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133U_REPROVISION_SOURCES,
+                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_corrected_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133u",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-indeterminate-reconciliation": CheckpointSpec(
+            name="arch133-robinhood-reprovision-indeterminate-reconciliation",
+            description="Architecture 133-V source-only indeterminate reconciliation",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133V_RECONCILIATION_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_reconciliation_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133v",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-sealed-predecessor-recovery": CheckpointSpec(
+            name="arch133-robinhood-reprovision-sealed-predecessor-recovery",
+            description="Architecture 133-W source-only sealed-predecessor recovery",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_recovery.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133W_RECOVERY_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_recovery.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_recovery_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133w",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-reprovision-recovery-reconciliation": CheckpointSpec(
+            name="arch133-robinhood-reprovision-recovery-reconciliation",
+            description="Architecture 133-X source-only post-W recovery reconciliation",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133X_RECONCILIATION_SOURCES,
+                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_reprovision_recovery_reconciliation_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133x",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-windows-rename-qualification": CheckpointSpec(
+            name="arch133-robinhood-windows-rename-qualification",
+            description="Architecture 133-Y source-only scratch Windows rename qualification",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_windows_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133Y_QUALIFICATION_SOURCES,
+                "tests/review_paper/test_arch133_windows_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_windows_rename_qualification_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133y",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-closed-descendant-rename-qualification": CheckpointSpec(
+            name="arch133-robinhood-closed-descendant-rename-qualification",
+            description="Architecture 133-Z source-only scratch Windows rename qualification",  # noqa: E501
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133Z_QUALIFICATION_SOURCES,
+                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_closed_descendant_rename_qualification_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133z",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-installation-operator": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-installation-operator",
+            description=(
+                "133-AG installation-only operator; "
+                "protected execution requires fresh authorization"
+            ),
+            tests=SUPERVISED_INSTALLATION_OPERATOR_TESTS,
+            ruff_paths=SUPERVISED_INSTALLATION_OPERATOR_RUFF_PATHS,
+            authority_check=_supervised_installation_operator_authority_check,
+            preflight=_supervised_installation_preflight,
+            execute=_supervised_installation_execute,
+            remote_branch="feature/robinhood-supervised-release-installation-operator",
+            remote_head_env=None,
+        ),
+        SUPERVISED_PUBLICATION_RECOVERY_NAME: CheckpointSpec(
+            name=SUPERVISED_PUBLICATION_RECOVERY_NAME,
+            description=(
+                "133-AJ preserved immutable-release publication recovery; "
+                "fresh authorization required"
+            ),
+            tests=SUPERVISED_PUBLICATION_RECOVERY_TESTS,
+            ruff_paths=SUPERVISED_PUBLICATION_RECOVERY_RUFF_PATHS,
+            authority_check=_supervised_publication_recovery_authority_check,
+            preflight=_supervised_publication_preflight,
+            execute=_supervised_publication_execute,
+            remote_branch="feature/robinhood-supervised-release-publication-recovery",
+            remote_head_env=None,
+        ),
+        SUPERVISED_INSTALLATION_RECONCILIATION_NAME: CheckpointSpec(
+            name=SUPERVISED_INSTALLATION_RECONCILIATION_NAME,
+            description=(
+                "133-AI read-only reconciliation of the consumed AG "
+                "publication ambiguity"
+            ),
+            tests=SUPERVISED_INSTALLATION_RECONCILIATION_TESTS,
+            ruff_paths=SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS,
+            authority_check=_supervised_installation_reconciliation_authority_check,
+            preflight=_supervised_installation_reconciliation_preflight,
+            execute=None,
+            remote_branch=(
+                "feature/robinhood-supervised-release-installation-reconciliation"
+            ),
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-deployment-qualification": CheckpointSpec(
+            name="arch133-robinhood-supervised-deployment-qualification",
+            description="Architecture 133-AF inert deployment/rollback qualification",
+            tests=SUPERVISED_DEPLOYMENT_QUALIFICATION_TESTS,
+            ruff_paths=SUPERVISED_DEPLOYMENT_QUALIFICATION_RUFF_PATHS,
+            authority_check=_supervised_deployment_qualification_authority_check,
+            remote_branch="feature/robinhood-supervised-deployment-qualification",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-runtime-host-admission": CheckpointSpec(
+            name="arch133-robinhood-supervised-runtime-host-admission",
+            description="Architecture 133-AE inert immutable runtime-host admission",
+            tests=SUPERVISED_RUNTIME_ADMISSION_TESTS,
+            ruff_paths=SUPERVISED_RUNTIME_ADMISSION_RUFF_PATHS,
+            authority_check=_supervised_runtime_admission_authority_check,
+            remote_branch="feature/robinhood-supervised-runtime-host-admission",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-maintenance-rebind": CheckpointSpec(
+            name="arch133-robinhood-supervised-maintenance-rebind",
+            description="Architecture 133-AD inert maintenance and immutable rebind",
+            tests=SUPERVISED_MAINTENANCE_TESTS,
+            ruff_paths=SUPERVISED_MAINTENANCE_RUFF_PATHS,
+            authority_check=_supervised_maintenance_authority_check,
+            remote_branch="feature/robinhood-supervised-maintenance-rebind",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-installation": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-installation",
+            description="Architecture 133-AC immutable installation and observation",
+            tests=SUPERVISED_RELEASE_INSTALLATION_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_INSTALLATION_RUFF_PATHS,
+            authority_check=_supervised_release_installation_authority_check,
+            remote_branch="feature/robinhood-supervised-release-installation",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-build-verification": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-build-verification",
+            description="Architecture 133-AB source bundle and runtime binding",
+            tests=SUPERVISED_RELEASE_BUNDLE_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_BUNDLE_RUFF_PATHS,
+            authority_check=_supervised_release_bundle_authority_check,
+            remote_branch="feature/robinhood-supervised-release-build-verification",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-supervised-release-foundation": CheckpointSpec(
+            name="arch133-robinhood-supervised-release-foundation",
+            description="Architecture 133 pure immutable-release foundation",
+            tests=SUPERVISED_RELEASE_TESTS,
+            ruff_paths=SUPERVISED_RELEASE_RUFF_PATHS,
+            authority_check=_supervised_release_authority_check,
+            remote_branch="feature/robinhood-supervised-release-foundation",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-single-session-scheduler-installation": CheckpointSpec(
+            name="arch133-robinhood-single-session-scheduler-installation",
+            description="Architecture 133-P source-only protected Q133-3 installation",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *(p for p in ARCH133_SCHEDULER_SOURCES if p.endswith(".py")),
+                "tests/review_paper/test_arch133_scheduler_installation.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_scheduler_installation_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133p",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-publication-state-paper-corrected": CheckpointSpec(
+            name="arch133-robinhood-publication-state-paper-corrected",
+            description=(
+                "Architecture 133-O source-only publication/state/paper diagnostic"
+            ),
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_publication_state_paper_corrected.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_PUBLICATION_CORRECTED_SOURCES,
+                "tests/review_paper/test_publication_state_paper_diagnostic.py",
+                "tests/review_paper/test_publication_state_paper_corrected.py",
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_publication_corrected_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133o",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-post-publication-verifier": CheckpointSpec(
+            name="arch133-robinhood-post-publication-verifier",
+            description="Architecture 133-L source-only post-publication verifier",
+            tests=(
+                *ARCH133_L_M_TESTS,
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_L_M_RUFF_PATHS,
+                *ARCH133_VERIFIER_SOURCES,
+                "tests/review_paper/test_post_publication_verifier.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_verifier_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133l",
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
+        "arch133-robinhood-retained-root-acl-recovery": CheckpointSpec(
+            name="arch133-robinhood-retained-root-acl-recovery",
+            description="Architecture 133-K source-only retained-root ACL recovery",
+            tests=(
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            ruff_paths=(
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_RECOVERY_SOURCES,
+                "tests/review_paper/test_retained_root_acl_recovery.py",
+            ),
+            authority_check=_arch133_recovery_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133k",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-retained-root-diagnostic": CheckpointSpec(
+            name="arch133-robinhood-retained-root-diagnostic",
+            description="Architecture 133-J source-only retained-root diagnostic",
+            tests=(
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_retained_root_diagnostic.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            ruff_paths=(
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_RETAINED_SOURCES,
+                "tests/review_paper/test_retained_root_diagnostic.py",
+            ),
+            authority_check=_arch133_retained_root_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133j",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-scratch-root-acl-qualification": CheckpointSpec(
+            name="arch133-robinhood-scratch-root-acl-qualification",
+            description=(
+                "Architecture 133-I source-only scratch native root ACL qualification"
+            ),
+            tests=(
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            ruff_paths=(
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_SCRATCH_SOURCES,
+                "src/trading_bot/review_paper/unattended_publication_windows.py",
+                "tests/review_paper/test_scratch_root_acl.py",
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            authority_check=_arch133_scratch_root_acl_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133i",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-host-publication": CheckpointSpec(
+            name="arch133-robinhood-unattended-host-publication",
+            description=(
+                "Architecture 133-H source-only Q133-2 publication prerequisite"
+            ),
+            tests=(
+                *ARCH133_H_K_TESTS,
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            ruff_paths=(
+                *ARCH133_H_K_RUFF_PATHS,
+                *ARCH133_PUBLICATION_SOURCES,
+                "tests/review_paper/test_unattended_publication.py",
+            ),
+            authority_check=_arch133_host_publication_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133h",
+            preflight=None,
+            execute=None,
+        ),
+        "arch133-robinhood-unattended-host-bootstrap": CheckpointSpec(
+            name="arch133-robinhood-unattended-host-bootstrap",
+            description=(
+                "Architecture 133-G pre-publication host/runtime bootstrap surface"
+            ),
+            tests=(
+                *ARCH133_A_G_TESTS,
+                "tests/review_paper/test_unattended_activation.py",
+                "tests/review_paper/test_unattended_state_store.py",
+                "tests/review_paper/test_unattended_one_wake.py",
+                "tests/review_paper/test_unattended_execution.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            ruff_paths=(
+                *ARCH133_A_G_RUFF_PATHS,
+                "src/trading_bot/review_paper/unattended_host_identity.py",
+                "src/trading_bot/review_paper/unattended_scheduler.py",
+                "src/trading_bot/review_paper/unattended_host.py",
+                "src/trading_bot/review_paper/unattended_host_bootstrap.py",
+                "scripts/run_arch133_unattended_review_paper.py",
+                "scripts/run_arch133_unattended_host_preflight.py",
+                "tests/review_paper/test_unattended_host.py",
+                "tests/scripts/certification_runner/test_profiles.py",
+            ),
+            authority_check=_arch133_host_bootstrap_authority_check,
+            remote_branch="feature/robinhood-unattended-review-paper-133g",
             preflight=None,
             execute=None,
         ),
@@ -5329,7 +13847,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-paper-operator",
             description="Architecture 131-H one-cycle Robinhood paper operator",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_operator.py",
                 "tests/test_robinhood_paper_cycle.py",
                 "tests/robinhood_mcp/test_account_resolution.py",
@@ -5337,7 +13855,7 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "tests/robinhood_mcp/test_windows_oauth.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_operator.py",
                 "tests/test_robinhood_paper_operator.py",
             ),
@@ -5350,13 +13868,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-agentic-account",
             description="Architecture 131-G internal Agentic-account resolution",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_account_resolution.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
                 "tests/test_robinhood_paper_cycle.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/account_resolution.py",
                 "src/trading_bot/robinhood_mcp/sdk_transport.py",
                 "src/trading_bot/robinhood_mcp/__init__.py",
@@ -5374,12 +13892,12 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-oauth-windows",
             description="Architecture 131-F Windows OAuth persistence and callback",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_windows_oauth.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/windows_oauth.py",
                 "tests/robinhood_mcp/test_windows_oauth.py",
             ),
@@ -5392,11 +13910,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-direct-mcp",
             description="Architecture 131-E direct Robinhood MCP transport",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_sdk_transport.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/__init__.py",
                 "src/trading_bot/robinhood_mcp/sdk_transport.py",
                 "tests/robinhood_mcp/test_sdk_transport.py",
@@ -5408,11 +13926,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-performance",
             description="Architecture 131-D durable Robinhood paper performance",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_performance.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/__init__.py",
                 "src/trading_bot/review_paper/performance.py",
                 "tests/review_paper/test_performance.py",
@@ -5424,11 +13942,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-paper-cycle",
             description="Architecture 131-C fail-closed Robinhood paper cycle",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/test_robinhood_paper_cycle.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_paper_cycle.py",
                 "tests/test_robinhood_paper_cycle.py",
             ),
@@ -5439,11 +13957,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-mcp-schema",
             description="Architecture 131-B typed Robinhood MCP read/review schema",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/robinhood_mcp/test_adapter.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/robinhood_mcp/__init__.py",
                 "src/trading_bot/robinhood_mcp/models.py",
                 "src/trading_bot/robinhood_mcp/parsing.py",
@@ -5457,11 +13975,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch131-robinhood-review-paper",
             description="Architecture 131 Robinhood review-based paper ledger",
             tests=(
-                *COMMON_TESTS,
+                *ARCH131_TESTS,
                 "tests/review_paper/test_store.py",
             ),
             ruff_paths=(
-                *COMMON_RUFF_PATHS,
+                *ARCH131_RUFF_PATHS,
                 "src/trading_bot/review_paper/__init__.py",
                 "src/trading_bot/review_paper/models.py",
                 "src/trading_bot/review_paper/store.py",
@@ -5476,12 +13994,11 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
                 "Architecture 130 failed first-wake read-only effect reconciliation"
             ),
             tests=(
-                *COMMON_TESTS,
+                *RETAINED_TESTS,
                 "tests/runtime/test_d10_arch130_r8i_d1.py",
             ),
             ruff_paths=(
-                "scripts/checkpoint_runner.py",
-                "tests/runtime/test_checkpoint_runner.py",
+                *RETAINED_RUFF_PATHS,
                 "scripts/d10_arch130_r8i_d1.py",
                 "tests/runtime/test_d10_arch130_r8i_d1.py",
             ),
@@ -5493,14 +14010,13 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
             name="arch128-r8-terminal-halt",
             description="R8I-H1 exact terminal first-wake scheduler halt source",
             tests=(
-                *COMMON_TESTS,
+                *RETAINED_TESTS,
                 "tests/runtime/test_d10_arch128_r8_terminal_halt.py",
                 "tests/runtime/test_d10_arch128_r8_readonly.py",
                 "tests/runtime/test_d10_durable_wake_evidence_observe.py",
             ),
             ruff_paths=(
-                "scripts/checkpoint_runner.py",
-                "tests/runtime/test_checkpoint_runner.py",
+                *RETAINED_RUFF_PATHS,
                 "scripts/d10_arch128_r8_terminal_halt.py",
                 "scripts/d10_arch128_r8_halt_windows.py",
                 "scripts/d10_arch128_r8_halt_diagnostic.py",
@@ -5678,20 +14194,11 @@ def build_verification_steps(
     *,
     python_executable: str,
     basetemp: Path,
+    tests: Sequence[str] | None = None,
 ) -> tuple[Step, ...]:
+    test_paths = spec.tests if tests is None else tuple(tests)
     return (
-        Step(
-            "pytest",
-            (
-                python_executable,
-                "-m",
-                "pytest",
-                *spec.tests,
-                f"--basetemp={basetemp}",
-                "-p",
-                "no:cacheprovider",
-            ),
-        ),
+        Step("git_diff_check", ("git", "diff", "--check")),
         Step(
             "ruff_check",
             (
@@ -5733,7 +14240,21 @@ def build_verification_steps(
                 *spec.ruff_paths,
             ),
         ),
-        Step("git_diff_check", ("git", "diff", "--check")),
+        Step(
+            "pytest",
+            (
+                python_executable,
+                "-m",
+                "pytest",
+                *test_paths,
+                f"--basetemp={basetemp}",
+                "-p",
+                "no:cacheprovider",
+                "--durations=100",
+                "--durations-min=0.0",
+                f"--junitxml={basetemp.parent / 'pytest-results.xml'}",
+            ),
+        ),
     )
 
 
@@ -5754,12 +14275,25 @@ def _execute_step(
     if argv is None:
         raise ValueError("diagnostic command is unavailable")
 
+    environment = None
+    if step.name == "pytest":
+        environment = os.environ.copy()
+        for variable in (
+            SOURCE_GATE_PHASE_ENV,
+            SOURCE_GATE_SHARD_INDEX_ENV,
+            SOURCE_GATE_SHARD_COUNT_ENV,
+        ):
+            environment.pop(variable, None)
+
+    started = time.monotonic()
     completed = subprocess.run(
         argv,
         cwd=repo_root,
         capture_output=True,
         check=False,
+        env=environment,
     )
+    elapsed_seconds = time.monotonic() - started
     stdout = completed.stdout
     stderr = completed.stderr
     prefix = f"{index:02d}-{_safe_step_name(label)}"
@@ -5784,6 +14318,7 @@ def _execute_step(
         stderr_sha256=hashlib.sha256(stderr).hexdigest(),
         stdout_path=str(stdout_path),
         stderr_path=str(stderr_path),
+        elapsed_seconds=elapsed_seconds,
     )
 
 
@@ -5812,6 +14347,65 @@ def _write_json(path: Path, value: object) -> None:
     )
 
 
+def _source_gate_phase() -> str:
+    phase = os.environ.get(SOURCE_GATE_PHASE_ENV, "all")
+    if phase not in {"all", "static", "tests"}:
+        raise RuntimeError("source gate phase rejected")
+    return phase
+
+
+def _source_gate_shard() -> tuple[int, int] | None:
+    raw_index = os.environ.get(SOURCE_GATE_SHARD_INDEX_ENV)
+    raw_count = os.environ.get(SOURCE_GATE_SHARD_COUNT_ENV)
+    if raw_index is None and raw_count is None:
+        return None
+    if raw_index is None or raw_count is None:
+        raise RuntimeError("source gate shard configuration incomplete")
+    try:
+        index, count = int(raw_index), int(raw_count)
+    except ValueError as exc:
+        raise RuntimeError("source gate shard configuration rejected") from exc
+    if not 1 <= count <= 16 or not 0 <= index < count:
+        raise RuntimeError("source gate shard configuration rejected")
+    return index, count
+
+
+def duration_balanced_test_shards(
+    tests: Sequence[str],
+    count: int,
+) -> tuple[tuple[str, ...], ...]:
+    """Deterministic LPT balance using the latest accepted CI duration evidence."""
+    if not tests or len(set(tests)) != len(tests):
+        raise ValueError("test sharding requires distinct nonempty paths")
+    if type(count) is not int or not 1 <= count <= min(16, len(tests)):
+        raise ValueError("test shard count rejected")
+    positions = {path: index for index, path in enumerate(tests)}
+    loads = [0.0] * count
+    shards: list[list[str]] = [[] for _ in range(count)]
+    ordered = sorted(
+        tests,
+        key=lambda path: (-CI_TEST_DURATION_WEIGHTS.get(path, 1.0), path),
+    )
+    for path in ordered:
+        target = min(range(count), key=lambda index: (loads[index], index))
+        shards[target].append(path)
+        loads[target] += CI_TEST_DURATION_WEIGHTS.get(path, 1.0)
+    return tuple(tuple(sorted(shard, key=positions.__getitem__)) for shard in shards)
+
+
+def _source_gate_steps(
+    steps: Sequence[Step],
+    phase: str,
+) -> tuple[tuple[Step, ...], tuple[Step, ...]]:
+    static = tuple(step for step in steps if step.name != "pytest")
+    tests = tuple(step for step in steps if step.name == "pytest")
+    if phase == "static":
+        return static, ()
+    if phase == "tests":
+        return (), tests
+    return static, tests
+
+
 def verify_checkpoint(
     spec: CheckpointSpec,
     *,
@@ -5828,12 +14422,21 @@ def verify_checkpoint(
     command_dir = evidence_dir / "commands"
     command_dir.mkdir(parents=True, exist_ok=False)
     basetemp = evidence_dir / "pytest"
+    phase = _source_gate_phase()
+    shard = _source_gate_shard()
+    if phase != "tests" and shard is not None:
+        raise RuntimeError("test shard is valid only for tests phase")
+    selected_tests = spec.tests
+    if phase == "tests" and shard is not None:
+        selected_tests = duration_balanced_test_shards(spec.tests, shard[1])[shard[0]]
 
     steps = build_verification_steps(
         spec,
         python_executable=sys.executable,
         basetemp=basetemp,
+        tests=selected_tests,
     )
+    static_steps, test_steps = _source_gate_steps(steps, phase)
     counter = 0
 
     def execute(step: Step, diagnostic: bool) -> CommandOutcome:
@@ -5847,8 +14450,22 @@ def verify_checkpoint(
             diagnostic=diagnostic,
         )
 
-    outcomes = run_verification_steps(steps, execute)
-    authority_failures = spec.authority_check(repo_root)
+    outcomes: list[CommandOutcome] = []
+    authority_requested = phase in {"all", "static"}
+    authority_checked = False
+    authority_failures: tuple[str, ...] = ()
+    if static_steps:
+        outcomes.extend(run_verification_steps(static_steps, execute))
+    static_pass = all(
+        outcome.exit_code == 0
+        for outcome in outcomes
+        if not outcome.name.endswith("_diagnostic")
+    )
+    if authority_requested and static_pass:
+        authority_checked = True
+        authority_failures = spec.authority_check(repo_root)
+    if test_steps and (phase == "tests" or (static_pass and not authority_failures)):
+        outcomes.extend(run_verification_steps(test_steps, execute))
     state_after = _git_state(repo_root)
 
     primary = {
@@ -5856,16 +14473,29 @@ def verify_checkpoint(
         for outcome in outcomes
         if not outcome.name.endswith("_diagnostic")
     }
-    commands_pass = all(
-        primary.get(name) == 0
-        for name in ("pytest", "ruff_check", "ruff_format", "git_diff_check")
-    )
+    required = {
+        "all": ("git_diff_check", "ruff_check", "ruff_format", "pytest"),
+        "static": ("git_diff_check", "ruff_check", "ruff_format"),
+        "tests": ("pytest",),
+    }[phase]
+    commands_pass = all(primary.get(name) == 0 for name in required)
+    if (
+        phase == "all"
+        and static_pass
+        and authority_failures
+        and "pytest" not in primary
+    ):
+        commands_pass = True
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]
         and not state_after["porcelain"]
     )
-    passed = commands_pass and not authority_failures and identity_stable
+    passed = (
+        commands_pass
+        and (not authority_checked or not authority_failures)
+        and identity_stable
+    )
 
     report = {
         "schema": SCHEMA,
@@ -5873,6 +14503,10 @@ def verify_checkpoint(
         "checkpoint": spec.name,
         "description": spec.description,
         "status": "PASS" if passed else "FAIL",
+        "phase": phase,
+        "test_shard": None if shard is None else {"index": shard[0], "count": shard[1]},
+        "executed_tests": list(selected_tests) if "pytest" in primary else [],
+        "authority_checked": authority_checked,
         "started_from": state_before,
         "finished_at": state_after,
         "identity_stable": identity_stable,
@@ -5886,14 +14520,24 @@ def verify_checkpoint(
     report_path = evidence_dir / "report.json"
     _write_json(report_path, report)
 
-    print(f"CHECKPOINT={spec.name}")
-    for name in ("pytest", "ruff_check", "ruff_format", "git_diff_check"):
+    print(f"CHECKPOINT={spec.name} PHASE={phase}")
+    for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest"):
         exit_code = primary.get(name)
-        status = "PASS" if exit_code == 0 else f"FAIL({exit_code})"
+        status = (
+            "SKIP"
+            if exit_code is None
+            else ("PASS" if exit_code == 0 else f"FAIL({exit_code})")
+        )
         print(f"{name.upper()}={status}")
     print(
         "AUTHORITY="
-        + ("PASS" if not authority_failures else f"FAIL({len(authority_failures)})")
+        + (
+            "NOT_RUN"
+            if not authority_checked
+            else (
+                "PASS" if not authority_failures else f"FAIL({len(authority_failures)})"
+            )
+        )
     )
     for failure in authority_failures:
         print(f"AUTHORITY_FAILURE={failure}")
@@ -5936,9 +14580,20 @@ def verify_batch(
         ruff_paths=ruff_paths,
         authority_check=lambda repo: (),
     )
+    phase = _source_gate_phase()
+    shard = _source_gate_shard()
+    if phase != "tests" and shard is not None:
+        raise RuntimeError("test shard is valid only for tests phase")
+    selected_tests = tests
+    if phase == "tests" and shard is not None:
+        selected_tests = duration_balanced_test_shards(tests, shard[1])[shard[0]]
     steps = build_verification_steps(
-        shared, python_executable=sys.executable, basetemp=evidence_dir / "pytest"
+        shared,
+        python_executable=sys.executable,
+        basetemp=evidence_dir / "pytest",
+        tests=selected_tests,
     )
+    static_steps, test_steps = _source_gate_steps(steps, phase)
     counter = 0
 
     def execute(step: Step, diagnostic: bool) -> CommandOutcome:
@@ -5952,26 +14607,57 @@ def verify_batch(
             diagnostic=diagnostic,
         )
 
-    outcomes = run_verification_steps(steps, execute)
-    authority_failures: dict[str, tuple[str, ...]] = {}
-    for spec in specs:
-        try:
-            authority_failures[spec.name] = spec.authority_check(repo_root)
-        except Exception as exc:
-            # One unavailable authority must fail closed without hiding others.
-            authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
-    state_after = _git_state(repo_root)
-    commands_pass = all(
+    outcomes: list[CommandOutcome] = []
+    authority_requested = phase in {"all", "static"}
+    authority_checked = False
+    authority_failures: dict[str, tuple[str, ...]] = {spec.name: () for spec in specs}
+    if static_steps:
+        outcomes.extend(run_verification_steps(static_steps, execute))
+    static_pass = all(
         outcome.exit_code == 0
         for outcome in outcomes
         if not outcome.name.endswith("_diagnostic")
     )
+    if authority_requested and static_pass:
+        authority_checked = True
+        for spec in specs:
+            try:
+                authority_failures[spec.name] = spec.authority_check(repo_root)
+            except Exception as exc:
+                authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
+    if test_steps and (
+        phase == "tests" or (static_pass and not any(authority_failures.values()))
+    ):
+        outcomes.extend(run_verification_steps(test_steps, execute))
+    state_after = _git_state(repo_root)
+    primary = {
+        outcome.name: outcome.exit_code
+        for outcome in outcomes
+        if not outcome.name.endswith("_diagnostic")
+    }
+    required = {
+        "all": ("git_diff_check", "ruff_check", "ruff_format", "pytest"),
+        "static": ("git_diff_check", "ruff_check", "ruff_format"),
+        "tests": ("pytest",),
+    }[phase]
+    commands_pass = all(primary.get(name) == 0 for name in required)
+    if (
+        phase == "all"
+        and static_pass
+        and any(authority_failures.values())
+        and "pytest" not in primary
+    ):
+        commands_pass = True
     identity_stable = (
         state_before["head"] == state_after["head"]
         and state_before["tree"] == state_after["tree"]
         and not state_after["porcelain"]
     )
-    passed = commands_pass and identity_stable and not any(authority_failures.values())
+    passed = (
+        commands_pass
+        and identity_stable
+        and (not authority_checked or not any(authority_failures.values()))
+    )
     report_path = evidence_dir / "report.json"
     participants = {}
     for spec in specs:
@@ -5983,7 +14669,11 @@ def verify_batch(
             "tests_covered": all(path in tests for path in spec.tests),
             "ruff_paths_covered": all(path in ruff_paths for path in spec.ruff_paths),
             "authority_failures": list(authority_failures[spec.name]),
-            "authority_status": "FAIL" if authority_failures[spec.name] else "PASS",
+            "authority_status": (
+                "NOT_RUN"
+                if not authority_checked
+                else ("FAIL" if authority_failures[spec.name] else "PASS")
+            ),
             "source_before": state_before,
             "source_after": state_after,
             "status": "PASS"
@@ -6006,16 +14696,26 @@ def verify_batch(
         "scheduler_mutation": "NOT_RUN",
         "provider_effects": "NOT_RUN",
         "broker_live_effects": "NOT_RUN",
+        "phase": phase,
+        "test_shard": None if shard is None else {"index": shard[0], "count": shard[1]},
+        "executed_tests": list(selected_tests) if "pytest" in primary else [],
+        "authority_checked": authority_checked,
         "status": "PASS" if passed else "FAIL",
     }
     _write_json(report_path, report)
     print(
-        f"CHECKPOINTS={len(specs)} TEST_PATHS={len(tests)} RUFF_PATHS={len(ruff_paths)}"
+        f"CHECKPOINTS={len(specs)} TEST_PATHS={len(tests)} "
+        f"EXECUTED_TEST_PATHS={len(selected_tests) if 'pytest' in primary else 0} "
+        f"RUFF_PATHS={len(ruff_paths)} PHASE={phase}"
     )
-    for outcome in outcomes:
-        print(f"{outcome.name.upper()}={outcome.exit_code}")
+    for name in ("git_diff_check", "ruff_check", "ruff_format", "pytest"):
+        exit_code = primary.get(name)
+        print(f"{name.upper()}={'SKIP' if exit_code is None else exit_code}")
     for name, failures in authority_failures.items():
-        print(f"AUTHORITY[{name}]={'FAIL' if failures else 'PASS'}")
+        print(
+            f"AUTHORITY[{name}]="
+            + ("NOT_RUN" if not authority_checked else ("FAIL" if failures else "PASS"))
+        )
         for failure in failures:
             print(f"AUTHORITY_FAILURE[{name}]={failure}")
     print(f"IDENTITY_STABLE={identity_stable}")
@@ -6159,7 +14859,7 @@ def preflight_checkpoint(
     *,
     repo_root: Path,
     evidence_root: Path,
-) -> tuple[bool, Path]:
+) -> tuple[bool, Path | None]:
     if spec.preflight is None:
         raise RuntimeError(f"checkpoint has no read-only preflight: {spec.name}")
 
@@ -6168,6 +14868,14 @@ def preflight_checkpoint(
         raise RuntimeError(
             f"preflight requires a clean worktree; found: {state_before['porcelain']}"
         )
+    if spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME:
+        _supervised_installation_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]:
+            raise RuntimeError("installation registration rejected")
+    if spec.name == SUPERVISED_PUBLICATION_RECOVERY_NAME:
+        _supervised_publication_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_PUBLICATION_RECOVERY_NAME]:
+            raise RuntimeError("publication recovery registration rejected")
 
     local_branch = str(state_before["branch"])
     remote_branch = spec.remote_branch
@@ -6192,8 +14900,14 @@ def preflight_checkpoint(
             f"remote={remote_head} branch={remote_branch}"
         )
 
-    evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
-    evidence_dir.mkdir(parents=True, exist_ok=False)
+    installation = spec.name in {
+        SUPERVISED_INSTALLATION_OPERATOR_NAME,
+        SUPERVISED_PUBLICATION_RECOVERY_NAME,
+    }
+    evidence_dir = None
+    if not installation:
+        evidence_dir = evidence_root / spec.name / f"preflight-{_stamp()}"
+        evidence_dir.mkdir(parents=True, exist_ok=False)
 
     result = spec.preflight()
     state_after = _git_state(repo_root)
@@ -6223,8 +14937,11 @@ def preflight_checkpoint(
         "production_effects": "NOT_RUN",
         "protected_execution": "NOT_AUTHORIZED",
     }
-    report_path = evidence_dir / "report.json"
-    _write_json(report_path, report)
+    report_path = None if evidence_dir is None else evidence_dir / "report.json"
+    if report_path is None:
+        print("PREFLIGHT_EVIDENCE=" + json.dumps(report, sort_keys=True))
+    else:
+        _write_json(report_path, report)
 
     primary = result.get("primary")
     if isinstance(primary, dict):
@@ -6246,7 +14963,7 @@ def preflight_checkpoint(
                     print(f"DIAGNOSTIC_DETAIL={diagnostic.get('detail')}")
 
     print(f"IDENTITY_STABLE={identity_stable}")
-    print(f"EVIDENCE={report_path}")
+    print(f"EVIDENCE={report_path if report_path is not None else 'STDOUT'}")
     print(f"OVERALL={'PASS' if passed else 'BLOCKED'}")
     return passed, report_path
 
@@ -6257,6 +14974,8 @@ def execute_checkpoint(
     repo_root: Path,
     evidence_root: Path,
 ) -> tuple[bool, Path]:
+    global _installation_execution_admitted, _installation_execution_source
+    global _publication_execution_source
     if spec.execute is None:
         raise RuntimeError(f"checkpoint has no protected execution: {spec.name}")
 
@@ -6266,6 +14985,21 @@ def execute_checkpoint(
             f"protected execution requires a clean worktree; "
             f"found: {state_before['porcelain']}"
         )
+
+    installation = spec.name == SUPERVISED_INSTALLATION_OPERATOR_NAME
+    if installation:
+        from trading_bot.supervised_release import installation_operator as operator
+
+        _supervised_installation_admission(repo_root, state_before)
+        if spec != _checkpoint_specs()[SUPERVISED_INSTALLATION_OPERATOR_NAME]:
+            raise RuntimeError("installation registration rejected")
+        if os.environ.get(operator.AUTH_ENV) != operator.AUTH_VALUE:
+            raise RuntimeError("installation authorization interlock rejected")
+        if _supervised_installation_latch_consumed():
+            raise RuntimeError(
+                "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY: "
+                "consumed installation attempt; MAY_HAVE_OCCURRED"
+            )
 
     local_branch = str(state_before["branch"])
     remote_branch = spec.remote_branch
@@ -6306,7 +15040,27 @@ def execute_checkpoint(
     )
 
     try:
-        result = spec.execute()
+        if installation:
+            _installation_execution_admitted = True
+            _installation_execution_source = (
+                str(state_before["head"]),
+                str(state_before["tree"]),
+            )
+        if spec.name == SUPERVISED_PUBLICATION_RECOVERY_NAME:
+            _supervised_publication_admission(repo_root, state_before)
+            if spec != _checkpoint_specs()[SUPERVISED_PUBLICATION_RECOVERY_NAME]:
+                raise RuntimeError("publication recovery registration rejected")
+            _publication_execution_source = (
+                str(state_before["head"]),
+                str(state_before["tree"]),
+            )
+        try:
+            result = spec.execute()
+        finally:
+            _publication_execution_source = None
+            if installation:
+                _installation_execution_admitted = False
+                _installation_execution_source = None
     except Exception as exc:
         state_after = _git_state(repo_root)
         identity_stable = (
@@ -6329,8 +15083,10 @@ def execute_checkpoint(
                 "identity_stable": identity_stable,
             },
             "runner_error": {
-                "type": type(exc).__name__,
-                "detail": str(exc),
+                "type": "INSTALLATION_STOPPED" if installation else type(exc).__name__,
+                "detail": "PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY"
+                if installation
+                else str(exc),
             },
             "effect_disposition": "MAY_HAVE_OCCURRED",
             "protected_execution": "ATTEMPTED",
@@ -6338,7 +15094,13 @@ def execute_checkpoint(
         }
         report_path = evidence_dir / "report.json"
         _write_json(report_path, report)
-        print(f"RUNNER_EXECUTION_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
+        if installation:
+            print(
+                "RUNNER_EXECUTION_ERROR=INSTALLATION_STOPPED:PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY",
+                file=sys.stderr,
+            )
+        else:
+            print(f"RUNNER_EXECUTION_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         print(f"IDENTITY_STABLE={identity_stable}")
         print(f"EVIDENCE={report_path}")
         print("OVERALL=STOPPED")
@@ -6352,6 +15114,17 @@ def execute_checkpoint(
         and not state_after["porcelain"]
     )
     passed = result.get("status") == "PASS" and identity_stable
+    if spec.name == SUPERVISED_PUBLICATION_RECOVERY_NAME and not identity_stable:
+        result = {
+            "status": "INDETERMINATE",
+            "effect_disposition": "MAY_HAVE_OCCURRED",
+            "automatic_retry": "NOT_AUTHORIZED",
+            "primary": {
+                "status": "INDETERMINATE",
+                "reason": "RUNNER_SOURCE_DRIFT",
+                "disposition": "PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY",
+            },
+        }
     effect_disposition = result.get("effect_disposition", "MAY_HAVE_OCCURRED")
 
     report = {
@@ -6523,7 +15296,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 evidence_root=evidence_root,
             )
     except Exception as exc:
-        print(f"RUNNER_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
+        if getattr(
+            args, "checkpoint", None
+        ) == SUPERVISED_INSTALLATION_OPERATOR_NAME and args.command in {
+            "preflight",
+            "execute",
+        }:
+            print(
+                "RUNNER_ERROR=INSTALLATION_AUTHORITY_REJECTED_OR_CONSUMED:NO_RETRY",
+                file=sys.stderr,
+            )
+        else:
+            print(f"RUNNER_ERROR={type(exc).__name__}:{exc}", file=sys.stderr)
         return 2
 
     return 0 if passed else 1

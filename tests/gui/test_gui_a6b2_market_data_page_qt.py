@@ -26,10 +26,15 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_production_strategy_state,
+    unavailable_runtime_state,
 )
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.market_data_page import MarketDataPage
 from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 
 _SNAPSHOT_ID = UUID("00000000-0000-0000-0000-000000000020")
 _CAPTURED_AT = datetime(2026, 8, 27, 21, 30, tzinfo=UTC)
@@ -90,6 +95,15 @@ class _RecordingService:
 
     def get_operator_observability_state(self):
         return unavailable_operator_operations_state()
+
+    def get_research_candidate_lifecycle_state(self):
+        return unavailable_research_candidate_lifecycle_state()
+
+    def get_production_strategy_state(self):
+        return unavailable_production_strategy_state()
+
+    def get_runtime_state(self):
+        return unavailable_runtime_state()
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         return MockGuiApplicationService().load_research_report(artifact_path)

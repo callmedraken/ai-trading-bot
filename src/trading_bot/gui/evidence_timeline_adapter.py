@@ -21,6 +21,11 @@ from trading_bot.gui.paper_account_models import (
     PaperAccountPageStatus,
 )
 from trading_bot.gui.paper_models import PaperPageState, PaperPageStatus
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+)
+from trading_bot.gui.runtime_models import RuntimePageState
+from trading_bot.gui.supervisor_models import SupervisorPageState
 
 
 def build_evidence_timeline_state(
@@ -29,6 +34,9 @@ def build_evidence_timeline_state(
     paper_account: PaperAccountPageState,
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
+    runtime: RuntimePageState,
+    supervisor: SupervisorPageState | None = None,
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None,
 ) -> EvidenceTimelinePageState:
     """Build a deterministic timeline without I/O, discovery, or service rereads."""
     expected = (
@@ -37,10 +45,18 @@ def build_evidence_timeline_state(
         (paper_account, PaperAccountPageState, "paper_account"),
         (market_data, MarketDataPageState, "market_data"),
         (operations, OperatorOperationsPageState, "operations"),
+        (runtime, RuntimePageState, "runtime"),
     )
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
             raise TypeError(f"{name} has an unsupported type")
+    if supervisor is not None and type(supervisor) is not SupervisorPageState:
+        raise TypeError("Exact SupervisorPageState required")
+    if (
+        research_lifecycle is not None
+        and type(research_lifecycle) is not ResearchCandidateLifecyclePageState
+    ):
+        raise TypeError("Exact lifecycle presentation required")
 
     entries = (
         *_research_entries(research),
@@ -48,6 +64,13 @@ def build_evidence_timeline_state(
         *_paper_account_entries(paper_account),
         *_market_data_entries(market_data),
         *_operations_entries(operations),
+        *_runtime_entries(runtime),
+        *(_supervisor_entries(supervisor) if supervisor is not None else ()),
+        *(
+            _lifecycle_entries(research_lifecycle)
+            if research_lifecycle is not None
+            else ()
+        ),
     )
     timed = [entry for entry in entries if entry.occurred_at is not None]
     untimed = [entry for entry in entries if entry.occurred_at is None]
@@ -66,6 +89,58 @@ def build_evidence_timeline_state(
             "read-only GUI state."
         )
     return EvidenceTimelinePageState(message, ordered)
+
+
+def _lifecycle_entries(
+    state: ResearchCandidateLifecyclePageState,
+) -> tuple[EvidenceTimelineEntry, ...]:
+    evidence = state.evidence
+    if evidence is None:
+        return ()
+    observations = evidence.observations
+    first_utc = observations.first_observed_at_utc.isoformat(timespec="microseconds")
+    last_utc = observations.last_observed_at_utc.isoformat(timespec="microseconds")
+    return tuple(
+        EvidenceTimelineEntry(
+            EvidenceTimelineSource.RESEARCH_LIFECYCLE,
+            title,
+            str(identifier),
+            None,
+            None,
+            (
+                f"{observations.observation_count} caller-supplied observations; "
+                f"{observations.distinct_session_count} sessions; dates "
+                f"{observations.first_session_date.isoformat()} to "
+                f"{observations.last_session_date.isoformat()}; UTC "
+                f"{first_utc} to {last_utc}. "
+                "No canonical batch event timestamp."
+                if title == "B1 observation batch"
+                else state.message
+            ),
+        )
+        for title, identifier in evidence.artifact_identifiers
+    )
+
+
+def _supervisor_entries(
+    state: SupervisorPageState,
+) -> tuple[EvidenceTimelineEntry, ...]:
+    contract = state.production_strategy.contract
+    if contract is None:
+        return ()
+    return (
+        EvidenceTimelineEntry(
+            EvidenceTimelineSource.SUPERVISOR,
+            "Production strategy contract",
+            str(contract.contract_id),
+            None,
+            None,
+            f"Target session: {contract.target_session_date.isoformat()}; "
+            f"strategy: {contract.strategy_id}/{contract.strategy_version}; "
+            f"symbol: {contract.symbol}; HEAD: {contract.source_head}; "
+            f"TREE: {contract.source_tree}.",
+        ),
+    )
 
 
 def _research_entries(
@@ -210,6 +285,52 @@ def _operations_entries(
                     f"Paper account {state.account.paper_account_id}; sequence "
                     f"{state.account.sequence}; bounded Operations presentation."
                 ),
+            )
+        )
+    return tuple(entries)
+
+
+def _runtime_entries(state: RuntimePageState) -> tuple[EvidenceTimelineEntry, ...]:
+    entries: list[EvidenceTimelineEntry] = []
+    if state.acl is not None:
+        acl = state.acl
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "Runtime ACL evidence",
+                acl.runtime_sid_digest or "production-paper-runtime-acl/v1",
+                None,
+                None,
+                f"Recorded {acl.status.value} / {acl.result.value}. {state.message}",
+            )
+        )
+    if state.qualification is not None:
+        qualification = state.qualification
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "Runtime qualification evidence",
+                qualification.source_head,
+                None,
+                None,
+                f"Recorded {qualification.status.value}; "
+                f"TREE {qualification.source_tree}. "
+                f"Not fresh production authority. {state.message}",
+            )
+        )
+    if state.session is not None:
+        session = state.session
+        entries.append(
+            EvidenceTimelineEntry(
+                EvidenceTimelineSource.RUNTIME,
+                "D1 session evidence",
+                str(session.operation_id),
+                session.admitted_at or session.wait_started_at,
+                None,
+                f"Recorded {session.status.value}; "
+                f"target {session.target_session.isoformat()}; "
+                f"HEAD {session.source_head}; TREE {session.source_tree}; "
+                f"contract {session.contract_id}. {state.message}",
             )
         )
     return tuple(entries)

@@ -24,6 +24,8 @@ from trading_bot.gui import (
     OperatorOperationsPageState,
     unavailable_market_data_state,
     unavailable_operator_operations_state,
+    unavailable_production_strategy_state,
+    unavailable_runtime_state,
 )
 from trading_bot.gui.comparison_chart import (
     ResearchComparisonChart,
@@ -43,6 +45,9 @@ from trading_bot.gui.paper_account_models import (
     unavailable_paper_account_state,
 )
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 from trading_bot.gui.research_page import ResearchPage
 
 
@@ -116,6 +121,15 @@ class _WindowResearchService:
 
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         return unavailable_operator_operations_state()
+
+    def get_research_candidate_lifecycle_state(self):
+        return unavailable_research_candidate_lifecycle_state()
+
+    def get_production_strategy_state(self):
+        return unavailable_production_strategy_state()
+
+    def get_runtime_state(self):
+        return unavailable_runtime_state()
 
 
 def _main_table(page: ResearchPage) -> QTableWidget:

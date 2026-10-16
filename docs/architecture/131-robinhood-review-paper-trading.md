@@ -7,7 +7,8 @@ operations. It never calls `place_equity_order`, `cancel_equity_order`, or any
 other order-changing tool.
 
 The actual connected MCP exposes `review_equity_order`,
-`get_equity_quotes`, and `get_equity_orders`, but does not expose the
+`get_equity_quotes`, `get_equity_orders`, and (134-B3)
+`get_equity_historicals`, but does not expose the
 trade-approval management tools originally assumed by the earlier design.
 
 The architecture is therefore:
@@ -144,7 +145,7 @@ Paper-mode application allowlist:
 review_equity_order
 get_equity_quotes
 get_equity_orders
-other explicitly reviewed read-only research tools
+get_equity_historicals
 ```
 
 Forbidden from the model/tool facade:
@@ -190,8 +191,10 @@ drawdown, win/loss rate, and model/strategy attribution.
 ### 131-E — direct Robinhood MCP transport
 
 Use the official MCP Python SDK over Streamable HTTP with the public application
-surface frozen to `review_equity_order`, `get_equity_quotes`, and
-`get_equity_orders`.
+surface now frozen by 134-B3 to exactly `review_equity_order`,
+`get_equity_quotes`, `get_equity_orders`, and `get_equity_historicals`.
+The original three-tool 131-E surface is historical/superseded.
+`get_accounts` remains private/internal; no generic tool-call facade exists.
 
 ### 131-F — Windows OAuth persistence and callback
 

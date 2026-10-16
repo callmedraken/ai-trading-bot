@@ -85,11 +85,52 @@ from trading_bot.gui.paper_models import (
     PaperPageStatus,
     unavailable_paper_state,
 )
+from trading_bot.gui.production_strategy_models import (
+    MAX_PRODUCTION_STRATEGY_BYTES,
+    ProductionStrategyContractView,
+    ProductionStrategyDiagnostic,
+    ProductionStrategyPageState,
+    ProductionStrategyPageStatus,
+    unavailable_production_strategy_state,
+)
+from trading_bot.gui.production_strategy_service import (
+    ProductionStrategyContractInspectionService,
+)
 from trading_bot.gui.research_service import CompactReportResearchService
+from trading_bot.gui.runtime_evidence_service import (
+    ProductionRuntimeEvidenceInspectionService,
+)
+from trading_bot.gui.runtime_models import (
+    MAX_RUNTIME_COUNT,
+    MAX_RUNTIME_EVIDENCE_BYTES,
+    MAX_RUNTIME_HISTORY,
+    RuntimeAclEvidenceView,
+    RuntimeAclStatus,
+    RuntimeDiagnostic,
+    RuntimePageState,
+    RuntimePageStatus,
+    RuntimePrepareResult,
+    RuntimeProvisionStatus,
+    RuntimeQualificationEvidenceView,
+    RuntimeQualificationStatus,
+    RuntimeResult,
+    RuntimeSessionEvidenceView,
+    RuntimeSessionStatus,
+    RuntimeStrategyOutcome,
+    RuntimeWriteReadiness,
+    unavailable_runtime_state,
+)
 from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
 from trading_bot.gui.startup_composition import (
     GuiStartupConfiguration,
     ReadOnlyGuiApplicationService,
+)
+from trading_bot.gui.supervisor_adapter import build_supervisor_state
+from trading_bot.gui.supervisor_models import (
+    SupervisorConsistency,
+    SupervisorDiagnostic,
+    SupervisorPageState,
+    SupervisorPageStatus,
 )
 from trading_bot.gui.system_health_adapter import build_system_health_state
 from trading_bot.gui.system_health_models import (
@@ -114,6 +155,37 @@ from trading_bot.gui.verified_successor_paper_account_inspection_service import 
 )
 
 __all__ = [
+    "MAX_PRODUCTION_STRATEGY_BYTES",
+    "ProductionStrategyContractView",
+    "ProductionStrategyDiagnostic",
+    "ProductionStrategyPageState",
+    "ProductionStrategyPageStatus",
+    "unavailable_production_strategy_state",
+    "ProductionStrategyContractInspectionService",
+    "build_supervisor_state",
+    "SupervisorConsistency",
+    "SupervisorDiagnostic",
+    "SupervisorPageState",
+    "SupervisorPageStatus",
+    "ProductionRuntimeEvidenceInspectionService",
+    "MAX_RUNTIME_EVIDENCE_BYTES",
+    "MAX_RUNTIME_COUNT",
+    "MAX_RUNTIME_HISTORY",
+    "RuntimeAclEvidenceView",
+    "RuntimeAclStatus",
+    "RuntimeDiagnostic",
+    "RuntimePageState",
+    "RuntimePageStatus",
+    "RuntimePrepareResult",
+    "RuntimeProvisionStatus",
+    "RuntimeQualificationEvidenceView",
+    "RuntimeQualificationStatus",
+    "RuntimeResult",
+    "RuntimeSessionEvidenceView",
+    "RuntimeSessionStatus",
+    "RuntimeStrategyOutcome",
+    "RuntimeWriteReadiness",
+    "unavailable_runtime_state",
     "ApplicationOverview",
     "ComponentStatus",
     "CompactReportResearchService",

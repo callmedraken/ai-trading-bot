@@ -1,5 +1,13 @@
 # Architecture 118 — GUI-A11 Read-Only Evidence Explorer
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A11 architecture contract.
@@ -32,7 +40,7 @@ mutate, settle, recover, execute, or authorize anything.
 The allowed flow is:
 
 ```text
-existing six GuiApplicationService reads
+existing eight GuiApplicationService acquisitions
   -> existing EvidenceTimelinePageState
   -> EvidenceTimelineFilter
   -> filter_evidence_timeline_entries(...)

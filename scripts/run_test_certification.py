@@ -28,9 +28,28 @@ ROBINHOOD_DIRECTORIES = (
     "tests/review_paper",
     "tests/robinhood_mcp",
 )
+ROBINHOOD_LANE_PINS = {
+    # Architecture 132-R3H: #553 JUnit timing evidence showed the byte-size
+    # proxy co-locating the dominant runtime outliers. Keep exactly two lanes
+    # and deterministically separate only these measured modules.
+    "tests/runtime/checkpoint_runner/test_arch131.py": 0,
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 0,
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 1,
+    "tests/review_paper/test_arch133_scheduler_installation.py": 1,
+}
+
 ROBINHOOD_INFRASTRUCTURE_MODULES = (
-    "tests/runtime/test_checkpoint_runner.py",
-    "tests/scripts/test_run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
 )
 # Frozen Architecture 132 baseline at accepted HEAD:
 # 69327a7d5fbea7499329902ff96fd98e77a62591.
@@ -67,8 +86,17 @@ ROBINHOOD_REQUIRED_MODULES = (
     "tests/robinhood_mcp/test_adapter.py",
     "tests/robinhood_mcp/test_sdk_transport.py",
     "tests/robinhood_mcp/test_windows_oauth.py",
-    "tests/runtime/test_checkpoint_runner.py",
-    "tests/scripts/test_run_test_certification.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
     "tests/test_robinhood_forward_paper_cycle.py",
     "tests/test_robinhood_live_qualification_verifier.py",
     "tests/test_robinhood_paper_cycle.py",
@@ -124,13 +152,23 @@ FULL_EXACT_MODULES = (
     "tests/market_data/test_historical_models.py",
     "tests/market_data/test_multi_symbol_models.py",
     "tests/market_data/test_multi_symbol_provider.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
+    "tests/scripts/test_archive_project_history.py",
     "tests/scripts/test_create_walk_forward_research_bundle.py",
     "tests/scripts/test_research_session_archive_scripts.py",
     "tests/scripts/test_run_backtest.py",
     "tests/scripts/test_run_historical_experiment.py",
     "tests/scripts/test_run_rolling_historical_simulation.py",
-    "tests/scripts/test_run_test_certification.py",
     "tests/scripts/test_run_walk_forward_experiment.py",
     "tests/test_config.py",
 )
@@ -231,13 +269,22 @@ FULL_REQUIRED_MODULES = (
     "tests/robinhood_mcp/test_adapter.py",
     "tests/robinhood_mcp/test_sdk_transport.py",
     "tests/robinhood_mcp/test_windows_oauth.py",
-    "tests/runtime/test_checkpoint_runner.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/test_children.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
     "tests/scripts/test_create_walk_forward_research_bundle.py",
     "tests/scripts/test_research_session_archive_scripts.py",
     "tests/scripts/test_run_backtest.py",
     "tests/scripts/test_run_historical_experiment.py",
     "tests/scripts/test_run_rolling_historical_simulation.py",
-    "tests/scripts/test_run_test_certification.py",
     "tests/scripts/test_run_walk_forward_experiment.py",
     "tests/simulation/test_optimized_paper_portfolio.py",
     "tests/simulation/test_paper_portfolio.py",
@@ -256,7 +303,11 @@ LEGACY_DIRECTORIES = (
     "tests/gui",
     "tests/runtime",
 )
+LEGACY_REQUIRED_MODULES = (
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py",
+)
 LEGACY_EXACT_MODULES = (
+    *LEGACY_REQUIRED_MODULES,
     "tests/cli/test_checkpoint_lineage.py",
     "tests/cli/test_checkpoint_transition.py",
     "tests/cli/test_daily_snapshot_capture.py",
@@ -361,6 +412,25 @@ def balance_broad(
     return tuple(lanes[0]), tuple(lanes[1])
 
 
+def apply_lane_pins(
+    lanes: tuple[tuple[str, ...], tuple[str, ...]],
+    pins: dict[str, int],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Apply deterministic reviewed lane placement without changing coverage."""
+    if any(type(lane) is not int or lane not in {0, 1} for lane in pins.values()):
+        raise CertificationError("Lane pins must select lane 0 or 1")
+    mutable = [list(lanes[0]), list(lanes[1])]
+    assigned = {module for lane in lanes for module in lane}
+    for module, target in sorted(pins.items()):
+        if module not in assigned:
+            continue
+        for lane in mutable:
+            if module in lane:
+                lane.remove(module)
+        mutable[target].append(module)
+    return tuple(mutable[0]), tuple(mutable[1])
+
+
 def validate_partitions(
     inventory: tuple[str, ...], lanes: tuple[tuple[str, ...], ...]
 ) -> None:
@@ -426,6 +496,7 @@ def classify_inventory(inventory: tuple[str, ...]) -> dict[str, tuple[str, ...]]
         )
         historical = module in LEGACY_EXACT_MODULES or (
             any(module.startswith(f"{directory}/") for directory in LEGACY_DIRECTORIES)
+            and not module.startswith("tests/runtime/checkpoint_runner/")
             and module not in FULL_EXACT_MODULES
         )
         if supported and historical:
@@ -458,7 +529,19 @@ def select_inventory(inventory: tuple[str, ...], profile: str) -> tuple[str, ...
     """Select one profile from the fully admitted repository inventory."""
     if profile not in PROFILES:
         raise CertificationError(f"Unknown certification profile: {profile}")
-    return classify_inventory(inventory)[profile]
+    selected = classify_inventory(inventory)[profile]
+    _validate_legacy_required(selected, profile)
+    return selected
+
+
+def _validate_legacy_required(selected: tuple[str, ...], profile: str) -> None:
+    """Preserve the relocated retained baseline at every profile admission path."""
+    if profile in {"legacy", "exhaustive"}:
+        missing = set(LEGACY_REQUIRED_MODULES) - set(selected)
+        if missing:
+            raise CertificationError(
+                f"Missing required LEGACY modules: {sorted(missing)}"
+            )
 
 
 def build_lanes(
@@ -472,6 +555,8 @@ def build_lanes(
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second, "serial": serial}
     elif profile in {"full", "robinhood"}:
         first, second = balance_broad(root, inventory)
+        if profile == "robinhood":
+            first, second = apply_lane_pins((first, second), ROBINHOOD_LANE_PINS)
         prefix = "broad" if profile == "full" else "robinhood"
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second}
     else:
@@ -812,6 +897,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_pytest_temp_root(args: argparse.Namespace) -> None:
+    """Keep local certification on the frozen root; admit hosted CI runner temp."""
+    if args.plan:
+        return
+    requested = args.temp_root.resolve()
+    if requested == DEFAULT_TEMP_ROOT.resolve():
+        return
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        runner_temp_raw = os.environ.get("RUNNER_TEMP")
+        if runner_temp_raw:
+            runner_temp = Path(runner_temp_raw).resolve()
+            if requested == runner_temp or runner_temp in requested.parents:
+                return
+    raise CertificationError(
+        f"Pytest basetemp root must be {DEFAULT_TEMP_ROOT} locally or "
+        "a GitHub Actions RUNNER_TEMP descendant"
+    )
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     """Admit source, save exact topology, and optionally execute certification."""
     if bool(args.expected_feature_ref) != bool(args.expected_feature_head):
@@ -826,14 +930,16 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         raise CertificationError("Timeout must be positive")
     reject_protected_opt_ins(dict(os.environ))
     identity = verify_source(args)
-    if not args.plan and args.temp_root.resolve() != DEFAULT_TEMP_ROOT.resolve():
-        raise CertificationError(f"Pytest basetemp root must be {DEFAULT_TEMP_ROOT}")
+    _validate_pytest_temp_root(args)
+    if not args.plan:
+        args.temp_root.mkdir(parents=True, exist_ok=True)
     profile = getattr(args, "profile", "full")
     repository_inventory = discover_inventory(args.root)
     if profile not in PROFILES:
         raise CertificationError(f"Unknown certification profile: {profile}")
     profiles = classify_inventory(repository_inventory)
     inventory = profiles[profile]
+    _validate_legacy_required(inventory, profile)
     lanes = build_lanes(args.root, inventory, profile)
     serial = lanes.get("serial", ())
     broad = tuple(module for module in inventory if module not in set(serial))

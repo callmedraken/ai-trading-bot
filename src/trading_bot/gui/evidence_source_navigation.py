@@ -15,18 +15,24 @@ class EvidenceSourcePage(Enum):
     """Closed destination pages for already-presented Evidence sources."""
 
     RESEARCH = "research"
+    RESEARCH_LIFECYCLE = "research-lifecycle"
     PAPER_OPERATION = "paper"
     PAPER_ACCOUNT = "paper-account"
     MARKET_DATA = "market-data"
     OPERATIONS = "operations"
+    RUNTIME = "runtime"
+    SUPERVISOR = "supervisor"
 
 
 _SOURCE_TO_PAGE = {
     EvidenceTimelineSource.RESEARCH: EvidenceSourcePage.RESEARCH,
+    EvidenceTimelineSource.RESEARCH_LIFECYCLE: EvidenceSourcePage.RESEARCH_LIFECYCLE,
     EvidenceTimelineSource.PAPER_OPERATION: EvidenceSourcePage.PAPER_OPERATION,
     EvidenceTimelineSource.PAPER_ACCOUNT: EvidenceSourcePage.PAPER_ACCOUNT,
     EvidenceTimelineSource.MARKET_DATA: EvidenceSourcePage.MARKET_DATA,
     EvidenceTimelineSource.OPERATIONS: EvidenceSourcePage.OPERATIONS,
+    EvidenceTimelineSource.RUNTIME: EvidenceSourcePage.RUNTIME,
+    EvidenceTimelineSource.SUPERVISOR: EvidenceSourcePage.SUPERVISOR,
 }
 
 

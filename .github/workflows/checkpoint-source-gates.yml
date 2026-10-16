@@ -8,77 +8,26 @@ on:
       - feature/d10c-r8-terminal-halt
       - feature/d10c-r8-incident-reconciliation
       - "feature/robinhood-*"
+      - "feature/test-suite-*"
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
-jobs:
-  source-gates:
-    runs-on: windows-latest
-    timeout-minutes: 20
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python 3.14
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.14"
-
-      - name: Classify changed paths
-        id: changes
-        env:
-          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
-        shell: powershell
-        run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 classify-ci
-          exit $LASTEXITCODE
-
-      - name: Validate docs-only range
-        if: steps.changes.outputs.mode == 'DOCS_ONLY'
-        env:
-          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
-        shell: powershell
-        run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-docs
-          exit $LASTEXITCODE
-
-      - name: Install source-gate dependencies
-        if: steps.changes.outputs.mode != 'DOCS_ONLY'
-        shell: powershell
-        run: |
-          python -m pip install --disable-pip-version-check `
-            "pytest>=8.0,<9.0" `
-            "ruff>=0.6,<1.0" `
-            "tzdata>=2024.1,<2027.0"
-
-      - name: Show checkpoint status
-        if: steps.changes.outputs.mode != 'DOCS_ONLY'
-        shell: powershell
-        run: |
-          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
-
-      - name: Verify batch source checkpoints
-        if: steps.changes.outputs.mode != 'DOCS_ONLY'
-        env:
-          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
-        shell: powershell
-        run: |
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 `
-            verify-batch `
-              arch128-parent-acl-repair `
-              arch128-r4 `
-              arch128-r5-substrate `
-              arch128-r5-trading `
-              arch128-r6 `
-              arch128-r7 `
-              arch128-r8-terminal-halt `
-              arch130-r8i-d1 `
+env:
+  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
+              arch133-robinhood-supervised-release-installation-operator `
+              arch133-robinhood-supervised-deployment-qualification `
+              arch133-robinhood-supervised-runtime-host-admission `
+              arch133-robinhood-supervised-maintenance-rebind `
+              arch133-robinhood-supervised-release-installation `
+              arch133-robinhood-supervised-release-build-verification `
+              arch133-robinhood-supervised-release-foundation `
               arch131-robinhood-review-paper `
               arch131-robinhood-mcp-schema `
               arch131-robinhood-paper-cycle `
@@ -107,17 +56,419 @@ jobs:
               arch133-robinhood-unattended-state-store `
               arch133-robinhood-unattended-one-wake-composition `
               arch133-robinhood-unattended-review-paper-execution `
-              arch133-robinhood-unattended-host-scheduler-surface
+              arch133-robinhood-unattended-host-scheduler-surface `
+              arch133-robinhood-unattended-host-bootstrap `
+              arch133-robinhood-unattended-host-publication `
+              arch133-robinhood-scratch-root-acl-qualification `
+              arch133-robinhood-retained-root-diagnostic `
+              arch133-robinhood-retained-root-acl-recovery `
+              arch133-robinhood-post-publication-verifier `
+              arch133-robinhood-post-publication-stage-diagnostic `
+              arch133-robinhood-publication-state-paper-diagnostic `
+              arch133-robinhood-publication-state-paper-corrected `
+              arch133-robinhood-single-session-scheduler-installation `
+              arch133-robinhood-fresh-activation-reprovision `
+              arch133-robinhood-reprovision-admission-diagnostic `
+              arch133-robinhood-reprovision-parent-security-diagnostic `
+              arch133-robinhood-reprovision-parent-policy-diagnostic `
+              arch133-robinhood-fresh-activation-reprovision-corrected `
+              arch133-robinhood-reprovision-indeterminate-reconciliation `
+              arch133-robinhood-reprovision-sealed-predecessor-recovery `
+              arch133-robinhood-reprovision-recovery-reconciliation `
+              arch133-robinhood-windows-rename-qualification `
+              arch133-robinhood-closed-descendant-rename-qualification `
+              arch134-d1r5-pre-market-wake-qualification `
+              arch134-alpaca-authentication-qualification `
+              arch134-armed-paper-mvp `
+              arch134-production-strategy-contract `
+              arch134-production-strategy-decision `
+              arch134-production-strategy-live-paper `
+              arch134-production-paper-runtime `
+              arch134-production-paper-runtime-acl
+
+jobs:
+  source-static:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.changes.outputs.mode }}
+      route: ${{ steps.route.outputs.route }}
+      checkpoint: ${{ steps.route.outputs.checkpoint }}
+      certification_profile: ${{ steps.route.outputs.certification_profile }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Classify changed paths
+        id: changes
+        env:
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 classify-ci
           exit $LASTEXITCODE
 
-      - name: Upload checkpoint evidence
+      - name: Resolve source gate route
+        id: route
+        shell: powershell
+        run: |
+          $Code = @'
+          import os
+          from scripts import checkpoint_runner as runner
+
+          checkpoint = runner.resolve_ci_checkpoint(
+              runner._checkpoint_specs(),
+              os.environ.get("GITHUB_REF_NAME", ""),
+              os.environ.get("GITHUB_EVENT_NAME", ""),
+          )
+          route = "ACTIVE" if checkpoint is not None else "FULL"
+          certification_profile = runner.resolve_ci_certification_profile(checkpoint)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as handle:
+              handle.write(f"route={route}\n")
+              handle.write(f"checkpoint={checkpoint or ''}\n")
+              handle.write(f"certification_profile={certification_profile or ''}\n")
+          '@
+          $Code | python -B -
+          exit $LASTEXITCODE
+
+      - name: Validate docs-only range
+        if: steps.changes.outputs.mode == 'DOCS_ONLY'
+        env:
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-docs
+          exit $LASTEXITCODE
+
+      - name: Install source-gate dependencies
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Show checkpoint status
+        if: steps.changes.outputs.mode != 'DOCS_ONLY'
+        shell: powershell
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 status
+
+      - name: Verify active checkpoint static authority
+        if: steps.changes.outputs.mode != 'DOCS_ONLY' && steps.route.outputs.route == 'ACTIVE'
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: static
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify "${{ steps.route.outputs.checkpoint }}"
+          exit $LASTEXITCODE
+
+      - name: Verify full batch static authority
+        if: steps.changes.outputs.mode != 'DOCS_ONLY' && steps.route.outputs.route == 'FULL'
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: static
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          $Checkpoints = @(
+            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\s+' |
+              Where-Object { $_ -like 'arch*' }
+          )
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-batch @Checkpoints
+          exit $LASTEXITCODE
+
+      - name: Upload source-static evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: checkpoint-source-gate-evidence
+          name: checkpoint-source-gate-static
           path: |
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+          if-no-files-found: ignore
+
+  active-tests:
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.route == 'ACTIVE'
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Verify active checkpoint tests
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify "${{ needs.source-static.outputs.checkpoint }}"
+          exit $LASTEXITCODE
+
+      - name: Upload active test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-active-tests
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest-results.xml
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
             !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
           if-no-files-found: ignore
+
+  full-tests:
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile == ''
+    runs-on: windows-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install source-gate dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Record broad test shard start
+        shell: powershell
+        run: |
+          $Started = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          "AI_TRADING_BOT_BROAD_SHARD_STARTED_MS=$Started" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Verify full batch test shard
+        env:
+          AI_TRADING_BOT_SOURCE_GATE_PHASE: tests
+          AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX: ${{ matrix.shard }}
+          AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT: 4
+          AI_TRADING_BOT_CHECKPOINT_EVIDENCE_ROOT: ${{ runner.temp }}/ai-trading-bot-checkpoints
+        shell: powershell
+        run: |
+          $Checkpoints = @(
+            $env:AI_TRADING_BOT_ACTIVE_CHECKPOINTS -split '\s+' |
+              Where-Object { $_ -like 'arch*' }
+          )
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\ops.ps1 verify-batch @Checkpoints
+          exit $LASTEXITCODE
+
+      - name: Enforce broad test hygiene budget
+        if: always()
+        shell: powershell
+        run: |
+          $Started = [int64]$env:AI_TRADING_BOT_BROAD_SHARD_STARTED_MS
+          $Finished = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+          $Seconds = [math]::Round(($Finished - $Started) / 1000.0, 3)
+          Write-Host "BROAD_TEST_SHARD_SECONDS=$Seconds"
+          if ($Seconds -ge 300) {
+            Write-Host "::error::Broad test shard exceeded the 300-second hygiene threshold ($Seconds s). Run a test topology/hygiene audit before accepting this source."
+            exit 86
+          }
+
+      - name: Upload full test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-source-gate-full-tests-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest-results.xml
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
+            ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
+            !${{ runner.temp }}/ai-trading-bot-checkpoints/**/pytest/**
+          if-no-files-found: ignore
+
+  certification-tests:
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile != ''
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install certification dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff>=0.6,<1.0" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Run canonical certification profile
+        env:
+          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}
+          EXPECTED_HEAD: ${{ github.sha }}
+          EXPECTED_BRANCH: ${{ github.ref_name }}
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:CERT_PROFILE -notin @('robinhood', 'full')) {
+            throw "Unsupported canonical certification profile: $env:CERT_PROFILE"
+          }
+
+          $FeatureSpec = "+refs/heads/$($env:EXPECTED_BRANCH):refs/remotes/origin/$($env:EXPECTED_BRANCH)"
+          git fetch --no-tags origin `
+            "+refs/heads/develop:refs/remotes/origin/develop" `
+            $FeatureSpec
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to refresh exact certification refs'
+          }
+
+          $Head = (git rev-parse HEAD).Trim()
+          $Tree = (git show -s --format=%T HEAD).Trim()
+          $BaseHead = (git rev-parse origin/develop).Trim()
+          $FeatureRef = "origin/$env:EXPECTED_BRANCH"
+          $FeatureHead = (git rev-parse $FeatureRef).Trim()
+          $CurrentBranch = (git branch --show-current).Trim()
+
+          if ($Head -ne $env:EXPECTED_HEAD) {
+            throw "Certification checkout HEAD mismatch: $Head"
+          }
+          if ($FeatureHead -ne $Head) {
+            throw "Certification feature ref mismatch: $FeatureHead"
+          }
+          if ($CurrentBranch -ne $env:EXPECTED_BRANCH) {
+            throw "Certification branch mismatch: $CurrentBranch"
+          }
+
+          $TempRoot = Join-Path $env:RUNNER_TEMP 'canonical-certification-pytest'
+          $Evidence = Join-Path $env:RUNNER_TEMP 'canonical-certification-evidence'
+          if (Test-Path -LiteralPath $Evidence) {
+            throw "Certification evidence path already exists: $Evidence"
+          }
+
+          "AI_TRADING_BOT_CERTIFICATION_EVIDENCE=$Evidence" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          & python -B .\scripts\run_test_certification.py `
+              --profile $env:CERT_PROFILE `
+              --root . `
+              --python (Get-Command python).Source `
+              --expected-head $Head `
+              --expected-tree $Tree `
+              --expected-base-head $BaseHead `
+              --expected-branch $env:EXPECTED_BRANCH `
+              --expected-feature-ref $FeatureRef `
+              --expected-feature-head $Head `
+              --temp-root $TempRoot `
+              --evidence-dir $Evidence
+          exit $LASTEXITCODE
+
+      - name: Enforce canonical certification hygiene budget
+        if: always()
+        shell: powershell
+        run: |
+          $Results = Join-Path $env:RUNNER_TEMP 'canonical-certification-evidence\results.json'
+          if (-not (Test-Path -LiteralPath $Results -PathType Leaf)) {
+            Write-Host 'Canonical certification results are absent; preserve the primary failure.'
+            exit 0
+          }
+          $Summary = Get-Content -LiteralPath $Results -Raw | ConvertFrom-Json
+          $Wall = [double]$Summary.wall_seconds
+          Write-Host "CANONICAL_CERTIFICATION_WALL_SECONDS=$Wall"
+          if ($Wall -ge 300) {
+            Write-Host "::error::Canonical certification exceeded the 300-second hygiene threshold ($Wall s). Run a test topology/hygiene audit before accepting this source."
+            exit 86
+          }
+
+      - name: Upload canonical certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-certification-${{ needs.source-static.outputs.certification_profile }}
+          path: |
+            ${{ runner.temp }}/canonical-certification-evidence/**
+          if-no-files-found: ignore
+
+  source-gates:
+    needs: [source-static, active-tests, full-tests, certification-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Require source gate success
+        shell: bash
+        env:
+          STATIC_RESULT: ${{ needs.source-static.result }}
+          ACTIVE_RESULT: ${{ needs.active-tests.result }}
+          FULL_RESULT: ${{ needs.full-tests.result }}
+          CERT_RESULT: ${{ needs.certification-tests.result }}
+          MODE: ${{ needs.source-static.outputs.mode }}
+          ROUTE: ${{ needs.source-static.outputs.route }}
+          CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}
+        run: |
+          set -euo pipefail
+          test "$STATIC_RESULT" = "success"
+
+          if [ "$MODE" = "DOCS_ONLY" ]; then
+            test "$ACTIVE_RESULT" = "skipped"
+            test "$FULL_RESULT" = "skipped"
+            test "$CERT_RESULT" = "skipped"
+          elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then
+            test "$ACTIVE_RESULT" = "success"
+            test "$FULL_RESULT" = "skipped"
+            test "$CERT_RESULT" = "success"
+          elif [ "$ROUTE" = "ACTIVE" ]; then
+            test "$ACTIVE_RESULT" = "success"
+            test "$FULL_RESULT" = "success"
+            test "$CERT_RESULT" = "skipped"
+          else
+            test "$ACTIVE_RESULT" = "skipped"
+            test "$FULL_RESULT" = "success"
+            test "$CERT_RESULT" = "skipped"
+          fi

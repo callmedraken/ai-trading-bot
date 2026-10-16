@@ -1,5 +1,13 @@
 # Architecture 117 — GUI-A10 Read-Only Evidence Timeline
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A10 architecture contract.
@@ -29,7 +37,7 @@ The allowed flow is:
 
 ```text
 existing GuiApplicationService
-  -> MainWindow performs the existing six state reads once
+  -> MainWindow performs the existing eight state acquisitions once
   -> build_evidence_timeline_state(...)
   -> immutable EvidenceTimelinePageState
   -> EvidenceTimelinePage
@@ -49,6 +57,7 @@ PaperPageState
 PaperAccountPageState
 MarketDataPageState
 OperatorOperationsPageState
+RuntimePageState
 ```
 
 It must not accept paths, credentials, runtime authority objects, provider
@@ -65,6 +74,7 @@ EvidenceTimelineSource:
   PAPER_ACCOUNT
   MARKET_DATA
   OPERATIONS
+  RUNTIME
 
 EvidenceTimelineEntry:
   source

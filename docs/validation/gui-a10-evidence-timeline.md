@@ -1,5 +1,13 @@
 # GUI-A10 Read-Only Evidence Timeline Validation Plan
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Purpose
 
 Validate Architecture 117,
@@ -41,7 +49,7 @@ Assert:
 
 Add `evidence` to stable page IDs and navigation.
 
-MainWindow must still perform exactly six service reads. It builds the timeline
+MainWindow must still perform exactly eight service acquisitions. It builds the timeline
 from local state variables already acquired for the existing pages.
 
 Tests must prove Evidence navigation performs no additional service call.

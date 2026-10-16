@@ -1,0 +1,73 @@
+name: GUI Source Gates
+
+on:
+  push:
+    branches:
+      - "feature/gui-*"
+  pull_request:
+    paths:
+      - "src/trading_bot/gui/**"
+      - "tests/gui/**"
+      - "tests/fixtures/gui/**"
+      - ".github/workflows/gui-source-gates.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gui:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+      - name: Install GUI and development dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check ".[dev,gui]"
+          if ($LASTEXITCODE -ne 0) { throw "GUI dependency installation failed" }
+      - name: Run complete GUI suite with real PySide6
+        shell: powershell
+        run: |
+          & {
+            @'
+          import PySide6
+          print("PySide6", PySide6.__version__)
+          '@ | python -B -
+            if ($LASTEXITCODE -ne 0) { throw "PySide6 is required" }
+            $GuiTemp = Join-Path $env:RUNNER_TEMP 'gui-source-tests'
+            $GuiXml = Join-Path $env:RUNNER_TEMP 'gui-results.xml'
+            python -B -m pytest -q -p no:cacheprovider tests/gui --basetemp $GuiTemp --junitxml $GuiXml
+            if ($LASTEXITCODE -ne 0) { throw "GUI tests failed" }
+          }
+      - name: Combined non-mutating Ruff and diff checks
+        shell: powershell
+        run: |
+          & {
+            python -B -m ruff check --no-cache src/trading_bot/gui tests/gui
+            $LintCode = $LASTEXITCODE
+            python -B -m ruff format --check --no-cache src/trading_bot/gui tests/gui
+            $FormatCode = $LASTEXITCODE
+            if ($LintCode -ne 0) { python -B -m ruff check --diff --no-cache src/trading_bot/gui tests/gui }
+            if ($FormatCode -ne 0) { python -B -m ruff format --diff --no-cache src/trading_bot/gui tests/gui }
+            if ($LintCode -ne 0 -or $FormatCode -ne 0) { throw "GUI Ruff checks failed" }
+            git diff --check
+            if ($LASTEXITCODE -ne 0) { throw "Diff check failed" }
+            Write-Output 'GUI_SOURCE_STATIC_PASS'
+          }
+      - name: Upload synthetic GUI test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-test-results
+          path: ${{ runner.temp }}/gui-results.xml
+          if-no-files-found: warn

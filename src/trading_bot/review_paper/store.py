@@ -44,10 +44,25 @@ class UnsupportedReviewPaperOrderError(ReviewPaperStoreError):
 class ReviewPaperStore:
     """Durably retain review-derived fills and reconstruct the virtual account."""
 
-    def __init__(self, path: str | Path, *, starting_cash: Decimal) -> None:
+    def __init__(
+        self, path: str | Path, *, starting_cash: Decimal, read_only: bool = False
+    ) -> None:
         self._path = Path(path)
         self._starting_cash = require_positive_decimal(starting_cash, "starting_cash")
-        self._initialize()
+        if type(read_only) is not bool:
+            raise TypeError("read_only must be bool")
+        self._read_only = read_only
+        if read_only:
+            with self._connect() as connection:
+                metadata = dict(connection.execute("SELECT key, value FROM metadata"))
+                if metadata != {
+                    "schema_version": "2",
+                    "starting_cash": str(self._starting_cash),
+                }:
+                    raise ReviewPaperStoreError("review-paper metadata mismatch")
+            self.reconstruct_ledger()
+        else:
+            self._initialize()
 
     @property
     def path(self) -> Path:
@@ -168,7 +183,13 @@ class ReviewPaperStore:
             rows = connection.execute(
                 _SELECT + " ORDER BY filled_at, paper_trade_id"
             ).fetchall()
-        return tuple(_record_from_row(row) for row in rows)
+        records = tuple(_record_from_row(row) for row in rows)
+        if self._read_only and any(
+            _record_row(record) != row
+            for record, row in zip(records, rows, strict=True)
+        ):
+            raise ReviewPaperStoreError("noncanonical review-paper history")
+        return records
 
     def reconstruct_ledger(self) -> PaperLedger:
         ledger = PaperLedger(self._starting_cash)
@@ -270,6 +291,10 @@ class ReviewPaperStore:
                 raise
 
     def _connect(self) -> sqlite3.Connection:
+        if self._read_only:
+            return sqlite3.connect(
+                self._path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True
+            )
         return sqlite3.connect(self._path)
 
 

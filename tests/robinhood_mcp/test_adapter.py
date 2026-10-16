@@ -121,6 +121,7 @@ def test_transport_protocol_has_only_review_and_read_methods() -> None:
         if not name.startswith("_")
     }
     assert public == {
+        "get_equity_historicals",
         "review_equity_order",
         "get_equity_quotes",
         "get_equity_orders",

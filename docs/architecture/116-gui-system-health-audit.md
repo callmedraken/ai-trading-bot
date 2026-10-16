@@ -1,5 +1,13 @@
 # Architecture 116 — GUI-A9 Read-Only System Health and Audit
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A9 architecture contract.
@@ -18,7 +26,7 @@ Give the operator one consolidated read-only view of:
 
 - the local GUI environment/mode;
 - the presentation availability of Research, Paper Operation, Paper Account,
-  Market Data, and Operations;
+  Market Data, Operations, and Runtime;
 - bounded audit identities already present in those page states;
 - whether any presented component is explicitly blocked.
 
@@ -52,6 +60,7 @@ PaperPageState
 PaperAccountPageState
 MarketDataPageState
 OperatorOperationsPageState
+RuntimePageState
 ```
 
 It must not accept:
@@ -144,6 +153,10 @@ Operations:
 The adapter must not reinterpret domain/runtime state that is not already
 present in the GUI models.
 
+Runtime: UNAVAILABLE -> UNAVAILABLE (neutral); AVAILABLE -> AVAILABLE;
+ATTENTION -> BLOCKED and overall ATTENTION. Only bounded HEAD/tree, principal
+digest and session contract/operation IDs may be copied.
+
 ## Audit entries
 
 GUI-A9 may copy only identities/evidence already exposed by existing
@@ -207,6 +220,8 @@ paper
 paper-account
 market-data
 operations
+runtime
+evidence
 system
 ```
 

@@ -1,5 +1,13 @@
 # GUI-A12 Read-Only System / Evidence Cross-Navigation Validation Plan
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Purpose
 
 Validate Architecture 119,
@@ -44,7 +52,7 @@ Verify:
 - Evidence search is the exact audit identifier;
 - resulting visible cards match that source/identifier;
 - Evidence scroll resets to the top;
-- service call count remains exactly six.
+- service acquisition count remains exactly eight.
 
 ## A12d regression gate
 

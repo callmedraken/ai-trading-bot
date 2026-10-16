@@ -1,5 +1,13 @@
 # Architecture 119 — GUI-A12 Read-Only System / Evidence Cross-Navigation
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A12 architecture contract.
@@ -24,14 +32,14 @@ authority, readiness, settlement status, or execution permission.
 ## Existing inputs
 
 A12 may use only the already-built objects that `MainWindow` constructs from
-its existing six service reads:
+its existing eight service acquisitions:
 
 ```text
 SystemHealthPageState
 EvidenceTimelinePageState
 ```
 
-No seventh service read is permitted.
+No navigation service reread is permitted.
 
 ## Closed source mapping
 
@@ -43,6 +51,7 @@ Paper Operation -> EvidenceTimelineSource.PAPER_OPERATION
 Paper Account   -> EvidenceTimelineSource.PAPER_ACCOUNT
 Market Data     -> EvidenceTimelineSource.MARKET_DATA
 Operations      -> EvidenceTimelineSource.OPERATIONS
+Runtime         -> EvidenceTimelineSource.RUNTIME
 ```
 
 No fuzzy source inference is permitted.

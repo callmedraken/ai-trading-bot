@@ -22,14 +22,32 @@ from trading_bot.gui.paper_account_models import (
     unavailable_paper_account_state,
 )
 from trading_bot.gui.paper_models import PaperPageState, unavailable_paper_state
+from trading_bot.gui.production_strategy_models import (
+    ProductionStrategyPageState,
+    unavailable_production_strategy_state,
+)
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    unavailable_research_candidate_lifecycle_state,
+)
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
 )
+from trading_bot.gui.runtime_models import RuntimePageState, unavailable_runtime_state
 
 
 class MockGuiApplicationService:
     """Return static presentation data without invoking application effects."""
+
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        return unavailable_research_candidate_lifecycle_state()
+
+    def get_production_strategy_state(self) -> ProductionStrategyPageState:
+        """Return the disconnected strategy default."""
+        return unavailable_production_strategy_state()
 
     def get_overview(self) -> ApplicationOverview:
         """Return deterministic read-only overview state."""
@@ -90,10 +108,23 @@ class MockGuiApplicationService:
                     ),
                 ),
                 ComponentStatus(
+                    "runtime",
+                    "Runtime",
+                    PresentationStatus.UNAVAILABLE,
+                    unavailable_runtime_state().message,
+                ),
+                ComponentStatus(
                     key="system",
                     title="System",
                     status=PresentationStatus.INFO,
                     detail="The GUI is read-only; no production authority is granted.",
+                ),
+                ComponentStatus(
+                    "supervisor",
+                    "Supervisor",
+                    PresentationStatus.UNAVAILABLE,
+                    "D2 supervisor runtime is not connected; "
+                    "no relevant evidence is selected.",
                 ),
             ),
         )
@@ -101,6 +132,10 @@ class MockGuiApplicationService:
     def get_research_state(self) -> ResearchPageState:
         """Return the deterministic empty research state."""
         return unavailable_research_state()
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return the deterministic unavailable Runtime state."""
+        return unavailable_runtime_state()
 
     def get_paper_state(self) -> PaperPageState:
         """Return the deterministic unavailable paper-inspection state."""
@@ -126,6 +161,16 @@ class MockGuiApplicationService:
 class ResearchReportGuiApplicationService:
     """Compose the normal overview with one explicit read-only report adapter."""
 
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        """Report selection never implies lifecycle artifact selection."""
+        return unavailable_research_candidate_lifecycle_state()
+
+    def get_production_strategy_state(self) -> ProductionStrategyPageState:
+        """Return the disconnected strategy default."""
+        return unavailable_production_strategy_state()
+
     def __init__(self, artifact_path: Path) -> None:
         self._overview_service = MockGuiApplicationService()
         self._research_service = CompactReportResearchService(artifact_path)
@@ -133,6 +178,10 @@ class ResearchReportGuiApplicationService:
     def get_overview(self) -> ApplicationOverview:
         """Return the existing deterministic read-only overview."""
         return self._overview_service.get_overview()
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return the deterministic unavailable Runtime state."""
+        return unavailable_runtime_state()
 
     def get_research_state(self) -> ResearchPageState:
         """Return the bounded state for the explicit compact report path."""

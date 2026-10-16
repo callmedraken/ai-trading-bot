@@ -32,6 +32,7 @@ from trading_bot.gui import (
     unavailable_operator_operations_state,
     unavailable_paper_account_state,
     unavailable_paper_state,
+    unavailable_runtime_state,
 )
 from trading_bot.gui.models import ComponentStatus
 from trading_bot.gui.operator_observability_models import (
@@ -213,6 +214,7 @@ def test_unavailable_sources_are_neutral_read_only_health() -> None:
         unavailable_paper_account_state(),
         unavailable_market_data_state(),
         unavailable_operator_operations_state(),
+        unavailable_runtime_state(),
     )
 
     assert state.status is SystemHealthStatus.READ_ONLY_READY
@@ -230,6 +232,7 @@ def test_loaded_verified_sources_copy_only_bounded_audit_identity() -> None:
         _paper_account_verified(),
         _market_verified(),
         unavailable_operator_operations_state(),
+        unavailable_runtime_state(),
     )
 
     assert state.status is SystemHealthStatus.READ_ONLY_READY
@@ -238,6 +241,7 @@ def test_loaded_verified_sources_copy_only_bounded_audit_identity() -> None:
         SystemComponentStatus.UNAVAILABLE,
         SystemComponentStatus.AVAILABLE,
         SystemComponentStatus.AVAILABLE,
+        SystemComponentStatus.UNAVAILABLE,
         SystemComponentStatus.UNAVAILABLE,
     )
     rendered = "\n".join(
@@ -268,6 +272,7 @@ def test_blocked_paper_inspection_sets_attention_without_receipt_path() -> None:
         unavailable_paper_account_state(),
         unavailable_market_data_state(),
         unavailable_operator_operations_state(),
+        unavailable_runtime_state(),
     )
 
     assert state.status is SystemHealthStatus.ATTENTION
@@ -295,6 +300,7 @@ def test_operations_open_gate_or_blocked_preview_sets_attention() -> None:
             unavailable_paper_account_state(),
             unavailable_market_data_state(),
             operations,
+            unavailable_runtime_state(),
         )
 
         assert state.status is SystemHealthStatus.ATTENTION

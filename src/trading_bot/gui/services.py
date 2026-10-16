@@ -8,6 +8,11 @@ from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.operator_observability_models import OperatorOperationsPageState
 from trading_bot.gui.paper_account_models import PaperAccountPageState
 from trading_bot.gui.paper_models import PaperPageState
+from trading_bot.gui.production_strategy_models import ProductionStrategyPageState
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+)
+from trading_bot.gui.runtime_models import RuntimePageState
 
 
 class ResearchReportLoader(Protocol):
@@ -21,8 +26,18 @@ class ResearchReportLoader(Protocol):
 class GuiApplicationService(ResearchReportLoader, Protocol):
     """Provide bounded application state without exposing framework objects."""
 
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        """Return cached local canonical artifacts and successor linkage evidence."""
+        ...
+
     def get_overview(self) -> ApplicationOverview:
         """Return the current read-only application overview."""
+        ...
+
+    def get_runtime_state(self) -> RuntimePageState:
+        """Return bounded recorded runtime evidence without execution authority."""
         ...
 
     def get_research_state(self) -> ResearchPageState:
@@ -43,4 +58,8 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         """Return bounded read-only operator-observability presentation state."""
+        ...
+
+    def get_production_strategy_state(self) -> ProductionStrategyPageState:
+        """Return bounded explicit strategy evidence without promotion authority."""
         ...

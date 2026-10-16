@@ -1,0 +1,40 @@
+{
+  "schema": "armed-paper-session/v1",
+  "source_head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "source_tree": "cccccccccccccccccccccccccccccccccccccccc",
+  "contract_id": "11111111-1111-5111-8111-111111111111",
+  "target_session": "2026-10-12",
+  "historical_provider": "alpaca",
+  "historical_sessions": [
+    "2026-10-08",
+    "2026-10-09"
+  ],
+  "snapshot_sha256": [
+    "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  ],
+  "history_seed_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "operation_id": "22222222-2222-5222-8222-222222222222",
+  "order_id": null,
+  "fill_id": null,
+  "strategy_outcome": "TRADE_PROPOSAL",
+  "proposal_id": "33333333-3333-5333-8333-333333333333",
+  "wait_started_at": "2026-10-12T12:00:00+00:00",
+  "admitted_at": null,
+  "admission_opens_at": "2026-10-12T13:35:00+00:00",
+  "admission_closes_at": "2026-10-12T19:55:00+00:00",
+  "prepare_result": null,
+  "execute_result": null,
+  "alpaca_reads": 2,
+  "strategy_evaluations": 1,
+  "prepare_attempts": 0,
+  "execute_attempts": 0,
+  "robinhood_get_equity_quotes": 0,
+  "robinhood_get_accounts": 0,
+  "robinhood_get_equity_orders": 0,
+  "robinhood_review_equity_order": 0,
+  "paper_mutations": 0,
+  "broker_placement_count": 0,
+  "effect_counts_complete": true,
+  "status": "WAITING_FOR_MARKET"
+}

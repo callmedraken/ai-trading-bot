@@ -1,5 +1,126 @@
 # AI Development and Review Workflow
 
+## Standing authorization for reviewed next steps — current normative rule
+
+Reviewed next-step actions are implicitly authorized by default within their
+exact described scope. ChatGPT must not insert an authorization-only turn to
+obtain a one-word approval for a bounded action it already reviewed and presented.
+For a supplied local command, the user's decision to execute it constitutes
+authorization for exactly its described effects and bounds. The user withholds
+authorization by not executing it and calling it out for manual review.
+
+This does not broaden a command, authorize unexpected effects or ambiguous/
+partial-state repair, permit automatic retry after ambiguity/partially consumed
+effects, override real-money NO-GO, or turn source/commit authority into merge,
+rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
+Protected source/effect separation, prerequisite checks and reviewed interlocks
+remain mandatory. Source or preflight PASS alone grants no effect authority.
+
+After a successful checkpoint, automatically include and proceed to the next
+reviewed safe step within scope. A separate new authorization message is not
+universally required for reviewed bounded operator actions. Historical accounts
+of separate authorization remain historical and do not override this current rule.
+
+## CI-owned selected certification — normative expedited path
+
+For reviewed coherent integration checkpoints, the source gate may own the
+selected Architecture-132 certification profile directly. The mapping from exact
+checkpoint name to `robinhood` or `full` is source-owned, explicit, and
+fail-closed; there is no heuristic profile selection.
+
+For a mapped non-docs push:
+
+- `source-static` runs first and emits the exact checkpoint plus selected profile;
+- `active-tests` still runs the checkpoint-specific fast/current integration gate;
+- the canonical profile runs through `scripts/run_test_certification.py` in
+  GitHub Actions with the unchanged profile inventory and lane semantics;
+- the redundant four-shard checkpoint-union `full-tests` job is skipped;
+- `source-gates` requires source-static + active-tests + canonical certification
+  success before the source may advance.
+
+For an unmapped active non-docs push, retain active-tests plus the four-shard
+broad checkpoint-union safety net. FULL fallback retains the four-shard broad
+path. Docs-only retains the reviewed cheap path.
+
+A terminal-green CI-owned canonical certification on the exact source satisfies
+that profile obligation. Do not ask the human operator to rerun the same profile
+locally. Local certification is reserved for an unmapped selected gate, invalid
+or incomplete CI evidence, or materially different host/runtime evidence.
+Protected provider/OAuth/paper/scheduler/broker operations remain separately
+authorized and are never implied by source certification.
+
+The canonical CI profile and each broad shard have a 300-second hygiene ceiling.
+Crossing it is a STOP for source acceptance and triggers a test-topology/hygiene
+audit; do not normalize recurring >300-second verification by increasing the
+budget.
+
+R3 is accepted on `fecc7a7aacefa2b7253f36f5077935c6b76b5810` /
+`1eb3d2882af4fb06e17c9e8753d0418830e34790`, CI
+**#498 / 38217916400 SUCCESS**. The mapped ROBINHOOD profile selected 92 modules
+in 45/47-module lanes and recorded 8,416 passed / 1 skipped / 0 failed/errors in
+170.058 seconds. Active tests passed, the redundant four-shard union was skipped,
+and terminal source-gates passed. This exact result is the reference proof that
+mapped CI certification replaces a duplicate human rerun.
+
+## Canonical source-gate topology non-regression notary — normative
+
+This rule is **normative**, not merely historical. The accepted source-gate
+topology is the audited split/sharded workflow. A return to the older monolithic
+single-job gate is a workflow regression and is a **STOP** condition.
+
+The incident being notarized is:
+
+~~~text
+REGRESSED SOURCE  90f9366f4251f062985ce335bea62e1c747aa1d4
+REGRESSED CI      #443 / 38111685698 SUCCESS
+REGRESSED WALL    7m 04s
+REGRESSED SHAPE   one monolithic source-gates job
+
+RESTORED SOURCE   165bae500ca8f486298d4ede8b6ba7ec5237fe89
+RESTORED CI       #445 / 38112755149 SUCCESS
+RESTORED WALL     3m 07s
+RESTORED SHAPE    source-static + four full-test shards + source-gates
+
+CURRENT AJ SOURCE 9e37d5bf38bc0383e9f84008f8961321771d7254
+CURRENT AJ CI     #447 / 38115827585 SUCCESS
+CURRENT AJ ROUTE  source-static + active-tests; full-tests skipped
+~~~
+
+The accepted workflow contract is:
+
+- `source-static` always owns classification, static checks, and authority;
+- an exact registered feature-branch push routes to `active-tests`;
+- an explicitly mapped integration checkpoint additionally routes to the
+  source-owned canonical `certification-tests` profile and skips the redundant
+  four-shard checkpoint-union batch;
+- unmapped active and broad/fallback source changes retain the four
+  duration-balanced `full-tests` shards `[0, 1, 2, 3]`;
+- `source-gates` is only the terminal aggregator and must depend on
+  `source-static`, `active-tests`, `full-tests`, and `certification-tests`,
+  requiring the exact applicable combination;
+- exact route resolution, source-gate phase controls, concurrency cancellation,
+  exit-code propagation, and the terminal aggregator remain fail closed;
+- docs-only changes may skip test jobs only through the reviewed docs-only
+  classifier; and
+- the old single monolithic `source-gates` execution path is not accepted.
+
+The regression occurred because a later checkpoint branch inherited an older
+pre-latency lineage. Therefore, before implementation on any branch whose
+ancestry predates the restored split gate, the current workflow **and** matching
+runner phase/shard support must be reconciled first. Do not copy only the YAML.
+If the workflow topology or runner support differs from the current accepted
+contract, stop before the implementation push.
+
+This is also machine-enforced. `scripts/checkpoint_runner.py` function
+`_batch_workflow_is_reviewed()` freezes the split topology, active/fallback
+routing, four-shard matrix, concurrency rule, and aggregator. Source authority
+must fail if that contract drifts. Checkpoint-specific tests must continue to
+assert `_batch_workflow_is_reviewed()` before source acceptance. Documentation
+does not replace that enforcement; both the canonical rule and executable
+authority must remain aligned.
+
+
 This document is the canonical working agreement for AI-assisted development in
 this repository. `AGENTS.md` remains the mandatory repository rule set; this
 file records the normal handoff, review, testing, and local-operator cycle in
@@ -10,11 +131,17 @@ more detail.
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. Read the current Git-tracked
-`docs/AI_TRADING_BOT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `AGENTS.md`, the
-relevant architecture/validation documents, and the available Trading Bot
-project conversation history. Verify the active remote branch/HEAD, recent
-commits/diff and CI through GitHub when material. Git-tracked canonical docs
+state before recommending or authorizing work. Resolve the canonical bounded
+handoff/history branch `feature/project-history-storage-foundation` first and
+read, in order, its `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
+relevant current architecture/validation document. Then verify the separately
+named active remote product branch/HEAD/tree, recent commits/diff and CI through
+GitHub when material. The canonical handoff branch is documentation/current-
+state authority only; it never substitutes for exact executable-source
+admission. Read `docs/history/INDEX.md` or an immutable legacy snapshot only
+when older provenance, incident reconstruction, predecessor semantics, or
+disputed historical evidence is actually necessary. Git-tracked canonical docs
 outrank uploaded mirrors or older chat summaries unless the conversation clearly
 records a newer intentional change that has not yet been committed.
 
@@ -41,8 +168,43 @@ should state, when applicable:
 The user should not need a follow-up merely to ask what to do next, which model
 to use, what command to run, what output to send back, or whether the checkpoint
 is ready to advance. If the next action crosses a protected effect boundary,
-provide the safe preflight/readiness material and stop at the authorization
-boundary rather than presenting the effectful command as ordinary verification.
+provide safe preflight/readiness material and state exact reviewed effect
+bounds. The user's execution authorizes only those bounds under the standing
+rule; never present a protected effect as ordinary verification.
+
+## Supervised release and unattended-runtime invariant
+
+The supported productionization model deliberately separates unattended trading
+from code deployment.
+
+- The unattended trading runtime MUST execute an already-installed immutable
+  release. It MUST NOT pull Git, install/update code, publish a new generation,
+  mutate scheduler configuration, replace its own executable/source tree, or
+  autonomously roll back/reprovision itself.
+- Trading/runtime mode and deployment/maintenance mode are mutually exclusive.
+  Deployment may switch the scheduler to a new release only after scheduled
+  execution is disabled/quiesced and the absence of an active bot process/cycle
+  is verified. Trading authority must remain unavailable while deployment is in
+  progress.
+- Releases are immutable, uniquely versioned directories. A strategy code or
+  strategy-parameter change creates a new reviewed release; do not hot-reload
+  source or strategy configuration into a running release.
+- Promotion uses supervised scheduler rebinding to the verified launcher inside
+  the new immutable release. Do not require ACTIVE->ARCHIVE or STAGE->ACTIVE
+  directory renames for normal deployment. Retain the prior immutable release
+  for rollback; rollback is another supervised scheduler rebind.
+- Each release must bind an exact release manifest including source identity and
+  the active strategy/config identity. Durable trading/account/paper state lives
+  outside the immutable release tree and requires explicit compatibility or
+  migration handling when its schema changes.
+- If a supervised deployment becomes ambiguous, keep scheduled trading disabled
+  and reconcile the scheduler/release binding read-only before taking another
+  deployment action. Never let an ambiguous deployment fall through into
+  unattended trading.
+- Preserved Architecture-133 experimental scratch/evidence remains historical
+  evidence. It is not part of the normal release path and must not be inspected,
+  mutated, cleaned or reused without a separately reviewed housekeeping or
+  diagnostic boundary.
 
 ## Roles
 
@@ -69,16 +231,30 @@ Direct ChatGPT changes follow the same repository discipline as delegated work:
 prove exact startup identity, edit only the intended files, run the focused
 checks appropriate to the change, exact-file stage/commit/push only when
 authorized, and leave broad/final certification to the established gate.
+
+After a ChatGPT-direct commit/push that triggers GitHub Actions, ChatGPT must
+poll the relevant push-triggered workflow/source gate to a **terminal** state
+before reporting the checkpoint complete, accepting the closeout, or advancing
+to the next checkpoint. `queued` and `in_progress` are not completion. The
+push is the checkpoint's single planned CI admission attempt, not an iterative
+debug loop. On failure, inspect the exact job/log evidence and STOP that
+checkpoint attempt; return to focused/local verification and declare any later
+replacement push as a separate corrective checkpoint before advancing a ref.
+On success, verify the run belongs to the exact pushed HEAD.
 Delegate to Luna/Astra/Sol High only when implementation size, discovery,
 isolation, or architecture/security sensitivity makes delegation materially
 useful.
 
 When the next action is known, ChatGPT must provide it automatically rather
-than waiting for the user to ask what to do next. The response should include
-the actionable execution material when known: exact operator commands,
-expected evidence and stop conditions, a ready-to-paste Codex prompt, or direct
+than waiting for the user to ask what to do next. Every accepted checkpoint,
+certification, merge and post-merge response must include a concrete
+**Next milestone / next step** section. The response should include the
+actionable execution material when known: exact operator commands, expected
+evidence and stop conditions, a ready-to-paste Codex prompt, or direct
 ChatGPT-led work. Merely naming the next milestone is not sufficient when the
-execution path is already known.
+execution path is already known. When that next action is safe, fully reviewed,
+and requires no new protected effect or repository-control approval, ChatGPT
+should continue into it automatically rather than waiting for another prompt.
 
 After every accepted checkpoint, ChatGPT must automatically:
 
@@ -91,10 +267,13 @@ After every accepted checkpoint, ChatGPT must automatically:
 5. continue automatically into the next safe docs-only, source-only,
    design-only, or read-only checkpoint when no protected approval boundary is
    crossed; and
-6. stop at the exact approval boundary for production/provider effects,
+6. enforce the exact reviewed approval boundary for production/provider effects,
    provisioning, scheduler mutation, merge/rebase/amend/force-push, PR metadata
    or review-thread changes, broker/live effects, or another explicitly
-   protected action.
+   protected action. For a reviewed bounded local command, the user's decision
+   to execute it supplies approval for that exact boundary under the standing
+   rule above; no additional authorization-only message is required. Keep all
+   prerequisites, interlocks and STOP/reconciliation conditions intact.
 
 If one of the two canonical status/handoff documents requires no material edit,
 ChatGPT should explicitly report that it was reviewed and remains current.
@@ -103,6 +282,13 @@ ChatGPT may directly perform small, tightly scoped, low-risk mechanical source,
 test, documentation, status, handoff, and workflow changes when delegation
 would add overhead without useful isolation. Codex should not receive every
 implementation task automatically.
+
+This is a routing invariant, not a preference. Routine docs/status/handoff
+closeouts and similarly small known-surface low-risk corrections are ChatGPT-
+direct by default when the available repository tools can perform the atomic
+change safely. Do not delegate such a closeout to Codex merely to create a
+handoff; delegate only when discovery, isolation, implementation scale, or
+safety sensitivity provides a material benefit.
 
 ### Codex
 
@@ -118,6 +304,14 @@ Codex is the bounded implementation agent. It should:
   commit, and ordinary-push the isolated feature branch;
 - report files changed, focused commands/results, commit/push result when
   authorized, and deviations/blockers;
+- after an authorized ordinary push that triggers CI/source gates, wait/poll the
+  relevant run to a terminal state rather than handing back an `in_progress`
+  run as completion;
+- treat that push as the logical checkpoint's one planned GitHub CI admission
+  attempt; do not use repeated pushes as the normal debugging loop;
+- if the source gate fails, inspect the preserved evidence and STOP that attempt;
+  return to focused/local verification, then declare any later correction as a
+  separate corrective checkpoint before another ordinary push;
 - stop before broad local certification unless the task explicitly says
   otherwise.
 
@@ -211,10 +405,13 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> normal checkpoint commit is created when authorized
 -> isolated feature branch is ordinary-pushed when authorized
 -> exact remote branch HEAD/tree are verified
+-> relevant push-triggered CI/source gate is polled to terminal
 -> ChatGPT reviews the exact GitHub commit/diff
 -> ChatGPT accepts the reviewed source checkpoint
--> user runs the appropriate certification tier when ChatGPT declares its gate
--> ChatGPT accepts/rejects certification
+-> when the checkpoint has an explicit CI profile mapping, terminal GitHub CI
+   supplies the canonical certification and no duplicate local profile is run
+-> otherwise ChatGPT selects a materially distinct local certification only when required
+-> ChatGPT accepts/rejects the resulting certification evidence
 -> ChatGPT reviews/updates PROJECT_STATUS + HANDOFF
 -> ChatGPT automatically provides and, when safe, advances into the next
    actionable milestone
@@ -310,9 +507,12 @@ This is a strict workflow invariant:
 - a separate `pull_request` workflow run caused by opening or updating a PR is
   legitimate and does not violate the rule; the invariant is one
   **push-triggered** CI run for the logical ChatGPT-direct checkpoint;
-- multiple branch-advancing commits/pushes require a deliberately declared
-  sequence of distinct review checkpoints, each with independently meaningful
-  acceptance value. A connector limitation or per-file API shape is never a
+- GitHub CI is an admission gate, not the edit/test loop: complete all intended
+  files and reasonable focused/local verification before the one branch advance;
+- multiple branch-advancing commits/pushes are prohibited inside one logical
+  checkpoint. A later push after terminal failure is a separately declared
+  corrective checkpoint, not a continuation of the original attempt. A connector
+  limitation, cosmetic cleanup, forgotten docs, or "try until green" is never a
   sufficient reason.
 
 If an atomic operation fails before the branch ref moves, discard/reuse the
@@ -320,6 +520,30 @@ unreferenced Git objects as needed and retry by a supported atomic path. If the
 branch has already moved unexpectedly or a partial remote state exists, STOP,
 review that state explicitly, and reconcile it before any further update. Never
 continue by serially appending the remaining files.
+
+## Canonical bounded handoff/history branch
+
+`feature/project-history-storage-foundation` is the ongoing canonical branch
+for bounded new-chat reconstruction. It must remain ancestry-compatible with
+the accepted product lineage:
+
+1. close an accepted checkpoint's bounded status/handoff/docs on the active
+   product lineage first;
+2. require that docs descendant to be terminal/accepted under its applicable
+   gate;
+3. fast-forward `feature/project-history-storage-foundation` to that exact same
+   descendant;
+4. do not create independent source or handoff commits only on the canonical
+   branch;
+5. never merge, rebase, cherry-pick, force-update, or resolve divergence merely
+   to make the canonical branch look current; a non-fast-forward state is a
+   reconciliation STOP.
+
+The canonical branch is optimized for new-chat startup: routine reconstruction
+uses its bounded status/handoff documents and current architecture pointers,
+while immutable legacy megafiles remain targeted-retrieval only. Executable
+source authority always comes from the separately verified active product
+branch and exact HEAD/tree.
 
 ## ChatGPT-direct bounded-commit local catch-up
 
@@ -358,6 +582,201 @@ pull/repair mechanism.
 
 ## Testing and certification
 
+### Normative verification and certification rules — 2026-10-11
+
+Verification is fail-fast before longer pytest/certification execution.
+These rules are normative and preserve Architecture 132's reviewed profile
+ownership, required baselines, lane topology and protected boundaries.
+
+#### 1. Cheap deterministic gates first
+
+Before longer pytest/certification execution, complete applicable source/
+admission/topology checks, `git diff --check`, Ruff check, Ruff format check and
+cheap static/authority checks. If a cheap gate fails, STOP before the longer
+test scope. Retain the combined Ruff diagnostic rule: both non-mutating Ruff
+phases run and failed phases emit `--diff` diagnostics before the Ruff gate
+stops. Required final/post-test identity and static checks remain required;
+this ordering rule does not remove them or modify the runner.
+
+#### 2. Do not run the same tests twice
+
+For the same exact HEAD/tree and unchanged environment/evidence validity, do
+not ask the human operator to rerun a scope already satisfactorily covered by
+Codex and/or terminal-green GitHub Actions. Codex normally performs focused
+verification during implementation; reviewed source-gate CI follows its
+bounded commit/push. The human operator must not repeat those tests merely for
+confidence.
+
+A separate user-run test is justified only when it supplies materially
+different required coverage/certification evidence, the source changed after
+prior evidence, prior evidence was invalid/incomplete, or ChatGPT identifies
+a distinct required gate not already covered. Independent required coverage
+is not duplicate execution. A docs-only closeout does not change already
+certified executable/test source and must not manufacture a repeat test event.
+
+#### 2a. One logical checkpoint means one atomic push and one planned CI run
+
+For one logical checkpoint, consolidate all foreseeable source, test, workflow,
+documentation, status/handoff, formatting, diff-check and cleanup edits
+**before** the ordinary push. The normal and required path is:
+
+```text
+focused/local verification
+-> one atomic commit
+-> one ordinary push/ref advance
+-> one push-triggered source-gate CI admission run
+-> terminal PASS or terminal failed checkpoint attempt
+```
+
+GitHub CI is not the implementation loop. Do not split predictable source fixes,
+formatting, documentation, handoff, pin updates, or mechanical cleanup into
+additional pushes that merely create more CI runs for the same logical
+checkpoint.
+
+If the single pushed attempt fails, preserve its evidence and classify the
+failure. Do not immediately fix-forward on the same logical checkpoint until
+green. Any later push must be declared and treated as a **new corrective
+checkpoint** with its own complete focused/local verification and atomic commit.
+Do not rerun an unchanged successful workflow merely for confidence.
+
+When a certification result must be recorded after source acceptance, prefer
+batching the status/handoff/workflow documentation into the single planned
+post-certification docs closeout rather than creating multiple docs-only pushes.
+
+#### 2b. Behavior-change cleanup is part of the feature change
+
+**Behavioral replacement/removal non-regression:** When a feature, behavior,
+API, workflow, or supported path is changed, replaced, retired, or removed,
+update or remove every current test, fixture, fake, validation assertion,
+operator instruction, and documentation reference that depends on the old
+behavior. This includes README/help text and checkpoint inventory or expected
+test topology. Do not preserve stale current-product assertions merely for
+backward compatibility unless the old behavior is intentionally retained as a
+reviewed LEGACY contract. Historical architecture/evidence documents should
+remain historical rather than being rewritten, but they must not be presented
+as current authority. Before closing the checkpoint, search the affected
+source/tests/docs surface for stale references to the retired behavior.
+
+When a task changes, replaces, retires, or removes existing behavior, end the
+implementation instructions with exactly:
+
+> Also remove or update any tests and docs that referenced the old behavior.
+
+ChatGPT's exact-diff review must verify that behavioral removals/replacements
+did not leave stale current-product tests or documentation behind.
+
+Do not keep a stale test by weakening its assertion until it passes. Update it
+to assert the replacement contract, or delete it when the covered behavior is
+intentionally removed and replacement coverage makes it obsolete. Search also
+examples, comments, snapshots, mocks and compatibility exports when they
+describe callable behavior or authority.
+
+This stale-reference cleanup is part of the feature checkpoint, not a later
+cosmetic follow-up, so include it before the checkpoint's planned push/CI run.
+
+#### 3. FULL is rare and is not an iteration loop
+
+FULL is a consequential/current-product certification boundary, not a debugging
+suite or a routine post-checkpoint confidence run. Preserve a failed FULL as
+diagnostic evidence; do not immediately rerun it. Diagnose from that evidence,
+make the bounded correction, pass cheap gates before focused tests, and run
+only affected focused tests while iterating. Then exact-file commit/push,
+obtain terminal-green source-gate CI, and obtain ChatGPT exact GitHub review/
+source acceptance. Only then run one fresh FULL if the consequential boundary
+still requires it.
+
+After a passing FULL, do not rerun it on unchanged executable/test source while
+its environment/evidence validity remains intact. Adjacent source-only
+checkpoints may explicitly batch a pending FULL obligation until the next
+genuine consequential boundary under the existing Architecture-132 conditions.
+This does not permit crossing a protected effect, merge, major integration,
+release or readiness boundary with an unsatisfied certification obligation.
+
+#### 4. Select certification tiers; do not stack them blindly
+
+FOCUSED -> SOURCE-GATE CI is routine. ChatGPT selects ROBINHOOD or FULL according
+to the required boundary; they are not cumulative confidence runs. When FULL
+is selected for unchanged source at a boundary where ROBINHOOD would otherwise
+also apply, FULL's strict superset coverage satisfies that narrower Robinhood
+source-certification obligation. Do not run ROBINHOOD and then FULL merely
+because both trigger descriptions apply. LEGACY/EXHAUSTIVE remain exceptional
+compatibility gates. PROTECTED requires reviewed bounded authorization under the standing rule;
+no source certification grants it.
+
+#### 5. Latest audited current-product certification topology
+
+Do not resurrect the older all-repository three-lane FULL layout for routine
+current-product testing. That topology predates the Architecture-132 current/
+legacy ownership split.
+
+The latest reviewed current-product certification contract is the
+Architecture-132-R2 selected-profile topology implemented by
+`scripts/run_test_certification.py`:
+
+- `--profile full` selects all CURRENTLY SUPPORTED modules and runs exactly
+  `broad-1` and `broad-2`, two deterministic nonempty balanced whole-file
+  lanes, with **no serial lane**;
+- `--profile robinhood` selects the reviewed Robinhood/current-product subset
+  and runs exactly `robinhood-1` and `robinhood-2`, also with **no serial
+  lane**;
+- the historical five-module Windows/global-state-sensitive `serial` lane is
+  retained only by `LEGACY` and `EXHAUSTIVE`, which are exceptional
+  compatibility/repository-archaeology profiles rather than normal
+  current-product verification.
+
+When the human operator must run broad current-product certification, use the
+reviewed selected-profile runner rather than a raw monolithic
+`python -m pytest` command and rather than reconstructing the pre-R1
+three-lane suite manually. Focused one/few-module verification remains focused.
+
+Audit chronology is normative provenance, not a timing threshold:
+
+- the earlier all-repository Architecture-132 topology used two broad lanes plus
+  the five-module serial safety lane;
+- Architecture 132-R1 moved current-supported FULL and ROBINHOOD to their
+  selected two-lane profiles; its accepted 113-module FULL completed in
+  **201.655 s**;
+- Architecture 132-R2 retained that selected-profile topology while
+  rationalizing ownership and collection; its accepted 136-module FULL completed
+  in **259.314 s**, while the corresponding routine source-gate workflow was
+  restored to roughly **250 s**;
+- later R2-B3/R2-B4 optimized routine source CI further and explicitly did
+  **not** change certification-profile topology.
+
+The current 134-C FULL contains more supported modules/cases than the R2 audit,
+so a larger observed wall time does not by itself authorize falling back to an
+older topology. If performance again becomes materially problematic, open a
+separate measured Architecture-132 performance/topology checkpoint; do not
+silently change lane semantics.
+
+Changing FULL/ROBINHOOD ownership or lane topology requires a separately
+reviewed certification-topology checkpoint.
+
+#### 6. Bounded Codex commit/push and direct ChatGPT GitHub review
+
+For an authorized bounded implementation/correction, Codex stages only the
+exact intended files after proving the index is clean, verifies the staged
+filename set and `git diff --cached --check`, creates one normal commit, and
+ordinary-pushes only the existing feature branch. That authority includes no
+merge, rebase, amend, force-push or PR metadata change. ChatGPT retrieves the
+exact GitHub commit/diff/CI directly; do not require pasted GitHub diffs when
+retrieval tools can obtain them.
+
+#### 7. Docs-only closeout preserves accepted test evidence
+
+Keep ordinary docs-only closeout strictly under `docs/**` so the existing
+classifier uses its cheap validation path. A separately reviewed history-
+storage cutover may include the explicitly scoped standing-rule update to
+`AGENTS.md`; do not broaden that exception to unrelated repository rules.
+Current-state documents record only current consequences and state. Closed
+detail belongs once in the relevant architecture, validation, or history
+record; do not append the same long milestone narrative to both current-state
+files. Docs-only verification uses appropriate source/docs checks, including
+exact admission, exact changed-file review, `git diff --check` and staged diff
+check; it does not rerun pytest, FULL/ROBINHOOD or Ruff over unchanged Python.
+
+### Tier selection and evidence contract
+
 During iteration:
 
 - Codex runs focused tests/checks for changed behavior;
@@ -368,15 +787,14 @@ During iteration:
   tests after the bounded fix.
 
 Architecture 132-R1 separates current-supported certification from legacy
-compatibility. The normal tier sequence is:
+compatibility. The routine flow and selected certification gates are:
 
 ```text
-FOCUSED
--> SOURCE-GATE CI
--> ROBINHOOD when appropriate
--> FULL at coherent current-product boundaries
--> LEGACY/EXHAUSTIVE only when explicitly relevant
--> PROTECTED separately authorized
+FOCUSED -> SOURCE-GATE CI
+-> ChatGPT selects ROBINHOOD or FULL for the required boundary
+   (FULL covers the narrower ROBINHOOD source obligation)
+-> LEGACY/EXHAUSTIVE only for explicitly relevant compatibility
+PROTECTED authorized within the exact reviewed bounds under the standing rule
 ```
 
 | Level | Trigger and responsibility |
@@ -386,13 +804,21 @@ FOCUSED
 | ROBINHOOD | ChatGPT-declared coherent Architecture 131 integration boundary; before protected Robinhood qualification; after material changes to shared domain/execution/ledger/risk foundations used by Architecture 131. |
 | FULL | Comprehensive CURRENTLY SUPPORTED product certification: after certification-topology changes; at coherent current-product boundaries; before major develop/release integration or consequential production/live-readiness transitions; after sufficiently broad supported shared-core changes; or when ChatGPT determines accumulated checkpoints warrant current-product regression. |
 | LEGACY / EXHAUSTIVE | Only when explicitly relevant: legacy architecture changes, interpreter/dependency migrations spanning both eras, broad repository restructuring, deliberate legacy removal, or explicit backward compatibility investigation. |
-| PROTECTED | Always separate fresh authorization at the exact effect boundary. |
+| PROTECTED | Fresh approval at the exact reviewed effect boundary; user execution of the reviewed bounded command supplies that approval under the standing rule. All interlocks and STOP conditions remain mandatory. |
 
 FULL remains the default and is not mechanically tied to every accepted source
 checkpoint or Architecture 131 letter. FULL now means all CURRENTLY SUPPORTED
 functionality, replacing the original Architecture 132 meaning. EXHAUSTIVE
 preserves that earlier all-repository behavior. Normal current-product
 certification does not require LEGACY or EXHAUSTIVE.
+
+A certification-topology change creates a pending FULL obligation. Adjacent
+source-only checkpoints may deliberately accumulate that obligation and run one
+FULL at the next coherent current-product/readiness boundary when every
+intermediate checkpoint has focused verification plus terminal-green source-gate
+CI and no protected effect, merge, major integration or release boundary occurs
+between them. This batching decision must be explicit; it is not permission to
+carry uncertified source across a protected or consequential boundary.
 
 ChatGPT chooses the appropriate tier after exact GitHub code review and source
 acceptance. The normal handoff remains:
@@ -409,12 +835,15 @@ implementation + focused checks
 At a declared certification boundary:
 
 - ChatGPT supplies exact local commands and frozen source identities;
+- every local certification attempt uses a fresh unique external evidence
+  directory (normally purpose + GUID suffix); an existing/ambiguous evidence
+  path is preserved and never deleted/reused merely to retry;
 - the user runs the selected profile and required source/artifact checks;
 - review-driven source corrections return to focused verification first;
 - if the environment invalidates the run, repair it before interpreting failures
   as source defects;
-- after clean certification, do not repeat it without a new source change or
-  explicit gate decision;
+- after clean certification, do not repeat covered scope without changed
+  source, invalid/incomplete evidence, or materially different required coverage;
 - a merge needs no second run when its resulting tree exactly equals the
   already-certified tree.
 
@@ -443,7 +872,9 @@ is legacy because it uses the retired operational artifact/runtime model. GUI
 remains a future product goal; a Robinhood-integrated GUI milestone must
 explicitly reclassify or replace it.
 
-Only LEGACY and EXHAUSTIVE retain the historical serial safety lane:
+Only LEGACY and EXHAUSTIVE retain the historical five-module serial safety
+lane. Current-product FULL/ROBINHOOD never add that serial lane; operator-run
+broad current-product certification uses the reviewed selected profile instead:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py
@@ -468,7 +899,7 @@ launching pytest or static checks for any profile.
 
 No profile grants native Windows acceptance opt-ins, provider access, Robinhood
 calls, OAuth interaction, broker effects, or production effects. PROTECTED
-remains separate and always needs fresh authorization. Architecture 132-R1
+remains separate and needs reviewed bounded authorization under the standing rule. Architecture 132-R1
 implementation runs only focused checks; actual certification requires the
 subsequent exact GitHub review and ChatGPT's gate decision.
 
@@ -487,11 +918,18 @@ preference. Operator commands must use this order of preference:
    command-line quoting.
 
 Never pass structured JSON or other structured payloads as a raw native command
-argument when a file path or stdin can carry the bytes. Never embed substantial
-Python in `python -c` from PowerShell. If a tiny Python diagnostic must be sent
-through stdin, use a single-quoted PowerShell here-string and pipe it to
-`python -B -`; do not pass that here-string as the `-c` argument. Substantial
-logic belongs in reviewed repository files.
+argument when a file path or stdin can carry the bytes. **Hard rule: from
+PowerShell, never transport multiline Python through `python -c`.** This
+includes `python -c $Code`, `& $Python -c $Code`, `python -c $hereString`,
+and equivalent variable-expanded forms, even for temporary/read-only
+diagnostics. PowerShell/native argument parsing can strip or reinterpret quoting
+before Python sees the program. For a tiny diagnostic, use a single-quoted
+PowerShell here-string and pipe it to `python -B -`. For anything more than a
+tiny diagnostic, write UTF-8 source to an approved temporary `.py` file and
+invoke that file; reusable or protected logic belongs in reviewed repository
+source. Never pass a here-string as the `-c` argument. A `SyntaxError` caused
+by shell transport is a workflow regression, not diagnostic evidence, and must
+not be worked around by trying alternate `-c` quoting.
 
 This serialization rule does not override a protected operator contract that
 explicitly requires real interactive terminal stdin. In that case, do not pipe
@@ -794,8 +1232,10 @@ operations use the runner's registered `preflight` layer and, only where
 separately source-reviewed, checkpoint-specific protected `execute` dispatches.
 The current protected dispatches are limited to
 `arch128-parent-acl-repair` and `arch128-r4`. A source or preflight PASS never
-grants protected production authority; a fresh explicit approval and the exact
-reviewed authorization interlock remain mandatory.
+grants protected production authority; fresh approval within the exact reviewed
+bounds under the standing rule and the exact reviewed authorization interlock
+remain mandatory. For a reviewed bounded local command, the user's decision to
+execute supplies that approval; all effect gates and STOP conditions remain.
 
 Checkpoint evidence is external to the repository. The preferred development
 host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner

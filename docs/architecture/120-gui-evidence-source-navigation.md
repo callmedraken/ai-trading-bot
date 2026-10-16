@@ -1,5 +1,13 @@
 # Architecture 120 — GUI-A13 Read-Only Evidence -> Source Page Navigation
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## Status
 
 GUI-A13 architecture contract.
@@ -38,6 +46,7 @@ EvidenceTimelineSource.PAPER_OPERATION -> paper
 EvidenceTimelineSource.PAPER_ACCOUNT   -> paper-account
 EvidenceTimelineSource.MARKET_DATA     -> market-data
 EvidenceTimelineSource.OPERATIONS      -> operations
+EvidenceTimelineSource.RUNTIME         -> runtime
 ```
 
 No fuzzy inference or fallback destination is permitted.
@@ -52,7 +61,7 @@ EvidenceSourcePageTarget:
   page_id: EvidenceSourcePage
 ```
 
-where `EvidenceSourcePage` is a closed enum whose values are the five page IDs
+where `EvidenceSourcePage` is a closed enum whose values are the six page IDs
 above.
 
 Requirements:
@@ -134,7 +143,7 @@ Focused tests must prove:
 4. each rendered evidence card has one source-navigation control;
 5. clicking Research evidence selects the Research page;
 6. clicking Market Data evidence selects the Market Data page;
-7. service call count remains exactly six;
+7. service acquisition count remains exactly eight;
 8. existing A11 filtering remains intact;
 9. existing A12 System -> Evidence exact targeting remains intact;
 10. navigation introduces no runtime I/O/effect control;

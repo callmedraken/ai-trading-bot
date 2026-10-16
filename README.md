@@ -10,53 +10,36 @@ boundaries decide what may actually happen.
 
 ## Current status
 
-The contained C3 production market-data capture boundary is complete and
-certified. PD1 Paper-v2 authority, PD2 reliable supervised paper operation, PD3
-supervised crash/recovery validation, and the **PD4 unattended simulated-paper
-source foundation are complete and source-certified**.
+The active product line is the Robinhood review-paper path using the
+Architecture-133 supervised immutable-release productionization model.
 
-The exact PD4 source tree certified before docs-only closeout is:
+Architecture 133-AF is FULL certified. Architecture **133-AG**, the reviewed
+protected immutable-release installation operator and read-only host preflight,
+is source-accepted on implementation HEAD
+141c5cb17d4183ee0f65a1b93c85d415ae2b8c14 / tree
+b1743eb5d954b34ff9bd14fdc7a7a105727b1bc7, with Checkpoint Source Gates
+#405 / 38043472442 successful.
 
-```text
-commit 248cd8de6a3539aab21d5719d96cb7ff1aa0d14c
-tree   5e867f1bfc6d945ad67f6c56be252b534645aeb2
-```
+AG introduces the first reviewed production installation invocation surface but
+has not executed it. It derives all release policy internally, verifies the exact
+clean live branch, performs a read-only real-host readiness check, consumes a
+fixed no-retry durable attempt latch before entering the accepted one-shot AC
+installer, and grants no scheduler/provider/Paper-v2/wake/broker/live authority.
 
-PD4 final certification passed:
+The next gate is the real **read-only AG preflight** on this final documentation
+closeout source. If that host readiness check passes, the same exact source must
+receive one FULL current-product certification before the single protected
+installation attempt is authorized. In particular, AG does not provision the
+required protected F:\AITradingBot\releases parent and does not repair or clean
+conflicting FINAL/STAGING state.
 
-```text
-5588 passed, 17 expected skips in 1519.25s
-Ruff check: PASS
-Ruff format --check: PASS (486 files)
-git diff --check: PASS
-git diff --cached --check: PASS
-worktree/index: clean
-```
+Production/live trading remains **NO-GO**. No immutable release has yet been
+installed through AG and no scheduler rebind/start, runtime wake, provider,
+Paper-v2, broker or live effect is authorized by source acceptance.
 
-The final Trading-principal read-only qualification also passed under the
-intended dedicated non-admin account. The frozen unattended launcher reported
-`EFFECTS_CLOSED`; the genuine PD4 read-only harness returned `VALIDATED` with an
-underlying fail-closed `BLOCKED` qualification and recorded no invocation
-publication, execution, recovery, provider call, database mutation, or scheduler
-mutation.
-
-All six Paper-v2 effect gates remain hard-coded `False`. The current safe target
-is the **PD4 unattended deployment acceptance design**: freeze the intended
-session/timing policy, scheduler deployment/verification sequence, invocation-
-storage provisioning checkpoint, first unattended Paper-v2 acceptance ordering,
-and the separate unattended C3/provider authority boundary.
-
-**Production/live trading remains NO-GO.** Provider call #7, unattended provider
-capture, Task Scheduler installation/modification/enabling/running, unattended
-storage provisioning, the first real unattended Paper-v2 cycle, broker order
-submission, recovery mutation, and live trading remain unauthorized unless a
-later explicitly reviewed checkpoint grants that specific effect.
-
-See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for canonical status,
-[`docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md`](docs/architecture/110-personal-desktop-unattended-paper-operation-authority.md)
-for the current unattended authority contract, and
-[`docs/validation/pd4-unattended-personal-desktop-paper-completion.md`](docs/validation/pd4-unattended-personal-desktop-paper-completion.md)
-for the PD4 source-foundation completion evidence.
+See docs/PROJECT_STATUS.md and docs/AI_TRADING_BOT_HANDOFF.md for the canonical
+resume state and the Architecture-133 authority/validation documents for the
+active protected transition.
 
 ## Product direction
 

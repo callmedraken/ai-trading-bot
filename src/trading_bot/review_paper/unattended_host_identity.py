@@ -1,9 +1,11 @@
 """Architecture-133 fixed host locations and read-only runtime admission.
 
 The administrator-reviewed host binding is published separately from activation.
-Publication/provisioning is outside this source checkpoint. Its exact source
-facts are independently checked by 131-H; executable bytes/version and launch
-isolation are independently checked here. No D10 identity or verifier is used.
+Publication/provisioning is outside this source checkpoint. Architecture 133-G
+reuses the already protected shared production Python substrate, but does not
+reuse D10 deployment/lease/scheduler authority. Exact source facts remain
+independently checked by 131-H; executable bytes/version and launch isolation
+are independently checked here.
 """
 
 from __future__ import annotations
@@ -27,10 +29,14 @@ TRADING_SID = "S-1-5-21-1397534616-3988210162-180023805-1009"
 
 HOST_SCHEMA = "arch133-review-paper-host-binding/v1"
 RUNTIME_SCHEMA = "arch133-review-paper-runtime/v1"
-SOURCE_BRANCH = "feature/robinhood-unattended-review-paper-133e"
-SOURCE_ROOT = Path(r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133e")
+SOURCE_BRANCH = "feature/robinhood-unattended-review-paper-133g"
+SOURCE_ROOT = Path(r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133g")
 HOST_ROOT = Path(r"F:\AITradingBot\Arch133")
-PRODUCTION_PYTHON = HOST_ROOT / "runtime" / "python.exe"
+PRODUCTION_PYTHON = Path(r"F:\AITradingBot\runtime\python.exe")
+PRODUCTION_PYTHON_SHA256 = (
+    "cce21c0e8710e304273e98ac4b2b0f5aceb639acbcd2343cbaa5c4e81619c45b"
+)
+PRODUCTION_PYTHON_VERSION = "3.14.3"
 LAUNCHER = SOURCE_ROOT / "scripts" / "run_arch133_unattended_review_paper.py"
 BINDING_PATH = HOST_ROOT / "host-binding.json"
 ACTIVATION_PATH = HOST_ROOT / "activation.json"
@@ -188,9 +194,11 @@ def admit_host_runtime(binding: HostBinding) -> None:
             or Path(sys.executable).resolve(strict=True)
             != PRODUCTION_PYTHON.resolve(strict=True)
             or Path(__file__).resolve().parents[3] != SOURCE_ROOT.resolve(strict=True)
-            or ".".join(map(str, sys.version_info[:3])) != runtime.python_version
+            or runtime.python_sha256 != PRODUCTION_PYTHON_SHA256
+            or runtime.python_version != PRODUCTION_PYTHON_VERSION
+            or ".".join(map(str, sys.version_info[:3])) != PRODUCTION_PYTHON_VERSION
             or hashlib.sha256(PRODUCTION_PYTHON.read_bytes()).hexdigest()
-            != runtime.python_sha256
+            != PRODUCTION_PYTHON_SHA256
             or hashlib.sha256(LAUNCHER.read_bytes()).hexdigest()
             != runtime.launcher_sha256
         ):

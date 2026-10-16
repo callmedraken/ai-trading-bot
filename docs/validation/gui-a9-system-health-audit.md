@@ -1,5 +1,13 @@
 # GUI-A9 Read-Only System Health and Audit Validation Plan
 
+Current GUI-A15 extension: Runtime and Supervisor are already-acquired
+presentation sources. MainWindow performs eight service acquisitions once,
+including get_runtime_state() and get_production_strategy_state(). System,
+Evidence and navigation add zero rereads. The closed sources include RUNTIME
+and SUPERVISOR, mapping to runtime and supervisor. See Architecture 136
+for explicit canonical contract inspection and disconnected D2 governance. Earlier
+dated validation results retain their historical counts.
+
 ## 1. Purpose
 
 Validate Architecture 116,
@@ -46,6 +54,10 @@ Operations UNAVAILABLE                UNAVAILABLE
 Operations AVAILABLE + all gates shut AVAILABLE
 Operations blocked preview            BLOCKED
 Operations any displayed gate open    BLOCKED
+
+Runtime UNAVAILABLE                   UNAVAILABLE
+Runtime AVAILABLE                     AVAILABLE
+Runtime ATTENTION                     BLOCKED
 ```
 
 Overall status is `ATTENTION` only when at least one component is BLOCKED.

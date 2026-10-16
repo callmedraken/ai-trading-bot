@@ -1,5 +1,27 @@
 # AI Trading Bot Development Rules
 
+## Standing authorization for reviewed next steps — current normative rule
+
+Reviewed next-step actions are implicitly authorized by default within their
+exact described scope. ChatGPT must not insert an authorization-only turn to
+obtain a one-word approval for a bounded action it already reviewed and presented.
+For a supplied local command, the user's decision to execute it constitutes
+authorization for exactly its described effects and bounds. The user withholds
+authorization by not executing it and calling it out for manual review.
+
+This does not broaden a command, authorize unexpected effects or ambiguous/
+partial-state repair, permit automatic retry after ambiguity/partially consumed
+effects, override real-money NO-GO, or turn source/commit authority into merge,
+rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
+Protected source/effect separation, prerequisite checks and reviewed interlocks
+remain mandatory. Source or preflight PASS alone grants no effect authority.
+
+After a successful checkpoint, automatically include and proceed to the next
+reviewed safe step within scope. A separate new authorization message is not
+universally required for reviewed bounded operator actions. Historical accounts
+of separate authorization remain historical and do not override this current rule.
+
 ## Project purpose
 
 Build a conservative algorithmic trading platform that progresses through
@@ -11,9 +33,55 @@ remain unavailable until the separately reviewed brokerage, credential,
 reconciliation, operator-control, and live-readiness gates are implemented and
 accepted. Paper trading remains the default operating mode.
 
-`docs/PROJECT_STATUS.md` is the canonical high-level source for the current
-milestone, completed foundations, roadmap, and production status. Read it before
+The canonical bounded new-chat handoff branch is
+`feature/project-history-storage-foundation`. Its
+`docs/PROJECT_STATUS.md` is the bounded current high-level source for the
+current milestone, completed foundations, roadmap, and production status, and
+its `docs/AI_TRADING_BOT_HANDOFF.md` is the bounded active-session/current-
+boundary handoff. This branch is documentation/history authority only; it is
+not executable-source, provider, broker, or trading authority. The active
+product branch and exact source HEAD/tree must always be verified separately.
+
+Read the two bounded current documents from the canonical handoff branch before
 starting a new milestone or preparing a broad implementation plan.
+`docs/history/INDEX.md` and immutable legacy snapshots are historical retrieval
+surfaces, not routine startup material. Historical detail belongs once in the
+relevant architecture, validation, or history record rather than being
+repeatedly copied into both current documents.
+
+## Supervised release and unattended-runtime invariant
+
+The supported productionization model deliberately separates unattended trading
+from code deployment.
+
+- The unattended trading runtime MUST execute an already-installed immutable
+  release. It MUST NOT pull Git, install/update code, publish a new generation,
+  mutate scheduler configuration, replace its own executable/source tree, or
+  autonomously roll back/reprovision itself.
+- Trading/runtime mode and deployment/maintenance mode are mutually exclusive.
+  Deployment may switch the scheduler to a new release only after scheduled
+  execution is disabled/quiesced and the absence of an active bot process/cycle
+  is verified. Trading authority must remain unavailable while deployment is in
+  progress.
+- Releases are immutable, uniquely versioned directories. A strategy code or
+  strategy-parameter change creates a new reviewed release; do not hot-reload
+  source or strategy configuration into a running release.
+- Promotion uses supervised scheduler rebinding to the verified launcher inside
+  the new immutable release. Do not require ACTIVE->ARCHIVE or STAGE->ACTIVE
+  directory renames for normal deployment. Retain the prior immutable release
+  for rollback; rollback is another supervised scheduler rebind.
+- Each release must bind an exact release manifest including source identity and
+  the active strategy/config identity. Durable trading/account/paper state lives
+  outside the immutable release tree and requires explicit compatibility or
+  migration handling when its schema changes.
+- If a supervised deployment becomes ambiguous, keep scheduled trading disabled
+  and reconcile the scheduler/release binding read-only before taking another
+  deployment action. Never let an ambiguous deployment fall through into
+  unattended trading.
+- Preserved Architecture-133 experimental scratch/evidence remains historical
+  evidence. It is not part of the normal release path and must not be inspected,
+  mutated, cleaned or reused without a separately reviewed housekeeping or
+  diagnostic boundary.
 
 ## Safety requirements
 
@@ -57,11 +125,36 @@ starting a new milestone or preparing a broad implementation plan.
 - Do not treat missing market data as zero.
 - Prefer clear and testable code over complicated abstractions.
 
+### Behavioral replacement/removal non-regression
+
+**Behavioral replacement/removal non-regression:** When a feature, behavior,
+API, workflow, or supported path is changed, replaced, retired, or removed,
+update or remove every current test, fixture, fake, validation assertion,
+operator instruction, and documentation reference that depends on the old
+behavior. This includes README/help text and checkpoint inventory or expected
+test topology. Do not preserve stale current-product assertions merely for
+backward compatibility unless the old behavior is intentionally retained as a
+reviewed LEGACY contract. Historical architecture/evidence documents should
+remain historical rather than being rewritten, but they must not be presented
+as current authority. Before closing the checkpoint, search the affected
+source/tests/docs surface for stale references to the retired behavior.
+
+When a task changes, replaces, retires, or removes existing behavior, end the
+implementation instructions with exactly:
+
+> Also remove or update any tests and docs that referenced the old behavior.
+
+ChatGPT's exact-diff review must verify that behavioral removals/replacements
+did not leave stale current-product tests or documentation behind.
+
 ## Tiered certification policy
 
-Architecture 132-R1 separates current product certification from retained
-historical compatibility. See `docs/architecture/132-tiered-certification-profiles.md`
-for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
+Architecture 132-R2 retains the R1 current/legacy ownership model while applying
+the accepted R2-B test-topology migration. See
+`docs/architecture/132-tiered-certification-profiles.md` for reviewed ownership
+and the current required FULL/Robinhood baselines (122/49 modules). The original
+R1 113/40 required tuples remain historical provenance, not the active required
+baselines.
 
 - **FOCUSED:** every implementation/correction; Codex runs affected tests and
   focused checks.
@@ -70,8 +163,8 @@ for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
 - **ROBINHOOD:** when ChatGPT declares a coherent Architecture 131 integration
   boundary, before protected Robinhood qualification, and after material changes
   to shared domain/execution/ledger/risk foundations used by Architecture 131.
-  `--profile robinhood` preserves the 40-module baseline in two nonempty balanced
-  lanes. Missing/renamed baseline modules fail closed; new owned tests enter
+  `--profile robinhood` preserves the current 49-module required baseline in two
+  nonempty balanced lanes. Missing/renamed baseline modules fail closed; new owned tests enter
   automatically.
 - **FULL:** the default `--profile full` certifies all CURRENTLY SUPPORTED
   functionality in exactly two nonempty balanced lanes, with no historical
@@ -81,6 +174,13 @@ for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
   supported shared-core changes, or when ChatGPT determines accumulated
   checkpoints warrant comprehensive current-product regression. FULL is not
   mechanically tied to every Architecture 131 letter/checkpoint.
+  A certification-topology change creates a pending FULL obligation, not
+  necessarily an immediate run after every adjacent source-only checkpoint.
+  ChatGPT may explicitly batch that obligation across a planned sequence of
+  focused/source-gate-green source-only checkpoints when no protected effect,
+  merge, major integration, release, or production-readiness boundary is crossed
+  between them. The final exact source must complete FULL before the next such
+  consequential boundary.
 - **LEGACY / EXHAUSTIVE:** only when explicitly relevant. LEGACY retains retired
   architecture; EXHAUSTIVE covers every discovered repository test and preserves
   the previous three-lane all-repository topology. Use for changes to legacy
@@ -88,14 +188,15 @@ for reviewed ownership and the frozen FULL/Robinhood baselines (113/40 modules).
   repository restructuring, deliberate legacy removal, or explicit backward
   compatibility investigation. Both retain the exact historical five-module
   serial lane. Normal current-product certification does not require them.
-- **PROTECTED:** always separate fresh authorization. No source profile grants
+- **PROTECTED:** reviewed bounded authorization under the standing rule. No source profile grants
   native Windows acceptance, provider/Robinhood/OAuth access, broker effects, or
   production effects; all profiles reject protected opt-ins.
 
 FULL and LEGACY are disjoint and together equal EXHAUSTIVE; Robinhood is a
-subset of FULL. Freeze the 113-module supported and 40-module Robinhood
-baselines. New modules in supported whole-directory families are automatically
-admitted. Unknown ownership fails closed and requires an explicit support-status
+subset of FULL. Freeze the current 122-module supported and 49-module Robinhood
+required baselines established by the accepted R2-B migration. The original R1
+113/40 tuples remain historical provenance. New modules in supported
+whole-directory families are automatically admitted. Unknown ownership fails closed and requires an explicit support-status
 decision; it must never silently default to legacy.
 
 D10/Windows/Paper-v2/Alpaca operational paths are historical compatibility.
@@ -107,13 +208,15 @@ that implementation.
 All profiles retain whole-repository Ruff check/format and `git diff --check`,
 exact source/remote admission and final verification, JUnit/evidence validation,
 and external temporary-root requirements. ChatGPT chooses the appropriate tier
-after exact GitHub code review and source acceptance; users normally run local
-certification. The normal handoff remains implementation + focused checks ->
-exact-file commit/push -> ChatGPT exact GitHub code review -> source acceptance
--> appropriate certification tier -> docs closeout. The certification workflow
-is FOCUSED -> SOURCE-GATE CI -> ROBINHOOD when appropriate -> FULL at coherent
-current-product boundaries -> LEGACY/EXHAUSTIVE only when explicitly relevant,
-with PROTECTED separately authorized.
+after exact GitHub code review and source acceptance. When an exact checkpoint
+has a reviewed CI certification-profile mapping, GitHub owns that canonical
+ROBINHOOD/FULL run and the human operator must not rerun the same profile locally.
+Unmapped or materially host-specific certification remains local when selected.
+The normal handoff is implementation + focused checks -> exact-file commit/push
+-> terminal GitHub source gate/canonical mapped certification -> ChatGPT exact
+GitHub review/acceptance -> local host/protected gate only when materially
+distinct -> docs closeout. LEGACY/EXHAUSTIVE remain explicit exceptional gates;
+PROTECTED is authorized within the exact reviewed bounds under the standing rule.
 
 ## AI development workflow
 
@@ -121,13 +224,19 @@ with PROTECTED separately authorized.
 
 At the start of a new Trading Bot chat, after a substantial context reset, or
 whenever the user asks to re-establish the workflow, reconstruct the current
-state before recommending or authorizing work. Read the current Git-tracked
-`docs/AI_TRADING_BOT_HANDOFF.md`, `docs/PROJECT_STATUS.md`, `AGENTS.md`, the
-relevant architecture/validation documents, and the available Trading Bot
-project conversation history. Verify the active remote branch/HEAD, recent
-commits/diff and CI through GitHub when material. Git-tracked canonical docs
-outrank uploaded mirrors or older chat summaries unless the conversation clearly
-records a newer intentional change that has not yet been committed.
+state before recommending or authorizing work. First resolve
+`feature/project-history-storage-foundation` and read its current Git-tracked
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, and the
+relevant current architecture/validation documents. Then verify the separately
+named active product branch/HEAD/tree, recent commits/diff and CI through GitHub
+when material. The canonical handoff branch is current-state/history authority,
+not executable-source authority. Read `docs/history/INDEX.md` or an immutable
+legacy snapshot only when older provenance, incident reconstruction,
+predecessor semantics, or disputed historical evidence is actually necessary.
+Git-tracked canonical docs outrank uploaded mirrors or older chat summaries
+unless the conversation clearly records a newer intentional change that has not
+yet been committed.
 
 Do not ask the user to paste GitHub diffs/comments, prior Trading Bot chats,
 repository files, or other project material when the available project/GitHub
@@ -151,17 +260,25 @@ should state, when applicable:
 
 The user should not need a follow-up merely to ask what to do next, which model
 to use, what command to run, what output to send back, or whether the checkpoint
-is ready to advance. If the next action crosses a protected effect boundary,
-provide the safe preflight/readiness material and stop at the authorization
-boundary rather than presenting the effectful command as ordinary verification.
+is ready to advance. Every accepted checkpoint, certification, merge, or
+post-merge response MUST include an explicit concrete next milestone/next-step
+section. When the next safe action is already determined and requires no new
+protected effect or repository-control approval, continue into it automatically
+or provide the exact ready-to-run material in the same response; never wait for
+the user to ask "what next?". If the next action crosses a protected effect
+boundary, provide safe preflight/readiness material and state exact reviewed
+effect bounds. The user's execution authorizes only those bounds under the
+standing rule; never present a protected effect as ordinary verification.
 
 
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
-- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Stop at the exact approval boundary for production/provider effects, storage provisioning, scheduler mutation, merge/rebase/amend/force-push, PR metadata/review-thread changes, broker/live effects, or other explicitly protected actions.
+- After the accepted checkpoint's bounded docs closeout is terminal, ChatGPT must keep `feature/project-history-storage-foundation` as the canonical handoff/history branch by fast-forwarding it to that exact accepted docs descendant. Never create an independent handoff-only lineage, merge/rebase it, or let it carry executable-source changes not already present in the accepted product ancestry. If the canonical branch cannot fast-forward cleanly, STOP for reconciliation.
+- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority never implies merge/rebase/amend/force-push or PR mutation authority.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
 - Codex is primarily a bounded implementation agent for changes already scoped and discussed.
+- After Codex ordinary-pushes a branch that has a CI/source gate, its implementation handoff is not complete merely because the run is `queued` or `in_progress`. Codex should wait/poll until the relevant CI run reaches a terminal state. GitHub CI is an admission gate, not an iterative debugger: one logical checkpoint gets one fully prepared atomic commit/push and one push-triggered CI run. If that run fails, inspect the exact failing job/logs and STOP that checkpoint attempt; return to focused/local verification and prepare any later correction as a separately declared corrective checkpoint rather than immediately pushing a sequence of fix-forward commits until green. Never hide a red gate behind an "in progress" handoff or consume repeated GitHub CI runs for ordinary iteration.
 - **Luna Extra High** is the default Codex implementation model when the contract is frozen or nearly frozen, the relevant entry points and test surface are already known, and the work is localized/mechanical or a small bounded correction. Prefer Luna for known-file implementation, focused test additions, small refactors under an established contract, and routine docs/help changes.
 - **Astra** is the default Codex implementation/diagnostic model when useful work requires repository exploration before coding, the affected file set or root cause is not yet obvious, the change crosses modules/subsystems, or the task is a bounded refactor/migration/hygiene/consistency pass. Astra may also be used for explicitly requested broad read-only repository audits. Astra replaces Sol Medium as the normal middle tier for new Codex work.
 - **Sol High** remains the escalation model for native Windows/security, production authority, ordering, crash/recovery, credential/reference-version changes, external-effect containment, broker/live boundaries, or other architecture-sensitive implementation where a mistake could weaken a safety invariant.
@@ -173,13 +290,14 @@ boundary rather than presenting the effectful command as ordinary verification.
 - Do not re-investigate settled architecture decisions unless implementation exposes a concrete contradiction or blocker.
 - Keep implementation prompts narrow and avoid broad repository scans when relevant files and architecture documents are already known. Astra's broader exploration allowance applies only when discovery is part of the task.
 - Keep implementation reports to files changed, verification commands/results, commit/push result when authorized, and deviations or unresolved concerns.
-- Codex should run focused tests/checks while implementing. Broad/full repository suites, long integration/E2E suites, release certification, deployment, and operator Windows gates are normally run locally by the user when ChatGPT supplies the exact commands.
-- If a broad local certification run fails, diagnose the affected area, make only the bounded correction needed, and run focused verification before asking the user to rerun the broad suite. Do not repeatedly rerun expensive full suites during iteration.
+- Codex should run focused tests/checks while implementing. For checkpoints with an explicit reviewed CI certification-profile mapping, GitHub owns the canonical ROBINHOOD/FULL certification and its evidence; do not ask the user to rerun that same profile locally. Unmapped certification, deployment, host/runtime qualification, and protected Windows/operator gates remain local only when they provide materially distinct required evidence.
+- If a broad/canonical certification fails, diagnose from the preserved evidence, make only the bounded correction needed, and run focused verification before the replacement push. Do not repeatedly rerun expensive suites during iteration. A mapped replacement push lets GitHub rerun the canonical profile automatically.
 - The normal review handoff for bounded implementation is: Codex implements and runs focused checks; when the task prompt explicitly authorizes the checkpoint, Codex exact-file stages only the intended paths, verifies the staged filename set and diff check, creates a normal commit, and ordinary-pushes the isolated feature branch; ChatGPT then inspects the exact GitHub commit/diff. If commit/push authorization is withheld, Codex stops before those Git operations and reports the local changes.
 - Manual patch uploads or pasted large diffs are fallback-only when GitHub/tool review is unavailable; they are not the normal review workflow.
 - Routine exact-file staging/commit/ordinary-push operations may be delegated to Codex when the current task explicitly authorizes that checkpoint. This authorization never includes merge, rebase, amend, force-push, PR metadata/review-thread changes, branch switching, or unrelated files.
 - Before an authorized Codex commit, verify that the index was initially clean, stage only exact intended paths, verify the staged filename set, and run `git diff --cached --check`. Never use `git add .` or `git add -A` for a scoped checkpoint.
 - Before edits, certification, deployment, or operator work in an active worktree, verify the exact worktree path, branch, HEAD, tree, intended origin/remote ref, clean index, and expected worktree state. Any mismatch is a STOP condition; do not self-correct by switching, resetting, cleaning, rebasing, pulling across unexpected history, or deleting artifacts.
+- Every local certification attempt must use a fresh unique external evidence directory. Never delete, overwrite, or reuse an existing/ambiguous certification evidence path merely to make a retry proceed; prefer a purpose prefix plus GUID suffix.
 - A known ChatGPT-direct bounded-commit lag is a reviewed synchronization case, not an unexpected-state repair: when ChatGPT has directly advanced the exact remote branch through one or more explicitly reviewed, tightly scoped commits (including routine docs/status/handoff closeout or a tiny mechanical source/test/workflow correction), and admission proves the local worktree is on the exact expected branch, tracked/index-clean, at the exact known pre-direct-change HEAD, while the remote is at the exact reviewed direct-change HEAD and the local HEAD is its ancestor, fast-forward the local branch only (`git fetch` plus `git merge --ff-only`, or an equivalent `git pull --ff-only`) before any next local/Codex work. Any different local/remote state is a STOP. Afterward verify local HEAD/tree == remote expected HEAD/tree and tracked/index-clean, then continue automatically into the next safe checkpoint.
 - After an ordinary push or an approved merge, verify the exact remote/resulting HEAD and tree plus the expected clean local state before reporting success. A merge does not require rerunning an already-completed broad suite when the exact resulting source tree was previously certified; otherwise use the appropriate final certification gate.
 - Preserve unrelated generated/untracked artifacts and historical permission-warning test directories.
@@ -327,11 +445,18 @@ preference. Operator commands must use this order of preference:
    command-line quoting.
 
 Never pass structured JSON or other structured payloads as a raw native command
-argument when a file path or stdin can carry the bytes. Never embed substantial
-Python in `python -c` from PowerShell. If a tiny Python diagnostic must be sent
-through stdin, use a single-quoted PowerShell here-string and pipe it to
-`python -B -`; do not pass that here-string as the `-c` argument. Substantial
-logic belongs in reviewed repository files.
+argument when a file path or stdin can carry the bytes. **Hard rule: from
+PowerShell, never transport multiline Python through `python -c`.** This
+includes `python -c $Code`, `& $Python -c $Code`, `python -c $hereString`,
+and equivalent variable-expanded forms, even for temporary/read-only
+diagnostics. PowerShell/native argument parsing can strip or reinterpret quoting
+before Python sees the program. For a tiny diagnostic, use a single-quoted
+PowerShell here-string and pipe it to `python -B -`. For anything more than a
+tiny diagnostic, write UTF-8 source to an approved temporary `.py` file and
+invoke that file; reusable or protected logic belongs in reviewed repository
+source. Never pass a here-string as the `-c` argument. A `SyntaxError` caused
+by shell transport is a workflow regression, not diagnostic evidence, and must
+not be worked around by trying alternate `-c` quoting.
 
 This serialization rule does not override a protected operator contract that
 explicitly requires real interactive terminal stdin. In that case, do not pipe
@@ -418,12 +543,21 @@ A separately triggered `pull_request` workflow run caused by opening/updating a
 PR is expected and is not a violation; the invariant is one **push-triggered**
 CI run per logical ChatGPT-direct checkpoint.
 
-Multiple branch-advancing commits/pushes are allowed only when the work is
-deliberately split into distinct review checkpoints with independently useful
-accepted states. ChatGPT must state that reason before the first push. A tool
-limitation is not such a reason. If an unexpected partial remote state already
-exists, stop and classify/review it before any further branch update rather than
-continuing a sequential-write chain.
+GitHub CI must not be used as the normal edit/test loop. Before the single branch
+advance, finish the intended source, tests, workflow edits, status/handoff
+closeout, focused verification, formatting and diff checks that can reasonably
+be performed locally or through read-only review. Do not knowingly publish an
+incomplete candidate merely to discover the next fix from CI.
+
+Multiple branch-advancing commits/pushes are prohibited inside one logical
+checkpoint. A second push is a **new corrective checkpoint**, allowed only after
+the prior pushed attempt has reached terminal failure or an unexpected remote
+state has been reconciled, the failure is classified, and the corrective scope
+is explicitly declared before the new branch advance. Tool convenience,
+cosmetic cleanup, forgotten docs, or "try until green" are not valid reasons.
+If an unexpected partial remote state already exists, stop and classify/review it
+before any further branch update rather than continuing a sequential-write
+chain.
 
 ## Unified checkpoint runner
 
@@ -449,7 +583,7 @@ Current registered examples:
 ```
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a
-source/preflight PASS. It may be invoked only after fresh explicit approval at
+source/preflight PASS. It may be invoked only after authorization within the exact reviewed bounds under the standing rule at
 the effect boundary and with the checkpoint's exact reviewed authorization
 interlock.
 

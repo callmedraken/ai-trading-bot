@@ -18,10 +18,13 @@ class EvidenceTimelineSource(Enum):
     """Closed source vocabulary for already-acquired GUI evidence."""
 
     RESEARCH = "Research"
+    RESEARCH_LIFECYCLE = "Research Lifecycle"
     PAPER_OPERATION = "Paper Operation"
     PAPER_ACCOUNT = "Paper Account"
     MARKET_DATA = "Market Data"
     OPERATIONS = "Operations"
+    RUNTIME = "Runtime"
+    SUPERVISOR = "Supervisor"
 
 
 def _require_text(value: str, field_name: str, maximum: int) -> None:

@@ -26,6 +26,12 @@ from trading_bot.gui.paper_models import (
     PaperPageState,
     PaperPageStatus,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    ResearchCandidateLifecyclePageStatus,
+)
+from trading_bot.gui.runtime_models import RuntimePageState, RuntimePageStatus
+from trading_bot.gui.supervisor_models import SupervisorPageState, SupervisorPageStatus
 from trading_bot.gui.system_health_models import (
     SystemAuditEntryView,
     SystemComponentHealthView,
@@ -49,6 +55,9 @@ def build_system_health_state(
     paper_account: PaperAccountPageState,
     market_data: MarketDataPageState,
     operations: OperatorOperationsPageState,
+    runtime: RuntimePageState,
+    supervisor: SupervisorPageState | None = None,
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None,
 ) -> SystemHealthPageState:
     """Build diagnostics without any service reread, I/O, or authority access."""
     expected = (
@@ -58,10 +67,18 @@ def build_system_health_state(
         (paper_account, PaperAccountPageState, "paper_account"),
         (market_data, MarketDataPageState, "market_data"),
         (operations, OperatorOperationsPageState, "operations"),
+        (runtime, RuntimePageState, "runtime"),
     )
     for value, expected_type, name in expected:
         if type(value) is not expected_type:
             raise TypeError(f"{name} has an unsupported type")
+    if supervisor is not None and type(supervisor) is not SupervisorPageState:
+        raise TypeError("Exact SupervisorPageState required")
+    if (
+        research_lifecycle is not None
+        and type(research_lifecycle) is not ResearchCandidateLifecyclePageState
+    ):
+        raise TypeError("Exact lifecycle presentation required")
 
     components = (
         _research_component(research),
@@ -69,6 +86,16 @@ def build_system_health_state(
         _paper_account_component(paper_account),
         _market_data_component(market_data),
         _operations_component(operations),
+        SystemComponentHealthView(
+            "runtime",
+            "Runtime",
+            {
+                RuntimePageStatus.UNAVAILABLE: SystemComponentStatus.UNAVAILABLE,
+                RuntimePageStatus.AVAILABLE: SystemComponentStatus.AVAILABLE,
+                RuntimePageStatus.ATTENTION: SystemComponentStatus.BLOCKED,
+            }[runtime.status],
+            runtime.message,
+        ),
     )
     audit_entries = (
         *_research_audit(research),
@@ -76,7 +103,47 @@ def build_system_health_state(
         *_paper_account_audit(paper_account),
         *_market_data_audit(market_data),
         *_operations_audit(operations),
+        *_runtime_audit(runtime),
+        *(_supervisor_audit(supervisor) if supervisor is not None else ()),
     )
+    if supervisor is not None:
+        components += (
+            SystemComponentHealthView(
+                "supervisor",
+                "Supervisor",
+                {
+                    SupervisorPageStatus.UNAVAILABLE: SystemComponentStatus.UNAVAILABLE,
+                    SupervisorPageStatus.AVAILABLE: SystemComponentStatus.AVAILABLE,
+                    SupervisorPageStatus.ATTENTION: SystemComponentStatus.BLOCKED,
+                }[supervisor.status],
+                supervisor.message,
+            ),
+        )
+    if research_lifecycle is not None:
+        components += (
+            SystemComponentHealthView(
+                "research-lifecycle",
+                "Research Lifecycle",
+                {
+                    ResearchCandidateLifecyclePageStatus.UNAVAILABLE: (
+                        SystemComponentStatus.UNAVAILABLE
+                    ),
+                    ResearchCandidateLifecyclePageStatus.AVAILABLE: (
+                        SystemComponentStatus.AVAILABLE
+                    ),
+                    ResearchCandidateLifecyclePageStatus.ATTENTION: (
+                        SystemComponentStatus.BLOCKED
+                    ),
+                }[research_lifecycle.status],
+                research_lifecycle.message,
+            ),
+        )
+        evidence = research_lifecycle.evidence
+        if evidence is not None:
+            audit_entries += tuple(
+                SystemAuditEntryView("Research Lifecycle", title, str(identifier))
+                for title, identifier in evidence.artifact_identifiers
+            )
     status = (
         SystemHealthStatus.ATTENTION
         if any(item.status is SystemComponentStatus.BLOCKED for item in components)
@@ -304,3 +371,53 @@ def _operations_audit(
             )
         )
     return tuple(entries)
+
+
+def _runtime_audit(state: RuntimePageState) -> tuple[SystemAuditEntryView, ...]:
+    entries: list[SystemAuditEntryView] = []
+    if state.acl is not None and state.acl.runtime_sid_digest is not None:
+        entries.append(
+            SystemAuditEntryView(
+                "Runtime", "Runtime-principal digest", state.acl.runtime_sid_digest
+            )
+        )
+    for title, evidence in (
+        ("Qualification", state.qualification),
+        ("Session", state.session),
+    ):
+        if evidence is not None:
+            entries.extend(
+                (
+                    SystemAuditEntryView(
+                        "Runtime", f"{title} HEAD", evidence.source_head
+                    ),
+                    SystemAuditEntryView(
+                        "Runtime", f"{title} TREE", evidence.source_tree
+                    ),
+                )
+            )
+    if state.session is not None:
+        entries.extend(
+            (
+                SystemAuditEntryView(
+                    "Runtime", "Session contract ID", str(state.session.contract_id)
+                ),
+                SystemAuditEntryView(
+                    "Runtime", "Session operation ID", str(state.session.operation_id)
+                ),
+            )
+        )
+    return tuple(entries)
+
+
+def _supervisor_audit(state: SupervisorPageState) -> tuple[SystemAuditEntryView, ...]:
+    contract = state.production_strategy.contract
+    if contract is None:
+        return ()
+    return (
+        SystemAuditEntryView(
+            "Supervisor", "Production contract ID", str(contract.contract_id)
+        ),
+        SystemAuditEntryView("Supervisor", "Production HEAD", contract.source_head),
+        SystemAuditEntryView("Supervisor", "Production TREE", contract.source_tree),
+    )

@@ -2,7 +2,8 @@
 
 No scheduler access, installation, retry or trading authority. The action is
 only the isolated fixed launcher; all semantic authority stays in publication
-and accepted durable wake state. D10's task/runtime identity is never reused.
+and accepted durable wake state. The protected shared Python substrate is
+reused, but D10 task/deployment/lease authority is never reused.
 """
 
 from __future__ import annotations
@@ -17,8 +18,8 @@ from trading_bot.review_paper.unattended_activation import ReviewPaperActivation
 
 SCHEDULER_SCHEMA = "arch133-review-paper-single-session-task/v1"
 TASK_PATH = r"\AITradingBot-Arch133-SingleSessionReviewPaper-v1"
-PYTHON = r"F:\AITradingBot\Arch133\runtime\python.exe"
-SOURCE = r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133e"
+PYTHON = r"F:\AITradingBot\runtime\python.exe"
+SOURCE = r"F:\AI\worktrees\ai-trading-bot-robinhood-unattended-133g"
 LAUNCHER = SOURCE + r"\scripts\run_arch133_unattended_review_paper.py"
 
 

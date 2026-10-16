@@ -2,76 +2,74 @@
 
 ## Current phase
 
-Architecture 134-D1R6R3 canonical Task Scheduler observation and exact consumed-arm
-recovery is **SOURCE ACCEPTED**.
-
-Accepted R3 executable/test source:
-
-```text
-branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    e6defea5aa7b9266f78c7d2f22ebac90bf568dd7
-TREE    f9ad06c9b26beb681ceb3429fd66452e4aef88a9
-CI      #572 / 38737407813 / SUCCESS / attempt 1
-```
-
-Independent GitHub review confirmed exactly one seven-file source commit over the
-frozen live-task base `3cf4284d017e362eee58a2f27526ab4de8f292a2` /
-`16a48a12756bb6d810799444859334ce6305001d`. The registered-task launcher,
-D1R5 child launcher, fixed runner, D1R5 source/tests/validation and source-gate
-workflow remain byte-for-byte frozen.
-
-Checkpoint #572 passed source-static, 2,599 active tests and canonical ROBINHOOD
-certification with 9,565 passed / 1 skipped / 0 failed / 0 errors in 164.700
-seconds. Inventory remains FULL 176 / ROBINHOOD 99 / LEGACY 215 / EXHAUSTIVE 391.
-Static evidence records authority PASS, stable exact HEAD/tree and scheduler,
-provider, production and broker/live effects NOT_RUN.
-
-R3 corrects only post-registration observation/recovery semantics. Task Scheduler
-start/end boundaries are parsed as explicit-offset DateTimeOffset values,
-normalized to exact UTC seconds and compared by canonical instant. Observed
-principal IDs are canonicalized to a SecurityIdentifier, resolving short account
-names through NTAccount when necessary. Registration behavior is unchanged and
-still contains exactly one TASK_CREATE=2 path with no update/delete/run authority.
-
-The consumed incident remains immutable and is pinned exactly:
+The repository now has one **SOURCE ACCEPTED canonical integration candidate**
+combining the accepted product/D1R6 lineage with the accepted Architecture
+138/139 research and Architecture 140 GUI-A16/A17/A18 safe-side lineage:
 
 ```text
-predecessor HEAD   3cf4284d017e362eee58a2f27526ab4de8f292a2
-predecessor TREE   16a48a12756bb6d810799444859334ce6305001d
-journal bytes      16917
-journal SHA-256    b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
-target session     2026-10-15
-terminal state     FINAL / INDETERMINATE
-native create      consumed exactly once
+branch  feature/test-suite-canonical-handoff-integration-current
+HEAD    e2b46c104168c007263c688450beb79d71637a94
+TREE    eaec980bda6e0669878e54d622cb8694ef3e2fc4
+
+CI      Checkpoint Source Gates #591 / 38957936922 / attempt 1 / SUCCESS
+GUI     GUI Source Gates #20 / 38957942329 / attempt 1 / SUCCESS
 ```
 
-R3 never makes that predecessor directly authoritative. Its separate
-`arch134-d1r6-consumed-arm-recovery/v1` path has zero scheduler-create/update/
-delete, task-run and D1R5-execution budgets and could publish only one separate
-exclusive recovery artifact after repeated read-only admission.
+Checkpoint #591 passed source-static and all four broad FULL shards at 88.401 /
+73.968 / 92.000 / 63.715 seconds, all below the frozen 300-second hygiene
+ceiling. GUI #20 passed the complete 1,001-test real-PySide6 suite plus Ruff and
+diff checks. The integrated inventory is:
 
-However, that incident-specific recovery gate deliberately requires
-`current_time < original trigger` (2026-10-15 06:20 Pacific). That trigger is
-now in the past. Therefore the October 15 consumed task is **not recoverable by
-R3 now**, and no recovery preflight or recovery-evidence publication should be
-attempted for it.
+```text
+ACTIVE 65 / FULL 180 / ROBINHOOD 99 / LEGACY 222
+EXHAUSTIVE 402 / GUI 51
+```
 
-The live registered-task worktree was intentionally left frozen at the
-predecessor during R3 implementation. Do not fast-forward it merely to revive
-the expired October 15 recovery path. The current safe next boundary is
-post-trigger read-only reconciliation of the consumed task/evidence, followed by
-a separately designed next-session scheduler cleanup/replacement/arming
-authority if another D1R5 qualification is desired.
+The integration is additive. It preserves the accepted D1R6 product source and
+authority chain, the frozen Architecture-139 SHADOW research semantics, the A16
+five-artifact local acquisition/linkage boundary, the A17 immutable audit
+presentation, and the A18 read-only lifecycle boundary map. The A16/A17/A18
+predecessor dictionaries and digests remain frozen; a separate seven-path
+canonical integration overlay binds only the shared current inventory-test
+bytes. No research promotion, production compatibility, post-SHADOW stage,
+provider effect, scheduler mutation, trading effect, or live-money authority is
+created by the integration.
 
-The fixed D1R5 target remains:
+The real October 16 D1R6 wake has also completed successfully. Read-only
+post-wake reconciliation ran from exact published source:
+
+```text
+D1R6 local HEAD   a36de3bfe81a6e1a94fb3deeec7e579145939f52
+D1R6 local TREE   6cde732e02e92eb2b34281672cdb7744250355b1
+D1R6 remote HEAD  a36de3bfe81a6e1a94fb3deeec7e579145939f52
+source admission  PASS
+
+disposition        PASS
+evidence           PASS
+task               MATCH
+reconcile exit     0
+```
+
+At the accepted D1R6 source, `PASS` requires canonical bounded D1R5 evidence
+for the frozen target source/session ending in `FINAL / PASS`; scheduler state
+cannot manufacture that result. The frozen D1R5 target remains:
 
 ```text
 HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
 TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-No fresh D1 session, PREPARE, EXECUTE, paper/broker mutation, D2 or live trading
-is authorized.
+The successful D1R5 sequence is therefore established as
+`QUALIFICATION_RESERVED -> SOURCE_ADMITTED -> WAITING_FOR_MARKET ->
+WAKE_OBSERVED -> SOURCE_READMITTED -> FINAL / PASS`. The reconciliation
+reported every operational effect counter as zero. No ARM retry, operator task
+run, task create/update/delete, evidence mutation, D1, PREPARE, EXECUTE, paper
+mutation, broker placement, provider/credential access, D2, or live effect was
+performed by the reconciliation.
+
+The earlier October 15 fail-closed task incident remains immutable historical
+evidence only; it is no longer the current product blocker. D1R5 PASS still
+stops before D1 and grants no D1/PREPARE/EXECUTE/paper/broker/D2/live authority.
 
 ## Operational checkpoint
 
@@ -146,97 +144,85 @@ It does not establish D1 session, paper, D2, broker, or live-trading readiness.
 
 ## Active work
 
-The October 15 D1R6 incident is now **POST-TRIGGER RECONCILED FAIL-CLOSED**.
+The October 16 pre-market wake qualification is **PASS and consumed for that
+qualification attempt**. Do not rerun D1R5, do not rerun D1R6 ARM, and do not
+treat the still-observed scheduler task as permission to run, update, delete, or
+recreate it.
 
-Read-only reconciliation proved:
+The accepted post-wake facts are:
 
 ```text
-live local HEAD       3cf4284d017e362eee58a2f27526ab4de8f292a2
-live local TREE       16a48a12756bb6d810799444859334ce6305001d
-remote branch HEAD    a72d1f4f3e84ff7682dbea5ba0c6851714547483
-source divergence     YES
-
-consumed journal      16917 bytes
-journal SHA-256       b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c
-launch fence          ABSENT
-D1R5 result           ABSENT
-recovery artifacts    0
-
-task state            3 / READY
-LastTaskResult         2
-LastRunTime            2026-10-15 06:20 Pacific
-NextRunTime            none / 1899-12-30 sentinel
+D1R6 source       a36de3bfe81a6e1a94fb3deeec7e579145939f52
+D1R6 tree         6cde732e02e92eb2b34281672cdb7744250355b1
+source admission  PASS
+D1R5 evidence     PASS
+task projection   MATCH
+overall           PASS
+effects           all reported zero
 ```
 
-The scheduled task fired exactly once at the intended 06:20 Pacific trigger and
-returned exit code 2. The frozen predecessor launcher first performs exact source
-admission, including a live `ls-remote` equality check. The remote branch had
-already moved to R3 while the live task worktree intentionally remained frozen
-at `3cf4284d...`; therefore the scheduled launch failed source admission before
-the consumed FINAL/INDETERMINATE journal could be considered and before any D1R5
-launch fence could be created.
+This proves the bounded D1R5 timing/wake/source-readmission gate. It does not
+prove or authorize a D1 session, strategy evaluation, PREPARE, EXECUTE, paper
+mutation, broker placement, D2, or live trading.
 
-This is independently confirmed by the absent launch fence and absent D1R5
-result. No D1R5 delegation occurred. The historical consumed journal remains
-byte-identical and no recovery artifact was created.
-
-The immediate next boundary is **not recovery** and **not another arm**. The
-stale one-time task is still present/enabled but has no next run. A new,
-separately reviewed cleanup/replacement authority is required before any future
-session can use the fixed task path again.
+Parallel safe-side work is source accepted through Architecture 139-B and
+Architecture 140 / GUI-A18. The research lifecycle remains stopped at SHADOW:
+no `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, production compatibility,
+or promotion authority is materialized.
 
 ## Current blocker / protected boundary
 
-The stale October 15 Task Scheduler registration is the current protected
-boundary.
+The next protected product boundary is now a **separately designed and
+source-reviewed D1-session authorization checkpoint that may consume the
+accepted D1R5 PASS**.
 
-It must not be deleted, updated, rerun or reused ad hoc. Its single native create
-attempt is consumed, and the October 15 R3 recovery path is expired.
+Nothing in the D1R5 PASS or this repository integration authorizes that boundary
+implicitly. Until a new exact contract is implemented, reviewed, admitted, and
+separately authorized:
 
-A successor checkpoint should provide an **exact stale-task retirement** path
-that:
+- do not invoke D1;
+- do not invoke PREPARE or EXECUTE;
+- do not perform paper or broker mutations;
+- do not invoke D2 or live trading;
+- do not rerun the consumed D1R6 arm or D1R5 qualification;
+- do not manually run/update/delete/recreate the scheduler task merely as
+  cleanup.
 
-- admits accepted R3/current source and frozen D1R5 source;
-- pins the consumed journal name/size/SHA exactly;
-- requires launch fence absent, D1R5 result absent and recovery artifact absent;
-- requires the exact registered task definition after R3 canonical observation;
-- requires LastRunTime = 2026-10-15 06:20 Pacific and LastTaskResult = 2;
-- requires no next run;
-- permits at most one native TASK_DELETE attempt;
-- never runs/updates/recreates the task in the same operation;
-- durably records intent/result/confirmation in separate retirement evidence;
-- treats deletion ambiguity as consumed and non-retryable;
-- has zero D1R5/D1/paper/broker/provider/credential/live authority.
-
-Only after independently accepted retirement may a fresh next-session D1R6
-preflight/arming generation be considered.
+Any future scheduler cleanup/replacement is its own reviewed effect boundary,
+not a side effect of accepting D1R5 PASS.
 
 ## Roadmap
 
 ### Now
 
-- Preserve D1R6R3 accepted source and the immutable October 15 consumed journal.
-- Treat October 15 as conclusively fail-closed: task fired, exit 2, no launch
-  fence, no D1R5 evidence, no recovery artifact.
-- Do not run R3 recover/recover-preflight for the expired incident.
-- Do not manually delete/update/run the stale task.
-- Design and source-review the next checkpoint for exact stale-task retirement.
+- Preserve the exact accepted canonical integration source at
+  `e2b46c104168c007263c688450beb79d71637a94` /
+  `eaec980bda6e0669878e54d622cb8694ef3e2fc4`.
+- Preserve the October 16 D1R6/D1R5 post-wake result as PASS / PASS / MATCH with
+  zero reported operational effects and no retries.
+- Keep the October 15 fail-closed incident as historical evidence only.
+- Preserve Architecture 139-B SHADOW semantics and GUI-A16/A17/A18
+  already-acquired-state presentation boundaries.
+- Keep D1, PREPARE, EXECUTE, paper/broker, D2 and live effects stopped.
 
 ### Next
 
-- Execute one separately authorized stale-task retirement after source acceptance
-  and a read-only retirement preflight.
-- Reconcile deletion independently; no blind retry.
-- Only after confirmed retirement, prepare a fresh next-session wake authority
-  with new session/evidence identity and a fresh read-only preflight.
-- Keep the D1R5 target unchanged unless separately reviewed.
+- Design and source-review the exact D1-session authorization boundary that may
+  consume the accepted D1R5 PASS without expanding authority implicitly.
+- Define any scheduler retirement/replacement operation separately if it is
+  still needed; require its own effect budget, durable fencing and independent
+  reconciliation.
+- Keep the D1R5 evidence immutable; no rerun/resume/repair.
 
 ### Later
 
-- Only after a future canonical D1R5 PASS is independently accepted may a fresh
-  D1-session authorization be considered.
-- Keep PREPARE/EXECUTE, paper/broker, D2 and real-money trading behind their own
-  reviewed authority boundaries.
+- Only after a separately accepted D1 authorization may the product proceed to
+  the next bounded session step.
+- Keep PREPARE/EXECUTE, broker effects, D2 and real-money trading behind their
+  own reviewed gates.
+- Continue safe-side GUI/research work only without creating production
+  compatibility or promotion authority unless a new architecture explicitly
+  reviews that transition.
 
 ## History and deep-reference pointers
 

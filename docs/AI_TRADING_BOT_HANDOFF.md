@@ -12,16 +12,17 @@ journal.
 authority. Detailed architecture, validation, and closed chronology belong in
 their authoritative records and in `docs/history/`.
 
-The ongoing canonical bounded new-chat handoff/history branch is
-`feature/project-history-storage-foundation`. It is documentation/current-state
-authority only and must remain a fast-forward mirror of the latest accepted
-bounded-docs descendant of the active product lineage. It is not executable-
-source, provider, broker, or trading authority.
+The canonical bounded new-chat/history branch is
+`feature/project-history-storage-foundation`. At this checkpoint it is the
+target for the accepted integrated product + safe-side source and current-state
+handoff. Making it the repository default branch does not itself grant any
+provider, scheduler, broker, production-effect, or trading authority.
 
-The current product/source branch at this checkpoint is
-`feature/robinhood-production-paper-premarket-wake-qualification`. Exact
-source HEAD/tree and CI must always be verified on that active branch before
-source or protected work. Real-money trading remains **NO-GO**.
+The protected operational D1R6 source that produced the accepted October 16
+wake evidence remains `feature/robinhood-production-paper-overnight-wake-arming`
+at exact HEAD/TREE recorded below. Exact source and evidence must still be
+re-proven before any later protected operation. Real-money trading remains
+**NO-GO**.
 
 ## New-session reading order
 
@@ -42,57 +43,58 @@ megafiles during startup.
 
 ## Current operational checkpoint
 
-Architecture 134-D1R6R3 **canonical observation + exact consumed-arm recovery**
-is SOURCE ACCEPTED:
+The October 16 D1R6 overnight wake and bounded D1R5 qualification completed
+successfully and are now read-only reconciled.
 
 ```text
-branch  feature/robinhood-production-paper-overnight-wake-arming
-HEAD    e6defea5aa7b9266f78c7d2f22ebac90bf568dd7
-TREE    f9ad06c9b26beb681ceb3429fd66452e4aef88a9
-CI      #572 / 38737407813 / SUCCESS / attempt 1
+D1R6 branch       feature/robinhood-production-paper-overnight-wake-arming
+D1R6 HEAD         a36de3bfe81a6e1a94fb3deeec7e579145939f52
+D1R6 TREE         6cde732e02e92eb2b34281672cdb7744250355b1
+remote HEAD       a36de3bfe81a6e1a94fb3deeec7e579145939f52
+source admission  PASS
+
+reconcile         PASS
+evidence          PASS
+task              MATCH
+exit              0
 ```
 
-Exact GitHub review confirmed the seven-file commit and frozen task launcher,
-D1R5 child, runner, D1R5 predecessor and source-gate workflow. R3 canonicalizes
-Task Scheduler offset-bearing trigger strings to the original UTC instants and
-resolves observed UserId values to canonical SIDs. It does not change task
-registration behavior or add scheduler update/delete/run authority.
-
-The exact October 15 consumed incident is hard-pinned by predecessor HEAD/TREE,
-journal filename, 16917 bytes and SHA-256
-`b62959f9988dcc42e4881e45ed95abcf4abc2b6d2932514c7253165e1223955c`.
-Its durable terminal classification remains FINAL/INDETERMINATE after
-TASK_CREATE_RETURNED; the one native create attempt remains consumed.
-
-R3 adds only a separate recovery artifact path with zero scheduler mutation,
-task-run and D1R5-execution budgets. The consumed predecessor alone never grants
-launch authority.
-
-Checkpoint #572 independently passed source-static and active tests (2,599 /
-2,599) plus canonical ROBINHOOD (9,565 passed / 1 skipped / 0 failed/errors,
-164.700s wall). Static authority passed with scheduler/provider/production/
-broker effects NOT_RUN.
-
-Operationally, the incident-specific recovery window has expired. Recovery
-requires current time strictly before the original 2026-10-15 06:20 Pacific
-trigger; that trigger is now past. Therefore do not fast-forward the live task
-worktree for the purpose of recovering today's task and do not run
-recover-preflight/recover.
-
-The current next boundary is read-only post-trigger reconciliation of the
-existing task, launch fence and D1R5 evidence. Expected behavior is fail-closed:
-the predecessor launcher cannot accept FINAL/INDETERMINATE, but this must be
-confirmed from the real host before any future scheduler cleanup/replacement.
-
-D1R5 remains:
+The frozen D1R5 target is:
 
 ```text
 HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
 TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
 ```
 
-No D1/PREPARE/EXECUTE/paper/broker/D2/live authority follows from R3 source
-acceptance.
+At the accepted D1R6 source, reconciliation can classify D1R5 evidence as PASS
+only after bounded reading, canonical D1R5 parsing, exact target
+HEAD/TREE/session matching, and a terminal `FINAL / PASS`. `task=MATCH` is
+an independent scheduler-definition observation and cannot substitute for
+evidence authority.
+
+The accepted D1R5 success sequence is:
+
+```text
+QUALIFICATION_RESERVED
+SOURCE_ADMITTED
+WAITING_FOR_MARKET
+WAKE_OBSERVED
+SOURCE_READMITTED
+FINAL / PASS
+```
+
+The user-reported reconciliation effect map is entirely zero. No arm retry,
+operator task run, scheduler create/update/delete, evidence mutation, D1,
+PREPARE, EXECUTE, strategy evaluation, paper mutation, broker placement,
+provider/credential access, D2, or live effect was performed during
+reconciliation.
+
+The October 15 FINAL/INDETERMINATE incident remains immutable historical
+evidence, but it is no longer the current blocker. Do not run its expired
+recovery path.
+
+D1R5 PASS is a prerequisite result only. It grants no D1 session, PREPARE,
+EXECUTE, paper/broker, D2, scheduler mutation, or live-trading authority.
 
 ## Exact D1R4 state
 
@@ -162,36 +164,22 @@ live-trading authority.
 
 ## Current protected boundary
 
-The October 15 wake incident is post-trigger reconciled and fail-closed.
+The next protected boundary is a **new D1-session authorization checkpoint**
+that may consume the accepted October 16 D1R5 PASS only under a separately
+implemented, source-reviewed and explicitly authorized contract.
 
-The one-time task fired at 06:20 Pacific and returned exit code 2. Its frozen
-launcher was still sourced from local HEAD
-`3cf4284d017e362eee58a2f27526ab4de8f292a2`, while the live remote branch had
-already advanced. The accepted predecessor host's exact source admission checks
-`ls-remote` against local HEAD before loading arm authority, so the scheduled
-launch necessarily stopped at source admission.
+Until that boundary exists and is accepted:
 
-Durable external facts:
+- do not invoke D1;
+- do not invoke PREPARE or EXECUTE;
+- do not perform Robinhood paper or broker effects;
+- do not invoke D2 or live trading;
+- do not rerun D1R6 ARM or the consumed D1R5 qualification;
+- do not manually run/update/delete/recreate the scheduler task as an implicit
+  cleanup step.
 
-```text
-consumed arm journal bytes/SHA exact      YES
-launch fence                              ABSENT
-D1R5 result                               ABSENT
-recovery artifact count                   0
-task LastRunTime                           2026-10-15 06:20 Pacific
-task LastTaskResult                        2
-task current state                         READY
-task next run                              none
-```
-
-Therefore D1R5 was not delegated and the October 15 incident grants no D1
-authority.
-
-Do not run arm, recover, recover-preflight, manual task run, update or deletion.
-The next protected boundary is a new source-reviewed stale-task retirement
-checkpoint with one exact delete budget and zero recreation/delegation/trading
-authority. After retirement is independently reconciled, a fresh next-session
-wake generation may be planned.
+Any scheduler retirement or replacement remains a separate protected effect
+boundary with its own fencing and reconciliation requirements.
 
 ## Standing safety and effect invariants
 
@@ -260,13 +248,54 @@ its authority boundaries:
   zero failed/errors, wall 253.493 seconds. Current inventory is FULL 175,
   ROBINHOOD 98, LEGACY 215, EXHAUSTIVE 390. No real D1R5 host/effect ran.
 
+## Canonical integrated checkpoint
+
+The accepted canonical integration candidate combines the product/D1R6 lineage
+with the already accepted Architecture 138/139 research and Architecture 140
+GUI safe-side lineage:
+
+```text
+branch  feature/test-suite-canonical-handoff-integration-current
+HEAD    e2b46c104168c007263c688450beb79d71637a94
+TREE    eaec980bda6e0669878e54d622cb8694ef3e2fc4
+
+CI      #591 / 38957936922 / push / attempt 1 / SUCCESS
+GUI     #20 / 38957942329 / pull_request / attempt 1 / SUCCESS
+```
+
+Checkpoint #591 passed source-static plus four broad shards at 88.401 / 73.968 /
+92.000 / 63.715 seconds. GUI #20 passed all 1,001 real-PySide6 tests and Ruff /
+diff checks. Integrated inventory is ACTIVE 65 / FULL 180 / ROBINHOOD 99 /
+LEGACY 222 / EXHAUSTIVE 402 / GUI 51.
+
+The integration preserves D1R6 source authority while incorporating accepted
+Architecture 139-B SHADOW research and GUI-A16/A17/A18. A16 remains the sole
+five-artifact local acquisition/linkage boundary; A17 remains immutable audit
+presentation; A18 remains a read-only lifecycle boundary map. No
+`PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, production compatibility,
+automatic promotion, promotion authority, trading authority, provider effect,
+or scheduler mutation is created by this merge.
+
+The A16, A17 and A18 predecessor overlays stay frozen. The canonical integration
+adds one separate seven-path current-inventory overlay only where product and
+safe-side test bytes legitimately meet.
+
 ## Immediate next step
 
-D1R4 authentication is accepted and consumed, and D1R5 source is accepted.
-The immediate safe next step is the **separately reviewed real bounded D1R5
-clock/sleep/external-evidence qualification** on the exact accepted source.
-Do not invoke a fresh D1 session, PREPARE, EXECUTE, Robinhood paper effect,
-broker action, D2, or live trading until that real qualification is accepted.
+Fast-forward `feature/project-history-storage-foundation` to the accepted
+integrated closeout once this documentation-only descendant passes its source
+gate. That branch is the intended canonical/default repository branch.
+
+For product progression, the next protected milestone is not another wake and
+not scheduler cleanup by implication. It is the separately designed
+D1-session-authorization checkpoint described above.
+
+For safe-side progression, preserve Architecture 139-B SHADOW and
+GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes
+production conversion or promotion.
+
+No fresh D1, PREPARE, EXECUTE, Robinhood paper effect, broker action, D2, or
+live trading is authorized by this handoff.
 
 ## Historical reconstruction
 

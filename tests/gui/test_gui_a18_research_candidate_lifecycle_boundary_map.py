@@ -444,11 +444,12 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
     relative = Path(__file__).relative_to(ROOT).as_posix()
     assert relative in run_test_certification.select_inventory(inventory, "legacy")
     assert relative not in run_test_certification.select_inventory(inventory, "full")
-    assert (
-        checkpoint_runner._git_blob_sha1(
-            ROOT / "tests/scripts/certification_runner/test_profiles.py"
+    profile_path = "tests/scripts/certification_runner/test_profiles.py"
+    assert checkpoint_runner._git_blob_sha1(ROOT / profile_path) == (
+        checkpoint_runner._canonical_current_inventory_test_pin(
+            profile_path,
+            checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[
+                profile_path
+            ],
         )
-        == checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[
-            "tests/scripts/certification_runner/test_profiles.py"
-        ]
     )

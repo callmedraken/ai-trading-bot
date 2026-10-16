@@ -446,7 +446,9 @@ def test_exact_successor_pins_and_frozen_a16_digest():
             checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
             == after[path]
         )
-        assert checkpoint_runner._git_blob_sha1(ROOT / path) == after[path]
+        assert checkpoint_runner._git_blob_sha1(ROOT / path) == (
+            checkpoint_runner._canonical_current_inventory_test_pin(path, after[path])
+        )
     assert (
         checkpoint_runner._arch140a17_current_inventory_test_pin("other", "a" * 40)
         == "a" * 40

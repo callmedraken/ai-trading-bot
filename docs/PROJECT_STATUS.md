@@ -1,5 +1,9 @@
 # AI Trading Bot - Project Status
 
+>
+> **Parallel-branch scope note:** this GUI branch is not canonical product/current-operational authority. Resolve `feature/project-history-storage-foundation` and the separately named active product branch for protected product state. This closeout records only the accepted safe-side GUI-A18 source and does not replay, authorize, retry, or mutate D1R6/D1R5 operations.
+>
+
 ## Current phase
 
 Architecture 134-D1R5 operational source remains accepted and the product line
@@ -36,7 +40,7 @@ credential, broker, paper, runtime, production compatibility, promotion,
 authority.
 
 Parallel safe-side GUI presentation is now **SOURCE ACCEPTED through Architecture
-140 / GUI-A17** on `feature/gui-research-candidate-lifecycle-audit-current`:
+140 / GUI-A18** on `feature/gui-research-candidate-lifecycle-boundary-map-current`:
 
 ```text
 A16 source  HEAD 6d092b8e05372d241dc4183b7b392f0eb83b4500
@@ -46,6 +50,11 @@ A17 source  HEAD 56f3e8ef73f8aa62e2444c7fc9c75dfb212ff246
             TREE 5de6706064424aa4734b53cad4efffe5011284f4
             GUI  #10 / 38848617395 / push / attempt 1 / SUCCESS
             CI   #580 / 38848782422 / workflow_dispatch / attempt 1 / SUCCESS
+
+A18 source  HEAD 4debec8661edd475ecb6aa58b61b9aa115648fb7
+            TREE c2392063383a863dff0be40bf08badae080374c7
+            GUI  #14 / 38860442146 / push / attempt 1 / SUCCESS
+            CI   #582 / 38860589811 / workflow_dispatch / attempt 1 / SUCCESS
 ```
 
 A16 remains the only lifecycle acquisition/linkage boundary: one explicit local
@@ -54,19 +63,25 @@ parsed and locally successor-verified, while complete historical/external-chain
 qualification is explicitly not re-run.
 
 A17 is presentation-only over the already acquired immutable A16 state. It adds
-a Qt-free provenance/audit composer and improves the existing Research Lifecycle
-page in place with five artifact identities, five retained source HEAD/TREE
-pairs, three policy-vs-recorded coverage comparisons and margins, the exact nine
-zero-effect counters, and the fixed no-authority governance matrix. It adds no
-artifact reads, service getter, domain parser/verifier, lifecycle stage,
-observation acquisition, production compatibility, promotion, provider,
-credential, broker, paper, runtime, scheduler/ACL, D1/D1R5/D2, or live-trading
+the Qt-free provenance/audit composer and retained artifact, provenance, coverage,
+zero-effect, and fixed-governance presentation without adding acquisition or
 authority.
 
-GUI #10 independently passed 984/984 tests with real PySide6 6.10.3. Checkpoint
-#580 passed exact-source static gates and four broad shards at 90.745 / 71.385 /
-52.168 / 104.792 seconds. Current parallel-line inventory is ACTIVE 64 / FULL
-179 / ROBINHOOD 98 / LEGACY 221 / EXHAUSTIVE 400 / GUI 50.
+A18 is a second additive presentation-only layer over the immutable A17 audit
+presentation. It adds a Qt-free lifecycle boundary map and one read-only table
+to the existing Research Lifecycle page. The fixed rows distinguish retained
+local verification/recorded facts from NOT_REVERIFIED, NOT_CONNECTED,
+NOT_ESTABLISHED, NOT_MATERIALIZED, DISABLED, and NONE authority boundaries.
+It does not create evidence, re-run qualification, acquire observations, or
+materialize PAPER_CANDIDATE / AWAITING_HUMAN_PROMOTION. The lifecycle remains
+SHADOW and no production compatibility, promotion, provider, credential, broker,
+paper, scheduler/ACL, D1/D1R5/D2, or live-trading authority is added.
+
+GUI #14 independently passed 1001/1001 tests with real PySide6 6.10.3. Checkpoint
+#582 passed exact-source static authority plus all four broad shards; shard
+hygiene times were 86.581 / 94.824 / 97.047 / 107.739 seconds, each below the
+300-second ceiling. Current parallel-line inventory is ACTIVE 64 / FULL 179 /
+ROBINHOOD 98 / LEGACY 222 / EXHAUSTIVE 401 / GUI 51.
 
 The canonical bounded new-chat handoff/history branch remains
 `feature/project-history-storage-foundation` on the active product lineage.
@@ -185,18 +200,23 @@ recorded above.
 
 The accepted 139-B domain boundary remains ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
 LEGACY 215 / EXHAUSTIVE 394 / GUI 44 at its source checkpoint. A16 advanced the
-parallel GUI inventory to LEGACY 220 / EXHAUSTIVE 399 / GUI 49. A17 adds exactly
-one new LEGACY GUI test module, yielding ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
-LEGACY 221 / EXHAUSTIVE 400 / GUI 50.
+parallel GUI inventory to LEGACY 220 / EXHAUSTIVE 399 / GUI 49, A17 to
+LEGACY 221 / EXHAUSTIVE 400 / GUI 50, and A18 adds exactly one new LEGACY GUI
+test module, yielding ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 222 /
+EXHAUSTIVE 401 / GUI 51.
 
-B1/B2, A16 and A17 use additive successor overlays only. A17 freezes the exact
-A16 seven-path overlay digest
-`887064885ca3be46514075efed384ccf1c6eb778d78dcc3f06bc402bff1a4e4f`
-and its own seven-path overlay digest is
-`dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3`.
-All predecessor dictionaries, accepted 137/138/139 domain/test blobs,
-executable/native/AST pins, ACTIVE membership, and workflow bytes remain frozen.
-No research checkpoint is integrated into the active product/history lineage.
+B1/B2, A16, A17 and A18 use additive successor overlays only. A18 preserves the
+exact A16 seven-path overlay digest
+`887064885ca3be46514075efed384ccf1c6eb778d78dcc3f06bc402bff1a4e4f`,
+the A17 digest
+`dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3`,
+and adds the A18 digest
+`a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
+The A18 resolver validates the frozen A17 predecessor before overlaying the same
+seven current inventory-test paths. All older predecessor dictionaries,
+accepted 137/138/139 domain/test blobs, A16 acquisition, A17 audit, workflow
+bytes, ACTIVE membership, and product authority remain frozen. No research
+checkpoint is integrated into the active product/history lineage.
 
 The 139-B source boundary is complete. No real SHADOW observation acquisition,
 integration, promotion, production conversion, or later research architecture
@@ -250,11 +270,11 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Preserve the exact accepted Architecture 139-B1/B2 research identities,
   deterministic models, verifiers, seven-path successor overlays, and zero-effect
   boundary.
-- Preserve accepted Architecture 140 / GUI-A16 acquisition/linkage semantics and
-  GUI-A17 presentation semantics: A17 consumes only the already-acquired immutable
-  A16 state, performs zero new artifact/service acquisition, and grants no
-  external-chain acceptance, promotion, production conversion, or operational
-  authority.
+- Preserve accepted Architecture 140 / GUI-A16 acquisition/linkage, GUI-A17
+  audit-presentation, and GUI-A18 boundary-map semantics. A17 and A18 consume
+  only already-acquired immutable presentation state, perform zero new
+  artifact/service acquisition, and grant no external-chain acceptance,
+  promotion, production conversion, or operational authority.
 - Keep `feature/project-history-storage-foundation` on the accepted active
   product-lineage bounded-docs descendant. Do not fast-forward it to the
   parallel research branch.
@@ -272,11 +292,11 @@ and [development workflow](AI_DEVELOPMENT_WORKFLOW.md).
 - Production remains gated on the separately reviewed real D1R5 pre-market /
   `WAITING_FOR_MARKET` / wake / exact source re-admission qualification.
 - The research lifecycle domain still stops at accepted Architecture 139-B.
-  GUI presentation is accepted through Architecture 140 / GUI-A17. Further
+  GUI presentation is accepted through Architecture 140 / GUI-A18. Further
   source-only GUI work must continue to consume already acquired presentation
   state unless a new protected acquisition boundary is separately designed and
   reviewed. No integration, production compatibility, promotion, or post-SHADOW
-  lifecycle progression is implied by A17.
+  lifecycle progression is implied by A18.
 
 ### Later
 

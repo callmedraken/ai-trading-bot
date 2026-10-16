@@ -1,5 +1,9 @@
 # AI Trading Bot - Current Handoff
 
+>
+> **Parallel-branch scope note:** this GUI branch is not canonical product/current-operational authority. Resolve `feature/project-history-storage-foundation` and the separately named active product branch for protected product state. This closeout records only the accepted safe-side GUI-A18 source and does not replay, authorize, retry, or mutate D1R6/D1R5 operations.
+>
+
 ## Purpose and authority
 
 This is the bounded active-session and current-boundary handoff. It records
@@ -254,24 +258,45 @@ ROBINHOOD 98 / LEGACY 215 / EXHAUSTIVE 394 / GUI 44 at that checkpoint. All
 seventeen recorded 139-B operational effect counters remain zero. No real SHADOW
 observation occurred.
 
-Architecture 140 / GUI-A16 is SOURCE ACCEPTED on
-`feature/gui-research-candidate-lifecycle-current`:
+Architecture 140 safe-side GUI presentation is SOURCE ACCEPTED through
+GUI-A18:
 
 ```text
-HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
-TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
-GUI   #8 / 38684121623 / push / attempt 1 / SUCCESS / 880 passed
-CI    #565 / 38684312270 / workflow_dispatch / attempt 1 / SUCCESS
+A16 HEAD  6d092b8e05372d241dc4183b7b392f0eb83b4500
+    TREE  fd17ccfd338266c04d24dd03e303ee36dd72b0ca
+    GUI   #8 / 38684121623 / SUCCESS / 880 passed
+    CI    #565 / 38684312270 / SUCCESS
+
+A17 HEAD  56f3e8ef73f8aa62e2444c7fc9c75dfb212ff246
+    TREE  5de6706064424aa4734b53cad4efffe5011284f4
+    GUI   #10 / 38848617395 / SUCCESS / 984 passed
+    CI    #580 / 38848782422 / SUCCESS
+
+A18 HEAD  4debec8661edd475ecb6aa58b61b9aa115648fb7
+    TREE  c2392063383a863dff0be40bf08badae080374c7
+    GUI   #14 / 38860442146 / SUCCESS / attempt 1 / 1001 passed
+    CI    #582 / 38860589811 / SUCCESS / attempt 1
 ```
 
-It presents one explicitly supplied five-artifact SHADOW lifecycle set using
-strict accepted canonical parsers and `verify_shadow_research_candidate` for
-local successor linkage. The GUI visibly states that complete historical
-external-chain qualification was not re-run. No real SHADOW acquisition,
-provider/network/credential/broker/paper/runtime effect, production compatibility,
-promotion, post-SHADOW materialization, D1/D1R5/D2 operation, or live authority
-was added. Current parallel-line inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
-LEGACY 220 / EXHAUSTIVE 399 / GUI 49.
+A16 remains the sole explicit local five-artifact acquisition and local SHADOW
+successor-linkage boundary. A17 consumes only that immutable page state and adds
+a Qt-free retained-state audit. A18 consumes only the immutable A17 audit
+presentation and adds the Qt-free lifecycle boundary map plus one read-only
+table on the existing page. A18 explicitly records that historical/external
+qualification was not re-run, real acquisition and promotion are not connected,
+production compatibility is not established, PAPER_CANDIDATE and
+AWAITING_HUMAN_PROMOTION are not materialized, automatic promotion is disabled,
+and trading authority is NONE.
+
+A18 preserves the A16 overlay digest
+`887064885ca3be46514075efed384ccf1c6eb778d78dcc3f06bc402bff1a4e4f`
+and A17 digest
+`dc11d4c1e6099c1eec3346cafb85220e42f495e472d220cf81ac741ccff524c3`;
+its own successor-overlay digest is
+`a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
+Inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 222 /
+EXHAUSTIVE 401 / GUI 51. No workflow, product, acquisition, provider,
+scheduler, promotion, or live-money authority changed.
 
 To preserve the canonical handoff invariant, do not move
 `feature/project-history-storage-foundation` onto this research branch. The
@@ -283,28 +308,19 @@ reviewed product-lineage integration/replay says otherwise.
 ## Next safe-side boundary
 
 The research lifecycle domain remains stopped at accepted Architecture 139-B.
-Architecture 140 / GUI-A17 is now the accepted safe-side **presentation**
-descendant:
+Architecture 140 / GUI-A18 is the accepted safe-side presentation descendant at
+`4debec8661edd475ecb6aa58b61b9aa115648fb7` /
+`c2392063383a863dff0be40bf08badae080374c7`.
 
-```text
-HEAD  56f3e8ef73f8aa62e2444c7fc9c75dfb212ff246
-TREE  5de6706064424aa4734b53cad4efffe5011284f4
-GUI   #10 / 38848617395 / SUCCESS / attempt 1 / 984 passed
-CI    #580 / 38848782422 / SUCCESS / attempt 1
-```
+A16 remains the sole acquisition/linkage boundary; A17 remains the sole audit
+composition boundary; A18 adds only the already-acquired-state lifecycle
+boundary map. Any future real-market/provider SHADOW observation acquisition,
+production compatibility, promotion, or post-SHADOW stage remains a separate
+architecture/effect boundary requiring a new explicit contract and review.
 
-A16 remains the only explicit local five-artifact acquisition and local SHADOW
-successor-linkage boundary. A17 uses only the immutable A16 page state and adds
-presentation-only provenance, policy-vs-recorded coverage/margin comparison,
-zero-effect audit and fixed governance. It adds no lifecycle file read, tenth
-service getter, domain parser/verifier, external lookup, provider, credential,
-broker, paper, scheduler/ACL, production compatibility, promotion, D1/D1R5/D2,
-or live authority.
-
-Any future real-market/provider SHADOW observation acquisition remains a separate
-protected architecture/effect boundary requiring a new explicit contract,
-source admission, effect accounting, and review. Further GUI-only work may
-continue from A17 only as a separately frozen read-only presentation contract.
+Further GUI-only work may continue automatically only as another separately
+frozen read-only presentation successor that consumes already acquired
+presentation state.
 
 ## Immediate next step
 
@@ -314,9 +330,9 @@ reviewed real bounded D1R5 clock/sleep/external-evidence qualification** on the
 exact accepted product source; this closeout does not execute it.
 
 For the parallel safe-side line, preserve accepted Architecture 139-B domain
-semantics, GUI-A16 acquisition/linkage semantics and GUI-A17 audit-presentation
-semantics. A17's current inventory is ACTIVE 64 / FULL 179 / ROBINHOOD 98 /
-LEGACY 221 / EXHAUSTIVE 400 / GUI 50.
+semantics, GUI-A16 acquisition/linkage semantics, GUI-A17 audit-presentation
+semantics, and GUI-A18 lifecycle-boundary-map semantics. A18's current inventory
+is ACTIVE 64 / FULL 179 / ROBINHOOD 98 / LEGACY 222 / EXHAUSTIVE 401 / GUI 51.
 
 Do not invoke real SHADOW acquisition, integrate into the product/history lineage,
 materialize a post-SHADOW stage, convert to production, or promote a strategy from

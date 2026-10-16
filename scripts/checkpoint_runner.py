@@ -10825,9 +10825,7 @@ def _arch134_production_paper_runtime_authority_check(
             expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
-            expected_pin = _canonical_current_inventory_test_pin(
-                relative, expected_pin
-            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11960,9 +11958,7 @@ def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
-            expected_pin = _canonical_current_inventory_test_pin(
-                relative, expected_pin
-            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R5 source drift: " + relative)
         for relative, allowed in ARCH134_D1R5_IMPORTS.items():
@@ -12079,9 +12075,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
-            expected_pin = _canonical_current_inventory_test_pin(
-                relative, expected_pin
-            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
@@ -12096,9 +12090,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
-            expected_pin = _canonical_current_inventory_test_pin(
-                relative, expected_pin
-            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
@@ -12122,9 +12114,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch140a18_current_inventory_test_pin(
                 relative, expected_pin
             )
-            expected_pin = _canonical_current_inventory_test_pin(
-                relative, expected_pin
-            )
+            expected_pin = _canonical_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {

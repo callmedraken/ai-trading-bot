@@ -29,6 +29,9 @@ from trading_bot.gui.mock_service import (
     MockGuiApplicationService,
     ResearchReportGuiApplicationService,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = (
@@ -68,6 +71,10 @@ class _RecordingService:
         self.calls += 1
         return unavailable_operator_operations_state()
 
+    def get_research_candidate_lifecycle_state(self):
+        self.calls += 1
+        return unavailable_research_candidate_lifecycle_state()
+
     def get_production_strategy_state(self):
         self.calls += 1
         return unavailable_production_strategy_state()
@@ -92,7 +99,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     assert application.applicationName() is not None
     assert window.page_ids == PAGE_IDS
     assert window.current_page_id == "home"
-    assert service.calls == 8
+    assert service.calls == 9
 
     window.select_page("paper")
     assert window.current_page_id == "paper"
@@ -103,7 +110,7 @@ def test_main_window_has_stable_pages_and_navigation_is_presentation_only() -> N
     window.select_page("paper")
 
     assert window.current_page_id == "paper"
-    assert service.calls == 8
+    assert service.calls == 9
     window.close()
 
 
@@ -155,11 +162,11 @@ def test_system_page_uses_already_acquired_state_without_service_reread() -> Non
     window = MainWindow(service)
 
     assert application.applicationName() is not None
-    assert service.calls == 8
+    assert service.calls == 9
 
     window.select_page("system")
 
-    assert service.calls == 8
+    assert service.calls == 9
     texts = [label.text() for label in window.findChildren(QLabel)]
     assert "System Health & Audit" in texts
     assert any("does not establish production readiness" in text for text in texts)
@@ -173,12 +180,12 @@ def test_evidence_page_uses_already_acquired_state_without_service_reread() -> N
     window = MainWindow(service)
 
     assert application.applicationName() is not None
-    assert service.calls == 8
+    assert service.calls == 9
 
     window.select_page("evidence")
 
     assert window.current_page_id == "evidence"
-    assert service.calls == 8
+    assert service.calls == 9
     texts = [label.text() for label in window.findChildren(QLabel)]
     assert "Evidence Timeline" in texts
     assert any("not a durable audit log" in text for text in texts)
@@ -192,5 +199,5 @@ def test_evidence_page_uses_already_acquired_state_without_service_reread() -> N
     source.setCurrentText("Research")
     application.processEvents()
 
-    assert service.calls == 8
+    assert service.calls == 9
     window.close()

@@ -5,6 +5,9 @@ from enum import Enum
 from uuid import UUID
 
 from trading_bot.gui.production_strategy_models import ProductionStrategyPageState
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+)
 from trading_bot.gui.runtime_models import RuntimePageState
 
 
@@ -44,6 +47,7 @@ class SupervisorPageState:
     runtime: RuntimePageState
     research_report_id: UUID | None = None
     research_experiment_result_id: UUID | None = None
+    research_lifecycle: ResearchCandidateLifecyclePageState | None = None
     supervisor_connected: bool = field(default=False, init=False)
     automatic_promotion_enabled: bool = field(default=False, init=False)
     human_promotion_required: bool = field(default=True, init=False)
@@ -51,6 +55,11 @@ class SupervisorPageState:
     can_research_replace_production: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
+        if (
+            self.research_lifecycle is not None
+            and type(self.research_lifecycle) is not ResearchCandidateLifecyclePageState
+        ):
+            raise TypeError("Exact lifecycle presentation state required")
         for value, kind in (
             (self.status, SupervisorPageStatus),
             (self.diagnostic, SupervisorDiagnostic),

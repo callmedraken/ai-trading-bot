@@ -107,7 +107,7 @@ def test_runtime_timeline_uses_only_explicit_timestamps_and_filter_mapping():
     }
 
 
-def test_main_window_exactly_eight_reads_and_runtime_evidence_source_navigation(
+def test_main_window_exactly_nine_reads_and_runtime_evidence_source_navigation(
     monkeypatch,
 ):
     application = QApplication.instance() or QApplication([])
@@ -128,6 +128,7 @@ def test_main_window_exactly_eight_reads_and_runtime_evidence_source_navigation(
         "get_operator_observability_state",
         "get_runtime_state",
         "get_production_strategy_state",
+        "get_research_candidate_lifecycle_state",
     ):
         original = getattr(service, name)
 
@@ -148,11 +149,12 @@ def test_main_window_exactly_eight_reads_and_runtime_evidence_source_navigation(
     window.resize(920, 620)
     window.show()
     application.processEvents()
-    assert len(reads) == 8 and len(set(reads)) == 8
+    assert len(reads) == 9 and len(set(reads)) == 9
     assert len(opens) == 3 and len(set(opens)) == 3
     assert window.page_ids == (
         "home",
         "research",
+        "research-lifecycle",
         "paper",
         "paper-account",
         "market-data",
@@ -174,5 +176,5 @@ def test_main_window_exactly_eight_reads_and_runtime_evidence_source_navigation(
     )
     button.click()
     assert window.current_page_id == "runtime"
-    assert len(reads) == 8 and len(opens) == 3
+    assert len(reads) == 9 and len(opens) == 3
     window.close()

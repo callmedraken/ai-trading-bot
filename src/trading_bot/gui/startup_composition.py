@@ -32,6 +32,13 @@ from trading_bot.gui.production_strategy_models import (
 from trading_bot.gui.production_strategy_service import (
     ProductionStrategyContractInspectionService,
 )
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    ResearchCandidateLifecyclePageState,
+    unavailable_research_candidate_lifecycle_state,
+)
+from trading_bot.gui.research_candidate_lifecycle_service import (
+    ResearchCandidateLifecycleInspectionService,
+)
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
     unavailable_research_state,
@@ -78,6 +85,11 @@ class GuiStartupConfiguration:
     paper_account_successor: Path | None = None
     paper_account_successor_expected_sha256: str | None = None
     paper_account_successor_expected_byte_length: int | None = None
+    research_walk_forward_candidate: Path | None = None
+    research_shadow_binding: Path | None = None
+    research_shadow_observation_batch: Path | None = None
+    research_shadow_qualification: Path | None = None
+    research_shadow_candidate: Path | None = None
 
     def __post_init__(self) -> None:
         path_fields = (
@@ -92,11 +104,28 @@ class GuiStartupConfiguration:
             "paper_account_snapshot",
             "paper_account_cycle_report",
             "paper_account_successor",
+            "research_walk_forward_candidate",
+            "research_shadow_binding",
+            "research_shadow_observation_batch",
+            "research_shadow_qualification",
+            "research_shadow_candidate",
         )
         for name in path_fields:
             value = getattr(self, name)
             if value is not None and not isinstance(value, Path):
                 raise TypeError(f"{name} must be a Path or None")
+
+        lifecycle_paths = (
+            self.research_walk_forward_candidate,
+            self.research_shadow_binding,
+            self.research_shadow_observation_batch,
+            self.research_shadow_qualification,
+            self.research_shadow_candidate,
+        )
+        if any(path is not None for path in lifecycle_paths) and not all(
+            path is not None for path in lifecycle_paths
+        ):
+            raise ValueError("research lifecycle requires all five explicit artifacts")
 
         text_fields = (
             "market_data_expected_sha256",
@@ -162,6 +191,17 @@ class ReadOnlyGuiApplicationService:
         if type(config) is not GuiStartupConfiguration:
             raise TypeError("config must be exactly GuiStartupConfiguration")
         self._config = config
+        self._lifecycle = (
+            None
+            if config.research_walk_forward_candidate is None
+            else ResearchCandidateLifecycleInspectionService(
+                config.research_walk_forward_candidate,
+                config.research_shadow_binding,
+                config.research_shadow_observation_batch,
+                config.research_shadow_qualification,
+                config.research_shadow_candidate,
+            )
+        )
         self._production_strategy = (
             None
             if config.production_strategy_contract is None
@@ -354,6 +394,14 @@ class ReadOnlyGuiApplicationService:
     def get_research_state(self) -> ResearchPageState:
         """Return the configured research report or deterministic unavailable state."""
         return self._research_state()
+
+    def get_research_candidate_lifecycle_state(
+        self,
+    ) -> ResearchCandidateLifecyclePageState:
+        """Acquire only the explicitly selected local set; never from Overview."""
+        if self._lifecycle is None:
+            return unavailable_research_candidate_lifecycle_state()
+        return self._lifecycle.get_research_candidate_lifecycle_state()
 
     def _research_state(self) -> ResearchPageState:
         if self._research is None:

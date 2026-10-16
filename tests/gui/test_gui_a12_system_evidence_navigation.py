@@ -36,6 +36,9 @@ from trading_bot.gui import (
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
 from trading_bot.gui.main_window import MainWindow
 from trading_bot.gui.mock_service import MockGuiApplicationService
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 from trading_bot.gui.system_health_page import SystemHealthPage
 
 _UUID1 = UUID("11111111-1111-1111-1111-111111111111")
@@ -104,6 +107,10 @@ class _NavigationService:
     def get_operator_observability_state(self):
         self.calls += 1
         return unavailable_operator_operations_state()
+
+    def get_research_candidate_lifecycle_state(self):
+        self.calls += 1
+        return unavailable_research_candidate_lifecycle_state()
 
     def get_production_strategy_state(self):
         self.calls += 1
@@ -233,7 +240,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     window.show()
     application.processEvents()
 
-    assert service.calls == 8
+    assert service.calls == 9
     window.select_page("system")
     buttons = window.findChildren(QPushButton, "systemHealthViewEvidenceButton")
     assert len(buttons) == 2
@@ -242,7 +249,7 @@ def test_main_window_system_navigation_reuses_existing_evidence_state() -> None:
     application.processEvents()
 
     assert window.current_page_id == "evidence"
-    assert service.calls == 8
+    assert service.calls == 9
 
     source = window.findChild(QComboBox, "evidenceTimelineSourceFilter")
     search = window.findChild(QLineEdit, "evidenceTimelineSearch")

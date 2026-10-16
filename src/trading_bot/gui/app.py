@@ -55,10 +55,20 @@ def _parse_startup_arguments(
     parser.add_argument("--runtime-qualification-evidence", type=Path)
     parser.add_argument("--runtime-session-evidence", type=Path)
     parser.add_argument("--production-strategy-contract", type=Path)
+    parser.add_argument("--research-walk-forward-candidate", type=Path)
+    parser.add_argument("--research-shadow-binding", type=Path)
+    parser.add_argument("--research-shadow-observation-batch", type=Path)
+    parser.add_argument("--research-shadow-qualification", type=Path)
+    parser.add_argument("--research-shadow-candidate", type=Path)
 
     arguments, qt_arguments = parser.parse_known_args(argv)
     try:
         config = GuiStartupConfiguration(
+            research_walk_forward_candidate=arguments.research_walk_forward_candidate,
+            research_shadow_binding=arguments.research_shadow_binding,
+            research_shadow_observation_batch=arguments.research_shadow_observation_batch,
+            research_shadow_qualification=arguments.research_shadow_qualification,
+            research_shadow_candidate=arguments.research_shadow_candidate,
             production_strategy_contract=arguments.production_strategy_contract,
             runtime_acl_evidence=arguments.runtime_acl_evidence,
             runtime_qualification_evidence=arguments.runtime_qualification_evidence,

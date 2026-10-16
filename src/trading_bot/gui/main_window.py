@@ -28,6 +28,9 @@ from trading_bot.gui.models import (
 from trading_bot.gui.operator_observability_page import OperatorOperationsPage
 from trading_bot.gui.paper_account_page import PaperAccountPage
 from trading_bot.gui.paper_page import PaperPage
+from trading_bot.gui.research_candidate_lifecycle_page import (
+    ResearchCandidateLifecyclePage,
+)
 from trading_bot.gui.research_page import ResearchPage
 from trading_bot.gui.runtime_page import RuntimePage
 from trading_bot.gui.services import GuiApplicationService
@@ -39,6 +42,7 @@ from trading_bot.gui.system_health_page import SystemHealthPage
 PAGE_IDS = (
     "home",
     "research",
+    "research-lifecycle",
     "paper",
     "paper-account",
     "market-data",
@@ -84,8 +88,9 @@ class MainWindow(QMainWindow):
         operations_state = service.get_operator_observability_state()
         runtime_state = service.get_runtime_state()
         strategy_state = service.get_production_strategy_state()
+        lifecycle_state = service.get_research_candidate_lifecycle_state()
         supervisor_state = build_supervisor_state(
-            research_state, runtime_state, strategy_state
+            research_state, runtime_state, strategy_state, lifecycle_state
         )
         evidence_timeline_state = build_evidence_timeline_state(
             research_state,
@@ -95,6 +100,7 @@ class MainWindow(QMainWindow):
             operations_state,
             runtime_state,
             supervisor_state,
+            lifecycle_state,
         )
         system_health_state = build_system_health_state(
             self._overview,
@@ -105,6 +111,7 @@ class MainWindow(QMainWindow):
             operations_state,
             runtime_state,
             supervisor_state,
+            lifecycle_state,
         )
         self._page_index = {page_id: index for index, page_id in enumerate(PAGE_IDS)}
 
@@ -124,6 +131,10 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._build_home_page(self._overview))
         self._research_page = ResearchPage(research_state, service, self)
         self._stack.addWidget(self._research_page)
+        self._research_lifecycle_page = ResearchCandidateLifecyclePage(
+            lifecycle_state, self
+        )
+        self._stack.addWidget(self._research_lifecycle_page)
         self._paper_page = PaperPage(paper_state, self)
         self._stack.addWidget(self._paper_page)
         self._paper_account_page = PaperAccountPage(paper_account_state, self)
@@ -203,6 +214,7 @@ class MainWindow(QMainWindow):
         labels = {
             "home": "Overview",
             "research": "Research",
+            "research-lifecycle": "Research Lifecycle",
             "paper": "Paper",
             "paper-account": "Paper Account",
             "market-data": "Market Data",

@@ -1,4 +1,4 @@
-"""Eight acquisitions, pure System/Evidence and zero navigation rereads/effects."""
+"""Nine acquisitions, pure System/Evidence and zero navigation rereads/effects."""
 
 import ast
 import json
@@ -31,7 +31,7 @@ from trading_bot.strategies.moving_average import MovingAverageCrossoverConfig
 from trading_bot.strategies.production import ProductionStrategyContract
 
 
-def test_eight_acquisitions_one_file_and_source_navigation(tmp_path, monkeypatch):
+def test_nine_acquisitions_one_file_and_source_navigation(tmp_path, monkeypatch):
     application = QApplication.instance() or QApplication([])
     path = tmp_path / "selected.json"
     contract = ProductionStrategyContract(
@@ -55,6 +55,7 @@ def test_eight_acquisitions_one_file_and_source_navigation(tmp_path, monkeypatch
         "get_operator_observability_state",
         "get_runtime_state",
         "get_production_strategy_state",
+        "get_research_candidate_lifecycle_state",
     )
     for name in names:
         original = getattr(service, name)
@@ -80,6 +81,7 @@ def test_eight_acquisitions_one_file_and_source_navigation(tmp_path, monkeypatch
     assert window.page_ids == (
         "home",
         "research",
+        "research-lifecycle",
         "paper",
         "paper-account",
         "market-data",
@@ -89,7 +91,7 @@ def test_eight_acquisitions_one_file_and_source_navigation(tmp_path, monkeypatch
         "evidence",
         "system",
     )
-    assert window._navigation.item(7).text() == "Supervisor"
+    assert window._navigation.item(8).text() == "Supervisor"
     for page in window.page_ids:
         window.select_page(page)
         application.processEvents()

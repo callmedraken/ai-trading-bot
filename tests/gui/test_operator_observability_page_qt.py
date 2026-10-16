@@ -53,6 +53,9 @@ from trading_bot.gui.operator_observability_models import (
 )
 from trading_bot.gui.operator_observability_page import OperatorOperationsPage
 from trading_bot.gui.operator_strategy_preview import evaluate_operator_strategy_preview
+from trading_bot.gui.research_candidate_lifecycle_models import (
+    unavailable_research_candidate_lifecycle_state,
+)
 from trading_bot.strategies import MovingAverageCrossoverConfig
 
 _REQUIRED = (
@@ -243,6 +246,9 @@ class _RecordingService:
     def get_operator_observability_state(self) -> OperatorOperationsPageState:
         self.operations_calls += 1
         return self.state
+
+    def get_research_candidate_lifecycle_state(self):
+        return unavailable_research_candidate_lifecycle_state()
 
     def get_production_strategy_state(self):
         return unavailable_production_strategy_state()

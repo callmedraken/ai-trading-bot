@@ -1,5 +1,33 @@
 # AI Trading Bot - Project Status
 
+## D1R9 read-only host readiness passed
+
+The corrected C2 scheduler observation has now been exercised on the real Windows
+host and returned exactly `{"status":"ABSENT"}` with exit code 0.
+
+Combined with the immediately preceding read-only readiness evidence, the host
+boundary is PASS for exact D1R9-C2 source
+`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` /
+`25a962daf3922c4226c7e395eba8613e1b03bbaf`:
+
+- D1R9/D1R7/D1R8 exact local/tracking/live source admission PASS;
+- D1R9 namespace empty / no active authorization;
+- D1R5/D1R6 exact immutable evidence and predecessor binding PASS;
+- prospective target 2026-10-19;
+- production runtime PRESENT_COMPATIBLE with fixed runtime identities;
+- prospective D1R7/D1R8 slots absent;
+- exact D1R9 scheduler task ABSENT;
+- all audited scheduler/journal/claim/child/credential/provider/paper/broker/ACL/
+  D2/live effects zero.
+
+The next separately reviewed protected boundary is one D1R9 top-level
+authorization for that single derived session. It may reserve one D1R9 journal,
+create the fixed D1R9 task once, demand-start it once, and thereafter allow the
+task-owned supervisor to wait/reconcile automatically. The accepted source
+continues to forbid scheduler update/delete, target rollover, duplicate child
+entry, broker/live/D2 effects and automatic retry after ambiguous protected
+entry.
+
 ## D1R9-C2 scheduler observation correction source accepted
 
 Architecture 134-D1R9-C2 is SOURCE ACCEPTED on the existing isolated feature

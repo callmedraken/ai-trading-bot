@@ -65,3 +65,25 @@ retested. Both touched Ruff phases passed for 30 Python files; the PowerShell
 adapter parsed without execution; `git diff --check` passed. The source authority
 chain passed with all 69 frozen predecessor dictionary digests unchanged. Local
 iteration failures are not CI attempts and no broad local profile was run.
+
+## Corrective checkpoint D1R9-C1
+
+Implementation `776d68d6b529a665d9d6e3670298687add3d8f1a`, tree
+`d94640c2758609f3861f458e1fa672b0dcc6a718`, reached terminal failure in
+Checkpoint Source Gates #605 / 39019001334 / push / attempt 1. Source-static
+passed; active tests reported 3318 passed / 5 skipped / 35 failed. Canonical
+ROBINHOOD reported 10325 cases: 10284 passed / 6 skipped / 35 failed / 0 errors,
+wall 293.795 seconds (hygiene passed). Both jobs exposed the same test-only
+failures: 33 source-admission fake cases depended on the local fixed F: roots
+and interpreter; two retained registration assertions omitted D1R9. Original
+failed CI artifacts and source remain preserved; no rerun/amend/rewrite occurs.
+
+C1 replaces only those fake root/interpreter bindings and stale registration
+assertions and refreshes the D1R9-owned source/test pins. It changes no runtime,
+authority, ordering, scheduler, child, protected-effect or workflow semantics.
+All predecessor dictionaries/digests and accepted child refs/executables remain
+frozen. Focused affected tests and static checks precede one new atomic ordinary
+push and its fresh mapped canonical CI run. No real protected effect is invoked.
+
+C1 focused final result: all 35 exact failed cases passed. No broad local
+certification was run; the replacement mapped run remains GitHub-owned.

@@ -614,7 +614,16 @@ def test_complete_looking_but_invalid_child_artifacts_never_retry(
     ],
 )
 def test_exact_three_source_readmission_matrix(fake, monkeypatch, root_index, field):
+    # The fixed production locations/interpreter are admitted through fake Git;
+    # the test must not depend on John's F: checkouts or virtual environment.
+    producer = fake.parent.parent / "producer-source"
+    consumer = fake.parent.parent / "consumer-source"
+    producer.mkdir()
+    consumer.mkdir()
     monkeypatch.setattr(bridge, "ROOT", ROOT)
+    monkeypatch.setattr(bridge, "R7_ROOT", producer)
+    monkeypatch.setattr(bridge, "R8_ROOT", consumer)
+    monkeypatch.setattr(bridge, "PYTHON", Path(sys.executable))
     monkeypatch.setattr(bridge, "load_store", lambda: s)
     facts = c.make_facts(SOURCE, fake.now, fake.binding)
     pairs = [(ROOT, SOURCE), (bridge.R7_ROOT, s.D1R7), (bridge.R8_ROOT, s.D1R8)]

@@ -13218,7 +13218,7 @@ ARCH134_D1R9_SOURCE_PINS: Final = {
         "314921f10c2742d34cd6f8369c5ad3e9193e8199"
     ),
     "docs/validation/arch134-d1r9-arbitrary-time-d1-supervisor.md": (
-        "860946e6f498b1b8bf352fc18fa45bdcef726a47"
+        "b224e11a27d9ae1fb84530f73cc49f4b32c379d1"
     ),
     "scripts/arch134_d1r9_bridge.py": ("edf3bb8eee81ac73815e6807a3dbc556b456517d"),
     "scripts/arch134_d1r9_d1r7_child.py": ("8574331c1a9249d438ecffabb7c651f1fb5a0126"),
@@ -13235,7 +13235,7 @@ ARCH134_D1R9_SOURCE_PINS: Final = {
         "a0ebf56afa089c245dbaaebcf2182bdb9486bf49"
     ),
     "tests/review_paper/test_d1_session_supervisor.py": (
-        "020fb5b647f33c2636c8153e6922542ff1ca8eef"
+        "648837a887ea8f2bbc741f804314d293a8511c60"
     ),
 }
 ARCH134_D1R9_PREDECESSOR_TEST_PINS: Final = {
@@ -13356,7 +13356,7 @@ ARCH134_D1R9_TEST_PIN_OVERRIDES: Final = {
         "b20c100387aa78e1f973c5cd0edcb0b6a342091b"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "863c6518041e3fd41e22805d18634d1a1ec543ff"
+        "7105586070371a3a0f038b51c31b7f638f7a5c04"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
         "83bee4c9cd41c52a1013f6a34f7148c8d3824d2b"
@@ -13581,7 +13581,7 @@ ARCH134_D1R9_PREDECESSOR_TEST_PINS_SHA256: Final = (
     "7b106297d65d30291b6f77060045c10efe069e86b33fd39a4e8b8c23640a511a"
 )
 ARCH134_D1R9_REVIEWED_TEST_PINS_SHA256: Final = (
-    "34986dd41a0986d3a117b79bbd044299c644420d65e085c5579a6ff6ff86e4ba"
+    "89a491c535ed2da2a20e4df707e7ce49e861c7c8955dd4a040807626fed784e4"
 )
 ARCH134_D1R9_TESTS: Final = (
     "tests/review_paper/test_d1_session_supervisor.py",

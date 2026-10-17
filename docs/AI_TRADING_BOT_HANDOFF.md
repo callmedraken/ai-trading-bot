@@ -1,5 +1,35 @@
 # AI Trading Bot - Current Handoff
 
+## D1R9 arbitrary-time supervisor design frozen
+
+Architecture 134-D1R9 is the active next source milestone. It corrects the
+manual-window regression discovered when a D1R7 invocation on Saturday,
+2026-10-17 failed in `Plan(...)` with
+`current published session unavailable or expired`.
+
+Read-only reconciliation proved the attempt failed before source admission,
+predecessor binding and O_EXCL reservation. No D1R7 artifact/slot was consumed
+and no protected effect occurred.
+
+The standing Architecture-134 requirement is arbitrary-time startup while the PC
+is ON: weekends, holidays, after-hours and premarket must resolve/reconcile to
+the next legal published session and wait automatically. Accepted D1R7/D1R8
+remain frozen narrow primitives; D1R9 is a successor supervisor above them.
+
+D1R9 will provide one top-level one-session authorization, deterministic
+next-session binding, durable NEXT_SESSION_WAIT/PREMARKET_WAIT/restart
+reconciliation, automatic D1R7 publication when its current-date contract becomes
+legal, source-owned D1R7 byte/hash proof reconciliation, and automatic D1R8
+delegation at/after open+5 minutes. Ambiguous protected effects still fail closed
+and never auto-retry.
+
+Manual D1R7 publication and manual D1R8 execution are no longer the active
+progression path. They remain unauthorized while D1R9 source is implemented and
+reviewed.
+
+See [D1R9 architecture](architecture/134-d1r9-arbitrary-time-d1-supervisor.md)
+and [validation](validation/arch134-d1r9-arbitrary-time-d1-supervisor.md).
+
 ## Purpose and authority
 
 This is the bounded active-session and current-boundary handoff. It records
@@ -274,12 +304,12 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R7 and the Option-C narrow D1R7-bound D1R8 consumer are SOURCE ACCEPTED,
-and the required D1R8 optional-SDK runtime verification is complete. These facts
-still grant no operational publication or execution authority. The remaining
-protected boundary is the separately reviewed current-session D1R7 publication
-and separately bound one-session D1R8 execution contract. October 16 D1R5/D1R6
-evidence remains immutable; no retry or scheduler cleanup is implied.
+D1R7 and D1R8 are SOURCE ACCEPTED and D1R8 optional-SDK verification is
+complete, but manual current-session progression is superseded as the active path
+by the frozen D1R9 arbitrary-time supervisor design. D1R9 source must be
+implemented, CI-admitted and exact-source accepted before another real D1
+attempt. October 16 D1R5/D1R6 evidence remains immutable; the failed Saturday
+D1R7 command was pre-reservation and consumed no slot or effect.
 
 Until a protected operation is separately reviewed and authorized:
 
@@ -404,14 +434,15 @@ fast-forward only, and the accepted D1R8 feature ref remains
 verification completed with 40 focused PASS / 0 SKIP and zero audited network or
 native-credential attempts.
 
-- ChatGPT/Sol High now owns the read-only protected-effect readiness review for
-  the exact D1R7 prerequisite-publication -> D1R8 one-session execution chain.
-  The review must freeze current-session admission, D1R7 artifact/proof binding,
-  D1R8 accepted source identity, one-shot reservation/consumption, effect budgets,
-  source re-admission, terminal outcomes, and ambiguity/no-retry behavior.
-- No D1R7 publication or D1R8 execution occurs during this review. If the reviewed
-  contract is sound, the same transition response must provide the exact bounded
-  operator command/prompt plus success evidence and STOP conditions.
+- Architecture 134-D1R9 is the active next source milestone. Use Sol High on a
+  new isolated D1R9 branch/worktree. Implement one-command arbitrary-time
+  one-session reconciliation above frozen D1R7/D1R8: next-session resolution,
+  durable waits/restarts, automatic D1R7 delegation/proof reconciliation, then
+  automatic D1R8 delegation when admitted.
+- No real D1R7/D1R8/scheduler/provider/credential/paper operation occurs during
+  source implementation. Codex stays with the checkpoint through terminal mapped
+  CI. ChatGPT then performs exact GitHub source acceptance and automatically
+  advances the next safe step.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

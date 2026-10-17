@@ -1,5 +1,35 @@
 # AI Trading Bot - Project Status
 
+## D1R9 arbitrary-time supervisor design frozen
+
+Architecture 134-D1R9 is the active next source milestone. It corrects the
+manual-window regression discovered when a D1R7 invocation on Saturday,
+2026-10-17 failed in `Plan(...)` with
+`current published session unavailable or expired`.
+
+Read-only reconciliation proved the attempt failed before source admission,
+predecessor binding and O_EXCL reservation. No D1R7 artifact/slot was consumed
+and no protected effect occurred.
+
+The standing Architecture-134 requirement is arbitrary-time startup while the PC
+is ON: weekends, holidays, after-hours and premarket must resolve/reconcile to
+the next legal published session and wait automatically. Accepted D1R7/D1R8
+remain frozen narrow primitives; D1R9 is a successor supervisor above them.
+
+D1R9 will provide one top-level one-session authorization, deterministic
+next-session binding, durable NEXT_SESSION_WAIT/PREMARKET_WAIT/restart
+reconciliation, automatic D1R7 publication when its current-date contract becomes
+legal, source-owned D1R7 byte/hash proof reconciliation, and automatic D1R8
+delegation at/after open+5 minutes. Ambiguous protected effects still fail closed
+and never auto-retry.
+
+Manual D1R7 publication and manual D1R8 execution are no longer the active
+progression path. They remain unauthorized while D1R9 source is implemented and
+reviewed.
+
+See [D1R9 architecture](architecture/134-d1r9-arbitrary-time-d1-supervisor.md)
+and [validation](validation/arch134-d1r9-arbitrary-time-d1-supervisor.md).
+
 ## D1R8 source accepted
 
 Architecture 134-D1R8 SOURCE ACCEPTED.
@@ -286,12 +316,12 @@ or promotion authority is materialized.
 
 ## Current blocker / protected boundary
 
-D1R7 and the Option-C narrow D1R7-bound D1R8 consumer are SOURCE ACCEPTED,
-and the required D1R8 optional-SDK runtime verification is complete. These facts
-still grant no operational publication or execution authority. The remaining
-protected boundary is the separately reviewed current-session D1R7 publication
-and separately bound one-session D1R8 execution contract. October 16 D1R5/D1R6
-evidence remains immutable; no retry or scheduler cleanup is implied.
+D1R7 and D1R8 are SOURCE ACCEPTED and D1R8 optional-SDK verification is
+complete, but manual current-session progression is superseded as the active path
+by the frozen D1R9 arbitrary-time supervisor design. D1R9 source must be
+implemented, CI-admitted and exact-source accepted before another real D1
+attempt. October 16 D1R5/D1R6 evidence remains immutable; the failed Saturday
+D1R7 command was pre-reservation and consumed no slot or effect.
 
 Nothing in the D1R5 PASS, D1R7/D1R8 source acceptance, SDK verification, or this
 repository integration authorizes that boundary implicitly. Until a protected
@@ -340,17 +370,15 @@ not a side effect of accepting D1R5 PASS.
 
 ### Next
 
-- ChatGPT/Sol High performs the read-only protected-effect readiness review for
-  the exact accepted D1R7 prerequisite-publication -> D1R8 one-session execution
-  chain. Freeze target-session admission, exact D1R7 artifact/proof binding,
-  current accepted D1R8 source identity, one-shot reservation/consumption,
-  provider/credential/Robinhood/paper budgets, source re-admission points,
-  terminal outcomes, ambiguity/no-retry semantics, and the exact operator
-  evidence required before any later paper-soak decision.
-- Do not invoke D1R7 or D1R8 during that review. If the contract remains sound,
-  ChatGPT must provide the exact bounded operator command/prompt, success evidence,
-  and STOP conditions in the same transition response rather than waiting for a
-  follow-up request.
+- Implement Architecture 134-D1R9 on a new isolated source branch/worktree using
+  Sol High. D1R9 must provide arbitrary-time one-session startup/reconciliation,
+  durable waiting/restart state, source-owned D1R7 proof reconciliation and
+  automatic D1R8 delegation while preserving all accepted child one-shot/effect
+  limits.
+- Do not invoke real D1R7, D1R8, scheduler mutation, credentials/providers or
+  paper effects during source implementation. After terminal-green mapped CI,
+  ChatGPT performs exact source review and automatically supplies the next
+  bounded operational step.
 - Keep accepted D1R5/D1R6 evidence immutable; no rerun/resume/repair or scheduler
   cleanup is implied.
 

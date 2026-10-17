@@ -481,6 +481,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        "arch134-d1r8-d1-session-execution-consumer": "robinhood",
         "arch134-d1r7-d1-session-authorization": "robinhood",
         "arch134-d1r6-overnight-wake-arming": "robinhood",
         "arch134-d1r5-pre-market-wake-qualification": "robinhood",
@@ -513,8 +514,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 66
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 66
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 67
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")
@@ -635,7 +636,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         is None
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 66
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
     assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
         runner.ARCH134_ARMED_PAPER_NAME,
         runner.ARCH134_PRODUCTION_STRATEGY_NAME,

@@ -1,5 +1,29 @@
 # AI Trading Bot - Project Status
 
+## D1R8 source implementation pending review
+
+Architecture 134-D1R8 implements the mandatory D1R7-bound execution consumer on
+`feature/robinhood-production-paper-d1-session-execution`, from frozen develop
+HEAD `3b3a11e822ad42a4dadfe0ac05577df3281bd2bb` / TREE
+`e559bc6e03ba63e2c276840e647f72461bdaabee` (gate #599 / 38998238712,
+push, attempt 1 SUCCESS). This authorized SOURCE-ONLY checkpoint requires
+one atomic push and terminal mapped CI before ChatGPT exact GitHub source review.
+No D1R8 source acceptance or final executable identity is asserted here.
+See [architecture](architecture/134-d1r8-d1-session-execution-consumer.md) and
+[validation](validation/arch134-d1r8-d1-session-execution-consumer.md).
+
+Current branch inventory: ACTIVE 67 / FULL 182 / ROBINHOOD 101 / LEGACY 222 /
+EXHAUSTIVE 404 / GUI 51. All historical executable sources, predecessor pin
+dictionaries/digests and workflow fallback remain frozen under the final
+test-only successor overlay. D1R7's accepted producer ref remains unchanged.
+No real D1R7 artifact has been published. D1R7 publication and D1R8 operational
+execution, credentials/providers, paper mutation, scheduler, broker, D2 and live
+effects remain unauthorized.
+
+Next concrete step: complete focused checks, make the authorized single atomic
+commit/push, wait for attempt-1 terminal CI, then STOP for ChatGPT/Sol High exact
+GitHub source review. CI owns ROBINHOOD; no duplicate local certification.
+
 ## D1R7 source accepted
 
 Architecture 134-D1R7 SOURCE ACCEPTED.
@@ -26,18 +50,15 @@ See [D1R7 architecture](architecture/134-d1r7-d1-session-authorization.md) and
 [validation](validation/arch134-d1r7-d1-session-authorization.md) for the frozen
 source contract; this closeout records its subsequent source acceptance.
 
-Current source inventory is ACTIVE 66 / FULL 181 / ROBINHOOD 100 / LEGACY 222 /
+Accepted D1R7 source inventory was ACTIVE 66 / FULL 181 / ROBINHOOD 100 / LEGACY 222 /
 EXHAUSTIVE 403 / GUI 51. Historical integrated 65/180/99/222/402 counts below
 remain provenance. Frozen predecessor pins/digests and workflow fallback remain
 unchanged under the bounded successor overlay. This docs integration preserves
 the accepted D1R7 feature ref, the optional history mirror, and D1R5/D1R6 refs.
 
-The next protected source milestone is the separate fixed-branch D1 execution
-consumer. Its proposed successor architecture identifier is **134-D1R8**, on
-`feature/robinhood-production-paper-d1-session-execution`. D1R8 implementation
-is not yet authorized; **ChatGPT/Sol High source/design audit is next**. No
-successor HEAD/TREE is asserted. Real D1R7 publication must wait for that future
-source's separate SOURCE ACCEPTED and reviewed operational authorization.
+The separate fixed-branch D1 execution consumer is now the authorized SOURCE-ONLY
+**134-D1R8** implementation described above. Real D1R7 publication must wait for
+that source's separate SOURCE ACCEPTED and reviewed operational authorization.
 No host/evidence/scheduler/provider/store/trading operation is part of this work.
 
 ## Current phase
@@ -221,10 +242,9 @@ or promotion authority is materialized.
 
 D1R7 source is accepted, but its prerequisite-only result cannot authorize
 a D1 session or operational publication. The next protected source milestone
-is the separate fixed-branch D1 execution consumer, proposed Architecture
-134-D1R8. Implementation is not yet authorized; ChatGPT/Sol High source/design
-audit must establish its contract before implementation or later source
-acceptance. Any D1 operation remains separately protected.
+is the separate fixed-branch D1 execution consumer, Architecture 134-D1R8.
+Its authorized source implementation now awaits terminal CI and ChatGPT/Sol
+High exact GitHub source review. Any D1 operation remains separately protected.
 
 Nothing in the D1R5 PASS or this repository integration authorizes that boundary
 implicitly. Until a new exact contract is implemented, reviewed, admitted, and
@@ -273,10 +293,10 @@ not a side effect of accepting D1R5 PASS.
 
 ### Next
 
-- ChatGPT/Sol High performs the source/design audit for the separate fixed-branch
-  D1 execution consumer, proposed Architecture 134-D1R8, on
-  `feature/robinhood-production-paper-d1-session-execution`. D1R8 implementation
-  is not yet authorized. Do not publish real D1R7 evidence before that consumer
+- ChatGPT/Sol High reviews the exact source diff after terminal green for the
+  separate D1 execution consumer, Architecture 134-D1R8, on
+  `feature/robinhood-production-paper-d1-session-execution`.
+  Do not publish real D1R7 evidence before that consumer
   reaches SOURCE ACCEPTED and operational publication is separately authorized.
 - Keep accepted D1R5/D1R6 evidence immutable; no rerun/resume/repair or scheduler
   cleanup is implied.

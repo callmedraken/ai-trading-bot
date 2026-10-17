@@ -691,11 +691,11 @@ def test_source_authority_and_source_only_registration():
     spec = runner._checkpoint_specs()[NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == admission.SOURCE_BRANCH
-    assert runner.ACTIVE_CI_CHECKPOINTS[-16:-14] == (
+    assert runner.ACTIVE_CI_CHECKPOINTS[-17:-15] == (
         "arch133-robinhood-reprovision-indeterminate-reconciliation",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 68
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
 
 

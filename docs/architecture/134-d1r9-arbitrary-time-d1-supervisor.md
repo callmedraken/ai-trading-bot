@@ -1,6 +1,6 @@
-# Architecture 134-D1R9 — arbitrary-time one-session D1 supervisor/reconciler
+# Architecture 134-D1R9 â€” arbitrary-time one-session D1 supervisor/reconciler
 
-Status: DESIGN FROZEN; source implementation is the next milestone. This
+Status: SOURCE IMPLEMENTED; pending exact GitHub source review and acceptance. This
 successor corrects the arbitrary-time startup regression discovered on
 2026-10-17. Accepted D1R7 and D1R8 remain frozen and byte-identical. This design
 authorizes no real scheduler, credential, provider, D1R7, D1R8 or paper effect.
@@ -204,3 +204,60 @@ Ruff and diff checks, exact-file stage, one atomic commit/push and mapped CI to
 terminal. Corrective pushes are separately declared checkpoints. No real D1R7,
 D1R8, scheduler, provider, credential or paper effect is authorized by source
 implementation.
+
+## Implemented source surface and operational boundary
+
+The supervisor is `d1_session_supervisor.py`; the standard-library-only journal
+and lifetime locks are `d1_session_supervisor_store.py`; Windows composition is
+`d1_session_supervisor_host.py`. All three live in `src/trading_bot/review_paper/`.
+The fixed `scripts/run_arch134_d1r9.py` launcher exposes only `--authorize`,
+`--resume`, `--status`, and reviewed source assertions `--accepted-head` /
+`--accepted-tree` for interactive authorization. Resume accepts no source or
+semantic selectors and never installs or repairs a task. Status is read-only.
+
+Authorization binds the exact source and paper/session/interpreter identities
+and hashes. Waits re-admit those bindings, immutable predecessors and current
+time. The paper/session contents may change only after the durable D1R8 intent;
+their file identities and the interpreter binding remain fixed. A regressing
+clock closes BLOCKED. Closed wait states append only when changing state, with
+at most 128 records / 131072 bytes. An exhausted or malformed slot stays consumed.
+
+`arch134_d1r9_bridge.py` loads only the standard-library journal codec before
+selecting the accepted child package root. Separate fixed D1R7/D1R8 adapters use
+isolated Python processes, null stdin/stdout/stderr, exact source re-admission
+and independently verified prerequisites. Durable O_EXCL child claims prevent
+even a direct adapter relaunch from entering a child twice. A separate OS
+lifetime lock detects a surviving child; uncertain liveness closes INDETERMINATE.
+Complete canonical artifacts can reconcile a consumed intent after process death;
+missing, invalid or partial evidence cannot retry. Child exit status/stdout does
+not confer completion. D1R8 proof is built internally from the exact D1R7 bytes.
+
+`arch134_d1r9_scheduler.ps1` owns a new fixed task
+`\AITradingBot-Arch134-D1R9-OneSessionSupervisor-v1`. The one current-user logon
+trigger uses InteractiveToken / least privilege. The fixed action is the D1R9
+launcher with `--resume`; WakeToRun=false, IgnoreNew, demand-start permitted,
+three one-minute failure restarts, no forced termination, and no execution time
+limit for weekend waits. No market trigger, update or deletion API exists. The initial demand start has
+its own durable intent, single-use claim, native acknowledgement and readback.
+Create is maintenance before SUPERVISOR_READY, with durable intent, independent
+single-use claim, native return, exact readback and acknowledgement. The initial authorizer
+records SCHEDULER_RUN_INTENT / SCHEDULER_RUN_ACK while holding the supervisor
+lock, then exits. The task waits only a bounded quantum for that lock and owns
+the actual supervisor process and its failure restarts. Resume is runtime-only
+and cannot mutate scheduler configuration or demand-start another process. An existing exact task
+is reused read-only; drift fails closed. Unacknowledged create or demand start is consumed even
+if its resulting task looks correct. Both scheduler effect counters are at most
+one per authorization; updates remain zero. No D1R6 task is inspected or changed.
+
+The implementation checkpoint is source-only. Native task installation, actual
+child delegation and host qualification remain unauthorized until exact source
+acceptance and a separately reviewed bounded operational step. The fixed source
+worktrees must remain at their reviewed immutable identities during operation;
+there is no Git adoption, source update, automatic deployment or rollback path.
+
+Current recomputed inventory: ACTIVE 68 / FULL 183 / ROBINHOOD 102 / LEGACY 222 /
+EXHAUSTIVE 405 / GUI 51. The new final successor overlay updates current inventory
+assertions only in this branch. Accepted D1R7/D1R8 refs/worktrees, executable
+blobs, all 69 predecessor pin dictionaries/digests, and workflow YAML are frozen.
+The source-only checkpoint has no preflight, execute or remote-head hook and maps
+to CI-owned ROBINHOOD. No duplicate local broad certification is required.

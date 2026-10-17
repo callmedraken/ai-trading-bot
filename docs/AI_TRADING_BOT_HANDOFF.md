@@ -1,31 +1,31 @@
 # AI Trading Bot - Current Handoff
 
-## D1R9 arbitrary-time supervisor design frozen
+## D1R9 source implemented; source acceptance pending
 
-Architecture 134-D1R9 is the active next source milestone. It corrects the
-manual-window regression discovered when a D1R7 invocation on Saturday,
-2026-10-17 failed in `Plan(...)` with
-`current published session unavailable or expired`.
+Architecture 134-D1R9 now has a one-session arbitrary-time supervisor above the
+frozen accepted D1R7/D1R8 children. It binds the first legal published NYSE session,
+resumes durable weekend/premarket/open+5 waits in at most 60-second quanta,
+independently reconciles D1R7 publication proof, and supplies the D1R8 proof and
+interlock internally. An ambiguous protected entry is consumed and never retried.
 
-Read-only reconciliation proved the attempt failed before source admission,
-predecessor binding and O_EXCL reservation. No D1R7 artifact/slot was consumed
-and no protected effect occurred.
+The source branch is
+`feature/robinhood-production-paper-d1-arbitrary-time-supervisor`, based exactly
+on design HEAD `30bc5270b8e7d06abf6841876582c4a48141c05b`, TREE
+`0dd6edb600cc32e4b39b0f91c470a1522814adec`. Its isolated worktree is
+`F:\AI\worktrees\ai-trading-bot-production-paper-d1-arbitrary-time-supervisor`.
+The fixed new D1R9 logon task supplies process lifetime only; resume cannot create
+or repair tasks, select sessions, or confer trading authority. Accepted child
+refs, executable blobs, predecessor dictionaries and historical evidence remain
+unchanged. Current inventory is ACTIVE 68 / FULL 183 / ROBINHOOD 102 / LEGACY 222 /
+EXHAUSTIVE 405 / GUI 51.
 
-The standing Architecture-134 requirement is arbitrary-time startup while the PC
-is ON: weekends, holidays, after-hours and premarket must resolve/reconcile to
-the next legal published session and wait automatically. Accepted D1R7/D1R8
-remain frozen narrow primitives; D1R9 is a successor supervisor above them.
-
-D1R9 will provide one top-level one-session authorization, deterministic
-next-session binding, durable NEXT_SESSION_WAIT/PREMARKET_WAIT/restart
-reconciliation, automatic D1R7 publication when its current-date contract becomes
-legal, source-owned D1R7 byte/hash proof reconciliation, and automatic D1R8
-delegation at/after open+5 minutes. Ambiguous protected effects still fail closed
-and never auto-retry.
-
-Manual D1R7 publication and manual D1R8 execution are no longer the active
-progression path. They remain unauthorized while D1R9 source is implemented and
-reviewed.
+Implementation and focused verification precede one atomic push and terminal
+CI-owned ROBINHOOD. ChatGPT/Sol High then reviews the exact GitHub diff/source
+before any bounded host qualification or operation. No duplicate local broad
+certification is required. No real child publication/execution, scheduler,
+credential/provider/Robinhood, paper, broker, ACL, D2 or live effect is authorized
+by this source checkpoint. Manual D1R7/D1R8 commands remain superseded as the
+active progression path.
 
 See [D1R9 architecture](architecture/134-d1r9-arbitrary-time-d1-supervisor.md)
 and [validation](validation/arch134-d1r9-arbitrary-time-d1-supervisor.md).
@@ -100,8 +100,8 @@ is the accepted final source; neither accepted-lineage commit is rewritten.
 Source-static, active-tests, canonical ROBINHOOD and source-gates passed #601.
 CI owns that canonical certification; no duplicate local ROBINHOOD run is needed.
 
-Current source inventory is ACTIVE 67 / FULL 182 / ROBINHOOD 101 / LEGACY 222 /
-EXHAUSTIVE 404 / GUI 51. All historical executable sources, predecessor pin
+Accepted D1R8 source inventory was ACTIVE 67 / FULL 182 / ROBINHOOD 101 /
+LEGACY 222 / EXHAUSTIVE 404 / GUI 51. All historical executable sources, predecessor pin
 dictionaries/digests and workflow fallback remain frozen under the final
 test-only successor overlay. The accepted D1R7/D1R8 feature refs, optional
 history mirror and D1R5/D1R6 refs remain unchanged by this acceptance integration.
@@ -140,8 +140,8 @@ No real D1R7 publication or D1R8 operation occurred. Operational authority stays
 NO: D1R7 publication, D1R8 execution, D1, PREPARE, EXECUTE, real credential or
 provider effects, paper mutation, broker, scheduler, ACL, D2 and live effects.
 
-The next protected boundary is a ChatGPT/Sol High read-only operational review
-of the exact D1R7 prerequisite-publication -> D1R8 one-session execution chain.
+The next boundary is ChatGPT/Sol High exact-source review of the D1R9
+supervisor before a separately reviewed bounded host/operational step.
 This docs closeout grants no protected effect authority.
 
 ## D1R7 source accepted
@@ -307,7 +307,7 @@ live-trading authority.
 D1R7 and D1R8 are SOURCE ACCEPTED and D1R8 optional-SDK verification is
 complete, but manual current-session progression is superseded as the active path
 by the frozen D1R9 arbitrary-time supervisor design. D1R9 source must be
-implemented, CI-admitted and exact-source accepted before another real D1
+CI-admitted and exact-source accepted before another real D1
 attempt. October 16 D1R5/D1R6 evidence remains immutable; the failed Saturday
 D1R7 command was pre-reservation and consumed no slot or effect.
 
@@ -434,9 +434,9 @@ fast-forward only, and the accepted D1R8 feature ref remains
 verification completed with 40 focused PASS / 0 SKIP and zero audited network or
 native-credential attempts.
 
-- Architecture 134-D1R9 is the active next source milestone. Use Sol High on a
-  new isolated D1R9 branch/worktree. Implement one-command arbitrary-time
-  one-session reconciliation above frozen D1R7/D1R8: next-session resolution,
+- Architecture 134-D1R9 is source implemented on its isolated branch/worktree.
+  Complete terminal mapped CI, then ChatGPT/Sol High exact-source review of
+  one-command arbitrary-time one-session reconciliation above frozen D1R7/D1R8: next-session resolution,
   durable waits/restarts, automatic D1R7 delegation/proof reconciliation, then
   automatic D1R8 delegation when admitted.
 - No real D1R7/D1R8/scheduler/provider/credential/paper operation occurs during

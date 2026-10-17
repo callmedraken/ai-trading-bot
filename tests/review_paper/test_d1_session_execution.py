@@ -969,8 +969,8 @@ def test_checkpoint_inventory_and_explicit_successor():
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 182, "robinhood": 101, "legacy": 222, "exhaustive": 404}
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
+    } == {"full": 183, "robinhood": 102, "legacy": 222, "exhaustive": 405}
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 68
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
 
 
@@ -987,6 +987,7 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         "_arch134_d1r6_test_pin",
         "_arch134_d1r7_test_pin",
         "_arch134_d1r8_test_pin",
+        "_arch134_d1r9_test_pin",
         "_canonical_current_inventory_test_pin",
     ):
         original = getattr(runner, name)
@@ -1009,6 +1010,7 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         *first,
         "_arch134_d1r7_test_pin",
         "_arch134_d1r8_test_pin",
+        "_arch134_d1r9_test_pin",
     ]
 
 

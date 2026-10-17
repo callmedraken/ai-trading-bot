@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "f27f46ecb06b897f0880387f87ac5901452f0a2735b5106cb3c8c0234a545da7"
+    "7118cc6eab2948c280eef8d077d7b583ed481b78f769934fca398c9015467a2c"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -196,6 +196,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-reprovision-recovery-reconciliation",
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch134-d1r9-arbitrary-time-d1-supervisor",
     "arch134-d1r8-d1-session-execution-consumer",
     "arch134-d1r7-d1-session-authorization",
     "arch134-d1r6-overnight-wake-arming",
@@ -213,6 +214,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-d1r9-arbitrary-time-d1-supervisor": "robinhood",
     "arch134-d1r8-d1-session-execution-consumer": "robinhood",
     "arch134-d1r7-d1-session-authorization": "robinhood",
     "arch134-d1r6-overnight-wake-arming": "robinhood",
@@ -326,11 +328,17 @@ def resolve_ci_certification_profile(checkpoint: str | None) -> str | None:
 
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze active routing, CI-owned certification, broad fallback and aggregation.
-    # The frozen D1R5 fallback stays unchanged; D1R6, D1R7 and D1R8 route dynamically.
+    # The frozen D1R5 fallback stays unchanged; D1R6-D1R9 route dynamically.
     workflow_active = tuple(
         name
         for name in ACTIVE_CI_CHECKPOINTS
-        if name not in {ARCH134_D1R6_NAME, ARCH134_D1R7_NAME, ARCH134_D1R8_NAME}
+        if name
+        not in {
+            ARCH134_D1R6_NAME,
+            ARCH134_D1R7_NAME,
+            ARCH134_D1R8_NAME,
+            ARCH134_D1R9_NAME,
+        }
     )
     checkpoint_block = (
         "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
@@ -13150,8 +13158,8 @@ def _arch134_d1r8_test_pin(relative: str, predecessor: str) -> str:
     if relative in ARCH134_D1R8_TEST_PIN_OVERRIDES:
         if predecessor != ARCH134_D1R8_PREDECESSOR_TEST_PINS[relative]:
             raise ValueError("D1R8 predecessor resolution drift")
-        return ARCH134_D1R8_TEST_PIN_OVERRIDES[relative]
-    return predecessor
+        predecessor = ARCH134_D1R8_TEST_PIN_OVERRIDES[relative]
+    return _arch134_d1r9_test_pin(relative, predecessor)
 
 
 def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -13160,7 +13168,9 @@ def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
         if set(ARCH134_D1R8_SOURCE_PINS) != set(ARCH134_D1R8_PATHS):
             failures.append("D1R8 source pin set drift")
         for relative, pin in ARCH134_D1R8_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1r9_test_pin(
+                relative, pin
+            ):
                 failures.append("D1R8 source drift: " + relative)
         for relative, predecessor in ARCH134_D1R8_PREDECESSOR_TEST_PINS.items():
             if _git_blob_sha1(repo_root / relative) != _arch134_d1r8_test_pin(
@@ -13182,6 +13192,470 @@ def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("D1R8 source-only registration drift")
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         failures.append("D1R8 authority unavailable")
+    return tuple(failures)
+
+
+# D1R9 final successor. All earlier pin dictionaries and digests remain frozen.
+ARCH134_D1R9_NAME: Final = "arch134-d1r9-arbitrary-time-d1-supervisor"
+ARCH134_D1R9_BRANCH: Final = (
+    "feature/robinhood-production-paper-d1-arbitrary-time-supervisor"
+)
+ARCH134_D1R9_PATHS: Final = (
+    "docs/architecture/134-d1r9-arbitrary-time-d1-supervisor.md",
+    "docs/validation/arch134-d1r9-arbitrary-time-d1-supervisor.md",
+    "scripts/arch134_d1r9_bridge.py",
+    "scripts/arch134_d1r9_d1r7_child.py",
+    "scripts/arch134_d1r9_d1r8_child.py",
+    "scripts/arch134_d1r9_scheduler.ps1",
+    "scripts/run_arch134_d1r9.py",
+    "src/trading_bot/review_paper/d1_session_supervisor.py",
+    "src/trading_bot/review_paper/d1_session_supervisor_host.py",
+    "src/trading_bot/review_paper/d1_session_supervisor_store.py",
+    "tests/review_paper/test_d1_session_supervisor.py",
+)
+ARCH134_D1R9_SOURCE_PINS: Final = {
+    "docs/architecture/134-d1r9-arbitrary-time-d1-supervisor.md": (
+        "314921f10c2742d34cd6f8369c5ad3e9193e8199"
+    ),
+    "docs/validation/arch134-d1r9-arbitrary-time-d1-supervisor.md": (
+        "860946e6f498b1b8bf352fc18fa45bdcef726a47"
+    ),
+    "scripts/arch134_d1r9_bridge.py": ("edf3bb8eee81ac73815e6807a3dbc556b456517d"),
+    "scripts/arch134_d1r9_d1r7_child.py": ("8574331c1a9249d438ecffabb7c651f1fb5a0126"),
+    "scripts/arch134_d1r9_d1r8_child.py": ("d3788070ec84c262f5a3385ebe7e5c51a3802091"),
+    "scripts/arch134_d1r9_scheduler.ps1": ("31c724b6a1ad78c485ee3ce51057e93a0c58204d"),
+    "scripts/run_arch134_d1r9.py": ("fe53ef0a43669adc84aa81b8c299c68b1c8a2d9f"),
+    "src/trading_bot/review_paper/d1_session_supervisor.py": (
+        "b35d47931ceb0a861b6e47ab6fb7853ac1f674ce"
+    ),
+    "src/trading_bot/review_paper/d1_session_supervisor_host.py": (
+        "ba1bd91d528f820e399bc93a3209239e09fdf7ba"
+    ),
+    "src/trading_bot/review_paper/d1_session_supervisor_store.py": (
+        "a0ebf56afa089c245dbaaebcf2182bdb9486bf49"
+    ),
+    "tests/review_paper/test_d1_session_supervisor.py": (
+        "020fb5b647f33c2636c8153e6922542ff1ca8eef"
+    ),
+}
+ARCH134_D1R9_PREDECESSOR_TEST_PINS: Final = {
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "4091b4425ca93b7cb05dc28266f462df49133afa"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "e5d1f905262eedd5c058595a2b26d608430d7ef1"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "02289416a57bfb2c5a526cbb216575c0e5e0ad36"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "8e04de2cf1b8f2b9b53729734013c3ad1b1ea125"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "a9aca0091710ee9c69eeb07f043465b931171650"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "85af47ddb199756650b156922411fca4529337c7"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "365bd172d072bc39b8c20b9879bafed16a4c50c5"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "f68fb73613595c6c9d3dd7b2d47bf432bcb0127b"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "6dff9d532b3243af3c26afe403df694c591ca3cd"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "a8714f5408d9e57de4cc4c032a2171361ec632b2"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "bd9ac03cca10a6a33a88da1bbfb4c77c96fa86d4"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "aa105f40f1d5110bc94dd192313c551ee0d0b812"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "9bc515170e7e30813e40bb07b33331ecb770943e"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "7b4eaa4992f234eb279a9d30de69fa2d02cad3b1"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "7da67612dd8ff6c70cc7c38f018e51b9449e6262"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "65ad4cce1fafad4887a9fd743ae66a0508a2fe0a"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "810521c86df6241c2472c6ef4b8f2d034c66bce7"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "f564d92900f4265770884c970a22c98e60b18329"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "51f4404eacc526d8108921642b670f93290bcd33"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "b5918a61b2b446fa0702fa88e1c4d5fd12a9cd57"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "e7c3bce13f6a33c8276e9272d7920a13f78fc1fb"
+    ),
+}
+ARCH134_D1R9_TEST_PIN_OVERRIDES: Final = {
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "3580465d819bd9cafd7d72b3fda38beda0b084e7"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "c634e961571b013d7125b4aba769081cfe98bf9f"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "91dbab2330664365f41be1b8c59a89b700655180"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "485d1f16762515ac79d3946f677b5c076d9407e9"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "2e19046e96d37c6d564ba18f17f7f5eacf41db84"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "6d170d01196854596516538f22594f327d7fa89e"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "deb4ffc604d992afa55715a4ab7d65531f888785"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "636f81ecc7753b305ca204db617a52ede19ebd7c"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "2dab8c49c8611c6cc95e7aa64905dfe27f430776"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "72403986d898cb0dbeb7d271bde7cf75192453b6"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "acb6cd5ca192c4fcd43f27853fecb458b4263553"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "a88b35d11c6eaf7d6dbcde04365db61bc5aa65f1"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "203366fb836c2f31de7520e68d93cc1edce1e4cc"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "5a5108858c929b840d673f54a991865891ac21a2"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "3d096d0b3f9ccc073dcab9c43497966e52abc00a"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "c4f2ca7e547ffce4b460081fbcc56fdd7cb81a07"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "b20c100387aa78e1f973c5cd0edcb0b6a342091b"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "863c6518041e3fd41e22805d18634d1a1ec543ff"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "83bee4c9cd41c52a1013f6a34f7148c8d3824d2b"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "3724fab791dcf9d366a18444ef06e69d9094821f"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "cb586c7a7eed94bf03ecf360505e3286bdfd525d"
+    ),
+}
+ARCH134_D1R9_PREDECESSOR_DIGESTS: Final = {
+    "ARCH133U_REPROVISION_PINS": (
+        "4f6c0865ff4aaf35a9f4c24fe6e675bc14efef4ff5a66fe394c25fb43fbcb73d"
+    ),
+    "ARCH133V_RECONCILIATION_PINS": (
+        "c7205fde0b6fb2f725dde053d5d4835d239f40a13284496e8756a308f53aa2bd"
+    ),
+    "ARCH133W_RECOVERY_PINS": (
+        "93de473c57f3ef2a03f43ab32eca4ec5418c408e079bc04334d1e3bd26c46be2"
+    ),
+    "ARCH133X_RECONCILIATION_PINS": (
+        "57814f7940fc7d7900ba79bf4da80d0de04c26f64d67ad81974e0b2e8e94e870"
+    ),
+    "ARCH133Y_QUALIFICATION_PINS": (
+        "b56ec36b605b3d19556f3ab2497eaca8e6c8bb171f2fee2d75c72d7642ddcc82"
+    ),
+    "ARCH133Z_QUALIFICATION_PINS": (
+        "bf706ad1b5aa09208078e5348e5337036dbe0a68dc75cdd396c051d4e104eed3"
+    ),
+    "ARCH133_DIAGNOSTIC_PINS": (
+        "1ca0f8dd0a969a492e707dedbda0ac3e6bc9f32747843d734b10fe24f4400d36"
+    ),
+    "ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS": (
+        "f514990f9f83b80cef3b46788961bda6fdb4f78e4d602b592e9ed7c1f19be18c"
+    ),
+    "ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS": (
+        "977acded4896cced317e60705d4c8607d0101f763e56c5073f15826d2b48c5b8"
+    ),
+    "ARCH133_PUBLICATION_CORRECTED_PINS": (
+        "1410f440bc90c400b0a27fb90656859daecc4553c057d7ed8c7aa9d73c1eae71"
+    ),
+    "ARCH133_PUBLICATION_DIAGNOSTIC_PINS": (
+        "b10ef58752971fe573febbb026a86f3f6a6cf38ddd28fb5c3f69c48a61424ec4"
+    ),
+    "ARCH133_PUBLICATION_PINS": (
+        "a7b0bb22b724188f3ede5220e8baffa445d029f694485f0a531593df2c5203a8"
+    ),
+    "ARCH133_RECOVERY_PINS": (
+        "d98fb0a37c606729aafa2789de1f89add56d1d5e8a0136e5977c0cd9da187e36"
+    ),
+    "ARCH133_REPROVISION_DIAGNOSTIC_PINS": (
+        "f84c5c8d317c22a1120ae4b1862e96b5a995a5e66c42336b494d49bea31f268f"
+    ),
+    "ARCH133_REPROVISION_PINS": (
+        "abf253319637ed8571a00b916294a826ff7ddbd376e3de55df5aa4bb379cd2fe"
+    ),
+    "ARCH133_RETAINED_PINS": (
+        "ea10d2a565d46ace869e114dc73384a267031013ed713529c7bd2825b1ff1ed4"
+    ),
+    "ARCH133_SCHEDULER_PINS": (
+        "42b50ef7637f12c48ed30c64510a967ceedbb85473cb70b21f8cf7d4ae6b18aa"
+    ),
+    "ARCH133_SCRATCH_PINS": (
+        "239f2660f4c2711ca75533a9ed1346ce395199ac4348e59494db22398b90aab2"
+    ),
+    "ARCH133_VERIFIER_PINS": (
+        "1b651f26e66af7442d00532e574335f64ceb00a2f7ba0334fb1218727485c524"
+    ),
+    "ARCH134_ARMED_PAPER_IMPORTS": (
+        "44360941702468b9ff64ae7590925584dadfe918836585a463c509cfac7f53fc"
+    ),
+    "ARCH134_ARMED_PAPER_RECOVERY_IMPORT_OVERRIDES": (
+        "f345ab56e17010688ccec5e4375ed5f62f4dc83523a1af07511c62e36442116b"
+    ),
+    "ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES": (
+        "883a60d81edf1b71aa7daa376e6b8067e2833484254ba7bc1967c03b8fa587ba"
+    ),
+    "ARCH134_ARMED_PAPER_SOURCE_PINS": (
+        "53dbbc49e50ecb94659b32e7280225be4cd16893b4d787a1f2aec3a960f5327b"
+    ),
+    "ARCH134_ARMED_PAPER_SUCCESSOR_IMPORT_OVERRIDES": (
+        "d0cb70147df26eb7e489f4009cb8144223f529bb1396619adbe0dcedc2930aff"
+    ),
+    "ARCH134_ARMED_PAPER_SUCCESSOR_PIN_OVERRIDES": (
+        "e30e003129212123771fad4326f24862e074d982126a274f660bf2d31b5d6ba5"
+    ),
+    "ARCH134_AUTH_CORRECTION_TEST_PINS": (
+        "fa26fb3014b0561dc91932d8fee3a493b656453f1e6ebddacda93be633edefb1"
+    ),
+    "ARCH134_AUTH_IMPORTS": (
+        "4b3010bac7cf806401f36d17b2641e9324b50805a718e199f7871fc863d6552a"
+    ),
+    "ARCH134_AUTH_SOURCE_PINS": (
+        "2a4868e293ee6f989de9ebe71b667f5b8887aea92ef871e6177e612beea893b1"
+    ),
+    "ARCH134_AUTH_TEST_PIN_OVERRIDES": (
+        "a560f2c2beff755ea9ad25b05c00458b09e3e3e3544e7c6a5e1ef72b93531f3c"
+    ),
+    "ARCH134_CURRENT_DECISION_SOURCE_PINS": (
+        "3bca37320bf6e34be46dca688d5f35788a53c547464f492cc92576bef2797ff5"
+    ),
+    "ARCH134_D1R4R_IMPORTS": (
+        "9f1194fc2242a3cf975647b5c4d4c354724fa9cf557bacfa67c613606d8968c2"
+    ),
+    "ARCH134_D1R4R_SOURCE_PINS": (
+        "90aaeafe836a2d2b4e93376097ec1b0b09f3541adf23cb696dea9b25881cd914"
+    ),
+    "ARCH134_D1R4_IMPORTS": (
+        "87e6537dce3b58363934544865d299a7637708ab664ba36ecbe5a7149da2e0cb"
+    ),
+    "ARCH134_D1R4_SOURCE_PINS": (
+        "f201621f2a1515f78a80b07446d6f4da3547fc2cf90bcc2dbfec31723d3abf5a"
+    ),
+    "ARCH134_D1R5_IMPORTS": (
+        "1e00ebdb9916d624591ecf41818a458dabf545cb8654c5e93f1e4e6e35402f03"
+    ),
+    "ARCH134_D1R5_SOURCE_PINS": (
+        "370e14ff9a9453b4e001278921c3d1084c6ff94c8e34be76d430cb2b2adae575"
+    ),
+    "ARCH134_D1R5_TEST_PIN_OVERRIDES": (
+        "6a95f4afc8640dfa0c672f5d77cda06ae57171c0199128a3ddd1d8b0debaac4a"
+    ),
+    "ARCH134_D1R6_ADDITIONAL_PREDECESSOR_PINS": (
+        "572d83c4a3938678894c0cb9072c182373fbce4f596c4b66c26b51f07e2089ab"
+    ),
+    "ARCH134_D1R6_PREDECESSOR_DIGESTS": (
+        "f17583c1a1e519c001acb9d3751ec3c0cdcbe1974589580c1836e75c3ac2e3bf"
+    ),
+    "ARCH134_D1R6_SOURCE_PINS": (
+        "bbf14101519464b7cd4495e32b5b402a845befd89e2ef1e9a1597efb0e236425"
+    ),
+    "ARCH134_D1R6_TEST_PIN_OVERRIDES": (
+        "dfe1999400e0a6fdea245ccdd7d77a62e49aa1a169dbd42c0f89e2e88868ef4b"
+    ),
+    "ARCH134_D1R7_PREDECESSOR_DIGESTS": (
+        "f65852b2a75e45d4637c2452b15ff8f2833c4a7f6ae1a1cea847b148dc50819f"
+    ),
+    "ARCH134_D1R7_PREDECESSOR_TEST_PINS": (
+        "a07ac0ce7dbb1ae2ddab299f3839a778bd469b5e7aa3ff65f044942a7f895aaa"
+    ),
+    "ARCH134_D1R7_SOURCE_PINS": (
+        "e194e364fb2278a8dfcaf789f5cc8c7d07b1785f4e68fa182f0982c93fa1274d"
+    ),
+    "ARCH134_D1R7_TEST_PIN_OVERRIDES": (
+        "15925f6d9c6e3e9407ac8893b36be95a1eb53b5704430ac94ac5471c5bfabb37"
+    ),
+    "ARCH134_D1R8_PREDECESSOR_DIGESTS": (
+        "173cdbe103ecf682ed3cd089b01d9a93b9b887fe346db454629f86e1b420f956"
+    ),
+    "ARCH134_D1R8_PREDECESSOR_TEST_PINS": (
+        "148bfa0eeefe831392380966a68e760b2c473f08101a1d3930b5186d3128c3b1"
+    ),
+    "ARCH134_D1R8_SOURCE_PINS": (
+        "c093c00309ead5ff90b52b3174747bf02846fab2f21b7fffd8379a11c1c59234"
+    ),
+    "ARCH134_D1R8_TEST_PIN_OVERRIDES": (
+        "2214e2c87a24034851f7a171cd80715849a8843dba3e402e6707e79e85b88853"
+    ),
+    "ARCH134_HIST2_TEST_PIN_OVERRIDES": (
+        "36f351a34aea60dcb532c210ff2a9fe077938c2d7dcce3e09ad26c0221a5ad8c"
+    ),
+    "ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS": (
+        "6a3b14a87587c582a2325bc7a77767d018548c1ded7578a64adecf91b8a5ae1a"
+    ),
+    "ARCH134_MARKET_HISTORY_SOURCE_PINS": (
+        "3329eecc17c1a447464dd41387585b2a8b33d1fb9e4e4bde353d18807f769117"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_IMPORTS": (
+        "c1fa7ca10e3f5290d9ca5a59d2d37659482dae8cdc8a1039fb901df561cd4b44"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS": (
+        "45013e6fc64a61923b49ae7ee692d970f07ecf20ce597a84600fb61d5a45e7c4"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_SOURCE_PINS": (
+        "be250f9d0e3b8dc02c193604ef3c093ff6e040185b9dd6a7d5f446fa48480dfe"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_SOURCE_PINS": (
+        "dae912a803d8907587ca1f75f6183e7492404713d78de28708c70305078f93a7"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_IMPORTS": (
+        "8223c3f7ba506bfb3b69be5b9e59c0466faa4d31ec10ea54104a3f4cd0e80079"
+    ),
+    "ARCH134_PRODUCTION_PAPER_RUNTIME_SUCCESSOR_SOURCE_PINS": (
+        "339c6ca847760c421ae536585728c9deced55a7f769b592fb2d9019d2892ca6f"
+    ),
+    "ARCH134_RUNTIME_ACL_AST_PINS": (
+        "367c40b729e8f149ec4c0d2e63d8c9d18db51befb214e83a0e9d26d0c70d429b"
+    ),
+    "ARCH134_RUNTIME_ACL_IMPORTS": (
+        "a8649856d3e25f5edd33b5ce52cc7bb4349cd862985ef7e7e6dd84f0687c1263"
+    ),
+    "ARCH134_RUNTIME_ACL_SOURCE_PINS": (
+        "d0afa4f6c071cb7a1883c3089b49eda97cd993100bcc17b5c9d3518dd91d9354"
+    ),
+    "ARCH138_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "6c64bc7769b89281c08147fd3d713df8154033d47a77f225bf693ccc0ca76c15"
+    ),
+    "ARCH139A_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "ea9cf52f35ec0a86587714aaad47b9b14eb26fe7d3baa8b1dcd5aa086785f02e"
+    ),
+    "ARCH139B1_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "b16b0ce3be61ab8e3652239b23dcabf8a9981b84a25d4802215179cd93fe6b3f"
+    ),
+    "ARCH139B2_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "e8b639e642962827b73e36be459ed7eb47c8ed5ae14458b6be3f20d5ee5283d9"
+    ),
+    "ARCH140A17_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "8a3d7bf075b2a78626957c3c1dcee7bbd595bce06787769ba1a5074662ced4fd"
+    ),
+    "ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "00a2195aca3ca844209f27437ebce3e179cc2060aaa8c334999180c7b5b4094f"
+    ),
+    "ARCH140_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "263f05881d0102ccc44023653957b0bbe734c8315031a4ae68c5f406f8e18ee2"
+    ),
+    "CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES": (
+        "1e00670b28dfbad915c34ec4657143deb40a0b7932207c302f9ea87ab12c7d51"
+    ),
+}
+ARCH134_D1R9_PREDECESSOR_TEST_PINS_SHA256: Final = (
+    "7b106297d65d30291b6f77060045c10efe069e86b33fd39a4e8b8c23640a511a"
+)
+ARCH134_D1R9_REVIEWED_TEST_PINS_SHA256: Final = (
+    "34986dd41a0986d3a117b79bbd044299c644420d65e085c5579a6ff6ff86e4ba"
+)
+ARCH134_D1R9_TESTS: Final = (
+    "tests/review_paper/test_d1_session_supervisor.py",
+    *ARCH134_D1R8_TESTS,
+)
+ARCH134_D1R9_RUFF_PATHS: Final = (
+    *(p for p in ARCH134_D1R9_PATHS if p.endswith(".py")),
+    *ARCH134_D1R9_TEST_PIN_OVERRIDES,
+    *ARCH134_D1R8_RUFF_PATHS,
+)
+
+
+def _arch134_d1r9_test_pin(relative: str, predecessor: str) -> str:
+    def digest(value: object) -> str:
+        return hashlib.sha256(
+            json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+
+    if (
+        set(ARCH134_D1R9_TEST_PIN_OVERRIDES) != set(ARCH134_D1R9_PREDECESSOR_TEST_PINS)
+        or any(
+            not p.startswith("tests/") or not p.endswith(".py")
+            for p in ARCH134_D1R9_TEST_PIN_OVERRIDES
+        )
+        or digest(ARCH134_D1R9_TEST_PIN_OVERRIDES)
+        != ARCH134_D1R9_REVIEWED_TEST_PINS_SHA256
+        or digest(ARCH134_D1R9_PREDECESSOR_TEST_PINS)
+        != ARCH134_D1R9_PREDECESSOR_TEST_PINS_SHA256
+    ):
+        raise ValueError("D1R9 closed successor overlay drift")
+    if relative in ARCH134_D1R9_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH134_D1R9_PREDECESSOR_TEST_PINS[relative]:
+            raise ValueError("D1R9 predecessor resolution drift")
+        return ARCH134_D1R9_TEST_PIN_OVERRIDES[relative]
+    return predecessor
+
+
+def _arch134_d1r9_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_arch134_d1r8_authority_check(repo_root))
+    try:
+
+        def digest(value: object) -> str:
+            return hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+
+        for name, expected in ARCH134_D1R9_PREDECESSOR_DIGESTS.items():
+            if digest(globals()[name]) != expected:
+                failures.append("D1R9 frozen predecessor drift: " + name)
+        if set(ARCH134_D1R9_SOURCE_PINS) != set(ARCH134_D1R9_PATHS):
+            failures.append("D1R9 source pin set drift")
+        for relative, expected in ARCH134_D1R9_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append("D1R9 source drift: " + relative)
+        for relative, predecessor in ARCH134_D1R9_PREDECESSOR_TEST_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1r9_test_pin(
+                relative, predecessor
+            ):
+                failures.append("D1R9 successor drift: " + relative)
+        spec = _checkpoint_specs()[ARCH134_D1R9_NAME]
+        if (
+            spec.remote_branch != ARCH134_D1R9_BRANCH
+            or spec.tests != ARCH134_D1R9_TESTS
+            or spec.ruff_paths != ARCH134_D1R9_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1r9_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH134_D1R9_NAME) != 1
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_D1R9_NAME) != "robinhood"
+        ):
+            failures.append("D1R9 source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("D1R9 authority unavailable")
     return tuple(failures)
 
 
@@ -13298,6 +13772,14 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_D1R9_NAME: CheckpointSpec(
+            name=ARCH134_D1R9_NAME,
+            description="Architecture 134-D1R9 arbitrary-time supervisor source only",
+            tests=ARCH134_D1R9_TESTS,
+            ruff_paths=ARCH134_D1R9_RUFF_PATHS,
+            authority_check=_arch134_d1r9_authority_check,
+            remote_branch=ARCH134_D1R9_BRANCH,
+        ),
         ARCH134_D1R8_NAME: CheckpointSpec(
             name=ARCH134_D1R8_NAME,
             description="Architecture 134-D1R8 execution consumer source only",

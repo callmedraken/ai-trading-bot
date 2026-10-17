@@ -881,6 +881,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_D1R6_NAME,
             runner.ARCH134_D1R7_NAME,
             runner.ARCH134_D1R8_NAME,
+            runner.ARCH134_D1R9_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])

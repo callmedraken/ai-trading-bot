@@ -1,5 +1,31 @@
 # AI Trading Bot - Current Handoff
 
+## Architecture 142 / RCL-5 design frozen
+
+Architecture 142 now freezes the new **strategy-native research evaluation**
+path required after Architecture 141 proved the existing portfolio SHADOW
+candidate has no reviewed production mapping.
+
+The new path is separate from Architecture 139/141. It carries exact
+`MovingAverageCrossoverStrategy` family/version, exact `Symbol`, exact
+`MovingAverageCrossoverConfig` and a fully bound backtest/risk evaluation
+policy by construction. 142-A uses caller-supplied immutable single-symbol
+historical data with the existing deterministic `BacktestEngine`,
+`NYSEMarketCalendar` and `PerformanceAnalyzer`; no provider acquisition or
+production contract is permitted.
+
+Architecture 142 is split into 142-A backtest evidence and 142-B strategy-native
+walk-forward qualification. 142-B begins only after 142-A source acceptance.
+Architecture 143 is reserved for a separate positive compatibility proof and
+still cannot create a production contract or PAPER_CANDIDATE.
+
+The next safe implementation checkpoint is 142-A on
+`feature/research-strategy-native-evaluation-current` /
+`F:\AI\worktrees\ai-trading-bot-research-strategy-native-evaluation-current`,
+based on this exact design-freeze descendant of `develop`.
+
+The active D1R9 one-session authority remains separate and untouched.
+
 ## Architecture 141 / RCL-4 source accepted
 
 Architecture 141 / RCL-4 — Research Candidate Production Compatibility

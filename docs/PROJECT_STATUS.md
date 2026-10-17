@@ -1,5 +1,44 @@
 # AI Trading Bot - Project Status
 
+## D1R9 host-readiness correction required
+
+The prior D1R9 source acceptance at
+`0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9` is superseded for operational
+progression by a real Windows host-readiness defect discovered immediately after
+acceptance.
+
+Read-only readiness independently proved:
+
+- D1R9/D1R7/D1R8 exact source admission PASS;
+- D1R9 namespace empty / no active authorization;
+- immutable D1R5/D1R6 evidence exact and predecessor binding PASS;
+- target derived as 2026-10-19;
+- fixed runtime identities admitted and production runtime
+  `PRESENT_COMPATIBLE`;
+- prospective D1R7/D1R8 slots absent;
+- zero protected effects.
+
+The accepted scheduler `Observe` path returned `{"status":"BLOCKED"}` / exit 2.
+A separate read-only COM diagnostic proved the Windows Schedule service is
+Running/Automatic, COM connect and root-folder access PASS, and the exact D1R9
+task lookup throws `System.IO.FileNotFoundException` with HRESULT
+`0x80070002` / `-2147024894`. Therefore the task is genuinely ABSENT and the
+observer must classify it as ABSENT. This is a bounded scheduler-observation
+compatibility defect, not host drift and not an operational/evidence
+consumption event.
+
+Required corrective checkpoint: D1R9-C2. Harden only missing-task exception
+classification in the D1R9 scheduler observer (and its focused tests/docs/current
+D1R9 pins) so any exception-chain member with HRESULT 0x80070002 is classified
+as ABSENT while all other failures remain BLOCKED. Preserve runtime, authority,
+scheduler create/run semantics, child ordering, one-shot claims, 69 predecessor
+digests, accepted D1R7/D1R8 sources, historical evidence and workflow topology.
+
+No scheduler create/update/run/delete, D1R7/D1R8 entry, credential/provider read,
+paper mutation, broker/ACL/D2/live effect is authorized until C2 reaches fresh
+terminal-green mapped CI, exact source re-review, and the same read-only host
+readiness returns scheduler `ABSENT`.
+
 ## D1R9 arbitrary-time supervisor source accepted
 
 Architecture 134-D1R9 is SOURCE ACCEPTED on the isolated feature branch:

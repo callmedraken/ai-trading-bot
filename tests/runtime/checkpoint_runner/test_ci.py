@@ -647,7 +647,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
     )
     assert (
         runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        == "2b9e0aab0b9c113b1836d231ebd55628fc4d50d0e586d79981cef5c7e338bb0d"
+        == "f27f46ecb06b897f0880387f87ac5901452f0a2735b5106cb3c8c0234a545da7"
     )
     root = Path(runner.__file__).resolve().parents[1]
     for check in (

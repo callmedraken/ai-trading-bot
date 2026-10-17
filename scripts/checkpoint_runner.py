@@ -13071,7 +13071,7 @@ ARCH134_D1R8_TEST_PIN_OVERRIDES: Final = {
         "65ad4cce1fafad4887a9fd743ae66a0508a2fe0a"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "4ea9c4afa184f68b528b8bddbde33e4a68594c86"
+        "810521c86df6241c2472c6ef4b8f2d034c66bce7"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "f564d92900f4265770884c970a22c98e60b18329"
@@ -13113,7 +13113,7 @@ ARCH134_D1R8_PREDECESSOR_TEST_PINS_SHA256: Final = (
     "148bfa0eeefe831392380966a68e760b2c473f08101a1d3930b5186d3128c3b1"
 )
 ARCH134_D1R8_REVIEWED_TEST_PINS_SHA256: Final = (
-    "382a420d3783bffa034dc9788324335c1aefe8f9f0a88ece1970413113bf1791"
+    "2214e2c87a24034851f7a171cd80715849a8843dba3e402e6707e79e85b88853"
 )
 ARCH134_D1R8_TESTS: Final = (
     "tests/review_paper/test_d1_session_execution.py",

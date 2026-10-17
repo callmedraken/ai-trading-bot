@@ -238,9 +238,17 @@ before reporting the checkpoint complete, accepting the closeout, or advancing
 to the next checkpoint. `queued` and `in_progress` are not completion. The
 push is the checkpoint's single planned CI admission attempt, not an iterative
 debug loop. On failure, inspect the exact job/log evidence and STOP that
-checkpoint attempt; return to focused/local verification and declare any later
-replacement push as a separate corrective checkpoint before advancing a ref.
-On success, verify the run belongs to the exact pushed HEAD.
+checkpoint attempt. That does **not** require ending the same delegated Codex
+task when the failure is fully classified as bounded/mechanical and no
+protected-effect, semantic, authority, or remote-state ambiguity exists. In that
+case Codex should explicitly declare a separate corrective C1, return to
+focused/local verification, create one new atomic commit/push for that
+corrective checkpoint, and poll its CI to terminal. One further bounded C2 may
+follow under the same rules when C1 exposes another purely mechanical stale
+pin/inventory/topology assertion. Hand back on terminal green, unexpected or
+ambiguous state, semantic/security/authority uncertainty, or exhaustion of the
+C1/C2 allowance. Never rerun unchanged CI or rewrite failed evidence. On
+success, verify the run belongs to the exact pushed HEAD.
 Delegate to Luna/Astra/Sol High only when implementation size, discovery,
 isolation, or architecture/security sensitivity makes delegation materially
 useful.

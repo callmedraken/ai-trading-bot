@@ -1,5 +1,65 @@
 # AI Trading Bot - Current Handoff
 
+## Architecture 141 / RCL-4 source accepted
+
+Architecture 141 / RCL-4 — Research Candidate Production Compatibility
+Assessment — is SOURCE ACCEPTED on the isolated safe-side feature branch:
+
+```text
+branch  feature/research-candidate-production-compatibility-current
+base    65c2401fa2edcc82ab388a2d1c1da405777026cc
+HEAD    c73c84f3011c1712255b58fb66de710f1ddcac01
+TREE    04dc1ce7b1d3ea12d9781ec0ef3960507c4c12c3
+```
+
+Accepted lineage is
+`65c2401... -> 17bb7dd... -> 969a919... -> c73c84f...`.
+The initial implementation `17bb7dd3d7fe5bda5696bc1f36e4ebe8cc3f663c`
+preserves its failed Checkpoint Source Gates #614 / `39068632984`: source
+static passed and the only failures were five stale FULL/EXHAUSTIVE inventory
+assertions after the new supported research test increased the measured
+inventories to FULL 183 and EXHAUSTIVE 405. Corrective C1
+`969a919816cce2eb6d006e6289ecf065c4d0d511` changed only those five
+current inventory assertions. Its #615 / `39069289640` then failed static
+authority because the newly changed test blobs were not yet covered by the
+Architecture-141 successor overlay. Corrective C2
+`c73c84f3011c1712255b58fb66de710f1ddcac01` extended the reviewed
+seven-path overlay while preserving the frozen Architecture-140-A18 predecessor
+digest `a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
+
+Final Checkpoint Source Gates #616 / `39069737222` is workflow_dispatch,
+attempt 1, terminal SUCCESS on exact final HEAD/tree. Source-static passed with
+`GIT_DIFF_CHECK=0`, `RUFF_CHECK=0`, `RUFF_FORMAT=0`; all four FULL
+shards passed with `PYTEST=0` in 90.429 / 93.962 / 98.913 / 63.783 seconds,
+all below the 300-second hygiene ceiling; source-gates passed. The workflow blob
+remains exactly `fe6aceac62721338eba4fcb40e2e7fde0d976e18`.
+
+The accepted implementation is pure and negative-only. Schema
+`research-candidate-production-compatibility/v1` remains at stage SHADOW,
+status `NOT_ESTABLISHED`, with the exact ordered blockers
+`RESEARCH_STRATEGY_FAMILY_UNBOUND`,
+`PRODUCTION_SYMBOL_MAPPING_UNBOUND`, and
+`PRODUCTION_CONFIG_MAPPING_UNBOUND`. Full 139-B external verification,
+independent SHADOW linkage verification, exact bound-variant resolution and
+lineage reconciliation precede assessment construction. Parsing proves only
+canonical self-consistency.
+
+No `ProductionStrategyContract`, moving-average config/strategy, positive
+compatibility, `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, promotion,
+provider/credential/runtime/paper/broker/scheduler/D1/D2 authority or effect is
+created. Architecture 141 remains outside ACTIVE production checkpoints. Final
+inventory is ACTIVE 67 / FULL 183 / ROBINHOOD 101 / LEGACY 222 / EXHAUSTIVE
+405 / GUI 51.
+
+The Architecture-141 feature source is not merged by this closeout. The active
+D1R9 one-session authorization for the immutable 2026-10-19 session remains
+independent and untouched.
+
+The next safe-side milestone is a separate design/source checkpoint for an
+explicit research-to-production semantic bridge. It must define a real reviewed
+strategy-family, symbol and configuration mapping before any positive
+compatibility or `PAPER_CANDIDATE` work can begin.
+
 ## Architecture 141 safe-side design frozen
 
 Parallel safe-side progression now advances to Architecture 141 / RCL-4,

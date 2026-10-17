@@ -1,45 +1,50 @@
 # AI Trading Bot - Current Handoff
 
-## D1R9 host-readiness correction required
+## D1R9-C2 scheduler observation correction source accepted
 
-The prior D1R9 source acceptance at
-`0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9` is superseded for operational
-progression by a real Windows host-readiness defect discovered immediately after
-acceptance.
+Architecture 134-D1R9-C2 is SOURCE ACCEPTED on the existing isolated feature
+branch:
 
-Read-only readiness independently proved:
+```text
+branch  feature/robinhood-production-paper-d1-arbitrary-time-supervisor
+HEAD    efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
+TREE    25a962daf3922c4226c7e395eba8613e1b03bbaf
+parent  0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9
+```
 
-- D1R9/D1R7/D1R8 exact source admission PASS;
-- D1R9 namespace empty / no active authorization;
-- immutable D1R5/D1R6 evidence exact and predecessor binding PASS;
-- target derived as 2026-10-19;
-- fixed runtime identities admitted and production runtime
-  `PRESENT_COMPATIBLE`;
-- prospective D1R7/D1R8 slots absent;
-- zero protected effects.
+C2 changes exactly four paths: the D1R9 scheduler observer, its focused
+supervisor tests, the D1R9 validation record, and D1R9-owned checkpoint pins.
+The runtime correction is limited to bounded exception-chain inspection for the
+exact Task Scheduler not-found HRESULT `0x80070002` /
+`-2147024894`. Direct or nested exact-HRESULT task absence now classifies
+`ABSENT`; message text alone does not; excessive depth and every other
+scheduler failure remain fail-closed as `BLOCKED`. Scheduler Create/Run
+behavior, task shape, authority, child ordering, journals, claims and effect
+ceilings are unchanged.
 
-The accepted scheduler `Observe` path returned `{"status":"BLOCKED"}` / exit 2.
-A separate read-only COM diagnostic proved the Windows Schedule service is
-Running/Automatic, COM connect and root-folder access PASS, and the exact D1R9
-task lookup throws `System.IO.FileNotFoundException` with HRESULT
-`0x80070002` / `-2147024894`. Therefore the task is genuinely ABSENT and the
-observer must classify it as ABSENT. This is a bounded scheduler-observation
-compatibility defect, not host drift and not an operational/evidence
-consumption event.
+Checkpoint Source Gates #609 / 39022830857 / push / attempt 1 is terminal
+SUCCESS. Static diff/Ruff/authority checks passed with stable identity. Active
+D1R9 source testing ran 3,359 cases: 3,354 passed / 5 skipped / 0 failed /
+0 errors. Canonical ROBINHOOD ran 10,326 cases: 10,320 passed / 6 skipped /
+0 failed / 0 errors, wall 251.81 seconds.
 
-Required corrective checkpoint: D1R9-C2. Harden only missing-task exception
-classification in the D1R9 scheduler observer (and its focused tests/docs/current
-D1R9 pins) so any exception-chain member with HRESULT 0x80070002 is classified
-as ABSENT while all other failures remain BLOCKED. Preserve runtime, authority,
-scheduler create/run semantics, child ordering, one-shot claims, 69 predecessor
-digests, accepted D1R7/D1R8 sources, historical evidence and workflow topology.
+All 11 final D1R9 source/test blobs match their exact runner pins. The complete
+69-entry predecessor digest block is unchanged. Accepted child refs remain D1R7
+`30322c49b13b80af8d20acee4bdb1efd83d86260` and D1R8
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`; no child source, historical
+evidence or workflow YAML changed.
 
-No scheduler create/update/run/delete, D1R7/D1R8 entry, credential/provider read,
-paper mutation, broker/ACL/D2/live effect is authorized until C2 reaches fresh
-terminal-green mapped CI, exact source re-review, and the same read-only host
-readiness returns scheduler `ABSENT`.
+The prior host-readiness evidence remains valid up to the scheduler edge:
+sources/predecessors/runtime/target/prospective slots passed with zero effects,
+and the real host diagnostic proved the exact D1R9 task is absent. C2 source
+acceptance still grants no scheduler creation/run or D1 operational authority.
 
-## D1R9 arbitrary-time supervisor source accepted
+The immediate next safe boundary is therefore only a read-only scheduler
+`Observe` rerun against exact C2 source. Expected result is
+`{"status":"ABSENT"}` with exit code 0. Any other result is STOP; do not
+Create or Run the task.
+
+## D1R9 pre-C2 source acceptance history
 
 Architecture 134-D1R9 is SOURCE ACCEPTED on the isolated feature branch:
 
@@ -81,8 +86,9 @@ This acceptance does not merge the feature branch and grants no real scheduler
 creation/run, D1R7 publication, credential/provider request, D1R8 execution,
 paper mutation, broker, ACL, D2 or live effect.
 
-The next safe boundary is a read-only Windows host-readiness check against the
-exact accepted source and frozen child/runtime/evidence identities.
+That pre-C2 acceptance was later host-blocked at scheduler observation and is
+superseded for operational progression by accepted corrective C2
+`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8`.
 
 ## Purpose and authority
 
@@ -358,13 +364,15 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R7, D1R8 and D1R9 are SOURCE ACCEPTED, and D1R8 optional-SDK verification is
-complete. D1R9 is the active operational path, but source acceptance grants no
-host or protected-effect authority. Before any real scheduler/D1 operation,
-perform the separately bounded read-only Windows host-readiness check against the
-exact accepted D1R9/D1R7/D1R8 sources, predecessor evidence, runtime identities
-and scheduler observation. October 16 D1R5/D1R6 evidence remains immutable; the
-failed Saturday D1R7 command was pre-reservation and consumed no slot or effect.
+D1R7, D1R8 and D1R9-C2 are SOURCE ACCEPTED, and D1R8 optional-SDK
+verification is complete. D1R9 remains the active operational path, but source
+acceptance grants no protected-effect authority. The full read-only host
+readiness already passed through source, predecessor, target, runtime and
+prospective-slot admission; only the corrected D1R9 scheduler `Observe` edge
+must be rerun against exact C2 source and return `ABSENT` before any separately
+reviewed scheduler/D1 authorization is considered. October 16 D1R5/D1R6 evidence
+remains immutable; the failed Saturday D1R7 command was pre-reservation and
+consumed no slot or effect.
 
 Until a protected operation is separately reviewed and authorized:
 
@@ -489,16 +497,14 @@ fast-forward only, and the accepted D1R8 feature ref remains
 verification completed with 40 focused PASS / 0 SKIP and zero audited network or
 native-credential attempts.
 
-- Run the exact D1R9 read-only Windows host-readiness check against accepted
-  feature HEAD `0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9`. Read-only scope:
-  exact Git/local/tracking/live identities for D1R9/D1R7/D1R8, predecessor
-  evidence identity/parsing, fixed runtime file identity/hash and compatible
-  read-only preflight, D1R9 authorization namespace/status, and Task Scheduler
-  Observe only.
-- No scheduler create/update/run/delete, D1R7/D1R8 child entry, credential read,
-  provider/Robinhood request, paper mutation, broker/ACL/D2/live effect is
-  permitted. Return sanitized readiness evidence to ChatGPT; operational
-  authorization remains a later separate reviewed boundary.
+- Rerun only the accepted C2 Task Scheduler observer from exact D1R9 feature
+  HEAD `efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` with `Mode=Observe`.
+  Expected output is exactly `{"status":"ABSENT"}` and exit code 0.
+- No scheduler Create/Run/update/delete, D1R9 journal/claim creation, D1R7/D1R8
+  child entry, credential/provider/Robinhood read, paper/broker/ACL/D2/live effect
+  is permitted. Any non-ABSENT result is STOP. On ABSENT, return the read-only
+  observation/effect audit to ChatGPT; operational authorization remains a later
+  separately reviewed boundary.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

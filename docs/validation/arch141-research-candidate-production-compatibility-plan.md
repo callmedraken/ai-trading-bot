@@ -1,6 +1,6 @@
 # Architecture 141 / RCL-4 — Production Compatibility Assessment Plan
 
-Status: **DESIGN FROZEN; IMPLEMENTATION PENDING**.
+Status: **SOURCE IMPLEMENTED; PUBLICATION PENDING**.
 
 ## Goal
 
@@ -24,7 +24,11 @@ Expected new paths:
 Expected additive/current updates only when mechanically required:
 
 - `src/trading_bot/experiments/__init__.py`;
+- `scripts/run_test_certification.py`;
 - `scripts/checkpoint_runner.py`;
+- `tests/scripts/certification_runner/helpers.py`;
+- `tests/scripts/certification_runner/test_profiles.py`;
+- current inventory assertions in the affected strategy and GUI tests;
 - this validation document;
 - Architecture-141 architecture document only if implementation discovers an
   ambiguity that can be clarified without broadening authority.
@@ -83,6 +87,39 @@ current test path mechanically requires a new successor overlay.
 Recompute ACTIVE/FULL/ROBINHOOD/LEGACY/EXHAUSTIVE/GUI module inventories from
 the exact final tree. Architecture 141 is research-only and must not become an
 ACTIVE production checkpoint.
+
+## Implementation record
+
+The pure in-memory implementation is now present in
+`src/trading_bot/experiments/research_candidate_production_compatibility.py`
+with additive package exports and strict canonical JSON parsing. It records
+schema `research-candidate-production-compatibility/v1`, identity version
+`research-candidate-production-compatibility-identity/v1`, UUID5 namespace
+`3a2c0a57-e61a-5b19-bdc2-00e96e732e96`, status `NOT_ESTABLISHED`, and the
+ordered three-blocker tuple required by the architecture.
+
+The builder requires the complete external 139-B SHADOW evidence, invokes
+both independent 139-B verifiers, resolves and revalidates the bound variant
+on a defensive copy, and checks explicit candidate/result/variant/source
+lineage before returning the fixed negative assessment. The implementation
+does not construct, evaluate, promote, or persist a production strategy or
+configuration, does not add an ACTIVE checkpoint, and does not modify the
+workflow topology or protected runtime paths.
+
+Local focused verification on the exact final source tree passed:
+
+- new Architecture-141 module: `41 passed in 49.20s`;
+- retained 137/138/139 research evidence tests: `760 passed in 82.87s`;
+- affected inventory/authority/checkpoint-runner tests: `771 passed in 48.60s`;
+- touched Ruff check and format check: passed;
+- `git diff --check`: passed.
+
+The measured final inventories are ACTIVE checkpoint registrations `67`, FULL
+`183`, ROBINHOOD `101`, LEGACY `222`, EXHAUSTIVE `405`, and GUI `51`.
+Architecture-140-A18 predecessor material remains frozen; the Architecture-
+141 overlay changes only the two mechanically touched current inventory-test
+pins, with predecessor digest
+`a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
 
 ## Local verification
 

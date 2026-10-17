@@ -138,6 +138,17 @@ from trading_bot.experiments.research_candidate import (
     build_backtested_research_candidate,
     verify_research_candidate_against_report,
 )
+from trading_bot.experiments.research_candidate_production_compatibility import (
+    RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_IDENTITY_VERSION,
+    RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_NAMESPACE,
+    RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_SCHEMA,
+    ResearchCandidateProductionCompatibilityAssessment,
+    ResearchCandidateProductionCompatibilityBlocker,
+    ResearchCandidateProductionCompatibilityError,
+    ResearchCandidateProductionCompatibilityStatus,
+    build_research_candidate_production_compatibility_assessment,
+    verify_research_candidate_production_compatibility_assessment,
+)
 from trading_bot.experiments.research_candidate_shadow_binding import (
     RESEARCH_CANDIDATE_SHADOW_BINDING_IDENTITY_VERSION,
     RESEARCH_CANDIDATE_SHADOW_BINDING_NAMESPACE,
@@ -451,4 +462,16 @@ __all__ += [
     "verify_research_candidate_shadow_qualification",
     "build_shadow_research_candidate",
     "verify_shadow_research_candidate",
+]
+
+__all__ += [
+    "RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_SCHEMA",
+    "RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_IDENTITY_VERSION",
+    "RESEARCH_CANDIDATE_PRODUCTION_COMPATIBILITY_NAMESPACE",
+    "ResearchCandidateProductionCompatibilityError",
+    "ResearchCandidateProductionCompatibilityStatus",
+    "ResearchCandidateProductionCompatibilityBlocker",
+    "ResearchCandidateProductionCompatibilityAssessment",
+    "build_research_candidate_production_compatibility_assessment",
+    "verify_research_candidate_production_compatibility_assessment",
 ]

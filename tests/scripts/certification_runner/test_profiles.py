@@ -110,7 +110,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     }
     assert runner.PROFILES == ("full", "robinhood", "legacy", "exhaustive")
     assert _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
-    assert len(runner.FULL_REQUIRED_MODULES) == 122
+    assert len(runner.FULL_REQUIRED_MODULES) == 123
     assert profiles["full"] == tuple(
         sorted(
             (
@@ -191,10 +191,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 182,
+        "full": 183,
         "robinhood": 101,
         "legacy": 222,
-        "exhaustive": 404,
+        "exhaustive": 405,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

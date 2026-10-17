@@ -160,7 +160,8 @@ _SUPPORTED_ADDITIONAL_FAMILIES = {
         "walk_forward_stability_serialization"
     ),
     "experiments": (
-        "comparison grid historical pairwise pareto report walk_forward "
+        "comparison grid historical pairwise pareto report "
+        "research_candidate_production_compatibility walk_forward "
         "walk_forward_analytics walk_forward_stability"
     ),
     "integration": (

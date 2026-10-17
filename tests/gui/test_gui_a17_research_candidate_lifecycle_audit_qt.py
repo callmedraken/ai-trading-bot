@@ -416,10 +416,10 @@ def test_actual_inventory_and_gui_stays_legacy():
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
     } == {
-        "full": 182,
+        "full": 183,
         "robinhood": 101,
         "legacy": 222,
-        "exhaustive": 404,
+        "exhaustive": 405,
     }
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 67
     assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51
@@ -446,13 +446,12 @@ def test_exact_successor_pins_and_frozen_a16_digest():
             checkpoint_runner._arch140a18_current_inventory_test_pin(path, pin)
             == after[path]
         )
+        expected = checkpoint_runner._arch134_d1r7_test_pin(
+            path,
+            checkpoint_runner._canonical_current_inventory_test_pin(path, after[path]),
+        )
         assert checkpoint_runner._git_blob_sha1(ROOT / path) == (
-            checkpoint_runner._arch134_d1r7_test_pin(
-                path,
-                checkpoint_runner._canonical_current_inventory_test_pin(
-                    path, after[path]
-                ),
-            )
+            checkpoint_runner._arch141_current_inventory_test_pin(path, expected)
         )
     assert (
         checkpoint_runner._arch140a17_current_inventory_test_pin("other", "a" * 40)

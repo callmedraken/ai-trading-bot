@@ -217,6 +217,7 @@ FULL_REQUIRED_MODULES = (
     "tests/experiments/test_pairwise.py",
     "tests/experiments/test_pareto.py",
     "tests/experiments/test_report.py",
+    "tests/experiments/test_research_candidate_production_compatibility.py",
     "tests/experiments/test_walk_forward.py",
     "tests/experiments/test_walk_forward_analytics.py",
     "tests/experiments/test_walk_forward_stability.py",

@@ -1,34 +1,49 @@
 # AI Trading Bot - Current Handoff
 
-## D1R9 arbitrary-time supervisor design frozen
+## D1R9 arbitrary-time supervisor source accepted
 
-Architecture 134-D1R9 is the active next source milestone. It corrects the
-manual-window regression discovered when a D1R7 invocation on Saturday,
-2026-10-17 failed in `Plan(...)` with
-`current published session unavailable or expired`.
+Architecture 134-D1R9 is SOURCE ACCEPTED on the isolated feature branch:
 
-Read-only reconciliation proved the attempt failed before source admission,
-predecessor binding and O_EXCL reservation. No D1R7 artifact/slot was consumed
-and no protected effect occurred.
+```text
+branch  feature/robinhood-production-paper-d1-arbitrary-time-supervisor
+HEAD    0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9
+TREE    e689c74336387f271f1e3476df984af95db20ca1
+base    30bc5270b8e7d06abf6841876582c4a48141c05b
+base TREE 0dd6edb600cc32e4b39b0f91c470a1522814adec
+```
 
-The standing Architecture-134 requirement is arbitrary-time startup while the PC
-is ON: weekends, holidays, after-hours and premarket must resolve/reconcile to
-the next legal published session and wait automatically. Accepted D1R7/D1R8
-remain frozen narrow primitives; D1R9 is a successor supervisor above them.
+Implementation `776d68d6b529a665d9d6e3670298687add3d8f1a` remains the immutable
+failed #605 source attempt. Corrective C1 `0b8a5bba...` changes only the fake
+source-admission harness, stale current registration assertions, validation
+record and D1R9-owned current pins; no runtime, authority, scheduler, child,
+protected-effect or workflow semantics changed.
 
-D1R9 will provide one top-level one-session authorization, deterministic
-next-session binding, durable NEXT_SESSION_WAIT/PREMARKET_WAIT/restart
-reconciliation, automatic D1R7 publication when its current-date contract becomes
-legal, source-owned D1R7 byte/hash proof reconciliation, and automatic D1R8
-delegation at/after open+5 minutes. Ambiguous protected effects still fail closed
-and never auto-retry.
+Checkpoint Source Gates #606 / 39019598738 / push / attempt 1 is terminal
+SUCCESS. Static authority, diff and Ruff checks passed with stable source
+identity. Active D1R9 source tests ran 3,358 cases: 3,353 passed / 5 skipped /
+0 failed / 0 errors. Canonical ROBINHOOD ran 10,325 cases: 10,319 passed /
+6 skipped / 0 failed / 0 errors, wall 249.474 seconds.
 
-Manual D1R7 publication and manual D1R8 execution are no longer the active
-progression path. They remain unauthorized while D1R9 source is implemented and
-reviewed.
+All 11 final D1R9 source/test blobs match their exact runner pins. All 69 frozen
+predecessor dictionary digests revalidated unchanged. Accepted child refs remain
+D1R7 `30322c49b13b80af8d20acee4bdb1efd83d86260` /
+`b7dc7f054fca50c3ab784505f264b6f716a45dff` and D1R8
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2` /
+`fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f`. Historical evidence and workflow
+YAML remain untouched.
 
-See [D1R9 architecture](architecture/134-d1r9-arbitrary-time-d1-supervisor.md)
-and [validation](validation/arch134-d1r9-arbitrary-time-d1-supervisor.md).
+D1R9 satisfies the frozen source contract: arbitrary-time target derivation,
+durable one-session journal/restart reconciliation, <=60-second wait quanta,
+isolated D1R7/D1R8 child processes, source-owned D1R7 bytes/SHA proof bridge,
+one-shot child and scheduler claims, no semantic CLI selectors, and scheduler
+plumbing separated from trading-session authority.
+
+This acceptance does not merge the feature branch and grants no real scheduler
+creation/run, D1R7 publication, credential/provider request, D1R8 execution,
+paper mutation, broker, ACL, D2 or live effect.
+
+The next safe boundary is a read-only Windows host-readiness check against the
+exact accepted source and frozen child/runtime/evidence identities.
 
 ## Purpose and authority
 
@@ -304,12 +319,13 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R7 and D1R8 are SOURCE ACCEPTED and D1R8 optional-SDK verification is
-complete, but manual current-session progression is superseded as the active path
-by the frozen D1R9 arbitrary-time supervisor design. D1R9 source must be
-implemented, CI-admitted and exact-source accepted before another real D1
-attempt. October 16 D1R5/D1R6 evidence remains immutable; the failed Saturday
-D1R7 command was pre-reservation and consumed no slot or effect.
+D1R7, D1R8 and D1R9 are SOURCE ACCEPTED, and D1R8 optional-SDK verification is
+complete. D1R9 is the active operational path, but source acceptance grants no
+host or protected-effect authority. Before any real scheduler/D1 operation,
+perform the separately bounded read-only Windows host-readiness check against the
+exact accepted D1R9/D1R7/D1R8 sources, predecessor evidence, runtime identities
+and scheduler observation. October 16 D1R5/D1R6 evidence remains immutable; the
+failed Saturday D1R7 command was pre-reservation and consumed no slot or effect.
 
 Until a protected operation is separately reviewed and authorized:
 
@@ -434,15 +450,16 @@ fast-forward only, and the accepted D1R8 feature ref remains
 verification completed with 40 focused PASS / 0 SKIP and zero audited network or
 native-credential attempts.
 
-- Architecture 134-D1R9 is the active next source milestone. Use Sol High on a
-  new isolated D1R9 branch/worktree. Implement one-command arbitrary-time
-  one-session reconciliation above frozen D1R7/D1R8: next-session resolution,
-  durable waits/restarts, automatic D1R7 delegation/proof reconciliation, then
-  automatic D1R8 delegation when admitted.
-- No real D1R7/D1R8/scheduler/provider/credential/paper operation occurs during
-  source implementation. Codex stays with the checkpoint through terminal mapped
-  CI. ChatGPT then performs exact GitHub source acceptance and automatically
-  advances the next safe step.
+- Run the exact D1R9 read-only Windows host-readiness check against accepted
+  feature HEAD `0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9`. Read-only scope:
+  exact Git/local/tracking/live identities for D1R9/D1R7/D1R8, predecessor
+  evidence identity/parsing, fixed runtime file identity/hash and compatible
+  read-only preflight, D1R9 authorization namespace/status, and Task Scheduler
+  Observe only.
+- No scheduler create/update/run/delete, D1R7/D1R8 child entry, credential read,
+  provider/Robinhood request, paper mutation, broker/ACL/D2/live effect is
+  permitted. Return sanitized readiness evidence to ChatGPT; operational
+  authorization remains a later separate reviewed boundary.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

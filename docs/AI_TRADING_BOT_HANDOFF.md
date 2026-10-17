@@ -1,5 +1,43 @@
 # AI Trading Bot - Current Handoff
 
+## D1R9 one-session authorization active
+
+The first real Architecture 134-D1R9 top-level authorization completed
+successfully on exact accepted C2 source
+`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` /
+`25a962daf3922c4226c7e395eba8613e1b03bbaf`.
+
+Operator result:
+
+```text
+AUTHORIZED_ONE_SESSION_TASK_STARTED
+status: NEXT_SESSION_WAIT
+scheduler Observe: {"status":"MATCH"}
+```
+
+This consumes exactly one D1R9 authorization for the immutable derived NYSE
+session `2026-10-19`. The fixed D1R9 journal is reserved, the fixed
+D1R9 scheduler task has been created once and demand-started once, and the
+task-owned supervisor is now reconciling automatically in
+`NEXT_SESSION_WAIT`.
+
+Do not run `--authorize` again for this session. Do not manually invoke
+scheduler `Create` or `Run`, and do not update/delete/recreate the task.
+The scheduler is plumbing only; trading/session authority remains bound to the
+durable D1R9 journal and published NYSE session authority.
+
+No D1R7 or D1R8 child entry has yet been observed at this checkpoint, and no
+new credential/provider/Robinhood, paper, broker, ACL, D2 or live effect is
+reported by this authorization handoff. The accepted supervisor is responsible
+for waiting/reconciling into the Monday session without another operator prompt.
+
+The next safe boundary is read-only monitoring of the durable D1R9 state.
+Normal expected progression is `NEXT_SESSION_WAIT` -> `PREMARKET_WAIT` ->
+D1R7 publication/proof -> `D1R8_WAIT` -> one consumed D1R8 terminal. Any
+`BLOCKED`, `INDETERMINATE`, unexpected `SESSION_MISSED`, task drift, or
+source/runtime drift is a STOP/reconciliation condition and must never be
+repaired by retrying authorization or native scheduler entry.
+
 ## D1R9 read-only host readiness passed
 
 The corrected C2 scheduler observation has now been exercised on the real Windows
@@ -392,15 +430,16 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R7, D1R8 and D1R9-C2 are SOURCE ACCEPTED, and D1R8 optional-SDK
-verification is complete. D1R9 remains the active operational path, but source
-acceptance grants no protected-effect authority. The full read-only host
-readiness already passed through source, predecessor, target, runtime and
-prospective-slot admission; only the corrected D1R9 scheduler `Observe` edge
-must be rerun against exact C2 source and return `ABSENT` before any separately
-reviewed scheduler/D1 authorization is considered. October 16 D1R5/D1R6 evidence
-remains immutable; the failed Saturday D1R7 command was pre-reservation and
-consumed no slot or effect.
+D1R7, D1R8 and D1R9-C2 are SOURCE ACCEPTED, and the first real D1R9
+one-session authorization is now active for the immutable `2026-10-19`
+published session. The authorizer returned
+`AUTHORIZED_ONE_SESSION_TASK_STARTED`; read-only status is
+`NEXT_SESSION_WAIT`; scheduler projection is `MATCH`.
+
+That authorization is consumed. Do not authorize again, rerun scheduler
+Create/Run, or perform scheduler cleanup. The task-owned supervisor now owns
+automatic reconciliation. October 16 D1R5/D1R6 evidence remains immutable; the
+failed Saturday D1R7 command was pre-reservation and consumed no slot or effect.
 
 Until a protected operation is separately reviewed and authorized:
 
@@ -525,14 +564,16 @@ fast-forward only, and the accepted D1R8 feature ref remains
 verification completed with 40 focused PASS / 0 SKIP and zero audited network or
 native-credential attempts.
 
-- Rerun only the accepted C2 Task Scheduler observer from exact D1R9 feature
-  HEAD `efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` with `Mode=Observe`.
-  Expected output is exactly `{"status":"ABSENT"}` and exit code 0.
-- No scheduler Create/Run/update/delete, D1R9 journal/claim creation, D1R7/D1R8
-  child entry, credential/provider/Robinhood read, paper/broker/ACL/D2/live effect
-  is permitted. Any non-ABSENT result is STOP. On ABSENT, return the read-only
-  observation/effect audit to ChatGPT; operational authorization remains a later
-  separately reviewed boundary.
+- The D1R9 one-session authorization for `2026-10-19` is active and
+  consumed. Do not run `--authorize` again or manually invoke scheduler
+  Create/Run, D1R7 or D1R8.
+- Monitoring may use only read-only `--status` and scheduler `Observe`.
+  Expected pre-session state is `NEXT_SESSION_WAIT` with scheduler `MATCH`.
+  Let the task-owned supervisor reconcile automatically.
+- Return the durable terminal/read-only evidence after the Monday session, or
+  immediately return any `BLOCKED`, `INDETERMINATE`, unexpected
+  `SESSION_MISSED`, source/runtime drift, or scheduler mismatch. Never repair
+  those conditions by retrying protected entry.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

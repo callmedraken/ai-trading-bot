@@ -43,20 +43,64 @@ provenance, incident reconstruction, predecessor semantics, or disputed
 historical evidence is actually required. Do not routinely load the legacy
 megafiles during startup.
 
-## D1R7 source accepted
+## D1R8 source accepted
 
-Active source checkpoint: **134-D1R8 — D1-session execution consumer**, on
-`feature/robinhood-production-paper-d1-session-execution` in
-`F:\AI\worktrees\ai-trading-bot-production-paper-d1-session-execution`.
-Frozen base develop HEAD `3b3a11e822ad42a4dadfe0ac05577df3281bd2bb`, TREE
-`e559bc6e03ba63e2c276840e647f72461bdaabee`; gate #599 / 38998238712 /
-push / attempt 1 / SUCCESS. SOURCE IMPLEMENTED; one atomic commit/push and
-terminal mapped ROBINHOOD CI precede ChatGPT/Sol High exact GitHub source review.
-No accepted D1R8 HEAD/TREE is asserted. The next owner is ChatGPT for exact source
-review after terminal green; red means STOP, no rerun/amend/fix-forward.
-No real D1R7 artifact was published and D1R8 operational execution remains
-unauthorized. See [D1R8 architecture](architecture/134-d1r8-d1-session-execution-consumer.md)
-and [validation](validation/arch134-d1r8-d1-session-execution-consumer.md).
+Architecture 134-D1R8 SOURCE ACCEPTED.
+`ARCH134_D1R8_SOURCE_ACCEPTED=YES` applies to the Option-C narrow D1R7-bound
+successor execution consumer on the exact accepted source:
+
+```text
+branch  feature/robinhood-production-paper-d1-session-execution
+HEAD    aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+TREE    fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+parent  a4173d32c333eeac327243e8fc66f9544348c205
+base    3b3a11e822ad42a4dadfe0ac05577df3281bd2bb
+base TREE e559bc6e03ba63e2c276840e647f72461bdaabee
+
+CI      Checkpoint Source Gates #601 / 39004436354 / push / attempt 1 / SUCCESS
+active  3217 passed / 5 skipped
+ROBINHOOD 10189 cases / 10183 passed / 6 skipped / 0 failed / 0 errors
+wall    256.478 seconds canonical
+```
+
+Lineage is `3b3a11e... -> a4173d32... -> aa07c5ba...`. The first source attempt
+`a4173d32...` and CI #600 remain historical failed checkpoint evidence: one
+stale current digest assertion failed. Corrective checkpoint C1 `aa07c5ba...`
+is the accepted final source; neither accepted-lineage commit is rewritten.
+Source-static, active-tests, canonical ROBINHOOD and source-gates passed #601.
+CI owns that canonical certification; no duplicate local ROBINHOOD run is needed.
+
+Current source inventory is ACTIVE 67 / FULL 182 / ROBINHOOD 101 / LEGACY 222 /
+EXHAUSTIVE 404 / GUI 51. All historical executable sources, predecessor pin
+dictionaries/digests and workflow fallback remain frozen under the final
+test-only successor overlay. The accepted D1R7/D1R8 feature refs, optional
+history mirror and D1R5/D1R6 refs remain unchanged by this acceptance integration.
+See [D1R8 architecture](architecture/134-d1r8-d1-session-execution-consumer.md) and
+[validation](validation/arch134-d1r8-d1-session-execution-consumer.md) for the
+historical implementation contract; this closeout records subsequent acceptance.
+
+Five D1R8 optional-SDK tests remained skipped because source CI does not install
+`httpx2`/`mcp`: `test_persisted_auth_has_single_yield_and_no_refresh_or_storage`
+and all four `test_persisted_token_rejection_has_no_renewal_path` cases.
+They are required pre-operational verification debt. The sixth canonical skip
+is a pre-existing optional OAuth SDK test. No real D1R7 publication or D1R8
+execution may be authorized until all five D1R8 tests have been observed
+non-skipped and passing on accepted executable/test source. This source
+acceptance does not assert that runtime verification has completed.
+
+No real D1R7 publication or D1R8 operation occurred. Operational authority stays
+NO: D1R7 publication, D1R8 execution, D1, PREPARE, EXECUTE, real credential or
+provider effects, paper mutation, broker, scheduler, ACL, D2 and live effects.
+
+Next: finish this atomic two-doc acceptance integration into `develop`, wait for
+terminal-green repository CI, then fast-forward the tracked-clean primary
+checkout while preserving all untracked files. Use declared `.[robinhood-mcp]`
+in an isolated test environment to execute the five tests plus adjacent
+fixed-credential and host/reachable-source tests, with fake/monkeypatched
+credential surfaces and no network/provider requests. STOP after non-operational
+verification; do not publish D1R7 or execute D1R8.
+
+## D1R7 source accepted
 
 Architecture 134-D1R7 SOURCE ACCEPTED.
 `ARCH134_D1R7_SOURCE_ACCEPTED=YES` applies to the exact source below:
@@ -89,10 +133,9 @@ remain provenance. Frozen predecessor pins/digests and workflow fallback remain
 unchanged under the bounded successor overlay. This docs integration preserves
 the accepted D1R7 feature ref, the optional history mirror, and D1R5/D1R6 refs.
 
-The separate fixed-branch D1 execution consumer is the active SOURCE-ONLY
-**134-D1R8** checkpoint above. Real D1R7 publication must wait for that source's
-separate SOURCE ACCEPTED and reviewed operational authorization.
-No host/evidence/scheduler/provider/store/trading operation is part of this work.
+The separate fixed-branch D1 execution consumer is the SOURCE ACCEPTED 134-D1R8
+checkpoint above. Real D1R7 publication and D1R8 execution remain blocked by
+required optional-SDK verification and separate operational authorization.
 
 ## Current operational checkpoint
 
@@ -217,15 +260,14 @@ live-trading authority.
 
 ## Current protected boundary
 
-The next protected source milestone is the **separate fixed-branch D1 execution
-consumer**, Architecture 134-D1R8, on
-`feature/robinhood-production-paper-d1-session-execution`. Its authorized source
-implementation awaits terminal CI and ChatGPT/Sol High exact GitHub review. D1R7
-source acceptance grants no operational publication or D1 execution authority.
-Any later operation requires the consumer's separate SOURCE ACCEPTED and an
-explicitly authorized operational contract; October 16 evidence stays immutable.
+D1R7 and the Option-C narrow D1R7-bound D1R8 consumer are SOURCE ACCEPTED.
+Source acceptance grants no operational publication or execution authority.
+The five D1R8 optional-SDK tests listed above must first execute non-skipped and
+pass on accepted executable/test source. A later protected operation also needs
+its separately reviewed operational contract and authorization. October 16
+D1R5/D1R6 evidence remains immutable; no retry or scheduler cleanup is implied.
 
-Until that boundary exists and is accepted:
+Until required optional-SDK verification passes and a protected operation is separately authorized:
 
 - do not invoke D1;
 - do not invoke PREPARE or EXECUTE;
@@ -342,15 +384,19 @@ safe-side test bytes legitimately meet.
 The earlier post-history-merge integration and mirror synchronization completed
 at HEAD `ec3572994558abed1c354766d65ec0a8aad14aa0`, TREE
 `5041c469c6d22c11bc465bdbe0ed330cae9aa8c8`. Current-state reconstruction starts
-from remote `develop`. This acceptance closeout integrates accepted D1R7 source
+from remote `develop`. This acceptance closeout integrates accepted D1R8 source
 and docs into develop; the optional history mirror and frozen D1R5/D1R6
 operational branches remain unchanged.
 
-The next product step is **ChatGPT/Sol High exact GitHub source review of the
-separate D1 execution consumer**, Architecture 134-D1R8, after terminal green on
-`feature/robinhood-production-paper-d1-session-execution`.
-Real D1R7 publication and D1 execution remain unavailable;
-the prerequisite record cannot authorize either operation.
+- Complete terminal-green acceptance integration, then fast-forward the primary
+  local `develop` with tracked worktree/index clean and all untracked files
+  preserved. Run only the declared optional-SDK tests and adjacent focused
+  fixed-credential/host/reachable-source tests with fake credentials and no
+  network/provider requests, against executable/test blobs identical to
+  `aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`.
+- Require the five D1R8 optional-SDK cases to PASS, never SKIP, before any later
+  operational authorization. STOP after this non-operational verification.
+  D1R7 publication and D1R8 execution remain unauthorized.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

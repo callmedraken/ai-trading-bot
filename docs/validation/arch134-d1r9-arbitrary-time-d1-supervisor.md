@@ -87,3 +87,31 @@ push and its fresh mapped canonical CI run. No real protected effect is invoked.
 
 C1 focused final result: all 35 exact failed cases passed. No broad local
 certification was run; the replacement mapped run remains GitHub-owned.
+
+## Corrective checkpoint D1R9-C2
+
+The bounded read-only Windows host-readiness observation against the accepted
+D1R9 source passed source, predecessor, runtime and prospective-slot admission,
+but the exact D1R9 scheduler observer returned `{"status":"BLOCKED"}` with
+exit code 2. A separate read-only COM diagnostic established that the Schedule
+service, COM connection and root folder were healthy, while lookup of
+`AITradingBot-Arch134-D1R9-OneSessionSupervisor-v1` raised
+`System.IO.FileNotFoundException` with HResult `-2147024894`
+(`0x80070002`). The task was therefore genuinely absent; no scheduler effect
+occurred.
+
+C2 changes only the missing-task classification in
+`scripts/arch134_d1r9_scheduler.ps1`. Its bounded
+`Test-TaskNotFoundException` helper inspects the caught exception and at most 32
+inner exceptions for the exact HResult. It does not inspect localized message
+text, and all other observation failures remain fail-closed as
+`{"status":"BLOCKED"}` with exit code 2. Task shape, scheduler identity,
+Create/Run behavior, supervisor authority, child boundaries, evidence and
+effect ceilings remain unchanged.
+
+Focused source tests exercise direct and nested `FileNotFoundException`
+instances, intermediate-chain matches, nonmatching HResults, message-only
+lookalikes and excessive-depth traversal through a PowerShell AST harness that
+never invokes Task Scheduler. The C2 checkpoint performs no real Observe,
+Create, Run, scheduler mutation, journal reservation, child entry, credential,
+provider, paper, broker, ACL, D2 or live effect.

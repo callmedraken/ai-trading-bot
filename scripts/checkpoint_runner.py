@@ -13218,12 +13218,12 @@ ARCH134_D1R9_SOURCE_PINS: Final = {
         "314921f10c2742d34cd6f8369c5ad3e9193e8199"
     ),
     "docs/validation/arch134-d1r9-arbitrary-time-d1-supervisor.md": (
-        "b224e11a27d9ae1fb84530f73cc49f4b32c379d1"
+        "50b66a1c1a3613f075c2e82a5fa147ab1e96ee4a"
     ),
     "scripts/arch134_d1r9_bridge.py": ("edf3bb8eee81ac73815e6807a3dbc556b456517d"),
     "scripts/arch134_d1r9_d1r7_child.py": ("8574331c1a9249d438ecffabb7c651f1fb5a0126"),
     "scripts/arch134_d1r9_d1r8_child.py": ("d3788070ec84c262f5a3385ebe7e5c51a3802091"),
-    "scripts/arch134_d1r9_scheduler.ps1": ("31c724b6a1ad78c485ee3ce51057e93a0c58204d"),
+    "scripts/arch134_d1r9_scheduler.ps1": ("d66cf32dd1d00357af1b37d597e37bbee398050f"),
     "scripts/run_arch134_d1r9.py": ("fe53ef0a43669adc84aa81b8c299c68b1c8a2d9f"),
     "src/trading_bot/review_paper/d1_session_supervisor.py": (
         "b35d47931ceb0a861b6e47ab6fb7853ac1f674ce"
@@ -13235,7 +13235,7 @@ ARCH134_D1R9_SOURCE_PINS: Final = {
         "a0ebf56afa089c245dbaaebcf2182bdb9486bf49"
     ),
     "tests/review_paper/test_d1_session_supervisor.py": (
-        "648837a887ea8f2bbc741f804314d293a8511c60"
+        "9617123c6829f05d97eb8f4f507a89beb6336715"
     ),
 }
 ARCH134_D1R9_PREDECESSOR_TEST_PINS: Final = {

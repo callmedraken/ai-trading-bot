@@ -6,6 +6,10 @@ import ast
 import copy
 import hashlib
 import importlib
+import json
+import os
+import shutil
+import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -491,6 +495,81 @@ def test_scheduler_definition_is_process_plumbing_only():
     assert "D1R6" not in source
     assert source.count("$task.Run($null)") == 1 and ".DeleteTask(" not in source
     assert "9:30" not in source and "9:20" not in source
+    assert "return @{status='MATCH'}" in source
+    assert "if ((Get-Observation).status -cne 'ABSENT')" in source
+    assert "RegisterTaskDefinition($taskName, $definition, 2," in source
+    assert "$result = @{status='CREATED'}" in source
+    assert "$result = @{status='STARTED'}" in source
+    assert "throw 'scheduler unavailable'" in source
+
+
+def test_scheduler_missing_task_hresult_chain_is_bounded_and_fail_closed():
+    powershell = shutil.which("powershell.exe")
+    if powershell is None:
+        pytest.skip("Windows PowerShell is required for the source harness")
+    command = r"""
+$ErrorActionPreference = 'Stop'
+$source = Get-Content -Raw -LiteralPath $env:D1R9_SCHEDULER_SOURCE
+$tokens = $null
+$errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseInput(
+    $source,
+    [ref]$tokens,
+    [ref]$errors
+)
+if ($errors.Count -ne 0) { throw 'scheduler source parse failed' }
+$function = $ast.Find({
+    param($node)
+    $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $node.Name -eq 'Test-TaskNotFoundException'
+}, $true)
+if ($null -eq $function) { throw 'missing task-not-found helper' }
+. ([scriptblock]::Create($function.Extent.Text))
+$direct = [System.IO.FileNotFoundException]::new('missing task')
+$inner = [System.IO.FileNotFoundException]::new('missing task')
+$nested = [System.Exception]::new('outer wrapper', $inner)
+$intermediate = [System.Exception]::new(
+    'outer wrapper',
+    [System.Exception]::new('middle wrapper', $inner)
+)
+$none = [System.Exception]::new('ordinary failure')
+$textOnly = [System.Exception]::new(
+    'System.IO.FileNotFoundException: missing task'
+)
+$deep = [System.IO.FileNotFoundException]::new('missing task')
+for ($index = 0; $index -lt 80; $index++) {
+    $deep = [System.Exception]::new(('wrapper ' + $index), $deep)
+}
+[ordered]@{
+    direct = Test-TaskNotFoundException $direct
+    nested = Test-TaskNotFoundException $nested
+    intermediate = Test-TaskNotFoundException $intermediate
+    none = Test-TaskNotFoundException $none
+    textOnly = Test-TaskNotFoundException $textOnly
+    excessive = Test-TaskNotFoundException $deep
+} | ConvertTo-Json -Compress
+"""
+    environment = dict(
+        os.environ,
+        D1R9_SCHEDULER_SOURCE=str(ROOT / "scripts/arch134_d1r9_scheduler.ps1"),
+    )
+    completed = subprocess.run(
+        [powershell, "-NoProfile", "-NonInteractive", "-Command", command],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+        timeout=30,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == {
+        "direct": True,
+        "nested": True,
+        "intermediate": True,
+        "none": False,
+        "textOnly": False,
+        "excessive": False,
+    }
 
 
 def test_child_import_guard_rejects_mixed_roots(monkeypatch):

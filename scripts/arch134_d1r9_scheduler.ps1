@@ -15,14 +15,21 @@ function Get-Service {
     $service.Connect()
     return $service
 }
+function Test-TaskNotFoundException([System.Exception]$Exception) {
+    $current = $Exception
+    for ($depth = 0; $depth -lt 32 -and $null -ne $current; $depth++) {
+        if ($current.HResult -eq -2147024894) { return $true }
+        $current = $current.InnerException
+    }
+    return $false
+}
 function Get-Observation {
     $service = Get-Service
     $folder = $service.GetFolder('\')
     try { $task = $folder.GetTask($taskName) }
     catch {
         $failure = $_.Exception
-        while ($null -ne $failure.InnerException) { $failure = $failure.InnerException }
-        if ($failure.HResult -eq -2147024894) { return @{status='ABSENT'} }
+        if (Test-TaskNotFoundException $failure) { return @{status='ABSENT'} }
         throw 'scheduler unavailable'
     }
     $definition = $task.Definition

@@ -79,26 +79,40 @@ See [D1R8 architecture](architecture/134-d1r8-d1-session-execution-consumer.md) 
 [validation](validation/arch134-d1r8-d1-session-execution-consumer.md) for the
 historical implementation contract; this closeout records subsequent acceptance.
 
-Five D1R8 optional-SDK tests remained skipped because source CI does not install
-`httpx2`/`mcp`: `test_persisted_auth_has_single_yield_and_no_refresh_or_storage`
-and all four `test_persisted_token_rejection_has_no_renewal_path` cases.
-They are required pre-operational verification debt. The sixth canonical skip
-is a pre-existing optional OAuth SDK test. No real D1R7 publication or D1R8
-execution may be authorized until all five D1R8 tests have been observed
-non-skipped and passing on accepted executable/test source. This source
-acceptance does not assert that runtime verification has completed.
+The D1R8 acceptance closeout is complete on current `develop`:
+
+```text
+closeout HEAD  ea07f5f8c80dfc01f26021cf4d886771bcdf2eb2
+closeout TREE  52f3874e6ca43ad899c399ef3f1d0a1723f021a7
+parent         aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+CI             Checkpoint Source Gates #602 / 39008433651 / push / attempt 1 / SUCCESS
+```
+
+Source-static, all four integration FULL shards, and source-gates passed; active
+and canonical-certification jobs were skipped by the integration route. Remote
+and primary local `develop` were reconciled by fast-forward only to the same
+HEAD/TREE with tracked worktree/index clean and the pre-existing untracked set
+preserved. The D1R8 feature ref remains exactly
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`.
+
+The required optional-SDK verification is also complete against executable/test
+blobs byte-identical to accepted D1R8 source, using declared-compatible
+`httpx2 2.13.1` and `mcp 2.2.0`:
+`D1R8_OPTIONAL_SDK_RUNTIME_VERIFICATION_COMPLETE=YES`.
+Forty focused tests passed with zero skipped in 3.96 seconds. The required
+persisted-bearer single-yield/no-refresh case and all four malformed-token
+rejection cases passed, together with 35 adjacent credential, host-admission,
+CLI, interactive, and reachable-source cases. The audit guard recorded zero
+network or native-credential attempts. The initial launcher collection-path
+mistake changed no repository source and its evidence remains preserved.
 
 No real D1R7 publication or D1R8 operation occurred. Operational authority stays
 NO: D1R7 publication, D1R8 execution, D1, PREPARE, EXECUTE, real credential or
 provider effects, paper mutation, broker, scheduler, ACL, D2 and live effects.
 
-Next: finish this atomic two-doc acceptance integration into `develop`, wait for
-terminal-green repository CI, then fast-forward the tracked-clean primary
-checkout while preserving all untracked files. Use declared `.[robinhood-mcp]`
-in an isolated test environment to execute the five tests plus adjacent
-fixed-credential and host/reachable-source tests, with fake/monkeypatched
-credential surfaces and no network/provider requests. STOP after non-operational
-verification; do not publish D1R7 or execute D1R8.
+The next protected boundary is a ChatGPT/Sol High read-only operational review
+of the exact D1R7 prerequisite-publication -> D1R8 one-session execution chain.
+This docs closeout grants no protected effect authority.
 
 ## D1R7 source accepted
 
@@ -260,14 +274,14 @@ live-trading authority.
 
 ## Current protected boundary
 
-D1R7 and the Option-C narrow D1R7-bound D1R8 consumer are SOURCE ACCEPTED.
-Source acceptance grants no operational publication or execution authority.
-The five D1R8 optional-SDK tests listed above must first execute non-skipped and
-pass on accepted executable/test source. A later protected operation also needs
-its separately reviewed operational contract and authorization. October 16
-D1R5/D1R6 evidence remains immutable; no retry or scheduler cleanup is implied.
+D1R7 and the Option-C narrow D1R7-bound D1R8 consumer are SOURCE ACCEPTED,
+and the required D1R8 optional-SDK runtime verification is complete. These facts
+still grant no operational publication or execution authority. The remaining
+protected boundary is the separately reviewed current-session D1R7 publication
+and separately bound one-session D1R8 execution contract. October 16 D1R5/D1R6
+evidence remains immutable; no retry or scheduler cleanup is implied.
 
-Until required optional-SDK verification passes and a protected operation is separately authorized:
+Until a protected operation is separately reviewed and authorized:
 
 - do not invoke D1;
 - do not invoke PREPARE or EXECUTE;
@@ -381,22 +395,23 @@ safe-side test bytes legitimately meet.
 
 ## Immediate next step
 
-The earlier post-history-merge integration and mirror synchronization completed
-at HEAD `ec3572994558abed1c354766d65ec0a8aad14aa0`, TREE
-`5041c469c6d22c11bc465bdbe0ed330cae9aa8c8`. Current-state reconstruction starts
-from remote `develop`. This acceptance closeout integrates accepted D1R8 source
-and docs into develop; the optional history mirror and frozen D1R5/D1R6
-operational branches remain unchanged.
+Current-state reconstruction starts from remote `develop`. The D1R8 acceptance
+closeout is integrated and terminal-green at
+`ea07f5f8c80dfc01f26021cf4d886771bcdf2eb2` /
+`52f3874e6ca43ad899c399ef3f1d0a1723f021a7`; primary local `develop` matches by
+fast-forward only, and the accepted D1R8 feature ref remains
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`. The required optional-SDK
+verification completed with 40 focused PASS / 0 SKIP and zero audited network or
+native-credential attempts.
 
-- Complete terminal-green acceptance integration, then fast-forward the primary
-  local `develop` with tracked worktree/index clean and all untracked files
-  preserved. Run only the declared optional-SDK tests and adjacent focused
-  fixed-credential/host/reachable-source tests with fake credentials and no
-  network/provider requests, against executable/test blobs identical to
-  `aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`.
-- Require the five D1R8 optional-SDK cases to PASS, never SKIP, before any later
-  operational authorization. STOP after this non-operational verification.
-  D1R7 publication and D1R8 execution remain unauthorized.
+- ChatGPT/Sol High now owns the read-only protected-effect readiness review for
+  the exact D1R7 prerequisite-publication -> D1R8 one-session execution chain.
+  The review must freeze current-session admission, D1R7 artifact/proof binding,
+  D1R8 accepted source identity, one-shot reservation/consumption, effect budgets,
+  source re-admission, terminal outcomes, and ambiguity/no-retry behavior.
+- No D1R7 publication or D1R8 execution occurs during this review. If the reviewed
+  contract is sound, the same transition response must provide the exact bounded
+  operator command/prompt plus success evidence and STOP conditions.
 
 For safe-side progression, preserve Architecture 139-B SHADOW and
 GUI-A16/A17/A18 read-only semantics. No integration step itself authorizes

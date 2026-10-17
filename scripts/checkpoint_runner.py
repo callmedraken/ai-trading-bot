@@ -11652,9 +11652,9 @@ def _arch140a18_current_inventory_test_pin(relative: str, predecessor: str) -> s
     return ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)
 
 
-# Architecture 141 / RCL-4 succeeds the accepted current inventory only for the
-# directly affected profile assertion.  It remains research-only and is not an
-# ACTIVE checkpoint registration.
+# Architecture 141 / RCL-4 succeeds the accepted current inventory for the
+# seven current-inventory tests touched by this source lineage.  It remains
+# research-only and is not an ACTIVE checkpoint registration.
 ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
     "tests/scripts/certification_runner/test_profiles.py": (
         "5e2a9b0158789a519157376388a1048a36e37f3c"
@@ -11662,14 +11662,28 @@ ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
     "tests/strategies/test_production_strategy_contract.py": (
         "4a4fda61f2a0cac6fc4132f8122a41cea2478982"
     ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "11d14027b3865a6d920533955c9ac9de2db3dbd4"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "47a994c5a404089368ec4837e192b11f3902ce9f"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "2a0befd1627e2e3880ae91d74b79fb20ea5b5ed9"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "ed95f6fe99afb96ba06b76e62cf01fecfe44cb67"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "a2276a94f137be2ef59e6732495c372c300cc5d3"
+    ),
 }
 
 
 def _arch141_current_inventory_test_pin(relative: str, predecessor: str) -> str:
-    if set(ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
-        "tests/scripts/certification_runner/test_profiles.py",
-        "tests/strategies/test_production_strategy_contract.py",
-    }:
+    if set(ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != set(
+        ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    ):
         raise ValueError("141 unreviewed current inventory override")
     material = json.dumps(
         ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
@@ -11679,15 +11693,30 @@ def _arch141_current_inventory_test_pin(relative: str, predecessor: str) -> str:
         != "a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5"
     ):
         raise ValueError("141 frozen 140-A18 predecessor drift")
+    expected_predecessors = {
+        "tests/scripts/certification_runner/test_profiles.py": (
+            "51f4404eacc526d8108921642b670f93290bcd33"
+        ),
+        "tests/strategies/test_production_strategy_contract.py": (
+            "b5918a61b2b446fa0702fa88e1c4d5fd12a9cd57"
+        ),
+        "tests/strategies/test_production_strategy_decision.py": (
+            "e7c3bce13f6a33c8276e9272d7920a13f78fc1fb"
+        ),
+        "tests/review_paper/test_production_strategy_cycle.py": (
+            "bd9ac03cca10a6a33a88da1bbfb4c77c96fa86d4"
+        ),
+        "tests/review_paper/test_supervised_deployment_qualification.py": (
+            "aa105f40f1d5110bc94dd192313c551ee0d0b812"
+        ),
+        "tests/review_paper/test_supervised_runtime_host_admission.py": (
+            "7da67612dd8ff6c70cc7c38f018e51b9449e6262"
+        ),
+        "tests/review_paper/test_supervised_maintenance_rebind.py": (
+            "9bc515170e7e30813e40bb07b33331ecb770943e"
+        ),
+    }
     if relative in ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
-        expected_predecessors = {
-            "tests/scripts/certification_runner/test_profiles.py": (
-                "51f4404eacc526d8108921642b670f93290bcd33"
-            ),
-            "tests/strategies/test_production_strategy_contract.py": (
-                "b5918a61b2b446fa0702fa88e1c4d5fd12a9cd57"
-            ),
-        }
         if predecessor != expected_predecessors[relative]:
             raise ValueError("141 wrong before pin")
     return ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(relative, predecessor)

@@ -348,6 +348,14 @@ def test_arch141_overlay_inventory_and_workflow_preservation():
     assert "arch141-research-candidate-production-compatibility" not in (
         checkpoint_runner.ACTIVE_CI_CHECKPOINTS
     )
+    assert set(checkpoint_runner.ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) == set(
+        checkpoint_runner.ARCH140A18_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    )
+    for (
+        path,
+        pin,
+    ) in checkpoint_runner.ARCH141_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.items():
+        assert checkpoint_runner._git_blob_sha1(root / path) == pin
     profile = "tests/scripts/certification_runner/test_profiles.py"
     assert (
         checkpoint_runner._git_blob_sha1(root / profile)

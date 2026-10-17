@@ -117,8 +117,8 @@ Local focused verification on the exact final source tree passed:
 The measured final inventories are ACTIVE checkpoint registrations `67`, FULL
 `183`, ROBINHOOD `101`, LEGACY `222`, EXHAUSTIVE `405`, and GUI `51`.
 Architecture-140-A18 predecessor material remains frozen; the Architecture-
-141 overlay changes only the two mechanically touched current inventory-test
-pins, with predecessor digest
+141 overlay freezes all seven current inventory-test paths, including the five
+corrected source-pinned assertions, with predecessor digest
 `a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
 
 ## Local verification

@@ -1,5 +1,30 @@
 # AI Trading Bot - Project Status
 
+## Architecture 141 safe-side design frozen
+
+Parallel safe-side progression now advances to Architecture 141 / RCL-4,
+**Research Candidate Production Compatibility Assessment**. The design is
+source-only and pure. It consumes the fully verified 139-B SHADOW chain and the
+exact bound historical variant, and records deterministic
+`NOT_ESTABLISHED` compatibility with the current production
+`MovingAverageCrossoverStrategy` family because no exact semantic
+strategy/symbol/config mapping exists.
+
+Architecture 141 explicitly does not create `ProductionStrategyContract`,
+`PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, promotion eligibility,
+strategy selection or any provider/paper/broker/scheduler/D1/D2 effect. Names,
+rank, metadata and one-symbol historical universes cannot substitute for a
+reviewed compatibility mapping.
+
+This safe-side design does not alter the active D1R9 one-session authority for
+2026-10-19. That supervisor remains independently active and must not be retried
+or modified by Architecture 141.
+
+The next safe-side implementation checkpoint is the isolated branch
+`feature/research-candidate-production-compatibility-current`, based on this
+exact design-freeze descendant of `develop`. It must complete as one atomic
+source commit/push and stop for ChatGPT exact-source review.
+
 ## D1R9 one-session authorization active
 
 The first real Architecture 134-D1R9 top-level authorization completed

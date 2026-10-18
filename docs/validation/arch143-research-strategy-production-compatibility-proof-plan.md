@@ -38,6 +38,29 @@ its public definition, walk-forward, qualification, and passed-artifact
 interfaces through the external verifier; it does not copy or merge feature
 source into `develop` as part of this design freeze.
 
+The future source checkpoint has two separate authorities:
+
+```text
+executable predecessor  e88f38f8deeb834ac3f162b6a82e328dc4708ad0
+design authority        3d66d1a3a7629eb07fcdef9fd1d6ed9f68d1bd87
+```
+
+Create the future feature branch/worktree from the exact accepted 142 commit,
+not from `develop`:
+
+```text
+branch   feature/research-strategy-production-compatibility-current
+worktree F:\AI\worktrees\ai-trading-bot-research-strategy-production-compatibility-current
+```
+
+The future implementation must preserve `e88f38f` as the direct executable
+predecessor and read the frozen Architecture-143 documents from exact design
+commit `3d66d1a3a7629eb07fcdef9fd1d6ed9f68d1bd87` using read-only `git show` or
+an equivalent. It must not merge, cherry-pick, rebase, or copy 142 source into
+`develop`, and must not merge/cherry-pick the 143 docs commit into the feature
+source merely to obtain documentation. Every implementation report must state
+both authorities separately.
+
 Future source scope is approximately:
 
 ```text
@@ -47,10 +70,25 @@ src/trading_bot/experiments/__init__.py
 ```
 
 Only mechanically required current inventory/authority successor overlays and
-their exact tests may be added after inventory recomputation. The source
+their exact tests may be added after actual inventory recomputation. Workflow
+YAML, D1R9, and operational authority remain prohibited. The source
 implementation must not change Architecture-139, 141, or 142 schemas,
-namespaces, identities, serialized bytes, or accepted behavior. It must not
-change `checkpoint_runner.py`, workflow YAML, D1R9, or operational authority.
+namespaces, identities, serialized bytes, or accepted behavior.
+
+`scripts/checkpoint_runner.py` remains unchanged unless actual local inventory
+recomputation and affected current-authority tests prove that a new supported
+Architecture-143 test surface mechanically requires a successor overlay. If
+required, the only permitted change is an additive, fail-closed Architecture-
+143 overlay that composes after the frozen Architecture-142-B overlay. The
+accepted 142-A and 142-B dictionaries/digests remain frozen and byte unchanged.
+The overlay may cover only exact current inventory/authority test blobs that
+actually changed because of Architecture-143 inventory admission. No
+historical pin may be rewritten in place and no unrelated source pin may be
+changed. Actual inventory must be recomputed, never guessed. Current inventory
+tests may change only for mechanically measured membership/count effects of the
+new supported test surface. If no successor overlay is mechanically required,
+`checkpoint_runner.py` must remain unchanged. This is narrow source-authority
+bookkeeping, not operational authority.
 
 ## Frozen artifacts
 

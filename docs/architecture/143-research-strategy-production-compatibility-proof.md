@@ -43,6 +43,52 @@ Architecture 142 remains complete and source accepted on its isolated feature
 lineage. The accepted 142-B source is consumed as an external interface only;
 its feature source remains intentionally unmerged into `develop`.
 
+## Implementation lineage and source-authority overlay
+
+The future Architecture-143 executable checkpoint has two deliberately
+separate authorities:
+
+```text
+executable predecessor  e88f38f8deeb834ac3f162b6a82e328dc4708ad0
+design authority        3d66d1a3a7629eb07fcdef9fd1d6ed9f68d1bd87
+```
+
+The executable predecessor is the exact accepted Architecture-142 feature
+source on `feature/research-strategy-native-evaluation-current`, with TREE
+`23f63ed62e67460edce5b9296893bdcfe49a25f7`. Architecture 143 must be developed
+from a new isolated branch/worktree descending directly from that commit:
+
+```text
+branch   feature/research-strategy-production-compatibility-current
+worktree F:\AI\worktrees\ai-trading-bot-research-strategy-production-compatibility-current
+```
+
+It must not use `develop` commit `3d66d1a` as its executable base. The future
+implementation reads these frozen design and validation documents from exact
+design commit `3d66d1a3a7629eb07fcdef9fd1d6ed9f68d1bd87` using read-only
+`git show` or an equivalent read-only retrieval. It must not merge, cherry-pick,
+rebase, or copy the accepted 142 source into `develop`, and it must not
+merge/cherry-pick the 143 docs commit into the feature source merely to obtain
+documentation. Reports must identify the executable predecessor and design
+authority separately.
+
+The current-inventory/checkpoint-runner boundary is narrow source-authority
+bookkeeping, not operational authority. Workflow YAML remains prohibited, as
+do D1R9 and all operational authority. `scripts/checkpoint_runner.py` remains
+unchanged unless actual local inventory recomputation and affected
+current-authority tests prove that a new supported Architecture-143 test
+surface mechanically requires a successor overlay. If required, the only
+permitted change is an additive, fail-closed Architecture-143 overlay that
+composes after the frozen Architecture-142-B overlay. The accepted 142-A and
+142-B dictionaries/digests remain frozen and byte unchanged. The overlay may
+cover only exact current inventory/authority test blobs that actually changed
+because of Architecture-143 inventory admission. No historical pin may be
+rewritten in place, no unrelated source pin may change, and actual inventory
+must be recomputed rather than guessed. Current inventory tests may change only
+for mechanically measured membership/count effects of the new supported test
+surface. If no successor overlay is mechanically required, the checkpoint
+runner remains unchanged.
+
 ## Frozen production semantic target
 
 The next source checkpoint will add the inert model
@@ -374,11 +420,12 @@ tests/experiments/test_research_strategy_production_compatibility.py
 src/trading_bot/experiments/__init__.py
 ```
 
-Only mechanically required current inventory/authority successor overlays and
-their exact tests may be added after actual inventory recomputation. No
+Only the exact source/test files in the frozen surface, plus the narrowly
+permitted mechanically required current-inventory/authority successor overlay
+described above, may be added after actual inventory recomputation. No
 Architecture-139, 141, or 142 artifact schema, namespace, identity, or
-accepted source behavior may change. `checkpoint_runner.py`, workflow YAML,
-D1R9, and operational authority remain outside this design freeze.
+accepted source behavior may change. Workflow YAML, D1R9, and operational
+authority remain prohibited.
 
 ## Required future test contract
 

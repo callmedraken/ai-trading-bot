@@ -1129,11 +1129,53 @@ def _validate_qualification(
 ) -> None:
     if type(qualification) is not ResearchStrategyWalkForwardQualification:
         raise ResearchStrategyWalkForwardError("exact qualification required")
-    if qualification.schema != RESEARCH_STRATEGY_WALK_FORWARD_QUALIFICATION_SCHEMA:
+    if (
+        type(qualification.schema) is not str
+        or qualification.schema != RESEARCH_STRATEGY_WALK_FORWARD_QUALIFICATION_SCHEMA
+    ):
         raise ResearchStrategyWalkForwardError("qualification schema is fixed")
     _validate_policy(qualification.policy)
-    if type(qualification.policy_id) is not UUID:
-        raise ResearchStrategyWalkForwardError("policy_id is inconsistent")
+    for value, name in (
+        (qualification.definition_id, "definition_id"),
+        (qualification.evaluation_policy_id, "evaluation_policy_id"),
+        (qualification.source_historical_fingerprint, "source_historical_fingerprint"),
+        (qualification.walk_forward_evidence_id, "walk_forward_evidence_id"),
+        (qualification.policy_id, "policy_id"),
+    ):
+        _uuid(value, name)
+    _source(qualification.qualification_source_head, "qualification_source_head")
+    _source(qualification.qualification_source_tree, "qualification_source_tree")
+    _integer(qualification.fold_count, "fold_count", positive=True)
+    if (
+        type(qualification.test_window_bar_counts) is not tuple
+        or not qualification.test_window_bar_counts
+    ):
+        raise ResearchStrategyWalkForwardError(
+            "test_window_bar_counts must be a nonempty tuple"
+        )
+    if len(qualification.test_window_bar_counts) != qualification.fold_count:
+        raise ResearchStrategyWalkForwardError(
+            "test_window_bar_counts must match fold_count"
+        )
+    for value in qualification.test_window_bar_counts:
+        _integer(value, "test_window_bar_count", positive=True)
+    for value, name in (
+        (qualification.minimum_observed_fold_return, "minimum_observed_fold_return"),
+        (qualification.median_fold_return, "median_fold_return"),
+        (
+            qualification.maximum_observed_fold_drawdown_percentage,
+            "maximum_observed_fold_drawdown_percentage",
+        ),
+    ):
+        _decimal(value, name)
+    if qualification.minimum_observed_fold_return > qualification.median_fold_return:
+        raise ResearchStrategyWalkForwardError(
+            "minimum observed return exceeds median return"
+        )
+    if qualification.maximum_observed_fold_drawdown_percentage < _ZERO:
+        raise ResearchStrategyWalkForwardError(
+            "maximum observed drawdown must be nonnegative"
+        )
     if type(qualification.test_windows_comparable) is not bool:
         raise ResearchStrategyWalkForwardError("comparability must be a bool")
     if type(qualification.status) is not ResearchStrategyWalkForwardQualificationStatus:
@@ -1181,15 +1223,16 @@ def _validate_qualification(
             "qualification derived fields inconsistent"
         )
     if check_identity:
+        _uuid(
+            getattr(qualification, "qualification_id", None),
+            "qualification_id",
+        )
         expected_id = _identity(
             RESEARCH_STRATEGY_WALK_FORWARD_QUALIFICATION_NAMESPACE,
             RESEARCH_STRATEGY_WALK_FORWARD_QUALIFICATION_IDENTITY_VERSION,
             _qualification_material(qualification),
         )
-        if (
-            type(qualification.qualification_id) is not UUID
-            or qualification.qualification_id != expected_id
-        ):
+        if qualification.qualification_id != expected_id:
             raise ResearchStrategyWalkForwardError("qualification_id is inconsistent")
 
 
@@ -1780,10 +1823,10 @@ def _validate_passed(passed: WalkForwardPassedResearchStrategy) -> None:
         raise ResearchStrategyWalkForwardError("passed_id is inconsistent")
 
 
-def build_walk_forward_passed_research_strategy(
+def _project_walk_forward_passed_research_strategy(
     qualification: ResearchStrategyWalkForwardQualification,
 ) -> WalkForwardPassedResearchStrategy:
-    """Build the passed research artifact only from exact derived PASS."""
+    """Project a qualification after its external chain was verified."""
     _validate_qualification(qualification)
     if (
         qualification.status
@@ -1803,13 +1846,44 @@ def build_walk_forward_passed_research_strategy(
     )
 
 
+def build_walk_forward_passed_research_strategy(
+    qualification: ResearchStrategyWalkForwardQualification,
+    completed: CompletedResearchStrategyWalkForward,
+    policy: ResearchStrategyWalkForwardQualificationPolicy,
+    *,
+    qualification_source_head: str,
+    qualification_source_tree: str,
+) -> WalkForwardPassedResearchStrategy:
+    """Externally verify the complete chain before projecting PASS evidence."""
+    verify_research_strategy_walk_forward_qualification(
+        qualification,
+        completed,
+        policy,
+        qualification_source_head=qualification_source_head,
+        qualification_source_tree=qualification_source_tree,
+    )
+    return _project_walk_forward_passed_research_strategy(qualification)
+
+
 def verify_walk_forward_passed_research_strategy(
     passed: WalkForwardPassedResearchStrategy,
     qualification: ResearchStrategyWalkForwardQualification,
+    completed: CompletedResearchStrategyWalkForward,
+    policy: ResearchStrategyWalkForwardQualificationPolicy,
+    *,
+    qualification_source_head: str,
+    qualification_source_tree: str,
 ) -> None:
-    """Verify the passed artifact is exactly bound to a PASS qualification."""
+    """Replay qualification evidence before accepting a PASS artifact."""
     _validate_passed(passed)
-    expected = build_walk_forward_passed_research_strategy(qualification)
+    verify_research_strategy_walk_forward_qualification(
+        qualification,
+        completed,
+        policy,
+        qualification_source_head=qualification_source_head,
+        qualification_source_tree=qualification_source_tree,
+    )
+    expected = _project_walk_forward_passed_research_strategy(qualification)
     if passed != expected:
         raise ResearchStrategyWalkForwardError("passed artifact does not reconcile")
 

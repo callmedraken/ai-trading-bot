@@ -10,6 +10,7 @@ from uuid import UUID
 
 import pytest
 
+import trading_bot.experiments.research_strategy_walk_forward as subject
 from scripts import checkpoint_runner
 from trading_bot.domain import Bar, Symbol
 from trading_bot.experiments.research_strategy_backtest import (
@@ -35,6 +36,7 @@ from trading_bot.experiments.research_strategy_walk_forward import (
     verify_research_strategy_walk_forward,
     verify_research_strategy_walk_forward_evidence,
     verify_research_strategy_walk_forward_qualification,
+    verify_walk_forward_passed_research_strategy,
 )
 from trading_bot.experiments.research_strategy_walk_forward import (
     ResearchStrategyWalkForwardFailureReason as Reason,
@@ -310,10 +312,24 @@ def test_qualification_derives_ordered_failures_and_passed_artifact(completed) -
         ResearchStrategyWalkForwardQualification.from_json(qualification.to_json())
         == qualification
     )
-    passed = build_walk_forward_passed_research_strategy(qualification)
+    passed = build_walk_forward_passed_research_strategy(
+        qualification,
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
     assert isinstance(passed, WalkForwardPassedResearchStrategy)
     assert WalkForwardPassedResearchStrategy.from_json(passed.to_json()) == passed
     verify_research_strategy_walk_forward_qualification(
+        qualification,
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    verify_walk_forward_passed_research_strategy(
+        passed,
         qualification,
         completed,
         policy,
@@ -346,7 +362,246 @@ def test_qualification_threshold_failures_are_valid_failed_evidence(completed) -
         expected_reasons += (Reason.MAXIMUM_FOLD_DRAWDOWN_PERCENTAGE_ABOVE_THRESHOLD,)
     assert qualification.failure_reasons == expected_reasons
     with pytest.raises(ResearchStrategyWalkForwardError):
-        build_walk_forward_passed_research_strategy(qualification)
+        build_walk_forward_passed_research_strategy(
+            qualification,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+
+
+def _self_consistent_unbound_qualification(
+    qualification: ResearchStrategyWalkForwardQualification,
+) -> ResearchStrategyWalkForwardQualification:
+    return ResearchStrategyWalkForwardQualification(
+        UUID(int=101),
+        UUID(int=102),
+        qualification.qualification_source_head,
+        qualification.qualification_source_tree,
+        UUID(int=103),
+        UUID(int=104),
+        qualification.policy,
+        qualification.fold_count,
+        qualification.test_window_bar_counts,
+        qualification.minimum_observed_fold_return,
+        qualification.median_fold_return,
+        qualification.maximum_observed_fold_drawdown_percentage,
+    )
+
+
+def _passed_projection(
+    qualification: ResearchStrategyWalkForwardQualification,
+) -> WalkForwardPassedResearchStrategy:
+    return WalkForwardPassedResearchStrategy(
+        qualification.definition_id,
+        qualification.evaluation_policy_id,
+        qualification.qualification_id,
+        qualification.walk_forward_evidence_id,
+        qualification.qualification_source_head,
+        qualification.qualification_source_tree,
+    )
+
+
+def test_unbound_self_consistent_pass_cannot_become_authoritative(
+    completed,
+) -> None:
+    policy = _qualification_policy()
+    legitimate = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    forged = _self_consistent_unbound_qualification(legitimate)
+    assert (
+        ResearchStrategyWalkForwardQualification.from_json(forged.to_json()) == forged
+    )
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        build_walk_forward_passed_research_strategy(
+            forged,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        verify_walk_forward_passed_research_strategy(
+            _passed_projection(forged),
+            forged,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+
+
+def test_failed_qualification_cannot_create_or_verify_passed_artifact(
+    completed,
+) -> None:
+    policy = ResearchStrategyWalkForwardQualificationPolicy(
+        minimum_fold_count=3,
+        minimum_fold_return=Decimal("100"),
+        minimum_median_return=Decimal("100"),
+        maximum_fold_drawdown_percentage=Decimal("0"),
+        require_equal_test_window_bar_count=True,
+    )
+    qualification = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    passed = _passed_projection(qualification)
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        build_walk_forward_passed_research_strategy(
+            qualification,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        verify_walk_forward_passed_research_strategy(
+            passed,
+            qualification,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+
+
+@pytest.mark.parametrize("wrong_input", ["policy", "head", "tree"])
+def test_pass_chain_rejects_wrong_independent_inputs(completed, wrong_input) -> None:
+    policy = _qualification_policy()
+    qualification = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    passed = build_walk_forward_passed_research_strategy(
+        qualification,
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    wrong_policy = replace(policy, minimum_fold_return=Decimal("-2"))
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        verify_walk_forward_passed_research_strategy(
+            passed,
+            qualification,
+            completed,
+            wrong_policy if wrong_input == "policy" else policy,
+            qualification_source_head="f" * 40
+            if wrong_input == "head"
+            else EVALUATION_HEAD,
+            qualification_source_tree="e" * 40
+            if wrong_input == "tree"
+            else EVALUATION_TREE,
+        )
+
+
+def test_tampered_underlying_fold_backtest_is_rejected_before_pass(
+    completed,
+) -> None:
+    policy = _qualification_policy()
+    qualification = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    tampered = replace(completed)
+    tampered_fold = replace(completed.folds[0])
+    tampered_training = replace(tampered_fold.training)
+    object.__setattr__(
+        tampered_training,
+        "evidence",
+        replace(
+            tampered_fold.training.evidence,
+            bar_count=tampered_fold.training.evidence.bar_count + 1,
+        ),
+    )
+    object.__setattr__(tampered_fold, "training", tampered_training)
+    object.__setattr__(tampered, "folds", (tampered_fold, *completed.folds[1:]))
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        build_walk_forward_passed_research_strategy(
+            qualification,
+            tampered,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("definition_id", "not-a-uuid"),
+        ("qualification_source_head", "not-a-source"),
+        ("fold_count", True),
+        ("test_window_bar_counts", (1,)),
+        ("test_window_bar_counts", (1, True)),
+        ("minimum_observed_fold_return", Decimal("NaN")),
+        ("minimum_observed_fold_return", Decimal("2")),
+        ("maximum_observed_fold_drawdown_percentage", Decimal("-1")),
+        ("policy_id", UUID(int=105)),
+        ("test_windows_comparable", False),
+        ("status", Status.FAILED),
+        ("qualification_id", UUID(int=106)),
+    ],
+)
+def test_defensive_qualification_validation_rejects_mutated_primitives(
+    completed, field, value
+) -> None:
+    policy = _qualification_policy()
+    qualification = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+    mutated = replace(qualification)
+    object.__setattr__(mutated, field, value)
+    with pytest.raises(ResearchStrategyWalkForwardError):
+        verify_research_strategy_walk_forward_qualification(
+            mutated,
+            completed,
+            policy,
+            qualification_source_head=EVALUATION_HEAD,
+            qualification_source_tree=EVALUATION_TREE,
+        )
+
+
+def test_parsing_pass_qualification_is_self_consistency_only(
+    completed, monkeypatch
+) -> None:
+    policy = _qualification_policy()
+    qualification = qualify_research_strategy_walk_forward(
+        completed,
+        policy,
+        qualification_source_head=EVALUATION_HEAD,
+        qualification_source_tree=EVALUATION_TREE,
+    )
+
+    def fail_if_research_runs(*args, **kwargs):
+        raise AssertionError("qualification parsing executed research")
+
+    monkeypatch.setattr(
+        subject, "run_research_strategy_walk_forward", fail_if_research_runs
+    )
+    monkeypatch.setattr(
+        subject, "verify_research_strategy_walk_forward", fail_if_research_runs
+    )
+    assert (
+        ResearchStrategyWalkForwardQualification.from_json(qualification.to_json())
+        == qualification
+    )
+    passed = _passed_projection(qualification)
+    assert WalkForwardPassedResearchStrategy.from_json(passed.to_json()) == passed
 
 
 @pytest.mark.parametrize(

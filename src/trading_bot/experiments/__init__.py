@@ -233,6 +233,19 @@ from trading_bot.experiments.research_strategy_definition import (
     build_research_strategy_definition,
     build_research_strategy_evaluation_policy,
 )
+from trading_bot.experiments.research_strategy_production_compatibility import (
+    PRODUCTION_STRATEGY_SEMANTIC_TARGET_IDENTITY_VERSION,
+    PRODUCTION_STRATEGY_SEMANTIC_TARGET_NAMESPACE,
+    PRODUCTION_STRATEGY_SEMANTIC_TARGET_SCHEMA,
+    RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_IDENTITY_VERSION,
+    RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_NAMESPACE,
+    RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_SCHEMA,
+    ProductionStrategySemanticTarget,
+    ResearchStrategyProductionCompatibilityError,
+    ResearchStrategyProductionCompatibilityProof,
+    build_research_strategy_production_compatibility_proof,
+    verify_research_strategy_production_compatibility_proof,
+)
 from trading_bot.experiments.research_strategy_walk_forward import (
     RESEARCH_STRATEGY_WALK_FORWARD_EVIDENCE_IDENTITY_VERSION,
     RESEARCH_STRATEGY_WALK_FORWARD_EVIDENCE_NAMESPACE,
@@ -500,6 +513,17 @@ __all__ = [
 ]
 
 __all__ += [
+    "PRODUCTION_STRATEGY_SEMANTIC_TARGET_IDENTITY_VERSION",
+    "PRODUCTION_STRATEGY_SEMANTIC_TARGET_NAMESPACE",
+    "PRODUCTION_STRATEGY_SEMANTIC_TARGET_SCHEMA",
+    "RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_IDENTITY_VERSION",
+    "RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_NAMESPACE",
+    "RESEARCH_STRATEGY_PRODUCTION_COMPATIBILITY_PROOF_SCHEMA",
+    "ProductionStrategySemanticTarget",
+    "ResearchStrategyProductionCompatibilityError",
+    "ResearchStrategyProductionCompatibilityProof",
+    "build_research_strategy_production_compatibility_proof",
+    "verify_research_strategy_production_compatibility_proof",
     "MOVING_AVERAGE_STRATEGY_ID",
     "MOVING_AVERAGE_STRATEGY_VERSION",
     "PRODUCTION_STRATEGY_SCHEMA",

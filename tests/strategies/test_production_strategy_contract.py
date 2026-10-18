@@ -94,6 +94,9 @@ def test_arch138_successor_preserves_unmodified_d1r5_pins() -> None:
             expected = checkpoint_runner._arch142b_current_inventory_test_pin(
                 relative, expected
             )
+            expected = checkpoint_runner._arch143_current_inventory_test_pin(
+                relative, expected
+            )
             assert checkpoint_runner._git_blob_sha1(root / relative) == expected
     assert checkpoint_runner._arch134_d1r5_authority_check(root) == ()
 
@@ -138,6 +141,9 @@ def test_arch140a18_successor_pins_match_and_preserve_unmodified_d1r5_pins():
             relative, current
         )
         current = checkpoint_runner._arch142b_current_inventory_test_pin(
+            relative, current
+        )
+        current = checkpoint_runner._arch143_current_inventory_test_pin(
             relative, current
         )
         assert checkpoint_runner._git_blob_sha1(root / relative) == current
@@ -416,10 +422,10 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 185,
+        "full": 186,
         "robinhood": 101,
         "legacy": 222,
-        "exhaustive": 407,
+        "exhaustive": 408,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

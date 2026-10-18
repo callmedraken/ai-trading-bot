@@ -10835,6 +10835,7 @@ def _arch134_production_paper_runtime_authority_check(
             expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             expected_pin = _arch142_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch142b_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch143_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(path) != expected_pin:
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
@@ -11840,6 +11841,7 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch134_d1r7_test_pin(relative, pin)
             pin = _arch142_current_inventory_test_pin(relative, pin)
             pin = _arch142b_current_inventory_test_pin(relative, pin)
+            pin = _arch143_current_inventory_test_pin(relative, pin)
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("134-D1R6 source drift: " + relative)
         for relative in ARCH134_D1R6_TEST_PIN_OVERRIDES:
@@ -11857,6 +11859,7 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = _arch134_d1r7_test_pin(relative, expected)
             expected = _arch142_current_inventory_test_pin(relative, expected)
             expected = _arch142b_current_inventory_test_pin(relative, expected)
+            expected = _arch143_current_inventory_test_pin(relative, expected)
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("134-D1R6 successor drift: " + relative)
         if (
@@ -12088,6 +12091,80 @@ def _arch142b_current_inventory_test_pin(relative: str, predecessor: str) -> str
     return predecessor
 
 
+ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "f85f5f44f8d2e90ddbba1daf734f92c468314af6"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "0f552f56a72419f4b3a2b84416759526300c2875"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "8d1c3739d9c5e70d16643124ab6e705fb3e6ca00"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "1349d66944d4b5adc08d3b0309c2b373aef4075d"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "8b1f47ad18a4af8b38c50fc518ef1cf8b64646a5"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "fa288b6db3671eab07cdac83f5b763975c3e3a49"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "a0ac8e53e6ddd266ea8acc5bbd25da9f8d6be197"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "b2e17f5f0301cdced36e2223ef6d3c6d2c9a6717"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "df9734fb68b6719b2cb500386977f735ad2e9ebf"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "435714e8f6789d0b51f7451673d4428e624c5d20"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "86b9711c2d105e9e1dc27ac12b85b5c5b4749d8d"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "643e0f87bdee1c6ae5f470672c2f04364481c050"
+    ),
+}
+ARCH143_CURRENT_INVENTORY_TEST_PINS_SHA256: Final = (
+    "394bc4086d09ab842e7773ec322e60fb01cbd1683c580e9828d09a531d3e1bc2"
+)
+
+
+def _arch143_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    if set(ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES) != {
+        "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py",
+        "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py",
+        "tests/review_paper/test_d1_session_authorization.py",
+        "tests/review_paper/test_d1_session_execution.py",
+        "tests/review_paper/test_pre_market_wake_overnight.py",
+        "tests/review_paper/test_production_strategy_cycle.py",
+        "tests/review_paper/test_supervised_deployment_qualification.py",
+        "tests/review_paper/test_supervised_maintenance_rebind.py",
+        "tests/review_paper/test_supervised_runtime_host_admission.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/strategies/test_production_strategy_decision.py",
+    }:
+        raise ValueError("143 unreviewed current inventory override")
+    material = json.dumps(
+        ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES, sort_keys=True
+    ).encode()
+    if (
+        hashlib.sha256(material).hexdigest()
+        != ARCH143_CURRENT_INVENTORY_TEST_PINS_SHA256
+    ):
+        raise ValueError("143 current inventory override drift")
+    if relative in ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        if predecessor != ARCH142B_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]:
+            raise ValueError("143 wrong before current inventory pin")
+        return ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]
+    return predecessor
+
+
 def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
     if set(ARCH134_D1R5_TEST_PIN_OVERRIDES) != {
         "tests/scripts/certification_runner/test_profiles.py",
@@ -12128,6 +12205,7 @@ def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             expected_pin = _arch142_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch142b_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch143_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R5 source drift: " + relative)
         for relative, allowed in ARCH134_D1R5_IMPORTS.items():
@@ -12248,6 +12326,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             expected_pin = _arch142_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch142b_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch143_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
@@ -12266,6 +12345,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             expected_pin = _arch142_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch142b_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch143_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
@@ -12293,6 +12373,7 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected_pin = _arch134_d1r7_test_pin(relative, expected_pin)
             expected_pin = _arch142_current_inventory_test_pin(relative, expected_pin)
             expected_pin = _arch142b_current_inventory_test_pin(relative, expected_pin)
+            expected_pin = _arch143_current_inventory_test_pin(relative, expected_pin)
             if _git_blob_sha1(repo_root / relative) != expected_pin:
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
@@ -13061,12 +13142,14 @@ def _arch134_d1r7_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch134_d1r8_test_pin(relative, pin)
             pin = _arch142_current_inventory_test_pin(relative, pin)
             pin = _arch142b_current_inventory_test_pin(relative, pin)
+            pin = _arch143_current_inventory_test_pin(relative, pin)
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("D1R7 source drift: " + relative)
         for relative, predecessor in ARCH134_D1R7_PREDECESSOR_TEST_PINS.items():
             expected = _arch134_d1r7_test_pin(relative, predecessor)
             expected = _arch142_current_inventory_test_pin(relative, expected)
             expected = _arch142b_current_inventory_test_pin(relative, expected)
+            expected = _arch143_current_inventory_test_pin(relative, expected)
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("D1R7 successor drift: " + relative)
         if not _batch_workflow_is_reviewed(
@@ -13326,12 +13409,14 @@ def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH134_D1R8_SOURCE_PINS.items():
             pin = _arch142_current_inventory_test_pin(relative, pin)
             pin = _arch142b_current_inventory_test_pin(relative, pin)
+            pin = _arch143_current_inventory_test_pin(relative, pin)
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("D1R8 source drift: " + relative)
         for relative, predecessor in ARCH134_D1R8_PREDECESSOR_TEST_PINS.items():
             expected = _arch134_d1r8_test_pin(relative, predecessor)
             expected = _arch142_current_inventory_test_pin(relative, expected)
             expected = _arch142b_current_inventory_test_pin(relative, expected)
+            expected = _arch143_current_inventory_test_pin(relative, expected)
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("D1R8 successor drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_D1R8_NAME]

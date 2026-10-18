@@ -970,6 +970,8 @@ def _new_evidence(
     *,
     evaluation_source_head: str,
     evaluation_source_tree: str,
+    fold_role: str = STANDALONE_FOLD_ROLE,
+    fold_id: UUID | None = None,
 ) -> ResearchStrategyBacktestEvidence:
     if type(definition) is not ResearchStrategyDefinition:
         raise ResearchStrategyBacktestError("exact research definition required")
@@ -994,7 +996,11 @@ def _new_evidence(
     data_fp = historical_data_fingerprint(data)
     result_fp = backtest_result_fingerprint(result)
     expected_run_id = derive_backtest_run_id(
-        definition.definition_id, evaluation_policy.policy_id, data_fp
+        definition.definition_id,
+        evaluation_policy.policy_id,
+        data_fp,
+        fold_role=fold_role,
+        fold_id=fold_id,
     )
     if result.config.run_id != expected_run_id:
         raise ResearchStrategyBacktestError("result run_id does not match evidence")
@@ -1028,8 +1034,15 @@ def run_research_strategy_backtest(
     *,
     evaluation_source_head: str,
     evaluation_source_tree: str,
+    fold_role: str = STANDALONE_FOLD_ROLE,
+    fold_id: UUID | None = None,
 ) -> CompletedResearchStrategyBacktest:
-    """Run one deterministic offline standalone evaluation."""
+    """Run one deterministic offline evaluation.
+
+    The default remains the accepted standalone 142-A behavior.  142-B uses
+    the explicit fold role and fold identity to derive independent training
+    and test run identities over the same offline machinery.
+    """
     if type(definition) is not ResearchStrategyDefinition:
         raise ResearchStrategyBacktestError("exact research definition required")
     if type(evaluation_policy) is not ResearchStrategyEvaluationPolicy:
@@ -1046,7 +1059,11 @@ def run_research_strategy_backtest(
         )
     data_fp = historical_data_fingerprint(historical_data)
     run_id = derive_backtest_run_id(
-        definition.definition_id, evaluation_policy.policy_id, data_fp
+        definition.definition_id,
+        evaluation_policy.policy_id,
+        data_fp,
+        fold_role=fold_role,
+        fold_id=fold_id,
     )
     config = build_backtest_config(evaluation_policy, run_id, historical_data)
     provider = _SuppliedHistoricalDataProvider(historical_data)
@@ -1062,6 +1079,8 @@ def run_research_strategy_backtest(
         report,
         evaluation_source_head=evaluation_source_head,
         evaluation_source_tree=evaluation_source_tree,
+        fold_role=fold_role,
+        fold_id=fold_id,
     )
     return CompletedResearchStrategyBacktest(
         definition=definition,
@@ -1079,6 +1098,8 @@ def verify_research_strategy_backtest(
     *,
     evaluation_source_head: str | None = None,
     evaluation_source_tree: str | None = None,
+    fold_role: str = STANDALONE_FOLD_ROLE,
+    fold_id: UUID | None = None,
 ) -> None:
     """Independently rerun and reconcile a completed evaluation exactly."""
     if type(completed) is not CompletedResearchStrategyBacktest:
@@ -1100,6 +1121,8 @@ def verify_research_strategy_backtest(
         data,
         evaluation_source_head=head,
         evaluation_source_tree=tree,
+        fold_role=fold_role,
+        fold_id=fold_id,
     )
     if (
         recomputed.result != completed.result
@@ -1121,6 +1144,8 @@ def verify_research_strategy_backtest_evidence(
     *,
     evaluation_source_head: str,
     evaluation_source_tree: str,
+    fold_role: str = STANDALONE_FOLD_ROLE,
+    fold_id: UUID | None = None,
 ) -> None:
     """Verify independently supplied evidence and exact engine/analyzer output."""
     if type(evidence) is not ResearchStrategyBacktestEvidence:
@@ -1131,6 +1156,8 @@ def verify_research_strategy_backtest_evidence(
         historical_data,
         evaluation_source_head=evaluation_source_head,
         evaluation_source_tree=evaluation_source_tree,
+        fold_role=fold_role,
+        fold_id=fold_id,
     )
     if evidence != expected.evidence:
         raise ResearchStrategyBacktestError("evidence does not reconcile")

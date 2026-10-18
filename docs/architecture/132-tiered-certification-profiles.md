@@ -1,5 +1,85 @@
 # Architecture 132 — Tiered certification profiles
 
+## 2026-10-18 — Architecture 132-R3I FULL-only timing-aware hygiene correction
+
+R3I changes only CURRENT FULL placement to four deterministic nonempty
+whole-module timing-aware lanes: `broad-1`, `broad-2`, `broad-3`, `broad-4`.
+ROBINHOOD retains exactly two lanes and the accepted R3H placement overlay,
+byte/behavior unchanged. LEGACY/EXHAUSTIVE retain their historical
+two-broad-plus-serial topology. Historical R1/R2/R3/R3H descriptions below record
+their accepted topology at the time; this section supersedes only current FULL
+placement, not their historical facts.
+
+The preserved Architecture-143 FULL evidence is
+`F:\AI\temp\pytest\arch143-full-bfda654ee4334d479c63e5ea0314b631`, from
+`feature/research-strategy-production-compatibility-current` at exact HEAD
+`33b14eab4e9577f15b2afa559918415e4d471d55`, TREE
+`d19ef77620881343cc38010290029865fd43c1f4`. It selected 186 supported modules,
+93 in each lane. The run was functionally passing but failed hygiene:
+
+| Evidence | broad-1 | broad-2 | Total |
+| --- | ---: | ---: | ---: |
+| Passed | 6,504 | 5,796 | 12,300 |
+| Skipped | 0 | 3 | 3 |
+| Failed / errors | 0 / 0 | 0 / 0 | 0 / 0 |
+| Cases | 6,504 | 5,799 | 12,303 |
+| Child elapsed seconds | 331.064 | 704.807 | 1035.871 |
+
+Wall time was 709.756 seconds; measured JUnit testcase work was approximately
+1001.177 seconds. Even ideal redistribution of observed child elapsed work
+across two lanes has a lower bound of 1035.871 / 2 = approximately 517.936
+seconds, so two-lane rebalancing is mathematically insufficient at measured
+cost. Greedy whole-module models over raw JUnit testcase work give:
+
+| Lanes | Modeled testcase seconds |
+| --- | --- |
+| 3 | 333.726 / 333.726 / 333.725 |
+| 4 | 250.295 / 250.294 / 250.294 / 250.294 |
+
+Four lanes are the smallest measured topology with credible sub-300-second
+headroom. These models are provenance, not a guarantee: CPU, disk, memory and
+antivirus contention remain explicit uncertainties for the later real run.
+The frozen 300-second hygiene ceiling remains exactly unchanged.
+
+`scripts/run_test_certification.py` owns a frozen 186-entry table of integer
+milliseconds, derived only by summing testcase times by canonical module path
+from those two JUnit files. The sole measured zero, `tests/test_config.py`, uses
+a documented positive 1-ms minimum. Thus the source-owned positive model totals
+1001178 ms (one millisecond above raw evidence), retains module counts
+46 / 47 / 46 / 47, and yields exact lane totals
+250295 / 250295 / 250294 / 250294 ms. The canonical table SHA256 is
+`e23c35fcebadd578e26beb349d09e84a308aeb229e5a2aef87863f6119e19d36`, over
+UTF-8 sorted compact JSON object material (`sort_keys=True`, separators `,`/`:`,
+no trailing newline). Source pairs preserve duplicate paths for validation.
+
+FULL validates canonical paths, exact positive integer values (bool excluded),
+unique semantic paths and membership in selected FULL; malformed, duplicate or
+stale entries fail closed before children launch. New supported modules absent
+from the table receive exactly 1000 ms. This is only a deterministic placement
+estimate and must never exclude a newly supported module or infer ownership.
+The runner never reads prior evidence, mutable timings, clocks or profiling for
+placement. It sorts selected modules by descending weight then ascending path,
+assigns each whole module to the lowest-total lane, breaks equal lane loads by
+lowest index, updates that total and preserves assignment order.
+
+Ownership and discovery are unchanged: FULL 186, ROBINHOOD 101, LEGACY 222,
+EXHAUSTIVE 408; frozen required baselines remain FULL 122 and ROBINHOOD 49.
+No tests are removed, skipped or reclassified. No slow-test deduplication,
+product/research/Architecture-143 semantics, Architecture-141/142 artifact
+source, D1R9, provider, broker, production or scheduler behavior changes.
+All exact-source/remote admission, protected rejection, JUnit validation,
+whole-repository Ruff/diff/static checks and external evidence rules remain.
+
+This unmapped `feature/test-suite-*` checkpoint uses the existing push-triggered
+source-static plus ordinary four-shard fallback source gate; certification-tests
+remains skipped. No workflow YAML or canonical mapping changes. Terminal-green
+source-gate CI is admission only. After ChatGPT exact-source acceptance, run
+exactly one fresh canonical local FULL with the project venv and unique external
+evidence directory. Acceptance requires zero failures/errors and wall strictly
+below 300 seconds; only then may Architecture 143 receive its single closeout.
+Status/handoff updates are deferred until that acceptance. No Architecture 144
+or D1R9 work is included.
+
 ## 2026-10-14 — Architecture 132-R3H measured two-lane hygiene correction
 
 Architecture 134-D1R5 exposed a certification-lane imbalance without a product
@@ -201,12 +281,12 @@ The older two-broad-plus-one-serial all-repository FULL layout is historical
 provenance. It predates the current/legacy ownership split and must not be
 reintroduced for routine current-product verification.
 
-The latest reviewed certification topology is Architecture 132-R2:
+The latest reviewed certification topology is Architecture 132-R3I:
 
-- FULL runs exactly two nonempty balanced lanes, `broad-1` and `broad-2`,
-  with no serial lane;
-- ROBINHOOD runs exactly two nonempty balanced lanes, `robinhood-1` and
-  `robinhood-2`, with no serial lane;
+- FULL runs four deterministic nonempty whole-module timing-aware lanes,
+  `broad-1`, `broad-2`, `broad-3`, and `broad-4`, with no serial lane;
+- ROBINHOOD runs exactly two deterministic nonempty lanes, `robinhood-1` and
+  `robinhood-2`, with the accepted R3H placement overlay and no serial lane;
 - LEGACY and EXHAUSTIVE alone retain the exact five-module serial safety lane.
 
 A canonical current-product certification therefore uses
@@ -1960,10 +2040,13 @@ full union legacy == exhaustive
 exhaustive == complete discovered repository inventory
 ```
 
-All profiles use the existing deterministic descending-file-size balancing,
-with stable path/lane ties and whole-file allocation. FULL and Robinhood have
-exactly two nonempty balanced lanes and no historical serial lane. LEGACY and
-EXHAUSTIVE retain the exact historical five-module serial allowlist:
+FULL uses four deterministic nonempty whole-module timing-aware lanes as
+specified by R3I above. Robinhood retains two deterministic lanes with the
+accepted R3H placement overlay. Both have no serial lane. Robinhood and the
+historical LEGACY/EXHAUSTIVE broad lanes retain descending-file-size balancing
+with stable path/lane ties and whole-file allocation. LEGACY and EXHAUSTIVE
+retain the exact historical two-broad-plus-serial topology and five-module
+serial allowlist:
 
 ```text
 tests/runtime/test_windows_transactional_capture_authority.py

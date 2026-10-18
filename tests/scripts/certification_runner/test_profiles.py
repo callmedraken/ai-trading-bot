@@ -216,9 +216,12 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             assert tuple(lanes.values())[:2] == runner.balance_broad(root, broad)
         else:
             assert not set(selected) & set(_EXPECTED_SERIAL)
-            expected = runner.balance_broad(root, selected)
-            if name == "robinhood":
-                expected = runner.apply_lane_pins(expected, runner.ROBINHOOD_LANE_PINS)
+            if name == "full":
+                expected = runner.balance_full(selected)
+            else:
+                expected = runner.apply_lane_pins(
+                    runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+                )
             assert tuple(lanes.values()) == expected
 
 
@@ -335,7 +338,7 @@ def test_new_supported_files_are_discovered_and_admitted(
     path.write_text("", encoding="utf-8")
     inventory = runner.discover_inventory(tmp_path)
     assert runner.select_inventory(inventory, "full") == tuple(
-        sorted((*_EXPECTED_FULL, module))
+        sorted((*_fixture_profiles()["full"], module))
     )
     assert module not in runner.select_inventory(inventory, "legacy")
 

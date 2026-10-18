@@ -38,6 +38,209 @@ ROBINHOOD_LANE_PINS = {
     "tests/review_paper/test_arch133_scheduler_installation.py": 1,
 }
 
+# Architecture 132-R3I: frozen module sums from Architecture-143 FULL JUnit.
+# HEAD 33b14eab4e9577f15b2afa559918415e4d471d55; TREE
+# d19ef77620881343cc38010290029865fd43c1f4. Sum testcase seconds in exact
+# milliseconds; tests/test_config.py measured 0 ms and uses a 1 ms minimum.
+# Pairs preserve duplicate keys for fail-closed validation (unlike a dict literal).
+# Canonical SHA256: sorted compact JSON object, UTF-8, no trailing newline:
+# e23c35fcebadd578e26beb349d09e84a308aeb229e5a2aef87863f6119e19d36
+FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
+FULL_MODULE_TIMINGS_MS = (
+    ("tests/analytics/test_analyzer.py", 15),
+    ("tests/backtesting/test_backtest_engine.py", 13),
+    ("tests/backtesting/test_backtest_models.py", 1),
+    ("tests/cli/test_create_research_session_bundle.py", 68),
+    ("tests/cli/test_historical_experiment.py", 9179),
+    ("tests/cli/test_historical_experiment_pairwise_config.py", 21),
+    ("tests/cli/test_historical_experiment_pairwise_serialization.py", 62),
+    ("tests/cli/test_historical_experiment_pareto_config.py", 7),
+    ("tests/cli/test_historical_experiment_pareto_serialization.py", 68),
+    ("tests/cli/test_historical_experiment_report_serialization.py", 96),
+    ("tests/cli/test_optimized_simulation.py", 8102),
+    ("tests/cli/test_research_session_archive.py", 438),
+    ("tests/cli/test_research_session_archive_cli.py", 69),
+    ("tests/cli/test_research_session_bundle.py", 253),
+    ("tests/cli/test_research_session_manifest.py", 34),
+    ("tests/cli/test_research_session_restore.py", 351),
+    ("tests/cli/test_restore_research_session_archive.py", 84),
+    ("tests/cli/test_rolling_historical.py", 296),
+    ("tests/cli/test_verify_research_session_manifest.py", 223),
+    ("tests/cli/test_walk_forward_aggregate_config.py", 9),
+    ("tests/cli/test_walk_forward_aggregate_serialization.py", 147),
+    ("tests/cli/test_walk_forward_experiment.py", 589),
+    ("tests/cli/test_walk_forward_experiment_config.py", 9),
+    ("tests/cli/test_walk_forward_experiment_serialization.py", 99),
+    ("tests/cli/test_walk_forward_stability_config.py", 17),
+    ("tests/cli/test_walk_forward_stability_serialization.py", 203),
+    ("tests/domain/test_market.py", 9),
+    ("tests/domain/test_orders.py", 14),
+    ("tests/domain/test_positions.py", 7),
+    ("tests/domain/test_proposals.py", 9),
+    ("tests/execution/test_execution_models.py", 3),
+    ("tests/execution/test_order_engine.py", 10),
+    ("tests/execution/test_paper_fill_application.py", 21),
+    ("tests/execution/test_paper_fills.py", 21),
+    ("tests/execution/test_paper_submission.py", 14),
+    ("tests/execution/test_portfolio_orders.py", 16),
+    ("tests/experiments/test_comparison.py", 73),
+    ("tests/experiments/test_grid.py", 71),
+    ("tests/experiments/test_historical.py", 418),
+    ("tests/experiments/test_pairwise.py", 1187),
+    ("tests/experiments/test_pareto.py", 359),
+    ("tests/experiments/test_report.py", 863),
+    ("tests/experiments/test_research_candidate.py", 594),
+    ("tests/experiments/test_research_candidate_shadow_binding.py", 31152),
+    ("tests/experiments/test_research_candidate_shadow_observation.py", 2248),
+    ("tests/experiments/test_research_candidate_shadow_qualification.py", 36236),
+    ("tests/experiments/test_research_candidate_walk_forward.py", 1351),
+    ("tests/experiments/test_research_strategy_backtest.py", 55),
+    ("tests/experiments/test_research_strategy_definition.py", 38),
+    ("tests/experiments/test_research_strategy_production_compatibility.py", 5390),
+    ("tests/experiments/test_research_strategy_walk_forward.py", 636),
+    ("tests/experiments/test_walk_forward.py", 132),
+    ("tests/experiments/test_walk_forward_analytics.py", 342),
+    ("tests/experiments/test_walk_forward_stability.py", 365),
+    ("tests/integration/test_walk_forward_e2e.py", 19707),
+    ("tests/integration/test_walk_forward_research_archive_e2e.py", 51),
+    ("tests/integration/test_walk_forward_research_bundle_e2e.py", 3469),
+    ("tests/integration/test_walk_forward_research_restore_e2e.py", 50),
+    ("tests/integration/test_walk_forward_research_transport_e2e.py", 490),
+    ("tests/ledger/test_checkpoint_state.py", 35),
+    ("tests/ledger/test_initialization.py", 16),
+    ("tests/ledger/test_ledger.py", 12),
+    ("tests/ledger/test_models.py", 1),
+    ("tests/market_calendar/test_calendar_models.py", 1),
+    ("tests/market_calendar/test_nyse_calendar.py", 10),
+    ("tests/market_data/test_csv_historical_provider.py", 262),
+    ("tests/market_data/test_historical_models.py", 3),
+    ("tests/market_data/test_multi_symbol_models.py", 4),
+    ("tests/market_data/test_multi_symbol_provider.py", 17),
+    ("tests/multi_backtesting/test_engine.py", 14),
+    ("tests/multi_backtesting/test_models.py", 1),
+    ("tests/multi_backtesting/test_strategy_contract.py", 2),
+    ("tests/optimization/test_cpu_mean_cvar.py", 23),
+    ("tests/portfolio/test_historical_scenarios.py", 36),
+    ("tests/portfolio/test_mean_cvar.py", 7),
+    ("tests/portfolio/test_models.py", 5),
+    ("tests/portfolio/test_optimized_targets.py", 23),
+    ("tests/portfolio/test_optimizer_protocol.py", 23),
+    ("tests/portfolio/test_scenarios.py", 10),
+    ("tests/portfolio_analytics/test_analyzer.py", 13),
+    ("tests/portfolio_analytics/test_models.py", 1),
+    ("tests/portfolio_analytics/test_optimized_simulation.py", 5679),
+    ("tests/rebalancing/test_models.py", 8),
+    ("tests/rebalancing/test_planner.py", 12),
+    ("tests/rebalancing/test_proposals.py", 27),
+    ("tests/review_paper/test_alpaca_authentication_qualification.py", 7043),
+    ("tests/review_paper/test_alpaca_credential_generation.py", 7393),
+    ("tests/review_paper/test_alpaca_credential_staging_cleanup.py", 4605),
+    (
+        "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+        22116,
+    ),
+    ("tests/review_paper/test_arch133_fresh_activation_reprovision.py", 14688),
+    (
+        "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+        15864,
+    ),
+    ("tests/review_paper/test_arch133_parent_policy_diagnostic.py", 1455),
+    ("tests/review_paper/test_arch133_parent_security_diagnostic.py", 849),
+    ("tests/review_paper/test_arch133_reprovision_admission_diagnostic.py", 439),
+    ("tests/review_paper/test_arch133_reprovision_reconciliation.py", 8524),
+    ("tests/review_paper/test_arch133_reprovision_recovery.py", 20401),
+    ("tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py", 9835),
+    ("tests/review_paper/test_arch133_scheduler_installation.py", 53864),
+    ("tests/review_paper/test_arch133_windows_rename_qualification.py", 16265),
+    ("tests/review_paper/test_armed_production_paper_session.py", 14731),
+    ("tests/review_paper/test_current_production_strategy_decision.py", 1748),
+    ("tests/review_paper/test_d1_session_authorization.py", 11422),
+    ("tests/review_paper/test_d1_session_execution.py", 98881),
+    ("tests/review_paper/test_forward_preview.py", 867),
+    ("tests/review_paper/test_history_qualification.py", 1431),
+    ("tests/review_paper/test_intent_bridge.py", 40),
+    ("tests/review_paper/test_nyse_published_regular_sessions.py", 53),
+    ("tests/review_paper/test_performance.py", 311),
+    ("tests/review_paper/test_post_publication_stage_diagnostic.py", 5003),
+    ("tests/review_paper/test_post_publication_verifier.py", 3415),
+    ("tests/review_paper/test_pre_market_wake_overnight.py", 16516),
+    ("tests/review_paper/test_pre_market_wake_qualification.py", 3573),
+    ("tests/review_paper/test_prepare_qualification.py", 891),
+    ("tests/review_paper/test_production_paper_runtime.py", 8228),
+    ("tests/review_paper/test_production_paper_runtime_acl.py", 16505),
+    ("tests/review_paper/test_production_strategy_cycle.py", 101),
+    ("tests/review_paper/test_production_strategy_prepare_operator.py", 2428),
+    ("tests/review_paper/test_publication_state_paper_corrected.py", 7162),
+    ("tests/review_paper/test_publication_state_paper_diagnostic.py", 6071),
+    ("tests/review_paper/test_published_session_prepare.py", 439),
+    ("tests/review_paper/test_retained_root_acl_recovery.py", 334),
+    ("tests/review_paper/test_retained_root_diagnostic.py", 448),
+    ("tests/review_paper/test_risk_context.py", 625),
+    ("tests/review_paper/test_risk_price_acquisition.py", 467),
+    ("tests/review_paper/test_risk_prices.py", 127),
+    ("tests/review_paper/test_scratch_root_acl.py", 389),
+    ("tests/review_paper/test_session_admission.py", 144),
+    ("tests/review_paper/test_store.py", 196),
+    ("tests/review_paper/test_strategy_market_history.py", 477),
+    ("tests/review_paper/test_supervised_deployment_qualification.py", 8882),
+    ("tests/review_paper/test_supervised_forward_paper.py", 431),
+    ("tests/review_paper/test_supervised_maintenance_rebind.py", 5915),
+    ("tests/review_paper/test_supervised_release_bundle.py", 38161),
+    ("tests/review_paper/test_supervised_release_foundation.py", 795),
+    ("tests/review_paper/test_supervised_release_installation.py", 2017),
+    ("tests/review_paper/test_supervised_release_installation_operator.py", 25918),
+    ("tests/review_paper/test_supervised_release_installation_reconciliation.py", 360),
+    ("tests/review_paper/test_supervised_release_publication_recovery.py", 4162),
+    ("tests/review_paper/test_supervised_runtime_host_admission.py", 2361),
+    ("tests/review_paper/test_unattended_activation.py", 222),
+    ("tests/review_paper/test_unattended_execution.py", 4977),
+    ("tests/review_paper/test_unattended_host.py", 2872),
+    ("tests/review_paper/test_unattended_one_wake.py", 3043),
+    ("tests/review_paper/test_unattended_publication.py", 1968),
+    ("tests/review_paper/test_unattended_state_store.py", 2792),
+    ("tests/risk/test_manager.py", 2),
+    ("tests/risk/test_orchestration.py", 9),
+    ("tests/risk/test_risk_models.py", 5),
+    ("tests/robinhood_mcp/test_account_resolution.py", 82),
+    ("tests/robinhood_mcp/test_adapter.py", 1),
+    ("tests/robinhood_mcp/test_historical.py", 59),
+    ("tests/robinhood_mcp/test_sdk_transport.py", 27),
+    ("tests/robinhood_mcp/test_windows_oauth.py", 667),
+    ("tests/runtime/checkpoint_runner/test_arch131.py", 72043),
+    ("tests/runtime/checkpoint_runner/test_arch133_a_g.py", 17048),
+    ("tests/runtime/checkpoint_runner/test_arch133_h_k.py", 75904),
+    ("tests/runtime/checkpoint_runner/test_arch133_l_m.py", 125386),
+    ("tests/runtime/checkpoint_runner/test_ci.py", 14650),
+    ("tests/runtime/checkpoint_runner/test_core.py", 400),
+    ("tests/scripts/certification_runner/test_children.py", 91),
+    ("tests/scripts/certification_runner/test_lanes.py", 106),
+    ("tests/scripts/certification_runner/test_profiles.py", 1825),
+    ("tests/scripts/certification_runner/test_results.py", 2815),
+    ("tests/scripts/certification_runner/test_source.py", 314),
+    ("tests/scripts/test_archive_project_history.py", 11871),
+    ("tests/scripts/test_create_walk_forward_research_bundle.py", 9),
+    ("tests/scripts/test_research_session_archive_scripts.py", 35),
+    ("tests/scripts/test_run_backtest.py", 3329),
+    ("tests/scripts/test_run_historical_experiment.py", 12774),
+    ("tests/scripts/test_run_rolling_historical_simulation.py", 2963),
+    ("tests/scripts/test_run_walk_forward_experiment.py", 18),
+    ("tests/simulation/test_optimized_paper_portfolio.py", 90),
+    ("tests/simulation/test_paper_portfolio.py", 85),
+    ("tests/simulation/test_rolling_historical.py", 185),
+    ("tests/strategies/test_moving_average.py", 2),
+    ("tests/strategies/test_production_strategy_contract.py", 19890),
+    ("tests/strategies/test_production_strategy_decision.py", 93),
+    ("tests/test_config.py", 1),
+    ("tests/test_robinhood_forward_paper_cycle.py", 406),
+    ("tests/test_robinhood_live_qualification_verifier.py", 1824),
+    ("tests/test_robinhood_paper_cycle.py", 387),
+    ("tests/test_robinhood_paper_operator.py", 690),
+    ("tests/test_robinhood_paper_pipeline.py", 87),
+    ("tests/test_robinhood_prepare_operator.py", 142),
+    ("tests/test_robinhood_prepare_qualification_verifier.py", 3559),
+    ("tests/test_robinhood_supervised_qualification.py", 7965),
+)
+
 ROBINHOOD_INFRASTRUCTURE_MODULES = (
     "tests/runtime/checkpoint_runner/test_arch131.py",
     "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
@@ -412,6 +615,41 @@ def balance_broad(
     return tuple(lanes[0]), tuple(lanes[1])
 
 
+def full_module_weights(inventory: tuple[str, ...]) -> dict[str, int]:
+    """Validate frozen timings against selected FULL, then admit fallback weights."""
+    if type(FULL_MODULE_TIMINGS_MS) is not tuple:
+        raise CertificationError("Malformed FULL timing table")
+    timings: dict[str, int] = {}
+    for entry in FULL_MODULE_TIMINGS_MS:
+        if type(entry) is not tuple or len(entry) != 2:
+            raise CertificationError("Malformed FULL timing entry")
+        module, weight = entry
+        if type(module) is not str or not re.fullmatch(
+            r"tests/(?:[a-z0-9_]+/)*test_[a-z0-9_]+\.py", module
+        ):
+            raise CertificationError("Noncanonical FULL timing module path")
+        if module in timings:
+            raise CertificationError("Duplicate FULL timing module path")
+        if type(weight) is not int or weight <= 0:
+            raise CertificationError("FULL timing weights must be positive integers")
+        if module not in inventory:
+            raise CertificationError(f"Stale FULL timing module: {module}")
+        timings[module] = weight
+    return {module: timings.get(module, FULL_FALLBACK_MS) for module in inventory}
+
+
+def balance_full(inventory: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    """Place whole FULL modules by frozen milliseconds, path, then lane index."""
+    weights = full_module_weights(inventory)
+    lanes: list[list[str]] = [[], [], [], []]
+    totals = [0, 0, 0, 0]
+    for module in sorted(inventory, key=lambda name: (-weights[name], name)):
+        index = min(range(4), key=lambda lane: (totals[lane], lane))
+        lanes[index].append(module)
+        totals[index] += weights[module]
+    return tuple(tuple(lane) for lane in lanes)
+
+
 def apply_lane_pins(
     lanes: tuple[tuple[str, ...], tuple[str, ...]],
     pins: dict[str, int],
@@ -553,12 +791,16 @@ def build_lanes(
         first, second = balance_broad(root, broad)
         prefix = "legacy" if profile == "legacy" else "broad"
         lanes = {f"{prefix}-1": first, f"{prefix}-2": second, "serial": serial}
-    elif profile in {"full", "robinhood"}:
-        first, second = balance_broad(root, inventory)
-        if profile == "robinhood":
-            first, second = apply_lane_pins((first, second), ROBINHOOD_LANE_PINS)
-        prefix = "broad" if profile == "full" else "robinhood"
-        lanes = {f"{prefix}-1": first, f"{prefix}-2": second}
+    elif profile == "full":
+        lanes = {
+            f"broad-{index}": modules
+            for index, modules in enumerate(balance_full(inventory), start=1)
+        }
+    elif profile == "robinhood":
+        first, second = apply_lane_pins(
+            balance_broad(root, inventory), ROBINHOOD_LANE_PINS
+        )
+        lanes = {"robinhood-1": first, "robinhood-2": second}
     else:
         raise CertificationError(f"Unknown certification profile: {profile}")
     validate_partitions(inventory, tuple(lanes.values()))

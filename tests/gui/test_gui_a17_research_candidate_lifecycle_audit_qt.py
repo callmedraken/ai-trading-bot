@@ -460,6 +460,9 @@ def test_exact_successor_pins_and_frozen_a16_digest():
             expected = checkpoint_runner._arch143_current_inventory_test_pin(
                 path, expected
             )
+            expected = checkpoint_runner._arch132_r3i_current_inventory_test_pin(
+                path, expected
+            )
         assert checkpoint_runner._git_blob_sha1(ROOT / path) == (expected)
     assert (
         checkpoint_runner._arch140a17_current_inventory_test_pin("other", "a" * 40)

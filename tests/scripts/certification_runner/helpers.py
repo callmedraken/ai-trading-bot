@@ -229,18 +229,106 @@ _FIXTURE_LEGACY = tuple(
 )
 
 
+_CURRENT_FULL_ADDITIONS = (
+    "tests/experiments/test_research_candidate.py",
+    "tests/experiments/test_research_candidate_shadow_binding.py",
+    "tests/experiments/test_research_candidate_shadow_observation.py",
+    "tests/experiments/test_research_candidate_shadow_qualification.py",
+    "tests/experiments/test_research_candidate_walk_forward.py",
+    "tests/experiments/test_research_strategy_backtest.py",
+    "tests/experiments/test_research_strategy_definition.py",
+    "tests/experiments/test_research_strategy_production_compatibility.py",
+    "tests/experiments/test_research_strategy_walk_forward.py",
+    "tests/review_paper/test_alpaca_authentication_qualification.py",
+    "tests/review_paper/test_alpaca_credential_generation.py",
+    "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+    "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
+    "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
+    "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
+    "tests/review_paper/test_arch133_parent_security_diagnostic.py",
+    "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+    "tests/review_paper/test_arch133_reprovision_recovery.py",
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+    "tests/review_paper/test_arch133_scheduler_installation.py",
+    "tests/review_paper/test_arch133_windows_rename_qualification.py",
+    "tests/review_paper/test_armed_production_paper_session.py",
+    "tests/review_paper/test_current_production_strategy_decision.py",
+    "tests/review_paper/test_d1_session_authorization.py",
+    "tests/review_paper/test_d1_session_execution.py",
+    "tests/review_paper/test_history_qualification.py",
+    "tests/review_paper/test_post_publication_stage_diagnostic.py",
+    "tests/review_paper/test_post_publication_verifier.py",
+    "tests/review_paper/test_pre_market_wake_overnight.py",
+    "tests/review_paper/test_pre_market_wake_qualification.py",
+    "tests/review_paper/test_production_paper_runtime.py",
+    "tests/review_paper/test_production_paper_runtime_acl.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_production_strategy_prepare_operator.py",
+    "tests/review_paper/test_publication_state_paper_corrected.py",
+    "tests/review_paper/test_publication_state_paper_diagnostic.py",
+    "tests/review_paper/test_published_session_prepare.py",
+    "tests/review_paper/test_retained_root_acl_recovery.py",
+    "tests/review_paper/test_retained_root_diagnostic.py",
+    "tests/review_paper/test_scratch_root_acl.py",
+    "tests/review_paper/test_strategy_market_history.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_supervised_release_bundle.py",
+    "tests/review_paper/test_supervised_release_foundation.py",
+    "tests/review_paper/test_supervised_release_installation.py",
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+    "tests/review_paper/test_supervised_release_publication_recovery.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/review_paper/test_unattended_activation.py",
+    "tests/review_paper/test_unattended_execution.py",
+    "tests/review_paper/test_unattended_host.py",
+    "tests/review_paper/test_unattended_one_wake.py",
+    "tests/review_paper/test_unattended_publication.py",
+    "tests/review_paper/test_unattended_state_store.py",
+    "tests/robinhood_mcp/test_historical.py",
+    "tests/scripts/test_archive_project_history.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+    "tests/test_robinhood_prepare_operator.py",
+    "tests/test_robinhood_supervised_qualification.py",
+)
+
+
 def _fixture_profiles() -> dict[str, tuple[str, ...]]:
     return {
-        "full": _EXPECTED_FULL,
-        "robinhood": _EXPECTED_ROBINHOOD,
+        "full": tuple(sorted((*_EXPECTED_FULL, *_CURRENT_FULL_ADDITIONS))),
+        "robinhood": tuple(
+            sorted(
+                (
+                    *_EXPECTED_ROBINHOOD,
+                    *(
+                        module
+                        for module in _CURRENT_FULL_ADDITIONS
+                        if (
+                            Path(module).parent.as_posix().removeprefix("tests/")
+                            in _BASELINE_FAMILIES
+                            or (
+                                Path(module).parent.as_posix() == "tests"
+                                and Path(module).name.startswith("test_robinhood_")
+                            )
+                        )
+                    ),
+                )
+            )
+        ),
         "legacy": _FIXTURE_LEGACY,
-        "exhaustive": tuple(sorted((*_EXPECTED_FULL, *_FIXTURE_LEGACY))),
+        "exhaustive": tuple(
+            sorted((*_EXPECTED_FULL, *_CURRENT_FULL_ADDITIONS, *_FIXTURE_LEGACY))
+        ),
     }
 
 
 def _lane_names(profile: str) -> tuple[str, ...]:
     return {
-        "full": ("broad-1", "broad-2"),
+        "full": ("broad-1", "broad-2", "broad-3", "broad-4"),
         "robinhood": ("robinhood-1", "robinhood-2"),
         "legacy": ("legacy-1", "legacy-2", "serial"),
         "exhaustive": ("broad-1", "broad-2", "serial"),

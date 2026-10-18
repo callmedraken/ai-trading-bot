@@ -463,4 +463,7 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
     expected = checkpoint_runner._arch143_current_inventory_test_pin(
         profile_path, expected
     )
+    expected = checkpoint_runner._arch132_r3i_current_inventory_test_pin(
+        profile_path, expected
+    )
     assert checkpoint_runner._git_blob_sha1(ROOT / profile_path) == expected

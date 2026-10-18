@@ -1,5 +1,49 @@
 # AI Trading Bot - Project Status
 
+## Architecture 143 / RCL-6 design frozen
+
+**ARCHITECTURE 143 / RCL-6 DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+
+This is a docs-only design checkpoint admitted from the exact clean `develop`
+checkout at HEAD `a0defb4a5c568e6afc78a76a325509396a9d327e` and TREE
+`50f6e193e917132dd596155115bbc1fc73691f4f`. Architecture 142 remains complete/
+source accepted on its isolated feature lineage; its source remains intentionally
+unmerged into `develop`.
+
+Architecture 143 freezes a separate pure strategy-native compatibility proof.
+It consumes only the accepted 142 definition, evaluation policy, completed
+walk-forward, qualification, qualification policy, and passed artifact after
+full external replay verification. It compares exact production schema,
+strategy family/version, Symbol, MovingAverageCrossoverConfig, and strategy /
+production source HEAD/TREE semantics against one explicit inert
+`ProductionStrategySemanticTarget`.
+
+Frozen target:
+
+```text
+production-strategy-semantic-target/v1
+production-strategy-semantic-target-identity/v1
+16be4a92-15d8-5db1-9f92-17a3dbd195f3
+```
+
+Frozen proof:
+
+```text
+research-strategy-production-compatibility-proof/v1
+research-strategy-production-compatibility-proof-identity/v1
+f9f82ac4-219d-512d-bfe9-a1c07c9427a1
+```
+
+The design creates no source, tests, production contract, paper candidate,
+promotion, provider/runtime/broker/scheduler authority, or operational effect.
+Architecture 141 remains immutable `SHADOW` / `NOT_ESTABLISHED`. D1R9 remains
+separate and untouched. The exact design and future validation contract are in
+[the Architecture-143 design record](architecture/143-research-strategy-production-compatibility-proof.md)
+and [its validation plan](validation/arch143-research-strategy-production-compatibility-proof-plan.md).
+
+The next checkpoint is the isolated Architecture-143 source implementation;
+real-money trading remains NO-GO.
+
 ## Architecture 142-A and 142-B / RCL-5 source acceptance
 
 Architecture 142-A and 142-B / RCL-5 are SOURCE ACCEPTED. Architecture 142 is

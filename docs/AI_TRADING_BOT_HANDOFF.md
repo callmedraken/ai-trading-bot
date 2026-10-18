@@ -1,5 +1,36 @@
 # AI Trading Bot - Current Handoff
 
+## Architecture 143 / RCL-6 design frozen
+
+**ARCHITECTURE 143 / RCL-6 DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+
+The docs-only Architecture-143 checkpoint is frozen from clean `develop` base
+HEAD `a0defb4a5c568e6afc78a76a325509396a9d327e` / TREE
+`50f6e193e917132dd596155115bbc1fc73691f4f` in
+`F:\AI\worktrees\ai-trading-bot-architecture-143-design-freeze`.
+
+Architecture 142 remains complete/source accepted on its isolated feature
+lineage and is not merged into `develop`. Architecture 143 / RCL-6 is a new
+strategy-native research-to-production semantic compatibility proof. It consumes
+only the accepted 142 chain after the full external
+`verify_walk_forward_passed_research_strategy(...)` boundary and compares exact
+production schema, strategy family/version, Symbol, config, and source
+HEAD/TREE semantics.
+
+The frozen future artifacts are the inert
+`ProductionStrategySemanticTarget` and positive-only
+`ResearchStrategyProductionCompatibilityProof`, with schemas/namespaces frozen
+in the Architecture-143 design and validation records. No status override,
+promotion eligibility, production selection, `ProductionStrategyContract`,
+`PAPER_CANDIDATE`, provider access, broker/paper/scheduler/D1/D1R9/D2 authority,
+or operational effect exists. Parsing alone never verifies research or grants
+authority.
+
+Architecture 141 remains immutable `SHADOW` / `NOT_ESTABLISHED` for the old
+portfolio candidate. D1R9 remains separate and untouched. The next checkpoint
+is the isolated Architecture-143 source implementation with focused tests and
+capability/zero-effect checks; real-money trading remains NO-GO.
+
 ## Architecture 142-A and 142-B / RCL-5 source acceptance
 
 Architecture 142-A and 142-B / RCL-5 are SOURCE ACCEPTED. Architecture 142 is

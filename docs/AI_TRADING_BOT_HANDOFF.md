@@ -1,6 +1,72 @@
 # AI Trading Bot - Current Handoff
 
-## 142-A source acceptance
+## Architecture 142-A and 142-B / RCL-5 source acceptance
+
+Architecture 142-A and 142-B / RCL-5 are SOURCE ACCEPTED. Architecture 142 is
+complete as a research-only milestone. The feature source remains intentionally
+unmerged; this closeout records source acceptance on `develop` only.
+
+The accepted feature source is `feature/research-strategy-native-evaluation-current`:
+
+```text
+142-B initial HEAD    e77bccdafc065148c56fee17095a7cfee0e1711b
+142-B initial TREE    bb02fd6e8c3b4d0c1bb5eca252a2fef1dff5ba69
+142-B initial PARENT  9ce66811aa37a47ee4f5d769cea1ff4c33b8dcae
+initial CI            #623 / 39095309178 SUCCESS
+
+142-B-C1 final HEAD   e88f38f8deeb834ac3f162b6a82e328dc4708ad0
+142-B-C1 final TREE   23f63ed62e67460edce5b9296893bdcfe49a25f7
+142-B-C1 PARENT      e77bccdafc065148c56fee17095a7cfee0e1711b
+final CI              #624 / 39096130260 SUCCESS
+```
+
+The accepted lineage is `9ce6681 -> e77bccd -> e88f38f`. Initial #623 SUCCESS
+is preserved. ChatGPT review found the initial 142-B PASS external-verification
+defect; C1 `e88f38f` corrected it. The #624 workflow_dispatch attempt 1 is
+terminal SUCCESS. Its four shard timings were `90.117 / 99.976 / 88.859 /
+80.482` seconds. JUnit evidence recorded `9,120 total / 9,119 passed / 1
+skipped / 0 failed / 0 errors`.
+
+Final source and focused-test identities are:
+
+```text
+research_strategy_walk_forward.py       6f8e69d023811f7763c67286cce0d44fab59a2c2
+test_research_strategy_walk_forward.py  ce20cc57ddc89591606b5d1de6e541f4228011bd
+workflow                                fe6aceac62721338eba4fcb40e2e7fde0d976e18
+142-A overlay                           515392eb1213323ab2bc0a62a4bd848a21b9fe60b6afcdaeac14b44523c43366
+142-B overlay                           8a7ddd8184e1beadecdce88207ed75b02dce75be870892957b9ae5ae5d7e33c6
+```
+
+The accepted certification inventories are FULL 185 / ROBINHOOD 101 / LEGACY
+222 / EXHAUSTIVE 407. Parsing remains self-consistency-only. External PASS
+verification now replays the full walk-forward/qualification chain and does not
+turn parsing into execution or acceptance authority.
+
+No `ProductionStrategyContract`, positive compatibility,
+`PAPER_CANDIDATE`, promotion or operational authority exists. All production,
+provider, credential, broker, scheduler, paper, D1, D1R9 and D2 effects remain
+zero:
+
+```text
+PRODUCTION_SQLITE_READS=0        PRODUCTION_SQLITE_WRITES=0
+CREDENTIAL_READS=0               PROVIDER_CALLS=0
+ROBINHOOD_READS=0                BROKER_CALLS=0
+SCHEDULER_CALLS=0                ACL_MUTATIONS=0
+PAPER_MUTATIONS=0                STRATEGY_PROMOTIONS=0
+PRODUCTION_CONTRACTS_CREATED=0   PAPER_CANDIDATES_CREATED=0
+D1_OPERATIONS=0                  D1R9_OPERATIONS=0
+D2_SUPERVISOR_EXECUTIONS=0
+```
+
+The next safe-side milestone is **Architecture 143 / RCL-6**: a separate pure
+compatibility-proof design/source checkpoint consuming the accepted
+strategy-native definition plus verified 142-B walk-forward/PASS evidence and
+comparing exact production family/version/symbol/config/source semantics.
+Architecture 143 must not create `ProductionStrategyContract`,
+`PAPER_CANDIDATE`, promotion, provider/runtime/broker/scheduler authority, or
+any operational effect.
+
+## 142-A predecessor source acceptance
 
 Architecture 142-A / RCL-5 is SOURCE ACCEPTED on the isolated safe-side branch:
 
@@ -85,12 +151,9 @@ research-only and is not an ACTIVE production checkpoint.
 
 The feature source is not merged by this acceptance closeout.
 
-The next safe-side source checkpoint is **Architecture 142-B** on the same
-isolated strategy-native research lineage. 142-B may consume accepted 142-A
-definition/policy/backtest evidence to add strategy-native walk-forward evidence
-and qualification only. It still cannot create positive compatibility,
-ProductionStrategyContract, PAPER_CANDIDATE, promotion or any operational
-authority.
+The predecessor 142-A source remains accepted and immutable. Its successor
+142-B is now accepted in the Architecture-142 closeout above; no feature source
+was merged by this handoff update.
 
 ## Architecture 142 / RCL-5 design frozen
 
@@ -106,15 +169,11 @@ historical data with the existing deterministic `BacktestEngine`,
 `NYSEMarketCalendar` and `PerformanceAnalyzer`; no provider acquisition or
 production contract is permitted.
 
-Architecture 142 is split into 142-A backtest evidence and 142-B strategy-native
-walk-forward qualification. 142-B begins only after 142-A source acceptance.
-Architecture 143 is reserved for a separate positive compatibility proof and
-still cannot create a production contract or PAPER_CANDIDATE.
-
-The next safe implementation checkpoint is 142-A on
-`feature/research-strategy-native-evaluation-current` /
-`F:\AI\worktrees\ai-trading-bot-research-strategy-native-evaluation-current`,
-based on this exact design-freeze descendant of `develop`.
+Architecture 142 was split into 142-A backtest evidence and 142-B
+strategy-native walk-forward qualification; both are now source accepted.
+Architecture 143 / RCL-6 is the separate next safe-side compatibility-proof
+design/source checkpoint and remains prohibited from creating a production
+contract, paper candidate, promotion, or operational authority.
 
 The active D1R9 one-session authority remains separate and untouched.
 

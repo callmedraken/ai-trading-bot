@@ -1,8 +1,72 @@
 # Architecture 142 / RCL-5 — Strategy-native research evaluation
 
-Status: **142-A SOURCE ACCEPTED; 142-B SOURCE NOT IMPLEMENTED**.
+Status: **142-A AND 142-B / RCL-5 SOURCE ACCEPTED; ARCHITECTURE 142 COMPLETE**.
 
-## 142-A source acceptance
+## 142-B / RCL-5 source acceptance closeout
+
+Architecture 142-A and 142-B / RCL-5 are SOURCE ACCEPTED on the isolated
+safe-side feature source. Architecture 142 is complete as a research-only
+milestone; the feature source remains intentionally unmerged.
+
+```text
+branch                 feature/research-strategy-native-evaluation-current
+142-B initial HEAD     e77bccdafc065148c56fee17095a7cfee0e1711b
+142-B initial TREE     bb02fd6e8c3b4d0c1bb5eca252a2fef1dff5ba69
+142-B initial PARENT   9ce66811aa37a47ee4f5d769cea1ff4c33b8dcae
+initial CI             #623 / 39095309178 SUCCESS
+
+142-B-C1 final HEAD    e88f38f8deeb834ac3f162b6a82e328dc4708ad0
+142-B-C1 final TREE    23f63ed62e67460edce5b9296893bdcfe49a25f7
+142-B-C1 PARENT       e77bccdafc065148c56fee17095a7cfee0e1711b
+final CI               #624 / 39096130260 SUCCESS
+```
+
+The accepted lineage is `9ce6681 -> e77bccd -> e88f38f`. Initial #623 SUCCESS
+is preserved. ChatGPT review found the initial 142-B PASS external-verification
+defect; C1 `e88f38f` corrected it. The #624 workflow_dispatch attempt 1 is
+terminal SUCCESS, with shard timings `90.117 / 99.976 / 88.859 / 80.482`
+seconds and JUnit `9,120 total / 9,119 passed / 1 skipped / 0 failed / 0
+errors`.
+
+Final source and focused-test identities are:
+
+```text
+research_strategy_walk_forward.py       6f8e69d023811f7763c67286cce0d44fab59a2c2
+test_research_strategy_walk_forward.py  ce20cc57ddc89591606b5d1de6e541f4228011bd
+workflow                                fe6aceac62721338eba4fcb40e2e7fde0d976e18
+142-A overlay                           515392eb1213323ab2bc0a62a4bd848a21b9fe60b6afcdaeac14b44523c43366
+142-B overlay                           8a7ddd8184e1beadecdce88207ed75b02dce75be870892957b9ae5ae5d7e33c6
+```
+
+The accepted certification inventories are FULL 185 / ROBINHOOD 101 / LEGACY
+222 / EXHAUSTIVE 407. Parsing remains self-consistency-only. External PASS
+verification now replays the full walk-forward/qualification chain.
+
+No `ProductionStrategyContract`, positive compatibility,
+`PAPER_CANDIDATE`, promotion or operational authority is created. All
+production/provider/credential/broker/scheduler/paper/D1/D1R9/D2 effects are
+zero:
+
+```text
+PRODUCTION_SQLITE_READS=0        PRODUCTION_SQLITE_WRITES=0
+CREDENTIAL_READS=0               PROVIDER_CALLS=0
+ROBINHOOD_READS=0                BROKER_CALLS=0
+SCHEDULER_CALLS=0                ACL_MUTATIONS=0
+PAPER_MUTATIONS=0                STRATEGY_PROMOTIONS=0
+PRODUCTION_CONTRACTS_CREATED=0   PAPER_CANDIDATES_CREATED=0
+D1_OPERATIONS=0                  D1R9_OPERATIONS=0
+D2_SUPERVISOR_EXECUTIONS=0
+```
+
+The next safe-side milestone is **Architecture 143 / RCL-6**: a separate pure
+compatibility-proof design/source checkpoint consuming the accepted
+strategy-native definition plus verified 142-B walk-forward/PASS evidence and
+comparing exact production family/version/symbol/config/source semantics.
+Architecture 143 must not create `ProductionStrategyContract`,
+`PAPER_CANDIDATE`, promotion, provider/runtime/broker/scheduler authority, or
+any operational effect.
+
+## 142-A predecessor source acceptance
 
 Architecture 142-A / RCL-5 is SOURCE ACCEPTED on the isolated safe-side branch:
 
@@ -87,12 +151,9 @@ research-only and is not an ACTIVE production checkpoint.
 
 The feature source is not merged by this acceptance closeout.
 
-The next safe-side source checkpoint is **Architecture 142-B** on the same
-isolated strategy-native research lineage. 142-B may consume accepted 142-A
-definition/policy/backtest evidence to add strategy-native walk-forward evidence
-and qualification only. It still cannot create positive compatibility,
-ProductionStrategyContract, PAPER_CANDIDATE, promotion or any operational
-authority.
+The predecessor 142-A source remains accepted and immutable. Its successor
+142-B is now accepted in the closeout above; no feature source was merged by
+this documentation update.
 
 ## Purpose
 
@@ -143,9 +204,10 @@ on that branch:
 2. **142-B** — strategy-native walk-forward evidence, qualification policy,
    qualification result and WALK_FORWARD_PASSED research evidence.
 
-142-B may begin only after 142-A source acceptance. Each sub-checkpoint is one
-logical atomic commit/push and one planned CI admission attempt, with bounded
-mechanical C1/C2 continuation under the canonical workflow rules.
+142-B began only after 142-A source acceptance and is now source accepted. Each
+sub-checkpoint was one logical atomic commit/push and one planned CI admission
+attempt, with bounded mechanical C1/C2 continuation under the canonical
+workflow rules.
 
 ## 142-A — strategy-native definition
 
@@ -421,8 +483,8 @@ New module:
 
 `src/trading_bot/experiments/research_strategy_walk_forward.py`
 
-This module is frozen by Architecture 142 but is not part of 142-A
-implementation.
+This module is frozen by Architecture 142 and is the accepted 142-B
+implementation surface.
 
 It owns these schemas/namespaces:
 
@@ -701,20 +763,19 @@ If it fails, preserve the failed attempt. Codex remains in the delegated task
 for fully classified bounded mechanical C1/C2 corrections under the canonical
 workflow rule; do not rerun unchanged CI or rewrite failed evidence.
 
-After terminal green, stop for ChatGPT exact-source review before 142-B.
+After terminal green, the exact 142-B source was reviewed and accepted as
+recorded above. This document does not authorize Architecture 143
+implementation.
 
 ## Next reviewed boundaries
 
-After 142-A source acceptance:
-
-1. implement 142-B strategy-native walk-forward evidence/qualification;
-2. exact-source review and acceptance;
-3. Architecture 143 / RCL-6 separately defines a positive compatibility proof
-   consuming only the new strategy-native definition plus verified 142-B
-   evidence and accepted production strategy semantics;
-4. Architecture 143 still must not construct `ProductionStrategyContract` or
-   `PAPER_CANDIDATE`;
-5. a later separately reviewed boundary may define `PAPER_CANDIDATE`;
-6. human promotion remains later and explicit.
+Architecture 142 is complete. The next reviewed boundary is Architecture 143 /
+RCL-6, a separate pure compatibility-proof design/source checkpoint consuming
+only the accepted strategy-native definition plus verified 142-B
+walk-forward/PASS evidence and comparing exact production family/version,
+symbol, config and source semantics. Architecture 143 still must not construct
+`ProductionStrategyContract` or `PAPER_CANDIDATE`, perform promotion, or grant
+provider/runtime/broker/scheduler authority; human promotion remains later and
+explicit.
 
 Real-money trading remains **NO-GO**.

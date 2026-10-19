@@ -1,11 +1,176 @@
 # Architecture 144 / RCL-7 — Research Strategy Paper-Candidate Eligibility Plan
 
-Status: **DESIGN FROZEN; source implementation is the next safe-side
-milestone.**
+Status: **DESIGN FROZEN; C1 source-readiness clarification recorded; 144-A is
+the next safe-side milestone.**
 
 This validation plan freezes the pure Architecture-144 eligibility boundary.
 It does not implement Architecture 144, acquire production evidence, create a
 paper candidate, authorize promotion, or grant any operational authority.
+
+## C1 source-readiness validation contract
+
+This corrective checkpoint preserves the existing Architecture-144 schemas,
+namespaces, exact field sets, lifecycle, frozen v1 policy, zero-effect
+boundary, and Monday D1R9 separation. It freezes only the byte-level identity,
+canonical transport, parser rejection, source-lineage, and 144-A/144-B
+implementation boundaries required before executable source work.
+
+Every UUID5 semantic text item is independently encoded as
+`<UTF-8 byte length>:<UTF-8 text>`; framed items are concatenated with no
+delimiter or trailing material. Artifact JSON bytes, `repr()`, Python hashes,
+object identity, paths, clocks, locale, UUID4/randomness, and ambient Decimal
+context are forbidden identity inputs. Canonical Decimal text requires an
+exact finite `Decimal`, `format(value, "f")`, removal of trailing fractional
+zeroes and a trailing decimal point, and normalization of `""` and `"-0"`
+to `"0"`.
+
+The exact UUID5 material is frozen as follows; each listed item is framed in
+the stated order and the derived ID is excluded from its own input.
+
+### Observation
+
+```text
+namespace b39bc4f6-4de1-5dd3-b9ec-286702cd744b
+research-strategy-paper-session-observation-identity/v1
+schema
+str(compatibility_proof_id)
+str(production_target_id)
+target_session_date.isoformat()
+str(production_contract_id)
+d1r9_source_head
+d1r9_source_tree
+d1r8_source_head
+d1r8_source_tree
+d1r9_journal_sha256
+d1r8_journal_sha256
+terminal_classification
+production_strategy_schema
+strategy_id
+strategy_version
+str(symbol)
+str(strategy_config.short_window)
+str(strategy_config.long_window)
+canonical_decimal(strategy_config.desired_quantity)
+production_source_head
+production_source_tree
+```
+
+`observation_id` is derived and excluded. A successfully externally verified
+observation may be exactly `NO_SIGNAL`, `RISK_REJECTED`, or
+`PAPER_EXECUTED`. `RISK_REJECTED` is a verified observation but is rejected by
+the v1 soak policy. `SESSION_MISSED`, `BLOCKED`, and `INDETERMINATE` do not
+produce a positive v1 observation because they do not establish a complete
+D1R8-backed boundary; this does not authorize retries.
+
+### Fixed policy
+
+```text
+namespace d0124aa1-3a8e-577f-9848-977fa0adb83a
+research-strategy-paper-soak-policy-identity/v1
+schema
+str(required_session_count)
+str(required_paper_executed_count)
+"true"
+str(len(qualifying_terminal_classifications))
+each qualifying_terminal_classification in exact tuple order
+```
+
+The tuple is exactly `("NO_SIGNAL", "PAPER_EXECUTED")`; the lowercase
+literal `"true"` is the identity spelling of the frozen boolean `true` value.
+`policy_id` is derived and excluded.
+
+### Eligibility
+
+```text
+namespace 28ed63ec-8f37-59ce-aad8-57741a645832
+research-strategy-paper-candidate-eligibility-identity/v1
+schema
+str(compatibility_proof_id)
+str(production_target_id)
+str(policy_id)
+str(len(observation_ids))
+each str(observation_id) in exact chronological order
+first_session_date.isoformat()
+last_session_date.isoformat()
+str(paper_executed_count)
+production_strategy_schema
+strategy_id
+strategy_version
+str(symbol)
+str(strategy_config.short_window)
+str(strategy_config.long_window)
+canonical_decimal(strategy_config.desired_quantity)
+research_strategy_source_head
+research_strategy_source_tree
+production_source_head
+production_source_tree
+eligibility_source_head
+eligibility_source_tree
+```
+
+`eligibility_id` is derived and excluded. All three artifacts use their exact
+existing field sets in canonical JSON with `sort_keys=True`, separators
+`(",", ":")`, `allow_nan=False`, and no trailing newline. UUIDs are canonical
+lowercase strings; dates are exact `YYYY-MM-DD`; symbols are `str(symbol)`;
+the config has only `short_window`, `long_window`, and `desired_quantity`; the
+window values are JSON integers and never bool; desired quantity is canonical
+Decimal text and never float; ordered arrays preserve chronology or the frozen
+policy tuple; the consecutive-session flag is a JSON boolean; journal hashes
+are lowercase 64-hex; and source HEAD/TREE values are lowercase 40-hex.
+
+Pure parsing rejects unknown, missing, or duplicate fields, alternate UUID/date
+spelling, floats, bool-as-int, nonfinite or noncanonical Decimal text,
+alternate config fields, and reordered/noncanonical bytes when exact canonical
+roundtrip is required.
+
+### Lineage and staged implementation boundary
+
+The future executable predecessor is the final accepted Architecture-143/R3I-
+C1 descendant:
+
+```text
+HEAD c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+TREE bf7019b1610c29563282ccb5f19be2bcb6501849
+```
+
+Accepted D1R8 parser authority is:
+
+```text
+branch feature/robinhood-production-paper-d1-session-execution
+HEAD   aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+TREE   fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+```
+
+Its parser is
+`src/trading_bot/review_paper/d1_session_execution_store.py`, blob
+`e35b0d528cecb396d5b7ffadcd158647becddba5`. Accepted D1R9 parser/store
+authority is:
+
+```text
+branch feature/robinhood-production-paper-d1-arbitrary-time-supervisor
+HEAD   efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
+TREE   25a962daf3922c4226c7e395eba8613e1b03bbaf
+```
+
+Its canonical store/parser is
+`src/trading_bot/review_paper/d1_session_supervisor_store.py`, blob
+`a0ebf56afa089c245dbaaebcf2182bdb9486bf49`; accepted reconciliation/proof
+logic is `src/trading_bot/review_paper/d1_session_supervisor.py`, blob
+`b35d47931ceb0a861b6e47ab6fb7853ac1f674ce`. D1R9 files are not present in
+the c522 predecessor or develop, and no merge/cherry-pick resolves that split.
+
+144-A is limited to the three artifact types, their constants and exact
+identities, strict canonical JSON, fixed v1 policy, intrinsic/self-consistency
+validation, pure parsing, exports, focused tests, and mechanically required
+inventory/current-pin bookkeeping. It must not import/copy D1R9 operational
+modules, parse real D1R9/D1R8 evidence, claim externally verified observations,
+provide positive builders, acquire evidence, read files, invoke D1/D1R7/D1R8/
+D1R9, create `PAPER_CANDIDATE`, or promote. Parsed objects are evidence
+containers only. 144-B is a separately reviewed external evidence verifier and
+positive builder composition; it must resolve a pure D1R9 verifier composition
+without importing/copying filesystem, scheduler, or other effectful surfaces
+just for parser semantics. C1 and 144-A make no decision about that pure
+composition.
 
 ## Validation objective
 

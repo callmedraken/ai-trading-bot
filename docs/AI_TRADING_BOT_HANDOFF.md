@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Architecture 144 / RCL-7 design frozen; Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
+## Architecture 144 / RCL-7 C1 source-readiness clarification; Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
 
 **ARCHITECTURE 143 / RCL-6 SOURCE/CERTIFICATION ACCEPTED.**
 
@@ -62,11 +62,22 @@ or D1R8 manually. The task-owned supervisor continues independently. Monday
 may become the first possible observation only after durable terminal evidence
 exists and is separately reviewed.
 
-The immediate safe-side next step after design acceptance is Architecture-144
-source implementation planning/admission, subject to ChatGPT exact review of
-the executable predecessor, accepted D1R9/D1R8 public verifiers, source scope
-and focused validation plan. This design checkpoint does not implement
-Architecture 144.
+Architecture-144 C1 now freezes exact deterministic identity framing,
+canonical JSON transport, parser rejection, source-lineage facts, and the
+staged 144-A / 144-B source boundary. Existing schemas, namespaces, exact
+field sets, lifecycle, v1 policy, and zero-effect boundary remain unchanged.
+The 144-A executable predecessor is the accepted Architecture-143/R3I-C1
+descendant `c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2` /
+`bf7019b1610c29563282ccb5f19be2bcb6501849`.
+
+The immediate next safe-side milestone after C1 acceptance is Architecture
+144-A, limited to the deterministic artifact/transport/fixed-policy
+foundation. Architecture 144-B is separately reviewed external evidence
+verification and positive-builder composition; no pure-composition decision is
+made by C1 or 144-A. No real Architecture-144 evidence has been acquired or
+inspected. The Monday `2026-10-19` D1R9 authorization remains independent and
+**ACTIVE / CONSUMED**; do not re-authorize or manually invoke its scheduler,
+D1R7, or D1R8.
 
 ## Architecture 144 / RCL-7 handoff record
 

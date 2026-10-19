@@ -1,7 +1,7 @@
 # Architecture 144 / RCL-7 — Research Strategy Paper-Candidate Eligibility
 
-Status: **DESIGN FROZEN; source implementation is the next safe-side
-milestone.**
+Status: **DESIGN FROZEN; C1 source-readiness clarification recorded; 144-A is
+the next safe-side milestone.**
 
 Architecture 144 is the separately reviewed successor permitted by the
 accepted Architecture-143 lifecycle boundary. It consumes the exact accepted
@@ -16,6 +16,203 @@ This design does not materialize `PAPER_CANDIDATE`, create
 `ProductionStrategyContract`, or select or replace the production strategy.
 Human promotion remains a later explicit boundary. Real-money trading remains
 **NO-GO**.
+
+## C1 source-readiness clarification — exact identity, transport, and staged boundary
+
+This corrective record does not redesign Architecture 144. The accepted
+schemas, namespaces, exact artifact field sets, lifecycle, frozen v1 policy,
+zero-effect boundary, and Monday D1R9 separation are unchanged. It removes
+only the deterministic identity and canonical transport ambiguity identified
+before executable source work.
+
+### Deterministic UUID5 framing
+
+Every UUID5 identity in the three Architecture-144 artifacts uses the same
+framing independently for every semantic text item:
+
+```text
+<UTF-8 byte length>:<UTF-8 text>
+```
+
+The framed items are concatenated with no delimiter and no trailing material.
+Identity material never uses artifact JSON bytes, `repr()`, Python hashes,
+object identity, filesystem paths, clocks, locale, UUID4/randomness, or the
+ambient `Decimal` context.
+
+Canonical Decimal text retains the accepted Architecture-143 meaning: require
+an exact finite `Decimal`; render with `format(value, "f")`; strip trailing
+fractional zeroes; strip a trailing decimal point; and normalize `""` and
+`"-0"` to `"0"`.
+
+### Observation identity and terminal boundary
+
+Under namespace `b39bc4f6-4de1-5dd3-b9ec-286702cd744b`,
+`ResearchStrategyPaperSessionObservation.observation_id` is derived from these
+framed items in exactly this order:
+
+```text
+research-strategy-paper-session-observation-identity/v1
+schema
+str(compatibility_proof_id)
+str(production_target_id)
+target_session_date.isoformat()
+str(production_contract_id)
+d1r9_source_head
+d1r9_source_tree
+d1r8_source_head
+d1r8_source_tree
+d1r9_journal_sha256
+d1r8_journal_sha256
+terminal_classification
+production_strategy_schema
+strategy_id
+strategy_version
+str(symbol)
+str(strategy_config.short_window)
+str(strategy_config.long_window)
+canonical_decimal(strategy_config.desired_quantity)
+production_source_head
+production_source_tree
+```
+
+`observation_id` is derived and is excluded from its own UUID5 input. A
+successfully externally verified observation may represent exactly
+`NO_SIGNAL`, `RISK_REJECTED`, or `PAPER_EXECUTED`. `RISK_REJECTED` may therefore
+exist as a verified observation, but it is rejected by the v1 eligibility soak
+policy. `SESSION_MISSED`, `BLOCKED`, and `INDETERMINATE` do not produce a
+positive v1 session observation because they do not establish the required
+complete D1R8-backed observation boundary. This does not authorize retries.
+
+### Fixed policy identity
+
+Under namespace `d0124aa1-3a8e-577f-9848-977fa0adb83a`,
+`ResearchStrategyPaperSoakPolicy.policy_id` is derived from these framed items
+in exactly this order:
+
+```text
+research-strategy-paper-soak-policy-identity/v1
+schema
+str(required_session_count)
+str(required_paper_executed_count)
+"true"
+str(len(qualifying_terminal_classifications))
+each qualifying_terminal_classification in exact tuple order
+```
+
+The `true` item is the lowercase literal text `"true"`, the identity spelling
+of the frozen boolean value. The qualifying tuple is exactly
+`("NO_SIGNAL", "PAPER_EXECUTED")`. `policy_id` is derived and is excluded
+from its own UUID5 input.
+
+### Eligibility identity
+
+Under namespace `28ed63ec-8f37-59ce-aad8-57741a645832`,
+`ResearchStrategyPaperCandidateEligibility.eligibility_id` is derived from
+these framed items in exactly this order:
+
+```text
+research-strategy-paper-candidate-eligibility-identity/v1
+schema
+str(compatibility_proof_id)
+str(production_target_id)
+str(policy_id)
+str(len(observation_ids))
+each str(observation_id) in exact chronological order
+first_session_date.isoformat()
+last_session_date.isoformat()
+str(paper_executed_count)
+production_strategy_schema
+strategy_id
+strategy_version
+str(symbol)
+str(strategy_config.short_window)
+str(strategy_config.long_window)
+canonical_decimal(strategy_config.desired_quantity)
+research_strategy_source_head
+research_strategy_source_tree
+production_source_head
+production_source_tree
+eligibility_source_head
+eligibility_source_tree
+```
+
+`eligibility_id` is derived and is excluded from its own UUID5 input.
+
+### Canonical JSON transport
+
+All three artifacts use their existing exact field sets and serialize as
+canonical JSON with `sort_keys=True`, separators exactly `(",", ":")`,
+`allow_nan=False`, and no trailing newline. UUIDs are canonical lowercase
+UUID strings; dates are exact `YYYY-MM-DD` strings; `Symbol` is `str(symbol)`;
+and `strategy_config` is an exact object containing only `short_window`,
+`long_window`, and `desired_quantity`. The two window values are JSON integers
+and never booleans. `desired_quantity` is canonical Decimal text, never a
+float. Observation IDs preserve exact chronological array order, and policy
+classifications preserve the frozen tuple order. The consecutive-session flag
+is a JSON boolean. Journal hashes remain lowercase 64-hex strings, and source
+HEAD/TREE values remain lowercase 40-hex strings.
+
+Pure parsing must reject unknown, missing, or duplicate fields; alternate UUID
+or date spelling; floats; bool-as-int; nonfinite or noncanonical Decimal text;
+alternate configuration fields; and reordered or otherwise noncanonical bytes
+when exact canonical roundtrip is required. Parsing and self-consistency do
+not establish external verification or operational authority.
+
+### Parser and source-lineage authority record
+
+The exact future executable predecessor for Architecture 144 is the final
+accepted Architecture-143/R3I-C1 descendant:
+
+```text
+HEAD  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+TREE  bf7019b1610c29563282ccb5f19be2bcb6501849
+```
+
+Architecture-144 design authority remains this documentation lineage on
+`develop`; after this C1, the final C1 commit is the exact design authority
+used by 144-A. The accepted D1R8 parser authority is branch
+`feature/robinhood-production-paper-d1-session-execution`, HEAD
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`, TREE
+`fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f`, at
+`src/trading_bot/review_paper/d1_session_execution_store.py`, blob
+`e35b0d528cecb396d5b7ffadcd158647becddba5`. That exact blob is already in
+the `c5225d8f...` source.
+
+The accepted D1R9 canonical store/parser authority is branch
+`feature/robinhood-production-paper-d1-arbitrary-time-supervisor`, HEAD
+`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8`, TREE
+`25a962daf3922c4226c7e395eba8613e1b03bbaf`, at
+`src/trading_bot/review_paper/d1_session_supervisor_store.py`, blob
+`a0ebf56afa089c245dbaaebcf2182bdb9486bf49`. Its accepted
+reconciliation/proof logic is
+`src/trading_bot/review_paper/d1_session_supervisor.py`, blob
+`b35d47931ceb0a861b6e47ab6fb7853ac1f674ce`. Those D1R9 files are not in
+`c5225d8f...` and are not in `develop`; this record does not merge or
+cherry-pick them.
+
+### Explicit 144-A / 144-B source split
+
+**Architecture 144-A** is the deterministic paper-eligibility artifact,
+transport, and fixed-policy foundation. Its direct executable predecessor is
+`c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2` /
+`bf7019b1610c29563282ccb5f19be2bcb6501849`. It may implement the three frozen
+artifact types, schemas/namespaces/constants, deterministic identities,
+strict canonical JSON, the fixed v1 policy, intrinsic/self-consistency
+validation, pure parsing, package exports, focused tests, and only mechanically
+required inventory/current-pin successor bookkeeping.
+
+144-A must not import or copy D1R9 operational modules; parse real D1R9 or
+D1R8 evidence; claim externally verified observations; provide the positive
+observation or eligibility builders; acquire evidence; read files; invoke
+D1/D1R7/D1R8/D1R9; create `PAPER_CANDIDATE`; or perform promotion. Parsed and
+self-consistent observation/eligibility objects remain evidence containers
+only and grant no externally verified status.
+
+**Architecture 144-B** is the separately reviewed external-evidence
+verification and positive-builder/verifier composition. It must resolve a
+pure D1R9 verifier composition without importing or copying the
+filesystem/scheduler/effectful surface merely to obtain parser semantics. No
+decision about that pure composition is implemented by this C1 or by 144-A.
 
 ## Frozen lifecycle boundary
 

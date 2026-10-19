@@ -1,7 +1,6 @@
 # Project History Storage
 
-Status: **post-cutover policy; HIST-2 exact snapshot and canonical cutover are
-complete**.
+Status: **post-cutover policy active; HIST-2 exact snapshot preserved**
 
 ## Purpose and information layers
 
@@ -16,26 +15,26 @@ The current information layers are:
    `docs/AI_TRADING_BOT_HANDOFF.md`;
 3. architecture and validation contracts: `docs/architecture/` and
    `docs/validation/`;
-4. closed historical record: `docs/history/`.
+4. compact closed records and immutable historical snapshots:
+   `docs/history/`.
 
-Current-state documents must remain bounded. Cumulative chronological
-narratives must not grow back into them. Closed detail belongs once in the
-relevant architecture, validation, or history record.
+Current-state documents must remain bounded. Cumulative chronological narratives
+must not grow back into them. Closed detail belongs once in the relevant
+architecture, validation, or history record.
 
 ## Default startup reference and compatibility/history mirror
 
 Current remote `develop` is the primary/default startup integration reference
 for bounded reconstruction. `feature/project-history-storage-foundation` may
 remain a synchronized compatibility/history mirror; it is not a required first
-startup hop. Its accepted fast-forward to
-`ec3572994558abed1c354766d65ec0a8aad14aa0` is complete, not a pending action.
+startup hop.
 
-The mirror must never become an independent development lineage. Any divergence
-from accepted integration ancestry is a STOP/reconciliation condition; never
-manufacture convergence with merge, rebase, cherry-pick, or force-push. Any
-separately authorized synchronization must be fast-forward-only to an exact
-accepted integration descendant, with no mirror-only source or handoff commits.
-Pending feature checkpoints do not move either integration or mirror ref.
+The mirror must never become an independent development lineage. After an
+accepted bounded-docs closeout and its terminal gate, the mirror may be
+fast-forwarded to that exact accepted descendant. Any divergence from accepted
+integration ancestry is a STOP/reconciliation condition; never manufacture
+convergence with merge, rebase, cherry-pick, or force-push. Pending feature
+checkpoints do not move either integration or mirror ref.
 
 Startup documentation is not executable-source, provider, broker, or trading
 authority; independently verify the active product branch and exact executable
@@ -79,26 +78,26 @@ It writes only beneath the requested legacy destination, verifies exact bytes
 and digests, and cleans up on failure. It must not be used to rewrite the
 immutable HIST-2B snapshot or to bypass a separately reviewed cutover.
 
-## Corrections and records
+## Corrections and compact records
 
-Frozen legacy snapshots are historical evidence. Do not rewrite them to make
-old terminology look current. Historical corrections are additive: add a later
-correction record or an index annotation that clearly identifies what it
-supersedes. Never silently rewrite immutable evidence.
+Frozen legacy snapshots are historical evidence. Do not rewrite them to make old
+terminology look current. Historical corrections are additive: add a later
+compact record or an index annotation that clearly identifies what it
+supersedes.
 
-Compact history records should preserve, when applicable, the date,
-architecture/checkpoint identifier, terminal state, branch, accepted source
-identity, CI or certification identity, evidence path and digest, protected-
-effect classification, material invariants, successor boundary, and links to
-the authoritative architecture or validation document. Never copy secrets,
-credential values, private keys, or tokens into history.
+Compact records should preserve, when applicable, the date, architecture or
+checkpoint identifier, terminal state, accepted source identity, CI or
+certification identity, evidence path/digest, protected-effect classification,
+material invariants, successor boundary, and links to authoritative
+architecture/validation documents. Never copy secrets, credential values,
+private keys, or tokens into history.
 
 ## Retrieval rule
 
 New sessions resolve current remote `develop` and read, in order, its
-`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded `docs/PROJECT_STATUS.md`,
-bounded `docs/AI_TRADING_BOT_HANDOFF.md`, then relevant architecture/validation
-documents. Separately verify the active remote product branch and exact
-executable HEAD/tree before source or protected work. Read [INDEX.md](INDEX.md)
-or a specific legacy snapshot only for targeted reconstruction. This keeps routine
-handoffs bounded while retaining the full audit trail.
+`AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
+`docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, then
+relevant architecture/validation documents. Separately verify the active remote
+product branch and exact executable HEAD/tree before source or protected work.
+Read [INDEX.md](INDEX.md), a compact record, or the legacy snapshot only for
+targeted reconstruction.

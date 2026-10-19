@@ -1,920 +1,175 @@
 # AI Trading Bot - Project Status
 
-## Monday D1R9 accepted; certified safe-side integration complete; Architecture 144-A is next
+## Current verified checkpoint
 
-**THE MONDAY SESSION AND SAFE-SIDE INTEGRATION CHECKPOINT ARE CLOSED.**
+The Monday 2026-10-19 production-paper session and the safe-side integration
+checkpoint are closed. Architecture 144-A / RCL-7 is the active next source
+milestone.
 
-The real `2026-10-19` D1R9 session is accepted as a clean consumed
-`FINAL / NO_SIGNAL` outcome. Read-only reconciliation proved the complete
-canonical D1R9 journal, the exact D1R8 terminal bytes bound by its proof, and
-the exact D1R7 prerequisite publication bound by D1R8. Scheduler observation
-remained `MATCH`; there was no retry, repair, scheduler mutation, evidence
-mutation, manual D1R7/D1R8 entry, D2 action, or live-money action.
-
-Accepted evidence identity:
+Accepted integration:
 
 ```text
-D1R9 sha256  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
-D1R9 HEAD    efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
-D1R9 TREE    25a962daf3922c4226c7e395eba8613e1b03bbaf
+HEAD  82c26460759aa868b739d7cacc310aa5ccc46dc4
+TREE  cccd7766e6bd7f92811cac8e5144170d145ba3e5
+CI    Checkpoint Source Gates #635 / 39313574240 / SUCCESS / attempt 1
+```
+
+The post-integration docs closeout at
+`4380b3c9ff658de733d09c8515b17e0c2e0ec25b` /
+`5183733bac9be9356ffbbce119f17e9bba9330fa` passed docs-only
+Checkpoint Source Gates #636 / 39314345671. This corrective checkpoint removes
+stale current-state wording from that closeout and restores the exact frozen
+Architecture-144 C1 documents.
+
+Canonical current-product FULL remains the accepted R3I-C1 run on unchanged
+executable/test bytes:
+
+```text
+HEAD     c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+TREE     bf7019b1610c29563282ccb5f19be2bcb6501849
+cases    12,354
+passed   12,351
+skipped  3
+failed   0
+errors   0
+elapsed  287.176 s
+```
+
+Do not rerun that FULL on unchanged executable/test source.
+
+## Architecture 144 / RCL-7
+
+Architecture 144 design authority is the accepted C1 documentation checkpoint:
+
+```text
+HEAD  5c737ec08ef806e16edeafd196f57177271cab41
+TREE  eba84b55f6f6822cc68e5b054cb3fbbbded10ec0
+```
+
+The frozen direct executable predecessor for 144-A remains:
+
+```text
+HEAD  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+TREE  bf7019b1610c29563282ccb5f19be2bcb6501849
+```
+
+Current remote `develop` is a docs-only descendant of that executable
+predecessor. That does not change 144-A's direct executable base.
+
+The reviewed Architecture-144 local worktree is:
+
+```text
+worktree  F:\AI\worktrees\ai-trading-bot-arch144-research-paper-eligibility-current
+branch    feature/test-suite-arch144-research-paper-eligibility-current
+HEAD      c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+TREE      bf7019b1610c29563282ccb5f19be2bcb6501849
+state     clean at last admission
+remote    absent at last admission
+```
+
+That worktree is already at the correct frozen 144-A source base and must not
+be fast-forwarded to `develop` merely to synchronize documentation commits.
+The current source-gate workflow already admits the stable
+`feature/test-suite-*` family, so no branch-bootstrap workflow registration is
+required before the first 144-A push.
+
+144-A is limited to the pure deterministic paper-eligibility artifact,
+transport, fixed-policy, parsing, export, focused-test, and mechanically required
+inventory/current-pin foundation frozen by the Architecture-144 C1 record.
+144-B remains the separately reviewed external-evidence verification and
+positive-builder composition.
+
+## Monday D1R9 terminal state
+
+The real 2026-10-19 D1R9 session is closed and consumed:
+
+```text
 D1R9 final   NO_SIGNAL
-D1R8 sha256  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
-D1R8 HEAD    aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
-D1R8 TREE    fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+D1R9 sha256  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
 D1R8 final   NO_SIGNAL
-D1R7 sha256  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
-D1R7 HEAD    30322c49b13b80af8d20acee4bdb1efd83d86260
-D1R7 TREE    b7dc7f054fca50c3ab784505f264b6f716a45dff
+D1R8 sha256  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
 D1R7 final   READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
+D1R7 sha256  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+scheduler    MATCH at reconciliation
 ```
 
-Under frozen Architecture-144 policy, Monday is qualifying clean-session input
-but contributes zero of the required minimum one `PAPER_EXECUTED` session.
-No Architecture-144 observation/eligibility artifact or lifecycle transition
-exists yet; real evidence acquisition/external verification remains a later
-reviewed boundary.
+There is no retry authority. No manual D1R7/D1R8 replay, scheduler mutation,
+paper execution, broker placement, D2 effect, or live-money action occurred
+during reconciliation.
 
-The accepted repository integration is:
+For Architecture 144, Monday is qualifying external session input under the
+frozen v1 policy because it ended `NO_SIGNAL`, but it contributes zero
+`PAPER_EXECUTED` count. It is not yet a
+`ResearchStrategyPaperSessionObservation`: real evidence acquisition,
+external verification, and positive observation construction remain 144-B.
+Closed operational detail is preserved in
+[the 2026-10-19 reconciliation record](history/2026-10-19-d1r9-no-signal-and-safe-side-integration.md).
+
+## Current repository/local synchronization boundary
+
+Remote `develop` is the primary startup integration reference.
+`feature/project-history-storage-foundation` remains an optional
+compatibility/history mirror and must remain fast-forward-only to an exact
+accepted bounded-docs descendant.
+
+Because ChatGPT directly advanced the remote integration/docs lineage, local
+integration refs are expected to require one reviewed known-behind
+fast-forward before the next local integration task:
 
 ```text
-develop HEAD       82c26460759aa868b739d7cacc310aa5ccc46dc4
-develop TREE       cccd7766e6bd7f92811cac8e5144170d145ba3e5
-parent 1           41d348367d31ac17e6bd9c9d12285955286606dc
-parent 2 / R3I-C1  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-CI                  Checkpoint Source Gates #635 / 39313574240
-event/attempt        push / 1
-result               SUCCESS
+last reported local develop HEAD
+5c737ec08ef806e16edeafd196f57177271cab41
+
+last reported local history-mirror HEAD
+f156953b373aafbf80b6984752f65f3dc42caea1
 ```
 
-The integration imported the 27 certified side-only executable/test paths,
-retained the newer develop-only Architecture-143/144/current documentation,
-kept the newer accepted Architecture-132 R3I closeout for the sole divergent
-same-path record, and preserved the two identical workflow-rule files.
-Source-static, all four broad admission shards, and final source-gates passed.
-`active-tests` and canonical `certification-tests` were correctly skipped.
-The four-shard source gate is admission evidence, not canonical FULL.
-
-Canonical FULL remains the already accepted R3I-C1 run on unchanged
-executable/test bytes: 12,354 cases / 12,351 passed / 3 skipped /
-0 failed/errors / 287.176 seconds. It is not rerun.
-
-The optional compatibility/history mirror
-`feature/project-history-storage-foundation` was then fast-forwarded from
-`ec3572994558abed1c354766d65ec0a8aad14aa0` to the exact accepted integration
-HEAD `82c26460759aa868b739d7cacc310aa5ccc46dc4`, with no force, merge,
-rebase, cherry-pick, mirror-only commit, or duplicate CI run. Immutable accepted
-feature refs remain frozen at their reviewed identities.
-
-The immediate next safe-side milestone is Architecture 144-A. Before source
-work, resolve its admission against this newly integrated `develop` descendant
-and the frozen c522 executable predecessor contract without silently changing
-the 144-A/144-B split. 144-A remains pure artifact/transport/policy source only:
-no real evidence reads, no positive externally verified builder, no D1/D1R9,
-no scheduler/provider/broker/paper effect, no `PAPER_CANDIDATE`, and no
-promotion. Real-money trading remains **NO-GO**.
-
-## Architecture 144 / RCL-7 design record
-
-The frozen contract is recorded in [the Architecture-144 design](architecture/144-research-strategy-paper-candidate-eligibility.md)
-and [its validation plan](validation/arch144-research-strategy-paper-candidate-eligibility-plan.md).
-The implementation boundary remains pure and positive-only: artifact
-existence after complete external verification is the eligibility assertion;
-any mismatch produces no artifact. The lifecycle remains
-`EXPERIMENTAL -> BACKTESTED -> WALK_FORWARD_PASSED -> SHADOW ->
-PAPER_CANDIDATE -> AWAITING_HUMAN_PROMOTION`, with Architecture 141 fixed at
-`SHADOW` / `NOT_ESTABLISHED`.
-
-## Architecture 143 / RCL-6 frozen design provenance
-
-The following preserves the original prospective design record. Its former
-future-implementation language is historical provenance; the accepted status
-and current next step are recorded above.
-
-Architecture 143 freezes a separate pure strategy-native compatibility proof.
-It consumes only the accepted 142 definition, evaluation policy, completed
-walk-forward, qualification, qualification policy, and passed artifact after
-full external replay verification. It compares exact production schema,
-strategy family/version, Symbol, MovingAverageCrossoverConfig, and strategy /
-production source HEAD/TREE semantics against one explicit inert
-`ProductionStrategySemanticTarget`.
-
-Frozen target:
-
-```text
-production-strategy-semantic-target/v1
-production-strategy-semantic-target-identity/v1
-16be4a92-15d8-5db1-9f92-17a3dbd195f3
-```
-
-Frozen proof:
-
-```text
-research-strategy-production-compatibility-proof/v1
-research-strategy-production-compatibility-proof-identity/v1
-f9f82ac4-219d-512d-bfe9-a1c07c9427a1
-```
-
-The design creates no source, tests, production contract, paper candidate,
-promotion, provider/runtime/broker/scheduler authority, or operational effect.
-Architecture 141 remains immutable `SHADOW` / `NOT_ESTABLISHED`. D1R9 remains
-separate and untouched. The exact design and future validation contract are in
-[the Architecture-143 design record](architecture/143-research-strategy-production-compatibility-proof.md)
-and [its validation plan](validation/arch143-research-strategy-production-compatibility-proof-plan.md).
-
-At the original design-freeze checkpoint, the next checkpoint was the isolated
-Architecture-143 source implementation. That checkpoint is now accepted above;
-real-money trading remains NO-GO.
-
-## Architecture 142-A and 142-B / RCL-5 source acceptance
-
-Architecture 142-A and 142-B / RCL-5 are SOURCE ACCEPTED. Architecture 142 is
-complete as a research-only milestone. The feature source remains intentionally
-unmerged; this closeout records source acceptance on `develop` only.
-
-The accepted feature source is `feature/research-strategy-native-evaluation-current`:
-
-```text
-142-B initial HEAD    e77bccdafc065148c56fee17095a7cfee0e1711b
-142-B initial TREE    bb02fd6e8c3b4d0c1bb5eca252a2fef1dff5ba69
-142-B initial PARENT  9ce66811aa37a47ee4f5d769cea1ff4c33b8dcae
-initial CI            #623 / 39095309178 SUCCESS
-
-142-B-C1 final HEAD   e88f38f8deeb834ac3f162b6a82e328dc4708ad0
-142-B-C1 final TREE   23f63ed62e67460edce5b9296893bdcfe49a25f7
-142-B-C1 PARENT      e77bccdafc065148c56fee17095a7cfee0e1711b
-final CI              #624 / 39096130260 SUCCESS
-```
-
-The accepted lineage is `9ce6681 -> e77bccd -> e88f38f`. Initial #623 SUCCESS
-is preserved. ChatGPT review found the initial 142-B PASS external-verification
-defect; C1 `e88f38f` corrected it. The #624 workflow_dispatch attempt 1 is
-terminal SUCCESS. Its four shard timings were `90.117 / 99.976 / 88.859 /
-80.482` seconds. JUnit evidence recorded `9,120 total / 9,119 passed / 1
-skipped / 0 failed / 0 errors`.
-
-Final source and focused-test identities are:
-
-```text
-research_strategy_walk_forward.py       6f8e69d023811f7763c67286cce0d44fab59a2c2
-test_research_strategy_walk_forward.py  ce20cc57ddc89591606b5d1de6e541f4228011bd
-workflow                                fe6aceac62721338eba4fcb40e2e7fde0d976e18
-142-A overlay                           515392eb1213323ab2bc0a62a4bd848a21b9fe60b6afcdaeac14b44523c43366
-142-B overlay                           8a7ddd8184e1beadecdce88207ed75b02dce75be870892957b9ae5ae5d7e33c6
-```
-
-The accepted certification inventories are FULL 185 / ROBINHOOD 101 / LEGACY
-222 / EXHAUSTIVE 407. Parsing remains self-consistency-only. External PASS
-verification now replays the full walk-forward/qualification chain and does not
-turn parsing into execution or acceptance authority.
-
-No `ProductionStrategyContract`, positive compatibility,
-`PAPER_CANDIDATE`, promotion or operational authority exists. All production,
-provider, credential, broker, scheduler, paper, D1, D1R9 and D2 effects remain
-zero:
-
-```text
-PRODUCTION_SQLITE_READS=0        PRODUCTION_SQLITE_WRITES=0
-CREDENTIAL_READS=0               PROVIDER_CALLS=0
-ROBINHOOD_READS=0                BROKER_CALLS=0
-SCHEDULER_CALLS=0                ACL_MUTATIONS=0
-PAPER_MUTATIONS=0                STRATEGY_PROMOTIONS=0
-PRODUCTION_CONTRACTS_CREATED=0   PAPER_CANDIDATES_CREATED=0
-D1_OPERATIONS=0                  D1R9_OPERATIONS=0
-D2_SUPERVISOR_EXECUTIONS=0
-```
-
-The next safe-side milestone is **Architecture 143 / RCL-6**: a separate pure
-compatibility-proof design/source checkpoint consuming the accepted
-strategy-native definition plus verified 142-B walk-forward/PASS evidence and
-comparing exact production family/version/symbol/config/source semantics.
-Architecture 143 must not create `ProductionStrategyContract`,
-`PAPER_CANDIDATE`, promotion, provider/runtime/broker/scheduler authority, or
-any operational effect.
-
-## 142-A predecessor source acceptance
-
-Architecture 142-A / RCL-5 is SOURCE ACCEPTED on the isolated safe-side branch:
-
-```text
-branch  feature/research-strategy-native-evaluation-current
-base    d9960c7480b2eebc2c6e4530b2bafaec47292036
-HEAD    9ce66811aa37a47ee4f5d769cea1ff4c33b8dcae
-TREE    447656468e1214b27028aff8516f80146d1cc398
-```
-
-Accepted lineage is
-`d9960c7 -> 262adc5 -> 5027aff -> 9ce6681`.
-
-The initial implementation commit
-`262adc52b5c17644a05c1d4872f6d1454fa2917e` introduced the strategy-native
-definition, evaluation policy, deterministic offline backtest evidence, exact
-in-memory completed-result carrier, external replay verification, focused tests
-and additive package exports. Checkpoint Source Gates #619 /
-`39074231322` preserved its red result: static source authority rejected the
-new `tests/scripts/certification_runner/test_profiles.py` blob because the
-current successor overlay had not yet admitted it.
-
-Corrective C1 `5027aff238c865041e1bb98274fc4aeadcc19395` added only the
-mechanically required Architecture-142 current-inventory pin overlay and
-successor composition. #620 / `39074576264` then passed static admission; its
-FULL shards exposed only stale current FULL/EXHAUSTIVE inventory assertions and
-one retained predecessor test that had not yet composed the new overlay.
-
-Corrective C2 `9ce66811aa37a47ee4f5d769cea1ff4c33b8dcae` changed only
-`scripts/checkpoint_runner.py` and the current inventory/pin tests required by
-that mechanically exposed successor layer. Final Checkpoint Source Gates #621 /
-`39075494778`, workflow_dispatch attempt 1, is terminal SUCCESS on exact final
-HEAD/tree. Static diff/Ruff/format admission passed. All four FULL shards passed
-with `PYTEST=0` in 75.282 / 98.325 / 90.395 / 85.452 seconds, all below the
-300-second hygiene ceiling, and source-gates passed.
-
-Final implementation blobs include:
-
-```text
-research_strategy_definition.py  f018076cc9adc17a06d3b335c7f297ecba6f2c38
-research_strategy_backtest.py    44cdc57901b5b63b611ff8ad1a53b95f22b7837f
-test_research_strategy_definition.py 5418ecb926bc73b1b91a8a9fad7c5a0d4debd0cf
-test_research_strategy_backtest.py   d3a4e54edc182c95c2f54bd91ed665099bb7d440
-checkpoint_runner.py              93d62b15519948b822181b161ebc30956e755ecc
-```
-
-The workflow blob remains exactly
-`fe6aceac62721338eba4fcb40e2e7fde0d976e18`.
-
-Accepted behavior:
-
-- fixed production family/version are carried by construction;
-- exact `Symbol` and exact `MovingAverageCrossoverConfig` are immutable
-  definition semantics;
-- every behavior-affecting BacktestConfig/RiskLimits value is bound explicitly;
-- only caller-supplied exact RAW daily single-symbol `HistoricalDataResult`
-  is accepted;
-- no symbol or strategy mapping is inferred;
-- run IDs, historical fingerprints, complete-result fingerprints and evidence
-  IDs are deterministic UUID5 values over canonical semantic material;
-- the supplied-data adapter is in-memory only and rejects any request other than
-  the exact bound request;
-- the unchanged `BacktestEngine`, `MovingAverageCrossoverStrategy`,
-  `NYSEMarketCalendar` and `PerformanceAnalyzer` perform the offline
-  computation;
-- the result fingerprint covers the complete behaviorally material
-  `BacktestResult` audit, including the complete `TradingSession` semantic
-  model (currently exact session date);
-- external verification reruns the engine/analyzer and requires exact result,
-  report and evidence reconciliation;
-- parser methods prove canonical self-consistency only.
-
-Architecture 139 and Architecture 141 remain immutable; 141 remains
-`NOT_ESTABLISHED`. 142-A creates no `ProductionStrategyContract`, positive
-compatibility, PAPER_CANDIDATE, promotion, provider acquisition, credential
-access, production/paper runtime mutation, broker effect, scheduler effect,
-D1/D2 or live authority.
-
-Final inventory is FULL 184 / ROBINHOOD 101 / LEGACY 222 / EXHAUSTIVE 406.
-Required frozen baselines remain FULL 122 / ROBINHOOD 49. Architecture 142-A is
-research-only and is not an ACTIVE production checkpoint.
-
-The feature source is not merged by this acceptance closeout.
-
-The predecessor 142-A source remains accepted and immutable. Its successor
-142-B is now accepted in the Architecture-142 closeout above; no feature source
-was merged by this status update.
-
-## Architecture 142 / RCL-5 design frozen
-
-Architecture 142 now freezes the new **strategy-native research evaluation**
-path required after Architecture 141 proved the existing portfolio SHADOW
-candidate has no reviewed production mapping.
-
-The new path is separate from Architecture 139/141. It carries exact
-`MovingAverageCrossoverStrategy` family/version, exact `Symbol`, exact
-`MovingAverageCrossoverConfig` and a fully bound backtest/risk evaluation
-policy by construction. 142-A uses caller-supplied immutable single-symbol
-historical data with the existing deterministic `BacktestEngine`,
-`NYSEMarketCalendar` and `PerformanceAnalyzer`; no provider acquisition or
-production contract is permitted.
-
-Architecture 142 was split into 142-A backtest evidence and 142-B
-strategy-native walk-forward qualification; both are now source accepted.
-Architecture 143 / RCL-6 is the separate next safe-side compatibility-proof
-design/source checkpoint and remains prohibited from creating a production
-contract, paper candidate, promotion, or operational authority.
-
-The active D1R9 one-session authority remains separate and untouched.
-
-## Architecture 141 / RCL-4 source accepted
-
-Architecture 141 / RCL-4 — Research Candidate Production Compatibility
-Assessment — is SOURCE ACCEPTED on the isolated safe-side feature branch:
-
-```text
-branch  feature/research-candidate-production-compatibility-current
-base    65c2401fa2edcc82ab388a2d1c1da405777026cc
-HEAD    c73c84f3011c1712255b58fb66de710f1ddcac01
-TREE    04dc1ce7b1d3ea12d9781ec0ef3960507c4c12c3
-```
-
-Accepted lineage is
-`65c2401... -> 17bb7dd... -> 969a919... -> c73c84f...`.
-The initial implementation `17bb7dd3d7fe5bda5696bc1f36e4ebe8cc3f663c`
-preserves its failed Checkpoint Source Gates #614 / `39068632984`: source
-static passed and the only failures were five stale FULL/EXHAUSTIVE inventory
-assertions after the new supported research test increased the measured
-inventories to FULL 183 and EXHAUSTIVE 405. Corrective C1
-`969a919816cce2eb6d006e6289ecf065c4d0d511` changed only those five
-current inventory assertions. Its #615 / `39069289640` then failed static
-authority because the newly changed test blobs were not yet covered by the
-Architecture-141 successor overlay. Corrective C2
-`c73c84f3011c1712255b58fb66de710f1ddcac01` extended the reviewed
-seven-path overlay while preserving the frozen Architecture-140-A18 predecessor
-digest `a82247963625dea0f6842d4dc59a851c6986d9f3d8d0c0f40d452aaea2a35af5`.
-
-Final Checkpoint Source Gates #616 / `39069737222` is workflow_dispatch,
-attempt 1, terminal SUCCESS on exact final HEAD/tree. Source-static passed with
-`GIT_DIFF_CHECK=0`, `RUFF_CHECK=0`, `RUFF_FORMAT=0`; all four FULL
-shards passed with `PYTEST=0` in 90.429 / 93.962 / 98.913 / 63.783 seconds,
-all below the 300-second hygiene ceiling; source-gates passed. The workflow blob
-remains exactly `fe6aceac62721338eba4fcb40e2e7fde0d976e18`.
-
-The accepted implementation is pure and negative-only. Schema
-`research-candidate-production-compatibility/v1` remains at stage SHADOW,
-status `NOT_ESTABLISHED`, with the exact ordered blockers
-`RESEARCH_STRATEGY_FAMILY_UNBOUND`,
-`PRODUCTION_SYMBOL_MAPPING_UNBOUND`, and
-`PRODUCTION_CONFIG_MAPPING_UNBOUND`. Full 139-B external verification,
-independent SHADOW linkage verification, exact bound-variant resolution and
-lineage reconciliation precede assessment construction. Parsing proves only
-canonical self-consistency.
-
-No `ProductionStrategyContract`, moving-average config/strategy, positive
-compatibility, `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, promotion,
-provider/credential/runtime/paper/broker/scheduler/D1/D2 authority or effect is
-created. Architecture 141 remains outside ACTIVE production checkpoints. Final
-inventory is ACTIVE 67 / FULL 183 / ROBINHOOD 101 / LEGACY 222 / EXHAUSTIVE
-405 / GUI 51.
-
-The Architecture-141 feature source is not merged by this closeout. The active
-D1R9 one-session authorization for the immutable 2026-10-19 session remains
-independent and untouched.
-
-The next safe-side milestone is a separate design/source checkpoint for an
-explicit research-to-production semantic bridge. It must define a real reviewed
-strategy-family, symbol and configuration mapping before any positive
-compatibility or `PAPER_CANDIDATE` work can begin.
-
-## Architecture 141 safe-side design frozen
-
-Parallel safe-side progression now advances to Architecture 141 / RCL-4,
-**Research Candidate Production Compatibility Assessment**. The design is
-source-only and pure. It consumes the fully verified 139-B SHADOW chain and the
-exact bound historical variant, and records deterministic
-`NOT_ESTABLISHED` compatibility with the current production
-`MovingAverageCrossoverStrategy` family because no exact semantic
-strategy/symbol/config mapping exists.
-
-Architecture 141 explicitly does not create `ProductionStrategyContract`,
-`PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, promotion eligibility,
-strategy selection or any provider/paper/broker/scheduler/D1/D2 effect. Names,
-rank, metadata and one-symbol historical universes cannot substitute for a
-reviewed compatibility mapping.
-
-This safe-side design does not alter the active D1R9 one-session authority for
-2026-10-19. That supervisor remains independently active and must not be retried
-or modified by Architecture 141.
-
-The next safe-side implementation checkpoint is the isolated branch
-`feature/research-candidate-production-compatibility-current`, based on this
-exact design-freeze descendant of `develop`. It must complete as one atomic
-source commit/push and stop for ChatGPT exact-source review.
-
-## D1R9 one-session authorization active
-
-The first real Architecture 134-D1R9 top-level authorization completed
-successfully on exact accepted C2 source
-`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` /
-`25a962daf3922c4226c7e395eba8613e1b03bbaf`.
-
-Operator result:
-
-```text
-AUTHORIZED_ONE_SESSION_TASK_STARTED
-status: NEXT_SESSION_WAIT
-scheduler Observe: {"status":"MATCH"}
-```
-
-This consumes exactly one D1R9 authorization for the immutable derived NYSE
-session `2026-10-19`. The fixed D1R9 journal is reserved, the fixed
-D1R9 scheduler task has been created once and demand-started once, and the
-task-owned supervisor is now reconciling automatically in
-`NEXT_SESSION_WAIT`.
-
-Do not run `--authorize` again for this session. Do not manually invoke
-scheduler `Create` or `Run`, and do not update/delete/recreate the task.
-The scheduler is plumbing only; trading/session authority remains bound to the
-durable D1R9 journal and published NYSE session authority.
-
-No D1R7 or D1R8 child entry has yet been observed at this checkpoint, and no
-new credential/provider/Robinhood, paper, broker, ACL, D2 or live effect is
-reported by this authorization handoff. The accepted supervisor is responsible
-for waiting/reconciling into the Monday session without another operator prompt.
-
-The next safe boundary is read-only monitoring of the durable D1R9 state.
-Normal expected progression is `NEXT_SESSION_WAIT` -> `PREMARKET_WAIT` ->
-D1R7 publication/proof -> `D1R8_WAIT` -> one consumed D1R8 terminal. Any
-`BLOCKED`, `INDETERMINATE`, unexpected `SESSION_MISSED`, task drift, or
-source/runtime drift is a STOP/reconciliation condition and must never be
-repaired by retrying authorization or native scheduler entry.
-
-## D1R9 read-only host readiness passed
-
-The corrected C2 scheduler observation has now been exercised on the real Windows
-host and returned exactly `{"status":"ABSENT"}` with exit code 0.
-
-Combined with the immediately preceding read-only readiness evidence, the host
-boundary is PASS for exact D1R9-C2 source
-`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` /
-`25a962daf3922c4226c7e395eba8613e1b03bbaf`:
-
-- D1R9/D1R7/D1R8 exact local/tracking/live source admission PASS;
-- D1R9 namespace empty / no active authorization;
-- D1R5/D1R6 exact immutable evidence and predecessor binding PASS;
-- prospective target 2026-10-19;
-- production runtime PRESENT_COMPATIBLE with fixed runtime identities;
-- prospective D1R7/D1R8 slots absent;
-- exact D1R9 scheduler task ABSENT;
-- all audited scheduler/journal/claim/child/credential/provider/paper/broker/ACL/
-  D2/live effects zero.
-
-The next separately reviewed protected boundary is one D1R9 top-level
-authorization for that single derived session. It may reserve one D1R9 journal,
-create the fixed D1R9 task once, demand-start it once, and thereafter allow the
-task-owned supervisor to wait/reconcile automatically. The accepted source
-continues to forbid scheduler update/delete, target rollover, duplicate child
-entry, broker/live/D2 effects and automatic retry after ambiguous protected
-entry.
-
-## D1R9-C2 scheduler observation correction source accepted
-
-Architecture 134-D1R9-C2 is SOURCE ACCEPTED on the existing isolated feature
-branch:
-
-```text
-branch  feature/robinhood-production-paper-d1-arbitrary-time-supervisor
-HEAD    efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
-TREE    25a962daf3922c4226c7e395eba8613e1b03bbaf
-parent  0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9
-```
-
-C2 changes exactly four paths: the D1R9 scheduler observer, its focused
-supervisor tests, the D1R9 validation record, and D1R9-owned checkpoint pins.
-The runtime correction is limited to bounded exception-chain inspection for the
-exact Task Scheduler not-found HRESULT `0x80070002` /
-`-2147024894`. Direct or nested exact-HRESULT task absence now classifies
-`ABSENT`; message text alone does not; excessive depth and every other
-scheduler failure remain fail-closed as `BLOCKED`. Scheduler Create/Run
-behavior, task shape, authority, child ordering, journals, claims and effect
-ceilings are unchanged.
-
-Checkpoint Source Gates #609 / 39022830857 / push / attempt 1 is terminal
-SUCCESS. Static diff/Ruff/authority checks passed with stable identity. Active
-D1R9 source testing ran 3,359 cases: 3,354 passed / 5 skipped / 0 failed /
-0 errors. Canonical ROBINHOOD ran 10,326 cases: 10,320 passed / 6 skipped /
-0 failed / 0 errors, wall 251.81 seconds.
-
-All 11 final D1R9 source/test blobs match their exact runner pins. The complete
-69-entry predecessor digest block is unchanged. Accepted child refs remain D1R7
-`30322c49b13b80af8d20acee4bdb1efd83d86260` and D1R8
-`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`; no child source, historical
-evidence or workflow YAML changed.
-
-The prior host-readiness evidence remains valid up to the scheduler edge:
-sources/predecessors/runtime/target/prospective slots passed with zero effects,
-and the real host diagnostic proved the exact D1R9 task is absent. C2 source
-acceptance still grants no scheduler creation/run or D1 operational authority.
-
-The immediate next safe boundary is therefore only a read-only scheduler
-`Observe` rerun against exact C2 source. Expected result is
-`{"status":"ABSENT"}` with exit code 0. Any other result is STOP; do not
-Create or Run the task.
-
-## D1R9 pre-C2 source acceptance history
-
-Architecture 134-D1R9 is SOURCE ACCEPTED on the isolated feature branch:
-
-```text
-branch  feature/robinhood-production-paper-d1-arbitrary-time-supervisor
-HEAD    0b8a5bbaedb9bd6d9a75cf7bc23d6bf6b0c34cd9
-TREE    e689c74336387f271f1e3476df984af95db20ca1
-base    30bc5270b8e7d06abf6841876582c4a48141c05b
-base TREE 0dd6edb600cc32e4b39b0f91c470a1522814adec
-```
-
-Implementation `776d68d6b529a665d9d6e3670298687add3d8f1a` remains the immutable
-failed #605 source attempt. Corrective C1 `0b8a5bba...` changes only the fake
-source-admission harness, stale current registration assertions, validation
-record and D1R9-owned current pins; no runtime, authority, scheduler, child,
-protected-effect or workflow semantics changed.
-
-Checkpoint Source Gates #606 / 39019598738 / push / attempt 1 is terminal
-SUCCESS. Static authority, diff and Ruff checks passed with stable source
-identity. Active D1R9 source tests ran 3,358 cases: 3,353 passed / 5 skipped /
-0 failed / 0 errors. Canonical ROBINHOOD ran 10,325 cases: 10,319 passed /
-6 skipped / 0 failed / 0 errors, wall 249.474 seconds.
-
-All 11 final D1R9 source/test blobs match their exact runner pins. All 69 frozen
-predecessor dictionary digests revalidated unchanged. Accepted child refs remain
-D1R7 `30322c49b13b80af8d20acee4bdb1efd83d86260` /
-`b7dc7f054fca50c3ab784505f264b6f716a45dff` and D1R8
-`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2` /
-`fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f`. Historical evidence and workflow
-YAML remain untouched.
-
-D1R9 satisfies the frozen source contract: arbitrary-time target derivation,
-durable one-session journal/restart reconciliation, <=60-second wait quanta,
-isolated D1R7/D1R8 child processes, source-owned D1R7 bytes/SHA proof bridge,
-one-shot child and scheduler claims, no semantic CLI selectors, and scheduler
-plumbing separated from trading-session authority.
-
-This acceptance does not merge the feature branch and grants no real scheduler
-creation/run, D1R7 publication, credential/provider request, D1R8 execution,
-paper mutation, broker, ACL, D2 or live effect.
-
-That pre-C2 acceptance was later host-blocked at scheduler observation and is
-superseded for operational progression by accepted corrective C2
-`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8`.
-
-## D1R8 source accepted
-
-Architecture 134-D1R8 SOURCE ACCEPTED.
-`ARCH134_D1R8_SOURCE_ACCEPTED=YES` applies to the Option-C narrow D1R7-bound
-successor execution consumer on the exact accepted source:
-
-```text
-branch  feature/robinhood-production-paper-d1-session-execution
-HEAD    aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
-TREE    fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
-parent  a4173d32c333eeac327243e8fc66f9544348c205
-base    3b3a11e822ad42a4dadfe0ac05577df3281bd2bb
-base TREE e559bc6e03ba63e2c276840e647f72461bdaabee
-
-CI      Checkpoint Source Gates #601 / 39004436354 / push / attempt 1 / SUCCESS
-active  3217 passed / 5 skipped
-ROBINHOOD 10189 cases / 10183 passed / 6 skipped / 0 failed / 0 errors
-wall    256.478 seconds canonical
-```
-
-Lineage is `3b3a11e... -> a4173d32... -> aa07c5ba...`. The first source attempt
-`a4173d32...` and CI #600 remain historical failed checkpoint evidence: one
-stale current digest assertion failed. Corrective checkpoint C1 `aa07c5ba...`
-is the accepted final source; neither accepted-lineage commit is rewritten.
-Source-static, active-tests, canonical ROBINHOOD and source-gates passed #601.
-CI owns that canonical certification; no duplicate local ROBINHOOD run is needed.
-
-Current source inventory is ACTIVE 67 / FULL 182 / ROBINHOOD 101 / LEGACY 222 /
-EXHAUSTIVE 404 / GUI 51. All historical executable sources, predecessor pin
-dictionaries/digests and workflow fallback remain frozen under the final
-test-only successor overlay. The accepted D1R7/D1R8 feature refs, optional
-history mirror and D1R5/D1R6 refs remain unchanged by this acceptance integration.
-See [D1R8 architecture](architecture/134-d1r8-d1-session-execution-consumer.md) and
-[validation](validation/arch134-d1r8-d1-session-execution-consumer.md) for the
-historical implementation contract; this closeout records subsequent acceptance.
-
-The D1R8 acceptance closeout is complete on current `develop`:
-
-```text
-closeout HEAD  ea07f5f8c80dfc01f26021cf4d886771bcdf2eb2
-closeout TREE  52f3874e6ca43ad899c399ef3f1d0a1723f021a7
-parent         aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
-CI             Checkpoint Source Gates #602 / 39008433651 / push / attempt 1 / SUCCESS
-```
-
-Source-static, all four integration FULL shards, and source-gates passed; active
-and canonical-certification jobs were skipped by the integration route. Remote
-and primary local `develop` were reconciled by fast-forward only to the same
-HEAD/TREE with tracked worktree/index clean and the pre-existing untracked set
-preserved. The D1R8 feature ref remains exactly
-`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2`.
-
-The required optional-SDK verification is also complete against executable/test
-blobs byte-identical to accepted D1R8 source, using declared-compatible
-`httpx2 2.13.1` and `mcp 2.2.0`:
-`D1R8_OPTIONAL_SDK_RUNTIME_VERIFICATION_COMPLETE=YES`.
-Forty focused tests passed with zero skipped in 3.96 seconds. The required
-persisted-bearer single-yield/no-refresh case and all four malformed-token
-rejection cases passed, together with 35 adjacent credential, host-admission,
-CLI, interactive, and reachable-source cases. The audit guard recorded zero
-network or native-credential attempts. The initial launcher collection-path
-mistake changed no repository source and its evidence remains preserved.
-
-No real D1R7 publication or D1R8 operation occurred. Operational authority stays
-NO: D1R7 publication, D1R8 execution, D1, PREPARE, EXECUTE, real credential or
-provider effects, paper mutation, broker, scheduler, ACL, D2 and live effects.
-
-The next protected boundary is a ChatGPT/Sol High read-only operational review
-of the exact D1R7 prerequisite-publication -> D1R8 one-session execution chain.
-This docs closeout grants no protected effect authority.
-
-## D1R7 source accepted
-
-Architecture 134-D1R7 SOURCE ACCEPTED.
-`ARCH134_D1R7_SOURCE_ACCEPTED=YES` applies to the exact source below:
-
-```text
-branch  feature/robinhood-production-paper-d1-session-authorization
-HEAD    30322c49b13b80af8d20acee4bdb1efd83d86260
-TREE    b7dc7f054fca50c3ab784505f264b6f716a45dff
-parent  38ae7222aee64f93d828f6c81aaf92683e07b7a8
-
-CI      Checkpoint Source Gates #598 / 38979537642 / push / attempt 1 / SUCCESS
-ROBINHOOD  9952 passed / 1 skipped / 0 failures / 0 errors
-wall       252.996 seconds canonical
-```
-
-D1R7 is prerequisite evidence only; success means only
-`READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION`. No real D1R7 evidence has been
-published. D1R7 operational publication remains unauthorized. D1, PREPARE,
-EXECUTE, provider/credential access, scheduler effects, paper mutation, broker,
-D2 and live effects remain unauthorized. Accepted October 16 D1R5/D1R6 evidence
-remains immutable qualification proof only.
-See [D1R7 architecture](architecture/134-d1r7-d1-session-authorization.md) and
-[validation](validation/arch134-d1r7-d1-session-authorization.md) for the frozen
-source contract; this closeout records its subsequent source acceptance.
-
-Accepted D1R7 source inventory was ACTIVE 66 / FULL 181 / ROBINHOOD 100 / LEGACY 222 /
-EXHAUSTIVE 403 / GUI 51. Historical integrated 65/180/99/222/402 counts below
-remain provenance. Frozen predecessor pins/digests and workflow fallback remain
-unchanged under the bounded successor overlay. This docs integration preserves
-the accepted D1R7 feature ref, the optional history mirror, and D1R5/D1R6 refs.
-
-The separate fixed-branch D1 execution consumer is the SOURCE ACCEPTED 134-D1R8
-implementation above. Real D1R7 publication and D1R8 execution remain blocked by
-the required optional-SDK verification and separate operational authorization.
-
-## Current phase
-
-The accepted product + safe-side integration is now merged into the repository
-default integration branch, `develop`, as one atomic two-parent merge. The
-merge combines the accepted product/D1R6 lineage with the accepted Architecture
-138/139 research and Architecture 140 GUI-A16/A17/A18 safe-side lineage while
-retaining `develop`'s prior manual source-gate dispatch commit in history. The
-canonical workflow already contains that dispatch capability plus the newer
-split/sharded source-gate topology, so no workflow downgrade or authority-pin
-rewrite is required.
-
-The source-accepted integration merged into `develop` is:
-
-```text
-branch  feature/test-suite-canonical-handoff-integration-current
-HEAD    e2b46c104168c007263c688450beb79d71637a94
-TREE    eaec980bda6e0669878e54d622cb8694ef3e2fc4
-
-CI      Checkpoint Source Gates #591 / 38957936922 / attempt 1 / SUCCESS
-GUI     GUI Source Gates #20 / 38957942329 / attempt 1 / SUCCESS
-```
-
-Checkpoint #591 passed source-static and all four broad FULL shards at 88.401 /
-73.968 / 92.000 / 63.715 seconds, all below the frozen 300-second hygiene
-ceiling. GUI #20 passed the complete 1,001-test real-PySide6 suite plus Ruff and
-diff checks. The integrated inventory is:
-
-```text
-ACTIVE 65 / FULL 180 / ROBINHOOD 99 / LEGACY 222
-EXHAUSTIVE 402 / GUI 51
-```
-
-The integration is additive. It preserves the accepted D1R6 product source and
-authority chain, the frozen Architecture-139 SHADOW research semantics, the A16
-five-artifact local acquisition/linkage boundary, the A17 immutable audit
-presentation, and the A18 read-only lifecycle boundary map. The A16/A17/A18
-predecessor dictionaries and digests remain frozen; a separate seven-path
-canonical integration overlay binds only the shared current inventory-test
-bytes. No research promotion, production compatibility, post-SHADOW stage,
-provider effect, scheduler mutation, trading effect, or live-money authority is
-created by the integration.
-
-The real October 16 D1R6 wake has also completed successfully. Read-only
-post-wake reconciliation ran from exact published source:
-
-```text
-D1R6 local HEAD   a36de3bfe81a6e1a94fb3deeec7e579145939f52
-D1R6 local TREE   6cde732e02e92eb2b34281672cdb7744250355b1
-D1R6 remote HEAD  a36de3bfe81a6e1a94fb3deeec7e579145939f52
-source admission  PASS
-
-disposition        PASS
-evidence           PASS
-task               MATCH
-reconcile exit     0
-```
-
-At the accepted D1R6 source, `PASS` requires canonical bounded D1R5 evidence
-for the frozen target source/session ending in `FINAL / PASS`; scheduler state
-cannot manufacture that result. The frozen D1R5 target remains:
-
-```text
-HEAD  7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343
-TREE  c826c2a71e6d907866ce3f80afce479d38ab7842
-```
-
-The successful D1R5 sequence is therefore established as
-`QUALIFICATION_RESERVED -> SOURCE_ADMITTED -> WAITING_FOR_MARKET ->
-WAKE_OBSERVED -> SOURCE_READMITTED -> FINAL / PASS`. The reconciliation
-reported every operational effect counter as zero. No ARM retry, operator task
-run, task create/update/delete, evidence mutation, D1, PREPARE, EXECUTE, paper
-mutation, broker placement, provider/credential access, D2, or live effect was
-performed by the reconciliation.
-
-The earlier October 15 fail-closed task incident remains immutable historical
-evidence only; it is no longer the current product blocker. D1R5 PASS still
-stops before D1 and grants no D1/PREPARE/EXECUTE/paper/broker/D2/live authority.
-
-## Operational checkpoint
-
-The one-shot D1R4 authentication qualification is **PASS / consumed**.
-
-```text
-evidence  F:\AI\temp\qualification\arch134-d1r4-auth-234614a21d68680f5b1e0ccd.json
-bytes     635
-SHA256    100e3590543b8ba36002d50d890578533100035b9f618434dd2c9adc2f3505c4
-status    PASS
-reason    PASS
-HTTP      200
-requests  1
-source    234614a21d68680f5b1e0ccdb5854347a6a8d090
-tree      f70459d91c393c6ea7a4a6358f02a2073b246574
-```
-
-The post-auth generation journal SHA-256 is
-`344f64a1c421c41174142aa4f30f2574537bb26e70901dd77cf56ec930ec7434`;
-its provider-effect fence is now irreversible. Authentication must not be retried.
-
-The accepted fresh `/v3` provisioning effect was executed from:
-
-```text
-HEAD  ae19cc933f00445d00f196f7b7963bf01b5433ae
-TREE  b361c153035ec1dca3ffacc5c819398239f55da6
-```
-
-Its preserved generation journal is:
-
-```text
-path    F:\AI\temp\qualification\arch134-d1r4-v3-generation-b206df8a30964c4c9a807d306b54c0b9.json
-bytes   4881
-SHA256  3cb18e50b821c4f7361b213f2095d148dd18a172f60cdf72255e36838eaa7ce3
-schema  alpaca-v3-credential-generation-journal/v1
-policy  windows-credential-manager-alpaca-market-data/v3
-```
-
-The journal is exactly:
-
-```text
-PROVISIONING_RESERVED -> LOCK_ACQUIRED -> EXPECTED_GENERATION
--> INITIAL_STATE_ACCEPTED -> KEY_WRITE_INTENT -> KEY_WRITE_CONFIRMED
--> SECRET_WRITE_INTENT -> SECRET_WRITE_CONFIRMED -> PAIR_CONFIRMED
--> FINAL / LOCAL_EXACT_MATCH
-```
-
-The expected UTF-8 lengths are key 26 and secret 44. The only accepted
-classification is `LOCAL_V3_PAIR_EXACTLY_PROVISIONED`. There is no
-`V3_PROVIDER_EFFECT_INTENT`, no Alpaca/provider request, and no ambiguity.
-The provisioning invocation is consumed and must not be rerun. Ordinary fresh
-`/v3` provisioning must block because the accepted staging pair exists.
-
-The provisioning record alone did not establish remote authentication, but the
-subsequent one-shot D1R4 qualification now does establish
-`REMOTE_ALPACA_AUTH_READY` for the fixed accepted probe/source observation.
-It does not establish D1 session, paper, D2, broker, or live-trading readiness.
-
-## Completed foundations
-
-- Architecture 131 provides the reviewed Robinhood paper, risk, execution, and
-  audit foundation ([architecture/131-robinhood-review-paper-trading.md](architecture/131-robinhood-review-paper-trading.md)).
-- Architecture 132 provides the tiered current/legacy certification model and
-  source-gate topology ([architecture/132-tiered-certification-profiles.md](architecture/132-tiered-certification-profiles.md)).
-- Architecture 133 preserves supervised immutable-release and unattended
-  review-paper runtime boundaries ([architecture/133-robinhood-single-session-unattended-review-paper-authority.md](architecture/133-robinhood-single-session-unattended-review-paper-authority.md)).
-- Architecture 134 is the current production strategy and AI-research
-  authority ([architecture/134-production-strategy-and-ai-research-authority.md](architecture/134-production-strategy-and-ai-research-authority.md)).
-- The D1R4 `/v3` provisioning contract and accepted evidence are preserved in
-  [architecture/134-d1r4-alpaca-v3-provisioning-concurrency.md](architecture/134-d1r4-alpaca-v3-provisioning-concurrency.md) and
-  [validation/arch134-d1r4-alpaca-v3-credential-generation.md](validation/arch134-d1r4-alpaca-v3-credential-generation.md).
+Both were independently verified as ancestors of the accepted remote lineage.
+Their unrelated generated/untracked artifacts are preserved; only tracked/index
+cleanliness is required for the later bounded fast-forward.
+
+This local integration/mirror synchronization is separate from 144-A source
+admission. Do not move the 144-A worktree off c5225d8f....
+
+## Protected and safety boundaries
+
+- Real-money trading remains NO-GO.
+- The consumed Monday D1R9 authority is not retried.
+- Source or CI acceptance grants no provider, scheduler, credential, broker,
+  paper-execution, D2, or live authority.
+- 144-A reads no real D1R9/D1R8 evidence and performs no operational effect.
+- 144-A does not materialize `PAPER_CANDIDATE`, create
+  `AWAITING_HUMAN_PROMOTION`, or promote/select a production strategy.
+- 144-B remains separately reviewed.
+- Human promotion and any future live boundary remain later explicit milestones.
 
 ## Active work
 
-The October 16 pre-market wake qualification is **PASS and consumed for that
-qualification attempt**. Do not rerun D1R5, do not rerun D1R6 ARM, and do not
-treat the still-observed scheduler task as permission to run, update, delete, or
-recreate it.
-
-The accepted post-wake facts are:
-
-```text
-D1R6 source       a36de3bfe81a6e1a94fb3deeec7e579145939f52
-D1R6 tree         6cde732e02e92eb2b34281672cdb7744250355b1
-source admission  PASS
-D1R5 evidence     PASS
-task projection   MATCH
-overall           PASS
-effects           all reported zero
-```
-
-This proves the bounded D1R5 timing/wake/source-readmission gate. It does not
-prove or authorize a D1 session, strategy evaluation, PREPARE, EXECUTE, paper
-mutation, broker placement, D2, or live trading.
-
-Parallel safe-side work is source accepted through Architecture 139-B and
-Architecture 140 / GUI-A18. The research lifecycle remains stopped at SHADOW:
-no `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, production compatibility,
-or promotion authority is materialized.
-
-## Current blocker / protected boundary
-
-D1R7, D1R8 and D1R9-C2 are SOURCE ACCEPTED, and the first real D1R9
-one-session authorization is now active for the immutable `2026-10-19`
-published session. The authorizer returned
-`AUTHORIZED_ONE_SESSION_TASK_STARTED`; read-only status is
-`NEXT_SESSION_WAIT`; scheduler projection is `MATCH`.
-
-That authorization is consumed. Do not authorize again, rerun scheduler
-Create/Run, or perform scheduler cleanup. The task-owned supervisor now owns
-automatic reconciliation. October 16 D1R5/D1R6 evidence remains immutable; the
-failed Saturday D1R7 command was pre-reservation and consumed no slot or effect.
-
-Nothing in the D1R5 PASS, D1R7/D1R8 source acceptance, SDK verification, or this
-repository integration authorizes that boundary implicitly. Until a protected
-operation is separately reviewed and authorized:
-
-- do not invoke D1;
-- do not invoke PREPARE or EXECUTE;
-- do not perform paper or broker mutations;
-- do not invoke D2 or live trading;
-- do not rerun the consumed D1R6 arm or D1R5 qualification;
-- do not manually run/update/delete/recreate the scheduler task merely as
-  cleanup.
-
-Any future scheduler cleanup/replacement is its own reviewed effect boundary,
-not a side effect of accepting D1R5 PASS.
-
-## Roadmap
-
 ### Now
 
-- Use current remote `develop` as the primary/default startup integration
-  reference. Read `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, bounded
-  status and handoff, then relevant architecture/validation documents; separately
-  verify the active product branch and exact executable HEAD/tree.
-- The earlier accepted integration and mirror synchronization completed at HEAD
-  `ec3572994558abed1c354766d65ec0a8aad14aa0`, TREE
-  `5041c469c6d22c11bc465bdbe0ed330cae9aa8c8`.
-  `feature/project-history-storage-foundation` may remain a synchronized
-  compatibility/history mirror, never a required first startup hop or independent
-  development lineage. Any divergence from accepted integration ancestry is a
-  STOP/reconciliation condition; never manufacture convergence with merge,
-  rebase, cherry-pick, or force-push. This acceptance closeout integrates the
-  accepted D1R8 source into develop; the optional mirror remains unchanged.
-- Enforce the one-checkpoint/one-atomic-push/one-push-triggered-CI rule. GitHub
-  CI is admission, not the normal debugging loop; any later correction after a
-  terminal failure is a separately declared corrective checkpoint.
-- Preserve the exact accepted canonical integration source at
-  `e2b46c104168c007263c688450beb79d71637a94` /
-  `eaec980bda6e0669878e54d622cb8694ef3e2fc4`.
-- Preserve the October 16 D1R6/D1R5 post-wake result as PASS / PASS / MATCH with
-  zero reported operational effects and no retries.
-- Keep the October 15 fail-closed incident as historical evidence only.
-- Preserve Architecture 139-B SHADOW semantics and GUI-A16/A17/A18
-  already-acquired-state presentation boundaries.
-- Keep D1, PREPARE, EXECUTE, paper/broker, D2 and live effects stopped.
+1. Finish this bounded docs-only corrective checkpoint.
+2. Fast-forward the optional remote history mirror once to the accepted
+   corrective docs descendant.
+3. Run one short operator PowerShell catch-up for local `develop` and the
+   local history-mirror ref/worktree only.
+4. Leave the 144-A worktree at exact c5225d8f... and start 144-A there with
+   Luna Extra High.
 
 ### Next
 
-- Leave the active D1R9 supervisor alone. Do not rerun `--authorize`,
-  scheduler Create/Run, D1R7, or D1R8 manually.
-- Read-only `--status` and scheduler `Observe` are permitted for monitoring.
-  While before the bound session, expected state is `NEXT_SESSION_WAIT` and
-  scheduler projection `MATCH`. On the session day the supervisor should
-  automatically transition through the accepted D1R7/D1R8 path.
-- After the Monday session reaches a durable terminal, return the read-only
-  status/evidence for ChatGPT reconciliation. If the state becomes
-  `BLOCKED`, `INDETERMINATE`, unexpectedly `SESSION_MISSED`, or scheduler
-  Observe stops matching, STOP and do not retry or repair.
-- Keep accepted D1R5/D1R6 evidence immutable; no rerun/resume/repair or scheduler
-  cleanup is implied.
+Architecture 144-B: pure external evidence verification / positive builder
+composition using independently supplied canonical evidence.
 
 ### Later
 
-- Only after a separately accepted D1 authorization may the product proceed to
-  the next bounded session step.
-- Keep PREPARE/EXECUTE, broker effects, D2 and real-money trading behind their
-  own reviewed gates.
-- Continue safe-side GUI/research work only without creating production
-  compatibility or promotion authority unless a new architecture explicitly
-  reviews that transition.
+A separate architecture may materialize `PAPER_CANDIDATE`; later explicit
+human promotion may move to `AWAITING_HUMAN_PROMOTION`. Restricted live
+trading remains unavailable until its own future reviewed readiness boundary.
 
 ## History and deep-reference pointers
 
-The immutable snapshot is indexed at [docs/history/INDEX.md](history/INDEX.md).
-Its exact files and manifest are under
-`docs/history/legacy/HIST-2B-2026-10-13/`. The legacy snapshot is for targeted
-audit and reconstruction, not routine startup. Read the relevant architecture
-or validation record first; use Git history when exact source-era provenance is
-required. Do not grow this dashboard back into a cumulative milestone journal.
+Use [docs/history/INDEX.md](history/INDEX.md) for targeted historical
+reconstruction. The bounded current documents intentionally do not replay every
+closed D1R*, research, GUI, certification, and history-storage checkpoint.
+Authoritative detail remains in the corresponding architecture, validation,
+Git, CI, and history records.

@@ -1,6 +1,6 @@
 # Project History Index
 
-Status: **ACTIVE - HIST-2B exact snapshot and canonical cutover complete**
+Status: **ACTIVE - HIST-2B exact snapshot and bounded current-state model active**
 
 This index routes historical reconstruction without making closed chronology
 part of routine startup. Current state belongs in:
@@ -13,19 +13,25 @@ part of routine startup. Current state belongs in:
 
 Current remote `develop` is the primary/default startup integration reference.
 New chats read, in order, its `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`,
-bounded `docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`, then
-relevant architecture/validation documents. Separately verify the active remote
-product branch and exact executable HEAD/tree/CI before source or protected work.
-Startup documentation grants no executable-source or trading authority.
+bounded `docs/PROJECT_STATUS.md`, bounded `docs/AI_TRADING_BOT_HANDOFF.md`,
+then relevant architecture/validation documents. Separately verify the active
+remote product branch and exact executable HEAD/tree/CI before source or
+protected work. Startup documentation grants no executable-source or trading
+authority.
 
 `feature/project-history-storage-foundation` may remain a synchronized
 compatibility/history mirror, never a required first startup hop or independent
-development lineage. The accepted fast-forward to
-`ec3572994558abed1c354766d65ec0a8aad14aa0` is complete. Any divergence from
-accepted integration ancestry is a STOP/reconciliation condition; never
-manufacture convergence with merge, rebase, cherry-pick, or force-push. Any
-separately authorized synchronization must be fast-forward-only to an exact
-accepted integration descendant, without mirror-only commits.
+development lineage. Synchronize it only by fast-forward to an exact accepted
+bounded-docs descendant after that descendant's applicable gate is terminal and
+accepted. Any divergence from accepted integration ancestry is a
+STOP/reconciliation condition; never manufacture convergence with merge, rebase,
+cherry-pick, or force-push.
+
+## Recent compact closed records
+
+- [2026-10-19 D1R9 NO_SIGNAL and safe-side integration](2026-10-19-d1r9-no-signal-and-safe-side-integration.md) —
+  terminal Monday D1R9/D1R8/D1R7 proof chain, accepted executable integration,
+  certification preservation, and Architecture-144 successor boundary.
 
 ## Immutable HIST-2B snapshot
 
@@ -65,8 +71,9 @@ Use the authoritative contract rather than copying its historical narrative:
 - [Architecture 132 tiered certification profiles](../architecture/132-tiered-certification-profiles.md);
 - [Architecture 133 unattended review-paper authority](../architecture/133-robinhood-single-session-unattended-review-paper-authority.md);
 - [Architecture 134 production strategy and AI research authority](../architecture/134-production-strategy-and-ai-research-authority.md);
-- [Current D1R4 provisioning concurrency and authentication-preparation authority](../architecture/134-d1r4-alpaca-v3-provisioning-concurrency.md);
-- [Current D1R4 generation and authentication-preparation validation](../validation/arch134-d1r4-alpaca-v3-credential-generation.md).
+- [Architecture 142 strategy-native evaluation](../architecture/142-research-strategy-native-evaluation.md);
+- [Architecture 143 production compatibility proof](../architecture/143-research-strategy-production-compatibility-proof.md);
+- [Architecture 144 paper-candidate eligibility](../architecture/144-research-strategy-paper-candidate-eligibility.md).
 
 ## Historical lookup order
 
@@ -75,9 +82,10 @@ For a historical question, use this order:
 1. bounded current status and handoff from current remote `develop`;
 2. this index for historical routing;
 3. the referenced architecture or validation document;
-4. the legacy snapshot only when deeper chronological reconstruction is
-   actually required;
-5. Git history for exact source-era reconstruction.
+4. a compact closed record where one exists;
+5. the legacy snapshot only when deeper chronological reconstruction is actually
+   required;
+6. Git history for exact source-era reconstruction.
 
 Do not create a duplicate milestone ledger here. Historical corrections are
 additive records or index annotations and must never silently rewrite the
@@ -85,6 +93,6 @@ immutable snapshot.
 
 ## Retrieval and immutability rule
 
-The legacy snapshot is an audit and targeted-reconstruction surface, not
-routine startup material. Do not modify, normalize, regenerate, or replace any
-file beneath `docs/history/legacy/HIST-2B-2026-10-13/`.
+The legacy snapshot is an audit and targeted-reconstruction surface, not routine
+startup material. Do not modify, normalize, regenerate, or replace any file
+beneath `docs/history/legacy/HIST-2B-2026-10-13/`.

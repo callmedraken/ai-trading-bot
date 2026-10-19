@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
+## Architecture 144 / RCL-7 design frozen; Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
 
 **ARCHITECTURE 143 / RCL-6 SOURCE/CERTIFICATION ACCEPTED.**
 
@@ -42,12 +42,41 @@ Architecture 143 remains a pure compatibility proof. It creates no
 scheduler, deployment, D1/D1R9/D2, or live authority. Architecture 141 remains
 immutable `SHADOW` / `NOT_ESTABLISHED`.
 
-The D1R9 one-session authorization for Monday `2026-10-19` is active and
-consumed. Do not re-authorize or manually Create/Run/update/delete/recreate its
-scheduler task. Safe-side progression may continue while the task-owned
-supervisor waits. The immediate safe-side next step is ChatGPT-led
-Architecture-144/next-RCL design selection and contract freezing; this closeout
-does not implement Architecture 144.
+Architecture 144 / RCL-7 is now design frozen as the separately reviewed
+successor permitted by Architecture 143. Its purpose is paper-candidate
+eligibility only. It consumes the fully externally verified Architecture-143
+proof and canonical production-paper session evidence under the frozen policy
+of five consecutive published XNYS regular sessions with at least one fully
+acknowledged `PAPER_EXECUTED` terminal.
+
+No `PAPER_CANDIDATE` exists yet. No `AWAITING_HUMAN_PROMOTION` or human-
+promotion eligibility exists yet. Real D1R9/D1R8 evidence acquisition for
+Architecture 144 has not occurred. This design creates no lifecycle artifact,
+production contract, promotion, provider, credential, paper, broker,
+scheduler, D1, D2 or live authority; it remains pure and positive-only.
+
+The Monday `2026-10-19` D1R9 one-session authorization remains independent
+and **ACTIVE / CONSUMED**. Do not re-authorize it or manually
+Create/Run/update/delete/recreate its scheduler task, and do not invoke D1R7
+or D1R8 manually. The task-owned supervisor continues independently. Monday
+may become the first possible observation only after durable terminal evidence
+exists and is separately reviewed.
+
+The immediate safe-side next step after design acceptance is Architecture-144
+source implementation planning/admission, subject to ChatGPT exact review of
+the executable predecessor, accepted D1R9/D1R8 public verifiers, source scope
+and focused validation plan. This design checkpoint does not implement
+Architecture 144.
+
+## Architecture 144 / RCL-7 handoff record
+
+The frozen contract is recorded in [the Architecture-144 design](architecture/144-research-strategy-paper-candidate-eligibility.md)
+and [its validation plan](validation/arch144-research-strategy-paper-candidate-eligibility-plan.md).
+The existing lifecycle remains
+`EXPERIMENTAL -> BACKTESTED -> WALK_FORWARD_PASSED -> SHADOW ->
+PAPER_CANDIDATE -> AWAITING_HUMAN_PROMOTION`; Architecture 141 remains
+`SHADOW` / `NOT_ESTABLISHED`. A later architecture must separately materialize
+`PAPER_CANDIDATE`, and human promotion remains later and explicit.
 
 ## Architecture 143 / RCL-6 frozen design provenance
 

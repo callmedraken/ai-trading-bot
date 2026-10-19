@@ -1,92 +1,77 @@
 # AI Trading Bot - Project Status
 
-## Monday 2026-10-19 D1R9 reconciled; certified safe-side integration catch-up is the current checkpoint
+## Monday D1R9 accepted; certified safe-side integration complete; Architecture 144-A is next
 
-**THE MONDAY D1R9 SESSION IS CLEANLY CONSUMED / NO_SIGNAL.**
+**THE MONDAY SESSION AND SAFE-SIDE INTEGRATION CHECKPOINT ARE CLOSED.**
 
-Read-only post-session reconciliation independently verified the exact durable
-D1R9, D1R8, and D1R7 evidence for the published XNYS session
-`2026-10-19`. No retry, scheduler mutation, evidence mutation, provider
-re-entry, D1R7/D1R8 manual entry, D2 action, or live-money action was used.
+The real `2026-10-19` D1R9 session is accepted as a clean consumed
+`FINAL / NO_SIGNAL` outcome. Read-only reconciliation proved the complete
+canonical D1R9 journal, the exact D1R8 terminal bytes bound by its proof, and
+the exact D1R7 prerequisite publication bound by D1R8. Scheduler observation
+remained `MATCH`; there was no retry, repair, scheduler mutation, evidence
+mutation, manual D1R7/D1R8 entry, D2 action, or live-money action.
 
-Accepted D1R9 evidence:
-
-```text
-journal      F:\AI\temp\qualification\arch134-d1r9-SPY-2026-10-19-434bcaf8a5faf15b38bcc7d54c297c9332af40c815f7efe67738cd7dc6bae368.jsonl
-bytes        8417
-sha256       dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
-state        FINAL
-terminal     NO_SIGNAL
-observed_at  2026-10-19T13:36:50.319883+00:00
-target       2026-10-19
-source HEAD  efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
-source TREE  25a962daf3922c4226c7e395eba8613e1b03bbaf
-scheduler    MATCH
-effects      d1r7_attempts=1, d1r8_attempts=1,
-             scheduler_creates=1, scheduler_runs=1, scheduler_updates=0
-```
-
-Its canonical proof binds the complete current D1R8 terminal bytes:
+Accepted evidence identity:
 
 ```text
-D1R8 path       F:\AI\temp\qualification\arch134-d1r8-SPY-2026-10-19.jsonl
-D1R8 bytes      62991
-D1R8 sha256     11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
-D1R8 terminal   NO_SIGNAL
-D1R8 observed   2026-10-19T13:36:43.475594+00:00
-D1R8 HEAD       aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
-D1R8 TREE       fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
-D1R9 proof      MATCH
-prepare         0
-execute         0
-paper fills     0
-broker/live     0
+D1R9 sha256  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+D1R9 HEAD    efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
+D1R9 TREE    25a962daf3922c4226c7e395eba8613e1b03bbaf
+D1R9 final   NO_SIGNAL
+D1R8 sha256  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+D1R8 HEAD    aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+D1R8 TREE    fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+D1R8 final   NO_SIGNAL
+D1R7 sha256  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+D1R7 HEAD    30322c49b13b80af8d20acee4bdb1efd83d86260
+D1R7 TREE    b7dc7f054fca50c3ab784505f264b6f716a45dff
+D1R7 final   READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
 ```
 
-D1R8 independently binds the complete accepted D1R7 publication:
+Under frozen Architecture-144 policy, Monday is qualifying clean-session input
+but contributes zero of the required minimum one `PAPER_EXECUTED` session.
+No Architecture-144 observation/eligibility artifact or lifecycle transition
+exists yet; real evidence acquisition/external verification remains a later
+reviewed boundary.
+
+The accepted repository integration is:
 
 ```text
-D1R7 path       F:\AI\temp\qualification\arch134-d1r7-2026-10-19-77a2ebb901a5ad28647dfb9b98ca89c3f11ffd607ab3fb3c51d6f350a04981d4.jsonl
-D1R7 bytes      30808
-D1R7 sha256     49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
-D1R7 final      READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
-D1R7 HEAD       30322c49b13b80af8d20acee4bdb1efd83d86260
-D1R7 TREE       b7dc7f054fca50c3ab784505f264b6f716a45dff
-binding         MATCH
-target          MATCH
+develop HEAD       82c26460759aa868b739d7cacc310aa5ccc46dc4
+develop TREE       cccd7766e6bd7f92811cac8e5144170d145ba3e5
+parent 1           41d348367d31ac17e6bd9c9d12285955286606dc
+parent 2 / R3I-C1  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+CI                  Checkpoint Source Gates #635 / 39313574240
+event/attempt        push / 1
+result               SUCCESS
 ```
 
-The recovered immutable production strategy contract is
-`b7f0e25a-d0da-51d1-8a8b-f25187936d86`,
-`production-strategy-contract/v1`, MovingAverageCrossoverStrategy
-`1.0.0`, SPY, short/long windows `2/3`, desired quantity `1`, and the
-exact D1R8 production source above.
+The integration imported the 27 certified side-only executable/test paths,
+retained the newer develop-only Architecture-143/144/current documentation,
+kept the newer accepted Architecture-132 R3I closeout for the sole divergent
+same-path record, and preserved the two identical workflow-rule files.
+Source-static, all four broad admission shards, and final source-gates passed.
+`active-tests` and canonical `certification-tests` were correctly skipped.
+The four-shard source gate is admission evidence, not canonical FULL.
 
-This is a clean consumed session. `NO_SIGNAL` qualifies as clean session-soak
-coverage under the frozen Architecture-144 v1 policy, but contributes **zero**
-of the required minimum one `PAPER_EXECUTED` session. No Architecture-144
-observation artifact exists yet: the real bytes remain external evidence for
-the separately reviewed 144-B acquisition/verifier boundary. No retry is
-authorized or needed.
+Canonical FULL remains the already accepted R3I-C1 run on unchanged
+executable/test bytes: 12,354 cases / 12,351 passed / 3 skipped /
+0 failed/errors / 287.176 seconds. It is not rerun.
 
-The current repository-control checkpoint also catches the default integration
-line up to the accepted safe-side executable/certification lineage. Its exact
-parents are current `develop`
-`41d348367d31ac17e6bd9c9d12285955286606dc` and terminal-green R3I-C1
-`c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2`. The integration keeps
-`develop`'s newer Architecture-132 R3I closeout text, imports only the
-certified side-only executable/test bytes, and retains the newer
-Architecture-143/144/current documentation. Older statements below that say
-142/143 executable source is still unmerged are historical provenance and are
-superseded by this integration checkpoint.
+The optional compatibility/history mirror
+`feature/project-history-storage-foundation` was then fast-forwarded from
+`ec3572994558abed1c354766d65ec0a8aad14aa0` to the exact accepted integration
+HEAD `82c26460759aa868b739d7cacc310aa5ccc46dc4`, with no force, merge,
+rebase, cherry-pick, mirror-only commit, or duplicate CI run. Immutable accepted
+feature refs remain frozen at their reviewed identities.
 
-The accepted canonical FULL evidence remains the exact R3I-C1 run:
-12,354 cases / 12,351 passed / 3 skipped / 0 failed/errors / 287.176 seconds.
-Because this integration changes no executable/test bytes relative to that
-certified tip, the FULL run is not duplicated. The integration itself must
-still pass one fresh push-triggered source gate before acceptance. After that
-gate and exact review, Architecture 144-A is the immediate safe-side source
-milestone. Real-money trading remains **NO-GO**.
+The immediate next safe-side milestone is Architecture 144-A. Before source
+work, resolve its admission against this newly integrated `develop` descendant
+and the frozen c522 executable predecessor contract without silently changing
+the 144-A/144-B split. 144-A remains pure artifact/transport/policy source only:
+no real evidence reads, no positive externally verified builder, no D1/D1R9,
+no scheduler/provider/broker/paper effect, no `PAPER_CANDIDATE`, and no
+promotion. Real-money trading remains **NO-GO**.
 
 ## Architecture 144 / RCL-7 design record
 

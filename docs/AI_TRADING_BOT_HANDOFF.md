@@ -1,65 +1,69 @@
 # AI Trading Bot - Current Handoff
 
-## Monday D1R9 terminal accepted; safe-side integration catch-up in progress
+## Monday D1R9 and safe-side integration accepted; Architecture 144-A next
 
-**CURRENT MODE: INTEGRATE THE CERTIFIED SAFE-SIDE LINEAGE, THEN RESUME 144-A.**
+**CURRENT MODE: RESUME THE PURE ARCHITECTURE 144-A SOURCE MILESTONE.**
 
-The Monday `2026-10-19` D1R9 authority is fully consumed and terminal.
-Read-only reconciliation proved:
-
-```text
-D1R9  FINAL / NO_SIGNAL
-hash  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
-HEAD  efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
-TREE  25a962daf3922c4226c7e395eba8613e1b03bbaf
-task  MATCH
-
-D1R8  FINAL / NO_SIGNAL
-hash  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
-HEAD  aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
-TREE  fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
-proof MATCH
-
-D1R7  READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
-hash  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
-HEAD  30322c49b13b80af8d20acee4bdb1efd83d86260
-TREE  b7dc7f054fca50c3ab784505f264b6f716a45dff
-bind  MATCH
-```
-
-D1R8 performed one strategy evaluation after two Alpaca credential reads and
-four history requests, then terminated `NO_SIGNAL` before Robinhood
-credential reads, PREPARE, EXECUTE, paper mutation, broker placement, D2, or
-live effects. This is the expected clean zero-trade outcome and creates no
-retry authority.
-
-For Architecture 144, Monday is accepted external clean-session evidence that
-is eligible to become the first v1 soak observation after the separately
-reviewed evidence-verification/builder boundary exists. It contributes clean
-coverage but zero `PAPER_EXECUTED` count. No Architecture-144 observation,
-eligibility, `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, or promotion
-authority exists yet.
-
-The current integration checkpoint has parents:
+Monday `2026-10-19` is terminal and reconciled:
 
 ```text
-develop parent     41d348367d31ac17e6bd9c9d12285955286606dc
-safe-side parent   c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-safe-side tree     bf7019b1610c29563282ccb5f19be2bcb6501849
+D1R9 FINAL / NO_SIGNAL
+  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+D1R8 FINAL / NO_SIGNAL
+  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+D1R7 READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
+  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+scheduler Observe = MATCH
 ```
 
-It retains `develop`'s newer R3I closeout and Architecture-143/144 docs while
-importing the certified 142/143/R3I executable/test bytes. Older historical
-sections below that describe 142/143 source as unmerged are superseded by this
-integration. The optional `feature/project-history-storage-foundation` ref may
-be fast-forwarded only after this exact integration descendant is accepted; it
-must not gain mirror-only commits.
+The D1R8 `NO_SIGNAL` path stopped before Robinhood credential reads, PREPARE,
+EXECUTE, paper mutation, broker placement, D2, or live effects. No retry is
+authorized or needed. For Architecture 144, Monday is qualifying clean-session
+input but provides zero `PAPER_EXECUTED` count; no Architecture-144
+observation artifact exists yet.
 
-The exact 12,354-case R3I-C1 FULL remains valid because executable/test bytes
-are unchanged from the certified tip. Do not rerun FULL. Require one fresh
-push-triggered source gate on the integration commit, then exact GitHub review.
-If terminal green, fast-forward the optional history mirror and proceed directly
-to Architecture 144-A. Real-money trading remains **NO-GO**.
+The certified side progression is now integrated into the default branch:
+
+```text
+HEAD    82c26460759aa868b739d7cacc310aa5ccc46dc4
+TREE    cccd7766e6bd7f92811cac8e5144170d145ba3e5
+parent  41d348367d31ac17e6bd9c9d12285955286606dc
+parent  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+CI      #635 / 39313574240 / push / attempt 1 / SUCCESS
+```
+
+The merge resolution was deterministic: 27 side-only certified source/test
+paths from R3I-C1, newer develop-only 143/144/current docs, identical AGENTS /
+workflow bytes, and develop's newer accepted Architecture-132 closeout for the
+only differing same-path record. The exact 12,354-case R3I-C1 canonical FULL
+remains valid for the unchanged executable/test bytes and must not be repeated.
+
+The optional `feature/project-history-storage-foundation` mirror is
+fast-forward synchronized to the same accepted integration HEAD. It remains a
+compatibility/history mirror only. The accepted Architecture 142/143/D1 feature
+refs are intentionally not repointed; their exact reviewed identities remain
+immutable provenance.
+
+### Immediate next step
+
+Architecture 144-A is the next milestone. Start with a read-only admission
+resolution: compare current remote `develop` against the frozen 144-A
+executable predecessor `c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2` and prove
+that the intervening integration/closeout changes do not alter the executable/
+test semantics 144-A is allowed to consume. Then create/use only the reviewed
+144-A isolated branch/worktree and implement the pure deterministic artifact,
+identity, canonical JSON, fixed-policy, parsing, exports, focused tests, and
+mechanically required inventory/current-pin bookkeeping.
+
+144-A must not import/copy D1R9 operational modules, read real D1R9/D1R8
+evidence, claim external verification, create positive verified builders,
+perform filesystem/provider/credential/scheduler/paper/broker/D1/D2 effects,
+materialize `PAPER_CANDIDATE`, or promote anything. 144-B remains separate.
+
+Publication rule remains one logical source checkpoint: cheap gates first,
+focused tests, exact staging, one atomic commit, one ordinary push, one
+push-triggered source gate, then ChatGPT exact GitHub review and automatic next
+step. Real-money trading remains **NO-GO**.
 
 ## Architecture 144 / RCL-7 handoff record
 

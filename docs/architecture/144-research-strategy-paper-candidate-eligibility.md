@@ -474,22 +474,33 @@ reviewed read-only evidence-acquisition boundary. The eventual source may use
 synthetic or fake canonical evidence in tests, but it may not touch the real
 D1R9 journal or any real production evidence during source validation.
 
-## Monday D1R9 relationship
+## Monday D1R9 relationship — terminal reconciliation accepted
 
-The existing D1R9 one-session authorization for Monday `2026-10-19` remains
-**ACTIVE / CONSUMED** and independent of Architecture 144. This design does
-not re-authorize it, create/run/update/delete/recreate its scheduler task, or
-invoke D1R7/D1R8 manually. The task-owned supervisor continues independently.
+The consumed Monday `2026-10-19` D1R9 authority reached canonical
+`FINAL / NO_SIGNAL` and was reconciled read-only against its complete D1R8 and
+D1R7 evidence. The D1R9 journal SHA-256 is
+`dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81`;
+its exact accepted source remains
+`efd1e6763dc4663d9c4b2444e785eb1c32adf8e8` /
+`25a962daf3922c4226c7e395eba8613e1b03bbaf`, and scheduler observation
+remained `MATCH`.
 
-Monday can become the first possible Architecture-144 session observation only
-after durable terminal evidence exists and is separately reviewed. This design
-checkpoint does not inspect or mutate that evidence.
+The D1R9 proof exactly matches the complete D1R8 journal
+`11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656`
+(62,991 bytes), also `FINAL / NO_SIGNAL`, from accepted D1R8 source
+`aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2` /
+`fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f`. D1R8 independently binds
+the complete D1R7 publication
+`49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade`
+(30,808 bytes), `READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION`, with exact
+target/source binding. No retry or repair occurred.
 
-If Monday ends `NO_SIGNAL`, it may later count as clean soak-session coverage
-but not execution evidence. If it ends `PAPER_EXECUTED`, it may later count as
-both clean coverage and the required execution evidence. `RISK_REJECTED`,
-`SESSION_MISSED`, `BLOCKED`, and `INDETERMINATE` cannot qualify inside the v1
-five-session window. None authorizes an automatic retry.
+Under the frozen v1 policy this real `NO_SIGNAL` result is qualifying clean
+session-soak input but contributes zero execution evidence. It does **not**
+itself create a `ResearchStrategyPaperSessionObservation`: acquisition and
+external verification remain the later 144-B boundary. Architecture 144 still
+does not re-authorize D1R9, mutate the scheduler, invoke D1R7/D1R8, materialize
+`PAPER_CANDIDATE`, or grant promotion/trading authority.
 
 ## No materialization or promotion
 

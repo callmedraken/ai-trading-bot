@@ -89,3 +89,244 @@ def test_empty_lane_never_launches_pytest(
     )
     with pytest.raises(runner.CertificationError, match="contain test modules"):
         runner.run_children(SimpleNamespace(), lanes, tmp_path)
+
+
+def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
+    import hashlib
+    import json
+
+    root = Path(runner.__file__).resolve().parents[1]
+    inventory = runner.select_inventory(runner.discover_inventory(root), "full")
+    weights = runner.full_module_weights(inventory)
+    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 186
+    assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
+    assert runner.FULL_FALLBACK_MS == 1000
+    assert (
+        hashlib.sha256(
+            json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        == "e23c35fcebadd578e26beb349d09e84a308aeb229e5a2aef87863f6119e19d36"
+    )
+    lanes = runner.build_lanes(root, inventory, "full")
+    assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
+    assert all(lanes.values())
+    assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
+    runner.validate_partitions(inventory, tuple(lanes.values()))
+    assert tuple(map(len, lanes.values())) == (46, 47, 46, 47)
+    assert tuple(
+        sum(weights[module] for module in lane) for lane in lanes.values()
+    ) == (250295, 250295, 250294, 250294)
+    # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
+    assert weights["tests/test_config.py"] == 1
+    raw = dict(weights, **{"tests/test_config.py": 0})
+    for count, expected in (
+        (2, (500589, 500588)),
+        (3, (333726, 333726, 333725)),
+        (4, (250295, 250294, 250294, 250294)),
+    ):
+        totals = [0] * count
+        for module in sorted(raw, key=lambda name: (-raw[name], name)):
+            index = min(range(count), key=lambda lane: (totals[lane], lane))
+            totals[index] += raw[module]
+        assert tuple(totals) == expected
+
+
+def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
+    original = runner.FULL_MODULE_TIMINGS_MS
+    modules = tuple(f"tests/domain/test_{letter}.py" for letter in "abcdef")
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ((modules[1], 1000),))
+    assert runner.full_module_weights(modules) == dict.fromkeys(modules, 1000)
+    expected = (
+        (modules[0], modules[4]),
+        (modules[1], modules[5]),
+        (modules[2],),
+        (modules[3],),
+    )
+    assert runner.balance_full(tuple(reversed(modules))) == expected
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", original)
+    root = Path(runner.__file__).resolve().parents[1]
+    current = runner.select_inventory(runner.discover_inventory(root), "full")
+    future = "tests/domain/test_future_supported.py"
+    selected = runner.select_inventory(
+        tuple(sorted((*runner.discover_inventory(root), future))), "full"
+    )
+    assert set(selected) == {*current, future}
+    assert runner.full_module_weights(selected)[future] == 1000
+    runner.validate_partitions(selected, runner.balance_full(selected))
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.0, "1", None, [], {}])
+def test_full_invalid_timing_values_fail_closed(monkeypatch, value) -> None:
+    module = "tests/domain/test_market.py"
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ((module, value),))
+    with pytest.raises(runner.CertificationError, match="positive integers"):
+        runner.balance_full((module,))
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        None,
+        {},
+        (("tests/domain/test_market.py",),),
+        (None,),
+        (("tests/domain/test_market.py", 1, 2),),
+        ((None, 1),),
+        (("tests\\domain\\test_market.py", 1),),
+        (("tests/domain/./test_market.py", 1),),
+        (("tests//domain/test_market.py", 1),),
+        (("tests/domain/../domain/test_market.py", 1),),
+        (("Tests/domain/test_market.py", 1),),
+        (("/tests/domain/test_market.py", 1),),
+        (("tests/domain/test_market.py", 1), ("tests/domain/test_market.py", 2)),
+        (("tests/domain/test_market.py", 1), ("tests/domain/./test_market.py", 2)),
+    ],
+)
+def test_full_malformed_and_duplicate_timing_paths_fail_closed(monkeypatch, table):
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", table)
+    with pytest.raises(runner.CertificationError):
+        runner.balance_full(("tests/domain/test_market.py",))
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "tests/domain/test_removed.py",
+        "tests/gui/test_legacy.py",
+    ],
+)
+def test_full_stale_or_nonfull_weight_fails_closed_before_children(monkeypatch, module):
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ((module, 1),))
+    with pytest.raises(runner.CertificationError, match="Stale FULL timing module"):
+        runner.build_lanes(Path("."), ("tests/domain/test_market.py",), "full")
+
+
+def test_robinhood_r3h_pins_remain_exact() -> None:
+    assert runner.ROBINHOOD_LANE_PINS == {
+        "tests/runtime/checkpoint_runner/test_arch131.py": 0,
+        "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 0,
+        "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 1,
+        "tests/review_paper/test_arch133_scheduler_installation.py": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "extra",
+        "wrong_blob",
+        "malformed_blob",
+        "malformed_table",
+        "digest",
+        "predecessor",
+        "predecessor_material",
+        "predecessor_digest",
+    ],
+)
+def test_r3i_successor_overlay_fails_closed(monkeypatch, mutation):
+    from scripts import checkpoint_runner as checkpoint
+
+    pins = dict(checkpoint.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES)
+    path = "tests/scripts/certification_runner/test_profiles.py"
+    predecessor = checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[path]
+    if mutation == "missing":
+        pins.pop(path)
+    elif mutation == "extra":
+        pins["tests/domain/test_market.py"] = "a" * 40
+    elif mutation == "wrong_blob":
+        pins[path] = "a" * 40
+    elif mutation == "malformed_blob":
+        pins[path] = None
+    elif mutation == "malformed_table":
+        pins = None
+    elif mutation == "digest":
+        monkeypatch.setattr(
+            checkpoint, "ARCH132_R3I_CURRENT_TEST_PINS_SHA256", "a" * 64
+        )
+    elif mutation == "predecessor":
+        predecessor = "a" * 40
+    elif mutation == "predecessor_material":
+        prior = dict(checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES)
+        prior[path] = "a" * 40
+        monkeypatch.setattr(
+            checkpoint, "ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES", prior
+        )
+    else:
+        monkeypatch.setattr(
+            checkpoint, "ARCH143_CURRENT_INVENTORY_TEST_PINS_SHA256", "a" * 64
+        )
+    monkeypatch.setattr(checkpoint, "ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES", pins)
+    with pytest.raises(ValueError, match="R3I"):
+        checkpoint._arch132_r3i_current_inventory_test_pin(path, predecessor)
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    if mutation != "predecessor":
+        assert checkpoint._arch134_d1r8_authority_check(root)
+
+
+def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    pins = checkpoint.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES
+    assert set(pins) == {
+        "tests/scripts/certification_runner/test_lanes.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/review_paper/test_d1_session_execution.py",
+        "tests/strategies/test_production_strategy_contract.py",
+        "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py",
+        "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py",
+    }
+    for module, pin in pins.items():
+        predecessor = checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.get(
+            module, checkpoint.ARCH134_D1R5_TEST_PIN_OVERRIDES.get(module)
+        )
+        assert predecessor != pin
+        assert (
+            checkpoint._arch132_r3i_current_inventory_test_pin(module, predecessor)
+            == pin
+        )
+        assert checkpoint._git_blob_sha1(root / module) == pin
+    assert (
+        checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
+        == "unchanged"
+    )
+    for check in (
+        checkpoint._arch134_production_paper_runtime_authority_check,
+        checkpoint._arch134_authentication_authority_check,
+        checkpoint._arch134_d1r5_authority_check,
+        checkpoint._arch134_d1r6_authority_check,
+        checkpoint._arch134_d1r7_authority_check,
+        checkpoint._arch134_d1r8_authority_check,
+    ):
+        assert check(root) == ()
+
+
+def test_r3i_preserves_all_arch139_through_143_predecessor_constants_and_ci_route():
+    import ast
+    import hashlib
+
+    from scripts import checkpoint_runner as checkpoint
+
+    tree = ast.parse(Path(checkpoint.__file__).read_text(encoding="utf-8"))
+    material = "\n".join(
+        ast.dump(node, include_attributes=False)
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and node.target.id.startswith(
+            ("ARCH139", "ARCH140", "ARCH141", "ARCH142", "ARCH143")
+        )
+    )
+    assert (
+        hashlib.sha256(material.encode()).hexdigest()
+        == "d85308fc9fed15c9c435c2220402ee9a2e96ddddda145d0354eac8763d040aed"
+    )
+    assert (
+        checkpoint.resolve_ci_checkpoint(
+            checkpoint._checkpoint_specs(),
+            "feature/test-suite-arch132-r3i-full-hygiene-current",
+            "push",
+        )
+        is None
+    )
+    assert checkpoint.resolve_ci_certification_profile(None) is None

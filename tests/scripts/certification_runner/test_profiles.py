@@ -174,6 +174,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/experiments/test_research_candidate_shadow_binding.py",
                 "tests/experiments/test_research_candidate_shadow_qualification.py",
                 "tests/experiments/test_research_candidate_shadow_observation.py",
+                "tests/experiments/test_research_strategy_backtest.py",
+                "tests/experiments/test_research_strategy_definition.py",
+                "tests/experiments/test_research_strategy_walk_forward.py",
+                "tests/experiments/test_research_strategy_production_compatibility.py",
                 "tests/scripts/test_archive_project_history.py",
             )
         )
@@ -191,10 +195,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 182,
+        "full": 186,
         "robinhood": 101,
         "legacy": 222,
-        "exhaustive": 404,
+        "exhaustive": 408,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
@@ -212,9 +216,12 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             assert tuple(lanes.values())[:2] == runner.balance_broad(root, broad)
         else:
             assert not set(selected) & set(_EXPECTED_SERIAL)
-            expected = runner.balance_broad(root, selected)
-            if name == "robinhood":
-                expected = runner.apply_lane_pins(expected, runner.ROBINHOOD_LANE_PINS)
+            if name == "full":
+                expected = runner.balance_full(selected)
+            else:
+                expected = runner.apply_lane_pins(
+                    runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+                )
             assert tuple(lanes.values()) == expected
 
 
@@ -331,7 +338,7 @@ def test_new_supported_files_are_discovered_and_admitted(
     path.write_text("", encoding="utf-8")
     inventory = runner.discover_inventory(tmp_path)
     assert runner.select_inventory(inventory, "full") == tuple(
-        sorted((*_EXPECTED_FULL, module))
+        sorted((*_fixture_profiles()["full"], module))
     )
     assert module not in runner.select_inventory(inventory, "legacy")
 

@@ -8,7 +8,6 @@ import pytest
 from scripts import run_test_certification as runner
 
 from .helpers import (
-    _EXPECTED_FULL,
     _EXPECTED_SERIAL,
     _FIXTURE_LEGACY,
     _fixture_profiles,
@@ -67,7 +66,7 @@ def test_plan_never_launches_pytest_and_saves_summary(
     assert evidence["classification"] == result["classification"]
     classification = evidence["classification"]
     assert classification["policy"] == "architecture-132-r1"
-    assert classification["supported_inventory"] == list(_EXPECTED_FULL)
+    assert classification["supported_inventory"] == list(expected["full"])
     assert classification["legacy_inventory"] == list(_FIXTURE_LEGACY)
     assert classification["profile_counts"] == {
         name: len(value) for name, value in expected.items()
@@ -102,6 +101,8 @@ def test_failed_child_sets_failed_summary(
         lambda *args: {
             "broad-1": {"error": "Child exited with 1", "exit_code": 1},
             "broad-2": {"exit_code": 0},
+            "broad-3": {"exit_code": 0},
+            "broad-4": {"exit_code": 0},
         },
     )
     monkeypatch.setattr(
@@ -313,3 +314,61 @@ def test_github_actions_temp_root_outside_runner_temp_is_rejected(
 
     with pytest.raises(runner.CertificationError, match="RUNNER_TEMP"):
         runner.run(args)
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ["pass", "nonzero", "timeout", "missing_junit", "malformed_junit", "cases"],
+)
+def test_four_child_totals_and_single_child_failure_fail_certification(
+    tmp_path, monkeypatch, outcome
+):
+    _profile_inventory(tmp_path, "full")
+    monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path)
+    monkeypatch.setattr(
+        runner, "verify_source", lambda args: {"head": "h", "tree": "t"}
+    )
+    children = {
+        f"broad-{i}": {
+            "exit_code": 0,
+            "counts": dict(cases=i + 2, passed=i, skipped=2, failed=0, errors=0),
+        }
+        for i in range(1, 5)
+    }
+    if outcome != "pass":
+        child = children["broad-4"]
+        child["error"] = outcome
+        if outcome == "nonzero":
+            child["exit_code"] = 1
+        if outcome == "cases":
+            child["counts"].update(cases=8, failed=1, errors=1)
+        if outcome in {"missing_junit", "malformed_junit"}:
+            child.pop("counts")
+    monkeypatch.setattr(runner, "run_children", lambda *args: children)
+    monkeypatch.setattr(
+        runner,
+        "run_static_checks",
+        lambda *args: {
+            name: {"exit_code": 0}
+            for name in ("ruff_check", "ruff_format", "git_diff_check")
+        },
+    )
+    args = SimpleNamespace(
+        root=tmp_path,
+        python=Path("python"),
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        evidence_dir=tmp_path.parent / f"{tmp_path.name}-four-child-totals",
+        temp_root=tmp_path,
+        profile="full",
+        plan=False,
+    )
+    summary = runner.run(args)
+    assert summary["status"] == ("passed" if outcome == "pass" else "failed")
+    expected = dict(cases=18, passed=10, skipped=8, failed=0, errors=0)
+    if outcome == "cases":
+        expected.update(cases=20, failed=1, errors=1)
+    if outcome in {"missing_junit", "malformed_junit"}:
+        expected.update(cases=12, passed=6, skipped=6)
+    assert summary["totals"] == expected

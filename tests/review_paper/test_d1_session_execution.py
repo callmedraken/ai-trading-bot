@@ -969,7 +969,7 @@ def test_checkpoint_inventory_and_explicit_successor():
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 182, "robinhood": 101, "legacy": 222, "exhaustive": 404}
+    } == {"full": 186, "robinhood": 101, "legacy": 222, "exhaustive": 408}
     assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
 
@@ -987,6 +987,10 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         "_arch134_d1r6_test_pin",
         "_arch134_d1r7_test_pin",
         "_arch134_d1r8_test_pin",
+        "_arch142_current_inventory_test_pin",
+        "_arch142b_current_inventory_test_pin",
+        "_arch143_current_inventory_test_pin",
+        "_arch132_r3i_current_inventory_test_pin",
         "_canonical_current_inventory_test_pin",
     ):
         original = getattr(runner, name)
@@ -1001,6 +1005,14 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         pin = runner._arch134_d1r6_test_pin(path, pin)
     pin = runner._canonical_current_inventory_test_pin(path, pin)
     pin = runner._arch134_d1r7_test_pin(path, pin)
+    if path in runner.ARCH142_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        pin = runner._arch142_current_inventory_test_pin(path, pin)
+    if path in runner.ARCH142B_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        pin = runner._arch142b_current_inventory_test_pin(path, pin)
+    if path in runner.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
+        pin = runner._arch143_current_inventory_test_pin(path, pin)
+    if path in runner.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES:
+        pin = runner._arch132_r3i_current_inventory_test_pin(path, pin)
     assert pin == runner._git_blob_sha1(ROOT / path)
     first = ["_arch134_d1r6_test_pin", "_canonical_current_inventory_test_pin"]
     if path not in runner.CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
@@ -1009,6 +1021,26 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         *first,
         "_arch134_d1r7_test_pin",
         "_arch134_d1r8_test_pin",
+        *(
+            ["_arch142_current_inventory_test_pin"]
+            if path in runner.ARCH142_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+            else []
+        ),
+        *(
+            ["_arch142b_current_inventory_test_pin"]
+            if path in runner.ARCH142B_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+            else []
+        ),
+        *(
+            ["_arch143_current_inventory_test_pin"]
+            if path in runner.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+            else []
+        ),
+        *(
+            ["_arch132_r3i_current_inventory_test_pin"]
+            if path in runner.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES
+            else []
+        ),
     ]
 
 

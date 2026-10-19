@@ -419,17 +419,29 @@ contract creation, lifecycle mutation, D1/D1R9 invocation, journal access,
 filesystem/network/provider/credential/broker/scheduler/SQLite/GUI/subprocess
 capabilities, current-clock acquisition, and randomness.
 
-## Monday D1R9 boundary
+## Monday D1R9 boundary — terminal evidence reconciled
 
-The Monday `2026-10-19` D1R9 authorization remains ACTIVE / CONSUMED and
-independent. This design checkpoint must not re-authorize it, manually invoke
-D1R7/D1R8, mutate its scheduler task, inspect its durable evidence, or infer
-an observation before separately reviewed terminal evidence exists.
+The Monday `2026-10-19` D1R9 authorization is consumed and terminal
+`NO_SIGNAL`. Read-only reconciliation verified the complete canonical D1R9
+journal, its exact D1R8 proof bytes/hash, the complete D1R8 `NO_SIGNAL`
+terminal, and D1R8's exact D1R7 publication binding. Scheduler observation
+remained `MATCH`; no retry, repair, manual D1R7/D1R8 entry, or evidence
+mutation occurred.
 
-The future validation may model Monday only with synthetic canonical evidence.
-The real result, whether `NO_SIGNAL`, `PAPER_EXECUTED`, `RISK_REJECTED`,
-`SESSION_MISSED`, `BLOCKED`, or `INDETERMINATE`, never authorizes retry or
-materialization by itself.
+The accepted evidence hashes are:
+
+```text
+D1R9 dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+D1R8 11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+D1R7 49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+```
+
+This is external operational evidence, not a source-test fixture and not an
+Architecture-144 artifact. `NO_SIGNAL` is qualifying clean-session input for
+the frozen v1 policy but contributes zero `PAPER_EXECUTED` count. 144-A
+continues to use synthetic canonical fixtures only; real evidence acquisition
+and positive verified builders remain 144-B. The real result grants no retry,
+materialization, promotion, scheduler, provider, D2, or live authority.
 
 ## Design-only verification
 

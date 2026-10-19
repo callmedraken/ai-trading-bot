@@ -1,49 +1,65 @@
 # AI Trading Bot - Current Handoff
 
-## Monday 2026-10-19 D1R9 standby; Architecture 144 progression paused
+## Monday D1R9 terminal accepted; safe-side integration catch-up in progress
 
-**CURRENT MODE: STAND BY FOR THE MONDAY MARKET SESSION.**
+**CURRENT MODE: INTEGRATE THE CERTIFIED SAFE-SIDE LINEAGE, THEN RESUME 144-A.**
 
-This handoff is composed against exact `develop` parent HEAD
-`5c737ec08ef806e16edeafd196f57177271cab41`, TREE `eba84b55f6f6822cc68e5b054cb3fbbbded10ec0`. It is docs-only and performs no
-source integration or operational effect.
-
-Accepted safe-side executable/certification identity remains:
+The Monday `2026-10-19` D1R9 authority is fully consumed and terminal.
+Read-only reconciliation proved:
 
 ```text
-Architecture-143 semantic implementation  33b14eab4e9577f15b2afa559918415e4d471d55
-Architecture-143 semantic TREE            d19ef77620881343cc38010290029865fd43c1f4
-Architecture-132-R3I implementation        9fb082d21f00326bc98103abb8d357e6368df72f
-R3I-C1 final HEAD                          c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-R3I-C1 final TREE                          bf7019b1610c29563282ccb5f19be2bcb6501849
+D1R9  FINAL / NO_SIGNAL
+hash  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+HEAD  efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
+TREE  25a962daf3922c4226c7e395eba8613e1b03bbaf
+task  MATCH
+
+D1R8  FINAL / NO_SIGNAL
+hash  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+HEAD  aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+TREE  fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+proof MATCH
+
+D1R7  READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
+hash  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+HEAD  30322c49b13b80af8d20acee4bdb1efd83d86260
+TREE  b7dc7f054fca50c3ab784505f264b6f716a45dff
+bind  MATCH
 ```
 
-Architecture 143 / RCL-6 remains source/certification accepted. Architecture
-144 / RCL-7 C1 remains design frozen, but 144-A implementation is
-**intentionally paused** while the already consumed D1R9 Monday authority is
-in flight.
+D1R8 performed one strategy evaluation after two Alpaca credential reads and
+four history requests, then terminated `NO_SIGNAL` before Robinhood
+credential reads, PREPARE, EXECUTE, paper mutation, broker placement, D2, or
+live effects. This is the expected clean zero-trade outcome and creates no
+retry authority.
 
-The Monday `2026-10-19` D1R9 one-session authorization remains
-**ACTIVE / CONSUMED**. The task-owned supervisor is the only accepted execution
-path. Do not re-authorize D1R9; do not manually create, run, update, delete, or
-recreate the scheduler task; do not invoke D1R7 or D1R8 manually; do not
-manufacture a retry; and do not alter durable evidence.
+For Architecture 144, Monday is accepted external clean-session evidence that
+is eligible to become the first v1 soak observation after the separately
+reviewed evidence-verification/builder boundary exists. It contributes clean
+coverage but zero `PAPER_EXECUTED` count. No Architecture-144 observation,
+eligibility, `PAPER_CANDIDATE`, `AWAITING_HUMAN_PROMOTION`, or promotion
+authority exists yet.
 
-Standby posture is read-only. No Architecture-144 source work, real evidence
-acquisition, paper-candidate materialization, promotion, provider/credential
-access, scheduler mutation, D1/D2 operation, or live authority is permitted by
-this closeout.
+The current integration checkpoint has parents:
 
-After the Monday session reaches durable terminal evidence, the immediate next
-review is a **read-only D1R9 reconciliation** of exact source/task/supervisor
-state and the durable terminal record. `NO_SIGNAL` and fully acknowledged
-`PAPER_EXECUTED` remain clean consumed outcomes; `RISK_REJECTED` remains a
-safe consumed outcome but does not qualify under the Architecture-144 v1 soak
-policy. `SESSION_MISSED`, `BLOCKED`, `INDETERMINATE`, scheduler/source
-drift, or ambiguous/partial evidence is STOP with no automatic retry.
+```text
+develop parent     41d348367d31ac17e6bd9c9d12285955286606dc
+safe-side parent   c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+safe-side tree     bf7019b1610c29563282ccb5f19be2bcb6501849
+```
 
-Only after that reconciliation is accepted should safe-side Architecture 144-A
-be reconsidered. Real-money trading remains **NO-GO**.
+It retains `develop`'s newer R3I closeout and Architecture-143/144 docs while
+importing the certified 142/143/R3I executable/test bytes. Older historical
+sections below that describe 142/143 source as unmerged are superseded by this
+integration. The optional `feature/project-history-storage-foundation` ref may
+be fast-forwarded only after this exact integration descendant is accepted; it
+must not gain mirror-only commits.
+
+The exact 12,354-case R3I-C1 FULL remains valid because executable/test bytes
+are unchanged from the certified tip. Do not rerun FULL. Require one fresh
+push-triggered source gate on the integration commit, then exact GitHub review.
+If terminal green, fast-forward the optional history mirror and proceed directly
+to Architecture 144-A. Real-money trading remains **NO-GO**.
 
 ## Architecture 144 / RCL-7 handoff record
 

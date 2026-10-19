@@ -1,63 +1,92 @@
 # AI Trading Bot - Project Status
 
-## Monday 2026-10-19 D1R9 standby; Architecture 144 safe-side progression intentionally paused
+## Monday 2026-10-19 D1R9 reconciled; certified safe-side integration catch-up is the current checkpoint
 
-**MONDAY MARKET-SESSION STANDBY IS THE CURRENT OPERATIONAL PRIORITY.**
+**THE MONDAY D1R9 SESSION IS CLEANLY CONSUMED / NO_SIGNAL.**
 
-This docs-only closeout is composed against exact `develop` parent HEAD
-`5c737ec08ef806e16edeafd196f57177271cab41`, TREE `eba84b55f6f6822cc68e5b054cb3fbbbded10ec0`. It changes no executable source,
-workflow, scheduler state, production authority, credentials, paper state,
-accepted feature lineage, or live-trading authority.
+Read-only post-session reconciliation independently verified the exact durable
+D1R9, D1R8, and D1R7 evidence for the published XNYS session
+`2026-10-19`. No retry, scheduler mutation, evidence mutation, provider
+re-entry, D1R7/D1R8 manual entry, D2 action, or live-money action was used.
 
-The accepted executable/certified safe-side predecessor remains separately:
+Accepted D1R9 evidence:
 
 ```text
-Architecture-143 semantic implementation  33b14eab4e9577f15b2afa559918415e4d471d55
-Architecture-143 semantic TREE            d19ef77620881343cc38010290029865fd43c1f4
-Architecture-132-R3I implementation        9fb082d21f00326bc98103abb8d357e6368df72f
-R3I-C1 final HEAD                          c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-R3I-C1 final TREE                          bf7019b1610c29563282ccb5f19be2bcb6501849
-R3I-C1 parent                              9fb082d21f00326bc98103abb8d357e6368df72f
+journal      F:\AI\temp\qualification\arch134-d1r9-SPY-2026-10-19-434bcaf8a5faf15b38bcc7d54c297c9332af40c815f7efe67738cd7dc6bae368.jsonl
+bytes        8417
+sha256       dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+state        FINAL
+terminal     NO_SIGNAL
+observed_at  2026-10-19T13:36:50.319883+00:00
+target       2026-10-19
+source HEAD  efd1e6763dc4663d9c4b2444e785eb1c32adf8e8
+source TREE  25a962daf3922c4226c7e395eba8613e1b03bbaf
+scheduler    MATCH
+effects      d1r7_attempts=1, d1r8_attempts=1,
+             scheduler_creates=1, scheduler_runs=1, scheduler_updates=0
 ```
 
-Architecture 143 / RCL-6 remains source/certification accepted. Its canonical
-FULL evidence remains the accepted 12,354-case run: 12,351 passed, 3 skipped,
-0 failed/errors, 287.176 seconds. That feature source remains intentionally
-unmerged into `develop`.
+Its canonical proof binds the complete current D1R8 terminal bytes:
 
-The existing D1R9 one-session authorization for the Monday
-`2026-10-19` market session remains independent, **ACTIVE / CONSUMED**, and
-is now the only in-progress operational track. The task-owned supervisor is the
-sole accepted path for that consumed authority. Do not re-authorize D1R9; do
-not manually create, run, update, delete, or recreate its scheduler task; do
-not invoke D1R7 or D1R8 manually; do not manufacture a retry; and do not mutate
-or replace durable evidence.
+```text
+D1R8 path       F:\AI\temp\qualification\arch134-d1r8-SPY-2026-10-19.jsonl
+D1R8 bytes      62991
+D1R8 sha256     11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+D1R8 terminal   NO_SIGNAL
+D1R8 observed   2026-10-19T13:36:43.475594+00:00
+D1R8 HEAD       aa07c5ba94e0b55cbd8f920464fcc5bd9efcabd2
+D1R8 TREE       fcbfc348dab307fb9c456ce9e17aad0e53d7bd4f
+D1R9 proof      MATCH
+prepare         0
+execute         0
+paper fills     0
+broker/live     0
+```
 
-Architecture 144 / RCL-7 remains design frozen at C1 with the exact
-artifact/identity/transport/policy and 144-A / 144-B split recorded below.
-**Architecture 144-A is intentionally paused until the Monday D1R9 session
-reaches durable terminal evidence and that evidence is reconciled read-only.**
-No Architecture-144 implementation branch/worktree needs to be created or
-pushed while standby is active, and no real D1R9/D1R8 evidence is to be
-acquired for Architecture 144 during the wait.
+D1R8 independently binds the complete accepted D1R7 publication:
 
-The Monday session may later become the first possible Architecture-144
-observation only after durable terminal evidence exists and passes separate
-read-only reconciliation. `NO_SIGNAL` and fully acknowledged
-`PAPER_EXECUTED` are clean consumed outcomes under the existing contracts.
-`RISK_REJECTED` is also safely consumed but is not a v1 qualifying soak
-session. `SESSION_MISSED`, `BLOCKED`, `INDETERMINATE`, scheduler/source
-drift, or ambiguous/partial evidence is a STOP/reconciliation condition and
-creates no retry authority.
+```text
+D1R7 path       F:\AI\temp\qualification\arch134-d1r7-2026-10-19-77a2ebb901a5ad28647dfb9b98ca89c3f11ffd607ab3fb3c51d6f350a04981d4.jsonl
+D1R7 bytes      30808
+D1R7 sha256     49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
+D1R7 final      READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
+D1R7 HEAD       30322c49b13b80af8d20acee4bdb1efd83d86260
+D1R7 TREE       b7dc7f054fca50c3ab784505f264b6f716a45dff
+binding         MATCH
+target          MATCH
+```
 
-The next reviewed boundary is therefore the Monday post-session D1R9
-**read-only reconciliation**, not Architecture 144-A implementation. Verify the
-exact task/supervisor terminal state and durable evidence without changing
-scheduler state or consuming new authority. Only after that result is accepted
-will ChatGPT decide whether to resume Architecture 144-A, record a qualifying
-first-observation path, or open a separate incident/reconciliation checkpoint.
+The recovered immutable production strategy contract is
+`b7f0e25a-d0da-51d1-8a8b-f25187936d86`,
+`production-strategy-contract/v1`, MovingAverageCrossoverStrategy
+`1.0.0`, SPY, short/long windows `2/3`, desired quantity `1`, and the
+exact D1R8 production source above.
 
-Real-money trading remains **NO-GO**.
+This is a clean consumed session. `NO_SIGNAL` qualifies as clean session-soak
+coverage under the frozen Architecture-144 v1 policy, but contributes **zero**
+of the required minimum one `PAPER_EXECUTED` session. No Architecture-144
+observation artifact exists yet: the real bytes remain external evidence for
+the separately reviewed 144-B acquisition/verifier boundary. No retry is
+authorized or needed.
+
+The current repository-control checkpoint also catches the default integration
+line up to the accepted safe-side executable/certification lineage. Its exact
+parents are current `develop`
+`41d348367d31ac17e6bd9c9d12285955286606dc` and terminal-green R3I-C1
+`c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2`. The integration keeps
+`develop`'s newer Architecture-132 R3I closeout text, imports only the
+certified side-only executable/test bytes, and retains the newer
+Architecture-143/144/current documentation. Older statements below that say
+142/143 executable source is still unmerged are historical provenance and are
+superseded by this integration checkpoint.
+
+The accepted canonical FULL evidence remains the exact R3I-C1 run:
+12,354 cases / 12,351 passed / 3 skipped / 0 failed/errors / 287.176 seconds.
+Because this integration changes no executable/test bytes relative to that
+certified tip, the FULL run is not duplicated. The integration itself must
+still pass one fresh push-triggered source gate before acceptance. After that
+gate and exact review, Architecture 144-A is the immediate safe-side source
+milestone. Real-money trading remains **NO-GO**.
 
 ## Architecture 144 / RCL-7 design record
 

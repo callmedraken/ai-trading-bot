@@ -1,16 +1,15 @@
 # AI Trading Bot - Project Status
 
-## Architecture 144 / RCL-7 C1 source-readiness clarification; Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
+## Monday 2026-10-19 D1R9 standby; Architecture 144 safe-side progression intentionally paused
 
-**ARCHITECTURE 143 / RCL-6 SOURCE/CERTIFICATION ACCEPTED.**
+**MONDAY MARKET-SESSION STANDBY IS THE CURRENT OPERATIONAL PRIORITY.**
 
-This bounded current-state closeout is composed against the exact `develop`
-startup and documentation integration parent at HEAD
-`3dd6a1c6ceaa090d006fb05494c03ac675a55fec`, TREE
-`7e357e39577ccaea2c54dd9f589537d3a48ccb96`. It does not integrate the
-accepted feature source into `develop`.
+This docs-only closeout is composed against exact `develop` parent HEAD
+`5c737ec08ef806e16edeafd196f57177271cab41`, TREE `eba84b55f6f6822cc68e5b054cb3fbbbded10ec0`. It changes no executable source,
+workflow, scheduler state, production authority, credentials, paper state,
+accepted feature lineage, or live-trading authority.
 
-The accepted executable/certified feature identity is separately:
+The accepted executable/certified safe-side predecessor remains separately:
 
 ```text
 Architecture-143 semantic implementation  33b14eab4e9577f15b2afa559918415e4d471d55
@@ -21,74 +20,44 @@ R3I-C1 final TREE                          bf7019b1610c29563282ccb5f19be2bcb6501
 R3I-C1 parent                              9fb082d21f00326bc98103abb8d357e6368df72f
 ```
 
-Checkpoint Source Gates #630 / run `39117841927` / push / attempt 1 is
-terminal SUCCESS. `source-static`, `full-tests (0)` through `full-tests (3)`,
-and `source-gates` passed; `active-tests` and `certification-tests` were
-skipped. The final canonical FULL was run exactly once because the feature
-checkpoint was unmapped and required materially distinct timing evidence. It
-passed 12,354 cases: 12,351 passed, 3 skipped, 0 failed, 0 errors, in 287.176
-seconds. The lanes were 46 / 47 / 46 / 47 modules with child elapsed values
-282.944 / 282.968 / 282.991 / 283.018 seconds. The 300-second hygiene ceiling
-remains unchanged. A post-run reporting-wrapper `.error` property issue
-occurred after certification had already completed and was not a certification
-failure.
+Architecture 143 / RCL-6 remains source/certification accepted. Its canonical
+FULL evidence remains the accepted 12,354-case run: 12,351 passed, 3 skipped,
+0 failed/errors, 287.176 seconds. That feature source remains intentionally
+unmerged into `develop`.
 
-Architecture 132-R3I changes current FULL only to four deterministic nonempty
-whole-module timing-aware lanes (`broad-1` through `broad-4`). ROBINHOOD
-remains exactly two deterministic lanes with the accepted R3H placement
-overlay. LEGACY/EXHAUSTIVE retain their historical two-broad-plus-serial
-topology. No tests were dropped or reclassified, and no test ownership or
-effect boundary changed.
+The existing D1R9 one-session authorization for the Monday
+`2026-10-19` market session remains independent, **ACTIVE / CONSUMED**, and
+is now the only in-progress operational track. The task-owned supervisor is the
+sole accepted path for that consumed authority. Do not re-authorize D1R9; do
+not manually create, run, update, delete, or recreate its scheduler task; do
+not invoke D1R7 or D1R8 manually; do not manufacture a retry; and do not mutate
+or replace durable evidence.
 
-The accepted feature source remains intentionally unmerged into `develop`.
-Architecture 143 remains a pure compatibility proof and creates no
-`ProductionStrategyContract`, `PAPER_CANDIDATE`,
-`AWAITING_HUMAN_PROMOTION`, promotion authority, provider/credential
-authority, paper/broker authority, scheduler authority, deployment authority,
-D1/D1R9/D2 authority, or live authority. Architecture 141 remains the
-immutable old `SHADOW` / `NOT_ESTABLISHED` path.
+Architecture 144 / RCL-7 remains design frozen at C1 with the exact
+artifact/identity/transport/policy and 144-A / 144-B split recorded below.
+**Architecture 144-A is intentionally paused until the Monday D1R9 session
+reaches durable terminal evidence and that evidence is reconciled read-only.**
+No Architecture-144 implementation branch/worktree needs to be created or
+pushed while standby is active, and no real D1R9/D1R8 evidence is to be
+acquired for Architecture 144 during the wait.
 
-The active D1R9 one-session authorization remains independent, active and
-consumed for the Monday `2026-10-19` market session. Do not re-authorize D1R9
-or manually Create/Run/update/delete/recreate its scheduler task. Safe-side
-progression may continue while the task-owned supervisor waits.
+The Monday session may later become the first possible Architecture-144
+observation only after durable terminal evidence exists and passes separate
+read-only reconciliation. `NO_SIGNAL` and fully acknowledged
+`PAPER_EXECUTED` are clean consumed outcomes under the existing contracts.
+`RISK_REJECTED` is also safely consumed but is not a v1 qualifying soak
+session. `SESSION_MISSED`, `BLOCKED`, `INDETERMINATE`, scheduler/source
+drift, or ambiguous/partial evidence is a STOP/reconciliation condition and
+creates no retry authority.
 
-Architecture 144 / RCL-7 is now design frozen as the separately reviewed
-successor to Architecture 143. Its purpose is paper-candidate eligibility
-only: it consumes a fully externally verified Architecture-143 proof plus
-canonical production-paper session evidence under one frozen policy of five
-consecutive published XNYS regular sessions with at least one fully
-acknowledged `PAPER_EXECUTED` terminal.
+The next reviewed boundary is therefore the Monday post-session D1R9
+**read-only reconciliation**, not Architecture 144-A implementation. Verify the
+exact task/supervisor terminal state and durable evidence without changing
+scheduler state or consuming new authority. Only after that result is accepted
+will ChatGPT decide whether to resume Architecture 144-A, record a qualifying
+first-observation path, or open a separate incident/reconciliation checkpoint.
 
-No `PAPER_CANDIDATE` exists yet. No `AWAITING_HUMAN_PROMOTION` or human-
-promotion eligibility exists yet. Real D1R9/D1R8 evidence acquisition for
-Architecture 144 has not occurred, and this design does not inspect or mutate
-the real journals. Architecture 144 creates no production contract, lifecycle
-stage, promotion, provider, credential, paper, broker, scheduler, D1, D2 or
-live authority.
-
-The D1R9 one-session authorization for Monday `2026-10-19` remains
-independent and **ACTIVE / CONSUMED**. Do not re-authorize it or manually
-Create/Run/update/delete/recreate its scheduler task; the task-owned
-supervisor continues independently. Monday may become the first possible
-observation only after durable terminal evidence exists and is separately
-reviewed.
-
-Architecture-144 C1 now freezes the exact deterministic identity framing,
-canonical JSON transport, parser rejection boundary, source-lineage facts, and
-staged 144-A / 144-B implementation split. Existing Architecture-144 schemas,
-namespaces, exact field sets, lifecycle, frozen v1 policy, and zero-effect
-boundary are unchanged. The executable predecessor for 144-A is the accepted
-Architecture-143/R3I-C1 descendant `c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2`
-with TREE `bf7019b1610c29563282ccb5f19be2bcb6501849`.
-
-The immediate next safe-side milestone after C1 acceptance is Architecture
-144-A: the deterministic artifact/transport/fixed-policy foundation only.
-Architecture 144-B remains a separately reviewed external-evidence verifier
-and positive-builder composition. No real Architecture-144 evidence has been
-acquired or inspected. The Monday `2026-10-19` D1R9 authorization remains
-independent and **ACTIVE / CONSUMED**; do not re-authorize or manually invoke
-its scheduler, D1R7, or D1R8.
+Real-money trading remains **NO-GO**.
 
 ## Architecture 144 / RCL-7 design record
 

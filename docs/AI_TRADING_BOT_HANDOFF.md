@@ -1,10 +1,61 @@
 # AI Trading Bot - Current Handoff
 
-## Architecture 143 / RCL-6 design frozen
+## Architecture 143 / RCL-6 + Architecture 132-R3I-C1 accepted
 
-**ARCHITECTURE 143 / RCL-6 DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+**ARCHITECTURE 143 / RCL-6 SOURCE/CERTIFICATION ACCEPTED.**
 
-The docs-only Architecture-143 checkpoint is frozen from clean `develop` base
+This bounded handoff closeout is composed against the exact `develop` startup
+and documentation integration parent at HEAD
+`3dd6a1c6ceaa090d006fb05494c03ac675a55fec`, TREE
+`7e357e39577ccaea2c54dd9f589537d3a48ccb96`. The accepted executable/certified
+feature identity remains separate and intentionally unmerged:
+
+```text
+Architecture-143 semantic implementation  33b14eab4e9577f15b2afa559918415e4d471d55
+Architecture-143 semantic TREE            d19ef77620881343cc38010290029865fd43c1f4
+Architecture-132-R3I implementation        9fb082d21f00326bc98103abb8d357e6368df72f
+R3I-C1 final HEAD                          c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+R3I-C1 final TREE                          bf7019b1610c29563282ccb5f19be2bcb6501849
+R3I-C1 parent                              9fb082d21f00326bc98103abb8d357e6368df72f
+```
+
+Checkpoint Source Gates #630 / run `39117841927` / push / attempt 1 is
+terminal SUCCESS. `source-static`, all four `full-tests` shards, and
+`source-gates` passed; `active-tests` and `certification-tests` were skipped.
+The required canonical local FULL ran exactly once because this feature
+checkpoint was unmapped and required materially distinct timing evidence. It
+passed 12,354 cases: 12,351 passed, 3 skipped, 0 failed, 0 errors, in 287.176
+seconds, with lanes 46 / 47 / 46 / 47 modules and child elapsed values
+282.944 / 282.968 / 282.991 / 283.018 seconds. The 300-second hygiene ceiling
+remains unchanged. The post-run reporting-wrapper `.error` issue occurred
+after certification completed and was not a certification failure.
+
+Current FULL is four deterministic nonempty whole-module timing-aware lanes.
+ROBINHOOD remains two deterministic lanes with the accepted R3H placement
+overlay. LEGACY/EXHAUSTIVE retain the historical two-broad-plus-serial
+topology. No tests were dropped or reclassified, and no effect boundary
+changed.
+
+Architecture 143 remains a pure compatibility proof. It creates no
+`ProductionStrategyContract`, `PAPER_CANDIDATE`,
+`AWAITING_HUMAN_PROMOTION`, promotion, provider/credential, paper/broker,
+scheduler, deployment, D1/D1R9/D2, or live authority. Architecture 141 remains
+immutable `SHADOW` / `NOT_ESTABLISHED`.
+
+The D1R9 one-session authorization for Monday `2026-10-19` is active and
+consumed. Do not re-authorize or manually Create/Run/update/delete/recreate its
+scheduler task. Safe-side progression may continue while the task-owned
+supervisor waits. The immediate safe-side next step is ChatGPT-led
+Architecture-144/next-RCL design selection and contract freezing; this closeout
+does not implement Architecture 144.
+
+## Architecture 143 / RCL-6 frozen design provenance
+
+The following preserves the original prospective design record. Its former
+future-implementation language is historical provenance; the accepted status
+and current next step are recorded above.
+
+The original design-freeze checkpoint was admitted from clean `develop` base
 HEAD `a0defb4a5c568e6afc78a76a325509396a9d327e` / TREE
 `50f6e193e917132dd596155115bbc1fc73691f4f` in
 `F:\AI\worktrees\ai-trading-bot-architecture-143-design-freeze`.
@@ -27,9 +78,10 @@ or operational effect exists. Parsing alone never verifies research or grants
 authority.
 
 Architecture 141 remains immutable `SHADOW` / `NOT_ESTABLISHED` for the old
-portfolio candidate. D1R9 remains separate and untouched. The next checkpoint
-is the isolated Architecture-143 source implementation with focused tests and
-capability/zero-effect checks; real-money trading remains NO-GO.
+portfolio candidate. D1R9 remains separate and untouched. At design freeze,
+the next checkpoint was the isolated Architecture-143 source implementation
+with focused tests and capability/zero-effect checks; that checkpoint is now
+accepted above and real-money trading remains NO-GO.
 
 ## Architecture 142-A and 142-B / RCL-5 source acceptance
 

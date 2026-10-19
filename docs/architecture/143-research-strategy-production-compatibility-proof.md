@@ -1,11 +1,74 @@
 # Architecture 143 / RCL-6 — Research Strategy Production Compatibility Proof
 
-Status: **ARCHITECTURE 143 / RCL-6 DESIGN FROZEN; SOURCE NOT IMPLEMENTED**.
+Status: **ARCHITECTURE 143 / RCL-6 SOURCE/CERTIFICATION ACCEPTED; R3I-C1 CLOSEOUT**.
 
-This is a docs-only design freeze for a separate, pure strategy-native
-research-to-production semantic compatibility proof. It does not implement
-Architecture 143 and grants no production, paper, broker, scheduler, D1, D1R9,
-D2, provider, credential, or live authority.
+The current acceptance is a bounded documentation/workflow closeout on
+`develop`. It records acceptance of the pure strategy-native compatibility
+proof while preserving the original design contract below as frozen
+pre-implementation provenance. It grants no production, paper, broker,
+scheduler, D1, D1R9, D2, provider, credential, deployment, or live authority.
+
+## Acceptance / closeout — 2026-10-18
+
+Architecture 143 / RCL-6 is **SOURCE/CERTIFICATION ACCEPTED**. The design
+authority is the frozen Architecture-143 design record at
+`3d66d1a3a7629eb07fcdef9fd1d6ed9f68d1bd87`; the accepted executable
+predecessor is Architecture 142-B at
+`e88f38f8deeb834ac3f162b6a82e328dc4708ad0` /
+`23f63ed62e67460edce5b9296893bdcfe49a25f7`.
+
+The Architecture-143 semantic implementation is accepted at HEAD
+`33b14eab4e9577f15b2afa559918415e4d471d55`, TREE
+`d19ef77620881343cc38010290029865fd43c1f4`. The Architecture-132-R3I source
+checkpoint is `9fb082d21f00326bc98103abb8d357e6368df72f`; the final R3I-C1
+descendant is HEAD
+`c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2`, TREE
+`bf7019b1610c29563282ccb5f19be2bcb6501849`, parent
+`9fb082d21f00326bc98103abb8d357e6368df72f`.
+
+Checkpoint Source Gates #630, run `39117841927`, push, attempt 1, is terminal
+SUCCESS. Its terminal jobs were `source-static`, `full-tests (0)`,
+`full-tests (1)`, `full-tests (2)`, `full-tests (3)`, and `source-gates`;
+`active-tests` and `certification-tests` were skipped. The final canonical FULL
+evidence was run exactly once after source acceptance because this feature
+checkpoint was unmapped and required materially distinct timing evidence. It
+passed 12,354 cases: 12,351 passed, 3 skipped, 0 failed, 0 errors, in 287.176
+seconds, with four whole-module lanes of 46 / 47 / 46 / 47 modules and child
+elapsed values 282.944 / 282.968 / 282.991 / 283.018 seconds. The 300-second
+hygiene ceiling remains unchanged. The later reporting-wrapper `.error`
+property issue occurred after certification had completed and is not a
+certification failure.
+
+R3I changes current FULL only to four deterministic nonempty whole-module
+timing-aware lanes. ROBINHOOD remains exactly two deterministic lanes with the
+accepted R3H placement overlay. LEGACY/EXHAUSTIVE retain their historical
+two-broad-plus-serial topology. No tests were dropped or reclassified, and no
+test ownership or effect boundary changed. The feature source remains
+intentionally unmerged into `develop`; `develop` is the bounded startup and
+documentation integration reference, while the accepted executable/certified
+source is identified separately above.
+
+Architecture 143 remains a pure compatibility proof. It does not create
+`ProductionStrategyContract`, `PAPER_CANDIDATE`,
+`AWAITING_HUMAN_PROMOTION`, promotion authority, provider/credential
+authority, paper/broker authority, scheduler authority, deployment authority,
+D1/D1R9/D2 authority, or live authority. Architecture 141 remains the
+immutable old `SHADOW` / `NOT_ESTABLISHED` path. D1R9 remains an independent
+primary operational progression: its one-session authorization is active and
+consumed while its supervisor waits for the Monday `2026-10-19` market
+session. Do not re-authorize D1R9 or manually create/run/update/delete/recreate
+its scheduler task. Safe-side progression may continue while the supervisor
+waits.
+
+The immediate safe-side next step is ChatGPT-led Architecture-144/next-RCL
+design selection and contract freezing. This closeout does not implement
+Architecture 144.
+
+## Frozen design provenance
+
+The following design-freeze text records the prospective contract that governed
+the implementation. Its former future-implementation language is historical
+provenance; the acceptance section above is the current status.
 
 ## Decision and boundary
 
@@ -29,7 +92,7 @@ artifact remains `SHADOW` / `NOT_ESTABLISHED`, and its blockers remain the
 historical truth for that old path. Architecture 143 does not consume or
 reinterpret that artifact.
 
-The design freeze was admitted from this exact clean checkout:
+The original design freeze was admitted from this exact clean checkout:
 
 ```text
 worktree F:\AI\worktrees\ai-trading-bot-architecture-143-design-freeze
@@ -455,11 +518,12 @@ The future implementation must add focused coverage for at least:
 
 ## Publication and next checkpoint
 
-This design freeze is one docs-only logical checkpoint. Its source/test/workflow
-surface is intentionally unchanged. The next checkpoint is the isolated
-Architecture-143 source implementation with focused tests and static capability
-checks. It must begin from this frozen contract, preserve the exact 142 source
-boundary, and stop before any production, paper, broker, scheduler, D1R9, D2,
+At design freeze, this was one docs-only logical checkpoint whose
+source/test/workflow surface was intentionally unchanged. Its recorded next
+checkpoint was the isolated Architecture-143 source implementation with
+focused tests and static capability checks. That checkpoint is now accepted as
+described above. The frozen contract still preserves the exact 142 source
+boundary and stops before any production, paper, broker, scheduler, D1R9, D2,
 provider, credential, or live effect.
 
 D1R9 remains separate and untouched.

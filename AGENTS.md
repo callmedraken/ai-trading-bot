@@ -166,11 +166,13 @@ baselines.
   boundary, before protected Robinhood qualification, and after material changes
   to shared domain/execution/ledger/risk foundations used by Architecture 131.
   `--profile robinhood` preserves the current 49-module required baseline in two
-  nonempty balanced lanes. Missing/renamed baseline modules fail closed; new owned tests enter
+  nonempty deterministic lanes with the accepted R3H placement overlay.
+  Missing/renamed baseline modules fail closed; new owned tests enter
   automatically.
 - **FULL:** the default `--profile full` certifies all CURRENTLY SUPPORTED
-  functionality in exactly two nonempty balanced lanes, with no historical
-  Windows serial lane. Use after certification-topology changes, at coherent
+  functionality in exactly four deterministic nonempty whole-module timing-aware
+  lanes (`broad-1` through `broad-4`), with no historical Windows serial lane.
+  Use after certification-topology changes, at coherent
   current-product boundaries, before major develop/release integration or
   consequential production/live-readiness transitions, after sufficiently broad
   supported shared-core changes, or when ChatGPT determines accumulated
@@ -185,7 +187,7 @@ baselines.
   consequential boundary.
 - **LEGACY / EXHAUSTIVE:** only when explicitly relevant. LEGACY retains retired
   architecture; EXHAUSTIVE covers every discovered repository test and preserves
-  the previous three-lane all-repository topology. Use for changes to legacy
+  the historical two-broad-plus-serial topology. Use for changes to legacy
   architecture, interpreter/dependency migrations spanning both eras, broad
   repository restructuring, deliberate legacy removal, or explicit backward
   compatibility investigation. Both retain the exact historical five-module

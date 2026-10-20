@@ -1,6 +1,6 @@
-# Architecture 134-F1 — five-session current-product live-paper soak authority
+# Architecture 134-F1 â€” five-session current-product live-paper soak authority
 
-Status: **DESIGN FROZEN; source implementation is the next milestone.**
+Status: **SOURCE IMPLEMENTED; exact-source acceptance pending; CI owns ROBINHOOD.**
 
 This document specializes Architecture 134-F's generic requirement for a fresh
 multi-session live-paper soak into a bounded current-product authority model.
@@ -30,8 +30,8 @@ final F1 source HEAD/TREE are accepted.
 The source implementation starts from current remote `develop`:
 
 ```text
-HEAD  1c06033f13c05a58351115c98effc2116aa65b92
-TREE  b972a4bd262d4ecef45b4db4c34536fbac3ec3a5
+HEAD  b3b605fdc0886cd90367027e72d43ecaf8ce5b4c
+TREE  1b2b783211aa41d9add5e3c29d3a336c33a75c3c
 ```
 
 Feature branch:
@@ -362,3 +362,39 @@ is:
 Architecture 144-C must keep the existing v1 D1R9 verifier, observation schema,
 eligibility schema, identities and canonical bytes unchanged. It may add only a
 separate v2/generic-authority path with truthful F1 provenance.
+
+## Implemented source/evidence surface
+
+`five_session_soak_store.py` is a standard-library-only closed parent/child
+codec shared by the current-lineage controller and fixed child bridges.
+`five_session_soak.py` derives and freezes the five published targets;
+`five_session_soak_child.py` preserves the accepted D1R9 one-session reducer.
+`five_session_soak_host.py`, `arch134_f1_bridge.py`, the two fixed F1 child
+adapters, `arch134_f1_scheduler.ps1`, and `run_arch134_f1.py` own only the F1
+worktree/task identity. There is no historical D1R9 runtime import or invocation.
+
+The exclusive parent slot is `arch134-f1-five-session-soak-v1.jsonl` beneath the
+fixed existing qualification parent. A consumed, malformed or terminal slot
+cannot authorize another series. Child UUID5 identities bind the semantic
+parent identity, exact ordinal/window/contract and source policy. Clocks,
+runtime file metadata and serialized journal bytes are excluded from UUID
+material. Exact runtime identities and canonical journal digests are separately
+bound in evidence. Both F1 schemas and UUID identity version are v1.
+
+A child binds `parent_prefix` (length/SHA256) through its parent's durable
+`SESSION_n_GRANT_INTENT`. Parent FINAL binds its own pre-FINAL prefix digest,
+plus the ordered five child identities, journal length/digests, exact targets,
+contracts, D1R7/D1R8 proof length/digests, terminal classifications, per-child
+attempts and complete D1R8 effect counters. This avoids a circular hash while
+allowing a future pure verifier to recompute every digest from supplied bytes.
+Each earlier finalized child and its underlying accepted proofs are re-read
+before later progression. Successful finalization also requires five exact
+children, matching saved summaries, idle child transport and scheduler MATCH.
+
+Incomplete/ambiguous child evidence halts without inventing a positive proof or
+repairing its consumed slot. Underlying durable child/D1R8 intents remain the
+effect evidence. Parent counters track its own grant/scheduler entries; actual
+D1R7/D1R8 attempts are recorded by their child journals and ordered summaries,
+including consumed intents, rather than a stale parent copy of child counters. The F1 checkpoint is `arch134-f1-five-session-soak`, with
+`preflight=None`, `execute=None`, and CI `robinhood` mapping. Architecture-144 v1
+source remains unchanged; Architecture 144-C is not implemented here.

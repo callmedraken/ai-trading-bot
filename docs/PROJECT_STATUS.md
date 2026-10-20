@@ -145,7 +145,9 @@ themselves to conclude long-run profitability.
 
 ### Now
 
-Architecture 134-F1 source implementation: a new current-product five-session
+Architecture 134-F1 source implementation is prepared on its isolated feature
+branch for exact-source review and CI-owned ROBINHOOD. It adds a current-product
+five-session
 live-data/synthetic-paper soak parent authority above the accepted D1R9
 one-session semantics. F1-to-Architecture-144 composition is deferred until a
 separate pure Architecture 144-C successor can pin the exact accepted F1 source.

@@ -3,7 +3,8 @@
 ## Current mode
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; FINAL CANONICAL FULL PASSED;
-ARCHITECTURE 134-F1 DESIGN FROZEN; SOURCE IMPLEMENTATION NEXT.**
+ARCHITECTURE 134-F1 SOURCE IMPLEMENTED ON FEATURE; EXACT REVIEW PENDING;
+CI OWNS CANONICAL ROBINHOOD.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state is in
@@ -133,8 +134,9 @@ promotion remain later explicit boundaries.
 
 ## Required continuation
 
-Continue automatically with Architecture 134-F1 source implementation on the
-existing clean F1 feature branch after fast-forwarding it to this corrected
-design checkpoint. Do not execute or provision the soak during source work.
-After terminal source/ROBINHOOD acceptance, return to ChatGPT for Architecture
-144-C; protected preflight comes only after 144-C acceptance.
+Complete the registered `arch134-f1-five-session-soak` focused/source gate and
+one atomic feature publication with CI-owned ROBINHOOD. Source acceptance
+remains ChatGPT's exact GitHub HEAD/TREE/diff review after terminal CI. No F1
+source result grants protected operational authority. After acceptance, return
+to ChatGPT to freeze Architecture 144-C against the exact accepted F1 source;
+do not begin 144-C or protected preflight automatically.

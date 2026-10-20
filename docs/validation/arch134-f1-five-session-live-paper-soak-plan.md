@@ -1,6 +1,6 @@
 # Architecture 134-F1 — five-session live-paper soak validation plan
 
-Status: **DESIGN FROZEN; implementation pending.**
+Status: **SOURCE IMPLEMENTED; focused verification and terminal CI gate apply.**
 
 This plan validates the source-only Architecture 134-F1 parent soak authority.
 No test or implementation command may create/run/update/delete a real scheduled
@@ -13,8 +13,8 @@ Current integration base:
 
 ```text
 branch develop
-HEAD   1c06033f13c05a58351115c98effc2116aa65b92
-TREE   b972a4bd262d4ecef45b4db4c34536fbac3ec3a5
+HEAD   b3b605fdc0886cd90367027e72d43ecaf8ce5b4c
+TREE   1b2b783211aa41d9add5e3c29d3a336c33a75c3c
 ```
 
 Implementation branch:
@@ -292,3 +292,24 @@ observation path while preserving v1 byte-for-byte.
 
 The protected F1 preflight remains blocked until both F1 source and 144-C source
 are accepted.
+
+## Implemented focused gate
+
+`tests/review_paper/test_five_session_soak.py` covers the F1 parent/window/store,
+immutable grants, progression/halt, consumed-intent recovery, independent
+reconciliation, current-inventory/checkpoint integration, and frozen v1 source.
+`tests/review_paper/test_five_session_soak_child.py` ports the accepted D1R9
+behavioral timing/proof/fault matrix onto F1 grants, retaining fake process/Git/
+scheduler edges and disposable evidence/runtime files only. Exact AST digests
+of the accepted D1R9 proof, terminal and bounded-supervision reducers supplement
+the behavioral checks. The scheduler source harness evaluates only the bounded
+HRESULT helper, never Task Scheduler or its COM transport.
+
+Current inventory metadata includes both new review-paper modules, the unchanged
+49-module required Robinhood baseline and two nonempty deterministic Robinhood
+lanes. The FULL timing/fixture inventory is synchronized as metadata only; no
+local FULL or duplicate local ROBINHOOD is part of F1 implementation.
+
+The atomic source publication is not source acceptance. Review the exact final
+HEAD/TREE and push-triggered CI evidence, then stop for ChatGPT. Do not implement
+144-C, provision a task, run protected preflight, or begin the soak in this gate.

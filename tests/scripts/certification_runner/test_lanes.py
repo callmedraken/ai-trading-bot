@@ -99,31 +99,31 @@ def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 187
+    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 189
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
     assert runner.FULL_FALLBACK_MS == 1000
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "2c103f4c2218e17e8f23461d6201e33ad10349a5eb95afe5fd736eac7546da35"
+        == "c478e893fa7cbfa86582f1b4ed1182cdd1a81ed25ff5359ea000879361d0c1ab"
     )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
     assert all(lanes.values())
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (46, 47, 47, 47)
+    assert tuple(map(len, lanes.values())) == (47, 48, 48, 46)
     assert tuple(
         sum(weights[module] for module in lane) for lane in lanes.values()
-    ) == (250880, 250880, 250879, 250879)
+    ) == (278227, 278227, 278227, 278226)
     # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
     assert weights["tests/test_config.py"] == 1
     raw = dict(weights, **{"tests/test_config.py": 0})
     for count, expected in (
-        (2, (501759, 501758)),
-        (3, (334506, 334506, 334505)),
-        (4, (250880, 250879, 250879, 250879)),
+        (2, (556453, 556453)),
+        (3, (370969, 370969, 370968)),
+        (4, (278227, 278227, 278226, 278226)),
     ):
         totals = [0] * count
         for module in sorted(raw, key=lambda name: (-raw[name], name)):
@@ -334,10 +334,12 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
                 module
             ]
         assert predecessor != pin
-        assert (
-            checkpoint._arch144_current_inventory_test_pin(module, predecessor) == pin
+        assert checkpoint._arch144_current_inventory_test_pin(
+            module, predecessor
+        ) == checkpoint._arch134_f1_current_inventory_test_pin(module, pin)
+        assert checkpoint._git_blob_sha1(root / module) == (
+            checkpoint._arch134_f1_current_inventory_test_pin(module, pin)
         )
-        assert checkpoint._git_blob_sha1(root / module) == pin
     assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
         "unchanged"
     )

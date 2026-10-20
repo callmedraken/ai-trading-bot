@@ -558,7 +558,8 @@ def test_aj_remains_registered_historical_and_closed_outside_active_ci():
     assert NAME not in active_batch.split()
     assert runner._batch_workflow_is_reviewed(workflow)
     # AJ pins the complete historical registry. Later checkpoint additions must
-    # keep that protected recovery gate closed without changing any other pin.
+    # keep that protected recovery gate closed. F2 extends only read-only
+    # preflight dispatch; its non-F2 predecessor AST is independently frozen.
     # Retirement also violates its frozen active-registration requirement.
     functions = {
         node.name: node
@@ -575,9 +576,10 @@ def test_aj_remains_registered_historical_and_closed_outside_active_ci():
         ).hexdigest()
         != pin
     }
-    assert drifted == {"_checkpoint_specs"}
+    assert drifted == {"_checkpoint_specs", "preflight_checkpoint"}
     assert runner._supervised_publication_recovery_authority_check(root) == (
         "publication recovery registration drift",
+        "publication recovery runner authority drift",
         "publication recovery runner authority drift",
     )
 

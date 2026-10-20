@@ -784,6 +784,46 @@ def test_contract_pins_and_effect_inventory_match_frozen_design():
         assert path + "\n" + blob in design
 
 
+def test_f2_only_dispatch_additions_preserve_frozen_predecessor_ast():
+    tree = ast.parse(
+        (ROOT / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    )
+    function = next(
+        n
+        for n in tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "preflight_checkpoint"
+    )
+    current = hashlib.sha256(
+        ast.dump(function, include_attributes=False).encode()
+    ).hexdigest()
+    assert runner.SUPERVISED_INSTALLATION_RUNNER_PINS[function.name] == current
+    predecessor_pin = "a5e63c447cb53e2998b4234dc0ecb2f81c2954b7677bc78d8414f6d278b8b15f"
+    assert runner.SUPERVISED_PUBLICATION_RUNNER_PINS[function.name] == predecessor_pin
+    predecessor = copy.deepcopy(function)
+    predicate = ast.dump(ast.parse("spec.name == ARCH134_F2_NAME", mode="eval").body)
+    branches = [
+        node
+        for node in predecessor.body
+        if isinstance(node, ast.If) and ast.dump(node.test) == predicate
+    ]
+    assert len(branches) == 2
+    assert not branches[0].orelse
+    assert len(branches[1].orelse) == 1 and isinstance(
+        branches[1].orelse[0], ast.Assign
+    )
+    predecessor.body = [
+        part
+        for node in predecessor.body
+        for part in (node.orelse if node in branches else [node])
+    ]
+    assert (
+        hashlib.sha256(
+            ast.dump(predecessor, include_attributes=False).encode()
+        ).hexdigest()
+        == predecessor_pin
+    )
+
+
 @pytest.mark.parametrize(
     "mutation",
     [

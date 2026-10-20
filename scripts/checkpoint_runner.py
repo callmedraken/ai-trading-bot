@@ -8840,7 +8840,7 @@ SUPERVISED_INSTALLATION_RUNNER_PINS: Final = {
         "c4584e649ea5a947fe26d7ebe7db41d5a47f3b7812c2b73fc8d01faac877f9ce"
     ),
     "preflight_checkpoint": (
-        "a5e63c447cb53e2998b4234dc0ecb2f81c2954b7677bc78d8414f6d278b8b15f"
+        "ac8bbe7b29c7fdebe86babe527b32ab0f788097d8f9465fa394f375171c5e50a"
     ),
     "execute_checkpoint": (
         "35164fc0985154d41a9f35f7b6b144df6ce86658941a083e7f5705fcee9366ed"
@@ -14393,6 +14393,9 @@ ARCH134_F2_BRANCH: Final = (
 ARCH134_F2_TESTS: Final = (
     *ARCH134_F1_TESTS,
     "tests/review_paper/test_five_session_soak_readiness.py",
+    "tests/review_paper/test_supervised_release_installation_operator.py",
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py",
+    "tests/review_paper/test_supervised_release_publication_recovery.py",
     "tests/scripts/certification_runner/test_profiles.py",
     "tests/scripts/certification_runner/test_lanes.py",
 )
@@ -14452,6 +14455,9 @@ ARCH134_F2_PREDECESSOR_PINS: Final = {
     "tests/review_paper/test_supervised_release_installation.py": (
         "cd8b750c23876476f4ff18c63da33ce5944914e2"
     ),
+    "tests/review_paper/test_supervised_release_publication_recovery.py": (
+        "79bf784a1930c55fc59580476d0f17ca4ed11b0a"
+    ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "300ba87491b4bf0d5faf4ce985043968a053a5c1"
     ),
@@ -14481,8 +14487,8 @@ ARCH134_F2_PREDECESSOR_PINS: Final = {
     ),
 }
 ARCH134_F2_PIN_OVERRIDES: Final = {
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("7e902ef66b67e5d796e910d5ab90119c99a9dc98"),
-    "docs/PROJECT_STATUS.md": ("fc8b193738d3a623da74ed7b739e280786125d48"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("df4d1f75c5a794b9c1eaa81b5ca86fcf632600e9"),
+    "docs/PROJECT_STATUS.md": ("00fa7fd35866f0f0159d1bfa154ac5ae07dca832"),
     "scripts/run_test_certification.py": ("3a09acf61fd9b5e54d942564cc2a99d9060e37de"),
     "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
         "456e59868db61becb579e153db06b56f6e7c4992"
@@ -14529,6 +14535,9 @@ ARCH134_F2_PIN_OVERRIDES: Final = {
     "tests/review_paper/test_supervised_release_installation.py": (
         "4c2b77217e0905de6113a7f5e4be6a95420b4440"
     ),
+    "tests/review_paper/test_supervised_release_publication_recovery.py": (
+        "248e65edb70d9ee109d981cd0a7af0f60b08caec"
+    ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "08fb5278f463ef99a659b529ef8c8801d10e963b"
     ),
@@ -14558,8 +14567,8 @@ ARCH134_F2_PIN_OVERRIDES: Final = {
     ),
 }
 ARCH134_F2_SOURCE_PINS: Final = {
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("7e902ef66b67e5d796e910d5ab90119c99a9dc98"),
-    "docs/PROJECT_STATUS.md": ("fc8b193738d3a623da74ed7b739e280786125d48"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("df4d1f75c5a794b9c1eaa81b5ca86fcf632600e9"),
+    "docs/PROJECT_STATUS.md": ("00fa7fd35866f0f0159d1bfa154ac5ae07dca832"),
     "docs/architecture/134-f2-five-session-live-paper-soak-readiness.md": (
         "a43201a61f25c4af3e5219c3bd939f8b735f97c5"
     ),
@@ -14601,7 +14610,7 @@ ARCH134_F2_SOURCE_PINS: Final = {
         "7a21d77e65cbf0ba719b5aae8bf3069636c75400"
     ),
     "tests/review_paper/test_five_session_soak_readiness.py": (
-        "2507819f2cd37180432720879663fecec6bbcf44"
+        "0cbe34ca3481746ca34c26e39d4bac05fd755121"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
         "c1449078efc47b15f3cd5112bf96b0c9a0d86356"
@@ -14617,6 +14626,9 @@ ARCH134_F2_SOURCE_PINS: Final = {
     ),
     "tests/review_paper/test_supervised_release_installation.py": (
         "4c2b77217e0905de6113a7f5e4be6a95420b4440"
+    ),
+    "tests/review_paper/test_supervised_release_publication_recovery.py": (
+        "248e65edb70d9ee109d981cd0a7af0f60b08caec"
     ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "08fb5278f463ef99a659b529ef8c8801d10e963b"
@@ -14647,7 +14659,7 @@ ARCH134_F2_SOURCE_PINS: Final = {
     ),
 }
 ARCH134_F2_PINS_SHA256: Final = (
-    "52cd7342e6ed9caa186b3bd37b88046bb08e6321232b299bc4834c89c8bafb57"
+    "881e058c543a330863e7885ea2cd7012372c46d4282633da4006493cfbc549fc"
 )
 
 
@@ -14655,6 +14667,7 @@ def _arch134_f2_current_pin(relative: str, predecessor: str) -> str:
     before = ARCH134_F2_PREDECESSOR_PINS
     after = ARCH134_F2_PIN_OVERRIDES
     allowed = {
+        "tests/review_paper/test_supervised_release_publication_recovery.py",
         "docs/AI_TRADING_BOT_HANDOFF.md",
         "docs/PROJECT_STATUS.md",
         "scripts/run_test_certification.py",
@@ -14733,6 +14746,7 @@ def _arch134_f2_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("F2 registration rejected")
         failures.extend(_arch134_f1_authority_check(repo_root))
         failures.extend(_arch144c_authority_check(repo_root))
+        failures.extend(_supervised_installation_operator_authority_check(repo_root))
     except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
         failures.append("F2 authority unavailable")
     return tuple(failures)

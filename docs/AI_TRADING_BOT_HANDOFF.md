@@ -134,7 +134,7 @@ commit, runs `.\ops.ps1 verify arch134-f2-five-session-soak-readiness` on the
 clean commit, and ordinary-pushes once. That push owns terminal active checks
 plus canonical ROBINHOOD. Do not duplicate ROBINHOOD locally or run FULL.
 
-ChatGPT must inspect that exact commit/diff, source pins, registered verify
+ChatGPT must inspect the initial commit plus separate C1, source pins, registered verify
 report and terminal CI/canonical evidence. Stop on mismatch or failure. Source
 acceptance may open only the separately reviewed read-only F2 preflight.
 
@@ -166,3 +166,23 @@ A preflight PASS still does not authorize the F1 five-session soak.
 
 Do not retry the consumed D1R9 authority and do not begin the real soak.
 Real-money trading remains **NO-GO**.
+
+## F2 failed attempt and bounded C1
+
+Initial F2 source `dd6a822d20b3b42a6c61eb5241fc6d5c6045521e` / tree
+`f2da182ef547f43f38d8f2af5afc43356e3ef1f2` passed its registered local gate
+(1,031 cases), source-static and active CI. Canonical ROBINHOOD #656 /
+39498692559 / attempt 1 failed four stale runner-pin/historical-expectation
+assertions: 104 modules, 10,662 cases, 10,652 passed, six skipped, four failed,
+zero errors; wall 282.215 seconds. The failed run and artifact remain preserved.
+
+Separate bounded C1 updates the installation gate's exact read-only preflight
+AST pin and the retired recovery test's expected drift set. A new proof removes
+only the two F2-only branches and requires the exact frozen non-F2 predecessor
+AST. The F2 focused gate now includes all three affected installation/recovery
+modules and installation source authority. No F2 runtime behavior, protected
+execute behavior, F1 operational blob, ownership baseline or lane policy changes.
+
+C1 has its own focused checks and atomic normal commit/push; it never amends or
+reruns the failed attempt. Replacement CI/source acceptance remain pending in
+this source record. No real F2 preflight, soak or operational effect is authorized.

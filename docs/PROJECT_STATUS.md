@@ -109,9 +109,10 @@ does **not** by itself authorize a fresh multi-session soak.
 With 144-B source accepted and the final canonical FULL green, Architecture 134-F
 is the next operational objective. The read-only preflight found that its current-
 product multi-session source authority was not yet implemented, so Architecture
-134-F1 source implementation must complete first. Only after F1 source/FULL
-acceptance may a separately reviewed protected preflight authorize the fresh
-multi-session paper soak.
+134-F1 source implementation must complete first. After F1 source/ROBINHOOD
+acceptance, Architecture 144-C must add the separate pure F1 evidence-admission
+successor. Only after 144-C acceptance may a separately reviewed protected
+preflight authorize the fresh multi-session paper soak.
 That soak validates scheduling/restart/idempotency and operational behavior. The
 Architecture-144 five-session policy then provides the first research eligibility
 gate over verified paper-session observations.
@@ -146,7 +147,8 @@ themselves to conclude long-run profitability.
 
 Architecture 134-F1 source implementation: a new current-product five-session
 live-data/synthetic-paper soak parent authority above the accepted D1R9
-one-session semantics.
+one-session semantics. F1-to-Architecture-144 composition is deferred until a
+separate pure Architecture 144-C successor can pin the exact accepted F1 source.
 
 Design authority:
 - `docs/architecture/134-f1-five-session-live-paper-soak-authority.md`;
@@ -161,9 +163,11 @@ effect is authorized.
 
 ### Then
 
-After exact-source acceptance and terminal canonical FULL, ChatGPT reviews a
-separate protected 134-F1 preflight for task/publication/runtime admission.
-The soak itself remains closed until that later boundary is explicitly reviewed.
+After exact-source acceptance and terminal canonical ROBINHOOD, ChatGPT freezes
+and implements Architecture 144-C, a pure F1 evidence-admission successor that
+keeps Architecture-144 v1 frozen. Only after 144-C source acceptance does ChatGPT
+review the separate protected 134-F1 preflight. The soak remains closed until
+that later boundary.
 
 ### Then
 

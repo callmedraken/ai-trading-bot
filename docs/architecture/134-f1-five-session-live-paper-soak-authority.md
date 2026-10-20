@@ -20,6 +20,11 @@ Architecture-144 research eligibility policy. Completing the operational soak
 does not itself establish research eligibility, profitability or promotion
 authority.
 
+F1 does **not** emit or construct Architecture-144 v1 observations. That accepted
+v1 contract is historically D1R9-specific and remains frozen. Truthful F1-to-144
+composition is deferred to a separate pure Architecture-144-C successor after the
+final F1 source HEAD/TREE are accepted.
+
 ## Current integration base
 
 The source implementation starts from current remote `develop`:
@@ -265,9 +270,16 @@ independently re-read and reconciled. The parent FINAL record binds, in order:
 The effectful F1 controller must not create Architecture-144 observations,
 eligibility artifacts, candidates or promotion state.
 
-After the soak is closed, externally supplied canonical evidence may be passed
-to the already-accepted pure Architecture-144 verifier in a separate read-only
-review step.
+The accepted Architecture-144 v1 verifier and v1 observation schema remain
+D1R9-bound and must not be loosened to admit F1 provenance. F1 end-of-window
+evidence instead preserves truthful current-lineage source HEAD/TREE, parent
+series identity/digest, ordered child identities/digests, exact D1R7/D1R8 proof
+bindings and terminal classifications.
+
+After F1 source acceptance, a separate pure Architecture-144-C successor will pin
+the exact final F1 source identity and define a generic paper-authority v2
+observation/eligibility path. That successor is the only allowed F1-to-144
+admission path. The real soak remains closed until 144-C is source-accepted.
 
 ## Effect ceilings
 
@@ -323,8 +335,30 @@ The implementation checkpoint must remain source-only with
 `preflight=None` and `execute=None`. It must provide focused proof of all
 authority/effect ceilings and complete current-inventory/pin integration.
 
-Because the terminal F1 source will gate a protected multi-session paper soak,
-its terminal certification profile is **FULL**. Under the canonical workflow,
-that certification belongs to the implementation agent automatically: prefer an
-explicit CI `full` mapping before the terminal publication so the one final push
-owns canonical certification. Do not ask the human to run a duplicate FULL.
+Because F1 changes only the current Robinhood/review-paper production authority
+surface plus its owned checkpoint infrastructure, its terminal selected
+certification profile is **ROBINHOOD**, not FULL. Map the terminal checkpoint to
+CI-owned `robinhood` before publication so one final push owns the canonical
+selected profile. Do not run FULL merely because the milestone is security-
+sensitive; FULL is reserved for materially broader supported-surface coverage.
+Do not ask the human to run a duplicate ROBINHOOD or FULL.
+
+## Architecture-144 successor dependency
+
+F1 source acceptance is intentionally **before** Architecture 144-C because the
+pure successor must bind the exact final F1 source HEAD/TREE. The required order
+is:
+
+```text
+134-F1 source + focused verification
+-> CI-owned ROBINHOOD
+-> ChatGPT exact-source acceptance
+-> 144-C pure F1 evidence-admission successor
+-> 144-C source acceptance
+-> protected 134-F preflight
+-> only then the real five-session soak
+```
+
+Architecture 144-C must keep the existing v1 D1R9 verifier, observation schema,
+eligibility schema, identities and canonical bytes unchanged. It may add only a
+separate v2/generic-authority path with truthful F1 provenance.

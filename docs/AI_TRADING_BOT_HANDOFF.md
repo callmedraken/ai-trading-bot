@@ -80,10 +80,14 @@ Owner/model: **Codex / Sol High**.
 Implement a source-only current-`develop` parent authority for exactly five
 consecutive published regular sessions. Preserve D1R9 semantics per child, add
 one new parent interlock/journal/task contract, forbid retry/backfill and keep
-Architecture-144 eligibility outside the effectful controller.
+Architecture-144 eligibility outside the effectful controller. Do not modify
+Architecture-144 v1 to accept F1 evidence; truthful F1 admission is deferred to
+Architecture 144-C after final F1 source acceptance.
 
-The terminal F1 checkpoint requires canonical FULL owned automatically by the
-implementation workflow. Prefer explicit CI `full` mapping before publication.
+The terminal F1 checkpoint requires canonical ROBINHOOD owned automatically by
+the implementation workflow. Prefer explicit CI `robinhood` mapping before
+publication; do not run FULL unless broader final source coverage actually
+requires it.
 
 No scheduler/provider/credential/paper effect is authorized by this design.
 
@@ -104,11 +108,12 @@ current-product multi-session source authority is not. The protected effect must
 not begin before:
 
 ```text
-134-F1 source implementation + canonical FULL
+134-F1 source implementation + canonical ROBINHOOD
+-> Architecture 144-C pure F1 evidence-admission successor
 -> 134-F protected preflight/authorization
 -> fresh unattended multi-session paper soak
 -> end-of-window reconciliation
--> Architecture-144 eligibility evaluation
+-> Architecture-144-C eligibility evaluation
 ```
 
 The five-session Architecture-144 v1 gate requires five consecutive published
@@ -128,7 +133,8 @@ promotion remain later explicit boundaries.
 
 ## Required continuation
 
-Continue automatically with Architecture 134-F1 source implementation on a new
-current-`develop` feature branch. Do not execute or provision the soak during
-source work. After terminal source/FULL acceptance, return to ChatGPT for the
-separate protected preflight.
+Continue automatically with Architecture 134-F1 source implementation on the
+existing clean F1 feature branch after fast-forwarding it to this corrected
+design checkpoint. Do not execute or provision the soak during source work.
+After terminal source/ROBINHOOD acceptance, return to ChatGPT for Architecture
+144-C; protected preflight comes only after 144-C acceptance.

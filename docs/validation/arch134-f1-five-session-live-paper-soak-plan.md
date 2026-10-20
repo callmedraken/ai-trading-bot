@@ -193,14 +193,17 @@ proofs for every target and rejects:
 - active/ambiguous child;
 - scheduler projection drift.
 
-The F1 controller must not import/call Architecture-144 builders as an automatic
-side effect. A separate pure test may feed complete synthetic final evidence to
-the accepted Architecture-144 verifier and show:
+The F1 controller must not import/call Architecture-144 builders or verifiers.
+The accepted Architecture-144 v1 evidence verifier is D1R9-specific and must
+reject truthful F1 provenance rather than be weakened.
 
-- five NO_SIGNAL/PAPER_EXECUTED qualifying sessions with >=1 PAPER_EXECUTED may
-  yield positive eligibility;
-- any RISK_REJECTED or halted child makes the five-session set nonqualifying;
-- operational F1 completion and research eligibility are distinct.
+F1 tests instead prove its own end-of-window evidence contains all information
+needed by a future pure successor: exact F1 source HEAD/TREE, parent-series
+identity/digest, ordered target sessions, ordered child identities/digests,
+D1R7/D1R8 proof bindings, terminal classifications and effect accounting.
+
+Architecture-144 composition is explicitly deferred to Architecture 144-C after
+F1 source acceptance, when the exact final F1 source identity can be pinned.
 
 ## Zero-effect implementation gate
 
@@ -238,22 +241,25 @@ Do not run raw repository-wide pytest while iterating.
 
 ## Terminal certification ownership
 
-The terminal F1 checkpoint requires canonical **FULL** because it introduces a
-new authority controller above the production-paper path.
+The terminal F1 checkpoint requires canonical **ROBINHOOD**, not FULL. F1 is a
+Robinhood/review-paper authority change and its new tests belong under the
+preserved Robinhood ownership surface. Whole-repository static checks remain part
+of every selected certification profile.
 
 Preferred publication route:
 
-- register the exact F1 checkpoint in `CI_CERTIFICATION_PROFILES` as `full`;
+- register the exact F1 checkpoint in `CI_CERTIFICATION_PROFILES` as `robinhood`;
 - finish all focused verification before commit;
 - create one atomic terminal commit;
 - ordinary-push once;
-- allow that single push-triggered CI to own canonical FULL;
+- allow that single push-triggered CI to own canonical ROBINHOOD;
 - poll to terminal;
-- do not run duplicate local FULL.
+- do not run duplicate local ROBINHOOD;
+- do not run FULL unless later source changes materially broaden beyond the
+  Robinhood-owned surface and ChatGPT explicitly selects FULL.
 
 If the mapping cannot safely be established before publication, follow the
-canonical unmapped fallback: exact clean unpublished terminal commit -> local
-canonical FULL -> one ordinary push only after green.
+canonical unmapped fallback using ROBINHOOD, not FULL.
 
 ## Acceptance
 
@@ -264,10 +270,25 @@ Source acceptance requires:
 - all F1 authority/effect ceilings fail closed;
 - historical D1R9/D1R7/D1R8 accepted sources unmodified;
 - zero operational effects;
-- terminal canonical FULL green;
+- terminal canonical ROBINHOOD green;
 - terminal CI green with no unchanged retry.
 
 Source acceptance authorizes only later protected F1 preflight/design of actual
 scheduler/publication effects. It does not authorize the soak itself.
 
 Real-money trading remains **NO-GO**.
+
+## Architecture 144-C sequencing
+
+Do not modify `src/trading_bot/experiments/` as part of F1 implementation merely
+to make current F1 evidence fit Architecture-144 v1. The v1 schema has explicit
+D1R9 provenance fields and the v1 verifier pins the historical D1R9 branch,
+HEAD and TREE.
+
+After F1 source is terminal-green and exact-source accepted, ChatGPT will freeze
+Architecture 144-C against that exact F1 source identity. 144-C will be a pure
+read-only successor and is expected to add a separate generic-authority/v2
+observation path while preserving v1 byte-for-byte.
+
+The protected F1 preflight remains blocked until both F1 source and 144-C source
+are accepted.

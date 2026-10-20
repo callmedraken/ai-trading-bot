@@ -19,13 +19,11 @@ remote product branch and exact executable HEAD/tree/CI before source or
 protected work. Startup documentation grants no executable-source or trading
 authority.
 
-`feature/project-history-storage-foundation` may remain a synchronized
-compatibility/history mirror, never a required first startup hop or independent
-development lineage. Synchronize it only by fast-forward to an exact accepted
-bounded-docs descendant after that descendant's applicable gate is terminal and
-accepted. Any divergence from accepted integration ancestry is a
-STOP/reconciliation condition; never manufacture convergence with merge, rebase,
-cherry-pick, or force-push.
+The former `feature/project-history-storage-foundation` compatibility/history
+mirror is retired. Its final synchronized tip was
+`19e5859fa83656cc50dbe69f89f3badd57841165`, identical to `develop`, with no
+unique commits or open PR dependency. Do not recreate it; historical mentions are
+retrieval context only.
 
 ## Recent compact closed records
 

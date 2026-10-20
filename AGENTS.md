@@ -44,8 +44,10 @@ exact executable HEAD/tree must always be verified separately.
 Read `AGENTS.md`, `docs/AI_DEVELOPMENT_WORKFLOW.md`, then the two bounded current
 documents from current remote `develop`, followed by relevant architecture/
 validation documents, before starting a new milestone or broad implementation
-plan. `feature/project-history-storage-foundation` may remain a synchronized
-compatibility/history mirror; it is not a required first startup hop.
+plan. The former `feature/project-history-storage-foundation` compatibility/history
+mirror is retired. Its final synchronized tip was
+`19e5859fa83656cc50dbe69f89f3badd57841165`, identical to `develop` at retirement.
+Do not recreate or use it as a startup/integration ref.
 `docs/history/INDEX.md` and immutable legacy snapshots are historical retrieval
 surfaces, not routine startup material. Historical detail belongs once in the
 relevant architecture, validation, or history record rather than being
@@ -279,7 +281,7 @@ standing rule; never present a protected effect as ordinary verification.
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
-- `develop` remains the primary/default startup integration reference. `feature/project-history-storage-foundation` may remain a synchronized compatibility/history mirror, never an independent development lineage or required startup hop. Any divergence from accepted integration ancestry is a STOP/reconciliation condition; never manufacture convergence with merge, rebase, cherry-pick, or force-push. Any separately authorized mirror synchronization must be fast-forward-only to an exact accepted integration descendant, with no mirror-only source or handoff commits. A pending feature checkpoint does not move either integration or mirror ref.
+- `develop` remains the sole primary/default startup integration reference. The former `feature/project-history-storage-foundation` compatibility/history mirror is retired at final synchronized tip `19e5859fa83656cc50dbe69f89f3badd57841165` and must not be recreated or used as an integration/startup ref. Historical references to that branch are retrieval context only. Pending feature checkpoints do not move `develop`.
 - After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority never implies merge/rebase/amend/force-push or PR mutation authority.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
 - Codex is primarily a bounded implementation agent for changes already scoped and discussed.

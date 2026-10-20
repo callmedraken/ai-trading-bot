@@ -22,19 +22,15 @@ Current-state documents must remain bounded. Cumulative chronological narratives
 must not grow back into them. Closed detail belongs once in the relevant
 architecture, validation, or history record.
 
-## Default startup reference and compatibility/history mirror
+## Default startup reference and retired compatibility/history mirror
 
-Current remote `develop` is the primary/default startup integration reference
-for bounded reconstruction. `feature/project-history-storage-foundation` may
-remain a synchronized compatibility/history mirror; it is not a required first
-startup hop.
-
-The mirror must never become an independent development lineage. After an
-accepted bounded-docs closeout and its terminal gate, the mirror may be
-fast-forwarded to that exact accepted descendant. Any divergence from accepted
-integration ancestry is a STOP/reconciliation condition; never manufacture
-convergence with merge, rebase, cherry-pick, or force-push. Pending feature
-checkpoints do not move either integration or mirror ref.
+Current remote `develop` is the sole primary/default startup integration
+reference for bounded reconstruction. The former
+`feature/project-history-storage-foundation` compatibility/history mirror is
+retired at final synchronized tip
+`19e5859fa83656cc50dbe69f89f3badd57841165`, which was identical to `develop`.
+Do not recreate or synchronize that branch. Historical references to it are
+retrieval context only.
 
 Startup documentation is not executable-source, provider, broker, or trading
 authority; independently verify the active product branch and exact executable

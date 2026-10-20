@@ -565,35 +565,29 @@ branch has already moved unexpectedly or a partial remote state exists, STOP,
 review that state explicitly, and reconcile it before any further update. Never
 continue by serially appending the remaining files.
 
-## Default startup integration reference and optional history mirror
+## Default startup integration reference and retired history mirror
 
-Current remote `develop` is the primary/default reference for bounded new-chat
-reconstruction. Read its standing rules and bounded status/handoff in the order
-above, then relevant architecture/validation documents. Executable-source
-authority always comes from the separately verified active product branch and
-exact executable HEAD/tree. Immutable legacy megafiles remain targeted-retrieval
-only.
+Current remote `develop` is the sole primary/default reference for bounded
+new-chat reconstruction. Read its standing rules and bounded status/handoff in
+the order above, then relevant architecture/validation documents. Executable-
+source authority always comes from the separately verified active product branch
+and exact executable HEAD/tree. Immutable legacy megafiles remain targeted-
+retrieval only.
 
-`feature/project-history-storage-foundation` may remain a synchronized
-compatibility/history mirror; it is not a required first startup hop. The
-post-history-merge fast-forward to `ec3572994558abed1c354766d65ec0a8aad14aa0`
-is complete, not a pending action.
+The former `feature/project-history-storage-foundation` compatibility/history
+mirror is retired. Before retirement it was fast-forwarded exactly to accepted
+integration commit:
 
-The mirror must never become an independent development lineage:
+```text
+HEAD  19e5859fa83656cc50dbe69f89f3badd57841165
+TREE  419262d709beabdd969efa1dc7a78403af5eedcd
+```
 
-1. close accepted checkpoint documentation on its reviewed product/integration
-   lineage, with the applicable gate terminal and accepted;
-2. integrate only under separate repository-control authority; a pending feature
-   checkpoint does not move `develop` or the mirror;
-3. any separately authorized mirror synchronization must be fast-forward-only
-   to an exact accepted integration descendant, without mirror-only commits;
-4. any divergence from accepted integration ancestry is a STOP/reconciliation
-   condition; never manufacture convergence with merge, rebase, cherry-pick, or
-   force-push.
-
-Mirror maintenance does not replace automatic next-step continuation after
-checkpoint acceptance or create a second implementation state, cleanup commit,
-or planned push-triggered CI attempt for the same logical checkpoint.
+That tip was byte-identical to `develop`, had zero unique commits and no open
+pull request dependency. The remote branch is deleted as part of the retirement
+checkpoint and must not be recreated, synchronized, or treated as a second
+integration lineage. Historical documents may name the former branch only as
+historical context.
 
 ## ChatGPT-direct bounded-commit local catch-up
 

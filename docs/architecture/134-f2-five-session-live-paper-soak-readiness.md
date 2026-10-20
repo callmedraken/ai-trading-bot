@@ -1,6 +1,6 @@
 # Architecture 134-F2 — five-session soak protected readiness preflight
 
-Status: **DESIGN FROZEN; source implementation is next.**
+Status: **SOURCE ACCEPTED at 2737f950beb4dd0ba75016ecb544576e1046f86f / 3445945966ad03c5fb399ae890fa48069a896641; canonical ROBINHOOD #657 passed. Real preflight remains unrun.**
 
 Architecture 134-F2 creates the missing read-only readiness boundary between the
 accepted Architecture 134-F1 source and any protected five-session authorization.

@@ -3,8 +3,8 @@
 ## Current mode
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
-ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED.
-134-F PROTECTED PREFLIGHT/READINESS REVIEW IS NEXT; NO OPERATIONAL EFFECT IS AUTHORIZED.**
+ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED; ARCHITECTURE 134-F2 SOURCE ACCEPTED.
+REAL F2 PREFLIGHT, F1 AUTHORIZATION, MERGE AND SOAK REMAIN STOPPED.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`.
@@ -78,58 +78,58 @@ research_strategy_paper_evidence_verification.py
 915bdd84bee3ad0b57efcafb0a78da01fce94e66
 ```
 
-## Architecture 134-F2 design freeze
-
-The read-only review established that the accepted F1 checkpoint has no
-registered preflight and that no complete F1 readiness command currently exists.
-
-Canonical F2 design:
-
-- `docs/architecture/134-f2-five-session-live-paper-soak-readiness.md`;
-- `docs/validation/arch134-f2-five-session-live-paper-soak-readiness.md`.
-
-F2 is source-only implementation of a registered read-only readiness callback.
+## Accepted Architecture 134-F2
 
 ```text
-branch
-feature/robinhood-production-paper-134f2-five-session-soak-readiness
-
-worktree
-F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness
-
-checkpoint
-arch134-f2-five-session-soak-readiness
-
-preflight
-implemented read-only callback
-
-execute
-None
-
-CI profile
-robinhood
+branch feature/robinhood-production-paper-134f2-five-session-soak-readiness
+base   9310eec609fcd273d9e248c4e897fe7e5828f953
+HEAD   2737f950beb4dd0ba75016ecb544576e1046f86f
+TREE   3445945966ad03c5fb399ae890fa48069a896641
 ```
 
-READY requires frozen F1/D1R7/D1R8 source admission, accepted predecessor
-evidence, read-only runtime compatibility, untouched F1 authority namespace,
-scheduler ABSENT, five-session preview and final readmission. Credentials,
-providers and write-readiness remain NOT_CHECKED.
+Initial source `dd6a822d20b3b42a6c61eb5241fc6d5c6045521e` preserved canonical
+ROBINHOOD #656 / 39498692559 failure evidence: 104 modules, 10,662 cases,
+10,652 passed, six skipped, four failed, zero errors, wall 282.215 s.
 
-## Immediate next milestone - Architecture 134-F2 source implementation
+Separate bounded C1 `2737f950...` did not change the F2 runtime implementation
+blob. It corrected shared-runner pin/historical expectations and added the
+frozen-predecessor AST proof.
 
-Owner/model: **Codex / Sol High**.
+Final canonical ROBINHOOD #657 / 39501375087 / attempt 1 passed:
 
-Implement only the frozen F2 read-only preflight boundary and its focused
-fake/static tests plus required runner/profile/current-inventory/pin metadata.
-Do not modify the seven frozen F1 operational blobs.
+```text
+104 modules
+10,663 cases
+10,657 passed
+6 skipped
+0 failed
+0 errors
+203.470 s wall
+```
 
-The source implementation must not run the real F2 preflight, create/run a task,
-reserve a parent/child/claim/lock, read credentials, call providers, invoke
-D1R7/D1R8, probe runtime writes, mutate paper/session state, or begin the soak.
+All seven frozen F1 blobs remain exact. F1 remains
+`preflight=None/execute=None`. F2 is
+`preflight=_arch134_f2_preflight/execute=None`.
 
-Use focused tests and `.\ops.ps1 verify arch134-f2-five-session-soak-readiness`,
-then one exact-file atomic commit/push. The one push-triggered CI owns canonical
-ROBINHOOD; no duplicate local ROBINHOOD/FULL.
+The F2 callback admits only read-only observations: exact source/worktree state,
+bounded predecessor evidence, read-only runtime compatibility, untouched F1
+namespace, scheduler `ABSENT`, preview targets and final readmission. Credential,
+provider and write-readiness remain `NOT_CHECKED`; all effect counters are
+required zero.
+
+## Immediate next milestone - F2 protected preflight boundary review
+
+Owner: **ChatGPT**.
+
+Source review is complete. Do not run the host preflight merely because source is
+accepted. First preserve the exact accepted F2 worktree/branch/HEAD/TREE and
+review the operator command/evidence path against the registered runner boundary.
+
+The workflow audit also confirms recent CI amplification was avoidable: mutable
+current-state docs must not force Python pin refreshes, immediately known
+acceptance-closeout + next-design docs should be batched, and shared runner
+dispatch changes require a pre-push AST/pin consumer audit. These rules are now
+recorded in `docs/AI_DEVELOPMENT_WORKFLOW.md`.
 
 ## Protected boundary after 144-C
 
@@ -145,12 +145,14 @@ Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-Implement Architecture 134-F2 from the frozen design. After terminal CI, return
-the exact feature HEAD/TREE, changed paths, focused verification and canonical
-ROBINHOOD evidence for ChatGPT exact-source review.
+Stop before the real F2 preflight, F1 authorization, task/provider/credential/
+paper effects, merge or soak.
 
-Only after F2 source acceptance may the registered read-only preflight be run.
-A preflight PASS still does not authorize the F1 five-session soak.
+The next turn may review and produce the exact **read-only F2 preflight** command
+and its evidence/STOP contract. Executing that command is a separate boundary.
+A preflight PASS still grants no F1 authorization.
 
-Do not retry the consumed D1R9 authority and do not begin the real soak.
+Preserve #656 failed evidence and #657 canonical ROBINHOOD success. Do not rerun
+either unchanged source.
+
 Real-money trading remains **NO-GO**.

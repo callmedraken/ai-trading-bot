@@ -687,6 +687,42 @@ When a certification result must be recorded after source acceptance, prefer
 batching the status/handoff/workflow documentation into the single planned
 post-certification docs closeout rather than creating multiple docs-only pushes.
 
+#### 2aa. CI-efficiency guardrails for mutable current docs and shared runner dispatch
+
+The two bounded current-state files, `docs/PROJECT_STATUS.md` and
+`docs/AI_TRADING_BOT_HANDOFF.md`, are intentionally mutable coordination
+surfaces. Do not introduce or refresh executable checkpoint authority solely to
+pin their exact current blob hashes. In particular, an ordinary acceptance or
+post-certification status/handoff closeout must not require a Python/test edit
+merely to keep mutable current-doc blob pins synchronized. If legacy authority
+maps still couple those current docs to executable pins, preserve the already
+accepted executable source and remove/replace that coupling only in the next
+already-required runner-touch source checkpoint unless it blocks a safety gate.
+Do not create a standalone broad/canonical certification cycle solely to refresh
+mutable current-doc hashes.
+
+A closeout that changes only current/narrative documentation must remain under
+`docs/**` and use the reviewed docs-only CI classifier. If a proposed
+"docs-only" closeout would require `scripts/checkpoint_runner.py`, tests or
+other executable-source edits only because a current-doc hash changed, STOP and
+classify that as checkpoint-authority design debt rather than silently turning
+the closeout into a broad source CI run.
+
+When ChatGPT accepts a checkpoint and, in the same review turn, also fully
+determines the immediately following design-only milestone before any branch ref
+has advanced, compose the acceptance closeout plus that next architecture/
+validation freeze into one planned docs-only atomic publication. Do not first
+publish a status/handoff closeout and then immediately publish a second design
+commit that could have been composed against the same parent.
+
+Any change to shared runner dispatch or common checkpoint functions (including
+`_checkpoint_specs`, `preflight_checkpoint`, `execute_checkpoint`, source
+routing, profile routing, or shared AST/pin registries) requires a pre-publication
+impact audit of every current AST/blob-pin consumer and every test that freezes
+the changed function/registry. Add those affected tests to focused verification
+before the first push. Canonical ROBINHOOD/FULL is an admission gate, not the
+mechanism for discovering predictable stale shared-runner pins.
+
 #### 2b. Behavior-change cleanup is part of the feature change
 
 **Behavioral replacement/removal non-regression:** When a feature, behavior,

@@ -1,6 +1,6 @@
 # Architecture 134-F2 — five-session soak protected readiness validation plan
 
-Status: **DESIGN FROZEN; source implementation is next.**
+Status: **SOURCE ACCEPTED; canonical ROBINHOOD #657 / 39501375087 passed. Real F2 preflight remains a separate unrun boundary.**
 
 This plan validates the read-only F2 readiness checkpoint defined by
 `docs/architecture/134-f2-five-session-live-paper-soak-readiness.md`.

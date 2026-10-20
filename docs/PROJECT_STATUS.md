@@ -2,7 +2,7 @@
 
 ## Current verified checkpoint
 
-Architecture 144-A+B / RCL-7, Architecture 134-F1, and Architecture 144-C are **SOURCE ACCEPTED**.
+Architecture 144-A+B / RCL-7, Architecture 134-F1, Architecture 144-C, and Architecture 134-F2 are **SOURCE ACCEPTED**.
 
 Accepted Architecture-144 v1 source:
 
@@ -146,64 +146,103 @@ establish long-run profitability.
 - `PAPER_CANDIDATE` materialization and human promotion remain later explicit
   architectures.
 
-## Architecture 134-F2 design state
+## Accepted Architecture 134-F2
 
-The read-only readiness review found no registered F1 preflight. The accepted F1
-checkpoint intentionally remains `preflight=None`, `execute=None`.
+Architecture 134-F2 is **SOURCE ACCEPTED** on its isolated feature branch.
 
-Architecture 134-F2 is now **DESIGN FROZEN** in:
+```text
+branch  feature/robinhood-production-paper-134f2-five-session-soak-readiness
+base    9310eec609fcd273d9e248c4e897fe7e5828f953
+HEAD    2737f950beb4dd0ba75016ecb544576e1046f86f
+TREE    3445945966ad03c5fb399ae890fa48069a896641
+```
 
-- `docs/architecture/134-f2-five-session-live-paper-soak-readiness.md`;
-- `docs/validation/arch134-f2-five-session-live-paper-soak-readiness.md`.
+The accepted source consists of two commits above the frozen design base:
 
-F2 adds only the missing registered **read-only** readiness boundary. It leaves
-accepted F1 operational source/provenance unchanged and must perform zero
-credential/provider/task/runtime-write/paper/broker/live effects.
+```text
+dd6a822d20b3b42a6c61eb5241fc6d5c6045521e
+feat: add read-only five-session soak readiness preflight
 
-READY requires exact frozen F1/D1R7/D1R8 source admission, accepted predecessor
-evidence, read-only compatible production runtime, an untouched F1 durable
-namespace, scheduler `ABSENT`, five published-session preview targets and final
-readmission.
+2737f950beb4dd0ba75016ecb544576e1046f86f
+fix: align F2 preflight authority pins and historical assertions
+```
 
-Credential/provider readiness and rollback/write readiness are deliberately
-`NOT_CHECKED` by F2 rather than being hidden inside a read-only preflight.
+The initial publication's canonical ROBINHOOD #656 / 39498692559 / attempt 1 is
+preserved as a failed checkpoint attempt: 104 modules, 10,662 cases, 10,652
+passed, six skipped, four failed, zero errors, wall 282.215 s. Source-static and
+the active F2 checkpoint passed; the four failures were stale shared-runner
+pin/historical-expectation assertions.
+
+Bounded C1 changed no F2 runtime implementation. It updated only current docs,
+runner pin/coverage metadata, the F2 frozen-predecessor AST proof and one
+historical recovery expectation. The F2 implementation blob is identical across
+both commits:
+
+```text
+src/trading_bot/review_paper/five_session_soak_readiness.py
+6b9196a7812bf854ac55d443cbd3d34b979de2d8
+```
+
+C1's AST proof removes only the two F2-specific branches from
+`preflight_checkpoint` and requires the reconstructed non-F2 predecessor to
+hash exactly to the preserved historical pin.
+
+Canonical ROBINHOOD #657 / 39501375087 / attempt 1 passed on the exact final
+HEAD/TREE:
+
+```text
+modules 104
+cases   10,663
+passed  10,657
+skipped 6
+failed  0
+errors  0
+wall    203.470 s
+```
+
+Source-static, active-tests, canonical ROBINHOOD and the terminal source-gates
+aggregator all passed; `full-tests` was correctly skipped.
+
+All seven frozen F1 operational blobs remain exact. F1 remains
+`preflight=None`, `execute=None`. F2 is registered with the read-only
+`_arch134_f2_preflight`, `execute=None`, and CI profile `robinhood`.
+
+The real F2 preflight has **not** run. No F1 parent/child/claim/lock, scheduler
+mutation, credential/provider access, runtime write probe, D1R7/D1R8 operation,
+paper/session mutation, broker effect or soak effect occurred.
 
 ## Active work
 
-### Now — Architecture 134-F2 source implementation
+### Now — workflow CI-efficiency correction recorded; protected boundary remains stopped
 
-Owner/model: **Codex / Sol High**.
+The F2 exact-source review is complete. The next operational boundary is the
+separately reviewed **read-only** F2 host preflight, but it is not run as part of
+source acceptance or this documentation closeout.
 
-Expected branch:
+The workflow review identified avoidable CI amplification:
 
-`feature/robinhood-production-paper-134f2-five-session-soak-readiness`
+- mutable `PROJECT_STATUS` / `AI_TRADING_BOT_HANDOFF` closeouts must remain
+  true docs-only updates and must not force Python runner pin refreshes merely to
+  record current state;
+- when ChatGPT immediately knows the next design-only milestone before publishing
+  an acceptance closeout, batch the acceptance closeout and that design freeze
+  into one docs-only branch advance rather than two sequential CI-triggering
+  commits;
+- any shared `checkpoint_runner.py` dispatch/function change must audit all
+  current AST/pin consumers and include affected historical/current tests in
+  focused verification before the first publication.
 
-Expected worktree:
-
-`F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness`
-
-Checkpoint:
-
-`arch134-f2-five-session-soak-readiness`
-
-Required registration:
-
-```text
-preflight  <read-only F2 callback>
-execute    None
-CI profile robinhood
-```
-
-Implement the frozen architecture/validation contract with focused fake/static
-coverage only. Do not run the real host preflight during source implementation.
-One atomic feature publication owns terminal active checks plus canonical
-ROBINHOOD.
+These rules are recorded in `docs/AI_DEVELOPMENT_WORKFLOW.md`. Existing
+legacy mutable-doc pin coupling should be removed only in the next already-needed
+runner-touch source checkpoint rather than creating a standalone certification
+cycle solely for cleanup.
 
 ### Next
 
-ChatGPT exact-source review of terminal F2 source/CI. If accepted, synchronize the
-exact F2 worktree and run the separately authorized **read-only** registered
-preflight. Review its evidence before considering any F1 authorization.
+Review the exact F2 preflight operator boundary from the accepted feature source.
+Do not execute it in this closeout. If/when separately authorized, synchronize
+the exact accepted F2 worktree first, then run only the registered read-only
+preflight and return its preserved evidence for ChatGPT review.
 
 ### Later
 

@@ -136,7 +136,8 @@ establish long-run profitability.
 
 ### Now
 
-Implement Architecture 144-C from the frozen design.
+Architecture 144-C is implemented on the bounded feature branch for exact-source
+review. Source acceptance remains pending terminal CI and ChatGPT review.
 
 Expected branch:
 
@@ -153,9 +154,18 @@ Use focused tests and the normal source gate. Do not preselect canonical FULL or
 ROBINHOOD. ChatGPT decides additional certification only after exact-source
 review.
 
-### Then
+### Next — ChatGPT exact-source acceptance review
 
-ChatGPT exact GitHub source/CI review and acceptance.
+Review the published feature HEAD/TREE, complete diff and terminal Checkpoint
+Source Gates evidence. Confirm independent F1/D1R7/D1R8 replay, complete 142/143
+composition, exact V2 identity/transport, zero operational capability, unchanged
+v1 blobs, and source-only registration. Select additional certification only
+when materially required by that final reviewed surface. Normal broad source
+shards do not constitute canonical FULL.
+
+The two new experiment modules enter supported inventory automatically. Timing,
+fixture and current-test pin updates are metadata only; required 122/49 baselines
+and accepted split source-gate topology remain unchanged.
 
 ### Then
 

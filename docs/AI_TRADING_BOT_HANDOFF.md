@@ -3,7 +3,7 @@
 ## Current mode
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
-ARCHITECTURE 144-C DESIGN FROZEN; 144-C SOURCE IMPLEMENTATION IS NEXT.
+ARCHITECTURE 144-C IMPLEMENTATION CANDIDATE; EXACT-SOURCE REVIEW PENDING.
 PROTECTED 134-F PREFLIGHT AND THE REAL SOAK REMAIN CLOSED.**
 
 Standing workflow authority remains `AGENTS.md` and
@@ -71,9 +71,10 @@ Key rules:
   observation;
 - no filesystem evidence acquisition or operational effect is permitted.
 
-## Immediate next milestone — Architecture 144-C source implementation
+## Immediate next milestone - Architecture 144-C exact-source review
 
-Owner/model: **Codex / Sol High**.
+Implementation owner/model: **Codex / Sol High**. Next owner: **ChatGPT** for
+exact-source acceptance and certification selection.
 
 Expected branch:
 
@@ -125,6 +126,11 @@ Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-Implement 144-C from the frozen design, obtain terminal source-gate evidence,
-then return the exact branch HEAD/TREE, changed-file set, focused verification
-results, and CI result for ChatGPT exact-source review.
+The implementation candidate adds the independent supplied-byte F1 V2 replay and
+positive builders, strict V2 artifacts, and a source-only registered checkpoint.
+Both frozen Architecture-144 v1 implementation blobs remain unchanged.
+
+Obtain terminal source-gate evidence and review the exact feature HEAD/TREE,
+complete diff, focused results and CI. ChatGPT owns source acceptance and any
+additional certification selection. Do not merge or begin protected preflight.
+No canonical ROBINHOOD/FULL mapping or local profile run is part of this checkpoint.

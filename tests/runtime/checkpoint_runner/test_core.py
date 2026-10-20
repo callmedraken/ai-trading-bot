@@ -205,6 +205,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-armed-paper-mvp",
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
+        "arch144-c-f1-paper-evidence-admission",
         "arch134-f1-five-session-soak",
         "arch134-d1r8-d1-session-execution-consumer",
         "arch134-d1r7-d1-session-authorization",
@@ -354,6 +355,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = (
                 "feature/robinhood-production-paper-alpaca-auth-qualification"
             )
+        if spec.name == "arch144-c-f1-paper-evidence-admission":
+            expected_branch = runner.ARCH144C_BRANCH
         if spec.name == "arch134-f1-five-session-soak":
             expected_branch = runner.ARCH134_F1_BRANCH
         if spec.name == "arch134-d1r8-d1-session-execution-consumer":
@@ -885,6 +888,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_D1R7_NAME,
             runner.ARCH134_D1R8_NAME,
             runner.ARCH134_F1_NAME,
+            runner.ARCH144C_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
@@ -1339,6 +1343,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                "arch144-c-f1-paper-evidence-admission",
                 "arch134-f1-five-session-soak",
                 "arch134-d1r8-d1-session-execution-consumer",
                 "arch134-d1r7-d1-session-authorization",
@@ -1391,3 +1396,48 @@ def test_source_junit_evidence_is_external_and_additive(tmp_path):
     assert f"--junitxml={tmp_path / 'pytest-results.xml'}" in step.argv
     assert "--durations=100" in step.argv
     assert "--durations-min=0.0" in step.argv
+
+
+def test_arch144c_source_only_route_authority_and_frozen_v1():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH144C_NAME]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == runner.ARCH144C_BRANCH
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), spec.remote_branch, "push"
+        )
+        == spec.name
+    )
+    assert runner.resolve_ci_certification_profile(spec.name) is None
+    assert runner._batch_workflow_is_reviewed(
+        (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    )
+    assert runner._arch144c_authority_check(root) == ()
+    for relative, pin in {
+        (
+            "src/trading_bot/experiments/"
+            "research_strategy_paper_candidate_eligibility.py"
+        ): ("fd6b0ad650fb3fb97f587deb7cffc7286e685813"),
+        (
+            "src/trading_bot/experiments/"
+            "research_strategy_paper_evidence_verification.py"
+        ): ("915bdd84bee3ad0b57efcafb0a78da01fce94e66"),
+    }.items():
+        assert runner._git_blob_sha1(root / relative) == pin
+
+
+def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
+    path = "tests/runtime/checkpoint_runner/test_core.py"
+    before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
+    after = runner.ARCH144C_TEST_PIN_OVERRIDES[path]
+    assert runner._arch144c_current_inventory_test_pin(path, before) == after
+    with pytest.raises(ValueError):
+        runner._arch144c_current_inventory_test_pin(path, "a" * 40)
+    pins = dict(runner.ARCH144C_TEST_PIN_OVERRIDES)
+    pins[path] = "a" * 40
+    monkeypatch.setattr(runner, "ARCH144C_TEST_PIN_OVERRIDES", pins)
+    with pytest.raises(ValueError):
+        runner._arch144c_current_inventory_test_pin(path, before)
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch144c_authority_check(root)

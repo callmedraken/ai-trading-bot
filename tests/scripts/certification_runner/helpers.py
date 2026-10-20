@@ -238,6 +238,8 @@ _CURRENT_FULL_ADDITIONS = (
     "tests/experiments/test_research_strategy_backtest.py",
     "tests/experiments/test_research_strategy_definition.py",
     "tests/experiments/test_research_strategy_paper_candidate_eligibility.py",
+    "tests/experiments/test_research_strategy_paper_candidate_eligibility_v2.py",
+    "tests/experiments/test_research_strategy_f1_paper_evidence_verification.py",
     "tests/experiments/test_research_strategy_production_compatibility.py",
     "tests/experiments/test_research_strategy_walk_forward.py",
     "tests/review_paper/test_alpaca_authentication_qualification.py",

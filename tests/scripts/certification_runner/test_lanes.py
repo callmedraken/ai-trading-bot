@@ -373,3 +373,20 @@ def test_r3i_preserves_all_arch139_through_143_predecessor_constants_and_ci_rout
         is None
     )
     assert checkpoint.resolve_ci_certification_profile(None) is None
+
+
+def test_f1_parent_outlier_placement_preserves_r3h_and_two_lane_coverage():
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    assert runner.ROBINHOOD_F1_LANE_PINS == {
+        "tests/review_paper/test_five_session_soak.py": 0
+    }
+    assert set(runner.ROBINHOOD_F1_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
+    lanes = runner.build_lanes(root, selected, "robinhood")
+    assert tuple(lanes) == ("robinhood-1", "robinhood-2")
+    runner.validate_partitions(selected, tuple(lanes.values()))
+    for module, index in {
+        **runner.ROBINHOOD_LANE_PINS,
+        **runner.ROBINHOOD_F1_LANE_PINS,
+    }.items():
+        assert module in tuple(lanes.values())[index]

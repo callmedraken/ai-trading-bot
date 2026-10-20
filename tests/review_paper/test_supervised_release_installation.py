@@ -880,7 +880,7 @@ def test_checkpoint_source_only_registration_pins_workflow_and_classifier():
     spec = runner._checkpoint_specs()[NAME]
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     assert (
-        NAME in runner.ACTIVE_CI_CHECKPOINTS and len(runner.ACTIVE_CI_CHECKPOINTS) == 67
+        NAME in runner.ACTIVE_CI_CHECKPOINTS and len(runner.ACTIVE_CI_CHECKPOINTS) == 68
     )
     assert spec.remote_branch == "feature/robinhood-supervised-release-installation"
     assert spec.preflight is spec.execute is spec.remote_head_env is None

@@ -1051,7 +1051,8 @@ def test_d1r6_resolution_runs_once_before_d1r7_successor():
     resolved = runner._arch134_d1r6_test_pin(path, predecessor)
     with pytest.raises(ValueError, match="predecessor resolution drift"):
         runner._arch134_d1r6_test_pin(path, resolved)
-    assert runner._arch134_d1r7_test_pin(path, resolved) == runner._git_blob_sha1(
-        ROOT / path
+    current = runner._arch134_f1_current_inventory_test_pin(
+        path, runner._arch134_d1r7_test_pin(path, resolved)
     )
+    assert current == runner._git_blob_sha1(ROOT / path)
     assert runner._arch134_d1r6_authority_check(ROOT) == ()

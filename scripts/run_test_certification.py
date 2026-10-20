@@ -38,6 +38,11 @@ ROBINHOOD_LANE_PINS = {
     "tests/review_paper/test_arch133_scheduler_installation.py": 1,
 }
 
+# F1 C1: canonical #648 measured 199.971/320.334-second lanes. Move only
+# the new parent outlier (42.599 summed testcase seconds) to lane 0; retain
+# every accepted R3H placement, the two-lane topology and the 300-second gate.
+ROBINHOOD_F1_LANE_PINS = {"tests/review_paper/test_five_session_soak.py": 0}
+
 # F1 timing-aware FULL inventory metadata; F1 certifies ROBINHOOD.
 # Existing timings retain
 # the accepted predecessor measurements; the new pure eligibility test uses its
@@ -805,7 +810,8 @@ def build_lanes(
         }
     elif profile == "robinhood":
         first, second = apply_lane_pins(
-            balance_broad(root, inventory), ROBINHOOD_LANE_PINS
+            apply_lane_pins(balance_broad(root, inventory), ROBINHOOD_LANE_PINS),
+            ROBINHOOD_F1_LANE_PINS,
         )
         lanes = {"robinhood-1": first, "robinhood-2": second}
     else:

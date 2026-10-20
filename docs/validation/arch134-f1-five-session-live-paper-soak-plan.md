@@ -313,3 +313,23 @@ local FULL or duplicate local ROBINHOOD is part of F1 implementation.
 The atomic source publication is not source acceptance. Review the exact final
 HEAD/TREE and push-triggered CI evidence, then stop for ChatGPT. Do not implement
 144-C, provision a task, run protected preflight, or begin the soak in this gate.
+
+## C1 corrective source gate after canonical #648
+
+Initial source `24a7397dff418c47a257e8d0ceec97088dc7caf0` passed source-static
+and all 331 active cases. Canonical ROBINHOOD #648 / 39399741708 / attempt 1
+failed eight stale test-only registry/successor expectations and the hygiene
+gate: 10,421 cases; 10,407 passed; six skipped; eight failed; zero errors;
+wall 321.863 seconds. Evidence remains preserved; the failed attempt is never
+rerun or rewritten.
+
+The bounded C1 corrects the six current registry adjacency/count assertions and
+two predecessor-resolution expectations, extending only the final test-pin
+overlay. Production F1 and Architecture-144 source remain unchanged.
+
+The read-only hygiene audit found 199.971/320.334-second lanes with the new F1
+parent tests on the slower lane (42.599 summed testcase seconds). C1 adds one
+F1-only deterministic placement pin for that module to lane 0, after the
+unchanged R3H overlay. Coverage, the 103-module inventory, two nonempty lanes,
+protected boundaries and 300-second ceiling are preserved. The replacement
+push owns a fresh canonical ROBINHOOD attempt; no local profile or FULL runs.

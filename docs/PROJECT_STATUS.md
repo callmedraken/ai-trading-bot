@@ -52,6 +52,54 @@ The initial #648 failure remains preserved. Its eight failures were stale
 test-only registry/successor expectations; C1 changed no F1 production module.
 Architecture-144 v1 remained byte-for-byte unchanged.
 
+## Architecture 134-F2 operational PASS and active F1 soak
+
+The separately reviewed real Architecture 134-F2 read-only preflight ran once on
+2026-10-20 against exact source
+`2737f950beb4dd0ba75016ecb544576e1046f86f / 3445945966ad03c5fb399ae890fa48069a896641`
+and returned `PASS / READY_FOR_SEPARATE_F1_AUTHORIZATION`.
+
+Preserved evidence:
+
+```text
+F:\AI\temp\ai-trading-bot-checkpoints\arch134-f2-five-session-soak-readiness\preflight-20261020T220328.998747Z\report.json
+SHA256 973ce41d5ec09e0b603aedfbd2001d3a50bc1117d93002291b46e0006fdd1a5d
+```
+
+The report re-admitted exact F1/D1R7/D1R8 source, accepted predecessor evidence,
+`PRESENT_COMPATIBLE` runtime, an empty F1 parent/child/claim/lock namespace and
+scheduler `ABSENT`. Credentials, provider readiness and runtime write-readiness
+remained deliberately `NOT_CHECKED`. All 21 protected-effect counters were
+zero. The frozen target window is:
+
+```text
+2026-10-21
+2026-10-22
+2026-10-23
+2026-10-26
+2026-10-27
+```
+
+The separately reviewed interactive F1 authorization then succeeded against exact
+accepted F1 source
+`b59ad3b44540a55a30f612d5c4e3e38e26a95b02 / e8a94e3512d7950f2fbc9c4d102a58b63e03244f`
+and returned `AUTHORIZED_FIVE_SESSION_TASK_STARTED`. The single F1 parent
+authority is therefore consumed and active. Automatic retry/re-authorization is
+not permitted.
+
+During this F1 soak only, a Windows reboot followed by current-user logon may
+automatically invoke the fixed scheduler action with `--resume`. Resume must
+first reconcile the durable parent/child/source/runtime state and cannot increase
+the frozen effect ceilings. If a target session is missed, or an effect intent is
+ambiguous, the series halts rather than backfilling or retrying.
+
+This F1 restart behavior is test-specific and is **not** the desired final
+production operator lifecycle. The future production requirement is frozen in
+`docs/architecture/134-production-operator-lifecycle-reboot-stop.md`: an
+intentional OS shutdown/restart means the bot is stopped, boot/logon must not
+automatically resume trading, and a fresh explicit operator start is required
+after reboot.
+
 Accepted executable integration state:
 
 ```text
@@ -139,8 +187,9 @@ establish long-run profitability.
 
 - Real-money trading remains **NO-GO**.
 - The Monday D1R9 authority remains consumed and is not retried.
-- 134-F protected preflight/readiness is now the next review boundary, but no protected command or operational effect is authorized yet.
-- The real five-session soak is closed.
+- The F2 read-only preflight has passed and is consumed as readiness evidence.
+- The F1 five-session soak is now authorized and active; the parent slot is consumed.
+- Do not re-authorize, retry, delete/replace F1 artifacts, or recreate the task to manufacture another attempt.
 - No source/CI/FULL/ROBINHOOD result grants scheduler/provider/credential/paper,
   broker, promotion, D2, or live authority.
 - `PAPER_CANDIDATE` materialization and human promotion remain later explicit
@@ -213,43 +262,41 @@ paper/session mutation, broker effect or soak effect occurred.
 
 ## Active work
 
-### Now — workflow CI-efficiency correction recorded; protected boundary remains stopped
+### Now — Architecture 134-F1 five-session soak active
 
-The F2 exact-source review is complete. The next operational boundary is the
-separately reviewed **read-only** F2 host preflight, but it is not run as part of
-source acceptance or this documentation closeout.
+The current protected objective is to let the accepted F1 authority progress
+through its five frozen published sessions while preserving the no-retry,
+no-backfill and exact durable-reconciliation contract.
 
-The workflow review identified avoidable CI amplification:
+A PC reboot is allowed during F1. After the same user logs in, the fixed logon
+trigger may automatically start `run_arch134_f1.py --resume`. That automatic
+resume exists to test restart/idempotency behavior across the soak and must not
+be generalized into the future production lifecycle.
 
-- mutable `PROJECT_STATUS` / `AI_TRADING_BOT_HANDOFF` closeouts must remain
-  true docs-only updates and must not force Python runner pin refreshes merely to
-  record current state;
-- when ChatGPT immediately knows the next design-only milestone before publishing
-  an acceptance closeout, batch the acceptance closeout and that design freeze
-  into one docs-only branch advance rather than two sequential CI-triggering
-  commits;
-- any shared `checkpoint_runner.py` dispatch/function change must audit all
-  current AST/pin consumers and include affected historical/current tests in
-  focused verification before the first publication.
-
-These rules are recorded in `docs/AI_DEVELOPMENT_WORKFLOW.md`. Existing
-legacy mutable-doc pin coupling should be removed only in the next already-needed
-runner-touch source checkpoint rather than creating a standalone certification
-cycle solely for cleanup.
+Owner: **runtime / accepted F1 source**. ChatGPT owns read-only review and
+classification of preserved evidence. No new source/CI checkpoint is required
+merely because the supervisor remains active.
 
 ### Next
 
-Review the exact F2 preflight operator boundary from the accepted feature source.
-Do not execute it in this closeout. If/when separately authorized, synchronize
-the exact accepted F2 worktree first, then run only the registered read-only
-preflight and return its preserved evidence for ChatGPT review.
+Use only read-only status/reconciliation observations while the soak is active.
+Do not run F1 authorization again. A reboot, process restart, or scheduler restart
+does not grant new authority; it must reconcile the already-consumed durable
+parent state. A missed session halts the series and is never replaced.
 
-### Later
+After the five-session parent reaches a terminal state, perform independent
+end-of-window reconciliation and then the pure Architecture-144-C V2 eligibility
+evaluation. Five sessions remain an operational/eligibility threshold, not a
+profitability conclusion.
 
-Only after a reviewed F2 preflight PASS may an exact interactive F1 authorization
-be separately proposed. That future command is the first authority-consuming
-boundary and remains separately protected. The real five-session soak and all
-provider/paper effects remain closed now.
+### Future production lifecycle
+
+Before the bot is treated as an operator-facing production deployment, implement
+and source-review the reboot/stop requirement frozen in
+`docs/architecture/134-production-operator-lifecycle-reboot-stop.md`.
+Shutdown/reboot must leave the bot stopped after boot; resuming trading requires
+a new explicit operator start after state reconciliation. F1's automatic
+logon-resume mechanism is a soak-only exception.
 
 ## History
 

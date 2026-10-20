@@ -4,7 +4,8 @@
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
 ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED; ARCHITECTURE 134-F2 SOURCE ACCEPTED.
-REAL F2 PREFLIGHT, F1 AUTHORIZATION, MERGE AND SOAK REMAIN STOPPED.**
+F2 READ-ONLY PREFLIGHT PASSED; F1 FIVE-SESSION SOAK IS AUTHORIZED AND ACTIVE.
+REAL-MONEY TRADING REMAINS NO-GO.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`.
@@ -117,19 +118,49 @@ namespace, scheduler `ABSENT`, preview targets and final readmission. Credential
 provider and write-readiness remain `NOT_CHECKED`; all effect counters are
 required zero.
 
-## Immediate next milestone - F2 protected preflight boundary review
+## Active operational state — Architecture 134-F1 soak
 
-Owner: **ChatGPT**.
+The real F2 read-only preflight passed once on the accepted F2 source:
 
-Source review is complete. Do not run the host preflight merely because source is
-accepted. First preserve the exact accepted F2 worktree/branch/HEAD/TREE and
-review the operator command/evidence path against the registered runner boundary.
+```text
+HEAD     2737f950beb4dd0ba75016ecb544576e1046f86f
+TREE     3445945966ad03c5fb399ae890fa48069a896641
+result   READY_FOR_SEPARATE_F1_AUTHORIZATION
+evidence F:\AI\temp\ai-trading-bot-checkpoints\arch134-f2-five-session-soak-readiness\preflight-20261020T220328.998747Z\report.json
+sha256   973ce41d5ec09e0b603aedfbd2001d3a50bc1117d93002291b46e0006fdd1a5d
+```
 
-The workflow audit also confirms recent CI amplification was avoidable: mutable
-current-state docs must not force Python pin refreshes, immediately known
-acceptance-closeout + next-design docs should be batched, and shared runner
-dispatch changes require a pre-push AST/pin consumer audit. These rules are now
-recorded in `docs/AI_DEVELOPMENT_WORKFLOW.md`.
+It observed exact F1/D1R7/D1R8 source, accepted predecessors,
+`PRESENT_COMPATIBLE` runtime, scheduler `ABSENT`, no F1 namespace artifacts,
+and zero for all 21 protected-effect counters.
+
+The subsequent exact interactive F1 authorization succeeded and printed
+`AUTHORIZED_FIVE_SESSION_TASK_STARTED`. The one parent authority is consumed.
+The frozen target sessions are 2026-10-21, 2026-10-22, 2026-10-23, 2026-10-26,
+and 2026-10-27. Do not authorize a second F1 series or manufacture retries.
+
+### Restart behavior during F1
+
+F1 deliberately uses a current-user logon-triggered Task Scheduler action that
+runs the fixed launcher with `--resume`. Therefore a reboot followed by login
+may automatically resume the active soak. Resume is not fresh authority: it must
+reconcile durable parent/child/source/runtime state before progression and it may
+not exceed the frozen effect ceilings. If the machine stays down long enough to
+miss a target session, the series halts with no catch-up/backfill.
+
+This is a soak/restart-reliability mechanism, not the target production UX.
+
+### Frozen future production operator requirement
+
+`docs/architecture/134-production-operator-lifecycle-reboot-stop.md` freezes
+the desired production lifecycle:
+
+- intentional OS shutdown/reboot means **stop the bot**;
+- Windows boot/logon must not automatically resume trading;
+- durable state is preserved and may be inspected/reconciled read-only after boot;
+- resuming trading requires a fresh explicit operator start after reboot;
+- the active F1 auto-resume behavior must not be copied into the final production
+  scheduler/launcher design.
 
 ## Protected boundary after 144-C
 
@@ -145,14 +176,17 @@ Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-Stop before the real F2 preflight, F1 authorization, task/provider/credential/
-paper effects, merge or soak.
+Keep the current F1 authority running under its accepted five-session contract.
+Do not re-authorize or retry the parent. Read-only status/reconciliation is the
+next safe operator action.
 
-The next turn may review and produce the exact **read-only F2 preflight** command
-and its evidence/STOP contract. Executing that command is a separate boundary.
-A preflight PASS still grants no F1 authorization.
+A reboot during F1 is permitted and may auto-resume after user logon. Treat that
+as deliberate soak-test behavior only. For future production, preserve the
+separate reboot=stop/manual-start requirement frozen in
+`docs/architecture/134-production-operator-lifecycle-reboot-stop.md`.
 
-Preserve #656 failed evidence and #657 canonical ROBINHOOD success. Do not rerun
-either unchanged source.
+After F1 reaches a terminal state, independently reconcile the full five-session
+evidence and then run the pure Architecture-144-C V2 eligibility evaluation.
+Longer paper observation remains required for profitability/stability assessment.
 
 Real-money trading remains **NO-GO**.

@@ -52,7 +52,7 @@ The initial #648 failure remains preserved. Its eight failures were stale
 test-only registry/successor expectations; C1 changed no F1 production module.
 Architecture-144 v1 remained byte-for-byte unchanged.
 
-Current integration state:
+Accepted executable integration state:
 
 ```text
 develop HEAD d4d007a5c4a7c6a5158b1fab6f82c082387783f3
@@ -146,38 +146,71 @@ establish long-run profitability.
 - `PAPER_CANDIDATE` materialization and human promotion remain later explicit
   architectures.
 
+## Architecture 134-F2 design state
+
+The read-only readiness review found no registered F1 preflight. The accepted F1
+checkpoint intentionally remains `preflight=None`, `execute=None`.
+
+Architecture 134-F2 is now **DESIGN FROZEN** in:
+
+- `docs/architecture/134-f2-five-session-live-paper-soak-readiness.md`;
+- `docs/validation/arch134-f2-five-session-live-paper-soak-readiness.md`.
+
+F2 adds only the missing registered **read-only** readiness boundary. It leaves
+accepted F1 operational source/provenance unchanged and must perform zero
+credential/provider/task/runtime-write/paper/broker/live effects.
+
+READY requires exact frozen F1/D1R7/D1R8 source admission, accepted predecessor
+evidence, read-only compatible production runtime, an untouched F1 durable
+namespace, scheduler `ABSENT`, five published-session preview targets and final
+readmission.
+
+Credential/provider readiness and rollback/write readiness are deliberately
+`NOT_CHECKED` by F2 rather than being hidden inside a read-only preflight.
+
 ## Active work
 
-### Now — 134-F protected preflight/readiness review
+### Now — Architecture 134-F2 source implementation
 
-Owner/model: **ChatGPT / GPT-5.6 Sol High**.
+Owner/model: **Codex / Sol High**.
 
-Review the accepted F1 operational source and frozen 134-F authority/validation
-contracts against the current integrated tree. The existing source checkpoint
-`arch134-f1-five-session-soak` intentionally has `preflight=None` and
-`execute=None`; do not invent protected authority from source acceptance.
+Expected branch:
 
-The review must determine the exact next protected boundary, including whether a
-separate checked-in preflight/readiness checkpoint is required before any host
-command can be allowed. Read-only inspection may establish expected worktree,
-runtime/source identity, task identity/state, durable parent/child evidence
-state, credential/provider prerequisites and STOP conditions. It must not create,
-run, update or delete a task, read credentials/providers, invoke D1R7/D1R8/F1
-effects, mutate paper state, or begin the soak.
+`feature/robinhood-production-paper-134f2-five-session-soak-readiness`
 
-### Then
+Expected worktree:
 
-If the read-only readiness review shows a missing source/preflight surface,
-freeze and implement that bounded source-only checkpoint first. If an already
-reviewed pure preflight surface exists and all prerequisites can be proven,
-provide its exact guarded command separately. Passing a preflight still does not
-authorize the real soak.
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness`
+
+Checkpoint:
+
+`arch134-f2-five-session-soak-readiness`
+
+Required registration:
+
+```text
+preflight  <read-only F2 callback>
+execute    None
+CI profile robinhood
+```
+
+Implement the frozen architecture/validation contract with focused fake/static
+coverage only. Do not run the real host preflight during source implementation.
+One atomic feature publication owns terminal active checks plus canonical
+ROBINHOOD.
+
+### Next
+
+ChatGPT exact-source review of terminal F2 source/CI. If accepted, synchronize the
+exact F2 worktree and run the separately authorized **read-only** registered
+preflight. Review its evidence before considering any F1 authorization.
 
 ### Later
 
-Run at most the frozen five-session paper soak only after separate protected
-authorization, reconcile the complete window, evaluate supplied evidence through
-144-C, and continue longer paper observation before any promotion decision.
+Only after a reviewed F2 preflight PASS may an exact interactive F1 authorization
+be separately proposed. That future command is the first authority-consuming
+boundary and remains separately protected. The real five-session soak and all
+provider/paper effects remain closed now.
 
 ## History
 

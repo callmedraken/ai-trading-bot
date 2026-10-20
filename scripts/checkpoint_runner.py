@@ -14132,13 +14132,13 @@ ARCH144C_SOURCE_PINS: Final = {
         "6afcdfe42ac1691bc477efcfb4764c227a0c1bc2"
     ),
     "docs/architecture/144-c-f1-paper-evidence-admission.md": (
-        "a6512ac8f35729e8d7a7af31b4e1beebd25db364"
+        "29f7c7b11f7f026723022b4d71361f26dcdc6dd5"
     ),
     "docs/validation/arch144-c-f1-paper-evidence-admission-plan.md": (
-        "bada32f6dddeea2ab82805255091a0184c3cd0b6"
+        "9488dd302f9012af4e4fba291bb771711934ed56"
     ),
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("88f43464e0d89d6ee26c7c9b6f45426d24820aba"),
-    "docs/PROJECT_STATUS.md": ("4158af1c6c230b3fb705500d8cfa779512562451"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("fb33dc10b30e1fbba836002c2271f386885f17b2"),
+    "docs/PROJECT_STATUS.md": ("7cd434843b0942e3d51caf3a9791582b0aac7c4a"),
     "scripts/run_test_certification.py": ("1a1362efb4bf8694461e51cae9ad7d71b4797cbe"),
 }
 ARCH144C_PREDECESSOR_TEST_PINS: Final = {
@@ -14286,8 +14286,8 @@ ARCH144C_PREDECESSOR_SOURCE_PINS: Final = {
     "scripts/run_test_certification.py": ("3987e5708689de72a9604290d6e875c574c37c08"),
 }
 ARCH144C_SOURCE_PIN_OVERRIDES: Final = {
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("88f43464e0d89d6ee26c7c9b6f45426d24820aba"),
-    "docs/PROJECT_STATUS.md": ("4158af1c6c230b3fb705500d8cfa779512562451"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("fb33dc10b30e1fbba836002c2271f386885f17b2"),
+    "docs/PROJECT_STATUS.md": ("7cd434843b0942e3d51caf3a9791582b0aac7c4a"),
     "docs/architecture/134-f1-five-session-live-paper-soak-authority.md": (
         "f5e53dfcd9f97f3b49b183edf815d19faa17ed13"
     ),

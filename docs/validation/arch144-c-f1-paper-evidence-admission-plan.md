@@ -1,6 +1,6 @@
 # Architecture 144-C — F1 paper-evidence admission validation plan
 
-Status: **DESIGN FROZEN; source implementation is next.**
+Status: **SOURCE ACCEPTED; Checkpoint Source Gates #652 / 39410467329 passed and accepted source is integrated.**
 
 This plan validates the pure V2 successor frozen in
 `docs/architecture/144-c-f1-paper-evidence-admission.md`.
@@ -341,8 +341,6 @@ decision, merge readiness, and protected-effect readiness.
 
 144-C source acceptance does not authorize the F1 soak.
 
-After 144-C source acceptance the next safe boundary is a separate read-only
-134-F protected preflight/readiness review. Only an exact separately reviewed
-protected command may create/run scheduler/provider/paper effects.
+After 144-C source acceptance, the read-only review found no registered F1 preflight. The next safe source boundary is Architecture 134-F2, which adds a separately reviewed registered read-only readiness preflight. Only after F2 source acceptance and a reviewed F2 preflight PASS may any F1 authorization command be considered; scheduler/provider/paper effects remain separately protected.
 
 Real-money trading remains **NO-GO**.

@@ -1,6 +1,6 @@
 # Architecture 144-C — F1 paper-evidence admission successor
 
-Status: **DESIGN FROZEN against accepted Architecture 134-F1 source. Implementation is next.**
+Status: **SOURCE ACCEPTED at 1e86b5dcce19cd45504266b4fa0ac0aca5854d04 / 47f13748c89784fddf0ef981072a7b23f7d02f22; integrated at d4d007a5c4a7c6a5158b1fab6f82c082387783f3.**
 
 Architecture 144-C adds a separate pure current-lineage evidence-admission
 successor for Architecture 134-F1. It does not reinterpret, loosen, or replace
@@ -399,9 +399,9 @@ No 144-C source, source gate, or certification result authorizes protected
 
 Real-money trading remains **NO-GO**.
 
-## Implementation boundary
+## Accepted implementation boundary
 
-Primary implementation branch:
+Preserved implementation branch:
 
 `feature/test-suite-arch144-c-f1-paper-evidence-admission-current`
 
@@ -441,18 +441,26 @@ requires one. FULL is not automatic.
 
 ## Sequencing
 
-Required order:
+Completed source sequence:
 
 ```text
 144-C design freeze
--> 144-C source implementation + focused verification
+-> 144-C source implementation
 -> one atomic feature publication
--> terminal source-gate CI
+-> terminal source-gate CI #652
 -> ChatGPT exact-source acceptance
--> only then protected 134-F preflight review
--> only then, if separately admitted, real five-session soak
--> end-of-window reconciliation
--> supplied-evidence V2 eligibility evaluation
+-> integration CI #653
 ```
 
-The design freeze itself performs no operational effect.
+The next protected sequence is separate:
+
+```text
+134-F2 read-only readiness source
+-> F2 exact-source acceptance
+-> separately invoked read-only F2 preflight
+-> ChatGPT review of preflight evidence
+-> only then, if separately authorized, F1 five-session authorization
+```
+
+Neither 144-C acceptance nor integration performs or authorizes an operational
+effect.

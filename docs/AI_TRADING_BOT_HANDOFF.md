@@ -9,7 +9,7 @@ ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED.
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`.
 
-## Current integration identity
+## Accepted executable integration identity
 
 ```text
 develop HEAD d4d007a5c4a7c6a5158b1fab6f82c082387783f3
@@ -78,27 +78,58 @@ research_strategy_paper_evidence_verification.py
 915bdd84bee3ad0b57efcafb0a78da01fce94e66
 ```
 
-## Immediate next milestone - 134-F protected preflight/readiness review
+## Architecture 134-F2 design freeze
 
-Owner/model: **ChatGPT / GPT-5.6 Sol High**.
+The read-only review established that the accepted F1 checkpoint has no
+registered preflight and that no complete F1 readiness command currently exists.
 
-Review the accepted F1 operational source and frozen 134-F authority/validation
-documents against current integrated `develop`.
+Canonical F2 design:
 
-Important: the accepted source checkpoint `arch134-f1-five-session-soak` has
-`preflight=None` and `execute=None`. Source acceptance and 144-C acceptance
-therefore do not create a protected command by implication.
+- `docs/architecture/134-f2-five-session-live-paper-soak-readiness.md`;
+- `docs/validation/arch134-f2-five-session-live-paper-soak-readiness.md`.
 
-Determine whether the next safe milestone is a separate checked-in
-preflight/readiness source checkpoint or an already-reviewed pure read-only
-operator gate. Establish exact source/worktree identity, fixed scheduler task
-identity, durable evidence/slot prerequisites, credential/provider boundaries,
-STOP conditions, and the one-publication/effect rules before authorizing any
-protected command.
+F2 is source-only implementation of a registered read-only readiness callback.
 
-Do not create/run/update/delete the F1 scheduled task, access provider
-credentials, invoke D1R7/D1R8/F1 operational effects, mutate paper state, or
-begin the five-session soak during this review.
+```text
+branch
+feature/robinhood-production-paper-134f2-five-session-soak-readiness
+
+worktree
+F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness
+
+checkpoint
+arch134-f2-five-session-soak-readiness
+
+preflight
+implemented read-only callback
+
+execute
+None
+
+CI profile
+robinhood
+```
+
+READY requires frozen F1/D1R7/D1R8 source admission, accepted predecessor
+evidence, read-only runtime compatibility, untouched F1 authority namespace,
+scheduler ABSENT, five-session preview and final readmission. Credentials,
+providers and write-readiness remain NOT_CHECKED.
+
+## Immediate next milestone - Architecture 134-F2 source implementation
+
+Owner/model: **Codex / Sol High**.
+
+Implement only the frozen F2 read-only preflight boundary and its focused
+fake/static tests plus required runner/profile/current-inventory/pin metadata.
+Do not modify the seven frozen F1 operational blobs.
+
+The source implementation must not run the real F2 preflight, create/run a task,
+reserve a parent/child/claim/lock, read credentials, call providers, invoke
+D1R7/D1R8, probe runtime writes, mutate paper/session state, or begin the soak.
+
+Use focused tests and `.\ops.ps1 verify arch134-f2-five-session-soak-readiness`,
+then one exact-file atomic commit/push. The one push-triggered CI owns canonical
+ROBINHOOD; no duplicate local ROBINHOOD/FULL.
 
 ## Protected boundary after 144-C
 
@@ -114,11 +145,12 @@ Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-Perform the read-only 134-F protected preflight/readiness review now. If required
-readiness logic is missing from the repository, freeze that source-only boundary
-and delegate its implementation before any operational command. If an adequate
-reviewed preflight surface already exists, produce the exact guarded command and
-its STOP/evidence contract separately.
+Implement Architecture 134-F2 from the frozen design. After terminal CI, return
+the exact feature HEAD/TREE, changed paths, focused verification and canonical
+ROBINHOOD evidence for ChatGPT exact-source review.
 
-Do not rerun 144-C certification, do not retry the consumed D1R9 authority, and
-do not begin the real soak. Real-money trading remains **NO-GO**.
+Only after F2 source acceptance may the registered read-only preflight be run.
+A preflight PASS still does not authorize the F1 five-session soak.
+
+Do not retry the consumed D1R9 authority and do not begin the real soak.
+Real-money trading remains **NO-GO**.

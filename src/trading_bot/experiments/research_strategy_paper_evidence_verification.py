@@ -591,7 +591,7 @@ def _validate_d1r7_facts(facts: object) -> _RecoveredPlan:
         raise ResearchStrategyPaperEvidenceVerificationError(
             "D1R7 published session rejected"
         )
-    expected_expires = schedule.closes_at - timedelta(minutes=5)
+    expected_expires = schedule.closes_at.astimezone(UTC) - timedelta(minutes=5)
     if observed >= expected_expires or expires != expected_expires:
         raise ResearchStrategyPaperEvidenceVerificationError(
             "D1R7 authorization expiry rejected"

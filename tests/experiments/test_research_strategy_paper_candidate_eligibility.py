@@ -1087,6 +1087,53 @@ def test_144b_replays_synthetic_d1r8_and_d1r9_before_building_observation(
     assert observation.d1r8_source_head == D1R8_SOURCE_HEAD
 
 
+def test_144b_reconstructs_canonical_utc_expiry_for_normal_session(
+    evidence_chain,
+) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9_evidence, d1r8_evidence = _synthetic_paper_evidence(session_date)
+    d1r8_facts = json.loads(d1r8_evidence.splitlines()[0])["facts"]
+
+    plan = evidence_subject._validate_d1r8_facts(d1r8_facts)
+    assert plan.expires_at == datetime(2026, 10, 19, 19, 55, tzinfo=UTC)
+    assert plan.facts["authorization_expires_at"] == ("2026-10-19T19:55:00+00:00")
+    observation = _build_verified_observation(
+        evidence_chain, session_date, d1r9_evidence, d1r8_evidence
+    )
+    assert observation.terminal_classification == "NO_SIGNAL"
+
+
+def test_144b_rejects_new_york_local_equivalent_expiry_spelling(evidence_chain) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9_evidence, d1r8_evidence = _synthetic_paper_evidence(
+        session_date,
+        authorization_expires_at="2026-10-19T15:55:00-04:00",
+    )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain, session_date, d1r9_evidence, d1r8_evidence
+        )
+
+
+def test_144b_reconstructs_early_close_expiry_as_canonical_utc(
+    evidence_chain,
+) -> None:
+    session_date = date(2026, 11, 27)
+    d1r9_evidence, d1r8_evidence = _synthetic_paper_evidence(
+        session_date,
+        authorization_expires_at="2026-11-27T17:55:00+00:00",
+    )
+    d1r8_facts = json.loads(d1r8_evidence.splitlines()[0])["facts"]
+
+    plan = evidence_subject._validate_d1r8_facts(d1r8_facts)
+    assert plan.expires_at == datetime(2026, 11, 27, 17, 55, tzinfo=UTC)
+    assert plan.facts["authorization_expires_at"] == ("2026-11-27T17:55:00+00:00")
+    observation = _build_verified_observation(
+        evidence_chain, session_date, d1r9_evidence, d1r8_evidence
+    )
+    assert observation.terminal_classification == "NO_SIGNAL"
+
+
 def test_144b_rejects_reconciled_artifact_mutation(evidence_chain) -> None:
     proof, completed, qualification, qualification_policy, passed, target = (
         evidence_chain

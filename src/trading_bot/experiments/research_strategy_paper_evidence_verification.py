@@ -13,9 +13,10 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid5
+from zoneinfo import ZoneInfo
 
 from trading_bot.domain import Symbol
 from trading_bot.experiments.research_strategy_paper_candidate_eligibility import (
@@ -35,6 +36,9 @@ from trading_bot.experiments.research_strategy_walk_forward import (
     ResearchStrategyWalkForwardQualification,
     ResearchStrategyWalkForwardQualificationPolicy,
     WalkForwardPassedResearchStrategy,
+)
+from trading_bot.review_paper.nyse_published_regular_sessions import (
+    NYSEPublishedRegularSessionAuthority,
 )
 from trading_bot.strategies.moving_average import MovingAverageCrossoverConfig
 from trading_bot.strategies.production import (
@@ -186,6 +190,9 @@ D1R9_INITIAL = ("AUTHORIZATION_RESERVED", "SOURCES_ADMITTED", "TARGET_BOUND")
 
 _SHA40 = re.compile(r"[0-9a-f]{40}")
 _SHA64 = re.compile(r"[0-9a-f]{64}")
+_NEW_YORK = ZoneInfo("America/New_York")
+_D1R7_CHECKPOINT = "arch134-d1r7-d1-session-authorization"
+_D1R7_SCHEMA = "arch134-d1r7-d1-session-authorization/v1"
 _CONTRACT_NAMESPACE = UUID("c0867c3b-548e-5512-a135-3c4f1225e6fc")
 _CONTRACT_IDENTITY_VERSION = "production-strategy-contract-identity/v1"
 _POSITIVE_CLASSIFICATIONS = frozenset({"NO_SIGNAL", "RISK_REJECTED", "PAPER_EXECUTED"})
@@ -356,6 +363,25 @@ class _RecoveredContract:
     strategy_config: MovingAverageCrossoverConfig
 
 
+@dataclass(frozen=True, slots=True)
+class _RecoveredPlan:
+    contract: _RecoveredContract
+    observed_at: datetime
+    target: date
+    expires_at: datetime
+    facts: dict[str, object]
+
+    def require_current(self, observed: datetime) -> None:
+        if (
+            observed < self.observed_at
+            or observed >= self.expires_at
+            or observed.astimezone(_NEW_YORK).date() != self.target
+        ):
+            raise ResearchStrategyPaperEvidenceVerificationError(
+                "D1R7 authorization is not current"
+            )
+
+
 def _recover_contract(value: object) -> _RecoveredContract:
     raw = _exact(
         value,
@@ -434,6 +460,25 @@ def _recover_contract(value: object) -> _RecoveredContract:
     return _RecoveredContract(contract_id, target, head, tree, symbol, config)
 
 
+def _recovered_contract_facts(contract: _RecoveredContract) -> dict[str, object]:
+    config = contract.strategy_config
+    return {
+        "schema": PRODUCTION_STRATEGY_SCHEMA,
+        "contract_id": str(contract.contract_id),
+        "target_session_date": contract.target_session_date.isoformat(),
+        "source_head": contract.source_head,
+        "source_tree": contract.source_tree,
+        "strategy_id": MOVING_AVERAGE_STRATEGY_ID,
+        "strategy_version": MOVING_AVERAGE_STRATEGY_VERSION,
+        "symbol": str(contract.symbol),
+        "strategy_config": {
+            "short_window": config.short_window,
+            "long_window": config.long_window,
+            "desired_quantity": _decimal(config.desired_quantity),
+        },
+    }
+
+
 _D1R5 = {
     "basename": (
         "arch134-d1r5-2026-10-16-7aa54bb618f63bfb2b470ff8fc88ba8d27ef9343.jsonl"
@@ -492,7 +537,7 @@ _D1R7_POLICY = {
 }
 
 
-def _validate_d1r7_facts(facts: object) -> _RecoveredContract:
+def _validate_d1r7_facts(facts: object) -> _RecoveredPlan:
     raw = _exact(
         facts,
         {
@@ -510,10 +555,7 @@ def _validate_d1r7_facts(facts: object) -> _RecoveredContract:
             "d1_policy",
         },
     )
-    if (
-        raw["checkpoint"] != "arch134-d1r7-d1-session-authorization/v1"
-        and raw["checkpoint"] != "arch134-d1r7-d1-session-authorization"
-    ):
+    if raw["checkpoint"] != _D1R7_CHECKPOINT:
         raise ResearchStrategyPaperEvidenceVerificationError("D1R7 checkpoint rejected")
     source = _exact(raw["source"], {"origin", "branch", "head", "tree"})
     intended = _exact(raw["intended_d1"], {"origin", "branch", "head", "tree"})
@@ -534,9 +576,25 @@ def _validate_d1r7_facts(facts: object) -> _RecoveredContract:
     target = _date_text(raw["target_session"])
     observed = _utc_text(raw["observed_at"])
     expires = _utc_text(raw["authorization_expires_at"])
-    if observed >= expires or observed.astimezone(UTC).date() != target:
+    derived_target = observed.astimezone(_NEW_YORK).date()
+    if target != derived_target:
         raise ResearchStrategyPaperEvidenceVerificationError(
-            "D1R7 session timing rejected"
+            "D1R7 target session derivation rejected"
+        )
+    try:
+        schedule = NYSEPublishedRegularSessionAuthority().schedule_for(target)
+    except (TypeError, ValueError):
+        raise ResearchStrategyPaperEvidenceVerificationError(
+            "D1R7 published session rejected"
+        ) from None
+    if schedule is None:
+        raise ResearchStrategyPaperEvidenceVerificationError(
+            "D1R7 published session rejected"
+        )
+    expected_expires = schedule.closes_at - timedelta(minutes=5)
+    if observed >= expected_expires or expires != expected_expires:
+        raise ResearchStrategyPaperEvidenceVerificationError(
+            "D1R7 authorization expiry rejected"
         )
     contract = _recover_contract(raw["strategy_contract"])
     if contract.target_session_date != target:
@@ -550,7 +608,7 @@ def _validate_d1r7_facts(facts: object) -> _RecoveredContract:
         + hashlib.sha256(
             _canonical(
                 [
-                    "arch134-d1r7-d1-session-authorization/v1",
+                    _D1R7_SCHEMA,
                     target.isoformat(),
                     _D1R5["sha256"],
                     _D1R6["sha256"],
@@ -559,19 +617,28 @@ def _validate_d1r7_facts(facts: object) -> _RecoveredContract:
         ).hexdigest()
         + ".jsonl"
     )
-    if (
-        raw["reservation_basename"] != expected_basename
-        or raw["d1r5"] != _D1R5
-        or raw["d1r6"] != _D1R6
-        or raw["d1_policy"] != _D1R7_POLICY
-    ):
+    expected_facts = {
+        "checkpoint": _D1R7_CHECKPOINT,
+        "source": dict(source),
+        "intended_d1": dict(intended),
+        "qualification_session": "2026-10-16",
+        "target_session": target.isoformat(),
+        "observed_at": observed.isoformat(),
+        "authorization_expires_at": expected_expires.isoformat(),
+        "reservation_basename": expected_basename,
+        "d1r5": _D1R5,
+        "d1r6": _D1R6,
+        "strategy_contract": _recovered_contract_facts(contract),
+        "d1_policy": _D1R7_POLICY,
+    }
+    if _canonical(raw) != _canonical(expected_facts):
         raise ResearchStrategyPaperEvidenceVerificationError(
-            "D1R7 prerequisite facts rejected"
+            "D1R7 reconstructed facts rejected"
         )
-    return contract
+    return _RecoveredPlan(contract, observed, target, expected_expires, expected_facts)
 
 
-def _validate_d1r8_facts(facts: object) -> _RecoveredContract:
+def _validate_d1r8_facts(facts: object) -> _RecoveredPlan:
     raw = _exact(
         facts,
         {"prerequisite", "d1r7_bytes", "d1r7_sha256", "publication_confirmed"},
@@ -591,12 +658,13 @@ def _validate_d1r8_facts(facts: object) -> _RecoveredContract:
 class _D1R8Replay:
     def __init__(self, facts: object) -> None:
         self._raw_facts = facts
-        self.contract = _validate_d1r8_facts(facts)
+        self.plan = _validate_d1r8_facts(facts)
+        self.contract = self.plan.contract
         self.binding = hashlib.sha256(_canonical(facts)).hexdigest()
         self.effects = dict.fromkeys(D1R8_BUDGETS, 0)
         self.pending: str | None = None
         self.phase = -1
-        self.last_time = _utc_text(self._facts["observed_at"])
+        self.last_time = self.plan.observed_at
         self.terminal = False
         self.baseline_pages = 0
         self.index = 0
@@ -661,10 +729,7 @@ class _D1R8Replay:
                     raise ResearchStrategyPaperEvidenceVerificationError(
                         "D1R8 terminal state rejected"
                     )
-                if observed.astimezone(UTC).date() != self.contract.target_session_date:
-                    raise ResearchStrategyPaperEvidenceVerificationError(
-                        "D1R8 target date rejected"
-                    )
+                self.plan.require_current(observed)
                 if result == "NO_SIGNAL":
                     expected = {
                         "alpaca_credential_reads": 2,
@@ -1057,7 +1122,8 @@ def _recover_session(
     r8_rows = _parse_d1r8(d1r8_evidence)
     r9_facts = r9_rows[0]["facts"]
     r8_binding = r8_rows[0]["facts"]
-    contract = _validate_d1r8_facts(r8_binding)
+    plan = _validate_d1r8_facts(r8_binding)
+    contract = plan.contract
     r9_target = _date_text(r9_facts["target_session"])  # type: ignore[index]
     r8_target = _date_text(r8_binding["prerequisite"]["target_session"])  # type: ignore[index]
     if (r9_target, r8_target, contract.target_session_date) != (
@@ -1231,6 +1297,8 @@ def build_verified_research_strategy_paper_candidate_eligibility(
         raise ResearchStrategyPaperEvidenceVerificationError(
             "exactly five evidence sessions required"
         )
+    eligibility_source_head = _source(eligibility_source_head)
+    eligibility_source_tree = _source(eligibility_source_tree)
     observations = tuple(
         build_verified_research_strategy_paper_session_observation(
             session_date,
@@ -1294,6 +1362,8 @@ def verify_research_strategy_paper_candidate_eligibility(
     qualification_source_tree: str,
     proof_source_head: str,
     proof_source_tree: str,
+    eligibility_source_head: str,
+    eligibility_source_tree: str,
 ) -> None:
     """Rebuild positive eligibility from independent evidence and compare exactly."""
     if type(eligibility) is not ResearchStrategyPaperCandidateEligibility:
@@ -1312,8 +1382,8 @@ def verify_research_strategy_paper_candidate_eligibility(
         qualification_source_tree=qualification_source_tree,
         proof_source_head=proof_source_head,
         proof_source_tree=proof_source_tree,
-        eligibility_source_head=eligibility.eligibility_source_head,
-        eligibility_source_tree=eligibility.eligibility_source_tree,
+        eligibility_source_head=_source(eligibility_source_head),
+        eligibility_source_tree=_source(eligibility_source_tree),
     )
     if eligibility != expected:
         raise ResearchStrategyPaperEvidenceVerificationError(

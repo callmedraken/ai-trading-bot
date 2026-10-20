@@ -222,7 +222,7 @@ def _synthetic_d1r7_facts(
         )
     ).hexdigest()
     return {
-        "checkpoint": "arch134-d1r7-d1-session-authorization/v1",
+        "checkpoint": "arch134-d1r7-d1-session-authorization",
         "source": {
             "origin": "https://github.com/callmedraken/ai-trading-bot.git",
             "branch": evidence_subject.D1R7_BRANCH,
@@ -237,8 +237,8 @@ def _synthetic_d1r7_facts(
         },
         "qualification_session": "2026-10-16",
         "target_session": session_date.isoformat(),
-        "observed_at": f"{session_date.isoformat()}T00:00:00+00:00",
-        "authorization_expires_at": f"{session_date.isoformat()}T00:05:00+00:00",
+        "observed_at": f"{session_date.isoformat()}T13:00:00+00:00",
+        "authorization_expires_at": f"{session_date.isoformat()}T19:55:00+00:00",
         "reservation_basename": (
             f"arch134-d1r7-{session_date.isoformat()}-{reservation_digest}.jsonl"
         ),
@@ -269,10 +269,20 @@ def _synthetic_paper_evidence(
     classification: str = "NO_SIGNAL",
     production_source_head: str = HEAD,
     production_source_tree: str = TREE,
+    observed_at: str | None = None,
+    authorization_expires_at: str | None = None,
+    terminal_at: str | None = None,
 ) -> tuple[bytes, bytes]:
+    observed_at = observed_at or f"{session_date.isoformat()}T13:00:00+00:00"
+    authorization_expires_at = (
+        authorization_expires_at or f"{session_date.isoformat()}T19:55:00+00:00"
+    )
+    terminal_at = terminal_at or observed_at
     d1r7 = _synthetic_d1r7_facts(
         session_date, production_source_head, production_source_tree
     )
+    d1r7["observed_at"] = observed_at
+    d1r7["authorization_expires_at"] = authorization_expires_at
     d1r8_facts = {
         "prerequisite": d1r7,
         "d1r7_bytes": 1,
@@ -282,7 +292,6 @@ def _synthetic_paper_evidence(
     budgets = dict(evidence_subject.D1R8_BUDGETS)
     effects = dict.fromkeys(budgets, 0)
     binding = sha256(_canonical(d1r8_facts)).hexdigest()
-    observed_at = f"{session_date.isoformat()}T00:00:00+00:00"
     rows: list[dict[str, object]] = []
 
     def state(event: str, *, facts: object = None, result_hash: str | None = None):
@@ -347,7 +356,7 @@ def _synthetic_paper_evidence(
     action("STRATEGY_STARTED", "INTENT", "strategy_evaluations")
     action("STRATEGY_STARTED", "ACK", "strategy_evaluations")
     state("STRATEGY_DECIDED", result_hash="c" * 64)
-    if classification == "PAPER_EXECUTED":
+    if classification in {"RISK_REJECTED", "PAPER_EXECUTED"}:
         state("PREPARE_STARTED")
         action("PREPARE_STARTED", "INTENT", "prepare_attempts")
         action("PREPARE_STARTED", "ACK", "prepare_attempts")
@@ -359,6 +368,7 @@ def _synthetic_paper_evidence(
         action("QUOTE_INTENT", "ACK", "quote_requests")
         state("QUOTE_CONFIRMED")
         state("PREPARED", result_hash="d" * 64)
+    if classification == "PAPER_EXECUTED":
         state("EXECUTE_STARTED")
         action("EXECUTE_STARTED", "INTENT", "execute_attempts")
         action("EXECUTE_STARTED", "ACK", "execute_attempts")
@@ -381,7 +391,7 @@ def _synthetic_paper_evidence(
         action("PAPER_WRITE_INTENT", "INTENT", "paper_fill_mutations")
         action("PAPER_WRITE_INTENT", "ACK", "paper_fill_mutations")
         state("PAPER_WRITE_ACKNOWLEDGED", result_hash="e" * 64)
-    elif classification != "NO_SIGNAL":
+    elif classification not in {"NO_SIGNAL", "RISK_REJECTED"}:
         raise AssertionError("unsupported synthetic classification")
     rows.append(
         {
@@ -394,7 +404,7 @@ def _synthetic_paper_evidence(
             "budgets": budgets,
             "effects": dict(effects),
             "classification": classification,
-            "observed_at": observed_at,
+            "observed_at": terminal_at,
             "result_sha256": None,
         }
     )
@@ -435,6 +445,7 @@ def _synthetic_paper_evidence(
         facts: object = None,
         proof: object = None,
         final: bool = False,
+        at: str | None = None,
     ):
         if event == "SCHEDULER_RUN_INTENT":
             d1r9_effects["scheduler_runs"] += 1
@@ -451,7 +462,7 @@ def _synthetic_paper_evidence(
                 "binding": d1r9_binding,
                 "effects": dict(d1r9_effects),
                 "budgets": d1r9_budgets,
-                "observed_at": observed_at,
+                "observed_at": at or observed_at,
                 "proof": proof,
             }
         )
@@ -472,9 +483,78 @@ def _synthetic_paper_evidence(
             "sha256": sha256(d1r8_payload).hexdigest(),
         },
         final=True,
+        at=terminal_at,
     )
     d1r9_payload = b"".join(_canonical(row) + b"\n" for row in d1r9_rows)
     return d1r9_payload, d1r8_payload
+
+
+def _rewrite_jsonl(payload: bytes, row_index: int, mutate) -> bytes:
+    rows = [json.loads(line) for line in payload.splitlines()]
+    mutate(rows[row_index])
+    return b"".join(_canonical(row) + b"\n" for row in rows)
+
+
+def _build_verified_observation(evidence_chain, session_date, d1r9, d1r8):
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    return build_verified_research_strategy_paper_session_observation(
+        session_date,
+        d1r9,
+        d1r8,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+
+
+def _build_verified_eligibility(evidence_chain, session_evidence):
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    return build_verified_research_strategy_paper_candidate_eligibility(
+        session_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+        eligibility_source_head=PRODUCTION_HEAD,
+        eligibility_source_tree=PRODUCTION_TREE,
+    )
+
+
+def _synthetic_window_evidence(
+    *,
+    dates: tuple[date, ...] = tuple(date(2026, 10, day) for day in range(19, 24)),
+    executed_index: int | None = 4,
+    classification: str = "NO_SIGNAL",
+) -> tuple[tuple[date, bytes, bytes], ...]:
+    return tuple(
+        (
+            session_date,
+            *_synthetic_paper_evidence(
+                session_date,
+                classification=(
+                    "PAPER_EXECUTED" if executed_index == index else classification
+                ),
+            ),
+        )
+        for index, session_date in enumerate(dates)
+    )
 
 
 def _uuid(name: str) -> UUID:
@@ -1093,10 +1173,340 @@ def test_144b_builds_and_replays_a_mixed_five_session_eligibility_window(
         qualification_source_tree=PRODUCTION_TREE,
         proof_source_head=PRODUCTION_HEAD,
         proof_source_tree=PRODUCTION_TREE,
+        eligibility_source_head=PRODUCTION_HEAD,
+        eligibility_source_tree=PRODUCTION_TREE,
     )
     assert eligibility.paper_executed_count == 1
     assert eligibility.first_session_date == session_dates[0]
     assert eligibility.last_session_date == session_dates[-1]
+
+
+@pytest.mark.parametrize(
+    ("session_date", "observed_at", "authorization_expires_at"),
+    [
+        (date(2026, 11, 26), None, None),
+        (date(2026, 10, 19), "2026-10-19T00:00:00+00:00", None),
+        (date(2026, 10, 19), None, "2026-10-19T19:54:00+00:00"),
+    ],
+)
+def test_144b_rejects_nonpublished_or_noncanonical_d1r7_timing(
+    evidence_chain, session_date, observed_at, authorization_expires_at
+) -> None:
+    d1r9, d1r8 = _synthetic_paper_evidence(
+        session_date,
+        observed_at=observed_at,
+        authorization_expires_at=authorization_expires_at,
+    )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(evidence_chain, session_date, d1r9, d1r8)
+
+
+@pytest.mark.parametrize(
+    "terminal_at",
+    [
+        "2026-10-19T19:55:00+00:00",
+        "2026-10-19T19:56:00+00:00",
+        "2026-10-19T12:59:00+00:00",
+    ],
+)
+def test_144b_requires_positive_terminal_within_recovered_authorization(
+    evidence_chain, terminal_at
+) -> None:
+    d1r9, d1r8 = _synthetic_paper_evidence(date(2026, 10, 19), terminal_at=terminal_at)
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(evidence_chain, date(2026, 10, 19), d1r9, d1r8)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda facts: facts["d1r5"].update(bytes=6715),
+        lambda facts: facts["d1_policy"].update(starting_synthetic_cash="9999"),
+        lambda facts: facts["strategy_contract"].update(
+            contract_id=str(_uuid("wrong"))
+        ),
+    ],
+)
+def test_144b_rejects_altered_d1r7_predecessor_policy_or_contract(
+    evidence_chain, mutation
+) -> None:
+    d1r9, d1r8 = _synthetic_paper_evidence(date(2026, 10, 19))
+
+    def alter(row):
+        mutation(row["facts"]["prerequisite"])
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain,
+            date(2026, 10, 19),
+            d1r9,
+            _rewrite_jsonl(d1r8, 0, alter),
+        )
+
+
+@pytest.mark.parametrize("journal", ["d1r8", "d1r9"])
+def test_144b_rejects_malformed_truncated_prefix_and_trailing_journals(
+    evidence_chain, journal
+) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+    payload = d1r8 if journal == "d1r8" else d1r9
+    variants = (
+        b"{not-json}\n",
+        payload[:-1],
+        b"\n".join(payload.splitlines()[:-1]) + b"\n",
+        payload + b"trailing",
+    )
+    for variant in variants:
+        with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+            _build_verified_observation(
+                evidence_chain,
+                session_date,
+                variant if journal == "d1r9" else d1r9,
+                variant if journal == "d1r8" else d1r8,
+            )
+
+
+@pytest.mark.parametrize("journal", ["d1r8", "d1r9"])
+def test_144b_rejects_duplicate_canonical_json_fields(evidence_chain, journal) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+    payload = d1r8 if journal == "d1r8" else d1r9
+    first = payload.splitlines()[0].decode()
+    field = (
+        '"event":"SESSION_RESERVED"'
+        if journal == "d1r8"
+        else '"event":"AUTHORIZATION_RESERVED"'
+    )
+    duplicate = first.replace(field, f"{field},{field}", 1).encode() + b"\n"
+    duplicate += b"\n".join(payload.splitlines()[1:]) + b"\n"
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain,
+            session_date,
+            duplicate if journal == "d1r9" else d1r9,
+            duplicate if journal == "d1r8" else d1r8,
+        )
+
+
+@pytest.mark.parametrize("mutation", ["bytes", "hash"])
+def test_144b_reconciles_d1r9_proof_bytes_and_hash(evidence_chain, mutation) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+
+    def alter(row):
+        if mutation == "bytes":
+            row["proof"]["bytes"] += 1
+        else:
+            row["proof"]["sha256"] = "f" * 64
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain,
+            session_date,
+            _rewrite_jsonl(d1r9, -1, alter),
+            d1r8,
+        )
+
+
+def test_144b_reconciles_d1r9_d1r8_target_and_classification(evidence_chain) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+    other_r9, _ = _synthetic_paper_evidence(date(2026, 10, 20))
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(evidence_chain, session_date, other_r9, d1r8)
+
+    def alter(row):
+        row["classification"] = "RISK_REJECTED"
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain, session_date, _rewrite_jsonl(d1r9, -1, alter), d1r8
+        )
+
+
+def test_144b_rejects_wrong_d1r8_and_d1r9_source_identity(evidence_chain) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+
+    def alter_d1r8(row):
+        row["facts"]["prerequisite"]["intended_d1"]["head"] = "f" * 40
+
+    def alter_d1r9(row):
+        row["facts"]["source"]["head"] = "f" * 40
+
+    for bad_d1r9, bad_d1r8 in (
+        (d1r9, _rewrite_jsonl(d1r8, 0, alter_d1r8)),
+        (_rewrite_jsonl(d1r9, 0, alter_d1r9), d1r8),
+    ):
+        with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+            _build_verified_observation(
+                evidence_chain, session_date, bad_d1r9, bad_d1r8
+            )
+
+
+@pytest.mark.parametrize(
+    "field_mutation",
+    [
+        lambda contract: contract.pop("contract_id"),
+        lambda contract: contract.update(target_session_date="2026-10-20"),
+        lambda contract: contract.update(source_head="f" * 40),
+        lambda contract: contract.update(source_tree="f" * 40),
+        lambda contract: contract.update(symbol="QQQ"),
+        lambda contract: contract["strategy_config"].update(short_window=3),
+        lambda contract: contract.update(schema="wrong/v1"),
+        lambda contract: contract.update(strategy_id="wrong"),
+        lambda contract: contract.update(strategy_version="wrong"),
+    ],
+)
+def test_144b_rejects_invalid_production_contract_semantics(
+    evidence_chain, field_mutation
+) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+
+    def alter(row):
+        field_mutation(row["facts"]["prerequisite"]["strategy_contract"])
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain,
+            session_date,
+            d1r9,
+            _rewrite_jsonl(d1r8, 0, alter),
+        )
+
+
+@pytest.mark.parametrize(
+    "classification", ["SESSION_MISSED", "BLOCKED", "INDETERMINATE"]
+)
+def test_144b_nonpositive_terminals_cannot_produce_observations(
+    evidence_chain, classification
+) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+
+    def alter(row):
+        row["classification"] = classification
+        row["proof"] = None
+
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            evidence_chain,
+            session_date,
+            _rewrite_jsonl(d1r9, -1, alter),
+            d1r8,
+        )
+
+
+def test_144b_risk_rejected_observation_is_valid_but_not_eligible(
+    evidence_chain,
+) -> None:
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date, classification="RISK_REJECTED")
+    observation = _build_verified_observation(evidence_chain, session_date, d1r9, d1r8)
+    assert observation.terminal_classification == "RISK_REJECTED"
+    session_evidence = tuple(
+        (
+            date(2026, 10, day),
+            *_synthetic_paper_evidence(
+                date(2026, 10, day), classification="RISK_REJECTED"
+            ),
+        )
+        for day in range(19, 24)
+    )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_eligibility(evidence_chain, session_evidence)
+
+
+def test_144b_rejects_altered_142_or_143_chain_inputs(evidence_chain) -> None:
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    session_date = date(2026, 10, 19)
+    d1r9, d1r8 = _synthetic_paper_evidence(session_date)
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            (
+                proof,
+                completed,
+                qualification,
+                qualification_policy,
+                passed,
+                replace(target, production_source_head="f" * 40),
+            ),
+            session_date,
+            d1r9,
+            d1r8,
+        )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        _build_verified_observation(
+            (
+                type(proof).from_json(
+                    replace(proof, proof_source_head="f" * 40).to_json()
+                ),
+                completed,
+                qualification,
+                qualification_policy,
+                passed,
+                target,
+            ),
+            session_date,
+            d1r9,
+            d1r8,
+        )
+
+
+def test_144b_eligibility_shape_rejections(evidence_chain) -> None:
+    valid = _synthetic_window_evidence()
+    variants = (
+        valid[:-1],
+        (valid[0], valid[0], *valid[2:]),
+        tuple(reversed(valid)),
+        _synthetic_window_evidence(
+            dates=(
+                date(2026, 10, 19),
+                date(2026, 10, 20),
+                date(2026, 10, 21),
+                date(2026, 10, 23),
+                date(2026, 10, 26),
+            )
+        ),
+        _synthetic_window_evidence(executed_index=None),
+    )
+    for variant in variants:
+        with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+            _build_verified_eligibility(evidence_chain, variant)
+
+
+def test_144b_eligibility_verifier_uses_independent_source_identity(
+    evidence_chain,
+) -> None:
+    eligibility = _build_verified_eligibility(
+        evidence_chain, _synthetic_window_evidence()
+    )
+    forged = replace(eligibility, eligibility_source_head="f" * 40)
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        verify_research_strategy_paper_candidate_eligibility(
+            forged,
+            _synthetic_window_evidence(),
+            proof,
+            completed,
+            qualification,
+            qualification_policy,
+            passed,
+            target,
+            qualification_source_head=PRODUCTION_HEAD,
+            qualification_source_tree=PRODUCTION_TREE,
+            proof_source_head=PRODUCTION_HEAD,
+            proof_source_tree=PRODUCTION_TREE,
+            eligibility_source_head=PRODUCTION_HEAD,
+            eligibility_source_tree=PRODUCTION_TREE,
+        )
 
 
 def test_144b_source_is_pure_and_does_not_import_effectful_d1_modules() -> None:

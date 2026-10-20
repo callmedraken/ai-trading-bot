@@ -4,7 +4,8 @@
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
 ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED.
-134-F PROTECTED PREFLIGHT/READINESS REVIEW IS NEXT; NO OPERATIONAL EFFECT IS AUTHORIZED.**
+134-F2 IMPLEMENTATION PREPARED; EXACT-SOURCE/CI REVIEW PENDING;
+NO OPERATIONAL EFFECT IS AUTHORIZED.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`.
@@ -115,21 +116,32 @@ evidence, read-only runtime compatibility, untouched F1 authority namespace,
 scheduler ABSENT, five-session preview and final readmission. Credentials,
 providers and write-readiness remain NOT_CHECKED.
 
-## Immediate next milestone - Architecture 134-F2 source implementation
+## Immediate next milestone - Architecture 134-F2 exact-source review
 
-Owner/model: **Codex / Sol High**.
+Owner: **ChatGPT**.
 
-Implement only the frozen F2 read-only preflight boundary and its focused
-fake/static tests plus required runner/profile/current-inventory/pin metadata.
-Do not modify the seven frozen F1 operational blobs.
+The frozen F2 read-only callback, focused fake/static/disposable coverage and
+runner/profile/current-inventory/pin metadata are implemented. All seven F1
+operational blobs remain frozen. F1 remains `preflight=None`, `execute=None`;
+F2 is `preflight=_arch134_f2_preflight`, `execute=None` and CI `robinhood`.
 
-The source implementation must not run the real F2 preflight, create/run a task,
-reserve a parent/child/claim/lock, read credentials, call providers, invoke
-D1R7/D1R8, probe runtime writes, mutate paper/session state, or begin the soak.
+Base HEAD/TREE are `9310eec609fcd273d9e248c4e897fe7e5828f953` /
+`dbac92b55169b3a21d1ebee046755707be40f1eb`. This source record does not claim
+acceptance or a terminal CI outcome for the unpublished source checkpoint.
 
-Use focused tests and `.\ops.ps1 verify arch134-f2-five-session-soak-readiness`,
-then one exact-file atomic commit/push. The one push-triggered CI owns canonical
-ROBINHOOD; no duplicate local ROBINHOOD/FULL.
+The implementing agent completes focused checks, creates one normal unpublished
+commit, runs `.\ops.ps1 verify arch134-f2-five-session-soak-readiness` on the
+clean commit, and ordinary-pushes once. That push owns terminal active checks
+plus canonical ROBINHOOD. Do not duplicate ROBINHOOD locally or run FULL.
+
+ChatGPT must inspect that exact commit/diff, source pins, registered verify
+report and terminal CI/canonical evidence. Stop on mismatch or failure. Source
+acceptance may open only the separately reviewed read-only F2 preflight.
+
+The real F2 preflight has not run. No task, parent/child/claim/lock, credential,
+provider, D1R7/D1R8, runtime-write, paper/session, broker or soak effect has run
+as part of implementation. Allowed observations and zero effects are separate
+fields in the F2 closed result.
 
 ## Protected boundary after 144-C
 
@@ -145,7 +157,7 @@ Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-Implement Architecture 134-F2 from the frozen design. After terminal CI, return
+Review the implemented Architecture 134-F2 feature after terminal CI. Return
 the exact feature HEAD/TREE, changed paths, focused verification and canonical
 ROBINHOOD evidence for ChatGPT exact-source review.
 

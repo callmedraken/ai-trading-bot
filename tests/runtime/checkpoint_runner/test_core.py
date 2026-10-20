@@ -206,6 +206,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
         "arch144-c-f1-paper-evidence-admission",
+        "arch134-f2-five-session-soak-readiness",
         "arch134-f1-five-session-soak",
         "arch134-d1r8-d1-session-execution-consumer",
         "arch134-d1r7-d1-session-authorization",
@@ -357,6 +358,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             )
         if spec.name == "arch144-c-f1-paper-evidence-admission":
             expected_branch = runner.ARCH144C_BRANCH
+        if spec.name == "arch134-f2-five-session-soak-readiness":
+            expected_branch = runner.ARCH134_F2_BRANCH
         if spec.name == "arch134-f1-five-session-soak":
             expected_branch = runner.ARCH134_F1_BRANCH
         if spec.name == "arch134-d1r8-d1-session-execution-consumer":
@@ -889,6 +892,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_D1R8_NAME,
             runner.ARCH134_F1_NAME,
             runner.ARCH144C_NAME,
+            runner.ARCH134_F2_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
@@ -1344,6 +1348,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
                 "arch144-c-f1-paper-evidence-admission",
+                "arch134-f2-five-session-soak-readiness",
                 "arch134-f1-five-session-soak",
                 "arch134-d1r8-d1-session-execution-consumer",
                 "arch134-d1r7-d1-session-authorization",
@@ -1431,7 +1436,9 @@ def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch)
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
     after = runner.ARCH144C_TEST_PIN_OVERRIDES[path]
-    assert runner._arch144c_current_inventory_test_pin(path, before) == after
+    assert runner._arch144c_current_inventory_test_pin(
+        path, before
+    ) == runner.ARCH134_F2_PIN_OVERRIDES.get(path, after)
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
     pins = dict(runner.ARCH144C_TEST_PIN_OVERRIDES)

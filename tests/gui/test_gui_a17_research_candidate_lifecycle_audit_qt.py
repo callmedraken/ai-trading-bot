@@ -416,12 +416,12 @@ def test_actual_inventory_and_gui_stays_legacy():
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
     } == {
-        "full": 189,
-        "robinhood": 103,
+        "full": 192,
+        "robinhood": 104,
         "legacy": 222,
-        "exhaustive": 411,
+        "exhaustive": 414,
     }
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 68
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 70
     assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51
     relative = Path(__file__).relative_to(ROOT).as_posix()
     assert relative in run_test_certification.select_inventory(inventory, "legacy")

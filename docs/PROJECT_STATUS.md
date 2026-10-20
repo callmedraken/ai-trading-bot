@@ -170,47 +170,45 @@ Credential/provider readiness and rollback/write readiness are deliberately
 
 ## Active work
 
-### Now — Architecture 134-F2 source implementation
+### Now - Architecture 134-F2 implemented; exact-source review pending
 
-Owner/model: **Codex / Sol High**.
-
-Expected branch:
-
-`feature/robinhood-production-paper-134f2-five-session-soak-readiness`
-
-Expected worktree:
-
-`F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness`
-
-Checkpoint:
-
-`arch134-f2-five-session-soak-readiness`
-
-Required registration:
+Implementation owner/model: **Codex / Sol High**.
 
 ```text
-preflight  <read-only F2 callback>
+branch     feature/robinhood-production-paper-134f2-five-session-soak-readiness
+worktree   F:\AI\worktrees\ai-trading-bot-production-paper-134f2-five-session-soak-readiness
+base HEAD  9310eec609fcd273d9e248c4e897fe7e5828f953
+base TREE  dbac92b55169b3a21d1ebee046755707be40f1eb
+checkpoint arch134-f2-five-session-soak-readiness
+preflight  _arch134_f2_preflight (read-only)
 execute    None
 CI profile robinhood
 ```
 
-Implement the frozen architecture/validation contract with focused fake/static
-coverage only. Do not run the real host preflight during source implementation.
-One atomic feature publication owns terminal active checks plus canonical
-ROBINHOOD.
+The source implements the frozen F2 contract with fake/static/disposable tests.
+All seven frozen F1 operational blobs remain unchanged. F1 registration remains
+`preflight=None`, `execute=None`. Allowed observations are counted separately
+from the zero effect counters. The real host preflight has not run.
 
-### Next
+Publication follows focused checks, one unpublished normal commit, registered
+source verification on that clean commit, and one ordinary feature push. The
+mapped push owns canonical ROBINHOOD; no duplicate local ROBINHOOD or FULL.
+Source acceptance and terminal CI evidence remain pending in this source record.
 
-ChatGPT exact-source review of terminal F2 source/CI. If accepted, synchronize the
-exact F2 worktree and run the separately authorized **read-only** registered
-preflight. Review its evidence before considering any F1 authorization.
+### Next - ChatGPT exact-source review
+
+Inspect the one F2 commit, complete changed-path set, frozen operational pins,
+registered verification and terminal source-gate/canonical ROBINHOOD evidence.
+Stop on a mismatch, red gate or ambiguous evidence. If accepted, ChatGPT may
+supply the separately reviewed read-only F2 preflight command from the exact
+clean F2 worktree. Review that evidence before considering F1 authorization.
 
 ### Later
 
 Only after a reviewed F2 preflight PASS may an exact interactive F1 authorization
-be separately proposed. That future command is the first authority-consuming
-boundary and remains separately protected. The real five-session soak and all
-provider/paper effects remain closed now.
+be separately proposed. That command is the first authority-consuming boundary.
+The real soak and all scheduler mutation, credential/provider, runtime-write,
+paper/broker, promotion and live effects remain closed. Real-money is **NO-GO**.
 
 ## History
 

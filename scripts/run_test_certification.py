@@ -176,6 +176,7 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_d1_session_execution.py", 98881),
     ("tests/review_paper/test_five_session_soak.py", 81310),
     ("tests/review_paper/test_five_session_soak_child.py", 28079),
+    ("tests/review_paper/test_five_session_soak_readiness.py", 1000),
     ("tests/review_paper/test_forward_preview.py", 867),
     ("tests/review_paper/test_history_qualification.py", 1431),
     ("tests/review_paper/test_intent_bridge.py", 40),

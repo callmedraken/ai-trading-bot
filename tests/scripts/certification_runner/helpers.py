@@ -262,6 +262,7 @@ _CURRENT_FULL_ADDITIONS = (
     "tests/review_paper/test_d1_session_execution.py",
     "tests/review_paper/test_five_session_soak.py",
     "tests/review_paper/test_five_session_soak_child.py",
+    "tests/review_paper/test_five_session_soak_readiness.py",
     "tests/review_paper/test_history_qualification.py",
     "tests/review_paper/test_post_publication_stage_diagnostic.py",
     "tests/review_paper/test_post_publication_verifier.py",

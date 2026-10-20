@@ -3,8 +3,8 @@
 ## Current mode
 
 **ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
-ARCHITECTURE 144-C IMPLEMENTATION CANDIDATE; EXACT-SOURCE REVIEW PENDING.
-PROTECTED 134-F PREFLIGHT AND THE REAL SOAK REMAIN CLOSED.**
+ARCHITECTURE 144-C SOURCE ACCEPTED AND INTEGRATED.
+134-F PROTECTED PREFLIGHT/READINESS REVIEW IS NEXT; NO OPERATIONAL EFFECT IS AUTHORIZED.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`.
@@ -12,12 +12,14 @@ Standing workflow authority remains `AGENTS.md` and
 ## Current integration identity
 
 ```text
-develop HEAD f47deac55e22f5a1f215bed69b3429038d7babb0
-develop TREE 6a5e3319729e2d1e4b034631dd1d2edb99ccaa4f
+develop HEAD d4d007a5c4a7c6a5158b1fab6f82c082387783f3
+develop TREE 47f13748c89784fddf0ef981072a7b23f7d02f22
 ```
 
-Integration source-gate #650 / 39403544950 passed. Its four `full-tests` jobs
-were routine broad source-gate shards, not canonical FULL.
+Integration source-gate #653 / 39490843514 / attempt 1 / SUCCESS. The merge tree
+is byte-identical to the accepted 144-C feature tree. Its four `full-tests`
+jobs were routine broad develop shards, not canonical FULL; active/canonical
+certification were correctly skipped.
 
 ## Accepted Architecture 144 v1
 
@@ -47,90 +49,76 @@ changed no F1 production module.
 No real scheduler/provider/credential/D1R7/D1R8/D1R9/paper/broker/promotion/live
 effect occurred during F1 source work or integration.
 
-## Architecture 144-C frozen design
-
-Canonical design:
-
-- `docs/architecture/144-c-f1-paper-evidence-admission.md`;
-- `docs/validation/arch144-c-f1-paper-evidence-admission-plan.md`.
-
-144-C adds separate pure V2 observation/eligibility artifacts for truthful F1
-provenance while preserving v1 byte-for-byte.
-
-Key rules:
-
-- F1 evidence continues to fail the v1 D1R9 binding;
-- V2 pins exact accepted F1 HEAD/TREE and parent/child provenance;
-- V2 independently verifies supplied F1 parent/child plus D1R7/D1R8 bytes;
-- the complete Architecture-142/143 chain remains required;
-- the unchanged v1 five-session policy is reused;
-- exactly five consecutive published sessions and at least one
-  `PAPER_EXECUTED` are required for positive eligibility;
-- `RISK_REJECTED` may be verified but is nonqualifying;
-- `SESSION_MISSED`, `BLOCKED`, and `INDETERMINATE` create no positive V2
-  observation;
-- no filesystem evidence acquisition or operational effect is permitted.
-
-## Immediate next milestone - Architecture 144-C exact-source review
-
-Implementation owner/model: **Codex / Sol High**. Next owner: **ChatGPT** for
-exact-source acceptance and certification selection.
-
-Expected branch:
-
-`feature/test-suite-arch144-c-f1-paper-evidence-admission-current`
-
-Expected worktree:
-
-`F:\AI\worktrees\ai-trading-bot-arch144-c-f1-paper-evidence-admission-current`
-
-Primary new source/tests:
+## Accepted Architecture 144-C
 
 ```text
-src/trading_bot/experiments/research_strategy_paper_candidate_eligibility_v2.py
-src/trading_bot/experiments/research_strategy_f1_paper_evidence_verification.py
-tests/experiments/test_research_strategy_paper_candidate_eligibility_v2.py
-tests/experiments/test_research_strategy_f1_paper_evidence_verification.py
+branch feature/test-suite-arch144-c-f1-paper-evidence-admission-current
+base   c2072179a50b3e8b441b447b18284f0dc2040d88
+HEAD   1e86b5dcce19cd45504266b4fa0ac0aca5854d04
+TREE   47f13748c89784fddf0ef981072a7b23f7d02f22
+CI     #652 / 39410467329 / attempt 1 / SUCCESS
 ```
 
-Checkpoint:
+Architecture 144-C is **SOURCE ACCEPTED**. No additional canonical
+ROBINHOOD/FULL was required.
 
-`arch144-c-f1-paper-evidence-admission`
+It adds separate pure V2 observation/eligibility artifacts for truthful F1
+provenance while preserving v1 byte-for-byte. The accepted verifier independently
+replays supplied F1 parent/child plus D1R7/D1R8 bytes, requires the complete
+Architecture-142/143 chain, keeps the unchanged v1 five-session policy, and has
+no filesystem acquisition or operational capability.
 
-Authority:
+Frozen v1 blobs remain:
 
 ```text
-preflight None
-execute   None
+research_strategy_paper_candidate_eligibility.py
+fd6b0ad650fb3fb97f587deb7cffc7286e685813
+
+research_strategy_paper_evidence_verification.py
+915bdd84bee3ad0b57efcafb0a78da01fce94e66
 ```
 
-The branch is already covered by the reviewed `feature/test-suite-*` source-gate
-family. Do not pre-map ROBINHOOD or FULL. Run focused verification, compose all
-predictable runner/inventory/pin/status/handoff changes, exact-file stage, make
-one atomic commit, ordinary-push once, and poll the single push-triggered source
-gate to terminal.
+## Immediate next milestone - 134-F protected preflight/readiness review
 
-Codex does not own architecture, source acceptance, certification selection,
-merge readiness, or protected-effect authority.
+Owner/model: **ChatGPT / GPT-5.6 Sol High**.
+
+Review the accepted F1 operational source and frozen 134-F authority/validation
+documents against current integrated `develop`.
+
+Important: the accepted source checkpoint `arch134-f1-five-session-soak` has
+`preflight=None` and `execute=None`. Source acceptance and 144-C acceptance
+therefore do not create a protected command by implication.
+
+Determine whether the next safe milestone is a separate checked-in
+preflight/readiness source checkpoint or an already-reviewed pure read-only
+operator gate. Establish exact source/worktree identity, fixed scheduler task
+identity, durable evidence/slot prerequisites, credential/provider boundaries,
+STOP conditions, and the one-publication/effect rules before authorizing any
+protected command.
+
+Do not create/run/update/delete the F1 scheduled task, access provider
+credentials, invoke D1R7/D1R8/F1 operational effects, mutate paper state, or
+begin the five-session soak during this review.
 
 ## Protected boundary after 144-C
 
-Only after 144-C source acceptance may ChatGPT review the separate 134-F
-protected preflight/readiness boundary.
+144-C acceptance opens only the **review** of the separate 134-F protected
+preflight/readiness boundary.
 
-That later review does not imply retry authority, task creation, provider access,
-paper effects, or the real soak until its exact protected command and
-prerequisites are separately established.
+A future exact preflight command, if source-reviewed and separately authorized,
+may inspect only its frozen bounded prerequisites. Passing such a preflight still
+does not authorize the five-session soak. Task creation/run, provider access,
+paper effects and the real soak remain separately protected.
 
 Real-money trading remains **NO-GO**.
 
 ## Required continuation
 
-The implementation candidate adds the independent supplied-byte F1 V2 replay and
-positive builders, strict V2 artifacts, and a source-only registered checkpoint.
-Both frozen Architecture-144 v1 implementation blobs remain unchanged.
+Perform the read-only 134-F protected preflight/readiness review now. If required
+readiness logic is missing from the repository, freeze that source-only boundary
+and delegate its implementation before any operational command. If an adequate
+reviewed preflight surface already exists, produce the exact guarded command and
+its STOP/evidence contract separately.
 
-Obtain terminal source-gate evidence and review the exact feature HEAD/TREE,
-complete diff, focused results and CI. ChatGPT owns source acceptance and any
-additional certification selection. Do not merge or begin protected preflight.
-No canonical ROBINHOOD/FULL mapping or local profile run is part of this checkpoint.
+Do not rerun 144-C certification, do not retry the consumed D1R9 authority, and
+do not begin the real soak. Real-money trading remains **NO-GO**.

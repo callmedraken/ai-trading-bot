@@ -14137,8 +14137,8 @@ ARCH144C_SOURCE_PINS: Final = {
     "docs/validation/arch144-c-f1-paper-evidence-admission-plan.md": (
         "bada32f6dddeea2ab82805255091a0184c3cd0b6"
     ),
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("2ce5fbfa7d1e5e3bb2d8d14fad9878d6729b37d0"),
-    "docs/PROJECT_STATUS.md": ("a6f604be16b80676baca295e7d03ac7a37255812"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("88f43464e0d89d6ee26c7c9b6f45426d24820aba"),
+    "docs/PROJECT_STATUS.md": ("4158af1c6c230b3fb705500d8cfa779512562451"),
     "scripts/run_test_certification.py": ("1a1362efb4bf8694461e51cae9ad7d71b4797cbe"),
 }
 ARCH144C_PREDECESSOR_TEST_PINS: Final = {
@@ -14286,8 +14286,8 @@ ARCH144C_PREDECESSOR_SOURCE_PINS: Final = {
     "scripts/run_test_certification.py": ("3987e5708689de72a9604290d6e875c574c37c08"),
 }
 ARCH144C_SOURCE_PIN_OVERRIDES: Final = {
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("2ce5fbfa7d1e5e3bb2d8d14fad9878d6729b37d0"),
-    "docs/PROJECT_STATUS.md": ("a6f604be16b80676baca295e7d03ac7a37255812"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("88f43464e0d89d6ee26c7c9b6f45426d24820aba"),
+    "docs/PROJECT_STATUS.md": ("4158af1c6c230b3fb705500d8cfa779512562451"),
     "docs/architecture/134-f1-five-session-live-paper-soak-authority.md": (
         "f5e53dfcd9f97f3b49b183edf815d19faa17ed13"
     ),

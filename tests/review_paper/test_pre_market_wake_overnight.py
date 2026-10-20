@@ -894,7 +894,7 @@ def test_checkpoint_inventory_and_frozen_predecessors():
             )
         )
         for profile in certification.PROFILES
-    } == {"full": 189, "robinhood": 103, "legacy": 222, "exhaustive": 411}
+    } == {"full": 191, "robinhood": 103, "legacy": 222, "exhaustive": 413}
     expected = {
         "ARCH134_D1R5_TEST_PIN_OVERRIDES": (
             "6a95f4afc8640dfa0c672f5d77cda06ae57171c0199128a3ddd1d8b0debaac4a"

@@ -515,8 +515,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 68
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 68
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 69
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 69
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")
@@ -637,7 +637,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         is None
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 68
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 69
     assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
         runner.ARCH134_ARMED_PAPER_NAME,
         runner.ARCH134_PRODUCTION_STRATEGY_NAME,
@@ -648,7 +648,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
     )
     assert (
         runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        == "2a97b88e6a60ec0816d491a00bf9de64c2966c25f2082a496141b0ebe6c4e40d"
+        == "7fadb7dc37d5e7f434cb8b5d1083f2e8a6e7dff04be146315f737f1ad9f73d19"
     )
     root = Path(runner.__file__).resolve().parents[1]
     for check in (

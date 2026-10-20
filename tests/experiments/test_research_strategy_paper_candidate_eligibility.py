@@ -3,7 +3,7 @@
 import ast
 import json
 from dataclasses import FrozenInstanceError, fields, replace
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
@@ -13,7 +13,15 @@ import pytest
 
 import trading_bot.experiments as exports
 import trading_bot.experiments.research_strategy_paper_candidate_eligibility as subject
-from trading_bot.domain import Symbol
+import trading_bot.experiments.research_strategy_walk_forward as walk_forward
+from trading_bot.domain import Bar, Symbol
+from trading_bot.experiments import (
+    research_strategy_paper_evidence_verification as evidence_subject,
+)
+from trading_bot.experiments.research_strategy_definition import (
+    ResearchStrategyDefinition,
+    ResearchStrategyEvaluationPolicy,
+)
 from trading_bot.experiments.research_strategy_paper_candidate_eligibility import (
     OBSERVATION_TERMINAL_CLASSIFICATIONS,
     PAPER_TERMINAL_CLASSIFICATIONS,
@@ -39,6 +47,24 @@ from trading_bot.experiments.research_strategy_paper_candidate_eligibility impor
 from trading_bot.experiments.research_strategy_paper_candidate_eligibility import (
     ResearchStrategyPaperCandidateEligibilityError as Error,
 )
+from trading_bot.experiments.research_strategy_paper_evidence_verification import (
+    D1R8_BRANCH,
+    D1R8_SOURCE_HEAD,
+    D1R8_SOURCE_TREE,
+    D1R9_BRANCH,
+    D1R9_SOURCE_HEAD,
+    D1R9_SOURCE_TREE,
+    ResearchStrategyPaperEvidenceVerificationError,
+    build_verified_research_strategy_paper_candidate_eligibility,
+    build_verified_research_strategy_paper_session_observation,
+    verify_research_strategy_paper_candidate_eligibility,
+    verify_research_strategy_paper_session_observation,
+)
+from trading_bot.experiments.research_strategy_production_compatibility import (
+    ProductionStrategySemanticTarget,
+    build_research_strategy_production_compatibility_proof,
+)
+from trading_bot.market_data.models import HistoricalDataRequest, HistoricalDataResult
 from trading_bot.strategies.moving_average import MovingAverageCrossoverConfig as Config
 from trading_bot.strategies.production import (
     MOVING_AVERAGE_STRATEGY_ID,
@@ -56,6 +82,399 @@ _DATES = (
     date(2024, 1, 5),
     date(2024, 1, 8),
 )
+
+
+@pytest.fixture
+def evidence_chain():
+    symbol = Symbol("SPY")
+    definition = ResearchStrategyDefinition(
+        HEAD, TREE, symbol, Config(2, 3, Decimal("1"))
+    )
+    policy = ResearchStrategyEvaluationPolicy(
+        starting_cash=Decimal("10000"),
+        fixed_commission=Decimal("0"),
+        slippage_basis_points=Decimal("0"),
+        trading_enabled=True,
+        allow_missing_sessions=False,
+        max_position_percent=Decimal("0.2"),
+        max_total_exposure_percent=Decimal("0.8"),
+        max_order_notional=None,
+        max_new_position_percent=None,
+        minimum_cash_reserve_percent=Decimal("0.1"),
+        allow_fractional_shares=True,
+        fractional_increment=Decimal("0.001"),
+        allow_buying=True,
+        allow_selling=True,
+        estimated_commission=Decimal("0"),
+    )
+    timestamps = tuple(
+        datetime(2024, 1, day, 20, tzinfo=UTC)
+        for day in (2, 3, 4, 5, 8, 9, 10, 11, 12, 16, 17)
+    )
+    bars = tuple(
+        Bar(
+            symbol,
+            timestamp,
+            Decimal(close),
+            Decimal(close),
+            Decimal(close),
+            Decimal(close),
+            1000,
+        )
+        for timestamp, close in zip(
+            timestamps,
+            (100, 101, 99, 102, 103, 101, 104, 105, 103, 106, 107),
+            strict=True,
+        )
+    )
+    data = HistoricalDataResult(
+        HistoricalDataRequest(
+            symbol, datetime(2024, 1, 2, tzinfo=UTC), datetime(2024, 1, 19, tzinfo=UTC)
+        ),
+        bars,
+        "test-memory",
+    )
+    folds = tuple(
+        walk_forward.ResearchStrategyWalkForwardFold(
+            datetime(2024, 1, start, 5, tzinfo=UTC),
+            datetime(2024, 1, middle, 5, tzinfo=UTC),
+            datetime(2024, 1, middle, 5, tzinfo=UTC),
+            datetime(2024, 1, end, 5, tzinfo=UTC),
+        )
+        for start, middle, end in ((2, 5, 9), (9, 12, 17))
+    )
+    completed = walk_forward.run_research_strategy_walk_forward(
+        definition,
+        policy,
+        data,
+        folds,
+        evaluation_source_head=PRODUCTION_HEAD,
+        evaluation_source_tree=PRODUCTION_TREE,
+    )
+    qualification_policy = walk_forward.ResearchStrategyWalkForwardQualificationPolicy(
+        minimum_fold_count=2,
+        minimum_fold_return=Decimal("-1"),
+        minimum_median_return=Decimal("-1"),
+        maximum_fold_drawdown_percentage=Decimal("100"),
+        require_equal_test_window_bar_count=True,
+    )
+    qualification = walk_forward.qualify_research_strategy_walk_forward(
+        completed,
+        qualification_policy,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+    )
+    passed = walk_forward.build_walk_forward_passed_research_strategy(
+        qualification,
+        completed,
+        qualification_policy,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+    )
+    target = ProductionStrategySemanticTarget(
+        HEAD, TREE, symbol, definition.strategy_config
+    )
+    proof = build_research_strategy_production_compatibility_proof(
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+    return proof, completed, qualification, qualification_policy, passed, target
+
+
+def _canonical(value: object) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+
+
+def _synthetic_d1r7_facts(
+    session_date: date, production_source_head: str, production_source_tree: str
+) -> dict[str, object]:
+    contract_material = (
+        "production-strategy-contract-identity/v1",
+        session_date.isoformat(),
+        production_source_head,
+        production_source_tree,
+        MOVING_AVERAGE_STRATEGY_ID,
+        MOVING_AVERAGE_STRATEGY_VERSION,
+        "SPY",
+        "2",
+        "3",
+        "1",
+    )
+    contract_id = uuid5(
+        UUID("c0867c3b-548e-5512-a135-3c4f1225e6fc"),
+        "".join(f"{len(item.encode()):}:{item}" for item in contract_material),
+    )
+    reservation_digest = sha256(
+        _canonical(
+            [
+                "arch134-d1r7-d1-session-authorization/v1",
+                session_date.isoformat(),
+                evidence_subject._D1R5["sha256"],
+                evidence_subject._D1R6["sha256"],
+            ]
+        )
+    ).hexdigest()
+    return {
+        "checkpoint": "arch134-d1r7-d1-session-authorization/v1",
+        "source": {
+            "origin": "https://github.com/callmedraken/ai-trading-bot.git",
+            "branch": evidence_subject.D1R7_BRANCH,
+            "head": evidence_subject.D1R7_SOURCE_HEAD,
+            "tree": evidence_subject.D1R7_SOURCE_TREE,
+        },
+        "intended_d1": {
+            "origin": "https://github.com/callmedraken/ai-trading-bot.git",
+            "branch": D1R8_BRANCH,
+            "head": D1R8_SOURCE_HEAD,
+            "tree": D1R8_SOURCE_TREE,
+        },
+        "qualification_session": "2026-10-16",
+        "target_session": session_date.isoformat(),
+        "observed_at": f"{session_date.isoformat()}T00:00:00+00:00",
+        "authorization_expires_at": f"{session_date.isoformat()}T00:05:00+00:00",
+        "reservation_basename": (
+            f"arch134-d1r7-{session_date.isoformat()}-{reservation_digest}.jsonl"
+        ),
+        "d1r5": evidence_subject._D1R5,
+        "d1r6": evidence_subject._D1R6,
+        "strategy_contract": {
+            "schema": PRODUCTION_STRATEGY_SCHEMA,
+            "contract_id": str(contract_id),
+            "target_session_date": session_date.isoformat(),
+            "source_head": production_source_head,
+            "source_tree": production_source_tree,
+            "strategy_id": MOVING_AVERAGE_STRATEGY_ID,
+            "strategy_version": MOVING_AVERAGE_STRATEGY_VERSION,
+            "symbol": "SPY",
+            "strategy_config": {
+                "short_window": 2,
+                "long_window": 3,
+                "desired_quantity": "1",
+            },
+        },
+        "d1_policy": evidence_subject._D1R7_POLICY,
+    }
+
+
+def _synthetic_paper_evidence(
+    session_date: date,
+    *,
+    classification: str = "NO_SIGNAL",
+    production_source_head: str = HEAD,
+    production_source_tree: str = TREE,
+) -> tuple[bytes, bytes]:
+    d1r7 = _synthetic_d1r7_facts(
+        session_date, production_source_head, production_source_tree
+    )
+    d1r8_facts = {
+        "prerequisite": d1r7,
+        "d1r7_bytes": 1,
+        "d1r7_sha256": "a" * 64,
+        "publication_confirmed": True,
+    }
+    budgets = dict(evidence_subject.D1R8_BUDGETS)
+    effects = dict.fromkeys(budgets, 0)
+    binding = sha256(_canonical(d1r8_facts)).hexdigest()
+    observed_at = f"{session_date.isoformat()}T00:00:00+00:00"
+    rows: list[dict[str, object]] = []
+
+    def state(event: str, *, facts: object = None, result_hash: str | None = None):
+        rows.append(
+            {
+                "schema": evidence_subject.D1R8_SCHEMA,
+                "event": event,
+                "action": None,
+                "counter": None,
+                "facts": facts,
+                "binding_sha256": binding,
+                "budgets": budgets,
+                "effects": dict(effects),
+                "classification": None,
+                "observed_at": observed_at,
+                "result_sha256": result_hash,
+            }
+        )
+
+    def action(event: str, action_name: str, counter: str):
+        if action_name == "INTENT":
+            effects[counter] += 1
+            if counter.endswith("credential_reads"):
+                effects["credential_reads"] += 1
+        rows.append(
+            {
+                "schema": evidence_subject.D1R8_SCHEMA,
+                "event": event,
+                "action": action_name,
+                "counter": counter,
+                "facts": None,
+                "binding_sha256": binding,
+                "budgets": budgets,
+                "effects": dict(effects),
+                "classification": None,
+                "observed_at": observed_at,
+                "result_sha256": None,
+            }
+        )
+
+    state("SESSION_RESERVED", facts=d1r8_facts)
+    state("SOURCE_AND_D1R7_BOUND")
+    state("WRITE_READINESS_STARTED")
+    action("WRITE_READINESS_STARTED", "INTENT", "write_readiness_attempts")
+    action("WRITE_READINESS_STARTED", "ACK", "write_readiness_attempts")
+    state("WRITE_READINESS_CONFIRMED")
+    action("WRITE_READINESS_CONFIRMED", "INTENT", "compatibility_reservations")
+    action("WRITE_READINESS_CONFIRMED", "ACK", "compatibility_reservations")
+    state("LEGACY_SESSION_FENCE_CLAIMED")
+    state("CREDENTIAL_READ_INTENT")
+    for _ in range(2):
+        action("CREDENTIAL_READ_INTENT", "INTENT", "alpaca_credential_reads")
+        action("CREDENTIAL_READ_INTENT", "ACK", "alpaca_credential_reads")
+    state("CREDENTIAL_READ_CONFIRMED")
+    for _ in range(4):
+        state("HISTORY_READ_INTENT")
+        action("HISTORY_READ_INTENT", "INTENT", "alpaca_history_requests")
+        action("HISTORY_READ_INTENT", "ACK", "alpaca_history_requests")
+        state("HISTORY_READ_CONFIRMED")
+    state("HISTORY_READY", result_hash="b" * 64)
+    state("STRATEGY_STARTED")
+    action("STRATEGY_STARTED", "INTENT", "strategy_evaluations")
+    action("STRATEGY_STARTED", "ACK", "strategy_evaluations")
+    state("STRATEGY_DECIDED", result_hash="c" * 64)
+    if classification == "PAPER_EXECUTED":
+        state("PREPARE_STARTED")
+        action("PREPARE_STARTED", "INTENT", "prepare_attempts")
+        action("PREPARE_STARTED", "ACK", "prepare_attempts")
+        for _ in range(2):
+            action("PREPARE_STARTED", "INTENT", "robinhood_credential_reads")
+            action("PREPARE_STARTED", "ACK", "robinhood_credential_reads")
+        state("QUOTE_INTENT")
+        action("QUOTE_INTENT", "INTENT", "quote_requests")
+        action("QUOTE_INTENT", "ACK", "quote_requests")
+        state("QUOTE_CONFIRMED")
+        state("PREPARED", result_hash="d" * 64)
+        state("EXECUTE_STARTED")
+        action("EXECUTE_STARTED", "INTENT", "execute_attempts")
+        action("EXECUTE_STARTED", "ACK", "execute_attempts")
+        state("ACCOUNT_READ")
+        action("ACCOUNT_READ", "INTENT", "account_resolutions")
+        action("ACCOUNT_READ", "ACK", "account_resolutions")
+        state("BASELINE_ORDER_READS")
+        for _ in range(2):
+            action("BASELINE_ORDER_READS", "INTENT", "order_history_attempts")
+            action("BASELINE_ORDER_READS", "ACK", "order_history_attempts")
+        state("REVIEW_INTENT")
+        action("REVIEW_INTENT", "INTENT", "order_reviews")
+        action("REVIEW_INTENT", "ACK", "order_reviews")
+        state("REVIEW_CONFIRMED")
+        state("POST_REVIEW_ORDER_READS")
+        for _ in range(2):
+            action("POST_REVIEW_ORDER_READS", "INTENT", "order_history_attempts")
+            action("POST_REVIEW_ORDER_READS", "ACK", "order_history_attempts")
+        state("PAPER_WRITE_INTENT")
+        action("PAPER_WRITE_INTENT", "INTENT", "paper_fill_mutations")
+        action("PAPER_WRITE_INTENT", "ACK", "paper_fill_mutations")
+        state("PAPER_WRITE_ACKNOWLEDGED", result_hash="e" * 64)
+    elif classification != "NO_SIGNAL":
+        raise AssertionError("unsupported synthetic classification")
+    rows.append(
+        {
+            "schema": evidence_subject.D1R8_SCHEMA,
+            "event": "FINAL",
+            "action": None,
+            "counter": None,
+            "facts": None,
+            "binding_sha256": binding,
+            "budgets": budgets,
+            "effects": dict(effects),
+            "classification": classification,
+            "observed_at": observed_at,
+            "result_sha256": None,
+        }
+    )
+    d1r8_payload = b"".join(_canonical(row) + b"\n" for row in rows)
+
+    d1r9_facts = {
+        "source": {
+            "branch": D1R9_BRANCH,
+            "head": D1R9_SOURCE_HEAD,
+            "tree": D1R9_SOURCE_TREE,
+        },
+        "d1r7": {
+            "branch": evidence_subject.D1R7_BRANCH,
+            "head": evidence_subject.D1R7_SOURCE_HEAD,
+            "tree": evidence_subject.D1R7_SOURCE_TREE,
+        },
+        "d1r8": {
+            "branch": D1R8_BRANCH,
+            "head": D1R8_SOURCE_HEAD,
+            "tree": D1R8_SOURCE_TREE,
+        },
+        "target_session": session_date.isoformat(),
+        "authorized_at": observed_at,
+        "symbol": "SPY",
+        "runtime": {
+            name: {"device": 1, "inode": index, "bytes": 1, "sha256": "d" * 64}
+            for index, name in enumerate(("paper", "sessions", "python"), start=1)
+        },
+    }
+    d1r9_binding = sha256(_canonical(d1r9_facts)).hexdigest()
+    d1r9_budgets = dict(evidence_subject.D1R9_BUDGETS)
+    d1r9_effects = dict.fromkeys(d1r9_budgets, 0)
+    d1r9_rows: list[dict[str, object]] = []
+
+    def supervisor_row(
+        event: str,
+        *,
+        facts: object = None,
+        proof: object = None,
+        final: bool = False,
+    ):
+        if event == "SCHEDULER_RUN_INTENT":
+            d1r9_effects["scheduler_runs"] += 1
+        elif event == "D1R7_DELEGATION_INTENT":
+            d1r9_effects["d1r7_attempts"] += 1
+        elif event == "D1R8_DELEGATION_INTENT":
+            d1r9_effects["d1r8_attempts"] += 1
+        d1r9_rows.append(
+            {
+                "schema": evidence_subject.D1R9_SCHEMA,
+                "event": event,
+                "classification": classification if final else None,
+                "facts": facts,
+                "binding": d1r9_binding,
+                "effects": dict(d1r9_effects),
+                "budgets": d1r9_budgets,
+                "observed_at": observed_at,
+                "proof": proof,
+            }
+        )
+
+    supervisor_row("AUTHORIZATION_RESERVED", facts=d1r9_facts)
+    supervisor_row("SOURCES_ADMITTED")
+    supervisor_row("TARGET_BOUND")
+    supervisor_row("SUPERVISOR_READY")
+    supervisor_row("SCHEDULER_RUN_INTENT")
+    supervisor_row("SCHEDULER_RUN_ACK")
+    supervisor_row("D1R7_DELEGATION_INTENT")
+    supervisor_row("D1R7_READY", proof={"bytes": 1, "sha256": "e" * 64})
+    supervisor_row("D1R8_DELEGATION_INTENT")
+    supervisor_row(
+        "FINAL",
+        proof={
+            "bytes": len(d1r8_payload),
+            "sha256": sha256(d1r8_payload).hexdigest(),
+        },
+        final=True,
+    )
+    d1r9_payload = b"".join(_canonical(row) + b"\n" for row in d1r9_rows)
+    return d1r9_payload, d1r8_payload
 
 
 def _uuid(name: str) -> UUID:
@@ -543,3 +962,181 @@ def test_schema_constants_are_exact() -> None:
     assert MOVING_AVERAGE_STRATEGY_ID
     assert MOVING_AVERAGE_STRATEGY_VERSION
     assert sha256(_eligibility(_window()).to_json().encode()).hexdigest()
+
+
+def test_144b_replays_synthetic_d1r8_and_d1r9_before_building_observation(
+    evidence_chain,
+) -> None:
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    session_date = date(2026, 10, 19)
+    d1r9_evidence, d1r8_evidence = _synthetic_paper_evidence(session_date)
+    observation = build_verified_research_strategy_paper_session_observation(
+        session_date,
+        d1r9_evidence,
+        d1r8_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+    verify_research_strategy_paper_session_observation(
+        observation,
+        d1r9_evidence,
+        d1r8_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+    assert observation.terminal_classification == "NO_SIGNAL"
+    assert observation.d1r9_source_head == D1R9_SOURCE_HEAD
+    assert observation.d1r8_source_head == D1R8_SOURCE_HEAD
+
+
+def test_144b_rejects_reconciled_artifact_mutation(evidence_chain) -> None:
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    session_date = date(2026, 10, 19)
+    d1r9_evidence, d1r8_evidence = _synthetic_paper_evidence(session_date)
+    observation = build_verified_research_strategy_paper_session_observation(
+        session_date,
+        d1r9_evidence,
+        d1r8_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+    with pytest.raises(ResearchStrategyPaperEvidenceVerificationError):
+        verify_research_strategy_paper_session_observation(
+            replace(observation, d1r8_journal_sha256="f" * 64),
+            d1r9_evidence,
+            d1r8_evidence,
+            proof,
+            completed,
+            qualification,
+            qualification_policy,
+            passed,
+            target,
+            qualification_source_head=PRODUCTION_HEAD,
+            qualification_source_tree=PRODUCTION_TREE,
+            proof_source_head=PRODUCTION_HEAD,
+            proof_source_tree=PRODUCTION_TREE,
+        )
+
+
+def test_144b_builds_and_replays_a_mixed_five_session_eligibility_window(
+    evidence_chain,
+) -> None:
+    proof, completed, qualification, qualification_policy, passed, target = (
+        evidence_chain
+    )
+    session_dates = tuple(date(2026, 10, day) for day in range(19, 24))
+    session_evidence = tuple(
+        (
+            session_date,
+            *(
+                _synthetic_paper_evidence(
+                    session_date,
+                    classification=("PAPER_EXECUTED" if index == 4 else "NO_SIGNAL"),
+                )
+            ),
+        )
+        for index, session_date in enumerate(session_dates)
+    )
+    eligibility = build_verified_research_strategy_paper_candidate_eligibility(
+        session_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+        eligibility_source_head=PRODUCTION_HEAD,
+        eligibility_source_tree=PRODUCTION_TREE,
+    )
+    verify_research_strategy_paper_candidate_eligibility(
+        eligibility,
+        session_evidence,
+        proof,
+        completed,
+        qualification,
+        qualification_policy,
+        passed,
+        target,
+        qualification_source_head=PRODUCTION_HEAD,
+        qualification_source_tree=PRODUCTION_TREE,
+        proof_source_head=PRODUCTION_HEAD,
+        proof_source_tree=PRODUCTION_TREE,
+    )
+    assert eligibility.paper_executed_count == 1
+    assert eligibility.first_session_date == session_dates[0]
+    assert eligibility.last_session_date == session_dates[-1]
+
+
+def test_144b_source_is_pure_and_does_not_import_effectful_d1_modules() -> None:
+    source_path = Path(evidence_subject.__file__).resolve()
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    forbidden_names = {
+        "ProductionStrategyContract",
+        "build_production_strategy",
+        "sqlite3",
+        "subprocess",
+        "socket",
+        "requests",
+        "uuid4",
+        "scheduler",
+        "provider",
+        "broker",
+    }
+    names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+    attributes = {
+        node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)
+    }
+    assert not forbidden_names & (names | attributes)
+    imported_modules = {
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        for alias in node.names
+    }
+    assert not any(
+        name.endswith(
+            (
+                "d1_session_execution_store",
+                "d1_session_supervisor",
+                "d1_session_execution",
+            )
+        )
+        for name in imported_modules
+    )
+
+
+def test_144b_exports_are_reachable_from_experiments_package() -> None:
+    for name in evidence_subject.__all__:
+        assert getattr(exports, name) is getattr(evidence_subject, name)

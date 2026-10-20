@@ -1,155 +1,140 @@
 # AI Trading Bot - Current Handoff
 
-## Purpose and authority
+## Current mode
 
-This is the bounded continuation handoff. Standing workflow authority remains
-`AGENTS.md` and `docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state
-is in `docs/PROJECT_STATUS.md`. Closed chronology belongs in architecture,
-validation, Git/CI evidence, or `docs/history/`.
+**ARCHITECTURE 144-A SOURCE ACCEPTED; CONTINUE DIRECTLY TO 144-B.**
 
-Current remote `develop` is the primary startup integration reference.
-`feature/project-history-storage-foundation` is an optional synchronized
-compatibility/history mirror, not executable-source or trading authority.
+Standing workflow authority remains `AGENTS.md` and
+`docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state is in
+`docs/PROJECT_STATUS.md`.
 
-## Current verified checkpoint
-
-The accepted safe-side executable/certification lineage has been integrated into
-`develop`:
+## Accepted Architecture 144-A source
 
 ```text
-HEAD  82c26460759aa868b739d7cacc310aa5ccc46dc4
-TREE  cccd7766e6bd7f92811cac8e5144170d145ba3e5
-CI    Checkpoint Source Gates #635 / 39313574240 / SUCCESS / attempt 1
-```
-
-The following docs-only closeout at
-`4380b3c9ff658de733d09c8515b17e0c2e0ec25b` /
-`5183733bac9be9356ffbbce119f17e9bba9330fa` passed Checkpoint Source Gates
-#636 / 39314345671. This corrective docs checkpoint removes stale
-current-product wording from that closeout and restores the exact frozen
-Architecture-144 C1 documents.
-
-Canonical FULL remains the accepted R3I-C1 result on:
-
-```text
-HEAD  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-TREE  bf7019b1610c29563282ccb5f19be2bcb6501849
-12,354 cases / 12,351 passed / 3 skipped / 0 failed / 0 errors
-287.176 s
-```
-
-Do not rerun FULL on unchanged executable/test source.
-
-## Architecture 144-A exact source boundary
-
-The frozen Architecture-144 C1 design authority is:
-
-```text
-HEAD  5c737ec08ef806e16edeafd196f57177271cab41
-TREE  eba84b55f6f6822cc68e5b054cb3fbbbded10ec0
-```
-
-The exact direct executable predecessor for 144-A is separately frozen as:
-
-```text
-HEAD  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-TREE  bf7019b1610c29563282ccb5f19be2bcb6501849
-```
-
-The existing local 144-A worktree was last admitted clean at exactly that
-executable predecessor:
-
-```text
+worktree
 F:\AI\worktrees\ai-trading-bot-arch144-research-paper-eligibility-current
+
+branch
 feature/test-suite-arch144-research-paper-eligibility-current
+
+BASE HEAD
+c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+
+BASE TREE
+bf7019b1610c29563282ccb5f19be2bcb6501849
+
+FINAL HEAD
+0c3064c7576d3c91a9039d49a514aae174253f6a
+
+FINAL TREE
+b6aa255eb6bbeeeb0bcc953a24a84e4d662807e2
+
+parent
+c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+
+commits above base
+1
+
+CI
+Checkpoint Source Gates #638 / 39346589645 / push / attempt 1 / SUCCESS
 ```
 
-Do not fast-forward that worktree to `develop`. The docs-only commits on
-`develop` are design/current-state authority, not a replacement executable
-parent for 144-A.
+ChatGPT independently reviewed the exact GitHub source and CI. 144-A is
+**SOURCE ACCEPTED**.
 
-The GitHub source-gate workflow already admits `feature/test-suite-*`, so the
-first ordinary push of the 144-A branch does not require a separate workflow
-bootstrap checkpoint.
+The new source is an inert deterministic foundation only. Canonical parsing and
+intrinsic validation do not establish external verification or operational
+authority.
 
-144-A implements only the deterministic artifact/transport/fixed-policy
-foundation for:
+## Certification boundary
 
-- `ResearchStrategyPaperSessionObservation`;
-- `ResearchStrategyPaperSoakPolicy`;
-- `ResearchStrategyPaperCandidateEligibility`.
+144-A changed the current FULL inventory from 186 to 187 modules and refreshed
+the reviewed timing/inventory successor chain. CI #638's four broad shards
+passed, but they are source-gate admission evidence rather than canonical FULL.
 
-It uses synthetic canonical fixtures only. It does not acquire or read real
-D1R9/D1R8 evidence, import/copy D1R9 operational modules, grant external
-verification from parsing, create positive externally verified builders, touch
-scheduler/provider/credentials/broker/paper state, invoke D1/D1R7/D1R8/D1R9/D2,
-materialize `PAPER_CANDIDATE`, or promote anything.
+The pending FULL obligation is deliberately batched through 144-B because 144-B
+is the adjacent source-only successor and no protected/consequential boundary is
+crossed between them.
 
-Owner/model for 144-A: **Codex with Luna Extra High** because the contract,
-entry points, identity rules, and focused-test surface are frozen and localized.
+After 144-B exact-source acceptance:
 
-## Monday D1R9 closed boundary
+1. run one fresh canonical FULL on the final exact 144-A+B source;
+2. do not also run redundant ROBINHOOD unless ChatGPT identifies materially
+   distinct required coverage;
+3. only after that gate may the project approach the protected 134-F
+   multi-session paper-soak boundary.
 
-The consumed 2026-10-19 D1R9 session is terminal:
+## Immediate next milestone — Architecture 144-B
+
+Owner/model: **Codex / Astra**.
+
+Reason: 144-B must compose existing Architecture-142/143 public verifiers with
+accepted D1R9/D1R8 parser/proof semantics while preserving a pure no-acquisition
+boundary. The contract is frozen, but the exact safe composition surface crosses
+multiple modules and should be discovered before implementation rather than
+guessed.
+
+144-B must remain separated from evidence acquisition:
+
+- caller supplies canonical bytes/objects;
+- complete 142/143/D1R9/D1R8 evidence is independently verified;
+- exact production contract/strategy/session/source semantics are reconciled;
+- positive verified observation construction occurs only after those checks;
+- five verified observations may produce positive eligibility only after the
+  frozen v1 soak rule passes.
+
+It must not:
+
+- open/read real evidence files itself;
+- import/copy effectful D1R9 scheduler/filesystem surface merely for parser
+  semantics;
+- access credentials/providers/Robinhood/brokers;
+- mutate scheduler or paper state;
+- invoke D1/D1R7/D1R8/D1R9/D2;
+- materialize `PAPER_CANDIDATE`;
+- promote anything.
+
+## Unattended paper-trading boundary
+
+The project has already completed Architecture-134's intended **134-E one
+unattended integration session** through the accepted Monday D1R9
+`FINAL / NO_SIGNAL` run and independent reconciliation.
+
+Architecture 134 explicitly names the next operational proof as:
 
 ```text
-D1R9  FINAL / NO_SIGNAL
-       dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
-D1R8  FINAL / NO_SIGNAL
-       11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
-D1R7  READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
-       49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
-task   MATCH at reconciliation
+134-F: fresh multi-session live-paper soak with end-of-window review
 ```
 
-There is no retry authority. Under the Architecture-144 v1 policy this is
-qualifying external clean-session input and contributes zero execution count.
-No Architecture-144 observation artifact exists yet. See
-[the compact closed record](history/2026-10-19-d1r9-no-signal-and-safe-side-integration.md).
-
-## Local integration catch-up pending after this docs correction
-
-Last reported local integration state:
+So the project is now technically close to unattended paper testing, but the
+multi-session protected effect should not begin until:
 
 ```text
-F:\AI\ai-trading-bot
-branch develop
-HEAD 5c737ec08ef806e16edeafd196f57177271cab41
-tracked/index state: reported clean; unrelated generated/untracked artifacts preserved
-
-local feature/project-history-storage-foundation
-HEAD f156953b373aafbf80b6984752f65f3dc42caea1
+144-B source accepted
+-> final exact canonical FULL
+-> 134-F protected preflight/authorization
+-> fresh unattended multi-session paper soak
+-> end-of-window reconciliation
+-> Architecture-144 eligibility evaluation
 ```
 
-Both reported heads were independently verified as ancestors of the accepted
-remote lineage. After this corrective docs commit and its terminal gate, the
-remote mirror is fast-forwarded once. Then the operator performs one short,
-exact-state, fast-forward-only local catch-up for these two integration refs.
-Unrelated generated/untracked artifacts remain untouched.
+The five-session Architecture-144 v1 gate requires five consecutive published
+regular sessions and at least one `PAPER_EXECUTED`. `NO_SIGNAL` supplies
+clean coverage but no execution evidence.
 
-That catch-up does not touch the 144-A worktree.
-
-## Immediate continuation
-
-The workflow after this corrective docs checkpoint is fixed:
-
-1. terminal docs-only CI;
-2. one remote history-mirror fast-forward to the accepted docs descendant;
-3. one short PowerShell operator catch-up for local `develop` and the local
-   history mirror;
-4. immediately continue 144-A in the unchanged c5225d8f... worktree using Luna
-   Extra High;
-5. one fully prepared atomic 144-A commit/push and one push-triggered CI run;
-6. ChatGPT exact GitHub source review and certification-tier decision;
-7. bounded status/handoff closeout and mirror fast-forward;
-8. automatic 144-B next-step material.
-
-No separate "what next?" or ceremonial approval turn is required when the next
-safe action is already determined.
+That five-session gate answers whether the strategy has cleared the project's
+first paper-eligibility threshold. It is not enough by itself to conclude that
+the strategy is profitable or robust; longer paper performance observation
+remains necessary before promotion.
 
 ## Safety boundary
 
-Real-money trading remains NO-GO. No source, docs, CI, or certification
-checkpoint grants external-effect authority. The Monday authority is consumed,
-144-A is pure, 144-B is separately reviewed, paper-candidate materialization is
-later, and human promotion is later and explicit.
+Real-money trading remains **NO-GO**. No source, CI, FULL, eligibility artifact,
+or paper soak grants live authority. Paper-candidate materialization and human
+promotion remain later explicit boundaries.
+
+## Required continuation
+
+Continue 144-B now on the accepted 144-A feature lineage. After its exact-source
+review, automatically run/prepare the one required canonical FULL and then the
+134-F protected preflight. Do not wait for a separate "what next?" request.

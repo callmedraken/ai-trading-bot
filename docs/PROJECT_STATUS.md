@@ -2,27 +2,50 @@
 
 ## Current verified checkpoint
 
-The Monday 2026-10-19 production-paper session and the safe-side integration
-checkpoint are closed. Architecture 144-A / RCL-7 is the active next source
-milestone.
-
-Accepted integration:
+Architecture 144-A / RCL-7 is **SOURCE ACCEPTED** on the isolated feature
+lineage.
 
 ```text
-HEAD  82c26460759aa868b739d7cacc310aa5ccc46dc4
-TREE  cccd7766e6bd7f92811cac8e5144170d145ba3e5
-CI    Checkpoint Source Gates #635 / 39313574240 / SUCCESS / attempt 1
+branch  feature/test-suite-arch144-research-paper-eligibility-current
+base    c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+base tree
+        bf7019b1610c29563282ccb5f19be2bcb6501849
+HEAD    0c3064c7576d3c91a9039d49a514aae174253f6a
+TREE    b6aa255eb6bbeeeb0bcc953a24a84e4d662807e2
+parent  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
+commits above base
+        1
+CI      Checkpoint Source Gates #638 / 39346589645
+event   push
+attempt 1
+result  SUCCESS
 ```
 
-The post-integration docs closeout at
-`4380b3c9ff658de733d09c8515b17e0c2e0ec25b` /
-`5183733bac9be9356ffbbce119f17e9bba9330fa` passed docs-only
-Checkpoint Source Gates #636 / 39314345671. This corrective checkpoint removes
-stale current-state wording from that closeout and restores the exact frozen
-Architecture-144 C1 documents.
+ChatGPT independently reviewed the exact GitHub commit, all 19 changed paths,
+the new Architecture-144 module/tests, current-inventory successor pins,
+certification inventory/timing changes, and exact CI route. The source remains
+pure and deterministic and does not acquire or verify real operational evidence.
 
-Canonical current-product FULL remains the accepted R3I-C1 run on unchanged
-executable/test bytes:
+144-A implemented:
+
+- `ResearchStrategyPaperSessionObservation`;
+- `ResearchStrategyPaperSoakPolicy`;
+- `ResearchStrategyPaperCandidateEligibility`;
+- exact UUID5 semantic identities and UTF-8 length framing;
+- canonical Decimal/JSON transport;
+- fixed v1 five-session policy;
+- intrinsic consecutive-session/window validation;
+- package exports;
+- focused tests;
+- mechanically required current-inventory/certification bookkeeping.
+
+The checkpoint reads no real D1R7/D1R8/D1R9 evidence and creates no provider,
+scheduler, credential, paper, broker, D2, promotion, or live effect.
+
+## Certification state
+
+The previous accepted canonical FULL remains historical evidence for the
+c522 predecessor only:
 
 ```text
 HEAD     c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
@@ -35,141 +58,124 @@ errors   0
 elapsed  287.176 s
 ```
 
-Do not rerun that FULL on unchanged executable/test source.
-
-## Architecture 144 / RCL-7
-
-Architecture 144 design authority is the accepted C1 documentation checkpoint:
+144-A added one current FULL module and refreshed timing/inventory topology:
 
 ```text
-HEAD  5c737ec08ef806e16edeafd196f57177271cab41
-TREE  eba84b55f6f6822cc68e5b054cb3fbbbded10ec0
+FULL       187 modules
+Robinhood  101 modules
+LEGACY     222 modules
+EXHAUSTIVE 409 modules
 ```
 
-The frozen direct executable predecessor for 144-A remains:
+CI #638 ran the four broad source-gate shards successfully. That is source-gate
+admission evidence, not a replacement canonical FULL certification.
+
+Because 144-B is the immediately adjacent source-only successor and no protected
+effect, merge, release, or production-readiness boundary is crossed between
+144-A and 144-B, the pending FULL obligation is intentionally **batched through
+144-B**. Run one fresh canonical FULL on the final accepted 144-A+B source
+before the next protected multi-session paper-soak boundary. Do not run FULL
+twice on adjacent source-only checkpoints.
+
+## Architecture 144-B — immediate next source milestone
+
+144-B is the separately reviewed external-evidence verification and positive
+builder/verifier composition.
+
+It must:
+
+- independently verify the accepted Architecture-142 chain;
+- independently verify the complete Architecture-143 compatibility proof;
+- verify complete canonical D1R9/D1R8 evidence supplied by a reviewed
+  acquisition boundary;
+- require exact session, terminal classification, source, contract, strategy,
+  symbol, configuration, and production-source agreement;
+- reject partial/ambiguous/noncanonical evidence;
+- construct verified session observations only after complete verification;
+- construct positive eligibility only after five exact consecutive qualifying
+  published regular sessions with at least one `PAPER_EXECUTED`.
+
+144-B must remain pure with respect to evidence acquisition and operational
+effects. It must not gain filesystem/scheduler/provider/broker authority merely
+to obtain parser semantics.
+
+## Unattended paper-trading readiness
+
+Architecture 134 already defines the operational sequence:
 
 ```text
-HEAD  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-TREE  bf7019b1610c29563282ccb5f19be2bcb6501849
+134-E  exactly one unattended integration session + independent reconciliation
+134-F  fresh multi-session live-paper soak + end-of-window review
 ```
 
-Current remote `develop` is a docs-only descendant of that executable
-predecessor. That does not change 144-A's direct executable base.
-
-The reviewed Architecture-144 local worktree is:
+The accepted Monday 2026-10-19 D1R9 run satisfied the intended 134-E one-session
+unattended proof:
 
 ```text
-worktree  F:\AI\worktrees\ai-trading-bot-arch144-research-paper-eligibility-current
-branch    feature/test-suite-arch144-research-paper-eligibility-current
-HEAD      c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-TREE      bf7019b1610c29563282ccb5f19be2bcb6501849
-state     clean at last admission
-remote    absent at last admission
+D1R9 FINAL / NO_SIGNAL
+sha256 dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
+D1R8 FINAL / NO_SIGNAL
+sha256 11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
+scheduler reconciliation MATCH
 ```
 
-That worktree is already at the correct frozen 144-A source base and must not
-be fast-forwarded to `develop` merely to synchronize documentation commits.
-The current source-gate workflow already admits the stable
-`feature/test-suite-*` family, so no branch-bootstrap workflow registration is
-required before the first 144-A push.
+That proves the unattended operational path can complete one session safely. It
+does **not** by itself authorize a fresh multi-session soak.
 
-144-A is limited to the pure deterministic paper-eligibility artifact,
-transport, fixed-policy, parsing, export, focused-test, and mechanically required
-inventory/current-pin foundation frozen by the Architecture-144 C1 record.
-144-B remains the separately reviewed external-evidence verification and
-positive-builder composition.
+The next protected operational boundary after 144-B + final canonical FULL is
+Architecture 134-F: a fresh multi-session paper soak with end-of-window review.
+That soak validates scheduling/restart/idempotency and operational behavior. The
+Architecture-144 five-session policy then provides the first research eligibility
+gate over verified paper-session observations.
 
-## Monday D1R9 terminal state
-
-The real 2026-10-19 D1R9 session is closed and consumed:
+The frozen v1 research eligibility policy is:
 
 ```text
-D1R9 final   NO_SIGNAL
-D1R9 sha256  dcd41df103ad7afc549b7fa0c19ea844b98e0aa013de26e4203a532c087a8f81
-D1R8 final   NO_SIGNAL
-D1R8 sha256  11834d8693a236f1ff813dfe7f6be3076a79e4c6d171421a2ae08deb07ea2656
-D1R7 final   READY_FOR_SEPARATE_D1_SESSION_AUTHORIZATION
-D1R7 sha256  49e1b365abd8663a55ac30478316674dd3aa181ede140055abd55d1c59d1fade
-scheduler    MATCH at reconciliation
+required_session_count = 5
+required_paper_executed_count = 1
+require_consecutive_published_regular_sessions = true
+qualifying_terminal_classifications = ("NO_SIGNAL", "PAPER_EXECUTED")
 ```
 
-There is no retry authority. No manual D1R7/D1R8 replay, scheduler mutation,
-paper execution, broker placement, D2 effect, or live-money action occurred
-during reconciliation.
-
-For Architecture 144, Monday is qualifying external session input under the
-frozen v1 policy because it ended `NO_SIGNAL`, but it contributes zero
-`PAPER_EXECUTED` count. It is not yet a
-`ResearchStrategyPaperSessionObservation`: real evidence acquisition,
-external verification, and positive observation construction remain 144-B.
-Closed operational detail is preserved in
-[the 2026-10-19 reconciliation record](history/2026-10-19-d1r9-no-signal-and-safe-side-integration.md).
-
-## Current repository/local synchronization boundary
-
-Remote `develop` is the primary startup integration reference.
-`feature/project-history-storage-foundation` remains an optional
-compatibility/history mirror and must remain fast-forward-only to an exact
-accepted bounded-docs descendant.
-
-Because ChatGPT directly advanced the remote integration/docs lineage, local
-integration refs are expected to require one reviewed known-behind
-fast-forward before the next local integration task:
-
-```text
-last reported local develop HEAD
-5c737ec08ef806e16edeafd196f57177271cab41
-
-last reported local history-mirror HEAD
-f156953b373aafbf80b6984752f65f3dc42caea1
-```
-
-Both were independently verified as ancestors of the accepted remote lineage.
-Their unrelated generated/untracked artifacts are preserved; only tracked/index
-cleanliness is required for the later bounded fast-forward.
-
-This local integration/mirror synchronization is separate from 144-A source
-admission. Do not move the 144-A worktree off c5225d8f....
+Five sessions are a qualification/eligibility boundary, not enough evidence by
+themselves to conclude long-run profitability.
 
 ## Protected and safety boundaries
 
-- Real-money trading remains NO-GO.
-- The consumed Monday D1R9 authority is not retried.
-- Source or CI acceptance grants no provider, scheduler, credential, broker,
-  paper-execution, D2, or live authority.
-- 144-A reads no real D1R9/D1R8 evidence and performs no operational effect.
-- 144-A does not materialize `PAPER_CANDIDATE`, create
-  `AWAITING_HUMAN_PROMOTION`, or promote/select a production strategy.
-- 144-B remains separately reviewed.
-- Human promotion and any future live boundary remain later explicit milestones.
+- Real-money trading remains **NO-GO**.
+- The Monday D1R9 authority is consumed and is not retried.
+- 144-A and 144-B source work grant no operational authority.
+- The future 134-F multi-session soak is a separately reviewed protected effect
+  boundary.
+- No source/CI/FULL result alone authorizes provider, scheduler, credential,
+  paper, broker, D2, promotion, or live effects.
+- `PAPER_CANDIDATE` materialization and human promotion remain later
+  architectures.
 
 ## Active work
 
 ### Now
 
-1. Finish this bounded docs-only corrective checkpoint.
-2. Fast-forward the optional remote history mirror once to the accepted
-   corrective docs descendant.
-3. Run one short operator PowerShell catch-up for local `develop` and the
-   local history-mirror ref/worktree only.
-4. Leave the 144-A worktree at exact c5225d8f... and start 144-A there with
-   Luna Extra High.
+Architecture 144-B source implementation on the accepted 144-A feature lineage.
 
-### Next
+### Then
 
-Architecture 144-B: pure external evidence verification / positive builder
-composition using independently supplied canonical evidence.
+One fresh canonical FULL on the final accepted 144-A+B exact source.
+
+### Then
+
+Architecture 134-F protected preflight/authorization for a fresh multi-session
+unattended paper soak, followed by end-of-window reconciliation and
+Architecture-144 eligibility evaluation.
 
 ### Later
 
-A separate architecture may materialize `PAPER_CANDIDATE`; later explicit
-human promotion may move to `AWAITING_HUMAN_PROMOTION`. Restricted live
-trading remains unavailable until its own future reviewed readiness boundary.
+Continue paper observation long enough to evaluate performance stability beyond
+the five-session qualification minimum before any promotion decision.
+Restricted live trading remains unavailable.
 
 ## History and deep-reference pointers
 
 Use [docs/history/INDEX.md](history/INDEX.md) for targeted historical
-reconstruction. The bounded current documents intentionally do not replay every
-closed D1R*, research, GUI, certification, and history-storage checkpoint.
-Authoritative detail remains in the corresponding architecture, validation,
-Git, CI, and history records.
+reconstruction. Closed D1R9/integration detail is preserved in
+[the 2026-10-19 compact record](history/2026-10-19-d1r9-no-signal-and-safe-side-integration.md).

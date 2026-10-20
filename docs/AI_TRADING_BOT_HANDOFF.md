@@ -2,8 +2,8 @@
 
 ## Current mode
 
-**ARCHITECTURE 144-A+B SOURCE ACCEPTED; FINAL CANONICAL FULL PASSED; NEXT IS
-ARCHITECTURE 134-F PROTECTED PREFLIGHT.**
+**ARCHITECTURE 144-A+B SOURCE ACCEPTED; FINAL CANONICAL FULL PASSED;
+ARCHITECTURE 134-F1 DESIGN FROZEN; SOURCE IMPLEMENTATION NEXT.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state is in
@@ -62,15 +62,30 @@ mismatch and were repaired in C3 without changing Architecture-144 domain source
 
 Do not rerun FULL or add redundant ROBINHOOD certification on unchanged source.
 
-## Immediate next milestone — Architecture 134-F protected preflight
+## Immediate next milestone — Architecture 134-F1 source authority
 
-Owner/model: **ChatGPT / GPT-5.6 Sol High**.
+The read-only 134-F preflight found that Architecture 134 specified only the
+multi-session soak objective; no current-product source-owned multi-session
+authority existed. The accepted D1R9 supervisor remains a one-session authority
+on a diverged historical feature branch and cannot be looped, merged wholesale
+or silently reused.
 
-The next action is preflight/authorization only. It must re-read the exact
-Architecture-134-F authority and current operational state, prove prerequisites
-and consumed-evidence boundaries, and produce the bounded paper-only operator
-action if admissible. Source/FULL success alone grants no provider, scheduler,
-credential, broker or paper effect authority.
+Architecture 134-F1 is now design-frozen in:
+
+- `docs/architecture/134-f1-five-session-live-paper-soak-authority.md`;
+- `docs/validation/arch134-f1-five-session-live-paper-soak-plan.md`.
+
+Owner/model: **Codex / Sol High**.
+
+Implement a source-only current-`develop` parent authority for exactly five
+consecutive published regular sessions. Preserve D1R9 semantics per child, add
+one new parent interlock/journal/task contract, forbid retry/backfill and keep
+Architecture-144 eligibility outside the effectful controller.
+
+The terminal F1 checkpoint requires canonical FULL owned automatically by the
+implementation workflow. Prefer explicit CI `full` mapping before publication.
+
+No scheduler/provider/credential/paper effect is authorized by this design.
 
 ## Unattended paper-trading boundary
 
@@ -84,11 +99,13 @@ Architecture 134 explicitly names the next operational proof as:
 134-F: fresh multi-session live-paper soak with end-of-window review
 ```
 
-The source and certification prerequisites are now complete. The multi-session
-protected effect still must not begin before:
+The Architecture-144 source/certification prerequisites are complete, but the
+current-product multi-session source authority is not. The protected effect must
+not begin before:
 
 ```text
-134-F protected preflight/authorization
+134-F1 source implementation + canonical FULL
+-> 134-F protected preflight/authorization
 -> fresh unattended multi-session paper soak
 -> end-of-window reconciliation
 -> Architecture-144 eligibility evaluation
@@ -111,6 +128,7 @@ promotion remain later explicit boundaries.
 
 ## Required continuation
 
-Continue automatically with the Architecture 134-F protected preflight on the
-accepted/certified source. Do not execute the soak merely because source/FULL are
-green, and do not wait for a separate "what next?" request.
+Continue automatically with Architecture 134-F1 source implementation on a new
+current-`develop` feature branch. Do not execute or provision the soak during
+source work. After terminal source/FULL acceptance, return to ChatGPT for the
+separate protected preflight.

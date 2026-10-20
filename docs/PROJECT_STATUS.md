@@ -106,10 +106,12 @@ scheduler reconciliation MATCH
 That proves the unattended operational path can complete one session safely. It
 does **not** by itself authorize a fresh multi-session soak.
 
-With 144-B source accepted and the final canonical FULL green, the next
-protected operational boundary is Architecture 134-F: first its reviewed
-preflight/authorization, then only the explicitly authorized fresh multi-session
-paper soak with end-of-window review.
+With 144-B source accepted and the final canonical FULL green, Architecture 134-F
+is the next operational objective. The read-only preflight found that its current-
+product multi-session source authority was not yet implemented, so Architecture
+134-F1 source implementation must complete first. Only after F1 source/FULL
+acceptance may a separately reviewed protected preflight authorize the fresh
+multi-session paper soak.
 That soak validates scheduling/restart/idempotency and operational behavior. The
 Architecture-144 five-session policy then provides the first research eligibility
 gate over verified paper-session observations.
@@ -142,32 +144,38 @@ themselves to conclude long-run profitability.
 
 ### Now
 
-Architecture 134-F **protected preflight/authorization only** for a fresh
-multi-session unattended live-paper soak. The preflight is the next reviewed
-boundary; it does not itself authorize or execute the soak.
+Architecture 134-F1 source implementation: a new current-product five-session
+live-data/synthetic-paper soak parent authority above the accepted D1R9
+one-session semantics.
 
-Owner/model: **ChatGPT / GPT-5.6 Sol High** because the next step crosses
-Windows/scheduler/provider/paper authority and must preserve the existing
-protected-effect interlocks.
+Design authority:
+- `docs/architecture/134-f1-five-session-live-paper-soak-authority.md`;
+- `docs/validation/arch134-f1-five-session-live-paper-soak-plan.md`.
+
+Owner/model: **Codex / Sol High** because the implementation creates a new
+multi-session production-paper authority boundary, scheduler composition and
+restart/idempotency contract.
+
+The implementation is source-only. No real scheduler/provider/credential/paper
+effect is authorized.
 
 ### Then
 
-If and only if the reviewed 134-F preflight yields a bounded operator action,
-execute the separately authorized paper-only multi-session soak, preserve each
-session's evidence, and perform the required end-of-window reconciliation.
+After exact-source acceptance and terminal canonical FULL, ChatGPT reviews a
+separate protected 134-F1 preflight for task/publication/runtime admission.
+The soak itself remains closed until that later boundary is explicitly reviewed.
 
 ### Then
 
-Feed only verified qualifying observations through Architecture-144 eligibility.
-The five-session gate establishes operational/research eligibility, not long-run
-profitability.
+Run at most the frozen five-session soak under the accepted parent authority,
+perform end-of-window reconciliation, then separately feed verified evidence to
+Architecture-144 eligibility.
 
 ### Later
 
-Continue paper observation long enough to evaluate strategy stability, realized
-P&L, drawdown, turnover, fill/slippage, exposure, signal frequency and divergence
-from backtest/walk-forward results before any promotion decision. Restricted
-real-money trading remains **NO-GO**.
+Continue paper observation beyond the five-session minimum for stability, P&L,
+drawdown, turnover, slippage/execution quality and backtest/walk-forward
+divergence before any promotion decision. Real-money trading remains **NO-GO**.
 
 ## History and deep-reference pointers
 

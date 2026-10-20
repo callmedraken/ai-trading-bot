@@ -768,12 +768,12 @@ def test_checkpoint_profile_inventory_and_frozen_authority():
     )
     assert runner.resolve_ci_certification_profile(q.CHECKPOINT) == "robinhood"
     assert runner._arch134_d1r7_authority_check(ROOT) == ()
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 67
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 68
     inventory = certification.discover_inventory(ROOT)
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 187, "robinhood": 101, "legacy": 222, "exhaustive": 409}
+    } == {"full": 189, "robinhood": 103, "legacy": 222, "exhaustive": 411}
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
     for name, expected in runner.ARCH134_D1R7_PREDECESSOR_DIGESTS.items():
         assert (
@@ -1051,7 +1051,8 @@ def test_d1r6_resolution_runs_once_before_d1r7_successor():
     resolved = runner._arch134_d1r6_test_pin(path, predecessor)
     with pytest.raises(ValueError, match="predecessor resolution drift"):
         runner._arch134_d1r6_test_pin(path, resolved)
-    assert runner._arch134_d1r7_test_pin(path, resolved) == runner._git_blob_sha1(
-        ROOT / path
+    current = runner._arch134_f1_current_inventory_test_pin(
+        path, runner._arch134_d1r7_test_pin(path, resolved)
     )
+    assert current == runner._git_blob_sha1(ROOT / path)
     assert runner._arch134_d1r6_authority_check(ROOT) == ()

@@ -141,45 +141,81 @@ themselves to conclude long-run profitability.
 - `PAPER_CANDIDATE` materialization and human promotion remain later
   architectures.
 
+## Architecture 134-F1 source state
+
+Architecture 134-F1 is **SOURCE ACCEPTED** on the isolated feature lineage:
+
+```text
+branch  feature/robinhood-production-paper-134f-five-session-soak
+base    b3b605fdc0886cd90367027e72d43ecaf8ce5b4c
+HEAD    b59ad3b44540a55a30f612d5c4e3e38e26a95b02
+TREE    e8a94e3512d7950f2fbc9c4d102a58b63e03244f
+```
+
+The exact aggregate diff is 40 paths across two commits. The initial source
+`24a7397dff418c47a257e8d0ceec97088dc7caf0` passed source-static and all
+331 active checkpoint cases but canonical ROBINHOOD #648 failed eight stale
+test-only registry/successor expectations and exceeded the 300-second hygiene
+ceiling. That failed evidence remains preserved.
+
+Bounded C1 changed no F1 production module. It corrected only the stale
+registry/successor expectations, final test-pin overlay, and one measured
+ROBINHOOD lane placement for `tests/review_paper/test_five_session_soak.py`.
+
+Canonical ROBINHOOD #649 / 39401319643 / attempt 1 passed on the exact final
+HEAD/TREE:
+
+```text
+profile      robinhood
+modules      103
+lane 1       52 modules / 5,444 passed / 0 skipped / 0 failed / 253.017 s
+lane 2       51 modules / 4,978 cases / 4,972 passed / 6 skipped / 0 failed / 285.347 s
+TOTAL        10,422 cases / 10,416 passed / 6 skipped / 0 failed / 0 errors
+wall         287.894 s
+```
+
+`full-tests` was correctly skipped. No local or CI FULL was required. Whole-
+repository Ruff check, Ruff format check and `git diff --check` passed.
+
+Architecture-144 v1 source remains byte-for-byte unchanged. F1 provides
+truthful current-lineage parent/child evidence only; F1-to-Architecture-144
+admission remains deferred to the separate pure Architecture 144-C successor.
+
+No real scheduler, credential, provider, D1R7/D1R8/D1R9, paper, broker, D2,
+promotion or real-money effect occurred during F1 source work or certification.
+
 ## Active work
 
 ### Now
 
-Architecture 134-F1 source implementation: a new current-product five-session
-live-data/synthetic-paper soak parent authority above the accepted D1R9
-one-session semantics. F1-to-Architecture-144 composition is deferred until a
-separate pure Architecture 144-C successor can pin the exact accepted F1 source.
+Architecture 144-C **exact design freeze only** against the accepted F1 source
+`b59ad3b44540a55a30f612d5c4e3e38e26a95b02` /
+`e8a94e3512d7950f2fbc9c4d102a58b63e03244f`.
 
-Design authority:
-- `docs/architecture/134-f1-five-session-live-paper-soak-authority.md`;
-- `docs/validation/arch134-f1-five-session-live-paper-soak-plan.md`.
+Owner/model: **ChatGPT / GPT-5.6 Sol High** for the provenance/schema boundary.
+Implementation remains closed until the exact 144-C design is frozen and reviewed.
 
-Owner/model: **Codex / Sol High** because the implementation creates a new
-multi-session production-paper authority boundary, scheduler composition and
-restart/idempotency contract.
-
-The implementation is source-only. No real scheduler/provider/credential/paper
-effect is authorized.
+144-C must preserve Architecture-144 v1 byte-for-byte while defining a separate
+pure generic-authority/v2 admission path for truthful F1 parent/child evidence.
 
 ### Then
 
-After exact-source acceptance and terminal canonical ROBINHOOD, ChatGPT freezes
-and implements Architecture 144-C, a pure F1 evidence-admission successor that
-keeps Architecture-144 v1 frozen. Only after 144-C source acceptance does ChatGPT
-review the separate protected 134-F1 preflight. The soak remains closed until
-that later boundary.
+Implement and source-review Architecture 144-C with focused/source-gate coverage.
+Select additional canonical certification only if its final changed surface
+materially requires one; FULL is not automatic.
 
 ### Then
 
-Run at most the frozen five-session soak under the accepted parent authority,
-perform end-of-window reconciliation, then separately feed verified evidence to
-Architecture-144 eligibility.
+Only after 144-C source acceptance, perform the separate protected 134-F
+preflight/authorization review. Source acceptance does not authorize scheduler
+creation, task run, provider access or the five-session soak.
 
 ### Later
 
-Continue paper observation beyond the five-session minimum for stability, P&L,
-drawdown, turnover, slippage/execution quality and backtest/walk-forward
-divergence before any promotion decision. Real-money trading remains **NO-GO**.
+Run at most the frozen five-session paper soak if separately authorized, reconcile
+the complete window, then evaluate the supplied evidence through Architecture
+144-C. Continue longer paper observation before any promotion decision.
+Real-money trading remains **NO-GO**.
 
 ## History and deep-reference pointers
 

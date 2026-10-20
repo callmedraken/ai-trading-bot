@@ -2,8 +2,9 @@
 
 ## Current mode
 
-**ARCHITECTURE 144-A+B SOURCE ACCEPTED; FINAL CANONICAL FULL PASSED;
-ARCHITECTURE 134-F1 DESIGN FROZEN; SOURCE IMPLEMENTATION NEXT.**
+**ARCHITECTURE 144-A+B SOURCE ACCEPTED; ARCHITECTURE 134-F1 SOURCE ACCEPTED;
+CANONICAL ROBINHOOD #649 PASSED; ARCHITECTURE 144-C DESIGN IS NEXT.
+PROTECTED PREFLIGHT AND THE REAL SOAK REMAIN CLOSED.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state is in
@@ -62,34 +63,53 @@ mismatch and were repaired in C3 without changing Architecture-144 domain source
 
 Do not rerun FULL or add redundant ROBINHOOD certification on unchanged source.
 
-## Immediate next milestone — Architecture 134-F1 source authority
+## Accepted Architecture 134-F1 source
 
-The read-only 134-F preflight found that Architecture 134 specified only the
-multi-session soak objective; no current-product source-owned multi-session
-authority existed. The accepted D1R9 supervisor remains a one-session authority
-on a diverged historical feature branch and cannot be looped, merged wholesale
-or silently reused.
+```text
+branch
+feature/robinhood-production-paper-134f-five-session-soak
 
-Architecture 134-F1 is now design-frozen in:
+BASE HEAD
+b3b605fdc0886cd90367027e72d43ecaf8ce5b4c
 
-- `docs/architecture/134-f1-five-session-live-paper-soak-authority.md`;
-- `docs/validation/arch134-f1-five-session-live-paper-soak-plan.md`.
+FINAL HEAD
+b59ad3b44540a55a30f612d5c4e3e38e26a95b02
 
-Owner/model: **Codex / Sol High**.
+FINAL TREE
+e8a94e3512d7950f2fbc9c4d102a58b63e03244f
 
-Implement a source-only current-`develop` parent authority for exactly five
-consecutive published regular sessions. Preserve D1R9 semantics per child, add
-one new parent interlock/journal/task contract, forbid retry/backfill and keep
-Architecture-144 eligibility outside the effectful controller. Do not modify
-Architecture-144 v1 to accept F1 evidence; truthful F1 admission is deferred to
-Architecture 144-C after final F1 source acceptance.
+CI
+Checkpoint Source Gates #649 / 39401319643 / attempt 1 / SUCCESS
+```
 
-The terminal F1 checkpoint requires canonical ROBINHOOD owned automatically by
-the implementation workflow. Prefer explicit CI `robinhood` mapping before
-publication; do not run FULL unless broader final source coverage actually
-requires it.
+ChatGPT independently reviewed the exact 40-path aggregate diff, both commits,
+the initial #648 failure, bounded C1 correction, production F1 source, checkpoint
+authority/pins and final canonical ROBINHOOD artifact. Architecture 134-F1 is
+**SOURCE ACCEPTED**.
 
-No scheduler/provider/credential/paper effect is authorized by this design.
+Initial #648 is preserved: 10,421 cases, eight stale test-only failures, six
+skips, zero errors, wall 321.863 s. C1 changed no F1 production module and
+corrected only registry/successor expectations, pin overlays and measured lane
+placement.
+
+Final canonical ROBINHOOD #649 selected 103 modules and passed 10,422 cases:
+10,416 passed, six skipped, zero failed/errors; lanes 253.017 / 285.347 s;
+wall 287.894 s. `full-tests` was correctly skipped and no FULL run is required
+for unchanged F1 source.
+
+Architecture-144 v1 source remains frozen. No operational effect was performed.
+
+## Immediate next milestone — Architecture 144-C exact design freeze
+
+Owner/model: **ChatGPT / GPT-5.6 Sol High**.
+
+Freeze the pure successor against exact accepted F1 HEAD/TREE. Preserve all
+Architecture-144 v1 schemas, identities, canonical bytes and D1R9 pins unchanged.
+Define a separate generic-authority/v2 F1 evidence-admission contract.
+
+Architecture 144-C implementation remains closed until that design is frozen.
+Protected 134-F preflight and the real five-session soak remain closed until
+144-C source is accepted.
 
 ## Unattended paper-trading boundary
 
@@ -133,8 +153,8 @@ promotion remain later explicit boundaries.
 
 ## Required continuation
 
-Continue automatically with Architecture 134-F1 source implementation on the
-existing clean F1 feature branch after fast-forwarding it to this corrected
-design checkpoint. Do not execute or provision the soak during source work.
-After terminal source/ROBINHOOD acceptance, return to ChatGPT for Architecture
-144-C; protected preflight comes only after 144-C acceptance.
+Freeze Architecture 144-C against accepted F1 source
+`b59ad3b44540a55a30f612d5c4e3e38e26a95b02` /
+`e8a94e3512d7950f2fbc9c4d102a58b63e03244f` before implementation.
+Do not rerun ROBINHOOD or FULL on unchanged F1 source. Do not begin protected
+preflight or the real soak.

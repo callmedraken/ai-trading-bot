@@ -38,14 +38,22 @@ ROBINHOOD_LANE_PINS = {
     "tests/review_paper/test_arch133_scheduler_installation.py": 1,
 }
 
-# Architecture 144 current timing-aware FULL inventory. Existing timings retain
+# F1 C1: canonical #648 measured 199.971/320.334-second lanes. Move only
+# the new parent outlier (42.599 summed testcase seconds) to lane 0; retain
+# every accepted R3H placement, the two-lane topology and the 300-second gate.
+ROBINHOOD_F1_LANE_PINS = {"tests/review_paper/test_five_session_soak.py": 0}
+
+# F1 timing-aware FULL inventory metadata; F1 certifies ROBINHOOD.
+# Existing timings retain
 # the accepted predecessor measurements; the new pure eligibility test uses its
-# focused verification duration as a placement estimate. Sum testcase seconds
+# focused verification duration as a placement estimate. F1 uses summed testcase
+# milliseconds from its 179-pass focused JUnit (81,310 / 28,079 ms).
+# Sum testcase seconds
 # in exact milliseconds; tests/test_config.py measured 0 ms and uses a 1 ms
 # minimum.
 # Pairs preserve duplicate keys for fail-closed validation (unlike a dict literal).
 # Canonical SHA256: sorted compact JSON object, UTF-8, no trailing newline:
-# 2c103f4c2218e17e8f23461d6201e33ad10349a5eb95afe5fd736eac7546da35
+# c478e893fa7cbfa86582f1b4ed1182cdd1a81ed25ff5359ea000879361d0c1ab
 FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
 FULL_MODULE_TIMINGS_MS = (
     ("tests/analytics/test_analyzer.py", 15),
@@ -158,6 +166,8 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_current_production_strategy_decision.py", 1748),
     ("tests/review_paper/test_d1_session_authorization.py", 11422),
     ("tests/review_paper/test_d1_session_execution.py", 98881),
+    ("tests/review_paper/test_five_session_soak.py", 81310),
+    ("tests/review_paper/test_five_session_soak_child.py", 28079),
     ("tests/review_paper/test_forward_preview.py", 867),
     ("tests/review_paper/test_history_qualification.py", 1431),
     ("tests/review_paper/test_intent_bridge.py", 40),
@@ -800,7 +810,8 @@ def build_lanes(
         }
     elif profile == "robinhood":
         first, second = apply_lane_pins(
-            balance_broad(root, inventory), ROBINHOOD_LANE_PINS
+            apply_lane_pins(balance_broad(root, inventory), ROBINHOOD_LANE_PINS),
+            ROBINHOOD_F1_LANE_PINS,
         )
         lanes = {"robinhood-1": first, "robinhood-2": second}
     else:

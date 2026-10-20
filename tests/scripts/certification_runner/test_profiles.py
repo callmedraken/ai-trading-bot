@@ -81,6 +81,8 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 "tests/review_paper/test_pre_market_wake_overnight.py",
                 "tests/review_paper/test_d1_session_authorization.py",
                 "tests/review_paper/test_d1_session_execution.py",
+                "tests/review_paper/test_five_session_soak.py",
+                "tests/review_paper/test_five_session_soak_child.py",
                 "tests/review_paper/test_alpaca_credential_generation.py",
                 "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
                 "tests/review_paper/test_armed_production_paper_session.py",
@@ -90,7 +92,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
             )
         )
     )
-    assert len(selected) == 101
+    assert len(selected) == 103
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -161,6 +163,8 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/review_paper/test_pre_market_wake_overnight.py",
                 "tests/review_paper/test_d1_session_authorization.py",
                 "tests/review_paper/test_d1_session_execution.py",
+                "tests/review_paper/test_five_session_soak.py",
+                "tests/review_paper/test_five_session_soak_child.py",
                 "tests/review_paper/test_alpaca_credential_generation.py",
                 "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
                 "tests/review_paper/test_armed_production_paper_session.py",
@@ -196,10 +200,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 187,
-        "robinhood": 101,
+        "full": 189,
+        "robinhood": 103,
         "legacy": 222,
-        "exhaustive": 409,
+        "exhaustive": 411,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
@@ -221,7 +225,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 expected = runner.balance_full(selected)
             else:
                 expected = runner.apply_lane_pins(
-                    runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+                    runner.apply_lane_pins(
+                        runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+                    ),
+                    runner.ROBINHOOD_F1_LANE_PINS,
                 )
             assert tuple(lanes.values()) == expected
 

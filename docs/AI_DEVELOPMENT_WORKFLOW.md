@@ -47,6 +47,42 @@ A terminal-green CI-owned canonical certification on the exact source satisfies
 that profile obligation. Do not ask the human operator to rerun the same profile
 locally. Local certification is reserved for an unmapped selected gate, invalid
 or incomplete CI evidence, or materially different host/runtime evidence.
+
+### Terminal selected-certification ownership — normative
+
+When a milestone is known before implementation to require terminal
+Architecture-132 `FULL` or `ROBINHOOD` certification, that certification is part
+of the implementation agent's completion scope automatically. The human operator
+must not need a separate follow-up request merely to initiate a known terminal
+certification gate.
+
+Use this order:
+
+1. Prefer registering the exact feature/checkpoint in the source-owned
+   `CI_CERTIFICATION_PROFILES` mapping before its terminal publication. The
+   checkpoint's one ordinary push then owns the selected canonical profile in CI,
+   and no duplicate local run is performed.
+2. If the terminal feature is intentionally or historically unmapped, Codex runs
+   focused verification first, creates the one intended final local commit without
+   pushing it, proves the exact clean HEAD/TREE and live base, runs the required
+   canonical selected profile against that exact unpublished commit, and ordinary-
+   pushes once only after the profile is green.
+3. A failed pre-publication canonical profile is preserved as evidence and blocks
+   publication. Classify the failure and run focused correction first; never rerun
+   unchanged certification merely to seek green.
+4. Do not run both a local canonical profile and an identical CI-owned canonical
+   profile for the same exact source. A terminal-green CI-owned profile satisfies
+   the obligation.
+5. Pre-publication history rewrite is never implicit. When preserving one atomic
+   terminal commit genuinely requires amending/squashing an unpublished provisional
+   commit after a reviewed certification correction, the current bounded task must
+   explicitly authorize that pre-publication rewrite. That authority ends at the
+   first push. Published commits are never amended/rebased/force-pushed under this
+   rule.
+
+Terminal certification is therefore a completion criterion for the implementing
+agent, not a post-handoff chore for the human.
+
 Protected provider/OAuth/paper/scheduler/broker operations remain separately
 authorized and are never implied by source certification.
 

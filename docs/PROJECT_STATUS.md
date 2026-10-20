@@ -2,102 +2,86 @@
 
 ## Current verified checkpoint
 
-Architecture 144-A / RCL-7 is **SOURCE ACCEPTED** on the isolated feature
-lineage.
+Architecture 144-A+B / RCL-7 is **SOURCE ACCEPTED AND CANONICAL FULL CERTIFIED**
+on the isolated feature lineage.
 
 ```text
 branch  feature/test-suite-arch144-research-paper-eligibility-current
 base    c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-base tree
-        bf7019b1610c29563282ccb5f19be2bcb6501849
-HEAD    0c3064c7576d3c91a9039d49a514aae174253f6a
-TREE    b6aa255eb6bbeeeb0bcc953a24a84e4d662807e2
-parent  c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-commits above base
-        1
-CI      Checkpoint Source Gates #638 / 39346589645
-event   push
-attempt 1
-result  SUCCESS
+HEAD    20219f65e59dc91287462490d85f41b8fdb2a97e
+TREE    a9e0b6fe7b85dbaeef8b3f46f5276483ec6b93bd
+
+CI
+Checkpoint Source Gates #643 / 39386250794 / push / attempt 1 / SUCCESS
 ```
 
-ChatGPT independently reviewed the exact GitHub commit, all 19 changed paths,
-the new Architecture-144 module/tests, current-inventory successor pins,
-certification inventory/timing changes, and exact CI route. The source remains
-pure and deterministic and does not acquire or verify real operational evidence.
+144-A established the inert deterministic paper-session observation, soak-policy,
+eligibility, identity, serialization and current-inventory/timing foundation.
+144-B added pure verification/reduction of the accepted Architecture-142/143 and
+D1R9/D1R8/D1R7 evidence semantics without acquiring operational evidence or
+performing effects. C1 and C2 corrected verifier-equivalence details before final
+acceptance. C3 changed only certification test infrastructure: it synchronized the
+synthetic FULL fixture with the already-reviewed 187-module FULL inventory, added
+an invariant test, and refreshed the existing Architecture-144 successor blob pin.
 
-144-A implemented:
-
-- `ResearchStrategyPaperSessionObservation`;
-- `ResearchStrategyPaperSoakPolicy`;
-- `ResearchStrategyPaperCandidateEligibility`;
-- exact UUID5 semantic identities and UTF-8 length framing;
-- canonical Decimal/JSON transport;
-- fixed v1 five-session policy;
-- intrinsic consecutive-session/window validation;
-- package exports;
-- focused tests;
-- mechanically required current-inventory/certification bookkeeping.
-
-The checkpoint reads no real D1R7/D1R8/D1R9 evidence and creates no provider,
-scheduler, credential, paper, broker, D2, promotion, or live effect.
+No real D1R7/D1R8/D1R9 evidence was accessed during 144 source implementation,
+C1/C2/C3 correction, or canonical certification. No provider, scheduler,
+credential, paper, broker, promotion or live effect was performed.
 
 ## Certification state
 
-The previous accepted canonical FULL remains historical evidence for the
-c522 predecessor only:
+The terminal Architecture-144 source is certified by one successful canonical
+FULL on the exact final C3 source:
 
 ```text
-HEAD     c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-TREE     bf7019b1610c29563282ccb5f19be2bcb6501849
-cases    12,354
-passed   12,351
-skipped  3
-failed   0
-errors   0
-elapsed  287.176 s
-```
-
-144-A added one current FULL module and refreshed timing/inventory topology:
-
-```text
+HEAD       20219f65e59dc91287462490d85f41b8fdb2a97e
+TREE       a9e0b6fe7b85dbaeef8b3f46f5276483ec6b93bd
+profile    full
 FULL       187 modules
-Robinhood  101 modules
-LEGACY     222 modules
-EXHAUSTIVE 409 modules
+cases      12,436
+passed     12,433
+skipped    3
+failed     0
+errors     0
+wall       256.955 s
+lanes      254.635 / 254.650 / 254.666 / 254.679 s
+evidence   F:\AI\temp\certification\arch144-final-full-c3-22964d67d60d43d08dadbdd8e8743eee
 ```
 
-CI #638 ran the four broad source-gate shards successfully. That is source-gate
-admission evidence, not a replacement canonical FULL certification.
+Every lane and the total wall time remain below the 300-second hygiene ceiling.
+Do not repeat FULL or add redundant ROBINHOOD coverage on unchanged source.
 
-Because 144-B is the immediately adjacent source-only successor and no protected
-effect, merge, release, or production-readiness boundary is crossed between
-144-A and 144-B, the pending FULL obligation is intentionally **batched through
-144-B**. Run one fresh canonical FULL on the final accepted 144-A+B source
-before the next protected multi-session paper-soak boundary. Do not run FULL
-twice on adjacent source-only checkpoints.
+The first final-source FULL attempt remains preserved as failure evidence:
 
-## Architecture 144-B — immediate next source milestone
+```text
+evidence   F:\AI\temp\certification\arch144-final-full-4bc908648d0c4b198a327380d7004ba8
+cases      12,435
+passed     12,415
+skipped    3
+failed     17
+errors     0
+wall       291.158 s
+```
 
-144-B is the separately reviewed external-evidence verification and positive
-builder/verifier composition.
+All 17 failures were the same stale synthetic certification-fixture mismatch:
+the accepted Architecture-144 FULL timing module was present in the real 187-module
+inventory but absent from the test fixture. C3 repaired only that fixture/pin
+material. The accepted Architecture-144 domain implementation was not changed.
 
-It must:
+## Architecture 144 source state
 
-- independently verify the accepted Architecture-142 chain;
-- independently verify the complete Architecture-143 compatibility proof;
-- verify complete canonical D1R9/D1R8 evidence supplied by a reviewed
-  acquisition boundary;
-- require exact session, terminal classification, source, contract, strategy,
-  symbol, configuration, and production-source agreement;
-- reject partial/ambiguous/noncanonical evidence;
-- construct verified session observations only after complete verification;
-- construct positive eligibility only after five exact consecutive qualifying
-  published regular sessions with at least one `PAPER_EXECUTED`.
+Architecture 144-A and 144-B are complete. The final verified source provides:
 
-144-B must remain pure with respect to evidence acquisition and operational
-effects. It must not gain filesystem/scheduler/provider/broker authority merely
-to obtain parser semantics.
+- deterministic `ResearchStrategyPaperSessionObservation`,
+  `ResearchStrategyPaperSoakPolicy`, and `ResearchStrategyPaperCandidateEligibility`;
+- exact UUID5 semantic identities, UTF-8 length framing, Decimal and canonical JSON;
+- fixed v1 five-session policy with at least one `PAPER_EXECUTED`;
+- pure complete verification of supplied Architecture-142/143 and D1R9/D1R8/D1R7
+  evidence, including exact published-XNYS/UTC close-minus-five-minute semantics;
+- independent eligibility source HEAD/TREE binding;
+- `NO_SIGNAL` clean coverage, `PAPER_EXECUTED` execution evidence, and inert
+  representability of `RISK_REJECTED`;
+- no filesystem evidence acquisition or operational authority.
 
 ## Unattended paper-trading readiness
 
@@ -122,8 +106,10 @@ scheduler reconciliation MATCH
 That proves the unattended operational path can complete one session safely. It
 does **not** by itself authorize a fresh multi-session soak.
 
-The next protected operational boundary after 144-B + final canonical FULL is
-Architecture 134-F: a fresh multi-session paper soak with end-of-window review.
+With 144-B source accepted and the final canonical FULL green, the next
+protected operational boundary is Architecture 134-F: first its reviewed
+preflight/authorization, then only the explicitly authorized fresh multi-session
+paper soak with end-of-window review.
 That soak validates scheduling/restart/idempotency and operational behavior. The
 Architecture-144 five-session policy then provides the first research eligibility
 gate over verified paper-session observations.
@@ -156,23 +142,32 @@ themselves to conclude long-run profitability.
 
 ### Now
 
-Architecture 144-B source implementation on the accepted 144-A feature lineage.
+Architecture 134-F **protected preflight/authorization only** for a fresh
+multi-session unattended live-paper soak. The preflight is the next reviewed
+boundary; it does not itself authorize or execute the soak.
+
+Owner/model: **ChatGPT / GPT-5.6 Sol High** because the next step crosses
+Windows/scheduler/provider/paper authority and must preserve the existing
+protected-effect interlocks.
 
 ### Then
 
-One fresh canonical FULL on the final accepted 144-A+B exact source.
+If and only if the reviewed 134-F preflight yields a bounded operator action,
+execute the separately authorized paper-only multi-session soak, preserve each
+session's evidence, and perform the required end-of-window reconciliation.
 
 ### Then
 
-Architecture 134-F protected preflight/authorization for a fresh multi-session
-unattended paper soak, followed by end-of-window reconciliation and
-Architecture-144 eligibility evaluation.
+Feed only verified qualifying observations through Architecture-144 eligibility.
+The five-session gate establishes operational/research eligibility, not long-run
+profitability.
 
 ### Later
 
-Continue paper observation long enough to evaluate performance stability beyond
-the five-session qualification minimum before any promotion decision.
-Restricted live trading remains unavailable.
+Continue paper observation long enough to evaluate strategy stability, realized
+P&L, drawdown, turnover, fill/slippage, exposure, signal frequency and divergence
+from backtest/walk-forward results before any promotion decision. Restricted
+real-money trading remains **NO-GO**.
 
 ## History and deep-reference pointers
 

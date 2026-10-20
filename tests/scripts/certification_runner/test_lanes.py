@@ -6,6 +6,7 @@ import pytest
 from scripts import run_test_certification as runner
 
 from .helpers import (
+    _fixture_profiles,
     _inventory,
     _lane_names,
     _profile_inventory,
@@ -98,37 +99,43 @@ def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 186
+    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 187
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
     assert runner.FULL_FALLBACK_MS == 1000
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "e23c35fcebadd578e26beb349d09e84a308aeb229e5a2aef87863f6119e19d36"
+        == "2c103f4c2218e17e8f23461d6201e33ad10349a5eb95afe5fd736eac7546da35"
     )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
     assert all(lanes.values())
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (46, 47, 46, 47)
+    assert tuple(map(len, lanes.values())) == (46, 47, 47, 47)
     assert tuple(
         sum(weights[module] for module in lane) for lane in lanes.values()
-    ) == (250295, 250295, 250294, 250294)
+    ) == (250880, 250880, 250879, 250879)
     # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
     assert weights["tests/test_config.py"] == 1
     raw = dict(weights, **{"tests/test_config.py": 0})
     for count, expected in (
-        (2, (500589, 500588)),
-        (3, (333726, 333726, 333725)),
-        (4, (250295, 250294, 250294, 250294)),
+        (2, (501759, 501758)),
+        (3, (334506, 334506, 334505)),
+        (4, (250880, 250879, 250879, 250879)),
     ):
         totals = [0] * count
         for module in sorted(raw, key=lambda name: (-raw[name], name)):
             index = min(range(count), key=lambda lane: (totals[lane], lane))
             totals[index] += raw[module]
         assert tuple(totals) == expected
+
+
+def test_full_fixture_matches_frozen_timing_membership() -> None:
+    assert set(_fixture_profiles()["full"]) == {
+        module for module, _ in runner.FULL_MODULE_TIMINGS_MS
+    }
 
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
@@ -286,7 +293,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
             checkpoint._arch132_r3i_current_inventory_test_pin(module, predecessor)
             == pin
         )
-        assert checkpoint._git_blob_sha1(root / module) == pin
+        assert checkpoint._git_blob_sha1(root / module) == (
+            checkpoint._arch144_current_inventory_test_pin(module, pin)
+        )
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
         == "unchanged"
@@ -300,6 +309,38 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
         checkpoint._arch134_d1r8_authority_check,
     ):
         assert check(root) == ()
+
+
+def test_arch144_current_inventory_successor_is_exact_and_current():
+    import hashlib
+    import json
+
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    pins = checkpoint.ARCH144_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
+    assert set(pins) == {
+        *checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES,
+        "tests/scripts/certification_runner/test_lanes.py",
+    }
+    assert (
+        hashlib.sha256(json.dumps(pins, sort_keys=True).encode()).hexdigest()
+        == checkpoint.ARCH144_CURRENT_INVENTORY_TEST_PINS_SHA256
+    )
+    for module, pin in pins.items():
+        predecessor = checkpoint.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES.get(module)
+        if predecessor is None:
+            predecessor = checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[
+                module
+            ]
+        assert predecessor != pin
+        assert (
+            checkpoint._arch144_current_inventory_test_pin(module, predecessor) == pin
+        )
+        assert checkpoint._git_blob_sha1(root / module) == pin
+    assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
+        "unchanged"
+    )
 
 
 def test_r3i_preserves_all_arch139_through_143_predecessor_constants_and_ci_route():

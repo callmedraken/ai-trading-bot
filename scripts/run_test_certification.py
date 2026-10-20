@@ -38,13 +38,14 @@ ROBINHOOD_LANE_PINS = {
     "tests/review_paper/test_arch133_scheduler_installation.py": 1,
 }
 
-# Architecture 132-R3I: frozen module sums from Architecture-143 FULL JUnit.
-# HEAD 33b14eab4e9577f15b2afa559918415e4d471d55; TREE
-# d19ef77620881343cc38010290029865fd43c1f4. Sum testcase seconds in exact
-# milliseconds; tests/test_config.py measured 0 ms and uses a 1 ms minimum.
+# Architecture 144 current timing-aware FULL inventory. Existing timings retain
+# the accepted predecessor measurements; the new pure eligibility test uses its
+# focused verification duration as a placement estimate. Sum testcase seconds
+# in exact milliseconds; tests/test_config.py measured 0 ms and uses a 1 ms
+# minimum.
 # Pairs preserve duplicate keys for fail-closed validation (unlike a dict literal).
 # Canonical SHA256: sorted compact JSON object, UTF-8, no trailing newline:
-# e23c35fcebadd578e26beb349d09e84a308aeb229e5a2aef87863f6119e19d36
+# 2c103f4c2218e17e8f23461d6201e33ad10349a5eb95afe5fd736eac7546da35
 FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
 FULL_MODULE_TIMINGS_MS = (
     ("tests/analytics/test_analyzer.py", 15),
@@ -96,6 +97,7 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/experiments/test_research_candidate_walk_forward.py", 1351),
     ("tests/experiments/test_research_strategy_backtest.py", 55),
     ("tests/experiments/test_research_strategy_definition.py", 38),
+    ("tests/experiments/test_research_strategy_paper_candidate_eligibility.py", 2340),
     ("tests/experiments/test_research_strategy_production_compatibility.py", 5390),
     ("tests/experiments/test_research_strategy_walk_forward.py", 636),
     ("tests/experiments/test_walk_forward.py", 132),

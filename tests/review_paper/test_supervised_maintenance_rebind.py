@@ -403,10 +403,10 @@ def test_source_registration_inventory_and_pins():
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 186,
+        "full": 187,
         "robinhood": 101,
         "legacy": 222,
-        "exhaustive": 408,
+        "exhaustive": 409,
     }
 
 

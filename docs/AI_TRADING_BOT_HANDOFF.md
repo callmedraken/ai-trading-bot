@@ -2,13 +2,14 @@
 
 ## Current mode
 
-**ARCHITECTURE 144-A SOURCE ACCEPTED; CONTINUE DIRECTLY TO 144-B.**
+**ARCHITECTURE 144-A+B SOURCE ACCEPTED; FINAL CANONICAL FULL PASSED; NEXT IS
+ARCHITECTURE 134-F PROTECTED PREFLIGHT.**
 
 Standing workflow authority remains `AGENTS.md` and
 `docs/AI_DEVELOPMENT_WORKFLOW.md`. Current high-level state is in
 `docs/PROJECT_STATUS.md`.
 
-## Accepted Architecture 144-A source
+## Accepted Architecture 144 source
 
 ```text
 worktree
@@ -20,79 +21,56 @@ feature/test-suite-arch144-research-paper-eligibility-current
 BASE HEAD
 c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
 
-BASE TREE
-bf7019b1610c29563282ccb5f19be2bcb6501849
-
 FINAL HEAD
-0c3064c7576d3c91a9039d49a514aae174253f6a
+20219f65e59dc91287462490d85f41b8fdb2a97e
 
 FINAL TREE
-b6aa255eb6bbeeeb0bcc953a24a84e4d662807e2
-
-parent
-c5225d8f3f584eb0eb60d62e5381f1caa3c56cb2
-
-commits above base
-1
+a9e0b6fe7b85dbaeef8b3f46f5276483ec6b93bd
 
 CI
-Checkpoint Source Gates #638 / 39346589645 / push / attempt 1 / SUCCESS
+Checkpoint Source Gates #643 / 39386250794 / attempt 1 / SUCCESS
 ```
 
-ChatGPT independently reviewed the exact GitHub source and CI. 144-A is
-**SOURCE ACCEPTED**.
+ChatGPT independently reviewed the exact C3 GitHub commit, its three-file
+mechanical fixture/pin correction, branch identity and CI. Architecture 144-A+B
+is **SOURCE ACCEPTED**.
 
-The new source is an inert deterministic foundation only. Canonical parsing and
-intrinsic validation do not establish external verification or operational
-authority.
+The source remains inert with respect to operational evidence acquisition and
+effects. C3 did not change the accepted Architecture-144 domain implementation.
 
-## Certification boundary
+## Canonical certification
 
-144-A changed the current FULL inventory from 186 to 187 modules and refreshed
-the reviewed timing/inventory successor chain. CI #638's four broad shards
-passed, but they are source-gate admission evidence rather than canonical FULL.
+The final exact source passed canonical FULL:
 
-The pending FULL obligation is deliberately batched through 144-B because 144-B
-is the adjacent source-only successor and no protected/consequential boundary is
-crossed between them.
+```text
+profile    full
+modules    187
+cases      12,436
+passed     12,433
+skipped    3
+failed     0
+errors     0
+wall       256.955 s
+lanes      254.635 / 254.650 / 254.666 / 254.679 s
+evidence   F:\AI\temp\certification\arch144-final-full-c3-22964d67d60d43d08dadbdd8e8743eee
+```
 
-After 144-B exact-source acceptance:
+The earlier failed FULL evidence at
+`F:\AI\temp\certification\arch144-final-full-4bc908648d0c4b198a327380d7004ba8`
+is preserved. Its 17 failures were all the same stale synthetic FULL-fixture
+mismatch and were repaired in C3 without changing Architecture-144 domain source.
 
-1. run one fresh canonical FULL on the final exact 144-A+B source;
-2. do not also run redundant ROBINHOOD unless ChatGPT identifies materially
-   distinct required coverage;
-3. only after that gate may the project approach the protected 134-F
-   multi-session paper-soak boundary.
+Do not rerun FULL or add redundant ROBINHOOD certification on unchanged source.
 
-## Immediate next milestone — Architecture 144-B
+## Immediate next milestone — Architecture 134-F protected preflight
 
-Owner/model: **Codex / Astra**.
+Owner/model: **ChatGPT / GPT-5.6 Sol High**.
 
-Reason: 144-B must compose existing Architecture-142/143 public verifiers with
-accepted D1R9/D1R8 parser/proof semantics while preserving a pure no-acquisition
-boundary. The contract is frozen, but the exact safe composition surface crosses
-multiple modules and should be discovered before implementation rather than
-guessed.
-
-144-B must remain separated from evidence acquisition:
-
-- caller supplies canonical bytes/objects;
-- complete 142/143/D1R9/D1R8 evidence is independently verified;
-- exact production contract/strategy/session/source semantics are reconciled;
-- positive verified observation construction occurs only after those checks;
-- five verified observations may produce positive eligibility only after the
-  frozen v1 soak rule passes.
-
-It must not:
-
-- open/read real evidence files itself;
-- import/copy effectful D1R9 scheduler/filesystem surface merely for parser
-  semantics;
-- access credentials/providers/Robinhood/brokers;
-- mutate scheduler or paper state;
-- invoke D1/D1R7/D1R8/D1R9/D2;
-- materialize `PAPER_CANDIDATE`;
-- promote anything.
+The next action is preflight/authorization only. It must re-read the exact
+Architecture-134-F authority and current operational state, prove prerequisites
+and consumed-evidence boundaries, and produce the bounded paper-only operator
+action if admissible. Source/FULL success alone grants no provider, scheduler,
+credential, broker or paper effect authority.
 
 ## Unattended paper-trading boundary
 
@@ -106,13 +84,11 @@ Architecture 134 explicitly names the next operational proof as:
 134-F: fresh multi-session live-paper soak with end-of-window review
 ```
 
-So the project is now technically close to unattended paper testing, but the
-multi-session protected effect should not begin until:
+The source and certification prerequisites are now complete. The multi-session
+protected effect still must not begin before:
 
 ```text
-144-B source accepted
--> final exact canonical FULL
--> 134-F protected preflight/authorization
+134-F protected preflight/authorization
 -> fresh unattended multi-session paper soak
 -> end-of-window reconciliation
 -> Architecture-144 eligibility evaluation
@@ -135,6 +111,6 @@ promotion remain later explicit boundaries.
 
 ## Required continuation
 
-Continue 144-B now on the accepted 144-A feature lineage. After its exact-source
-review, automatically run/prepare the one required canonical FULL and then the
-134-F protected preflight. Do not wait for a separate "what next?" request.
+Continue automatically with the Architecture 134-F protected preflight on the
+accepted/certified source. Do not execute the soak merely because source/FULL are
+green, and do not wait for a separate "what next?" request.

@@ -437,7 +437,7 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
     assert {
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
-    } == {"full": 186, "robinhood": 101, "legacy": 222, "exhaustive": 408}
+    } == {"full": 187, "robinhood": 101, "legacy": 222, "exhaustive": 409}
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 67
     gui_paths = [path for path in inventory if path.startswith("tests/gui/")]
     assert len(gui_paths) == 51
@@ -464,6 +464,9 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
         profile_path, expected
     )
     expected = checkpoint_runner._arch132_r3i_current_inventory_test_pin(
+        profile_path, expected
+    )
+    expected = checkpoint_runner._arch144_current_inventory_test_pin(
         profile_path, expected
     )
     assert checkpoint_runner._git_blob_sha1(ROOT / profile_path) == expected

@@ -624,11 +624,17 @@ def test_arch143_inventory_overlay_exact_predecessor_and_blobs():
             )
             == pin
         )
-        expected_current = checkpoint_runner.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES.get(
+        expected_current = checkpoint_runner._arch132_r3i_current_inventory_test_pin(
             path, pin
         )
+        expected_current = checkpoint_runner._arch144_current_inventory_test_pin(
+            path, expected_current
+        )
         assert (
-            checkpoint_runner._arch132_r3i_current_inventory_test_pin(path, pin)
+            checkpoint_runner._arch144_current_inventory_test_pin(
+                path,
+                checkpoint_runner._arch132_r3i_current_inventory_test_pin(path, pin),
+            )
             == expected_current
         )
         assert checkpoint_runner._git_blob_sha1(root / path) == expected_current

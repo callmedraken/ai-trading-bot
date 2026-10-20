@@ -6,6 +6,7 @@ import pytest
 from scripts import run_test_certification as runner
 
 from .helpers import (
+    _fixture_profiles,
     _inventory,
     _lane_names,
     _profile_inventory,
@@ -129,6 +130,12 @@ def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
             index = min(range(count), key=lambda lane: (totals[lane], lane))
             totals[index] += raw[module]
         assert tuple(totals) == expected
+
+
+def test_full_fixture_matches_frozen_timing_membership() -> None:
+    assert set(_fixture_profiles()["full"]) == {
+        module for module, _ in runner.FULL_MODULE_TIMINGS_MS
+    }
 
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:

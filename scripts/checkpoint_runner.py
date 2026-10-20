@@ -12290,11 +12290,11 @@ ARCH144_CURRENT_INVENTORY_TEST_PIN_OVERRIDES: Final = {
         "2a68830609ace599f5cc0eabe766692799a232c9"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
-        "2de8ae7184203d4a0f1674b83ea3631ca4317423"
+        "7697ae59eb5ef6eefc2c506679a1aad875f4a90a"
     ),
 }
 ARCH144_CURRENT_INVENTORY_TEST_PINS_SHA256: Final = (
-    "db6fe589836ecd25ad259cef84a9ac3346c5cce69443a68ca021cb586de17431"
+    "8debe5182901b67ef26ea2745481b14d1931d4ab752422dfe9fb6f839e6f24be"
 )
 
 

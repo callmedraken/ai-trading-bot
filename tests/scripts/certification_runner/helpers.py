@@ -237,6 +237,7 @@ _CURRENT_FULL_ADDITIONS = (
     "tests/experiments/test_research_candidate_walk_forward.py",
     "tests/experiments/test_research_strategy_backtest.py",
     "tests/experiments/test_research_strategy_definition.py",
+    "tests/experiments/test_research_strategy_paper_candidate_eligibility.py",
     "tests/experiments/test_research_strategy_production_compatibility.py",
     "tests/experiments/test_research_strategy_walk_forward.py",
     "tests/review_paper/test_alpaca_authentication_qualification.py",

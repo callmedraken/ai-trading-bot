@@ -364,8 +364,11 @@ def test_source_has_no_lookahead_or_operational_capability() -> None:
     assert "uuid4" not in source
     assert not {
         "F1_NAMESPACE_READS",
+        "F1_NAMESPACE_WRITES",
         "PRODUCTION_SQLITE_READS",
+        "PRODUCTION_SQLITE_WRITES",
         "CREDENTIAL_READS",
+        "CREDENTIAL_WRITES",
         "PROVIDER_CALLS",
         "BROKER_CALLS",
         "SCHEDULER_CALLS",

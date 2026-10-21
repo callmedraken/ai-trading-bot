@@ -1435,7 +1435,7 @@ def test_arch144c_source_only_route_authority_and_frozen_v1():
 def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
-    after = runner.ARCH144C_TEST_PIN_OVERRIDES[path]
+    after = runner.ARCH145A_TEST_PIN_OVERRIDES[path]
     assert runner._arch144c_current_inventory_test_pin(path, before) == after
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
@@ -1457,8 +1457,165 @@ def test_arch145a_source_only_route_is_registered_and_inert():
         runner.resolve_ci_checkpoint(
             runner._checkpoint_specs(), spec.remote_branch, "push"
         )
-        == spec.name
+        is None
     )
+    assert runner.ARCH145A_NAME not in runner.ACTIVE_CI_CHECKPOINTS
     assert runner.resolve_ci_certification_profile(spec.name) is None
     assert runner._arch145a_authority_check(root) == ()
     assert runner.ARCH145A_SOURCE_PINS.keys() == set(runner.ARCH145A_PATHS)
+
+
+def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
+    root = Path(runner.__file__).resolve().parents[1]
+    path = root / runner.ARCH145A_D1R6_WORKFLOW_PATH
+    current = path.read_text(encoding="utf-8")
+    predecessor = subprocess.run(
+        [
+            "git",
+            "show",
+            "c9b9fe92997f015c3b392fdcbb15d4ff1d1db63b:.github/workflows/"
+            "checkpoint-source-gates.yml",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert current == predecessor.replace(
+        '      - "feature/robinhood-*"\n',
+        '      - "feature/robinhood-*"\n      - "feature/research-*"\n',
+    )
+    assert runner._batch_workflow_is_reviewed(current)
+    assert "pull_request:" in current
+    assert "workflow_dispatch:" in current
+    assert "group: ${{ github.workflow }}-${{ github.ref }}" in current
+    assert "cancel-in-progress: true" in current
+    assert "shard: [0, 1, 2, 3]" in current
+    assert current.count("  source-gates:\n") == 1
+    assert "feature/robinhood-*" in current
+    assert "feature/test-suite-*" in current
+    candidate = runner._git_blob_sha1(path)
+    assert candidate == runner.ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+    assert (
+        runner._arch145a_d1r6_workflow_successor(
+            runner.ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1,
+            candidate,
+        )
+        == candidate
+    )
+    with pytest.raises(ValueError, match="145-A D1R6"):
+        runner._arch145a_d1r6_workflow_successor("a" * 40, candidate)
+    with pytest.raises(ValueError, match="145-A D1R6"):
+        runner._arch145a_d1r6_workflow_successor(
+            runner.ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1,
+            "a" * 40,
+        )
+    without_research = current.replace('      - "feature/research-*"\n', "")
+    extra_branch = current.replace(
+        '      - "feature/research-*"\n',
+        '      - "feature/research-*"\n      - "feature/unreviewed-*"\n',
+    )
+    for mutated in (without_research, extra_branch):
+        raw = mutated.encode("utf-8")
+        mutated_blob = hashlib.sha1(
+            b"blob " + str(len(raw)).encode("ascii") + bytes((0,)) + raw
+        ).hexdigest()
+        with pytest.raises(ValueError, match="145-A D1R6"):
+            runner._arch145a_d1r6_workflow_successor(
+                runner.ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1,
+                mutated_blob,
+            )
+    assert runner._arch134_d1r6_authority_check(root) == ()
+    assert runner._arch145a_authority_check(root) == ()
+
+
+def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers():
+    root = Path(runner.__file__).resolve().parents[1]
+    digest = lambda value: hashlib.sha256(  # noqa: E731
+        json.dumps(value, sort_keys=True).encode()
+    ).hexdigest()
+
+    assert (
+        digest(
+            [
+                runner.ARCH144C_PREDECESSOR_TEST_PINS,
+                runner.ARCH144C_TEST_PIN_OVERRIDES,
+            ]
+        )
+        == runner.ARCH144C_TEST_PINS_SHA256
+    )
+    assert runner._arch145a_predecessor_active_checkpoint_inventory() == (
+        runner.ACTIVE_CI_CHECKPOINTS
+    )
+    assert runner._arch144c_authority_check(root) == ()
+    assert runner._arch134_f1_authority_check(root) == ()
+    for check in (
+        runner._arch134_armed_paper_authority_check,
+        runner._arch134_production_paper_runtime_authority_check,
+        runner._arch134_runtime_acl_authority_check,
+    ):
+        assert check(root) == ()
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "extra",
+        "wrong_blob",
+        "malformed_blob",
+        "digest",
+        "predecessor",
+        "predecessor_material",
+    ],
+)
+def test_arch145a_test_successor_overlay_fails_closed(
+    monkeypatch: pytest.MonkeyPatch, mutation: str
+):
+    path = "tests/runtime/checkpoint_runner/test_core.py"
+    predecessor = runner.ARCH145A_PREDECESSOR_TEST_PINS[path]
+    pins = dict(runner.ARCH145A_TEST_PIN_OVERRIDES)
+    if mutation == "missing":
+        pins.pop(path)
+    elif mutation == "extra":
+        pins["tests/domain/test_market.py"] = "a" * 40
+    elif mutation == "wrong_blob":
+        pins[path] = "a" * 40
+    elif mutation == "malformed_blob":
+        pins[path] = None
+    elif mutation == "digest":
+        monkeypatch.setattr(runner, "ARCH145A_TEST_PIN_OVERRIDES_SHA256", "a" * 64)
+    elif mutation == "predecessor":
+        predecessor = "a" * 40
+    else:
+        prior = dict(runner.ARCH144C_TEST_PIN_OVERRIDES)
+        prior[path] = "a" * 40
+        monkeypatch.setattr(runner, "ARCH144C_TEST_PIN_OVERRIDES", prior)
+    monkeypatch.setattr(runner, "ARCH145A_TEST_PIN_OVERRIDES", pins)
+    with pytest.raises(ValueError, match="145-A"):
+        runner._arch145a_current_inventory_test_pin(path, predecessor)
+
+
+def test_arch145a_source_successor_rejects_missing_or_extra_paths(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    path = "scripts/run_test_certification.py"
+    predecessor = runner.ARCH145A_PREDECESSOR_SOURCE_PINS[path]
+    for mutation in ("missing", "extra"):
+        pins = dict(runner.ARCH145A_SOURCE_PIN_OVERRIDES)
+        if mutation == "missing":
+            pins.pop(path)
+        else:
+            pins["tests/domain/test_market.py"] = "a" * 40
+        monkeypatch.setattr(runner, "ARCH145A_SOURCE_PIN_OVERRIDES", pins)
+        with pytest.raises(ValueError, match="145-A"):
+            runner._arch145a_current_source_pin(path, predecessor)
+        monkeypatch.undo()
+
+
+def test_arch145a_successor_removal_restores_predecessor_failure(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    root = Path(runner.__file__).resolve().parents[1]
+    monkeypatch.setattr(runner, "ARCH145A_TEST_PIN_OVERRIDES", {})
+    assert runner._arch144c_authority_check(root)

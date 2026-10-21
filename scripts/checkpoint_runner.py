@@ -14139,21 +14139,6 @@ ARCH145A_PREDECESSOR_TEST_PINS: Final = {
     "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
         "f83282083640056fdc6d375e351a7090f50a7d0c"
     ),
-    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
-        "b94e0857df8617d6c64c1a2e5d634cf067ab5996"
-    ),
-    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
-        "351e0f22db0b9f08a17f8c6b8d6a8cb0918970ac"
-    ),
-    "tests/review_paper/test_arch133_reprovision_recovery.py": (
-        "c4ce9a36ae5d5f59b12bf665eea6893e7e671c7c"
-    ),
-    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
-        "02253a169829ecd34520cc2a14c45232aef23496"
-    ),
-    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
-        "ffcb9925026e754c01623ec3a8509202f71da2cf"
-    ),
     "tests/review_paper/test_d1_session_authorization.py": (
         "d02f79c72fe8dc4a5df216f45d6f63f093b4c1f5"
     ),
@@ -14171,9 +14156,6 @@ ARCH145A_PREDECESSOR_TEST_PINS: Final = {
     ),
     "tests/review_paper/test_supervised_maintenance_rebind.py": (
         "5101c2003da3c642c8110a43d8c7c8d43c525d1a"
-    ),
-    "tests/review_paper/test_supervised_release_installation.py": (
-        "cd8b750c23876476f4ff18c63da33ce5944914e2"
     ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "300ba87491b4bf0d5faf4ce985043968a053a5c1"
@@ -14202,49 +14184,31 @@ ARCH145A_PREDECESSOR_TEST_PINS: Final = {
 }
 ARCH145A_TEST_PIN_OVERRIDES: Final = {
     "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
-        "d451f91d2753f7db76558974f9804745f1a03055"
+        "227fc083ea4d610d88c96ac7fe826eeb6da16303"
     ),
     "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
-        "4a3efc90c8ca6da23a37ee5c7fc6128c704c6edc"
-    ),
-    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
-        "81cf462bafd937bad63b35055e73dee31037b56a"
-    ),
-    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
-        "cf51d08220ab6c7436e8a2d919db6af5c9f6d31e"
-    ),
-    "tests/review_paper/test_arch133_reprovision_recovery.py": (
-        "09f7cf0ebb18cf5617fbd46a53b23e476e2169ab"
-    ),
-    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
-        "7512a93e8d0e83be3147ebeccb75ec35b8a5202b"
-    ),
-    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
-        "f586a8b44582f47cc5f49a61ad246a19b5ffa59b"
+        "8a01b1f2f4256b2bd5bbe03f730761913b58a94e"
     ),
     "tests/review_paper/test_d1_session_authorization.py": (
-        "ad7a6a69c816c5b04902eab03c003474d56cd5d5"
+        "6da9172588a5934c4cc538d65494ee22c9e0ab6e"
     ),
     "tests/review_paper/test_d1_session_execution.py": (
-        "ff34dac73b039eb1a4311d1eedbb04d26201a974"
+        "e55d100d677408c36a7e1a5fbd391945a33b267c"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
         "2b9257dd5ebbf1e2d019cd41f663552138f07077"
     ),
     "tests/review_paper/test_production_strategy_cycle.py": (
-        "52d2d583cdfa1371a0a3e88432ddc952161bced4"
+        "1496b254369535abb61318acb4f5771c94ac1672"
     ),
     "tests/review_paper/test_supervised_deployment_qualification.py": (
-        "d7431a1814eca7e0bf79bab0c97ac0e0a64d70e4"
+        "3e432f5c128b27f5759db445147dde1f4235898e"
     ),
     "tests/review_paper/test_supervised_maintenance_rebind.py": (
-        "f77de8d14b119003e7828c6d21e9ad46ad3e8a84"
-    ),
-    "tests/review_paper/test_supervised_release_installation.py": (
-        "4c2b77217e0905de6113a7f5e4be6a95420b4440"
+        "82087bf56946e0c81465953514cf0d0dfb9cf531"
     ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
-        "77a621e2ac7c8a4b55902cbc7b363ab8a684644d"
+        "2d92d825177d628f7a942475131aaf3f731f387d"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "486c85ba872af23209eb4f13f59ba9b5907b4fb2"
@@ -14262,17 +14226,17 @@ ARCH145A_TEST_PIN_OVERRIDES: Final = {
         "b6bcd3aaf87f28fd0fe7d36b211bb5a1a4078c5a"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
-        "9998928bad17e1f1a85e10fe23ecc7ee91f6c64a"
+        "e9c460d748636e13d4f090782c734ecc6bf038f2"
     ),
     "tests/strategies/test_production_strategy_decision.py": (
-        "b20f2031c00a1e192531207df96551a24ad780ab"
+        "fc9a753942e67d1827454e80f2f3f967fccebbaa"
     ),
 }
 ARCH145A_PREDECESSOR_TEST_PINS_SHA256: Final = (
-    "a8649f9f50ed49db9655b11f8f6d5884e2091359b98a70f306b724a38ec124ee"
+    "20216754a6bc04916e57a54b64236af5dd259cc539a6721462535d7b1ff32347"
 )
 ARCH145A_TEST_PIN_OVERRIDES_SHA256: Final = (
-    "3be4a3c13d335069d43895b5045f0990ea14aa934752ea15555ca3825b1a665c"
+    "f60b9fe529150dadda332425922fdd5e8d0b571012cedf010809ba1e0ff757fd"
 )
 
 # Architecture 145 is registered for local verification but remains outside

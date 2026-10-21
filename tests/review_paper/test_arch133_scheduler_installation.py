@@ -1161,11 +1161,11 @@ def test_133p_registration_workflow_drift_fails_closed(
     previous = (
         f'    "{prior}",\n' if target == "runner" else f"              {prior} `\n"
     )
-    assert text.count(line) == 1
+    assert text.count(line) == (2 if target == "runner" else 1)
     if mutation == "order":
-        text = text.replace(previous + line, line + previous)
+        text = text.replace(previous + line, line + previous, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2)
+        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_scheduler_installation_authority_check(
         workflow_authority_copy

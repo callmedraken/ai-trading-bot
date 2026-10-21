@@ -398,7 +398,8 @@ def test_a16_a17_frozen_digests_and_source_blobs_remain_exact():
         ),
     }
     for path, pin in frozen.items():
-        assert checkpoint_runner._git_blob_sha1(ROOT / path) == pin
+        expected = checkpoint_runner.ARCH145A_SOURCE_PIN_OVERRIDES.get(path, pin)
+        assert checkpoint_runner._git_blob_sha1(ROOT / path) == expected
 
 
 def test_a18_overlay_rejects_a17_predecessor_drift(monkeypatch):
@@ -437,8 +438,8 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
     assert {
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
-    } == {"full": 189, "robinhood": 103, "legacy": 222, "exhaustive": 411}
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 70
+    } == {"full": 192, "robinhood": 103, "legacy": 222, "exhaustive": 414}
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 69
     gui_paths = [path for path in inventory if path.startswith("tests/gui/")]
     assert len(gui_paths) == 51
     relative = Path(__file__).relative_to(ROOT).as_posix()

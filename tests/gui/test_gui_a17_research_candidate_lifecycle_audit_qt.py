@@ -416,12 +416,12 @@ def test_actual_inventory_and_gui_stays_legacy():
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
     } == {
-        "full": 189,
+        "full": 192,
         "robinhood": 103,
         "legacy": 222,
-        "exhaustive": 411,
+        "exhaustive": 414,
     }
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 70
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 69
     assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51
     relative = Path(__file__).relative_to(ROOT).as_posix()
     assert relative in run_test_certification.select_inventory(inventory, "legacy")
@@ -592,7 +592,8 @@ def test_workflow_bytes_and_five_resolver_sites_unchanged():
             "fe6aceac62721338eba4fcb40e2e7fde0d976e18",
         ),
     ):
-        assert checkpoint_runner._git_blob_sha1(ROOT / path) == pin
+        expected = checkpoint_runner.ARCH145A_SOURCE_PIN_OVERRIDES.get(path, pin)
+        assert checkpoint_runner._git_blob_sha1(ROOT / path) == expected
     source = (ROOT / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
     assert (

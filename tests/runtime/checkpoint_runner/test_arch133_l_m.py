@@ -100,16 +100,16 @@ def test_133l_ci_registration_drift_fails_closed(
         if target == "runner"
         else f"              {_L133_NAME} `\n"
     )
-    assert text.count(line) == 1
+    assert text.count(line) == (2 if target == "runner" else 1)
     if mutation == "order":
         prior = (
             f'    "{_K133_NAME}",\n'
             if target == "runner"
             else f"              {_K133_NAME} `\n"
         )
-        text = text.replace(prior + line, line + prior)
+        text = text.replace(prior + line, line + prior, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2)
+        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_verifier_authority_check(root)
 
@@ -191,16 +191,16 @@ def test_133m_ci_registration_drift_fails_closed(
         if target == "runner"
         else f"              {_M133_NAME} `\n"
     )
-    assert text.count(line) == 1
+    assert text.count(line) == (2 if target == "runner" else 1)
     if mutation == "order":
         prior = (
             f'    "{_L133_NAME}",\n'
             if target == "runner"
             else f"              {_L133_NAME} `\n"
         )
-        text = text.replace(prior + line, line + prior)
+        text = text.replace(prior + line, line + prior, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2)
+        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_diagnostic_authority_check(root)
 
@@ -357,16 +357,16 @@ def test_133n_ci_registration_drift_fails_closed(
         if target == "runner"
         else f"              {_N133_NAME} `\n"
     )
-    assert text.count(line) == 1
+    assert text.count(line) == (2 if target == "runner" else 1)
     if mutation == "order":
         prior = (
             f'    "{_M133_NAME}",\n'
             if target == "runner"
             else f"              {_M133_NAME} `\n"
         )
-        text = text.replace(prior + line, line + prior)
+        text = text.replace(prior + line, line + prior, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2)
+        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_publication_diagnostic_authority_check(root)
 
@@ -461,16 +461,16 @@ def test_133o_ci_registration_drift_fails_closed(
         if target == "runner"
         else f"              {_O133_NAME} `\n"
     )
-    assert text.count(line) == 1
+    assert text.count(line) == (2 if target == "runner" else 1)
     if mutation == "order":
         prior = (
             f'    "{_N133_NAME}",\n'
             if target == "runner"
             else f"              {_N133_NAME} `\n"
         )
-        text = text.replace(prior + line, line + prior)
+        text = text.replace(prior + line, line + prior, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2)
+        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_publication_corrected_authority_check(root)
 
@@ -515,8 +515,8 @@ def test_complete_133p_real_chain_pass_and_rejection(tmp_path, monkeypatch, muta
             else f"              {_H133_NAME} `\n"
         )
         text = path.read_text(encoding="utf-8")
-        assert text.count(line) == 1
-        path.write_text(text.replace(line, ""), encoding="utf-8")
+        assert text.count(line) == (2 if mutation == "runner" else 1)
+        path.write_text(text.replace(line, "", 1), encoding="utf-8")
         expected = (
             "133-H batch registration drift"
             if mutation == "runner"

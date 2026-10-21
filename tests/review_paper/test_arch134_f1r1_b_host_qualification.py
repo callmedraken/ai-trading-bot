@@ -45,9 +45,11 @@ from trading_bot.supervised_release.runtime_admission import (
 from trading_bot.supervised_release.runtime_host_composition import (
     Architecture133HostBinding,
     HostBindingError,
+    HostQualificationReadiness,
     QualificationHost,
     QualificationState,
     SuccessorExternalEffectAdapter,
+    assess_host_qualification_readiness,
     bind_architecture133_host,
     bind_architecture133_runtime,
 )
@@ -170,6 +172,31 @@ class _EffectJournal:
         self._records = (*self._records, record)
 
 
+class _FakeLease:
+    def __init__(self) -> None:
+        self.holder: str | None = None
+        self.acquire_calls: list[str] = []
+        self.release_calls = 0
+        self.release_statuses: list[LifecycleStatus] = []
+        self.journal: DurableLifecycleJournal | None = None
+        self.records_at_acquire = ()
+
+    def acquire(self, runtime_id: str) -> bool:
+        self.acquire_calls.append(runtime_id)
+        if self.holder is not None:
+            return False
+        self.holder = runtime_id
+        if self.journal is not None:
+            self.records_at_acquire = self.journal.records()
+        return True
+
+    def release(self) -> None:
+        self.release_calls += 1
+        if self.journal is not None:
+            self.release_statuses.append(self.journal.snapshot().status)
+        self.holder = None
+
+
 def test_verified_architecture_133_evidence_binds_to_f1r1_material():
     release, binding, installed, runtime = _host_evidence()
 
@@ -184,6 +211,42 @@ def test_verified_architecture_133_evidence_binds_to_f1r1_material():
     assert bind_architecture133_runtime(release, binding, installed, runtime) == (
         result.material
     )
+
+
+def test_exact_admitted_binding_returns_closed_host_readiness_result():
+    release, binding, installed, runtime = _host_evidence()
+    host_binding = bind_architecture133_host(release, binding, installed, runtime)
+
+    assert (
+        assess_host_qualification_readiness(host_binding)
+        is HostQualificationReadiness.READY_FOR_F1R1_HOST_QUALIFICATION
+    )
+    with pytest.raises(ValueError):
+        HostQualificationReadiness("READY_FOR_SEPARATE_SUCCESSOR_SOAK_DESIGN")
+    assert not any(
+        callable(
+            getattr(
+                HostQualificationReadiness.READY_FOR_F1R1_HOST_QUALIFICATION,
+                name,
+                None,
+            )
+        )
+        for name in ("install", "schedule", "execute", "submit")
+    )
+
+
+def test_malformed_host_binding_cannot_produce_readiness_result():
+    release, binding, installed, runtime = _host_evidence()
+    host_binding = bind_architecture133_host(release, binding, installed, runtime)
+    malformed = replace(
+        host_binding,
+        material=replace(host_binding.material, binding_sha256="0" * 64),
+    )
+
+    with pytest.raises(HostBindingError):
+        assess_host_qualification_readiness(malformed)
+    with pytest.raises(HostBindingError):
+        assess_host_qualification_readiness(object())
 
 
 @pytest.mark.parametrize(
@@ -360,7 +423,7 @@ def test_qualification_host_survives_disposable_development_disturbances(
     release, binding, installed, runtime = _host_evidence()
     material = bind_architecture133_runtime(release, binding, installed, runtime)
     journal = DurableLifecycleJournal(material.runtime_id, MemoryLifecycleStorage())
-    host = QualificationHost(material, journal)
+    host = QualificationHost(material, journal, _FakeLease())
     stop_state = {"done": False}
 
     def wait_once() -> None:
@@ -380,6 +443,94 @@ def test_qualification_host_survives_disposable_development_disturbances(
     assert result.runtime_id == material.runtime_id
     assert result.status is LifecycleStatus.NORMAL_RETURN
     assert host.evidence().runtime_id == material.runtime_id
+
+
+def test_qualification_host_requires_lease_and_records_lock_only_after_acquisition():
+    release, binding, installed, runtime = _host_evidence()
+    material = bind_architecture133_runtime(release, binding, installed, runtime)
+    journal = DurableLifecycleJournal(material.runtime_id, MemoryLifecycleStorage())
+
+    with pytest.raises(TypeError):
+        QualificationHost(material, journal)  # type: ignore[call-arg]
+
+    lease = _FakeLease()
+    lease.journal = journal
+    result = QualificationHost(material, journal, lease).run(
+        stop=lambda: True, wait_once=lambda: None
+    )
+
+    assert lease.records_at_acquire == (journal.records()[0],)
+    assert [record.event for record in journal.records()] == [
+        LifecycleEvent.HOST_ENTERED,
+        LifecycleEvent.SUPERVISOR_LOCK_ACQUIRED,
+        LifecycleEvent.SUPERVISOR_LOOP_ENTERED,
+        LifecycleEvent.SAFE_WAITING,
+        LifecycleEvent.NORMAL_RETURN,
+    ]
+    assert lease.release_calls == 1
+    assert lease.release_statuses == [LifecycleStatus.NORMAL_RETURN]
+    assert result.status is LifecycleStatus.NORMAL_RETURN
+
+
+def test_rejected_lease_cannot_enter_supervisor_loop_or_claim_lock():
+    release, binding, installed, runtime = _host_evidence()
+    material = bind_architecture133_runtime(release, binding, installed, runtime)
+    journal = DurableLifecycleJournal(material.runtime_id, MemoryLifecycleStorage())
+    lease = _FakeLease()
+    lease.holder = "another-runtime"
+
+    result = QualificationHost(material, journal, lease).run(
+        stop=lambda: pytest.fail("rejected host must not poll stop"),
+        wait_once=lambda: pytest.fail("rejected host must not wait"),
+    )
+
+    assert result.state is QualificationState.AUTHORITY_REJECTED
+    assert result.status is LifecycleStatus.ABRUPT_PROCESS_DISAPPEARANCE
+    assert [record.event for record in journal.records()] == [
+        LifecycleEvent.HOST_ENTERED
+    ]
+    assert lease.release_calls == 0
+
+
+def test_two_hosts_sharing_one_fake_lease_have_one_durable_authority():
+    release, binding, installed, runtime = _host_evidence()
+    material = bind_architecture133_runtime(release, binding, installed, runtime)
+    lease = _FakeLease()
+    first_journal = DurableLifecycleJournal(
+        material.runtime_id, MemoryLifecycleStorage()
+    )
+    second_journal = DurableLifecycleJournal(
+        material.runtime_id, MemoryLifecycleStorage()
+    )
+    first = QualificationHost(material, first_journal, lease)
+    second = QualificationHost(material, second_journal, lease)
+    second_result = None
+    stop_first = False
+
+    def wait_once() -> None:
+        nonlocal second_result, stop_first
+        second_result = second.run(stop=lambda: True, wait_once=lambda: None)
+        stop_first = True
+
+    first_result = first.run(stop=lambda: stop_first, wait_once=wait_once)
+
+    assert first_result.status is LifecycleStatus.NORMAL_RETURN
+    assert second_result is not None
+    assert second_result.state is QualificationState.AUTHORITY_REJECTED
+    assert [record.event for record in second_journal.records()] == [
+        LifecycleEvent.HOST_ENTERED
+    ]
+    assert (
+        sum(
+            record.event is LifecycleEvent.SUPERVISOR_LOCK_ACQUIRED
+            for journal in (first_journal, second_journal)
+            for record in journal.records()
+        )
+        == 1
+    )
+    assert first_journal.snapshot().status is LifecycleStatus.NORMAL_RETURN
+    assert lease.release_calls == 1
+    assert lease.holder is None
 
 
 def test_qualification_host_has_no_effect_capability_and_reboot_stays_manual():

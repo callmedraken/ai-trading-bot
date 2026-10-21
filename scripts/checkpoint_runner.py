@@ -14576,19 +14576,19 @@ ARCH134_F1R1_B_SOURCE_PINS: Final = {
         "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
     ),
     "docs/architecture/134-f1r1-b-host-qualification.md": (
-        "3bf1244c5f61a1b97edcbaf880a306ddec0abbf8"
+        "fad9c9c58d42f33d0ce53eb386433f857fb88cf1"
     ),
     "docs/validation/arch134-f1r1-b-host-qualification.md": (
-        "7ae79bd32b33b5fd0648532ca5e4ce97e466ec39"
+        "97155006c9ae324a57f41a94b34968163d22f56c"
     ),
     "src/trading_bot/supervised_release/lifecycle_store.py": (
         "f03fce5913d8ef41bb3515dc02670b38fc7c296a"
     ),
     "src/trading_bot/supervised_release/runtime_host_composition.py": (
-        "4db8f7df9e14ce00a0d7d2375ad6a891e3680b18"
+        "fc86a4ef0a8911fb96f91571bccf58a44f93e203"
     ),
     "tests/review_paper/test_arch134_f1r1_b_host_qualification.py": (
-        "ae05dffa08a69d8961ed306bade4b17a22f4912c"
+        "0241cb84c7122d7a6ea95534fd298641d1c85cd8"
     ),
 }
 ARCH134_F1R1_B_PATHS: Final = tuple(sorted(ARCH134_F1R1_B_SOURCE_PINS))
@@ -14691,7 +14691,7 @@ ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
         "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
     ),
-    "scripts/run_test_certification.py": ("f67211b95a5ea0ce5328fcf060bf35fc960108a5"),
+    "scripts/run_test_certification.py": ("f718b95e3a920936e8e1e0078694171ce54da8fe"),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "324a079174343b7512bd97b60235d50561719acf"
     ),
@@ -14699,10 +14699,10 @@ ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
         "5d5726d853c9a0b86443fb8776ac6e20951a47a7"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "e22b84ced588bede3b0201380fcff64e5aa37b93"
+        "bc79bccf05cb25e6c9ce94057555ad1df0a793b6"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
-        "d99f426c9db7765dc1cddc41f52f400eb9044bf2"
+        "8338d781b19a1354c5330575c609ec23a4e1c745"
     ),
     "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
         "81cf462bafd937bad63b35055e73dee31037b56a"
@@ -14780,13 +14780,13 @@ ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
     "797dd699c866fd229761c7230f5a9ec1428f1363a6408558814d182d884d2d1c"
 )
 ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES_SHA256: Final = (
-    "d49bebcd6a5e130307c65f3caa4c13b97af2f8d144d869fc938d7029e56389a6"
+    "944cd76c499a9b49ae384b5571bc623dc45fe8d56d1c25af923d2895b375266c"
 )
 ARCH134_F1R1_B_PREDECESSOR_TEST_PINS_SHA256: Final = (
     "0fe0168d6eaeeae96950daa9af25e394db68ae87ac581adf22354ddc69ee7939"
 )
 ARCH134_F1R1_B_TEST_PIN_OVERRIDES_SHA256: Final = (
-    "bcf9001d2f37b29fe8aa9540e8e102adf438768718810f2aade97b440f404036"
+    "6663dc42d268dd53fd40d09e5b067fd1f05770a4dc54631a80f92583d04c2db8"
 )
 ARCH134_F1R1_B_PREDECESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS

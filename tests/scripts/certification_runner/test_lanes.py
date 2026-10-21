@@ -388,5 +388,38 @@ def test_f1_parent_outlier_placement_preserves_r3h_and_two_lane_coverage():
     for module, index in {
         **runner.ROBINHOOD_LANE_PINS,
         **runner.ROBINHOOD_F1_LANE_PINS,
+        **runner.ROBINHOOD_F1R1_B_LANE_PINS,
     }.items():
         assert module in tuple(lanes.values())[index]
+
+
+def test_f1r1_b_pin_is_exact_and_applied_after_r3h_and_f1():
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    assert runner.ROBINHOOD_F1R1_B_LANE_PINS == {
+        "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": 0
+    }
+    assert set(runner.ROBINHOOD_F1R1_B_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
+    assert set(runner.ROBINHOOD_F1R1_B_LANE_PINS).isdisjoint(
+        runner.ROBINHOOD_F1_LANE_PINS
+    )
+    baseline = runner.apply_lane_pins(
+        runner.apply_lane_pins(
+            runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+        ),
+        runner.ROBINHOOD_F1_LANE_PINS,
+    )
+    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_F1R1_B_LANE_PINS)
+    lanes = runner.build_lanes(root, selected, "robinhood")
+    assert tuple(lanes.values()) == expected
+    runner.validate_partitions(selected, tuple(lanes.values()))
+    assert all(lanes.values())
+    assert (
+        "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py"
+        in lanes["robinhood-1"]
+    )
+    with pytest.raises(runner.CertificationError, match="lane 0 or 1"):
+        runner.apply_lane_pins(
+            (("a.py",), ("b.py",)),
+            {"a.py": 2},
+        )

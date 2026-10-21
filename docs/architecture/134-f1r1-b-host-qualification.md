@@ -47,12 +47,22 @@ provider, credential, broker, paper, scheduler, or trading implementation.
 ## Qualification host
 
 `QualificationHost` accepts immutable material, performs fresh local
-admission, records `HOST_ENTERED`, lock/loop entry, safe waiting, and a final
-normal or caught-return event, then exits only on an injected harmless stop
-signal. It exposes deterministic status/evidence and no heartbeat authority.
+admission, and requires an injected disposable `QualificationHostLease`.
+Only an exact `True` lease acquisition permits `SUPERVISOR_LOCK_ACQUIRED`,
+loop entry, or safe waiting. A rejected lease records only `HOST_ENTERED`,
+never releases another host's lease, and cannot claim host authority. An
+acquired lease is released only after a durable `NORMAL_RETURN` or
+`CAUGHT_INTERNAL_FAILURE` record. The seam has no operating-system lock,
+installation, scheduler, provider, credential, paper, broker, or trading
+capability.
+
+The host exposes deterministic status/evidence and no heartbeat authority.
 The focused harness keeps this cooperative host alive while tests perform
 disposable development-directory, Git-status, file, and subprocess activity.
-Those disturbances cannot alter the admitted runtime identity.
+Those disturbances cannot alter the admitted runtime identity. The pure
+`assess_host_qualification_readiness` boundary returns the closed
+`READY_FOR_F1R1_HOST_QUALIFICATION` result only for an exact revalidated and
+admitted `Architecture133HostBinding`; it grants no operational capability.
 
 ## Reboot and successor readiness
 

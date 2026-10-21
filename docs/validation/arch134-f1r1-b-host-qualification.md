@@ -21,6 +21,12 @@ It verifies:
   and imports no live-Git, provider, credential, broker, or scheduler helper;
 - lifecycle JSONL is canonical, append-only, replay-valid, bounded, durable
   through an injected flush/fsync seam, and bound to exactly one runtime ID;
+- the injected disposable host lease makes lock evidence truthful, rejects a
+  competing host without entering the supervisor loop, releases only after a
+  durable terminal event, and preserves one-holder authority evidence;
+- exact revalidated admitted host material returns only the closed
+  `READY_FOR_F1R1_HOST_QUALIFICATION` result, with no installation, scheduler,
+  credential, provider, paper, broker, F1, soak, D1, D2, or live capability;
 - partial, corrupt, noncanonical, terminal-extension, and over-budget state is
   rejected without truncation or repair;
 - pre-entry rejection never enters the injected seam, `ENTRY_ADMITTED` is
@@ -45,9 +51,10 @@ the exact operator boundary. Do not execute it in this source run.
    verified immutable release and the exact accepted 133 host evidence. Do not
    install it or use production state.
 2. Launch one harmless qualification host independently from the development
-   checkout, using the code-owned lifecycle destination or a separately
-   reviewed disposable host destination. Record the exact runtime ID and
-   verify the first durable lifecycle rows by read-only replay.
+   checkout, using a separately reviewed, disposable, fixed
+   qualification-only lifecycle destination. Never target the code-owned
+   production lifecycle destination by default. Record the exact runtime ID
+   and verify the first durable lifecycle rows by read-only replay.
 3. Start Codex concurrently. Perform only read-only Git/status operations,
    disposable test execution, disposable file edits, and disposable
    worktree-like directory/repository activity outside the immutable release.

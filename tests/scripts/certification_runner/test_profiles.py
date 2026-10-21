@@ -233,9 +233,13 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             else:
                 expected = runner.apply_lane_pins(
                     runner.apply_lane_pins(
-                        runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+                        runner.apply_lane_pins(
+                            runner.balance_broad(root, selected),
+                            runner.ROBINHOOD_LANE_PINS,
+                        ),
+                        runner.ROBINHOOD_F1_LANE_PINS,
                     ),
-                    runner.ROBINHOOD_F1_LANE_PINS,
+                    runner.ROBINHOOD_F1R1_B_LANE_PINS,
                 )
             assert tuple(lanes.values()) == expected
 

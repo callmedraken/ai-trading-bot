@@ -233,6 +233,47 @@ def bind_architecture133_runtime(
     ).material
 
 
+class HostQualificationReadiness(StrEnum):
+    """Closed source-only result for the separately reviewed host step."""
+
+    READY_FOR_F1R1_HOST_QUALIFICATION = "READY_FOR_F1R1_HOST_QUALIFICATION"
+
+
+def assess_host_qualification_readiness(
+    binding: Architecture133HostBinding,
+) -> HostQualificationReadiness:
+    """Return the positive B result only for an exact, admitted host binding."""
+
+    if type(binding) is not Architecture133HostBinding:
+        raise HostBindingError("exact Architecture-133 host binding required")
+    try:
+        _require_exact_host_evidence(
+            binding.verified_release,
+            binding.runtime_binding,
+            binding.installed_evidence,
+            binding.runtime_admission,
+        )
+        expected_material = InstalledRuntimeMaterial.from_manifest(
+            binding.verified_release.manifest,
+            binding_sha256=binding.runtime_binding.sha256,
+            durable_store_identities=binding.material.durable_store_identities,
+        )
+        if binding.material != expected_material:
+            raise HostBindingError("immutable host material mismatch")
+        admitted = admit_installed_runtime(
+            binding.material,
+            expected_runtime_id=binding.runtime_id,
+            expected_state_identities=binding.material.durable_store_identities,
+        )
+        if admitted.status is not RuntimeAdmissionStatus.ADMITTED:
+            raise HostBindingError("immutable runtime material rejected")
+    except HostBindingError:
+        raise
+    except (TypeError, ValueError, KeyError, ArithmeticError) as exc:
+        raise HostBindingError("host qualification readiness rejected") from exc
+    return HostQualificationReadiness.READY_FOR_F1R1_HOST_QUALIFICATION
+
+
 class SuccessorExternalEffectAdapter:
     """Inert composition for a future quote/paper seam."""
 
@@ -262,6 +303,7 @@ class SuccessorExternalEffectAdapter:
 
 class QualificationState(StrEnum):
     NOT_STARTED = "NOT_STARTED"
+    AUTHORITY_REJECTED = "AUTHORITY_REJECTED"
     SAFE_WAITING = "SAFE_WAITING"
     STOPPED = "STOPPED"
     CAUGHT_INTERNAL_FAILURE = "CAUGHT_INTERNAL_FAILURE"
@@ -273,6 +315,14 @@ class StopSignal(Protocol):
 
 class WaitOnce(Protocol):
     def __call__(self) -> None: ...
+
+
+class QualificationHostLease(Protocol):
+    """Disposable host-authority seam; it has no external-effect capability."""
+
+    def acquire(self, runtime_id: str) -> bool: ...
+
+    def release(self) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,10 +359,13 @@ class QualificationEvidence:
 
 
 class QualificationHost:
-    """Cooperative safe-idle host with injected stop and wait seams."""
+    """Cooperative safe-idle host with injected stop, wait, and lease seams."""
 
     def __init__(
-        self, material: InstalledRuntimeMaterial, journal: DurableLifecycleJournal
+        self,
+        material: InstalledRuntimeMaterial,
+        journal: DurableLifecycleJournal,
+        lease: QualificationHostLease,
     ):
         if type(material) is not InstalledRuntimeMaterial:
             raise ValueError("immutable runtime material required")
@@ -320,8 +373,13 @@ class QualificationHost:
             raise ValueError("durable lifecycle journal required")
         if journal.runtime_id != material.runtime_id:
             raise ValueError("lifecycle journal runtime identity mismatch")
+        if not all(
+            callable(getattr(lease, name, None)) for name in ("acquire", "release")
+        ):
+            raise ValueError("injected qualification host lease required")
         self._material = material
         self._journal = journal
+        self._lease = lease
         self._state = QualificationState.NOT_STARTED
 
     @property
@@ -348,30 +406,47 @@ class QualificationHost:
         if admitted.status is not RuntimeAdmissionStatus.ADMITTED:
             raise ValueError("fresh immutable runtime admission required")
         self._journal.append(LifecycleEvent.HOST_ENTERED)
+        try:
+            acquired = self._lease.acquire(self.runtime_id) is True
+        except Exception:
+            acquired = False
+        if not acquired:
+            self._state = QualificationState.AUTHORITY_REJECTED
+            return self.evidence()
         self._journal.append(LifecycleEvent.SUPERVISOR_LOCK_ACQUIRED)
         self._journal.append(LifecycleEvent.SUPERVISOR_LOOP_ENTERED)
         self._journal.append(LifecycleEvent.SAFE_WAITING)
         self._state = QualificationState.SAFE_WAITING
+        terminal_recorded = False
         try:
             while stop() is not True:
                 wait_once()
-            self._journal.append(LifecycleEvent.NORMAL_RETURN)
-            self._state = QualificationState.STOPPED
         except Exception:
             self._journal.append(LifecycleEvent.CAUGHT_INTERNAL_FAILURE)
             self._state = QualificationState.CAUGHT_INTERNAL_FAILURE
+            terminal_recorded = True
+        else:
+            self._journal.append(LifecycleEvent.NORMAL_RETURN)
+            self._state = QualificationState.STOPPED
+            terminal_recorded = True
+        finally:
+            if terminal_recorded:
+                self._lease.release()
         return self.evidence()
 
 
 __all__ = [
     "Architecture133HostBinding",
     "HostBindingError",
+    "HostQualificationReadiness",
     "QualificationEvidence",
     "QualificationHost",
+    "QualificationHostLease",
     "QualificationState",
     "StopSignal",
     "SuccessorExternalEffectAdapter",
     "WaitOnce",
     "bind_architecture133_host",
     "bind_architecture133_runtime",
+    "assess_host_qualification_readiness",
 ]

@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "7fadb7dc37d5e7f434cb8b5d1083f2e8a6e7dff04be146315f737f1ad9f73d19"
+    "6ef20a733aecfc8396c6b22465ba9ce40b68c9b2496bd8d1915c6bcfa5efd12e"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -197,6 +197,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-b-host-qualification",
     "arch134-f1-five-session-soak",
     "arch134-d1r8-d1-session-execution-consumer",
     "arch134-d1r7-d1-session-authorization",
@@ -215,6 +216,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-f1r1-b-host-qualification": "robinhood",
     "arch134-f1-five-session-soak": "robinhood",
     "arch134-d1r8-d1-session-execution-consumer": "robinhood",
     "arch134-d1r7-d1-session-authorization": "robinhood",
@@ -14076,10 +14078,10 @@ ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1: Final = (
     "fe6aceac62721338eba4fcb40e2e7fde0d976e18"
 )
 ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1: Final = (
-    "6c5b26541ce58c278a3705093e2ffd44b8d38d92"
+    "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
 )
 ARCH145A_D1R6_WORKFLOW_SUCCESSOR_PROOF_SHA256: Final = (
-    "2786e7edf626c527430c98d0994fbe727584747c422ffe194a8c6249a88f1ca3"
+    "6a577385f8cad8a970fb18cc36df208dcb0bb8d3e7926825e06b32b9637f8b21"
 )
 
 
@@ -14562,6 +14564,248 @@ def _arch134_f1r1_a_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# Architecture 134-F1R1-B is the explicit successor overlay for the current
+# host-qualification composition, certification inventory, and runner
+# consumers.  F1R1-A and all D1R7/D1R8/F1/133 blobs remain frozen.
+ARCH134_F1R1_B_NAME: Final = "arch134-f1r1-b-host-qualification"
+ARCH134_F1R1_B_BRANCH: Final = (
+    "feature/robinhood-production-paper-134f1r1-host-qualification-current"
+)
+ARCH134_F1R1_B_SOURCE_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
+    ),
+    "docs/architecture/134-f1r1-b-host-qualification.md": (
+        "3bf1244c5f61a1b97edcbaf880a306ddec0abbf8"
+    ),
+    "docs/validation/arch134-f1r1-b-host-qualification.md": (
+        "7ae79bd32b33b5fd0648532ca5e4ce97e466ec39"
+    ),
+    "src/trading_bot/supervised_release/lifecycle_store.py": (
+        "f03fce5913d8ef41bb3515dc02670b38fc7c296a"
+    ),
+    "src/trading_bot/supervised_release/runtime_host_composition.py": (
+        "4db8f7df9e14ce00a0d7d2375ad6a891e3680b18"
+    ),
+    "tests/review_paper/test_arch134_f1r1_b_host_qualification.py": (
+        "ae05dffa08a69d8961ed306bade4b17a22f4912c"
+    ),
+}
+ARCH134_F1R1_B_PATHS: Final = tuple(sorted(ARCH134_F1R1_B_SOURCE_PINS))
+ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "6c5b26541ce58c278a3705093e2ffd44b8d38d92"
+    ),
+    "scripts/run_test_certification.py": ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES[
+        "scripts/run_test_certification.py"
+    ],
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/runtime/checkpoint_runner/test_core.py"
+        ]
+    ),
+    "tests/scripts/certification_runner/helpers.py": ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+        "tests/scripts/certification_runner/helpers.py"
+    ],
+    "tests/scripts/certification_runner/test_profiles.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/scripts/certification_runner/test_profiles.py"
+        ]
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/scripts/certification_runner/test_lanes.py"
+        ]
+    ),
+}
+ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
+    ),
+    "scripts/run_test_certification.py": ("f67211b95a5ea0ce5328fcf060bf35fc960108a5"),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "8ad5efc7a27cb6fc13428f72dd992afe305bce07"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5d5726d853c9a0b86443fb8776ac6e20951a47a7"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "e22b84ced588bede3b0201380fcff64e5aa37b93"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "d99f426c9db7765dc1cddc41f52f400eb9044bf2"
+    ),
+}
+ARCH134_F1R1_B_PREDECESSOR_TEST_PINS: Final = {
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a4cac2aa60397f1a3de3b6ad623855aca3a54f38"
+    ),
+    **{
+        path: pin
+        for path, pin in ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS.items()
+        if path != "scripts/run_test_certification.py"
+    },
+}
+ARCH134_F1R1_B_TEST_PIN_OVERRIDES: Final = {
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "63c89e3d588ac948b90cbd012b0d396cf4f7eaa2"
+    ),
+    **{
+        path: pin
+        for path, pin in ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES.items()
+        if path != "scripts/run_test_certification.py"
+    },
+}
+ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
+    "0551b2775f71b33b6fb3ac583e72474f1ece4b83d2a79327613bacdf7eb8f11f"
+)
+ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES_SHA256: Final = (
+    "17013053c9299371e507d6ca0efa9c5f3c0adcfacdc7b6b84e00a12b557f247a"
+)
+ARCH134_F1R1_B_PREDECESSOR_TEST_PINS_SHA256: Final = (
+    "712a8575cb65e3a1b4028184db9d5aff13753c2597911bbed26ae79f6a4402bf"
+)
+ARCH134_F1R1_B_TEST_PIN_OVERRIDES_SHA256: Final = (
+    "7f47099df820ef2595e6a01d6e1fa9ddbd3ccbfae789f85b4c0ba614999d623c"
+)
+ARCH134_F1R1_B_PREDECESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS
+)
+ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
+    *ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS[
+        : ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS.index(
+            "arch134-f1-five-session-soak"
+        )
+    ],
+    ARCH134_F1R1_B_NAME,
+    *ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS[
+        ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS.index(
+            "arch134-f1-five-session-soak"
+        ) :
+    ],
+)
+ARCH134_F1R1_B_PREDECESSOR_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+)
+ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    "6ef20a733aecfc8396c6b22465ba9ce40b68c9b2496bd8d1915c6bcfa5efd12e"
+)
+
+
+def _arch134_f1r1_b_current_source_pin(relative: str, predecessor: str) -> str:
+    before = ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS
+    after = ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES
+    if (
+        type(before) is not dict
+        or set(before) != set(after)
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS_SHA256
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in (*before.values(), *after.values())
+        )
+    ):
+        raise ValueError("134-F1R1-B source successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("134-F1R1-B wrong source predecessor")
+        return after[relative]
+    return predecessor
+
+
+def _arch134_f1r1_b_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    before = ARCH134_F1R1_B_PREDECESSOR_TEST_PINS
+    after = ARCH134_F1R1_B_TEST_PIN_OVERRIDES
+    if (
+        type(before) is not dict
+        or set(before) != set(after)
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_B_PREDECESSOR_TEST_PINS_SHA256
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_B_TEST_PIN_OVERRIDES_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in (*before.values(), *after.values())
+        )
+    ):
+        raise ValueError("134-F1R1-B current-inventory successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("134-F1R1-B wrong current-inventory predecessor")
+        return after[relative]
+    return predecessor
+
+
+ARCH134_F1R1_B_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
+    "tests/review_paper/test_arch134_f1r1_b_host_qualification.py",
+    "tests/review_paper/test_supervised_release_bundle.py",
+    "tests/review_paper/test_supervised_release_foundation.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/scripts/certification_runner/test_source.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH134_F1R1_B_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "src/trading_bot/supervised_release/lifecycle_store.py",
+    "src/trading_bot/supervised_release/runtime_host_composition.py",
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
+    "tests/review_paper/test_arch134_f1r1_b_host_qualification.py",
+    "tests/review_paper/test_supervised_release_bundle.py",
+    "tests/review_paper/test_supervised_release_foundation.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+    "tests/scripts/certification_runner/test_source.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "scripts/run_test_certification.py",
+)
+
+
+def _arch134_f1r1_b_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        if set(ARCH134_F1R1_B_SOURCE_PINS) != set(ARCH134_F1R1_B_PATHS):
+            failures.append("134-F1R1-B source pin set drift")
+        for relative, pin in ARCH134_F1R1_B_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-F1R1-B source drift: " + relative)
+        spec = _checkpoint_specs()[ARCH134_F1R1_B_NAME]
+        if (
+            spec.remote_branch != ARCH134_F1R1_B_BRANCH
+            or spec.tests != ARCH134_F1R1_B_TESTS
+            or spec.ruff_paths != ARCH134_F1R1_B_RUFF_PATHS
+            or spec.authority_check is not _arch134_f1r1_b_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or ARCH134_F1R1_B_NAME not in ACTIVE_CI_CHECKPOINTS
+            or CI_CERTIFICATION_PROFILES.get(ARCH134_F1R1_B_NAME) != "robinhood"
+            or not _batch_workflow_is_reviewed(
+                (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        ):
+            failures.append("134-F1R1-B source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-F1R1-B authority unavailable")
+    return tuple(failures)
+
+
 def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
     before = ARCH145A_PREDECESSOR_SOURCE_PINS
     after = ARCH145A_SOURCE_PIN_OVERRIDES
@@ -14596,8 +14840,10 @@ def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
     if relative in after:
         if predecessor != before[relative]:
             raise ValueError("145-A wrong source predecessor")
-        return _arch134_f1r1_a_current_source_pin(relative, after[relative])
-    return _arch134_f1r1_a_current_source_pin(relative, predecessor)
+        current = _arch134_f1r1_a_current_source_pin(relative, after[relative])
+    else:
+        current = _arch134_f1r1_a_current_source_pin(relative, predecessor)
+    return _arch134_f1r1_b_current_source_pin(relative, current)
 
 
 def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str:
@@ -14628,8 +14874,10 @@ def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str
     if relative in after:
         if predecessor != before[relative]:
             raise ValueError("145-A wrong current-inventory predecessor")
-        return _arch134_f1r1_a_current_inventory_test_pin(relative, after[relative])
-    return _arch134_f1r1_a_current_inventory_test_pin(relative, predecessor)
+        current = _arch134_f1r1_a_current_inventory_test_pin(relative, after[relative])
+    else:
+        current = _arch134_f1r1_a_current_inventory_test_pin(relative, predecessor)
+    return _arch134_f1r1_b_current_inventory_test_pin(relative, current)
 
 
 def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
@@ -14643,12 +14891,24 @@ def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
             ).encode("utf-8")
         ).hexdigest()
         != ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
-        or tuple(ACTIVE_CI_CHECKPOINTS) != predecessor
+        or predecessor != ARCH134_F1R1_B_PREDECESSOR_ACTIVE_CI_CHECKPOINTS
+        or hashlib.sha256(
+            ast.dump(
+                ast.parse(
+                    repr(ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS),
+                    mode="eval",
+                ).body,
+                include_attributes=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        or tuple(ACTIVE_CI_CHECKPOINTS)
+        != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
         or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        != ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
     ):
         raise ValueError("145-A active checkpoint successor overlay drift")
-    return predecessor
+    return ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
 
 
 ARCH145A_TESTS: Final = (
@@ -15141,6 +15401,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_F1R1_B_NAME: CheckpointSpec(
+            name=ARCH134_F1R1_B_NAME,
+            description=("Architecture 134-F1R1-B host qualification source only"),
+            tests=ARCH134_F1R1_B_TESTS,
+            ruff_paths=ARCH134_F1R1_B_RUFF_PATHS,
+            authority_check=_arch134_f1r1_b_authority_check,
+            remote_branch=ARCH134_F1R1_B_BRANCH,
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
         ARCH134_F1R1_A_NAME: CheckpointSpec(
             name=ARCH134_F1R1_A_NAME,
             description=(

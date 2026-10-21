@@ -208,6 +208,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch144-c-f1-paper-evidence-admission",
         "arch145-a-research-robustness-live-canary-eligibility",
         "arch134-f1r1-a-runtime-isolation",
+        "arch134-f1r1-b-host-qualification",
         "arch134-f1-five-session-soak",
         "arch134-d1r8-d1-session-execution-consumer",
         "arch134-d1r7-d1-session-authorization",
@@ -363,6 +364,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH145A_BRANCH
         if spec.name == "arch134-f1r1-a-runtime-isolation":
             expected_branch = runner.ARCH134_F1R1_A_BRANCH
+        if spec.name == "arch134-f1r1-b-host-qualification":
+            expected_branch = runner.ARCH134_F1R1_B_BRANCH
         if spec.name == "arch134-f1-five-session-soak":
             expected_branch = runner.ARCH134_F1_BRANCH
         if spec.name == "arch134-d1r8-d1-session-execution-consumer":
@@ -896,6 +899,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_F1_NAME,
             runner.ARCH144C_NAME,
             runner.ARCH145A_NAME,
+            runner.ARCH134_F1R1_B_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
@@ -1361,8 +1365,17 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-alpaca-authentication-qualification",
             }
             else (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/" + module,
+                (
+                    *runner.COMMON_TESTS,
+                    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
+                    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
+                    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
+                )
+                if name == runner.ARCH134_F1R1_B_NAME
+                else (
+                    *runner.COMMON_TESTS,
+                    "tests/runtime/checkpoint_runner/" + module,
+                )
             )
         )
         assert selected == expected
@@ -1376,6 +1389,11 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             (),
             ("tests/scripts/certification_runner/test_profiles.py",),
             (
+                "tests/scripts/certification_runner/test_profiles.py",
+                "tests/scripts/certification_runner/test_lanes.py",
+            ),
+            (
+                "tests/scripts/certification_runner/test_source.py",
                 "tests/scripts/certification_runner/test_profiles.py",
                 "tests/scripts/certification_runner/test_lanes.py",
             ),
@@ -1685,3 +1703,46 @@ def test_arch145a_successor_removal_restores_predecessor_failure(
     root = Path(runner.__file__).resolve().parents[1]
     monkeypatch.setattr(runner, "ARCH145A_TEST_PIN_OVERRIDES", {})
     assert runner._arch144c_authority_check(root)
+
+
+def test_arch134_f1r1_b_registration_and_active_successor_are_source_only():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_B_NAME]
+
+    assert runner._arch134_f1r1_b_authority_check(root) == ()
+    assert spec.remote_branch == runner.ARCH134_F1R1_B_BRANCH
+    assert spec.tests == runner.ARCH134_F1R1_B_TESTS
+    assert spec.ruff_paths == runner.ARCH134_F1R1_B_RUFF_PATHS
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH134_F1R1_B_NAME] == ("robinhood")
+    assert runner._arch145a_predecessor_active_checkpoint_inventory() == (
+        runner.ACTIVE_CI_CHECKPOINTS
+    )
+
+
+@pytest.mark.parametrize("kind", ["source", "test"])
+def test_arch134_f1r1_b_overlay_rejects_wrong_predecessor_or_shape(
+    monkeypatch: pytest.MonkeyPatch, kind: str
+):
+    if kind == "source":
+        path = "scripts/run_test_certification.py"
+        before_name = "ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS"
+        after_name = "ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES"
+        resolver = runner._arch134_f1r1_b_current_source_pin
+    else:
+        path = "tests/runtime/checkpoint_runner/test_core.py"
+        before_name = "ARCH134_F1R1_B_PREDECESSOR_TEST_PINS"
+        after_name = "ARCH134_F1R1_B_TEST_PIN_OVERRIDES"
+        resolver = runner._arch134_f1r1_b_current_inventory_test_pin
+
+    before = getattr(runner, before_name)
+    after = dict(getattr(runner, after_name))
+    with pytest.raises(ValueError, match="134-F1R1-B"):
+        resolver(path, "a" * 40)
+
+    after.pop(path)
+    monkeypatch.setattr(runner, after_name, after)
+    with pytest.raises(ValueError, match="134-F1R1-B"):
+        resolver(path, before[path])

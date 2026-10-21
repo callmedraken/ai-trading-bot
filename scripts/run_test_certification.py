@@ -53,7 +53,7 @@ ROBINHOOD_F1_LANE_PINS = {"tests/review_paper/test_five_session_soak.py": 0}
 # minimum.
 # Pairs preserve duplicate keys for fail-closed validation (unlike a dict literal).
 # Canonical SHA256: sorted compact JSON object, UTF-8, no trailing newline:
-# 79bc22d85d38feea2c6060865fc5a8ddeda1016b5d0dd23aeab650cc4b796efe
+# 424a2e8cb0df6a99665605357de917b5bfcfe014293740acb7a5c99c6af75328
 FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
 FULL_MODULE_TIMINGS_MS = (
     (
@@ -172,6 +172,7 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_arch133_scheduler_installation.py", 53864),
     ("tests/review_paper/test_arch133_windows_rename_qualification.py", 16265),
     ("tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py", 1000),
+    ("tests/review_paper/test_arch134_f1r1_b_host_qualification.py", 1000),
     ("tests/review_paper/test_armed_production_paper_session.py", 14731),
     ("tests/review_paper/test_current_production_strategy_decision.py", 1748),
     ("tests/review_paper/test_d1_session_authorization.py", 11422),

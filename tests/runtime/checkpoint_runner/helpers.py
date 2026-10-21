@@ -230,6 +230,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch134-production-strategy-live-paper",
     "arch134-production-paper-runtime",
     "arch134-production-paper-runtime-acl",
+    "arch145-a-research-robustness-live-canary-eligibility",
 )
 
 

@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "7fadb7dc37d5e7f434cb8b5d1083f2e8a6e7dff04be146315f737f1ad9f73d19"
+    "1e51a239587ee757b64b0658949879808b0cf81110f69fdb3b20768038a6f149"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -209,6 +209,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch134-production-strategy-live-paper",
     "arch134-production-paper-runtime",
     "arch134-production-paper-runtime-acl",
+    "arch145-a-research-robustness-live-canary-eligibility",
 )
 
 
@@ -14063,6 +14064,67 @@ def _arch134_f1_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+ARCH145A_NAME: Final = "arch145-a-research-robustness-live-canary-eligibility"
+ARCH145A_BRANCH: Final = (
+    "feature/research-backtest-robustness-live-canary-eligibility-current"
+)
+ARCH145A_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/experiments/test_research_strategy_robustness.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH145A_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "src/trading_bot/experiments/research_strategy_robustness.py",
+    "tests/experiments/test_research_strategy_robustness.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH145A_PATHS: Final = (
+    "src/trading_bot/experiments/research_strategy_robustness.py",
+    "tests/experiments/test_research_strategy_robustness.py",
+)
+ARCH145A_SOURCE_PINS: Final = {
+    "src/trading_bot/experiments/research_strategy_robustness.py": (
+        "80073f28c98ff81792e16b01098eaf61437d4690"
+    ),
+    "tests/experiments/test_research_strategy_robustness.py": (
+        "cf4bdd815217d85b01c90c8e9d1a048a04341e59"
+    ),
+}
+
+
+def _arch145a_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        for relative, pin in ARCH145A_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("145-A source drift: " + relative)
+        spec = _checkpoint_specs()[ARCH145A_NAME]
+        if (
+            set(ARCH145A_SOURCE_PINS) != set(ARCH145A_PATHS)
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != ARCH145A_BRANCH
+            or spec.tests != ARCH145A_TESTS
+            or spec.ruff_paths != ARCH145A_RUFF_PATHS
+            or spec.authority_check is not _arch145a_authority_check
+            or ACTIVE_CI_CHECKPOINTS.count(ARCH145A_NAME) != 1
+            or ARCH145A_NAME in CI_CERTIFICATION_PROFILES
+            or not _batch_workflow_is_reviewed(
+                (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        ):
+            failures.append("145-A source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("145-A authority unavailable")
+    return tuple(failures)
+
+
 ARCH144C_NAME: Final = "arch144-c-f1-paper-evidence-admission"
 ARCH144C_BRANCH: Final = (
     "feature/test-suite-arch144-c-f1-paper-evidence-admission-current"
@@ -14494,6 +14556,16 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH145A_NAME: CheckpointSpec(
+            name=ARCH145A_NAME,
+            description="Architecture 145-A pure research robustness source only",
+            tests=ARCH145A_TESTS,
+            ruff_paths=ARCH145A_RUFF_PATHS,
+            authority_check=_arch145a_authority_check,
+            remote_branch=ARCH145A_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         ARCH144C_NAME: CheckpointSpec(
             name=ARCH144C_NAME,
             description="Architecture 144-C pure F1 evidence admission source only",

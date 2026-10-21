@@ -206,6 +206,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-production-paper-runtime",
         "arch134-production-paper-runtime-acl",
         "arch144-c-f1-paper-evidence-admission",
+        "arch145-a-research-robustness-live-canary-eligibility",
         "arch134-f1-five-session-soak",
         "arch134-d1r8-d1-session-execution-consumer",
         "arch134-d1r7-d1-session-authorization",
@@ -357,6 +358,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             )
         if spec.name == "arch144-c-f1-paper-evidence-admission":
             expected_branch = runner.ARCH144C_BRANCH
+        if spec.name == "arch145-a-research-robustness-live-canary-eligibility":
+            expected_branch = runner.ARCH145A_BRANCH
         if spec.name == "arch134-f1-five-session-soak":
             expected_branch = runner.ARCH134_F1_BRANCH
         if spec.name == "arch134-d1r8-d1-session-execution-consumer":
@@ -889,6 +892,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH134_D1R8_NAME,
             runner.ARCH134_F1_NAME,
             runner.ARCH144C_NAME,
+            runner.ARCH145A_NAME,
         }
     )
     parent = (*active[:7], runner.SUPERVISED_PUBLICATION_RECOVERY_NAME, *active[7:])
@@ -1344,6 +1348,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
                 "arch144-c-f1-paper-evidence-admission",
+                "arch145-a-research-robustness-live-canary-eligibility",
                 "arch134-f1-five-session-soak",
                 "arch134-d1r8-d1-session-execution-consumer",
                 "arch134-d1r7-d1-session-authorization",
@@ -1441,3 +1446,19 @@ def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch)
         runner._arch144c_current_inventory_test_pin(path, before)
     root = Path(runner.__file__).resolve().parents[1]
     assert runner._arch144c_authority_check(root)
+
+
+def test_arch145a_source_only_route_is_registered_and_inert():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH145A_NAME]
+    assert spec.preflight is None and spec.execute is None
+    assert spec.remote_branch == runner.ARCH145A_BRANCH
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), spec.remote_branch, "push"
+        )
+        == spec.name
+    )
+    assert runner.resolve_ci_certification_profile(spec.name) is None
+    assert runner._arch145a_authority_check(root) == ()
+    assert runner.ARCH145A_SOURCE_PINS.keys() == set(runner.ARCH145A_PATHS)

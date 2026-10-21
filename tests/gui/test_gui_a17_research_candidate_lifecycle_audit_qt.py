@@ -421,7 +421,7 @@ def test_actual_inventory_and_gui_stays_legacy():
         "legacy": 222,
         "exhaustive": 411,
     }
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 68
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 70
     assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51
     relative = Path(__file__).relative_to(ROOT).as_posix()
     assert relative in run_test_certification.select_inventory(inventory, "legacy")

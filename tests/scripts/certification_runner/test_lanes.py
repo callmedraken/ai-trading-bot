@@ -99,31 +99,31 @@ def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 191
+    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 192
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
     assert runner.FULL_FALLBACK_MS == 1000
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "3b41f4ecf0c770611545c0165173472414c3544072ed8d51799849ae0f1e89b1"
+        == "79bc22d85d38feea2c6060865fc5a8ddeda1016b5d0dd23aeab650cc4b796efe"
     )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
     assert all(lanes.values())
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (47, 48, 49, 47)
+    assert tuple(map(len, lanes.values())) == (47, 49, 49, 47)
     assert tuple(
         sum(weights[module] for module in lane) for lane in lanes.values()
-    ) == (279727, 279727, 279727, 279726)
+    ) == (279977, 279977, 279977, 279976)
     # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
     assert weights["tests/test_config.py"] == 1
     raw = dict(weights, **{"tests/test_config.py": 0})
     for count, expected in (
-        (2, (559453, 559453)),
-        (3, (372969, 372969, 372968)),
-        (4, (279727, 279727, 279726, 279726)),
+        (2, (559953, 559953)),
+        (3, (373302, 373302, 373302)),
+        (4, (279977, 279977, 279976, 279976)),
     ):
         totals = [0] * count
         for module in sorted(raw, key=lambda name: (-raw[name], name)):

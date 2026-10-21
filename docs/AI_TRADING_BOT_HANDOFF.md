@@ -162,6 +162,35 @@ the desired production lifecycle:
 - the active F1 auto-resume behavior must not be copied into the final production
   scheduler/launcher design.
 
+## Revised strategy qualification direction
+
+The active F1 five-session soak remains important, but only as an operational
+soak: scheduler/restart behavior, durable authority, provider integration,
+session handling and paper execution plumbing. Its P&L is not the project's main
+strategy-quality signal.
+
+The preferred research-to-live progression is now:
+
+```text
+extensive historical backtests
+-> walk-forward / out-of-sample qualification
+-> parameter/regime stability
+-> conservative execution stress, including fill delay/miss/reject modeling
+-> sealed final holdout
+-> inert LIVE_CANARY_ELIGIBLE evidence
+-> separately reviewed tiny-capital live canary
+-> real fill/slippage/reject/reconciliation measurement
+-> later gradual scaling review
+```
+
+Architecture 144-C remains frozen and useful for F1 provenance. It does not need
+to become a months-long paper-profitability program. Extended paper trading is
+diagnostic, not the default promotion path.
+
+The next safe parallel source milestone is **Architecture 145 / RCL-8**, frozen
+in `docs/architecture/145-backtest-robustness-live-canary-eligibility.md` and
+its validation plan. It is offline/source-only and cannot authorize real money.
+
 ## Protected boundary after 144-C
 
 144-C acceptance opens only the **review** of the separate 134-F protected
@@ -185,8 +214,14 @@ as deliberate soak-test behavior only. For future production, preserve the
 separate reboot=stop/manual-start requirement frozen in
 `docs/architecture/134-production-operator-lifecycle-reboot-stop.md`.
 
-After F1 reaches a terminal state, independently reconcile the full five-session
-evidence and then run the pure Architecture-144-C V2 eligibility evaluation.
-Longer paper observation remains required for profitability/stability assessment.
+While F1 continues, implement Architecture 145 / RCL-8 in an isolated research
+worktree with zero access to the active F1 operational namespace. After F1
+reaches terminal state, independently reconcile its evidence and run the pure
+Architecture-144-C V2 evaluation for provenance/operational qualification.
+
+Do not treat a five-day or longer paper P&L series as the main profitability
+gate. Strategy-quality evidence should come primarily from the frozen 145
+historical/walk-forward/stress/holdout path. Any real-money test remains a later,
+separately reviewed tiny-capital live-canary authority.
 
 Real-money trading remains **NO-GO**.

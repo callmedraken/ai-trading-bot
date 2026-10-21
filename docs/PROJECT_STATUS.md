@@ -183,6 +183,48 @@ qualifying_terminal_classifications = ("NO_SIGNAL", "PAPER_EXECUTED")
 Five sessions are an eligibility boundary, not enough evidence by themselves to
 establish long-run profitability.
 
+## Revised research-to-live roadmap — backtest first, paper operational only
+
+The project now treats the active five-session F1 paper soak as an
+**operational/restart/integration qualification**, not as the primary evidence of
+strategy quality or expected profitability.
+
+The preferred progression for strategy selection is now:
+
+```text
+research hypothesis
+-> extensive deterministic historical backtesting
+-> walk-forward / out-of-sample qualification
+-> parameter and regime stability
+-> conservative execution-cost and execution-fault stress
+-> sealed final holdout
+-> LIVE_CANARY_ELIGIBLE evidence only
+-> separate human-reviewed tiny-capital live-canary authority
+-> measured real fill/slippage/reject/reconciliation evidence
+-> gradual scaling only after later review
+```
+
+Architecture 144/144-C remains accepted and useful for truthful F1 evidence, but
+its five-session paper eligibility result is no longer treated as a profitability
+gate. Extended paper trading is optional diagnostic evidence unless a later
+architecture explicitly requires it.
+
+The next safe parallel research milestone is
+**Architecture 145 / RCL-8 — robust historical qualification for bounded
+live-canary eligibility**, frozen in:
+
+- `docs/architecture/145-backtest-robustness-live-canary-eligibility.md`;
+- `docs/validation/arch145-backtest-robustness-live-canary-eligibility-plan.md`.
+
+Architecture 145 is source/research only. It grants no broker, credential,
+provider, scheduler, paper, D2, promotion or real-money authority.
+
+A later live-canary architecture must remain separate and must require, at
+minimum, accepted robust historical evidence, the production reboot=STOP/manual
+start lifecycle, explicit human approval, bounded notional/loss ceilings,
+no automatic size increase, durable order/fill reconciliation and fail-closed
+handling of ambiguous outcomes.
+
 ## Protected and safety boundaries
 
 - Real-money trading remains **NO-GO**.
@@ -285,9 +327,33 @@ does not grant new authority; it must reconcile the already-consumed durable
 parent state. A missed session halts the series and is never replaced.
 
 After the five-session parent reaches a terminal state, perform independent
-end-of-window reconciliation and then the pure Architecture-144-C V2 eligibility
-evaluation. Five sessions remain an operational/eligibility threshold, not a
-profitability conclusion.
+end-of-window reconciliation and then the pure Architecture-144-C V2 evidence
+evaluation. Treat that result as operational/provenance evidence, not as the
+primary strategy-profitability decision.
+
+In parallel while F1 runs, implement Architecture 145 / RCL-8 from its frozen
+design. This becomes the primary strategy-quality path: extensive backtesting,
+walk-forward/out-of-sample evidence, stability/sensitivity, conservative
+execution stress and a sealed final holdout.
+
+### Parallel research — Architecture 145 / RCL-8
+
+Owner/model: **Codex / Astra** for bounded research-framework implementation;
+ChatGPT owns policy freeze, exact-source review and live-canary boundary design.
+
+Expected branch:
+
+`feature/research-backtest-robustness-live-canary-eligibility-current`
+
+Expected worktree:
+
+`F:\AI\worktrees\ai-trading-bot-research-backtest-robustness-live-canary-eligibility-current`
+
+Implementation must remain offline/source-only and must not read the active F1
+namespace or perform provider/broker/paper/live effects. Use existing deterministic
+backtest, walk-forward aggregate/stability and research-candidate primitives
+where they fit; do not weaken frozen predecessor schemas merely to add the new
+qualification.
 
 ### Future production lifecycle
 

@@ -416,10 +416,10 @@ def test_actual_inventory_and_gui_stays_legacy():
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
     } == {
-        "full": 192,
-        "robinhood": 103,
+        "full": 193,
+        "robinhood": 104,
         "legacy": 222,
-        "exhaustive": 414,
+        "exhaustive": 415,
     }
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 69
     assert len([path for path in inventory if path.startswith("tests/gui/")]) == 51

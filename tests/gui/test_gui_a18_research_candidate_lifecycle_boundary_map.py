@@ -438,7 +438,7 @@ def test_a18_inventory_counts_and_legacy_ownership_are_exact():
     assert {
         name: len(run_test_certification.select_inventory(inventory, name))
         for name in ("full", "robinhood", "legacy", "exhaustive")
-    } == {"full": 192, "robinhood": 103, "legacy": 222, "exhaustive": 414}
+    } == {"full": 193, "robinhood": 104, "legacy": 222, "exhaustive": 415}
     assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 69
     gui_paths = [path for path in inventory if path.startswith("tests/gui/")]
     assert len(gui_paths) == 51

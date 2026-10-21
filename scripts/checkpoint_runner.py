@@ -14348,6 +14348,43 @@ ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES: Final = {
     "scripts/run_test_certification.py": "7be92eb4e939416e0fdc24174cef8c74288e8e93",
 }
 ARCH134_F1R1_A_PREDECESSOR_TEST_PINS: Final = {
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py"
+        ]
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py"
+        ]
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/review_paper/test_d1_session_authorization.py"
+    ],
+    "tests/review_paper/test_d1_session_execution.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/review_paper/test_d1_session_execution.py"
+    ],
+    "tests/review_paper/test_pre_market_wake_overnight.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/review_paper/test_pre_market_wake_overnight.py"
+    ],
+    "tests/review_paper/test_production_strategy_cycle.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/review_paper/test_production_strategy_cycle.py"
+    ],
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_deployment_qualification.py"
+        ]
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_maintenance_rebind.py"
+        ]
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_runtime_host_admission.py"
+        ]
+    ),
     "tests/runtime/checkpoint_runner/test_core.py": ARCH145A_TEST_PIN_OVERRIDES[
         "tests/runtime/checkpoint_runner/test_core.py"
     ],
@@ -14360,8 +14397,45 @@ ARCH134_F1R1_A_PREDECESSOR_TEST_PINS: Final = {
     "tests/scripts/certification_runner/test_profiles.py": ARCH145A_TEST_PIN_OVERRIDES[
         "tests/scripts/certification_runner/test_profiles.py"
     ],
+    "tests/strategies/test_production_strategy_contract.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/strategies/test_production_strategy_contract.py"
+        ]
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        ARCH145A_TEST_PIN_OVERRIDES[
+            "tests/strategies/test_production_strategy_decision.py"
+        ]
+    ),
 }
 ARCH134_F1R1_A_TEST_PIN_OVERRIDES: Final = {
+    "tests/gui/test_gui_a17_research_candidate_lifecycle_audit_qt.py": (
+        "f1dd866228354fe84dfdb1634db1cf8c4c7b6dec"
+    ),
+    "tests/gui/test_gui_a18_research_candidate_lifecycle_boundary_map.py": (
+        "f98f38ab2af0aec575e9926026ff581d6d245193"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "2c11d5aadb3078b7d9235a82639cc7dd72a63e30"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "75d030dc87a45d0aeb2c4b80dc5c406519ae48ed"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "6c40258349ef32cdf6ea36858920964721632a26"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "6545d6031423016ba2b713463cc4d143ad61e1ca"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "6742c7b57057395339487341aa27da18001e08da"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "2d8821729e7899a7187630948bec64ada2538d58"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "c4ad394dc6f3e378652c1f0bf4bcc1001793b639"
+    ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "fc42bebb8a8bcabdf68e67ae70947effde6948fe"
     ),
@@ -14374,6 +14448,12 @@ ARCH134_F1R1_A_TEST_PIN_OVERRIDES: Final = {
     "tests/scripts/certification_runner/test_profiles.py": (
         "526e61c69b76c509cb4fe969b7d1323798ee3d81"
     ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "fbf0739a560bb00ccb35f07659a45799437dc0c8"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "804192e170fd774ef437542306668f7b9795aecf"
+    ),
 }
 ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
     "b34dc3f3674cc0c665b17680c2221f229f64c786c4c47aafc6aed8ad45994e66"
@@ -14382,10 +14462,10 @@ ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES_SHA256: Final = (
     "ab40ea76f1790c387183c65a34ba898133882f7a91f9bddd2c2ba52937c95d12"
 )
 ARCH134_F1R1_A_PREDECESSOR_TEST_PINS_SHA256: Final = (
-    "62a040aacad2bbb70390a47839cd24fc07d73078dfa86ece5e9f9b70ce97b162"
+    "b0c6f4b95e17a857e0bb5e8b29bdbf025bd770c92eaac57fe3b113a4aacb0788"
 )
 ARCH134_F1R1_A_TEST_PIN_OVERRIDES_SHA256: Final = (
-    "f1b76fcd0f8ffe54dab4743a25592a32905c5df9cfaa853d76f8645356e11381"
+    "4d95b452ff51696d806eed65a9d13d56ffc8a4ee47cb1918d3835eeb7c16f6a2"
 )
 
 

@@ -1457,7 +1457,7 @@ def test_arch144c_source_only_route_authority_and_frozen_v1():
 def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
-    successor = runner.ARCH134_F1R1_A_TEST_PIN_OVERRIDES[path]
+    successor = runner.ARCH134_F1R1_B_TEST_PIN_OVERRIDES[path]
     assert runner._arch144c_current_inventory_test_pin(path, before) == successor
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
@@ -1568,6 +1568,10 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     assert current == predecessor.replace(
         '      - "feature/robinhood-*"\n',
         '      - "feature/robinhood-*"\n      - "feature/research-*"\n',
+    ).replace(
+        "              arch134-d1r5-pre-market-wake-qualification `\n",
+        "              arch134-f1r1-b-host-qualification `\n"
+        "              arch134-d1r5-pre-market-wake-qualification `\n",
     )
     assert runner._batch_workflow_is_reviewed(current)
     assert "pull_request:" in current

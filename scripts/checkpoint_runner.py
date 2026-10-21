@@ -14617,6 +14617,75 @@ ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS: Final = {
             "tests/scripts/certification_runner/test_lanes.py"
         ]
     ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "b94e0857df8617d6c64c1a2e5d634cf067ab5996"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "351e0f22db0b9f08a17f8c6b8d6a8cb0918970ac"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "c4ce9a36ae5d5f59b12bf665eea6893e7e671c7c"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "02253a169829ecd34520cc2a14c45232aef23496"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "ffcb9925026e754c01623ec3a8509202f71da2cf"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_d1_session_authorization.py"
+        ]
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_d1_session_execution.py"
+        ]
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        ARCH134_F1_SOURCE_PINS["tests/review_paper/test_five_session_soak.py"]
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_pre_market_wake_overnight.py"
+        ]
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_production_strategy_cycle.py"
+        ]
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_deployment_qualification.py"
+        ]
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_maintenance_rebind.py"
+        ]
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "cd8b750c23876476f4ff18c63da33ce5944914e2"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/review_paper/test_supervised_runtime_host_admission.py"
+        ]
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "486c85ba872af23209eb4f13f59ba9b5907b4fb2"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/strategies/test_production_strategy_contract.py"
+        ]
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        ARCH134_F1R1_A_TEST_PIN_OVERRIDES[
+            "tests/strategies/test_production_strategy_decision.py"
+        ]
+    ),
 }
 ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
@@ -14624,7 +14693,7 @@ ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
     ),
     "scripts/run_test_certification.py": ("f67211b95a5ea0ce5328fcf060bf35fc960108a5"),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "8ad5efc7a27cb6fc13428f72dd992afe305bce07"
+        "324a079174343b7512bd97b60235d50561719acf"
     ),
     "tests/scripts/certification_runner/helpers.py": (
         "5d5726d853c9a0b86443fb8776ac6e20951a47a7"
@@ -14634,6 +14703,57 @@ ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES: Final = {
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
         "d99f426c9db7765dc1cddc41f52f400eb9044bf2"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "81cf462bafd937bad63b35055e73dee31037b56a"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "cf51d08220ab6c7436e8a2d919db6af5c9f6d31e"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "09f7cf0ebb18cf5617fbd46a53b23e476e2169ab"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "7512a93e8d0e83be3147ebeccb75ec35b8a5202b"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "f586a8b44582f47cc5f49a61ad246a19b5ffa59b"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "d6370f6ba1d0579ad5c582cd8f734e58d71bf03e"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "f98a6c1939d3181b112353c4d6bb36199a4dd835"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "7ab8fcfb5de2a856e9fa8663d7b7ed79d1ba840b"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "42f50cbe40648a8dba4b17c3be5028150785abff"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "00ff75807e42021487f897bea2f55bcc5bc892f2"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "fb86137629342cd6cbd62dc69868a20014a31a38"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "db35cc36bde65d59b0aa72f7e47e9b9d3630105e"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "4c2b77217e0905de6113a7f5e4be6a95420b4440"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "30ec92cb61ebbf2ad716fc644f3683409bc5d506"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "8b83383c8b62d1fb973de08f188f3030548ed615"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "bb0aedcea17430d07da776d6ecd7510ff991d65e"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "ec19956cde2b212256b9c1031d2884e52447a2ea"
     ),
 }
 ARCH134_F1R1_B_PREDECESSOR_TEST_PINS: Final = {
@@ -14657,16 +14777,16 @@ ARCH134_F1R1_B_TEST_PIN_OVERRIDES: Final = {
     },
 }
 ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
-    "0551b2775f71b33b6fb3ac583e72474f1ece4b83d2a79327613bacdf7eb8f11f"
+    "797dd699c866fd229761c7230f5a9ec1428f1363a6408558814d182d884d2d1c"
 )
 ARCH134_F1R1_B_SOURCE_PIN_OVERRIDES_SHA256: Final = (
-    "17013053c9299371e507d6ca0efa9c5f3c0adcfacdc7b6b84e00a12b557f247a"
+    "d49bebcd6a5e130307c65f3caa4c13b97af2f8d144d869fc938d7029e56389a6"
 )
 ARCH134_F1R1_B_PREDECESSOR_TEST_PINS_SHA256: Final = (
-    "712a8575cb65e3a1b4028184db9d5aff13753c2597911bbed26ae79f6a4402bf"
+    "0fe0168d6eaeeae96950daa9af25e394db68ae87ac581adf22354ddc69ee7939"
 )
 ARCH134_F1R1_B_TEST_PIN_OVERRIDES_SHA256: Final = (
-    "7f47099df820ef2595e6a01d6e1fa9ddbd3ccbfae789f85b4c0ba614999d623c"
+    "bcf9001d2f37b29fe8aa9540e8e102adf438768718810f2aade97b440f404036"
 )
 ARCH134_F1R1_B_PREDECESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS

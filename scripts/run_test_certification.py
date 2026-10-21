@@ -171,6 +171,7 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py", 9835),
     ("tests/review_paper/test_arch133_scheduler_installation.py", 53864),
     ("tests/review_paper/test_arch133_windows_rename_qualification.py", 16265),
+    ("tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py", 1000),
     ("tests/review_paper/test_armed_production_paper_session.py", 14731),
     ("tests/review_paper/test_current_production_strategy_decision.py", 1748),
     ("tests/review_paper/test_d1_session_authorization.py", 11422),

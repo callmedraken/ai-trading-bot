@@ -207,6 +207,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch134-production-paper-runtime-acl",
         "arch144-c-f1-paper-evidence-admission",
         "arch145-a-research-robustness-live-canary-eligibility",
+        "arch134-f1r1-a-runtime-isolation",
         "arch134-f1-five-session-soak",
         "arch134-d1r8-d1-session-execution-consumer",
         "arch134-d1r7-d1-session-authorization",
@@ -360,6 +361,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH144C_BRANCH
         if spec.name == "arch145-a-research-robustness-live-canary-eligibility":
             expected_branch = runner.ARCH145A_BRANCH
+        if spec.name == "arch134-f1r1-a-runtime-isolation":
+            expected_branch = runner.ARCH134_F1R1_A_BRANCH
         if spec.name == "arch134-f1-five-session-soak":
             expected_branch = runner.ARCH134_F1_BRANCH
         if spec.name == "arch134-d1r8-d1-session-execution-consumer":
@@ -1349,6 +1352,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-paper-runtime-acl",
                 "arch144-c-f1-paper-evidence-admission",
                 "arch145-a-research-robustness-live-canary-eligibility",
+                "arch134-f1r1-a-runtime-isolation",
                 "arch134-f1-five-session-soak",
                 "arch134-d1r8-d1-session-execution-consumer",
                 "arch134-d1r7-d1-session-authorization",
@@ -1435,8 +1439,8 @@ def test_arch144c_source_only_route_authority_and_frozen_v1():
 def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
-    after = runner.ARCH145A_TEST_PIN_OVERRIDES[path]
-    assert runner._arch144c_current_inventory_test_pin(path, before) == after
+    successor = runner.ARCH134_F1R1_A_TEST_PIN_OVERRIDES[path]
+    assert runner._arch144c_current_inventory_test_pin(path, before) == successor
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
     pins = dict(runner.ARCH144C_TEST_PIN_OVERRIDES)
@@ -1463,6 +1467,68 @@ def test_arch145a_source_only_route_is_registered_and_inert():
     assert runner.resolve_ci_certification_profile(spec.name) is None
     assert runner._arch145a_authority_check(root) == ()
     assert runner.ARCH145A_SOURCE_PINS.keys() == set(runner.ARCH145A_PATHS)
+
+
+def test_arch134_f1r1_a_source_only_route_is_registered_and_inert():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_A_NAME]
+
+    assert runner._arch134_f1r1_a_authority_check(root) == ()
+    assert spec.remote_branch == runner.ARCH134_F1R1_A_BRANCH
+    assert spec.tests == runner.ARCH134_F1R1_A_TESTS
+    assert spec.ruff_paths == runner.ARCH134_F1R1_A_RUFF_PATHS
+    assert spec.preflight is None
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert runner.ARCH134_F1R1_A_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH134_F1R1_A_NAME not in runner.CI_CERTIFICATION_PROFILES
+    assert set(runner.ARCH134_F1R1_A_SOURCE_PINS) == set(runner.ARCH134_F1R1_A_PATHS)
+
+
+def test_arch134_f1r1_a_overlays_fail_closed_and_restore_predecessor(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    source_path = "scripts/run_test_certification.py"
+    source_predecessor = runner.ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS[source_path]
+    assert (
+        runner._arch134_f1r1_a_current_source_pin(source_path, source_predecessor)
+        == runner.ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES[source_path]
+    )
+    assert (
+        runner._arch134_f1r1_a_current_source_pin("unrelated.py", "a" * 40) == "a" * 40
+    )
+    with pytest.raises(ValueError, match="134-F1R1-A"):
+        runner._arch134_f1r1_a_current_source_pin(source_path, "a" * 40)
+
+    for mutation in ("missing", "extra", "wrong"):
+        pins = dict(runner.ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES)
+        if mutation == "missing":
+            pins.pop(source_path)
+        elif mutation == "extra":
+            pins["extra.py"] = "b" * 40
+        else:
+            pins[source_path] = "b" * 40
+        monkeypatch.setattr(runner, "ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES", pins)
+        with pytest.raises(ValueError, match="134-F1R1-A"):
+            runner._arch134_f1r1_a_current_source_pin(source_path, source_predecessor)
+        monkeypatch.undo()
+
+    test_path = "tests/scripts/certification_runner/test_profiles.py"
+    test_predecessor = runner.ARCH134_F1R1_A_PREDECESSOR_TEST_PINS[test_path]
+    for mutation in ("missing", "extra", "wrong"):
+        pins = dict(runner.ARCH134_F1R1_A_TEST_PIN_OVERRIDES)
+        if mutation == "missing":
+            pins.pop(test_path)
+        elif mutation == "extra":
+            pins["tests/extra.py"] = "b" * 40
+        else:
+            pins[test_path] = "b" * 40
+        monkeypatch.setattr(runner, "ARCH134_F1R1_A_TEST_PIN_OVERRIDES", pins)
+        with pytest.raises(ValueError, match="134-F1R1-A"):
+            runner._arch134_f1r1_a_current_inventory_test_pin(
+                test_path, test_predecessor
+            )
+        monkeypatch.undo()
 
 
 def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():

@@ -14317,6 +14317,171 @@ ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
 )
 
 
+# Architecture 134-F1R1-A is a source/design/test-only successor.  Its
+# current-inventory overlays are deliberately separate from every frozen
+# D1R7/D1R8/F1/133 predecessor dictionary above.
+ARCH134_F1R1_A_NAME: Final = "arch134-f1r1-a-runtime-isolation"
+ARCH134_F1R1_A_BRANCH: Final = (
+    "feature/robinhood-production-paper-134f1r1-runtime-isolation-current"
+)
+ARCH134_F1R1_A_SOURCE_PINS: Final = {
+    "docs/architecture/134-f1r1-a-immutable-runtime-isolation.md": (
+        "a3408598435608bbd440aa8c92017f210b1ce647"
+    ),
+    "docs/validation/arch134-f1r1-a-immutable-runtime-isolation.md": (
+        "683171db4f739470bfec0f4f1ccb47bae2abad54"
+    ),
+    "src/trading_bot/supervised_release/runtime_isolation.py": (
+        "cba9836c68a027901637c0ac6f2a4f0c70f21637"
+    ),
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py": (
+        "24f80dcd5a06e79d5baf191d47a0eda8cdc1f899"
+    ),
+}
+ARCH134_F1R1_A_PATHS: Final = tuple(sorted(ARCH134_F1R1_A_SOURCE_PINS))
+ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS: Final = {
+    "scripts/run_test_certification.py": ARCH145A_SOURCE_PIN_OVERRIDES[
+        "scripts/run_test_certification.py"
+    ],
+}
+ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES: Final = {
+    "scripts/run_test_certification.py": "7be92eb4e939416e0fdc24174cef8c74288e8e93",
+}
+ARCH134_F1R1_A_PREDECESSOR_TEST_PINS: Final = {
+    "tests/runtime/checkpoint_runner/test_core.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/runtime/checkpoint_runner/test_core.py"
+    ],
+    "tests/scripts/certification_runner/helpers.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/scripts/certification_runner/helpers.py"
+    ],
+    "tests/scripts/certification_runner/test_lanes.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/scripts/certification_runner/test_lanes.py"
+    ],
+    "tests/scripts/certification_runner/test_profiles.py": ARCH145A_TEST_PIN_OVERRIDES[
+        "tests/scripts/certification_runner/test_profiles.py"
+    ],
+}
+ARCH134_F1R1_A_TEST_PIN_OVERRIDES: Final = {
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "fc42bebb8a8bcabdf68e67ae70947effde6948fe"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "2ff27b171cfa164b629fb434c66de7f8601b8090"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "d9c50a7701c4a1e4cd92ca05c4d13e99e852964c"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "526e61c69b76c509cb4fe969b7d1323798ee3d81"
+    ),
+}
+ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
+    "b34dc3f3674cc0c665b17680c2221f229f64c786c4c47aafc6aed8ad45994e66"
+)
+ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES_SHA256: Final = (
+    "ab40ea76f1790c387183c65a34ba898133882f7a91f9bddd2c2ba52937c95d12"
+)
+ARCH134_F1R1_A_PREDECESSOR_TEST_PINS_SHA256: Final = (
+    "62a040aacad2bbb70390a47839cd24fc07d73078dfa86ece5e9f9b70ce97b162"
+)
+ARCH134_F1R1_A_TEST_PIN_OVERRIDES_SHA256: Final = (
+    "f1b76fcd0f8ffe54dab4743a25592a32905c5df9cfaa853d76f8645356e11381"
+)
+
+
+def _arch134_f1r1_a_current_source_pin(relative: str, predecessor: str) -> str:
+    before = ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS
+    after = ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES
+    if (
+        type(before) is not dict
+        or set(before) != set(after)
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_A_PREDECESSOR_SOURCE_PINS_SHA256
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_A_SOURCE_PIN_OVERRIDES_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in (*before.values(), *after.values())
+        )
+    ):
+        raise ValueError("134-F1R1-A source successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("134-F1R1-A wrong source predecessor")
+        return after[relative]
+    return predecessor
+
+
+def _arch134_f1r1_a_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    before = ARCH134_F1R1_A_PREDECESSOR_TEST_PINS
+    after = ARCH134_F1R1_A_TEST_PIN_OVERRIDES
+    if (
+        type(before) is not dict
+        or set(before) != set(after)
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_A_PREDECESSOR_TEST_PINS_SHA256
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_F1R1_A_TEST_PIN_OVERRIDES_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in (*before.values(), *after.values())
+        )
+    ):
+        raise ValueError("134-F1R1-A current-inventory successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("134-F1R1-A wrong current-inventory predecessor")
+        return after[relative]
+    return predecessor
+
+
+ARCH134_F1R1_A_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH134_F1R1_A_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "src/trading_bot/supervised_release/runtime_isolation.py",
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
+    "scripts/run_test_certification.py",
+    "tests/scripts/certification_runner/helpers.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+
+
+def _arch134_f1r1_a_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        if set(ARCH134_F1R1_A_SOURCE_PINS) != set(ARCH134_F1R1_A_PATHS):
+            failures.append("134-F1R1-A source pin set drift")
+        for relative, pin in ARCH134_F1R1_A_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-F1R1-A source drift: " + relative)
+        spec = _checkpoint_specs()[ARCH134_F1R1_A_NAME]
+        if (
+            spec.remote_branch != ARCH134_F1R1_A_BRANCH
+            or spec.tests != ARCH134_F1R1_A_TESTS
+            or spec.ruff_paths != ARCH134_F1R1_A_RUFF_PATHS
+            or spec.authority_check is not _arch134_f1r1_a_authority_check
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or ARCH134_F1R1_A_NAME in ACTIVE_CI_CHECKPOINTS
+            or ARCH134_F1R1_A_NAME in CI_CERTIFICATION_PROFILES
+        ):
+            failures.append("134-F1R1-A source-only registration drift")
+    except (OSError, UnicodeError, SyntaxError, ValueError, TypeError, KeyError):
+        failures.append("134-F1R1-A authority unavailable")
+    return tuple(failures)
+
+
 def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
     before = ARCH145A_PREDECESSOR_SOURCE_PINS
     after = ARCH145A_SOURCE_PIN_OVERRIDES
@@ -14351,8 +14516,8 @@ def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
     if relative in after:
         if predecessor != before[relative]:
             raise ValueError("145-A wrong source predecessor")
-        return after[relative]
-    return predecessor
+        return _arch134_f1r1_a_current_source_pin(relative, after[relative])
+    return _arch134_f1r1_a_current_source_pin(relative, predecessor)
 
 
 def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str:
@@ -14383,8 +14548,8 @@ def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str
     if relative in after:
         if predecessor != before[relative]:
             raise ValueError("145-A wrong current-inventory predecessor")
-        return after[relative]
-    return predecessor
+        return _arch134_f1r1_a_current_inventory_test_pin(relative, after[relative])
+    return _arch134_f1r1_a_current_inventory_test_pin(relative, predecessor)
 
 
 def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
@@ -14896,6 +15061,18 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_F1R1_A_NAME: CheckpointSpec(
+            name=ARCH134_F1R1_A_NAME,
+            description=(
+                "Architecture 134-F1R1-A immutable runtime isolation source only"
+            ),
+            tests=ARCH134_F1R1_A_TESTS,
+            ruff_paths=ARCH134_F1R1_A_RUFF_PATHS,
+            authority_check=_arch134_f1r1_a_authority_check,
+            remote_branch=ARCH134_F1R1_A_BRANCH,
+            preflight=None,
+            execute=None,
+        ),
         ARCH145A_NAME: CheckpointSpec(
             name=ARCH145A_NAME,
             description="Architecture 145-A pure research robustness source only",

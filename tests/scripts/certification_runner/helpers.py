@@ -257,6 +257,7 @@ _CURRENT_FULL_ADDITIONS = (
     "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
     "tests/review_paper/test_arch133_scheduler_installation.py",
     "tests/review_paper/test_arch133_windows_rename_qualification.py",
+    "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
     "tests/review_paper/test_armed_production_paper_session.py",
     "tests/review_paper/test_current_production_strategy_decision.py",
     "tests/review_paper/test_d1_session_authorization.py",

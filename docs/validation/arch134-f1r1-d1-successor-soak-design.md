@@ -125,11 +125,20 @@ design-only checkpoint.
 
 ## Acceptance and stop conditions
 
-Design acceptance requires exactly the two new D1 documents plus the mutable
-status and handoff closeout, with every changed path under `docs/**`. It must
-leave the index and worktree clean before publication and must use one atomic
-commit and one ordinary feature-branch push. The mapped docs-only gate must
-reach terminal SUCCESS; queued or in-progress is not completion.
+The accepted D1 publication preserves two attempts. Initial commit
+`094b4840942958abc25b257bafb849f470363eb5`, tree
+`ac9dd937e19a7926758173281e6f57634adc6ca1`, CI 39745445665 / attempt 1
+FAILED only on C1 shared successor drift for PROJECT_STATUS and HANDOFF.
+The bounded corrective commit `a5485a64dd9848e74daf9596bbb3194dc458e363`,
+tree `f93ef9060c77c15bcd6aa3131c16116655c5bd64`, restored both frozen C1
+current-doc blobs. CI 39745941442 / attempt 1 succeeded DOCS_ONLY with
+verify-docs PASS. The initial failure is preserved, never squashed or rerun.
+
+The final net D1 change versus accepted develop is exactly the architecture
+and validation documents. Current-doc closeout was deferred to the D1S1
+source checkpoint's explicit fail-closed successor overlay. D1 design semantics
+are accepted; D1 has not been fast-forwarded into develop. Historical publication
+therefore does not claim a single successful initial commit/push.
 
 Stop without publication if remote develop differs from the frozen base, the
 design requires source changes to accepted A/B/C1 contracts, any consumed F1 or

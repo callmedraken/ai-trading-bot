@@ -1,66 +1,57 @@
 # AI Trading Bot — Current Handoff
 
-## Verified starting identity
+## Verified boundary
 
-Current C1 source starts from accepted develop:
+C1 is accepted/integrated at develop HEAD
+`1490f0391a49150dee913ca029cd2838774d5343`, tree
+`fc02c35af88419a3e2b8c2dffd8fc5e19ad71850`; source gate 39732123326 and
+post-merge gate 39736130846 both succeeded, attempt 1.
+
+C2 returned `F1R1_EXTERNAL_HOST_QUALIFICATION=PASS`, runtime
+`qualification-573ce39f76eb8a4b5e789f1e2d4d97828bff0269274ebce64147192eb8ef83cf`.
+The consumed root `F:\AI\temp\qualification\arch134-f1r1-host-isolation`
+is immutable/non-reusable evidence. Do not inspect or mutate it in this checkpoint.
+Qualification evidence cannot satisfy Architecture-133/F1R1 production admission.
+
+## D1S1 source handoff
 
 ```text
-HEAD 3f2e75f3daee40dfcf094b6057ae1a91f8de8928
-TREE 6c53d02418f19769cab7851b5a8dbdbf0acfe514
-CI   39698995537 / attempt 1 / SUCCESS
+predecessor HEAD a5485a64dd9848e74daf9596bbb3194dc458e363
+predecessor TREE f93ef9060c77c15bcd6aa3131c16116655c5bd64
+branch feature/robinhood-production-paper-134f1r1-successor-soak-source-current
+worktree F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-soak-source-current
+checkpoint arch134-f1r1-d1s1-successor-soak-source
+canonical CI profile ROBINHOOD
 ```
 
-Worktree: F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-qualification-operator-current
-Branch: feature/robinhood-production-paper-134f1r1-qualification-operator-current
-C1 is implementation pending exact-source review; do not claim SOURCE ACCEPTED.
+D1 design is accepted. Initial D1 CI 39745445665 failed only on C1 shared-doc
+pin drift; that failure is preserved. Corrective D1 CI 39745941442 succeeded
+DOCS_ONLY. D1S1 resolves the coupling through an explicit exact successor layer;
+the frozen C1 dictionaries/digests remain unchanged. The D1 validation wording
+now records both historical publication attempts truthfully.
 
-## C1 contract
+The source contract binds exactly 2026-11-02 and 2026-11-03, SPY long-only
+synthetic review-paper, a fresh deterministic parent and two children, canonical
+bounded durable JSONL, fresh manual admission and consumed ambiguity.
+No Task Scheduler or automatic boot/login startup exists. A second start can
+continue only the same parent after a benign terminal first child. No third
+session, date substitution, retry, repair or historical authority reuse exists.
+Existing Architecture-133/F1R1-A/B production primitives and historical F1
+source remain unchanged. Production adapters/launcher remain absent.
 
-The first C1 attempt correctly stopped because Architecture-133/B admits only
-production installed-host evidence. The reviewed additive successor resolves
-that conflict with distinct qualification-only manifest/fixture/interpreter/process
-and admission dataclasses, a qualification-<sha256> identity and the closed
-READY_FOR_F1R1_C2_EXTERNAL_QUALIFICATION result. Qualification evidence remains
-non-substitutable for production InstalledEvidence/RuntimeAdmissionEvidence/
-RuntimeAdmissionResult/Architecture133HostBinding. All frozen production semantics
-and predecessor maps/digests remain unchanged.
+D1S1 is pending ChatGPT exact-source acceptance; do not claim SOURCE ACCEPTED.
+No duplicate local ROBINHOOD or FULL run is required for its mapped CI profile.
 
-The dedicated CLI is scripts/run_arch134_f1r1_qualification.py with exactly
-prepare, run, status, stop and verify. The sole operator root is
-F:\AI\temp\qualification\arch134-f1r1-host-isolation. Prepared source and observed
-Python run with -I -S -B, independently of development checkouts/Git/Codex.
-The lease is disposable process-lifetime byte-range ownership; status is read-only
-and uses creation identity plus real lease/replay evidence. Stop is fixed-root,
-cooperative, and commits NORMAL_RETURN before release. Abrupt disappearance and
-duplicate/consumed state preserve evidence without repair, restart or retry.
+## Protected boundary and immediate next step
 
-## Consumed F1 and zero-effect boundary
+Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. Production/F1/C2
+evidence is untouched; all protected effects remain zero. Successor-soak execution
+remains unauthorized. Architecture 145 remains separate/offline; live remains
+NO-GO.
 
-Original F1 is FINAL / INDETERMINATE and consumed; no successor session/soak is
-authorized. Do not touch preserved F1 evidence or reuse its original worktree.
-Production reboot remains STOP after boot/login and requires explicit manual start.
-C1 does not run real fixed-root prepare/qualification or restart Codex. It does
-not access production SQLite, credentials/providers, broker/paper state, D1/D2,
-installation, scheduler/services or live trading. All protected counters stay zero.
-Real-money trading remains NO-GO.
-
-## Immediate continuation
-
-Owner: ChatGPT exact GitHub review and certification acceptance. Review the
-atomic C1 commit/diff, frozen-predecessor/overlay proof and terminal mapped
-ROBINHOOD CI. No duplicate local canonical profile is needed.
-
-After acceptance, review C2 using:
-
-- docs/architecture/134-f1r1-c1-qualification-operator.md
-- docs/validation/arch134-f1r1-c1-qualification-operator.md
-- docs/operators/arch134-f1r1-c2-external-qualification.md
-
-C2 alone may later materialize the fixed disposable fixture, start its host from
-independent PowerShell, observe development/Codex restart survival and stop it.
-The operator plan supplies seven phases, exact bounded commands, evidence checks
-and no-retry stop conditions. C2 PASS grants no successor-soak authority.
-
-Research strategy qualification (Architecture 145) remains separate and offline.
-Historical detail is retrieved only as needed through docs/history/INDEX.md;
-current workflow authority remains AGENTS.md and docs/AI_DEVELOPMENT_WORKFLOW.md.
+Owner: ChatGPT. Review the exact D1S1 GitHub commit/diff, immutable predecessor
+proof, shared-doc/AST/inventory successor overlays, focused verification and
+terminal mapped ROBINHOOD source gate. Only if source is accepted, separately
+review installed-release/readiness admission and then effect preflight. Do not
+install/start a release, touch Task Scheduler, access credentials/providers,
+mutate paper state or reuse any consumed evidence during that review.

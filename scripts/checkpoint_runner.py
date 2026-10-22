@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "c3039186f4891948bdd8b7aa0826a644a582294f99b2384ff0f13debe80fdb5c"
+    "b3051e28779c71b040bf4ba4684740fa5f8dc2ff7a99eedfcd14e2e40fde6db9"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -197,6 +197,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-d1s1-successor-soak-source",
     "arch134-f1r1-c1-qualification-operator",
     "arch134-f1r1-b-host-qualification",
     "arch134-f1-five-session-soak",
@@ -217,6 +218,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-f1r1-d1s1-successor-soak-source": "robinhood",
     "arch134-f1r1-c1-qualification-operator": "robinhood",
     "arch134-f1r1-b-host-qualification": "robinhood",
     "arch134-f1-five-session-soak": "robinhood",
@@ -14101,8 +14103,11 @@ def _arch145a_d1r6_workflow_successor(predecessor: str, candidate: str) -> str:
         != ARCH145A_D1R6_WORKFLOW_SUCCESSOR_PROOF_SHA256
         or predecessor != ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1
         or candidate
-        != _arch134_f1r1_c1_current_source_pin(
-            ARCH145A_D1R6_WORKFLOW_PATH, ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+        != _arch134_d1s1_current_source_pin(
+            ARCH145A_D1R6_WORKFLOW_PATH,
+            _arch134_f1r1_c1_current_source_pin(
+                ARCH145A_D1R6_WORKFLOW_PATH, ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+            ),
         )
         or type(candidate) is not str
         or len(candidate) != 40
@@ -14906,9 +14911,9 @@ def _arch134_f1r1_b_authority_check(repo_root: Path) -> tuple[str, ...]:
         if set(ARCH134_F1R1_B_SOURCE_PINS) != set(ARCH134_F1R1_B_PATHS):
             failures.append("134-F1R1-B source pin set drift")
         for relative, pin in ARCH134_F1R1_B_SOURCE_PINS.items():
-            if _git_blob_sha1(
-                repo_root / relative
-            ) != _arch134_f1r1_c1_current_source_pin(relative, pin):
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1s1_current_source_pin(
+                relative, _arch134_f1r1_c1_current_source_pin(relative, pin)
+            ):
                 failures.append("134-F1R1-B source drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_F1R1_B_NAME]
         if (
@@ -14970,8 +14975,11 @@ def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
         current = _arch134_f1r1_a_current_source_pin(relative, after[relative])
     else:
         current = _arch134_f1r1_a_current_source_pin(relative, predecessor)
-    return _arch134_f1r1_c1_current_source_pin(
-        relative, _arch134_f1r1_b_current_source_pin(relative, current)
+    return _arch134_d1s1_current_source_pin(
+        relative,
+        _arch134_f1r1_c1_current_source_pin(
+            relative, _arch134_f1r1_b_current_source_pin(relative, current)
+        ),
     )
 
 
@@ -15006,8 +15014,11 @@ def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str
         current = _arch134_f1r1_a_current_inventory_test_pin(relative, after[relative])
     else:
         current = _arch134_f1r1_a_current_inventory_test_pin(relative, predecessor)
-    return _arch134_f1r1_c1_current_inventory_test_pin(
-        relative, _arch134_f1r1_b_current_inventory_test_pin(relative, current)
+    return _arch134_d1s1_current_source_pin(
+        relative,
+        _arch134_f1r1_c1_current_inventory_test_pin(
+            relative, _arch134_f1r1_b_current_inventory_test_pin(relative, current)
+        ),
     )
 
 
@@ -15033,14 +15044,13 @@ def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
             ).encode("utf-8")
         ).hexdigest()
         != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
-        or tuple(ACTIVE_CI_CHECKPOINTS)
-        != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+        or tuple(ACTIVE_CI_CHECKPOINTS) != ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
         or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        != ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
     ):
         raise ValueError("145-A active checkpoint successor overlay drift")
     _arch134_f1r1_c1_active_inventory()
-    return ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+    return ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
 
 
 ARCH145A_TESTS: Final = (
@@ -15890,8 +15900,9 @@ def _arch134_f1r1_c1_active_inventory() -> None:
             + before[before.index(ARCH134_F1R1_B_NAME) :]
         )
         or digest(after) != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
-        or tuple(ACTIVE_CI_CHECKPOINTS) != after
-        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != digest(after)
+        or tuple(ACTIVE_CI_CHECKPOINTS) != _arch134_d1s1_active_inventory()
+        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        != ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
     ):
         raise ValueError("134-F1R1-C1 active inventory drift")
 
@@ -15901,10 +15912,14 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _arch134_f1r1_c1_active_inventory()
         for relative, pin in ARCH134_F1R1_C1_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1s1_current_source_pin(
+                relative, pin
+            ):
                 failures.append("134-F1R1-C1 source drift: " + relative)
         for relative, before in ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS.items():
-            expected = _arch134_f1r1_c1_current_source_pin(relative, before)
+            expected = _arch134_d1s1_current_source_pin(
+                relative, _arch134_f1r1_c1_current_source_pin(relative, before)
+            )
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("134-F1R1-C1 shared successor drift: " + relative)
         tree = ast.parse(
@@ -15912,12 +15927,9 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_F1R1_C1_RUNNER_AST_PINS.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != expected
-            ):
+            if hashlib.sha256(
+                ast.dump(functions[name], include_attributes=False).encode()
+            ).hexdigest() != _arch134_d1s1_runner_ast_pin(name, expected):
                 failures.append("134-F1R1-C1 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_F1R1_C1_NAME]
         if (
@@ -15938,6 +15950,494 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("134-F1R1-C1 source-only registration drift")
     except (OSError, ValueError, TypeError, KeyError, SyntaxError):
         failures.append("134-F1R1-C1 authority unavailable")
+    return tuple(failures)
+
+
+# D1S1 is a separate successor layer. Every predecessor dictionary/digest above
+# remains historical and byte-for-byte unchanged.
+ARCH134_D1S1_NAME: Final = "arch134-f1r1-d1s1-successor-soak-source"
+ARCH134_D1S1_BRANCH: Final = (
+    "feature/robinhood-production-paper-134f1r1-successor-soak-source-current"
+)
+# D1S1_GENERATED_PINS_BEGIN
+ARCH134_D1S1_SHARED_PATHS: Final = (
+    ".github/workflows/checkpoint-source-gates.yml",
+    "docs/AI_TRADING_BOT_HANDOFF.md",
+    "docs/PROJECT_STATUS.md",
+    "scripts/run_test_certification.py",
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py",
+    "tests/review_paper/test_arch133_reprovision_recovery.py",
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
+    "tests/review_paper/test_arch133_windows_rename_qualification.py",
+    "tests/review_paper/test_d1_session_authorization.py",
+    "tests/review_paper/test_d1_session_execution.py",
+    "tests/review_paper/test_pre_market_wake_overnight.py",
+    "tests/review_paper/test_production_strategy_cycle.py",
+    "tests/review_paper/test_supervised_deployment_qualification.py",
+    "tests/review_paper/test_supervised_maintenance_rebind.py",
+    "tests/review_paper/test_supervised_release_installation.py",
+    "tests/review_paper/test_supervised_runtime_host_admission.py",
+    "tests/runtime/checkpoint_runner/helpers.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/scripts/certification_runner/helpers.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/strategies/test_production_strategy_contract.py",
+    "tests/strategies/test_production_strategy_decision.py",
+)
+ARCH134_D1S1_PREDECESSOR_PINS: Final = {
+    "docs/PROJECT_STATUS.md": ("2518ad685ec0501c42720e210049de70987b8387"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("c558eb4170e271cdf10be2b232ea447be3a89578"),
+    "scripts/run_test_certification.py": ("80aa649a16b45eea55914071c0f2111c3d9bb448"),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a9c2f3696152d6c045f6fb83b18af7f152e94e55"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "16be625d2c56474e5f3a10e1093b5cecaef10b2d"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a66ce484a4c21ec10928c45e9321fc66b520059c"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "f2b5c690d6dfcaa449befbb9ac2ece2d9f161ac4"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "2d85390187505eb2f7262362d1819397d4af2f3b"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "f3f4806ecc66374ed2833b997a16c37c272d95ca"
+    ),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "ebc1050baa92a52ebbaaaa9c4a66e7a30ca15fcc"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "3ea5f6f9d396e0cf622f40ad938bb77a282e56f6"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "6bfaae312b1e571a587581cb845ed6399f5db701"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "22ab8969932d892889c2152740eb744088953fc1"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "bb6e7ebfc3250259be155b8b37df37060f10501c"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "1b6753f641375486cd8fef5a8bcf63b7672ed2c3"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "5316ad0697f9ddab998442cdd98b2c3abd14ba35"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "8de2208dd25973fdcc87582f4d9f465da623a9a0"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "3857ea00a66d4f15be4050176bf033254d9566d5"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "fea71ab9af2be58eedd38360fa0cd331b5536672"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8f8ef991b440353da2bc34fa1c1d364c38b66557"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "63c48802f6b20960f49eb77d5f5771279b928164"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "81fd4e122d81231828ee2bb98da90167edf6b592"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f4f09c3ab7b038601c579a596426187399eb9e79"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "7504f97f2e61eeb937fb36cd97190a9421e4c228"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "1b508a664f7e247276edd0538312bd73c6d99ae6"
+    ),
+}
+ARCH134_D1S1_PREDECESSOR_PINS_SHA256: Final = (
+    "80a85f56ac65638922757972a9bed7cb253f641417d7f57d3b6a3737e17a1028"
+)
+ARCH134_D1S1_SUCCESSOR_PINS: Final = {
+    "docs/PROJECT_STATUS.md": ("30209a678874b7d58738fe0197781ee0b763759b"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("53ca4d10291639f4727ea0fbbf559dc76b53e71d"),
+    "scripts/run_test_certification.py": ("cffca91b13478906f182ebfdb916648bfd6343e2"),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "7b47c13feba6ab998ced4af91a0b11779ba8a9a7"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "f9030aa2b65cffbc458b956928943d3d11f54310"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "47ddc27dc2390ce7d2cf920c8bd995bc51868aac"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5257e306d9843cbc931f3b1fbafb14f5a58084b2"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "ac31637eb5ed20aa10b248ddef27d2a7f00feac7"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "c28a9818787c3b8a4eaeedff5a887f107f405d43"
+    ),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "96296c3283ae6bc4a05c9f6c64d6441bb16b94f7"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "dbe2ee0913ae14e05bb6f2fa66811b435cdab12a"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "0b5ed1798e6d15a3957ac17ddbedb67b0e1d10c5"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "1041d61c3335cf7fa4434b2d57e074459a42f6d5"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "0c9edee39908c16bca73ac9859f1e6cc91ace320"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "f5a9937c6ad9c9532ce8f53716d9435a93a5bf06"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "d7d6a0b98330dc8800598ea29901b342b0c090cb"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "9787a206431821374a197c61ed194c4ca65b4ad0"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "6a2f2ff6222cf74f2709cc00e38cb4c0573ef861"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "61ca5a0d03d9f311326c636d0bd0da87c734d066"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "2e8cf696fc4310e6a7c523244e465cbec640c601"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "6a38ada9b28603ae0f3ee70a5ee067defb1d53f2"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "a06b31062d75efbce3fe8f4a422f8f336c5b1e40"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "dc4cf441a6772b0693605b876cea5a48d768200c"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "cf51083ec229fa31098921b52de2948a6145d86a"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "25c34813737869d2b65154b7d1cbf60922c04d8f"
+    ),
+}
+ARCH134_D1S1_SUCCESSOR_PINS_SHA256: Final = (
+    "345946aee85714d5d898d596dc98fc0eec8fa60106db81c4339878d2b05f924d"
+)
+ARCH134_D1S1_PREDECESSOR_AST_PINS: Final = {
+    "_arch134_f1r1_b_authority_check": (
+        "c4fcfeb01cbf2b2d7a85bf8daa5e6e5131df9960e36fef6e6378a24638837dbf"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "68d1e96b927cf6e2d0287ebd312f5190031be504c185ee7c505dc84f77c13aaf"
+    ),
+    "_arch134_f1r1_c1_authority_check": (
+        "492e74bcbcc36f5070a56084b3bd846e117637537c9ae6bc900538f25d0feac5"
+    ),
+    "_arch145a_current_inventory_test_pin": (
+        "af98a64c8dba75fa6c5255f14c4e2c3352517ba7a8bfaa155b95e1b4f0fbbe5c"
+    ),
+    "_arch145a_current_source_pin": (
+        "be351ec8d738764afcbd530139616658896e08aabb6c25b1dbc00b8a9655f48d"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "41cc6122f12dd6bbe5b249f67a488c89fd91d9bb2f8f44dfa78fca3d92b5453f"
+    ),
+    "_checkpoint_specs": (
+        "2fd5b8d7b7ad7745a38fc4c5d39e6bba151b1763254c058f69631a27190a6359"
+    ),
+    "_arch145a_d1r6_workflow_successor": (
+        "e4961a3991273540fae9eec1ee23cf979704ce4753a2d0dd02f7dfe045e05b82"
+    ),
+}
+ARCH134_D1S1_PREDECESSOR_AST_PINS_SHA256: Final = (
+    "93efb53d863958c587256d9f2aeb8c1854f282ec615a2f01827d12dfca1cb457"
+)
+ARCH134_D1S1_SUCCESSOR_AST_PINS: Final = {
+    "_arch134_f1r1_b_authority_check": (
+        "2934b0fb7b7b2c662a22717ce08859eac1bb7e2c254a401965528d4056eedcfb"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "ba12c8834eeb39a9870c5c962eb43d8dd708a7ebda804db0cb1a17e8ef36ad22"
+    ),
+    "_arch134_f1r1_c1_authority_check": (
+        "1838267ce87246f6de390ecbe8ab50cafab05066cd1315b227e2fa3df39542ae"
+    ),
+    "_arch145a_current_inventory_test_pin": (
+        "390cde97ad99df8e2832da81eb034b15557f0eeee16cb36e21f452c0fa5fd3ed"
+    ),
+    "_arch145a_current_source_pin": (
+        "564243959a779fbf38e3ac51098fc4339a5f5178d9210c9ddae5cc89a69784c5"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "adff91053c3f84960917e8f4f36c0977c55be9bdd6518e1865cf6d5029d51759"
+    ),
+    "_checkpoint_specs": (
+        "959ccba65f8ff19319cdce04c6ff0848ccaf2c7e83e3c7663ee99b7e1cae6014"
+    ),
+    "_arch145a_d1r6_workflow_successor": (
+        "71cd6d8287b3bdcd60b316c5f0afbe8cb9e836196180626f984b4ffb8a8c18d3"
+    ),
+}
+ARCH134_D1S1_SUCCESSOR_AST_PINS_SHA256: Final = (
+    "11c626490667f6ad557e8c2a75f4442da728b7f54f12427fe7e3178365b1a600"
+)
+ARCH134_D1S1_SOURCE_PINS: Final = {
+    "docs/architecture/134-f1r1-d1-successor-soak-design.md": (
+        "3409e89b7de6b55c032cd2b406679e0aff596f03"
+    ),
+    "docs/validation/arch134-f1r1-d1-successor-soak-design.md": (
+        "fd142855144c57224e4639d90623493197139336"
+    ),
+    "docs/validation/arch134-f1r1-d1s1-successor-soak-source.md": (
+        "b655dd27a2a538f0e08fbe73095aac76c9634282"
+    ),
+    "scripts/arch134_f1r1_qualification.py": (
+        "8e0419670d1109bcf7688195aa67a155afb64218"
+    ),
+    "scripts/arch134_f1r1_qualification_process.py": (
+        "21ea1130c127bffedf62a2fc5fb1ebbef95f93e1"
+    ),
+    "scripts/run_arch134_f1r1_qualification.py": (
+        "8fe804753bc3fbfd531ef08dfc56b340ed07350b"
+    ),
+    "src/trading_bot/review_paper/five_session_soak.py": (
+        "9de15257fc9b6fe97e90314450b097849ff81320"
+    ),
+    "src/trading_bot/review_paper/five_session_soak_child.py": (
+        "6afcdfe42ac1691bc477efcfb4764c227a0c1bc2"
+    ),
+    "src/trading_bot/review_paper/five_session_soak_host.py": (
+        "9c3197005811ec0cd2b38f8ce4c7717f6c9e2108"
+    ),
+    "src/trading_bot/review_paper/five_session_soak_store.py": (
+        "3813837e8d10ee2b19150405143704a7f03d474f"
+    ),
+    "src/trading_bot/review_paper/successor_soak.py": (
+        "0526019818cb0ac18738f5841fc6ac86e65776c8"
+    ),
+    "src/trading_bot/review_paper/successor_soak_admission.py": (
+        "a4c7410fdd933c5290d95367e69d63aff83de4cf"
+    ),
+    "src/trading_bot/review_paper/successor_soak_contract.py": (
+        "9d56fc1f2c677d049bed939e67abb45cefd3918b"
+    ),
+    "src/trading_bot/review_paper/successor_soak_store.py": (
+        "82c00c2a2752418abf358c8563df93e3adc5ba10"
+    ),
+    "src/trading_bot/supervised_release/binding.py": (
+        "acdd2dfa17398afc822e770dd18166b747514cc1"
+    ),
+    "src/trading_bot/supervised_release/bundle.py": (
+        "1a3edc3186da17851106810c7f34c43c17b56b7c"
+    ),
+    "src/trading_bot/supervised_release/installation_contract.py": (
+        "ffff404ed16c7a476a0a3ecb622b8bdfbd701ef1"
+    ),
+    "src/trading_bot/supervised_release/lifecycle_store.py": (
+        "f03fce5913d8ef41bb3515dc02670b38fc7c296a"
+    ),
+    "src/trading_bot/supervised_release/model.py": (
+        "1619bf29a3c0c8b262912dfaf517ae44e4b77708"
+    ),
+    "src/trading_bot/supervised_release/runtime_admission.py": (
+        "ef95b314c527d5f2e773b06c9d2a5f217ae8d09b"
+    ),
+    "src/trading_bot/supervised_release/runtime_host_composition.py": (
+        "fc86a4ef0a8911fb96f91571bccf58a44f93e203"
+    ),
+    "src/trading_bot/supervised_release/runtime_isolation.py": (
+        "cba9836c68a027901637c0ac6f2a4f0c70f21637"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "9dea8d9d0cc7cbf62e2dfc2b723eed9a44a6f175"
+    ),
+}
+ARCH134_D1S1_RUNNER_AST_PINS: Final = {
+    "_arch134_f1r1_b_authority_check": (
+        "2934b0fb7b7b2c662a22717ce08859eac1bb7e2c254a401965528d4056eedcfb"
+    ),
+    "_arch145a_current_source_pin": (
+        "564243959a779fbf38e3ac51098fc4339a5f5178d9210c9ddae5cc89a69784c5"
+    ),
+    "_arch145a_current_inventory_test_pin": (
+        "390cde97ad99df8e2832da81eb034b15557f0eeee16cb36e21f452c0fa5fd3ed"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "adff91053c3f84960917e8f4f36c0977c55be9bdd6518e1865cf6d5029d51759"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "ba12c8834eeb39a9870c5c962eb43d8dd708a7ebda804db0cb1a17e8ef36ad22"
+    ),
+    "_arch134_f1r1_c1_authority_check": (
+        "1838267ce87246f6de390ecbe8ab50cafab05066cd1315b227e2fa3df39542ae"
+    ),
+    "_arch134_d1s1_current_source_pin": (
+        "9ef263416768c065e65589abd82f63f9c866b220da125a704d847f6cf48da215"
+    ),
+    "_arch134_d1s1_runner_ast_pin": (
+        "66a97fdd1ec9b570c5f55f129dc7650661548dd3975e7458f7ec03d12cfaa896"
+    ),
+    "_arch134_d1s1_active_inventory": (
+        "3b2f4a9fecbf5709312f6014eb7c2b833e2334cbcbbcc9cf65b18b13369137cf"
+    ),
+    "_arch134_d1s1_authority_check": (
+        "30a7f35d5dca5d07ac202437f87f6c97c2d9bafbbfeb43d6cdb85d24a5509617"
+    ),
+    "_checkpoint_specs": (
+        "959ccba65f8ff19319cdce04c6ff0848ccaf2c7e83e3c7663ee99b7e1cae6014"
+    ),
+    "_arch145a_d1r6_workflow_successor": (
+        "71cd6d8287b3bdcd60b316c5f0afbe8cb9e836196180626f984b4ffb8a8c18d3"
+    ),
+}
+ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
+    *ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS[
+        : ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS.index(ARCH134_F1R1_C1_NAME)
+    ],
+    ARCH134_D1S1_NAME,
+    *ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS[
+        ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS.index(ARCH134_F1R1_C1_NAME) :
+    ],
+)
+ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    "b3051e28779c71b040bf4ba4684740fa5f8dc2ff7a99eedfcd14e2e40fde6db9"
+)
+# D1S1_GENERATED_PINS_END
+ARCH134_D1S1_TESTS: Final = (
+    *ARCH134_F1R1_C1_TESTS,
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
+)
+ARCH134_D1S1_RUFF_PATHS: Final = (
+    *ARCH134_F1R1_C1_RUFF_PATHS,
+    "src/trading_bot/review_paper/successor_soak_contract.py",
+    "src/trading_bot/review_paper/successor_soak_admission.py",
+    "src/trading_bot/review_paper/successor_soak_store.py",
+    "src/trading_bot/review_paper/successor_soak.py",
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
+)
+
+
+def _arch134_d1s1_current_source_pin(relative: str, predecessor: str) -> str:
+    before, after = ARCH134_D1S1_PREDECESSOR_PINS, ARCH134_D1S1_SUCCESSOR_PINS
+    paths = set(ARCH134_D1S1_SHARED_PATHS)
+    if (
+        type(before) is not dict
+        or set(before) != paths
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_D1S1_PREDECESSOR_PINS_SHA256
+    ):
+        raise ValueError("D1S1 frozen C1 predecessor drift")
+    if relative in paths and predecessor != before[relative]:
+        raise ValueError("D1S1 wrong C1 predecessor blob")
+    if after is None:
+        return predecessor
+    if (
+        type(after) is not dict
+        or set(after) != paths
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_D1S1_SUCCESSOR_PINS_SHA256
+    ):
+        raise ValueError("D1S1 exact successor path/blob drift")
+    return after.get(relative, predecessor)
+
+
+def _arch134_d1s1_runner_ast_pin(name: str, predecessor: str) -> str:
+    before, after = ARCH134_D1S1_PREDECESSOR_AST_PINS, ARCH134_D1S1_SUCCESSOR_AST_PINS
+    if (
+        set(before) != set(after)
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_D1S1_PREDECESSOR_AST_PINS_SHA256
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH134_D1S1_SUCCESSOR_AST_PINS_SHA256
+    ):
+        raise ValueError("D1S1 runner AST successor drift")
+    if name in before and before[name] != predecessor:
+        raise ValueError("D1S1 runner AST predecessor drift")
+    return after.get(name, predecessor)
+
+
+def _arch134_d1s1_active_inventory() -> tuple[str, ...]:
+    before = ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+    after = ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+
+    def digest_tuple(value):
+        return hashlib.sha256(
+            ast.dump(
+                ast.parse(repr(value), mode="eval").body, include_attributes=False
+            ).encode()
+        ).hexdigest()
+
+    expected = (
+        before[: before.index(ARCH134_F1R1_C1_NAME)]
+        + (ARCH134_D1S1_NAME,)
+        + before[before.index(ARCH134_F1R1_C1_NAME) :]
+    )
+    if (
+        digest_tuple(before) != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        or after != expected
+        or tuple(ACTIVE_CI_CHECKPOINTS) != after
+        or digest_tuple(after) != ARCH134_D1S1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != digest_tuple(after)
+    ):
+        raise ValueError("D1S1 exact active inventory drift")
+    return after
+
+
+def _arch134_d1s1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch134_d1s1_active_inventory()
+        for relative, pin in ARCH134_D1S1_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("D1S1 source drift: " + relative)
+        for relative, pin in ARCH134_D1S1_PREDECESSOR_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch134_d1s1_current_source_pin(
+                relative, pin
+            ):
+                failures.append("D1S1 shared successor drift: " + relative)
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(tree)
+        for name, expected in ARCH134_D1S1_RUNNER_AST_PINS.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append("D1S1 runner AST drift: " + name)
+        spec = _checkpoint_specs()[ARCH134_D1S1_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != ARCH134_D1S1_BRANCH
+            or spec.tests != ARCH134_D1S1_TESTS
+            or spec.ruff_paths != ARCH134_D1S1_RUFF_PATHS
+            or spec.authority_check is not _arch134_d1s1_authority_check
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+            or not _batch_workflow_is_reviewed(
+                (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        ):
+            failures.append("D1S1 source-only registration drift")
+    except (OSError, ValueError, TypeError, KeyError, SyntaxError):
+        failures.append("D1S1 authority unavailable")
     return tuple(failures)
 
 
@@ -16054,6 +16554,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_D1S1_NAME: CheckpointSpec(
+            name=ARCH134_D1S1_NAME,
+            description="Fresh fixed two-session successor source contract only",
+            tests=ARCH134_D1S1_TESTS,
+            ruff_paths=ARCH134_D1S1_RUFF_PATHS,
+            authority_check=_arch134_d1s1_authority_check,
+            remote_branch=ARCH134_D1S1_BRANCH,
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
         ARCH134_F1R1_C1_NAME: CheckpointSpec(
             name=ARCH134_F1R1_C1_NAME,
             description="Architecture 134-F1R1-C1 qualification operator source only",

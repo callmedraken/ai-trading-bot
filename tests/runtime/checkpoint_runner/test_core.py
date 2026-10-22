@@ -208,6 +208,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         "arch144-c-f1-paper-evidence-admission",
         "arch145-a-research-robustness-live-canary-eligibility",
         "arch134-f1r1-a-runtime-isolation",
+        "arch134-f1r1-d1s1-successor-soak-source",
         "arch134-f1r1-c1-qualification-operator",
         "arch134-f1r1-b-host-qualification",
         "arch134-f1-five-session-soak",
@@ -365,6 +366,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH145A_BRANCH
         if spec.name == "arch134-f1r1-a-runtime-isolation":
             expected_branch = runner.ARCH134_F1R1_A_BRANCH
+        if spec.name == "arch134-f1r1-d1s1-successor-soak-source":
+            expected_branch = runner.ARCH134_D1S1_BRANCH
         if spec.name == "arch134-f1r1-c1-qualification-operator":
             expected_branch = runner.ARCH134_F1R1_C1_BRANCH
         if spec.name == "arch134-f1r1-b-host-qualification":
@@ -903,6 +906,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH144C_NAME,
             runner.ARCH145A_NAME,
             runner.ARCH134_F1R1_B_NAME,
+            runner.ARCH134_D1S1_NAME,
             runner.ARCH134_F1R1_C1_NAME,
         }
     )
@@ -1375,7 +1379,12 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                     "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
                     "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
                 )
-                if name in {runner.ARCH134_F1R1_B_NAME, runner.ARCH134_F1R1_C1_NAME}
+                if name
+                in {
+                    runner.ARCH134_F1R1_B_NAME,
+                    runner.ARCH134_F1R1_C1_NAME,
+                    runner.ARCH134_D1S1_NAME,
+                }
                 else (
                     *runner.COMMON_TESTS,
                     "tests/runtime/checkpoint_runner/" + module,
@@ -1461,7 +1470,7 @@ def test_arch144c_source_only_route_authority_and_frozen_v1():
 def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
-    successor = runner.ARCH134_F1R1_C1_TEST_PIN_OVERRIDES[path]
+    successor = runner.ARCH134_D1S1_SUCCESSOR_PINS[path]
     assert runner._arch144c_current_inventory_test_pin(path, before) == successor
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
@@ -1580,6 +1589,10 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
         "              arch134-f1r1-b-host-qualification `\n",
         "              arch134-f1r1-c1-qualification-operator `\n"
         "              arch134-f1r1-b-host-qualification `\n",
+    ).replace(
+        "              arch134-f1r1-c1-qualification-operator `\n",
+        "              arch134-f1r1-d1s1-successor-soak-source `\n"
+        "              arch134-f1r1-c1-qualification-operator `\n",
     )
     assert runner._batch_workflow_is_reviewed(current)
     assert "pull_request:" in current
@@ -1593,9 +1606,7 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     candidate = runner._git_blob_sha1(path)
     assert (
         candidate
-        == runner.ARCH134_F1R1_C1_SOURCE_PIN_OVERRIDES[
-            runner.ARCH145A_D1R6_WORKFLOW_PATH
-        ]
+        == runner.ARCH134_D1S1_SUCCESSOR_PINS[runner.ARCH145A_D1R6_WORKFLOW_PATH]
     )
     assert (
         runner._arch145a_d1r6_workflow_successor(

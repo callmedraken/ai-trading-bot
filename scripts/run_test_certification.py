@@ -60,9 +60,10 @@ ROBINHOOD_F1R1_B_LANE_PINS = {
 # minimum.
 # Pairs preserve duplicate keys for fail-closed validation (unlike a dict literal).
 # Canonical SHA256: sorted compact JSON object, UTF-8, no trailing newline:
-# 424a2e8cb0df6a99665605357de917b5bfcfe014293740acb7a5c99c6af75328
+# 0d02dcc0c98d8b1ce5f86ac3093294641cbd0d64e44c9bf258c296c1439e4457
 FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
 FULL_MODULE_TIMINGS_MS = (
+    ("tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py", 16000),
     (
         "tests/experiments/test_research_strategy_paper_candidate_eligibility_v2.py",
         1000,

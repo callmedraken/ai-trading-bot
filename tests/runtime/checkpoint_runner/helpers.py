@@ -161,6 +161,7 @@ _EXPECTED_RETAINED_CHECKPOINTS = (
 )
 
 _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
+    "arch134-f1r1-d1s3-successor-release-installation-operator",
     "arch133-robinhood-supervised-release-installation-operator",
     "arch133-robinhood-supervised-deployment-qualification",
     "arch133-robinhood-supervised-runtime-host-admission",

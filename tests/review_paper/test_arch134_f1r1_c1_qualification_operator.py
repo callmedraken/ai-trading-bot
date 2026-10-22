@@ -588,6 +588,7 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
         n.name: n for n in ast.parse(current).body if isinstance(n, ast.FunctionDef)
     }
     permitted = set(runner.ARCH134_F1R1_C1_RUNNER_AST_PINS)
+    permitted.update(runner.ARCH134_D1S3_RUNNER_AST_PINS)
     for name, function in frozen_functions.items():
         if name not in permitted:
             assert ast.dump(function) == ast.dump(current_functions[name]), name

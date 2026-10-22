@@ -66,6 +66,10 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py", 16000),
     ("tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py", 1000),
     (
+        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
+        1000,
+    ),
+    (
         "tests/experiments/test_research_strategy_paper_candidate_eligibility_v2.py",
         1000,
     ),

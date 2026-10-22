@@ -773,7 +773,7 @@ def test_checkpoint_profile_inventory_and_frozen_authority():
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 197, "robinhood": 108, "legacy": 222, "exhaustive": 419}
+    } == {"full": 198, "robinhood": 109, "legacy": 222, "exhaustive": 420}
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
     for name, expected in runner.ARCH134_D1R7_PREDECESSOR_DIGESTS.items():
         assert (

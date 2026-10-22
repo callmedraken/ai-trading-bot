@@ -2,29 +2,32 @@
 
 ## Verified boundary
 
-D1S1 is SOURCE ACCEPTED and integrated at current `develop`:
+D1S2 is SOURCE ACCEPTED and integrated at current `develop`:
 
 ```text
-HEAD 88d6a4ba11a77ca4a7b04b102b914e9e4ea9bd96
-TREE eae9ad713620f1a030a981f27e0a2672d0222fa0
-feature CI 39754184070 / attempt 1 / SUCCESS
-preserved failed first source attempt 39751885721
-post-merge develop CI 39756068943 / attempt 1 / SUCCESS
+HEAD 2b697b79e6bdbc964d2b0414ced057628e6c2da7
+TREE e510210070874ade43a240457645939650e457d8
+D1S2 feature CI 39767775803 / attempt 1 / SUCCESS
+preserved failed D1S2 source attempt 39765888238 / attempt 1
+post-merge develop CI 39839904057 / attempt 1 / SUCCESS
 ```
 
 The active handoff is the source-only
-`arch134-f1r1-d1s2-successor-installed-readiness` checkpoint on branch
-`feature/robinhood-production-paper-134f1r1-successor-readiness-current`,
+`arch134-f1r1-d1s3-successor-release-installation-operator` checkpoint on
+branch
+`feature/robinhood-production-paper-134f1r1-successor-installation-operator-current`,
 worktree
-`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-readiness-current`.
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
+D1S3 is pending ChatGPT exact-source acceptance.
 
-Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. C2 remains consumed
-immutable evidence at
-`F:\AI\temp\qualification\arch134-f1r1-host-isolation`; it is not production
-admission and must not be inspected, mutated, repaired, or reused. Architecture
-145 remains separate/offline and live remains NO-GO.
+Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. C2 remains consumed and
+non-reusable immutable evidence; neither namespace is a D1S3 authority. The
+successor root remains uncreated. No production installation has occurred.
+Provider, credential, paper, broker, D1, D2, and successor execution remain
+unauthorized. Architecture 145 remains separate/offline and live remains
+NO-GO.
 
-## D1S2 source handoff
+## D1S2/D1S3 source handoff
 
 D1S2 provides a fresh successor-specific readiness composition. It binds an
 explicit accepted remote/ref/HEAD/tree policy to the accepted
@@ -53,22 +56,46 @@ effects remain unavailable.
 The Architecture-133 launcher is intentionally unchanged: no caller-selected
 semantic arguments, `-I -S -B`, fixed immutable release/source/site-packages
 policy, no pycache, and inert fail-closed behavior after runtime-admission
-import. D1S2 records the launcher/runtime-host gap; it does not add effectful
-quote or paper wiring.
+import. D1S3 does not add effectful quote or paper wiring and creates no
+scheduler, service, boot, logon, or resume behavior.
+
+D1S3 is a fresh successor-specific operator. It proves the live accepted
+remote/ref/HEAD/tree and clean source inventory, constructs and independently
+replays the complete immutable release bundle, binds the canonical runtime,
+and observes only the fixed production release/runtime paths. It does not
+reuse or mutate the historical Architecture-133 AG installation operator.
+
+The exact D1S3 one-shot attempt path is
+`F:\AI\temp\arch134-f1r1-d1s3-installation-attempt\attempt.json`.
+Preflight only observes it; a later protected execute must reserve and flush
+it before entering the accepted Architecture-133 installation engine. Any
+post-entry exception is consumed `INDETERMINATE`; timeout never grants retry.
+
+The future root is
+`F:\AITradingBot\Arch133\arch134-f1r1-d1-successor-soak-v1`. D1S3 never
+creates it. An absent root after a verified install returns
+`READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`; an exact existing root may
+proceed only through D1S2 read-only readiness. Conflicting, malformed,
+consumed, aliased, reparse, wrong-policy, or indeterminate observations stop.
+
+The current coordination documents are the only mutable current-state
+exception. `PROJECT_STATUS.md` and this handoff are not executable blob
+authority under D1S3; source, test, workflow, AST, inventory, architecture,
+and validation paths remain exact-pinned. Removing the D1S3 overlay restores
+D1S2 exact-pin behavior.
 
 ## Review and next step
 
-The D1S2 runner is mapped to ROBINHOOD. Its successor overlay preserves the
-accepted D1S1 predecessor dictionaries/digests and updates current status,
-handoff, inventory, AST, and test consumers exactly. Removing the D1S2
-overlay restores D1S1 resolution. Retained Architecture-133/F1R1-A/B/C1 and
-D1S1 focused tests remain part of the source checkpoint.
+The D1S3 runner is mapped to ROBINHOOD. Its successor overlay preserves the
+accepted D1S2 predecessor dictionaries/digests, makes only the two current
+coordination documents mutable, and updates the exact inventory, AST, and test
+consumers. Retained Architecture-133/F1R1-A/B/C1, D1S1, and D1S2 focused tests
+remain part of the source checkpoint.
 
-Owner: ChatGPT. Perform exact-source review of the D1S2 commit/diff and
-terminal mapped CI. Only after that acceptance should a separately reviewed
-protected operator construct and, if explicitly authorized, install/observe
-the exact accepted successor release. That later boundary must preserve
-manual STOP/reboot semantics and return a closed readiness result before any
-provider or paper effect.
+Owner: ChatGPT. Perform exact-source review of the D1S3 commit/diff, terminal
+mapped CI, and source identity/current-document overlay. Only after SOURCE
+ACCEPTED may ChatGPT review the separate read-only protected preflight. Only
+after that preflight may an immutable-release installation effect be considered
+within exact reviewed bounds.
 
 Also remove or update any tests and docs that referenced the old behavior.

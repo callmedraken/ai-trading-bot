@@ -384,7 +384,7 @@ def test_runtime_admission_checkpoint_is_first_and_source_only():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-runtime-host-admission"
-    assert runner.ACTIVE_CI_CHECKPOINTS[2] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[3] == name
     assert workflow.count(name) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
@@ -397,7 +397,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
-    assert runner.ACTIVE_CI_CHECKPOINTS[4] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[5] == name
     assert workflow.count(f"              {name} `\n") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
@@ -482,6 +482,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        "arch134-f1r1-d1s3-successor-release-installation-operator": "robinhood",
         "arch134-f1r1-d1s2-successor-installed-readiness": "robinhood",
         "arch134-f1r1-d1s1-successor-soak-source": "robinhood",
         "arch134-f1-five-session-soak": "robinhood",
@@ -520,8 +521,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 73
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 73
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 74
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 74
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")
@@ -642,7 +643,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         is None
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 73
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 74
     assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
         runner.ARCH134_ARMED_PAPER_NAME,
         runner.ARCH134_PRODUCTION_STRATEGY_NAME,
@@ -653,7 +654,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
     )
     assert (
         runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        == runner.ARCH134_D1S2_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        == runner.ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256
     )
     root = Path(runner.__file__).resolve().parents[1]
     for check in (

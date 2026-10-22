@@ -99,31 +99,31 @@ def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 197
+    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 198
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
     assert runner.FULL_FALLBACK_MS == 1000
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "ca26262ec4c94fd2ca6b2cb65b602be9cb39620f567d13d4288e3e19b4f5fbfe"
+        == "d6656504a4307b958821a6659226621e7e5137351ca948909864b428e8da03f6"
     )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
     assert all(lanes.values())
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (48, 50, 50, 49)
+    assert tuple(map(len, lanes.values())) == (49, 50, 50, 49)
     assert tuple(
         sum(weights[module] for module in lane) for lane in lanes.values()
-    ) == (287227, 287227, 287227, 287226)
+    ) == (287477, 287477, 287477, 287476)
     # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
     assert weights["tests/test_config.py"] == 1
     raw = dict(weights, **{"tests/test_config.py": 0})
     for count, expected in (
-        (2, (574453, 574453)),
-        (3, (382969, 382969, 382968)),
-        (4, (287227, 287227, 287226, 287226)),
+        (2, (574953, 574953)),
+        (3, (383302, 383302, 383302)),
+        (4, (287477, 287477, 287476, 287476)),
     ):
         totals = [0] * count
         for module in sorted(raw, key=lambda name: (-raw[name], name)):
@@ -293,7 +293,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
             checkpoint._arch132_r3i_current_inventory_test_pin(module, predecessor)
             == pin
         )
-        expected_current = checkpoint.ARCH134_D1S2_SUCCESSOR_PINS.get(module)
+        expected_current = checkpoint.ARCH134_D1S3_SHARED_SUCCESSOR_PINS.get(module)
+        if expected_current is None:
+            expected_current = checkpoint.ARCH134_D1S2_SUCCESSOR_PINS.get(module)
         if expected_current is None:
             expected_current = checkpoint._arch144_current_inventory_test_pin(
                 module, pin
@@ -340,7 +342,9 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
         assert checkpoint._arch144_current_inventory_test_pin(
             module, predecessor
         ) == checkpoint._arch134_f1_current_inventory_test_pin(module, pin)
-        expected_current = checkpoint.ARCH134_D1S2_SUCCESSOR_PINS.get(module)
+        expected_current = checkpoint.ARCH134_D1S3_SHARED_SUCCESSOR_PINS.get(module)
+        if expected_current is None:
+            expected_current = checkpoint.ARCH134_D1S2_SUCCESSOR_PINS.get(module)
         if expected_current is None:
             expected_current = checkpoint._arch134_f1_current_inventory_test_pin(
                 module, pin

@@ -633,8 +633,8 @@ def test_checkpoint_profile_and_exact_authority_consumers():
     assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS
     assert runner._arch134_d1s1_authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
-    assert len(certification.select_inventory(inventory, "full")) == 197
-    assert len(certification.select_inventory(inventory, "robinhood")) == 108
+    assert len(certification.select_inventory(inventory, "full")) == 198
+    assert len(certification.select_inventory(inventory, "robinhood")) == 109
     assert (
         "feature/robinhood-*"
         in (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
@@ -682,6 +682,20 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
     assert changed == (
         set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
         | set(runner.ARCH134_D1S2_PREDECESSOR_AST_PINS)
+        | (
+            set(runner.ARCH134_D1S3_RUNNER_AST_PINS)
+            - {
+                "_arch134_d1s3_preflight",
+                "_arch134_d1s3_execute",
+                "_arch134_d1s3_authority_check",
+                "_arch134_d1s2_current_source_pin",
+                "_arch134_d1s2_active_inventory",
+                "_arch134_d1s2_authority_check",
+                "_arch134_d1s2_source_pin",
+                "_arch134_d1s3_mutable_current_doc",
+                "_arch134_d1s3_shared_successor_pin",
+            }
+        )
     ) - {"_arch134_d1s1_authority_check"}
     for name, pin in runner.ARCH134_D1S1_PREDECESSOR_AST_PINS.items():
         if name in runner.ARCH134_D1S2_PREDECESSOR_AST_PINS:

@@ -16638,10 +16638,10 @@ ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
             "99c2495ffd8dd8c9eda790aa4d55dd2a80b62935"
         ),
         "tests/strategies/test_production_strategy_decision.py": (
-            "23ce3938aeee0c8e09a654da6443e7984a54341d"
+            "8628376b0695c96870415a6bf8590f5e0045a509"
         ),
         "tests/strategies/test_production_strategy_contract.py": (
-            "1928b939b758e8c9ef6140a0b7e2472a3b6ce001"
+            "da66c7168412d17c9bffbf697c99fa5b336d0d3f"
         ),
         "tests/review_paper/test_arch133_reprovision_recovery.py": (
             "dcdc69b2b456a57bd1cf37aa806305ce39a31340"
@@ -16650,19 +16650,25 @@ ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
             "a4fc95c3cb1c23df142ab1cf97a774606a8c0c48"
         ),
         "tests/review_paper/test_d1_session_authorization.py": (
-            "f11f95cdff94781b9c61adc1929b6f6b44fae44f"
+            "2a83e342da558b17b4c534320937b1d1f052ff30"
         ),
         "tests/review_paper/test_d1_session_execution.py": (
-            "53087c187feb41d960b4b9c589e72e9900978cc6"
+            "3b2746387eb6eecdf03f7544d0380e2b338a0b66"
+        ),
+        "tests/review_paper/test_pre_market_wake_overnight.py": (
+            "b22c8e6fd4e70396471ef51e8478819edc879686"
         ),
         "tests/review_paper/test_production_strategy_cycle.py": (
-            "cb8534d822bdd4a29ff2a2941d3f194aa3aee8b6"
+            "13bc1a9fb4b4c294dd70e9389a9883a3747f3a14"
         ),
         "tests/review_paper/test_supervised_maintenance_rebind.py": (
-            "afcb28ffd171d1348dea203abbc302efa103c419"
+            "5890fdc0eaa9834067050d48ef46773e65720f2c"
         ),
         "tests/review_paper/test_supervised_deployment_qualification.py": (
-            "561e66d5bfffee145ae1e90ea1cc73f0c5ab561b"
+            "fc4b56489f9b96ed51c1fdddace6d26a03ffd3a5"
+        ),
+        "tests/review_paper/test_five_session_soak.py": (
+            "7565284b81131e0b3d7ecbf6ca77dd2db9e82c5f"
         ),
         "tests/review_paper/test_supervised_release_installation.py": (
             "e8ef8996f93b62c60fd8bd4cc6e7305e8e42c451"
@@ -16685,7 +16691,7 @@ ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
     },
 )
 ARCH134_D1S2_SUCCESSOR_PINS_SHA256: Final = (
-    "48f2a9a3c6b1c28ec8699508625600cec6707f26c1b1b04979fb964b9205453b"
+    "9511fb8c16f09d0e6c21ca731f28867d1883c1f8b8b012c84c59e2591d19681f"
 )
 ARCH134_D1S2_SOURCE_PREDECESSOR_PINS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (

@@ -16611,6 +16611,9 @@ ARCH134_D1S2_PREDECESSOR_PINS_SHA256: Final = (
 ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
     ARCH134_D1S2_PREDECESSOR_PINS,
     **{
+        "scripts/run_test_certification.py": (
+            "9b5f2abb160631cda73327269c6a913a9de45069"
+        ),
         ".github/workflows/checkpoint-source-gates.yml": (
             "19f23864a4ee715f546defb75356697ae326da36"
         ),
@@ -16621,6 +16624,9 @@ ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
         ),
         "tests/runtime/checkpoint_runner/test_core.py": (
             "eea0e04aeac4de5afb5f21ea67ff9f6594ca211a"
+        ),
+        "tests/scripts/certification_runner/helpers.py": (
+            "380d146829e9fa2b17e5bf836dd9b7885079c30e"
         ),
         "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
             "de3ac1aab049fe1ab4a547db825d9b9a7cb750cc"
@@ -16667,13 +16673,19 @@ ARCH134_D1S2_SUCCESSOR_PINS: Final = dict(
         "tests/runtime/checkpoint_runner/test_ci.py": (
             "d1b80911f650a061a0e58b25b1ae0664d5faa9b0"
         ),
+        "tests/scripts/certification_runner/test_lanes.py": (
+            "5536c24e2fb2a2140a7c700f73b2213063aa1a0d"
+        ),
+        "tests/scripts/certification_runner/test_profiles.py": (
+            "df25ebd67c4e24a1d171c476bca2b2954dfaad90"
+        ),
         "tests/runtime/test_personal_desktop_d10_launch_guard.py": (
             "0be94cd25c3a912f2e9cf63720966815b3bb80fb"
         ),
     },
 )
 ARCH134_D1S2_SUCCESSOR_PINS_SHA256: Final = (
-    "7da2582d1a7e76f75b56675048f017a1af0828642a4ad66a1c13a5c7d15dab88"
+    "48f2a9a3c6b1c28ec8699508625600cec6707f26c1b1b04979fb964b9205453b"
 )
 ARCH134_D1S2_SOURCE_PREDECESSOR_PINS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (

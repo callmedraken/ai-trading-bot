@@ -42,6 +42,15 @@ source remain unchanged. Production adapters/launcher remain absent.
 D1S1 is pending ChatGPT exact-source acceptance; do not claim SOURCE ACCEPTED.
 No duplicate local ROBINHOOD or FULL run is required for its mapped CI profile.
 
+D1S1 first publication `0edaf4d10e782ba6c6b820310710c5ec4a024482` /
+`797b5869db8789816ebfc17d5d8cd4d87700f925`, CI 39751885721 / attempt 1,
+failed only a stale F1 module-count assertion plus the 300.913-second canonical
+hygiene gate. Source-static and active tests passed; all failure evidence is
+preserved. Corrective D1S1-C1 fixes that assertion and reduces disposable test
+fixture parsing with exact AST/tuple preservation. Coverage, production authority,
+lane policy and the 300-second limit remain unchanged. Source acceptance remains
+pending ChatGPT review of the terminal corrective result.
+
 ## Protected boundary and immediate next step
 
 Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. Production/F1/C2

@@ -722,7 +722,16 @@ def _copy_local_authority(tmp_path, pins):
     ):
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes((repo / relative).read_bytes())
+        if relative == "scripts/checkpoint_runner.py":
+            target.write_text(
+                _runner_contract_source(
+                    (repo / relative).read_text(encoding="utf-8"),
+                    include_history=True,
+                ),
+                encoding="utf-8",
+            )
+        else:
+            target.write_bytes((repo / relative).read_bytes())
     return tmp_path
 
 
@@ -764,16 +773,19 @@ def _copy_mutation_authority(
     return _copy_local_authority(tmp_path, paths)
 
 
-@lru_cache(maxsize=1)
-def _runner_contract_source(source: str) -> str:
+@lru_cache(maxsize=2)
+def _runner_contract_source(source: str, *, include_history: bool = False) -> str:
     """Keep real AST contract material; this fixture is never imported/executed.
 
     Authorities still parse each mutated copy normally. Only extraction of the
-    identical accepted source is cached, keyed by its complete text. No parsed
+    identical accepted source is cached, keyed by complete text and selection. No parsed
     authority result or mutated fixture is cached, and runner.ast is untouched.
     """
     tree = ast.parse(source)
     declarations = ("ACTIVE_CI_CHECKPOINTS", "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH")
+    if include_history:
+        # H-P matrices preserve the second historical tuple mutation anchor.
+        declarations += ("ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS",)
     for name in declarations:
         matches = [
             node

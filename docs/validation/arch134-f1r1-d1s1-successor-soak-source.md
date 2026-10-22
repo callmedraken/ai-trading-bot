@@ -107,3 +107,36 @@ Next owner: ChatGPT exact GitHub source review and CI evidence acceptance.
 Only if accepted, separately review installed-release/readiness admission and
 then a bounded effect preflight. Live remains NO-GO; Architecture 145 is separate
 and offline. No source result grants successor-soak execution.
+
+
+## Preserved first publication and corrective D1S1-C1
+
+First source HEAD 0edaf4d10e782ba6c6b820310710c5ec4a024482, tree
+797b5869db8789816ebfc17d5d8cd4d87700f925, CI 39751885721 / attempt 1
+FAILED. Source-static and active tests passed. Canonical ROBINHOOD recorded
+10,610 passed / 6 skipped / 1 failed; the sole failure was the historical F1
+current-inventory assertion expecting 106 rather than 107 modules. Canonical
+wall time 300.913 s also exceeded the unchanged 300-second hygiene limit.
+The failed commit, run, JUnit and timing artifacts are preserved without rerun.
+
+Measured lanes took 298.303 / 298.320 s, so moving modules would not resolve
+that balanced bottleneck. H-P checkpoint mutation tests repeatedly parsed full
+runner copies (hot module sums: H-K 38.756 s, L-M 83.948 s). Corrective C1 uses
+the existing cached exact-source AST extraction for those disposable test
+copies, retaining the real registration function and current/historical tuple
+anchors. Native/domain/runtime checkers, source ASTs, mutations, complete profile
+coverage, lane ownership/placement and the 300-second limit remain unchanged.
+A focused AST-equivalence test and retained H-P mutation/complete-chain tests
+verify the compact fixture. No production code or authority primitive changes.
+
+C1 also corrects the one F1 current-inventory assertion and explicitly extends
+the unaccepted D1S1 successor layer for that test consumer. Accepted predecessor
+maps/digests remain unchanged. It is a separate normal corrective commit/push;
+no amend, squash, force push or unchanged CI rerun occurs.
+
+
+C1 focused verification passed 485 affected cases plus eight existing direct
+fixture-extraction cases. The same H-K/L-M modules' summed local testcase times
+fell from 77.314/146.498 s to 26.776/65.413 s. This is focused hygiene evidence;
+the replacement mapped CI run owns canonical ROBINHOOD and its unchanged limit.
+No local canonical profile was repeated.

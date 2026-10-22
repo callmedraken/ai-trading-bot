@@ -15972,6 +15972,7 @@ ARCH134_D1S1_SHARED_PATHS: Final = (
     "tests/review_paper/test_arch133_windows_rename_qualification.py",
     "tests/review_paper/test_d1_session_authorization.py",
     "tests/review_paper/test_d1_session_execution.py",
+    "tests/review_paper/test_five_session_soak.py",
     "tests/review_paper/test_pre_market_wake_overnight.py",
     "tests/review_paper/test_production_strategy_cycle.py",
     "tests/review_paper/test_supervised_deployment_qualification.py",
@@ -16057,19 +16058,22 @@ ARCH134_D1S1_PREDECESSOR_PINS: Final = {
     "tests/strategies/test_production_strategy_decision.py": (
         "1b508a664f7e247276edd0538312bd73c6d99ae6"
     ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "9be221a23fe5ed50ae0bdb3316d488686dff6023"
+    ),
 }
 ARCH134_D1S1_PREDECESSOR_PINS_SHA256: Final = (
-    "80a85f56ac65638922757972a9bed7cb253f641417d7f57d3b6a3737e17a1028"
+    "fe37fa5dde15617ca7814b2dc28b9d8c4b0bdb801eff860cac48c35b11d21d62"
 )
 ARCH134_D1S1_SUCCESSOR_PINS: Final = {
-    "docs/PROJECT_STATUS.md": ("30209a678874b7d58738fe0197781ee0b763759b"),
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("53ca4d10291639f4727ea0fbbf559dc76b53e71d"),
+    "docs/PROJECT_STATUS.md": ("6a2e4da57b629d2571a13d9243b9165cced273a9"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("4755df6073443ebc4aa7827b53ab5d1223b82318"),
     "scripts/run_test_certification.py": ("cffca91b13478906f182ebfdb916648bfd6343e2"),
     "tests/runtime/checkpoint_runner/helpers.py": (
-        "7b47c13feba6ab998ced4af91a0b11779ba8a9a7"
+        "f892a765183e0c06320251c03810f8cd0233e2ec"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
-        "f9030aa2b65cffbc458b956928943d3d11f54310"
+        "45fc0f0da372d5785c321ec29e4b7bb4777777b1"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "47ddc27dc2390ce7d2cf920c8bd995bc51868aac"
@@ -16131,9 +16135,12 @@ ARCH134_D1S1_SUCCESSOR_PINS: Final = {
     "tests/strategies/test_production_strategy_decision.py": (
         "25c34813737869d2b65154b7d1cbf60922c04d8f"
     ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "ce80ff4db9de424cad6643713c3fafd10aa1224e"
+    ),
 }
 ARCH134_D1S1_SUCCESSOR_PINS_SHA256: Final = (
-    "345946aee85714d5d898d596dc98fc0eec8fa60106db81c4339878d2b05f924d"
+    "8d343d995082ed0589ed3cae52704275a15480a6f574e16ca1b9710537f47ac4"
 )
 ARCH134_D1S1_PREDECESSOR_AST_PINS: Final = {
     "_arch134_f1r1_b_authority_check": (
@@ -16201,7 +16208,7 @@ ARCH134_D1S1_SOURCE_PINS: Final = {
         "fd142855144c57224e4639d90623493197139336"
     ),
     "docs/validation/arch134-f1r1-d1s1-successor-soak-source.md": (
-        "b655dd27a2a538f0e08fbe73095aac76c9634282"
+        "c5c1bc38db3879ac24d6921289ef56a5f093e975"
     ),
     "scripts/arch134_f1r1_qualification.py": (
         "8e0419670d1109bcf7688195aa67a155afb64218"

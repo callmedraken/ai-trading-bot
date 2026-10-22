@@ -1774,3 +1774,49 @@ def test_arch134_f1r1_b_overlay_rejects_wrong_predecessor_or_shape(
     monkeypatch.setattr(runner, after_name, after)
     with pytest.raises(ValueError, match="134-F1R1-B"):
         resolver(path, before[path])
+
+
+def test_h_p_compact_fixtures_preserve_exact_source_ast_and_tuple_anchors(tmp_path):
+    from .helpers import _copy_local_authority
+
+    root = Path(runner.__file__).resolve().parents[1]
+    original = (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    fixture_root = _copy_local_authority(tmp_path, {})
+    compact = (fixture_root / "scripts/checkpoint_runner.py").read_text(
+        encoding="utf-8"
+    )
+    old_tree, new_tree = ast.parse(original), ast.parse(compact)
+    expected = {
+        "ACTIVE_CI_CHECKPOINTS",
+        "ARCH131_SIDE_FOUNDATION_REMOTE_BRANCH",
+        "ARCH145A_PREDECESSOR_ACTIVE_CI_CHECKPOINTS",
+    }
+    for name in expected:
+        before = next(
+            n
+            for n in old_tree.body
+            if isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and n.target.id == name
+        )
+        after = next(
+            n
+            for n in new_tree.body
+            if isinstance(n, ast.AnnAssign)
+            and isinstance(n.target, ast.Name)
+            and n.target.id == name
+        )
+        assert ast.dump(before) == ast.dump(after)
+    before = next(
+        n
+        for n in old_tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "_checkpoint_specs"
+    )
+    after = next(
+        n
+        for n in new_tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "_checkpoint_specs"
+    )
+    assert ast.dump(before) == ast.dump(after)
+    assert compact.count('    "arch133-robinhood-unattended-host-publication",\n') == 2
+    assert len(compact) < len(original) // 3

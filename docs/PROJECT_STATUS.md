@@ -104,6 +104,25 @@ successor root remains absent, and the original F1 and C2 evidence remains
 untouched. Provider, credential, paper, broker, D1, D2, and live effects
 remain unauthorized; live remains NO-GO.
 
+## D1S3-R2 recovery state
+
+D1S3-R1 remains preserved as terminal-red CI evidence. R1 restored the
+predecessor-authority ordering and its reviewed Robinhood lane hygiene was
+successful: the two lanes completed in 278.765 and 278.779 seconds, with a
+280.368-second wall below the unchanged 300-second ceiling. The remaining R1
+failure was the accepted D1S2 source-overlay rollback test: setting
+`ARCH134_D1S2_SOURCE_PINS` to `None` incorrectly raised `D1S2 source overlay
+drift` instead of restoring the validated D1S1 predecessor result.
+
+D1S3-R2 is the explicitly ChatGPT-reviewed source-only recovery. It restores
+the accepted `None` rollback sentinel only after exact D1S2 predecessor-map and
+predecessor-blob validation, while retaining R1's fail-closed behavior for
+malformed non-`None` overlays and all D1S3 predecessor-authority checks. D1S3
+remains NOT SOURCE ACCEPTED pending terminal CI and ChatGPT exact-source review.
+No installation or successor-root provisioning has occurred; all protected
+effects remain zero, and provider, paper, broker, D1, D2, and live authority
+remain unauthorized.
+
 ## Preserved operational boundary
 
 Original F1 remains `FINAL / INDETERMINATE / CONSUMED`; its D1R7/D1R8 attempts

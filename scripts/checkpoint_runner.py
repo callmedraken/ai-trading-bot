@@ -17005,7 +17005,7 @@ ARCH134_D1S3_SOURCE_PINS: Final = {
         "e62f3deec6b7f04f511ae60fc22664b485ecfdac"
     ),
     "docs/validation/arch134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "d65a5a21a9d1bf382b776d099b3f2b2852f84f0a"
+        "6db7311c3a2f521896c9053d41ae3712a8c0d1b6"
     ),
     "src/trading_bot/supervised_release/successor_installation_operator.py": (
         "db952ba9b1ebb4dcb8d5fe7c0f43c10f3173b843"
@@ -17061,7 +17061,7 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "d77e8736de8d5601ae301b7cdeb655389ecf7716fd27b02772fdc7a32ec086a5"
     ),
     "_arch134_d1s2_source_pin": (
-        "b62457c22fa860a2a08297092d9e92bc74f9ab49e15b5eada8093767b1566e72"
+        "73f85db77e98df8f4e9721dc9cabc93a743a4cfd51e5ca95a316cbe87cdcaa99"
     ),
     "_arch134_f1_authority_check": (
         "29e640d07a74074c2391b685eba5faf37325cf73ce5f24fcd163322ebe51d3cf"
@@ -17089,10 +17089,10 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
     "ea1d2a1965312355e233d11acca0ba64b2aa7a7e5e13c423b18163ef5972bfa7"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "c311516c6f4e200b8895fa36dd137253e92d3655240f0a0601744f11f580be08"
+    "71ce4ac451c69b5b1fa2aaf5fa1905569425c886af3eb844d87bdd69f6c7229f"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
-    "b699c746784b949a8ccb40cc56db59a5c7c9d87cab8f2152e5eeeb79875a2e3b"
+    "3a96dc8344c6e6f1088784ae013db248aea042c6be0ce4a30e674601e9f2dc32"
 )
 ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
     "eb795b69055a41ad13b0595e47721b57aed2337d12bc15a187ed0c48748768dd"
@@ -17149,7 +17149,6 @@ def _arch134_d1s2_source_pin(relative: str, predecessor: str) -> str:
     )
     if (
         type(before) is not dict
-        or type(after) is not dict
         or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
         != ARCH134_D1S2_SOURCE_PREDECESSOR_PINS_SHA256
     ):
@@ -17158,7 +17157,9 @@ def _arch134_d1s2_source_pin(relative: str, predecessor: str) -> str:
         return predecessor
     if predecessor != before[relative]:
         raise ValueError("D1S2 wrong source predecessor blob")
-    if relative not in after:
+    if after is None:
+        return predecessor
+    if type(after) is not dict or relative not in after:
         raise ValueError("D1S2 source overlay drift")
     successor_pin = _arch134_d1s3_shared_successor_pin(relative)
     if successor_pin is not None:

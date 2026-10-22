@@ -59,6 +59,28 @@ D1S2. No installation has run, the successor root remains absent, original F1
 and C2 evidence is untouched, and provider/paper/broker/live effects remain
 unauthorized with live NO-GO.
 
+## D1S3-R1 terminal evidence and D1S3-R2 rationale
+
+D1S3-R1 was published at
+`c4d315e8eb2328594febb63e0e0c0c75c5f228ad` with CI run `39866210805`, attempt
+1. Source-static passed, but active tests failed at
+`tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py::test_removing_d1s2_overlay_restores_d1s1_resolution`
+because `ARCH134_D1S2_SOURCE_PINS = None` raised `ValueError: D1S2 source
+overlay drift`. Canonical ROBINHOOD retained the reviewed two-lane shape at
+55/54 modules, with elapsed times 278.765/278.779 seconds and a 280.368-second
+wall; it recorded 10,669 cases, 10,662 passed, 6 skipped, 1 failed, and 0
+errors. The hygiene ceiling passed, but the run was terminal red and remains
+preserved.
+
+D1S3-R2 restores the accepted D1S2 rollback sentinel. The source resolver now
+validates the exact predecessor dictionary and predecessor blob first, returns
+the predecessor when the successor overlay is exactly `None`, and only then
+requires a non-`None` successor overlay to be an exact dictionary before
+applying the terminal D1S3 successor pin. No accepted D1S2 test is weakened,
+and the R1 predecessor-authority fix, lane pin/topology, and installation
+operator remain unchanged. R2 is source-only; D1S3 remains NOT SOURCE ACCEPTED
+pending terminal CI and ChatGPT exact-source review.
+
 No production release, successor root, credential, provider, paper, broker,
 D1, D2, scheduler, service, startup, or live effect is authorized or created.
 Original F1 remains FINAL / INDETERMINATE / CONSUMED and C2 remains consumed

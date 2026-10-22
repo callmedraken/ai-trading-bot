@@ -102,6 +102,24 @@ successor root remains absent, and original F1/C2 evidence remains untouched.
 Provider, credential, paper, broker, D1, D2, and live effects remain
 unauthorized; live remains NO-GO.
 
+## D1S3-R2 recovery handoff
+
+D1S3-R1 remains preserved as terminal-red CI evidence. R1 fixed the
+predecessor-authority short circuit, and its reviewed Robinhood lane hygiene
+completed in 278.765 and 278.779 seconds with a 280.368-second wall, below the
+unchanged 300-second ceiling. The remaining R1 failure was the accepted D1S2
+rollback-sentinel regression: `ARCH134_D1S2_SOURCE_PINS = None` raised
+`D1S2 source overlay drift` instead of restoring the already-validated D1S1
+predecessor result.
+
+D1S3-R2 is the explicitly ChatGPT-reviewed source-only recovery. It restores
+the accepted `None` sentinel after exact D1S2 predecessor validation and keeps
+R1's predecessor-authority fix, lane pin/topology, and installation semantics
+unchanged. D1S3 remains NOT SOURCE ACCEPTED pending terminal CI and ChatGPT
+review. Develop remains accepted D1S2; no installation or successor-root
+provisioning occurred; all protected effects remain zero; and provider, paper,
+broker, D1, D2, and live authority remain unauthorized.
+
 ## Review and next step
 
 The D1S3 runner is mapped to ROBINHOOD. Its successor overlay preserves the

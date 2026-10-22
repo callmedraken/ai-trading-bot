@@ -50,6 +50,13 @@ ROBINHOOD_F1R1_B_LANE_PINS = {
     "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": 0
 }
 
+# D1S3-R1: preserved C2 canonical ROBINHOOD timing measured 237.839/287.630
+# summed testcase seconds in robinhood-1/robinhood-2.  Move only the reviewed
+# 26.729-second D1 session execution module to lane 0, giving an estimated
+# 264.568/260.901 split while retaining the two-lane topology and 300-second
+# hygiene ceiling.
+ROBINHOOD_D1S3_LANE_PINS = {"tests/review_paper/test_d1_session_execution.py": 0}
+
 # F1 timing-aware FULL inventory metadata; F1 certifies ROBINHOOD.
 # Existing timings retain
 # the accepted predecessor measurements; the new pure eligibility test uses its
@@ -836,10 +843,15 @@ def build_lanes(
     elif profile == "robinhood":
         first, second = apply_lane_pins(
             apply_lane_pins(
-                apply_lane_pins(balance_broad(root, inventory), ROBINHOOD_LANE_PINS),
-                ROBINHOOD_F1_LANE_PINS,
+                apply_lane_pins(
+                    apply_lane_pins(
+                        balance_broad(root, inventory), ROBINHOOD_LANE_PINS
+                    ),
+                    ROBINHOOD_F1_LANE_PINS,
+                ),
+                ROBINHOOD_F1R1_B_LANE_PINS,
             ),
-            ROBINHOOD_F1R1_B_LANE_PINS,
+            ROBINHOOD_D1S3_LANE_PINS,
         )
         lanes = {"robinhood-1": first, "robinhood-2": second}
     else:

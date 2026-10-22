@@ -84,6 +84,24 @@ authority under D1S3; source, test, workflow, AST, inventory, architecture,
 and validation paths remain exact-pinned. Removing the D1S3 overlay restores
 D1S2 exact-pin behavior.
 
+## D1S3-R1 recovery handoff
+
+D1S3 remains not source accepted. The initial, C1, and C2 publication attempts
+are preserved. C2 exposed a real predecessor-authority short circuit: a D1S3
+successor blob could be returned before the accepted predecessor lineage was
+validated. C2 also exposed Robinhood lane hygiene after its inventory-test
+edits reshuffled the deterministic byte-size balance. This D1S3-R1 change is
+the explicitly ChatGPT-reviewed recovery: predecessor validation is restored
+before terminal successor substitution, and the reviewed D1 session-execution
+pin is applied after the accepted R3H/F1/F1R1-B layers.
+
+Develop remains accepted D1S2 at HEAD
+`2b697b79e6bdbc964d2b0414ced057628e6c2da7`, tree
+`e510210070874ade43a240457645939650e457d8`. No installation has run, the
+successor root remains absent, and original F1/C2 evidence remains untouched.
+Provider, credential, paper, broker, D1, D2, and live effects remain
+unauthorized; live remains NO-GO.
+
 ## Review and next step
 
 The D1S3 runner is mapped to ROBINHOOD. Its successor overlay preserves the

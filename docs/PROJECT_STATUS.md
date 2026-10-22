@@ -88,6 +88,22 @@ The Architecture-133 launcher remains unchanged and inert/fail-closed after
 runtime-admission import. D1S3 does not wire provider or paper behavior into
 it and creates no scheduler, service, boot, logon, or resume behavior.
 
+## D1S3-R1 recovery state
+
+D1S3 remains not source accepted. The initial D1S3 publication, C1, and C2
+attempts remain preserved; C2 exposed both a predecessor-authority short
+circuit and a Robinhood lane-hygiene issue. D1S3-R1 is this explicitly
+ChatGPT-reviewed recovery checkpoint. It restores validation of the accepted
+predecessor overlays before any terminal D1S3 successor substitution and adds
+only the reviewed D1 session-execution Robinhood lane pin.
+
+Current `develop` remains accepted D1S2 at HEAD
+`2b697b79e6bdbc964d2b0414ced057628e6c2da7`, tree
+`e510210070874ade43a240457645939650e457d8`. No installation has run, the
+successor root remains absent, and the original F1 and C2 evidence remains
+untouched. Provider, credential, paper, broker, D1, D2, and live effects
+remain unauthorized; live remains NO-GO.
+
 ## Preserved operational boundary
 
 Original F1 remains `FINAL / INDETERMINATE / CONSUMED`; its D1R7/D1R8 attempts

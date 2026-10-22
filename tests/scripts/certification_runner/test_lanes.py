@@ -419,7 +419,8 @@ def test_f1r1_b_pin_is_exact_and_applied_after_r3h_and_f1():
         ),
         runner.ROBINHOOD_F1_LANE_PINS,
     )
-    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_F1R1_B_LANE_PINS)
+    baseline = runner.apply_lane_pins(baseline, runner.ROBINHOOD_F1R1_B_LANE_PINS)
+    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_D1S3_LANE_PINS)
     lanes = runner.build_lanes(root, selected, "robinhood")
     assert tuple(lanes.values()) == expected
     runner.validate_partitions(selected, tuple(lanes.values()))
@@ -428,8 +429,52 @@ def test_f1r1_b_pin_is_exact_and_applied_after_r3h_and_f1():
         "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py"
         in lanes["robinhood-1"]
     )
+    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]
     with pytest.raises(runner.CertificationError, match="lane 0 or 1"):
         runner.apply_lane_pins(
             (("a.py",), ("b.py",)),
             {"a.py": 2},
         )
+
+
+def test_d1s3_pin_is_exact_last_and_full_topology_is_unchanged(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    assert runner.ROBINHOOD_D1S3_LANE_PINS == {
+        "tests/review_paper/test_d1_session_execution.py": 0
+    }
+    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
+    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(
+        runner.ROBINHOOD_F1_LANE_PINS
+    )
+    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(
+        runner.ROBINHOOD_F1R1_B_LANE_PINS
+    )
+    baseline = runner.apply_lane_pins(
+        runner.apply_lane_pins(
+            runner.apply_lane_pins(
+                runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
+            ),
+            runner.ROBINHOOD_F1_LANE_PINS,
+        ),
+        runner.ROBINHOOD_F1R1_B_LANE_PINS,
+    )
+    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_D1S3_LANE_PINS)
+    lanes = runner.build_lanes(root, selected, "robinhood")
+    assert tuple(lanes.values()) == expected
+    assert tuple(lanes) == ("robinhood-1", "robinhood-2")
+    assert all(lanes.values())
+    runner.validate_partitions(selected, tuple(lanes.values()))
+    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]
+
+    full = runner.select_inventory(runner.discover_inventory(root), "full")
+    full_lanes = runner.build_lanes(root, full, "full")
+    assert tuple(full_lanes.values()) == runner.balance_full(full)
+
+    monkeypatch.setattr(runner, "ROBINHOOD_D1S3_LANE_PINS", {})
+    with pytest.raises(AssertionError):
+        assert runner.ROBINHOOD_D1S3_LANE_PINS == {
+            "tests/review_paper/test_d1_session_execution.py": 0
+        }

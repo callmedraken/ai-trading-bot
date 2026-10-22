@@ -15426,11 +15426,13 @@ def _arch144c_current_inventory_test_pin(relative: str, predecessor: str) -> str
     if relative in after:
         if predecessor != before[relative]:
             raise ValueError("144-C current-inventory predecessor drift")
-        successor = _arch134_d1s3_shared_successor_pin(relative)
-        if successor is not None:
-            return successor
-        return _arch145a_current_inventory_test_pin(relative, after[relative])
-    return _arch145a_current_inventory_test_pin(relative, predecessor)
+        current = _arch145a_current_inventory_test_pin(relative, after[relative])
+    else:
+        current = _arch145a_current_inventory_test_pin(relative, predecessor)
+    successor = _arch134_d1s3_shared_successor_pin(relative)
+    if successor is not None:
+        return successor
+    return current
 
 
 def _arch144c_current_source_pin(relative: str, predecessor: str) -> str:
@@ -15448,9 +15450,6 @@ def _arch144c_current_source_pin(relative: str, predecessor: str) -> str:
         raise ValueError("144-C source metadata override drift")
     if _arch134_d1s3_mutable_current_doc(relative):
         return predecessor
-    successor_pin = _arch134_d1s3_shared_successor_pin(relative)
-    if successor_pin is not None:
-        return successor_pin
     if any(ARCH134_F1_SOURCE_PINS.get(p) != v for p, v in before.items()):
         raise ValueError("144-C source metadata predecessor drift")
     if relative.startswith("tests/"):
@@ -15459,7 +15458,11 @@ def _arch144c_current_source_pin(relative: str, predecessor: str) -> str:
         if predecessor != before[relative]:
             raise ValueError("144-C wrong source metadata predecessor")
         predecessor = after[relative]
-    return _arch145a_current_source_pin(relative, predecessor)
+    current = _arch145a_current_source_pin(relative, predecessor)
+    successor_pin = _arch134_d1s3_shared_successor_pin(relative)
+    if successor_pin is not None:
+        return successor_pin
+    return current
 
 
 def _arch144c_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -15990,27 +15993,25 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH134_F1R1_C1_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            expected = _arch134_d1s3_shared_successor_pin(relative)
-            if expected is None:
-                expected = _arch134_d1s1_current_source_pin(relative, pin)
+            expected = _arch134_d1s1_current_source_pin(relative, pin)
+            successor_pin = _arch134_d1s3_shared_successor_pin(relative)
+            if successor_pin is not None:
+                expected = successor_pin
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("134-F1R1-C1 source drift: " + relative)
         for relative, before in ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            successor_pin = _arch134_d1s3_shared_successor_pin(relative)
-            if successor_pin is not None:
-                if _git_blob_sha1(repo_root / relative) != successor_pin:
-                    failures.append("134-F1R1-C1 shared successor drift: " + relative)
-                continue
+            current = _arch134_f1r1_c1_current_source_pin(relative, before)
             if relative in ARCH134_D1S2_PREDECESSOR_PINS:
                 expected = _arch134_d1s2_current_source_pin(
                     relative, ARCH134_D1S2_PREDECESSOR_PINS[relative]
                 )
             else:
-                expected = _arch134_d1s1_current_source_pin(
-                    relative, _arch134_f1r1_c1_current_source_pin(relative, before)
-                )
+                expected = _arch134_d1s1_current_source_pin(relative, current)
+            successor_pin = _arch134_d1s3_shared_successor_pin(relative)
+            if successor_pin is not None:
+                expected = successor_pin
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("134-F1R1-C1 shared successor drift: " + relative)
         tree = ast.parse(
@@ -16913,7 +16914,7 @@ ARCH134_D1S3_MUTABLE_CURRENT_DOCS: Final = (
 # Exact D1S3 successor blobs.  The predecessor and D1S2 dictionaries above are
 # never rewritten.
 ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
-    "scripts/run_test_certification.py": ("0b6564eace28be500cc8220b97ee1fb3147d8f24"),
+    "scripts/run_test_certification.py": ("1df5ae3743df66568eaebc3962ae7fd74c660e80"),
     "tests/runtime/checkpoint_runner/helpers.py": (
         "96839d53f6d69fa89a54778ed1e6864908c754ab"
     ),
@@ -16927,10 +16928,10 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
         "8936dedd1ba334558aff97724db8221a0fe3480e"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
-        "e926c64da07c29576ab625ae1e135f25fb0ce297"
+        "78c9a6f80bc2c1ea1c5c8ee097bcb28913f47327"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
-        "9422e9551dc46a1e2971a1839561ff9b262f481d"
+        "d8be16e5a25d13d990eb75b31d4be240c8e3ee75"
     ),
     "tests/strategies/test_production_strategy_contract.py": (
         "0a54a8989cd78a0a1032072ac80dadab8d2226dc"
@@ -17004,13 +17005,13 @@ ARCH134_D1S3_SOURCE_PINS: Final = {
         "e62f3deec6b7f04f511ae60fc22664b485ecfdac"
     ),
     "docs/validation/arch134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "92919852cf14421509870d3bc7fc4bb983135bc7"
+        "d65a5a21a9d1bf382b776d099b3f2b2852f84f0a"
     ),
     "src/trading_bot/supervised_release/successor_installation_operator.py": (
         "db952ba9b1ebb4dcb8d5fe7c0f43c10f3173b843"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
-        "c2d6d758a22e16f1cad9b0241b46490ac1b0d945"
+        "75581a8906f2a4da96b7d9f9a79a497f752801f8"
     ),
 }
 ARCH134_D1S3_RUNNER_AST_PINS: Final = {
@@ -17033,7 +17034,7 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "8e20d7e4aa7ca0cab158dce96ac18fb3ff2c3f74587f7eb41734882338dda1e0"
     ),
     "_arch134_f1r1_c1_authority_check": (
-        "82a1db892fa1ff7e47a292d6dc7cffe96cf537a643ee7288e422de89cc2b2123"
+        "74fbcf49b35823b7231a6fe13df844a7b52f8dd4dd00c790f2b27d04557f29c8"
     ),
     "_arch134_d1s2_current_source_pin": (
         "7f0c038977c1d06a6f37e0e8854964b12d4406e0204ab0dc543526d0acfc3063"
@@ -17051,7 +17052,7 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "a7e7e7693b67318410c1231624c7bf8396f1035035a6085ed5b8e1b67114682a"
     ),
     "_arch134_d1s3_authority_check": (
-        "c44f9326ae887f5f41f339afec77ecd0c311aaa0164dc7de042a7012e448d647"
+        "ee8eb93c696c5f549ef893dacc1eee897f2c33953e66575e2ef0d6fdf2c11a81"
     ),
     "_arch145a_predecessor_active_checkpoint_inventory": (
         "16fc9b764139e5d459f52ecec26ca4fd0b68e574252f5494986025965c1e71e6"
@@ -17060,7 +17061,7 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "d77e8736de8d5601ae301b7cdeb655389ecf7716fd27b02772fdc7a32ec086a5"
     ),
     "_arch134_d1s2_source_pin": (
-        "611e15fb1ca4401832fa5a85e2652c2109fc6e81f31d86e5afbeee82e6d184f2"
+        "b62457c22fa860a2a08297092d9e92bc74f9ab49e15b5eada8093767b1566e72"
     ),
     "_arch134_f1_authority_check": (
         "29e640d07a74074c2391b685eba5faf37325cf73ce5f24fcd163322ebe51d3cf"
@@ -17069,10 +17070,10 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "bddf96109154f8dffef8251d7566104b7ef4ecd4567220269264f677c9c5f959"
     ),
     "_arch144c_current_inventory_test_pin": (
-        "33b3298f189649956092a0e2b653dda7a616641638d329310af479aea16f2535"
+        "2890bcca035a684f2b1c70101d8bb08198f0868f5fce8301ef1b085b4ac5ffe3"
     ),
     "_arch144c_current_source_pin": (
-        "305423cb2fd8aef0f7b201ad8f8a16532408959bd04b786df2408658a161267e"
+        "cda130c8f0caa57c19b8c24e7455c62e7722f284fe1cb30b02e15389eeeb39fb"
     ),
     "_arch144c_authority_check": (
         "570dbac4dbec51a34cc1cffc3898a1da506d9f6611dd309106812f0ca9c7be4f"
@@ -17085,13 +17086,13 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
     ),
 }
 ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "c32ff9401ef2cac5257b0a962d6b35d81826aa19e6e67daedcbbc92ad08b3b42"
+    "ea1d2a1965312355e233d11acca0ba64b2aa7a7e5e13c423b18163ef5972bfa7"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "0460e09e0d5537888e81becf2557df1ca10b54fb6deea2bf5d9eb1ee16acbb19"
+    "c311516c6f4e200b8895fa36dd137253e92d3655240f0a0601744f11f580be08"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
-    "5d3ad3a844576f8ed54b94d40243fc478a888a950b68b2694046f2cd9b99d206"
+    "b699c746784b949a8ccb40cc56db59a5c7c9d87cab8f2152e5eeeb79875a2e3b"
 )
 ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
     "eb795b69055a41ad13b0595e47721b57aed2337d12bc15a187ed0c48748768dd"
@@ -17146,16 +17147,17 @@ def _arch134_d1s2_source_pin(relative: str, predecessor: str) -> str:
         ARCH134_D1S2_SOURCE_PREDECESSOR_PINS,
         ARCH134_D1S2_SOURCE_PINS,
     )
-    if relative not in before:
-        return predecessor
-    if hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest() != (
-        ARCH134_D1S2_SOURCE_PREDECESSOR_PINS_SHA256
+    if (
+        type(before) is not dict
+        or type(after) is not dict
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != ARCH134_D1S2_SOURCE_PREDECESSOR_PINS_SHA256
     ):
         raise ValueError("D1S2 source overlay drift")
+    if relative not in before:
+        return predecessor
     if predecessor != before[relative]:
         raise ValueError("D1S2 wrong source predecessor blob")
-    if after is None:
-        return predecessor
     if relative not in after:
         raise ValueError("D1S2 source overlay drift")
     successor_pin = _arch134_d1s3_shared_successor_pin(relative)
@@ -17372,6 +17374,64 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
             != ARCH134_D1S2_SUCCESSOR_PINS_SHA256
         ):
             failures.append("D1S2 accepted pin dictionaries changed")
+        predecessor_probes = (
+            (
+                ARCH134_D1S2_PREDECESSOR_PINS,
+                _arch134_d1s2_current_source_pin,
+                "tests/runtime/checkpoint_runner/test_core.py",
+            ),
+            (
+                ARCH134_D1S2_SOURCE_PREDECESSOR_PINS,
+                _arch134_d1s2_source_pin,
+                "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
+            ),
+            (
+                ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS,
+                _arch134_f1r1_c1_current_source_pin,
+                "scripts/run_test_certification.py",
+            ),
+            (
+                ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS,
+                _arch134_f1r1_c1_current_inventory_test_pin,
+                "tests/runtime/checkpoint_runner/test_core.py",
+            ),
+            (
+                ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS,
+                _arch134_f1r1_b_current_source_pin,
+                "scripts/run_test_certification.py",
+            ),
+            (
+                ARCH134_F1R1_B_PREDECESSOR_TEST_PINS,
+                _arch134_f1r1_b_current_inventory_test_pin,
+                "tests/runtime/checkpoint_runner/test_core.py",
+            ),
+            (
+                ARCH144C_PREDECESSOR_SOURCE_PINS,
+                _arch144c_current_source_pin,
+                "scripts/run_test_certification.py",
+            ),
+            (
+                ARCH144C_PREDECESSOR_TEST_PINS,
+                _arch144c_current_inventory_test_pin,
+                "tests/runtime/checkpoint_runner/test_core.py",
+            ),
+            (
+                ARCH145A_PREDECESSOR_SOURCE_PINS,
+                _arch145a_current_source_pin,
+                "scripts/run_test_certification.py",
+            ),
+            (
+                ARCH145A_PREDECESSOR_TEST_PINS,
+                _arch145a_current_inventory_test_pin,
+                "tests/runtime/checkpoint_runner/test_core.py",
+            ),
+        )
+        for pins, resolver, probe in predecessor_probes:
+            if pins:
+                for relative, predecessor in pins.items():
+                    resolver(relative, predecessor)
+            else:
+                resolver(probe, "")
         tree = ast.parse(
             (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
         )

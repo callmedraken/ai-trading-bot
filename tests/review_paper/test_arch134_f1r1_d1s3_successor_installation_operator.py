@@ -509,6 +509,57 @@ def test_other_pinned_paths_and_arbitrary_docs_remain_fail_closed(monkeypatch):
     assert runner._arch134_d1s3_authority_check(ROOT)
 
 
+def test_arch145a_source_removal_restores_predecessor_failure(monkeypatch):
+    monkeypatch.setattr(runner, "ARCH145A_SOURCE_PIN_OVERRIDES", {})
+    assert runner._arch144c_authority_check(ROOT)
+
+
+@pytest.mark.parametrize(
+    ("attribute", "path"),
+    [
+        (
+            "ARCH144C_PREDECESSOR_SOURCE_PINS",
+            "scripts/run_test_certification.py",
+        ),
+        (
+            "ARCH144C_PREDECESSOR_TEST_PINS",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        ),
+        (
+            "ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS",
+            "scripts/run_test_certification.py",
+        ),
+        (
+            "ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        ),
+        (
+            "ARCH134_F1R1_B_PREDECESSOR_SOURCE_PINS",
+            "scripts/run_test_certification.py",
+        ),
+        (
+            "ARCH134_F1R1_B_PREDECESSOR_TEST_PINS",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        ),
+        (
+            "ARCH134_D1S2_PREDECESSOR_PINS",
+            "tests/runtime/checkpoint_runner/test_core.py",
+        ),
+        (
+            "ARCH134_D1S2_SOURCE_PREDECESSOR_PINS",
+            "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
+        ),
+    ],
+)
+def test_d1s3_authority_requires_each_predecessor_overlay(
+    monkeypatch: pytest.MonkeyPatch, attribute: str, path: str
+) -> None:
+    pins = dict(getattr(runner, attribute))
+    pins[path] = "a" * 40
+    monkeypatch.setattr(runner, attribute, pins)
+    assert runner._arch134_d1s3_authority_check(ROOT)
+
+
 def test_removing_d1s3_overlay_restores_d1s2_fail_closed_behavior(monkeypatch):
     monkeypatch.setattr(runner, "ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256", "")
     monkeypatch.setattr(runner, "ARCH134_D1S3_MUTABLE_CURRENT_DOCS", ())

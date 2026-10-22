@@ -2,65 +2,73 @@
 
 ## Verified boundary
 
-C1 is accepted/integrated at develop HEAD
-`1490f0391a49150dee913ca029cd2838774d5343`, tree
-`fc02c35af88419a3e2b8c2dffd8fc5e19ad71850`; source gate 39732123326 and
-post-merge gate 39736130846 both succeeded, attempt 1.
-
-C2 returned `F1R1_EXTERNAL_HOST_QUALIFICATION=PASS`, runtime
-`qualification-573ce39f76eb8a4b5e789f1e2d4d97828bff0269274ebce64147192eb8ef83cf`.
-The consumed root `F:\AI\temp\qualification\arch134-f1r1-host-isolation`
-is immutable/non-reusable evidence. Do not inspect or mutate it in this checkpoint.
-Qualification evidence cannot satisfy Architecture-133/F1R1 production admission.
-
-## D1S1 source handoff
+D1S1 is SOURCE ACCEPTED and integrated at current `develop`:
 
 ```text
-predecessor HEAD a5485a64dd9848e74daf9596bbb3194dc458e363
-predecessor TREE f93ef9060c77c15bcd6aa3131c16116655c5bd64
-branch feature/robinhood-production-paper-134f1r1-successor-soak-source-current
-worktree F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-soak-source-current
-checkpoint arch134-f1r1-d1s1-successor-soak-source
-canonical CI profile ROBINHOOD
+HEAD 88d6a4ba11a77ca4a7b04b102b914e9e4ea9bd96
+TREE eae9ad713620f1a030a981f27e0a2672d0222fa0
+feature CI 39754184070 / attempt 1 / SUCCESS
+preserved failed first source attempt 39751885721
+post-merge develop CI 39756068943 / attempt 1 / SUCCESS
 ```
 
-D1 design is accepted. Initial D1 CI 39745445665 failed only on C1 shared-doc
-pin drift; that failure is preserved. Corrective D1 CI 39745941442 succeeded
-DOCS_ONLY. D1S1 resolves the coupling through an explicit exact successor layer;
-the frozen C1 dictionaries/digests remain unchanged. The D1 validation wording
-now records both historical publication attempts truthfully.
+The active handoff is the source-only
+`arch134-f1r1-d1s2-successor-installed-readiness` checkpoint on branch
+`feature/robinhood-production-paper-134f1r1-successor-readiness-current`,
+worktree
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-readiness-current`.
 
-The source contract binds exactly 2026-11-02 and 2026-11-03, SPY long-only
-synthetic review-paper, a fresh deterministic parent and two children, canonical
-bounded durable JSONL, fresh manual admission and consumed ambiguity.
-No Task Scheduler or automatic boot/login startup exists. A second start can
-continue only the same parent after a benign terminal first child. No third
-session, date substitution, retry, repair or historical authority reuse exists.
-Existing Architecture-133/F1R1-A/B production primitives and historical F1
-source remain unchanged. Production adapters/launcher remain absent.
+Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. C2 remains consumed
+immutable evidence at
+`F:\AI\temp\qualification\arch134-f1r1-host-isolation`; it is not production
+admission and must not be inspected, mutated, repaired, or reused. Architecture
+145 remains separate/offline and live remains NO-GO.
 
-D1S1 is pending ChatGPT exact-source acceptance; do not claim SOURCE ACCEPTED.
-No duplicate local ROBINHOOD or FULL run is required for its mapped CI profile.
+## D1S2 source handoff
 
-D1S1 first publication `0edaf4d10e782ba6c6b820310710c5ec4a024482` /
-`797b5869db8789816ebfc17d5d8cd4d87700f925`, CI 39751885721 / attempt 1,
-failed only a stale F1 module-count assertion plus the 300.913-second canonical
-hygiene gate. Source-static and active tests passed; all failure evidence is
-preserved. Corrective D1S1-C1 fixes that assertion and reduces disposable test
-fixture parsing with exact AST/tuple preservation. Coverage, production authority,
-lane policy and the 300-second limit remain unchanged. Source acceptance remains
-pending ChatGPT review of the terminal corrective result.
+D1S2 provides a fresh successor-specific readiness composition. It binds an
+explicit accepted remote/ref/HEAD/tree policy to the accepted
+Architecture-133 `ReleaseBundle` / `VerifiedRelease` / `RuntimeBinding`, then
+observes the exact installed final and `.installing` paths. It classifies
+`INSTALL_REQUIRED`, `ALREADY_INSTALLED_EXACT`, `BLOCKED`, and `INDETERMINATE`
+without installing, publishing, creating, deleting, repairing, or retrying.
 
-## Protected boundary and immediate next step
+The injected successor-root observer distinguishes an absent eligible root,
+empty/fresh admitted root, already-bound exact root, foreign/conflicting root,
+aliases/reparse points, wrong parent/filesystem/ACL/owner, replaced identity,
+consumed evidence, malformed evidence, and unproven state. It requires the
+frozen root
+`F:\AITradingBot\Arch133\arch134-f1r1-d1-successor-soak-v1`, exact D1
+`STORE_IDENTITY`, exact namespace/process evidence, and repeated no-drift
+observation. The C2 root and old-F1 evidence cannot substitute.
 
-Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. Production/F1/C2
-evidence is untouched; all protected effects remain zero. Successor-soak execution
-remains unauthorized. Architecture 145 remains separate/offline; live remains
-NO-GO.
+The proof order is Architecture-133 -> F1R1-A -> F1R1-B -> D1. The positive
+closed result is
+`READY_FOR_D1_SUCCESSOR_INSTALLED_RELEASE_PREFLIGHT`; it grants only a later
+ChatGPT review of a separately protected installation/readiness operator. No
+successor execution authority exists. Provider, credential, paper, broker,
+D1, D2, scheduler, service, boot/logon, resume, retry, catch-up, and live
+effects remain unavailable.
 
-Owner: ChatGPT. Review the exact D1S1 GitHub commit/diff, immutable predecessor
-proof, shared-doc/AST/inventory successor overlays, focused verification and
-terminal mapped ROBINHOOD source gate. Only if source is accepted, separately
-review installed-release/readiness admission and then effect preflight. Do not
-install/start a release, touch Task Scheduler, access credentials/providers,
-mutate paper state or reuse any consumed evidence during that review.
+The Architecture-133 launcher is intentionally unchanged: no caller-selected
+semantic arguments, `-I -S -B`, fixed immutable release/source/site-packages
+policy, no pycache, and inert fail-closed behavior after runtime-admission
+import. D1S2 records the launcher/runtime-host gap; it does not add effectful
+quote or paper wiring.
+
+## Review and next step
+
+The D1S2 runner is mapped to ROBINHOOD. Its successor overlay preserves the
+accepted D1S1 predecessor dictionaries/digests and updates current status,
+handoff, inventory, AST, and test consumers exactly. Removing the D1S2
+overlay restores D1S1 resolution. Retained Architecture-133/F1R1-A/B/C1 and
+D1S1 focused tests remain part of the source checkpoint.
+
+Owner: ChatGPT. Perform exact-source review of the D1S2 commit/diff and
+terminal mapped CI. Only after that acceptance should a separately reviewed
+protected operator construct and, if explicitly authorized, install/observe
+the exact accepted successor release. That later boundary must preserve
+manual STOP/reboot semantics and return a closed readiness result before any
+provider or paper effect.
+
+Also remove or update any tests and docs that referenced the old behavior.

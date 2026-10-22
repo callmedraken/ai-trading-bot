@@ -218,6 +218,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-d1s2-successor-installed-readiness",
     "arch134-f1r1-d1s1-successor-soak-source",
     "arch134-f1r1-c1-qualification-operator",
     "arch134-f1r1-b-host-qualification",

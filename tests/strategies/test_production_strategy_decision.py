@@ -324,7 +324,7 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
         "arch134-production-strategy-contract",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 72
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 73
 
     root = Path(certification.__file__).resolve().parents[1]
     inventory = certification.discover_inventory(root)

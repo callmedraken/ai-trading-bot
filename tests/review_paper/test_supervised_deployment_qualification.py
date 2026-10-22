@@ -627,7 +627,7 @@ def test_registration_workflow_profiles_and_authority_chain():
     )
     assert spec.authority_check(ROOT) == ()
     assert runner.ACTIVE_CI_CHECKPOINTS[1] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 72
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 73
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(NAME) == 1

@@ -1037,7 +1037,7 @@ def test_a1243_native_cng_positive_and_adversarial_signature() -> None:
         assert finalize(key, 0) == 0
         size = wintypes.ULONG()
         assert export(key, None, "ECCPUBLICBLOB", None, 0, ctypes.byref(size), 0) == 0
-        assert size.value == 72
+        assert size.value == 73
         blob = (ctypes.c_ubyte * size.value)()
         assert (
             export(key, None, "ECCPUBLICBLOB", blob, size.value, ctypes.byref(size), 0)

@@ -835,7 +835,7 @@ def test_y_real_complete_authority_and_source_only_registration():
         runner.ACTIVE_CI_CHECKPOINTS.index(NAME)
         - 1 : runner.ACTIVE_CI_CHECKPOINTS.index(NAME) + 1
     ] == (X_NAME, NAME)
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 72
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 73
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     assert spec.tests == (
         *runner.ARCH133_L_M_TESTS,

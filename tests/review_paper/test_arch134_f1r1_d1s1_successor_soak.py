@@ -630,11 +630,11 @@ def test_checkpoint_profile_and_exact_authority_consumers():
         == spec.name
     )
     assert runner.resolve_ci_certification_profile(spec.name) == "robinhood"
-    assert runner._arch134_d1s1_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS
+    assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS
     assert runner._arch134_d1s1_authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
-    assert len(certification.select_inventory(inventory, "full")) == 196
-    assert len(certification.select_inventory(inventory, "robinhood")) == 107
+    assert len(certification.select_inventory(inventory, "full")) == 197
+    assert len(certification.select_inventory(inventory, "robinhood")) == 108
     assert (
         "feature/robinhood-*"
         in (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
@@ -679,14 +679,24 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
         for name, node in functions.items()
         if ast.dump(node) != ast.dump(new_functions[name])
     }
-    assert changed == set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
+    assert changed == (
+        set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
+        | set(runner.ARCH134_D1S2_PREDECESSOR_AST_PINS)
+    ) - {"_arch134_d1s1_authority_check"}
     for name, pin in runner.ARCH134_D1S1_PREDECESSOR_AST_PINS.items():
+        if name in runner.ARCH134_D1S2_PREDECESSOR_AST_PINS:
+            continue
         assert (
             runner._arch134_d1s1_runner_ast_pin(name, pin)
             == runner.ARCH134_D1S1_SUCCESSOR_AST_PINS[name]
         )
+    for name, pin in runner.ARCH134_D1S2_PREDECESSOR_AST_PINS.items():
+        assert (
+            runner._arch134_d1s2_runner_ast_pin(name, pin)
+            == runner.ARCH134_D1S2_SUCCESSOR_AST_PINS[name]
+        )
         with pytest.raises(ValueError):
-            runner._arch134_d1s1_runner_ast_pin(name, "a" * 64)
+            runner._arch134_d1s2_runner_ast_pin(name, "a" * 64)
 
 
 def test_lost_ack_readback_never_reports_success_or_retries(harness, monkeypatch):

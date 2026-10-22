@@ -9004,7 +9004,19 @@ def _supervised_installation_reconciliation_authority_check(
             or spec.ruff_paths != SUPERVISED_INSTALLATION_RECONCILIATION_RUFF_PATHS
             or spec.authority_check
             is not _supervised_installation_reconciliation_authority_check
-            or ACTIVE_CI_CHECKPOINTS[0] != SUPERVISED_INSTALLATION_OPERATOR_NAME
+            or tuple(
+                ACTIVE_CI_CHECKPOINTS[
+                    : 2 if ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256 else 1
+                ]
+            )
+            != (
+                (
+                    ARCH134_D1S3_NAME,
+                    SUPERVISED_INSTALLATION_OPERATOR_NAME,
+                )
+                if ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256
+                else (SUPERVISED_INSTALLATION_OPERATOR_NAME,)
+            )
             or SUPERVISED_INSTALLATION_RECONCILIATION_NAME in ACTIVE_CI_CHECKPOINTS
         ):
             failures.append("installation reconciliation registration drift")
@@ -16929,20 +16941,35 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
         "404e76e2306c7310bf9f1ae602e7dd3ec639484d"
     ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "025824450037b0c8668102a6d1ef493dedef0a22"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "729c0eff0881736ca32fd5d2ea78e0bbbae472e4"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "a49d23e9b3cf912a79c1ee3f4f3457a07806af1e"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "001b35f1d3602d67fafb2777e5349d68b171442c"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "3ce59cc819df04c9b82d65a3280fcfd1f5b7c6d0"
+    ),
     "tests/review_paper/test_d1_session_authorization.py": (
-        "a669735f1a0d102823cb058319bbc7582d3ae335"
+        "1c037ebdc6f205385db86fddff45bd80b89d9af4"
     ),
     "tests/review_paper/test_five_session_soak.py": (
         "da4d006638e1b2ad0ecc7e798bf4d11d4dd7de37"
     ),
     "tests/review_paper/test_d1_session_execution.py": (
-        "c51468180bdaa0dc3340e9fb0e5a76e0435baa97"
+        "bef919307562f01a278f2b65662333948673d617"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
         "6c8eff3ec09201d69f7ab264326c38ad8c42c476"
     ),
     "tests/review_paper/test_production_strategy_cycle.py": (
-        "9351693b5e085489cffb61a9d94a016b95e157db"
+        "e46abcae342ae5cfbc3c3a715dff4eef7dd6556c"
     ),
     "tests/review_paper/test_supervised_deployment_qualification.py": (
         "d05af318b307a4836232c062fe99ea8401119142"
@@ -16957,7 +16984,13 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
         "b4b6e8231a4deb09435837778b674f0e2ab1d68b"
     ),
     "tests/review_paper/test_supervised_maintenance_rebind.py": (
-        "5965edbe327e0e23d0776b45b7a6c92fc05e2559"
+        "69e27eca1b5dfa5f817597524ea094a008dd39ee"
+    ),
+    "tests/review_paper/test_supervised_release_publication_recovery.py": (
+        "7a94d088e8b8041097597f1232c7adce4a243f32"
+    ),
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py": (
+        "f0deae5f2bd4bf3656d3c6921446779076a5530b"
     ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "59b4cbce24caeed18c777a0c5c415fa41c04c8e0"
@@ -16986,6 +17019,9 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
     ),
     "_supervised_installation_operator_authority_check": (
         "0ae351dcded206d58a9dce40f88c82b539464e93165e840d2952d9122d9be447"
+    ),
+    "_supervised_installation_reconciliation_authority_check": (
+        "b028fa3543603919120fa20414700be57f5a642b773d49411ebe6c1cc1bc2a76"
     ),
     "_arch134_d1s3_mutable_current_doc": (
         "fba651786dc4ea1aefee6e8d267ddb9e960ea31f5c4a70f7a7817dbb46a392dc"
@@ -17049,13 +17085,13 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
     ),
 }
 ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "42a36d2d2b37928bf7456866141e5274c23bfb421d79be6417b457badec82df3"
+    "c32ff9401ef2cac5257b0a962d6b35d81826aa19e6e67daedcbbc92ad08b3b42"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
     "0460e09e0d5537888e81becf2557df1ca10b54fb6deea2bf5d9eb1ee16acbb19"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
-    "e632a51c1e9515a5128fac0bf3273ac3043765254fb131f96d22f9403b4cc446"
+    "5d3ad3a844576f8ed54b94d40243fc478a888a950b68b2694046f2cd9b99d206"
 )
 ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
     "eb795b69055a41ad13b0595e47721b57aed2337d12bc15a187ed0c48748768dd"

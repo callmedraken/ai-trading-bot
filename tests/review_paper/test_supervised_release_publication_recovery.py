@@ -575,9 +575,10 @@ def test_aj_remains_registered_historical_and_closed_outside_active_ci():
         ).hexdigest()
         != pin
     }
-    assert drifted == {"_checkpoint_specs"}
+    assert drifted == {"_checkpoint_specs", "execute_checkpoint"}
     assert runner._supervised_publication_recovery_authority_check(root) == (
         "publication recovery registration drift",
+        "publication recovery runner authority drift",
         "publication recovery runner authority drift",
     )
 

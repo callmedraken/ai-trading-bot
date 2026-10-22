@@ -258,8 +258,9 @@ def test_checkpoint_registration_is_read_only():
     name = "arch133-robinhood-supervised-release-installation-reconciliation"
     spec = runner._checkpoint_specs()[name]
 
-    assert runner.ACTIVE_CI_CHECKPOINTS[0] == (
-        "arch133-robinhood-supervised-release-installation-operator"
+    assert runner.ACTIVE_CI_CHECKPOINTS[:2] == (
+        "arch134-f1r1-d1s3-successor-release-installation-operator",
+        "arch133-robinhood-supervised-release-installation-operator",
     )
     assert name not in runner.ACTIVE_CI_CHECKPOINTS
     assert spec.preflight is runner._supervised_installation_reconciliation_preflight

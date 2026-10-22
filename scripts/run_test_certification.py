@@ -180,6 +180,7 @@ FULL_MODULE_TIMINGS_MS = (
     ("tests/review_paper/test_arch133_windows_rename_qualification.py", 16265),
     ("tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py", 1000),
     ("tests/review_paper/test_arch134_f1r1_b_host_qualification.py", 1000),
+    ("tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py", 10000),
     ("tests/review_paper/test_armed_production_paper_session.py", 14731),
     ("tests/review_paper/test_current_production_strategy_decision.py", 1748),
     ("tests/review_paper/test_d1_session_authorization.py", 11422),

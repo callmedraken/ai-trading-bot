@@ -943,10 +943,12 @@ def test_retained_individual_verification_exercises_registered_source_contract(
     )
     assert passed
     report = json.loads(path.read_text())
-    assert all(path in calls[0].argv for path in spec.tests)
-    assert all(path in calls[1].argv for path in spec.ruff_paths)
+    steps = {step.name: step for step in calls}
+    assert all(path in steps["pytest"].argv for path in spec.tests)
+    assert all(path in steps["ruff_check"].argv for path in spec.ruff_paths)
     assert report["authority_failures"] == []
     assert (
-        "tests/runtime/checkpoint_runner/test_retained_arch128_130.py" in calls[0].argv
+        "tests/runtime/checkpoint_runner/test_retained_arch128_130.py"
+        in steps["pytest"].argv
     )
     assert report["production_effects"] == "NOT_RUN"

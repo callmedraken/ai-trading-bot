@@ -135,7 +135,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "6ef20a733aecfc8396c6b22465ba9ce40b68c9b2496bd8d1915c6bcfa5efd12e"
+    "c3039186f4891948bdd8b7aa0826a644a582294f99b2384ff0f13debe80fdb5c"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -197,6 +197,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-c1-qualification-operator",
     "arch134-f1r1-b-host-qualification",
     "arch134-f1-five-session-soak",
     "arch134-d1r8-d1-session-execution-consumer",
@@ -216,6 +217,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-f1r1-c1-qualification-operator": "robinhood",
     "arch134-f1r1-b-host-qualification": "robinhood",
     "arch134-f1-five-session-soak": "robinhood",
     "arch134-d1r8-d1-session-execution-consumer": "robinhood",
@@ -14098,7 +14100,10 @@ def _arch145a_d1r6_workflow_successor(predecessor: str, candidate: str) -> str:
         ).hexdigest()
         != ARCH145A_D1R6_WORKFLOW_SUCCESSOR_PROOF_SHA256
         or predecessor != ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1
-        or candidate != ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+        or candidate
+        != _arch134_f1r1_c1_current_source_pin(
+            ARCH145A_D1R6_WORKFLOW_PATH, ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+        )
         or type(candidate) is not str
         or len(candidate) != 40
         or any(character not in "0123456789abcdef" for character in candidate)
@@ -14901,7 +14906,9 @@ def _arch134_f1r1_b_authority_check(repo_root: Path) -> tuple[str, ...]:
         if set(ARCH134_F1R1_B_SOURCE_PINS) != set(ARCH134_F1R1_B_PATHS):
             failures.append("134-F1R1-B source pin set drift")
         for relative, pin in ARCH134_F1R1_B_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(
+                repo_root / relative
+            ) != _arch134_f1r1_c1_current_source_pin(relative, pin):
                 failures.append("134-F1R1-B source drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_F1R1_B_NAME]
         if (
@@ -14963,7 +14970,9 @@ def _arch145a_current_source_pin(relative: str, predecessor: str) -> str:
         current = _arch134_f1r1_a_current_source_pin(relative, after[relative])
     else:
         current = _arch134_f1r1_a_current_source_pin(relative, predecessor)
-    return _arch134_f1r1_b_current_source_pin(relative, current)
+    return _arch134_f1r1_c1_current_source_pin(
+        relative, _arch134_f1r1_b_current_source_pin(relative, current)
+    )
 
 
 def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str:
@@ -14997,7 +15006,9 @@ def _arch145a_current_inventory_test_pin(relative: str, predecessor: str) -> str
         current = _arch134_f1r1_a_current_inventory_test_pin(relative, after[relative])
     else:
         current = _arch134_f1r1_a_current_inventory_test_pin(relative, predecessor)
-    return _arch134_f1r1_b_current_inventory_test_pin(relative, current)
+    return _arch134_f1r1_c1_current_inventory_test_pin(
+        relative, _arch134_f1r1_b_current_inventory_test_pin(relative, current)
+    )
 
 
 def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
@@ -15023,12 +15034,13 @@ def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
         ).hexdigest()
         != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
         or tuple(ACTIVE_CI_CHECKPOINTS)
-        != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+        != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
         or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
     ):
         raise ValueError("145-A active checkpoint successor overlay drift")
-    return ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+    _arch134_f1r1_c1_active_inventory()
+    return ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
 
 
 ARCH145A_TESTS: Final = (
@@ -15408,6 +15420,527 @@ def _arch144c_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# C1 additive successor layer. Every predecessor dictionary/digest remains frozen.
+ARCH134_F1R1_C1_NAME: Final = "arch134-f1r1-c1-qualification-operator"
+ARCH134_F1R1_C1_BRANCH: Final = (
+    "feature/robinhood-production-paper-134f1r1-qualification-operator-current"
+)
+# C1_GENERATED_PINS_BEGIN
+ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "e10f0583d3a6ebbae288e2efd27a0bcd4eaa9ffd"
+    ),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("5d441843abbcd11220f27ca96449f2cc740dc8d1"),
+    "docs/PROJECT_STATUS.md": ("b311423518f60ec4ca2b5d176d5fa200d6c05d0f"),
+    "scripts/run_test_certification.py": ("f718b95e3a920936e8e1e0078694171ce54da8fe"),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "81cf462bafd937bad63b35055e73dee31037b56a"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "cf51d08220ab6c7436e8a2d919db6af5c9f6d31e"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "09f7cf0ebb18cf5617fbd46a53b23e476e2169ab"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "7512a93e8d0e83be3147ebeccb75ec35b8a5202b"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "f586a8b44582f47cc5f49a61ad246a19b5ffa59b"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "d6370f6ba1d0579ad5c582cd8f734e58d71bf03e"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "f98a6c1939d3181b112353c4d6bb36199a4dd835"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "7ab8fcfb5de2a856e9fa8663d7b7ed79d1ba840b"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "42f50cbe40648a8dba4b17c3be5028150785abff"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "00ff75807e42021487f897bea2f55bcc5bc892f2"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "fb86137629342cd6cbd62dc69868a20014a31a38"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "db35cc36bde65d59b0aa72f7e47e9b9d3630105e"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "4c2b77217e0905de6113a7f5e4be6a95420b4440"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "30ec92cb61ebbf2ad716fc644f3683409bc5d506"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "63c89e3d588ac948b90cbd012b0d396cf4f7eaa2"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "8b83383c8b62d1fb973de08f188f3030548ed615"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "324a079174343b7512bd97b60235d50561719acf"
+    ),
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py": (
+        "3be9801099a53e6adf6b75e0d2e910f2c2c3187e"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5d5726d853c9a0b86443fb8776ac6e20951a47a7"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "8338d781b19a1354c5330575c609ec23a4e1c745"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "bc79bccf05cb25e6c9ce94057555ad1df0a793b6"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "bb0aedcea17430d07da776d6ecd7510ff991d65e"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "ec19956cde2b212256b9c1031d2884e52447a2ea"
+    ),
+}
+ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS_SHA256: Final = (
+    "a5d8c98ad38c71b16cd3187d3ee6e02f07ddbac15bfc8cbaca84f4b82f60a614"
+)
+ARCH134_F1R1_C1_SOURCE_PIN_OVERRIDES: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "ebc1050baa92a52ebbaaaa9c4a66e7a30ca15fcc"
+    ),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("c558eb4170e271cdf10be2b232ea447be3a89578"),
+    "docs/PROJECT_STATUS.md": ("2518ad685ec0501c42720e210049de70987b8387"),
+    "scripts/run_test_certification.py": ("80aa649a16b45eea55914071c0f2111c3d9bb448"),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "3ea5f6f9d396e0cf622f40ad938bb77a282e56f6"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "6bfaae312b1e571a587581cb845ed6399f5db701"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "22ab8969932d892889c2152740eb744088953fc1"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "bb6e7ebfc3250259be155b8b37df37060f10501c"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "1b6753f641375486cd8fef5a8bcf63b7672ed2c3"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "5316ad0697f9ddab998442cdd98b2c3abd14ba35"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "8de2208dd25973fdcc87582f4d9f465da623a9a0"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "9be221a23fe5ed50ae0bdb3316d488686dff6023"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "3857ea00a66d4f15be4050176bf033254d9566d5"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "fea71ab9af2be58eedd38360fa0cd331b5536672"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8f8ef991b440353da2bc34fa1c1d364c38b66557"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "63c48802f6b20960f49eb77d5f5771279b928164"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "81fd4e122d81231828ee2bb98da90167edf6b592"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f4f09c3ab7b038601c579a596426187399eb9e79"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a9c2f3696152d6c045f6fb83b18af7f152e94e55"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a66ce484a4c21ec10928c45e9321fc66b520059c"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "16be625d2c56474e5f3a10e1093b5cecaef10b2d"
+    ),
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py": (
+        "f84c9b695a058b775975b2fb597783d982da6ee0"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "f2b5c690d6dfcaa449befbb9ac2ece2d9f161ac4"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "f3f4806ecc66374ed2833b997a16c37c272d95ca"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "2d85390187505eb2f7262362d1819397d4af2f3b"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "7504f97f2e61eeb937fb36cd97190a9421e4c228"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "1b508a664f7e247276edd0538312bd73c6d99ae6"
+    ),
+}
+ARCH134_F1R1_C1_SOURCE_PIN_OVERRIDES_SHA256: Final = (
+    "62d32d48584324931c53fcd8b95edfd5aa5d373c8365944100a71d1521a032c5"
+)
+ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS: Final = {
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "81cf462bafd937bad63b35055e73dee31037b56a"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "cf51d08220ab6c7436e8a2d919db6af5c9f6d31e"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "09f7cf0ebb18cf5617fbd46a53b23e476e2169ab"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "7512a93e8d0e83be3147ebeccb75ec35b8a5202b"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "f586a8b44582f47cc5f49a61ad246a19b5ffa59b"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "d6370f6ba1d0579ad5c582cd8f734e58d71bf03e"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "f98a6c1939d3181b112353c4d6bb36199a4dd835"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "7ab8fcfb5de2a856e9fa8663d7b7ed79d1ba840b"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "42f50cbe40648a8dba4b17c3be5028150785abff"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "00ff75807e42021487f897bea2f55bcc5bc892f2"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "fb86137629342cd6cbd62dc69868a20014a31a38"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "db35cc36bde65d59b0aa72f7e47e9b9d3630105e"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "4c2b77217e0905de6113a7f5e4be6a95420b4440"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "30ec92cb61ebbf2ad716fc644f3683409bc5d506"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "63c89e3d588ac948b90cbd012b0d396cf4f7eaa2"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "8b83383c8b62d1fb973de08f188f3030548ed615"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "324a079174343b7512bd97b60235d50561719acf"
+    ),
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py": (
+        "3be9801099a53e6adf6b75e0d2e910f2c2c3187e"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5d5726d853c9a0b86443fb8776ac6e20951a47a7"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "8338d781b19a1354c5330575c609ec23a4e1c745"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "bc79bccf05cb25e6c9ce94057555ad1df0a793b6"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "bb0aedcea17430d07da776d6ecd7510ff991d65e"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "ec19956cde2b212256b9c1031d2884e52447a2ea"
+    ),
+}
+ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS_SHA256: Final = (
+    "d8e4ea957b04c8f7b96eba36206d927c0c268850e0e5987d1183c9d9f08e4c00"
+)
+ARCH134_F1R1_C1_TEST_PIN_OVERRIDES: Final = {
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "3ea5f6f9d396e0cf622f40ad938bb77a282e56f6"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "6bfaae312b1e571a587581cb845ed6399f5db701"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "22ab8969932d892889c2152740eb744088953fc1"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "bb6e7ebfc3250259be155b8b37df37060f10501c"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "1b6753f641375486cd8fef5a8bcf63b7672ed2c3"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "5316ad0697f9ddab998442cdd98b2c3abd14ba35"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "8de2208dd25973fdcc87582f4d9f465da623a9a0"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "9be221a23fe5ed50ae0bdb3316d488686dff6023"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "3857ea00a66d4f15be4050176bf033254d9566d5"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "fea71ab9af2be58eedd38360fa0cd331b5536672"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8f8ef991b440353da2bc34fa1c1d364c38b66557"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "63c48802f6b20960f49eb77d5f5771279b928164"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "81fd4e122d81231828ee2bb98da90167edf6b592"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f4f09c3ab7b038601c579a596426187399eb9e79"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "a9c2f3696152d6c045f6fb83b18af7f152e94e55"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a66ce484a4c21ec10928c45e9321fc66b520059c"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "16be625d2c56474e5f3a10e1093b5cecaef10b2d"
+    ),
+    "tests/runtime/checkpoint_runner/test_retained_arch128_130.py": (
+        "f84c9b695a058b775975b2fb597783d982da6ee0"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "f2b5c690d6dfcaa449befbb9ac2ece2d9f161ac4"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "f3f4806ecc66374ed2833b997a16c37c272d95ca"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "2d85390187505eb2f7262362d1819397d4af2f3b"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "7504f97f2e61eeb937fb36cd97190a9421e4c228"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "1b508a664f7e247276edd0538312bd73c6d99ae6"
+    ),
+}
+ARCH134_F1R1_C1_TEST_PIN_OVERRIDES_SHA256: Final = (
+    "0f962ec6cc1773eb24850c0673f5daccc3b1d54238d1bd9924c07b947d7a1192"
+)
+ARCH134_F1R1_C1_SOURCE_PINS: Final = {
+    "scripts/arch134_f1r1_qualification.py": (
+        "8e0419670d1109bcf7688195aa67a155afb64218"
+    ),
+    "scripts/arch134_f1r1_qualification_process.py": (
+        "21ea1130c127bffedf62a2fc5fb1ebbef95f93e1"
+    ),
+    "scripts/run_arch134_f1r1_qualification.py": (
+        "8fe804753bc3fbfd531ef08dfc56b340ed07350b"
+    ),
+    "scripts/arch134_f1r1_qualification_reference.json": (
+        "340d339d4a169d6b6cbb1c3400750f376c70895d"
+    ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "bd48ebc3dd10b45012102eff4e7beaf2f0dca0c7"
+    ),
+    "docs/architecture/134-f1r1-c1-qualification-operator.md": (
+        "aae050a48dd0f3a867687a61d13131e79ffac046"
+    ),
+    "docs/validation/arch134-f1r1-c1-qualification-operator.md": (
+        "3a28809eeb2b8e7f68a2d7672824e357033850b8"
+    ),
+    "docs/operators/arch134-f1r1-c2-external-qualification.md": (
+        "210344d8562c85c2b4c32e750b2cc84f13a0b92e"
+    ),
+}
+ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS: Final = (
+    *ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS[
+        : ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS.index(ARCH134_F1R1_B_NAME)
+    ],
+    ARCH134_F1R1_C1_NAME,
+    *ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS[
+        ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS.index(ARCH134_F1R1_B_NAME) :
+    ],
+)
+ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
+    "c3039186f4891948bdd8b7aa0826a644a582294f99b2384ff0f13debe80fdb5c"
+)
+ARCH134_F1R1_C1_RUNNER_AST_PINS: Final = {
+    "_arch145a_d1r6_workflow_successor": (
+        "e4961a3991273540fae9eec1ee23cf979704ce4753a2d0dd02f7dfe045e05b82"
+    ),
+    "_arch134_f1r1_b_authority_check": (
+        "c4fcfeb01cbf2b2d7a85bf8daa5e6e5131df9960e36fef6e6378a24638837dbf"
+    ),
+    "_arch145a_current_source_pin": (
+        "be351ec8d738764afcbd530139616658896e08aabb6c25b1dbc00b8a9655f48d"
+    ),
+    "_arch145a_current_inventory_test_pin": (
+        "af98a64c8dba75fa6c5255f14c4e2c3352517ba7a8bfaa155b95e1b4f0fbbe5c"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "41cc6122f12dd6bbe5b249f67a488c89fd91d9bb2f8f44dfa78fca3d92b5453f"
+    ),
+    "_arch134_f1r1_c1_resolve": (
+        "1e29d8177858f96969d399e699247d0aeeab559369d7f607c714b9c7a5e6b522"
+    ),
+    "_arch134_f1r1_c1_current_source_pin": (
+        "ab8edd10bde9149aa7bacb907798a4d64db1cf059b2ffca2aedd505c56e701b2"
+    ),
+    "_arch134_f1r1_c1_current_inventory_test_pin": (
+        "f17d8e8752821a588facc0b409d969b1b1d14b3c4f443aac738bfc2bbce68570"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "68d1e96b927cf6e2d0287ebd312f5190031be504c185ee7c505dc84f77c13aaf"
+    ),
+    "_arch134_f1r1_c1_authority_check": (
+        "492e74bcbcc36f5070a56084b3bd846e117637537c9ae6bc900538f25d0feac5"
+    ),
+    "_checkpoint_specs": (
+        "2fd5b8d7b7ad7745a38fc4c5d39e6bba151b1763254c058f69631a27190a6359"
+    ),
+}
+# C1_GENERATED_PINS_END
+ARCH134_F1R1_C1_TESTS: Final = (
+    *ARCH134_F1R1_B_TESTS,
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
+)
+ARCH134_F1R1_C1_RUFF_PATHS: Final = (
+    *ARCH134_F1R1_B_RUFF_PATHS,
+    "scripts/arch134_f1r1_qualification.py",
+    "scripts/arch134_f1r1_qualification_process.py",
+    "scripts/run_arch134_f1r1_qualification.py",
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
+)
+
+
+def _arch134_f1r1_c1_resolve(
+    relative, predecessor, before, after, before_sha, after_sha
+):
+    if (
+        type(before) is not dict
+        or type(after) is not dict
+        or set(before) != set(after)
+        or not before
+        or hashlib.sha256(json.dumps(before, sort_keys=True).encode()).hexdigest()
+        != before_sha
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != after_sha
+        or any(
+            type(v) is not str
+            or len(v) != 40
+            or any(c not in "0123456789abcdef" for c in v)
+            for v in (*before.values(), *after.values())
+        )
+    ):
+        raise ValueError("134-F1R1-C1 successor overlay drift")
+    if relative in before:
+        if predecessor != before[relative]:
+            raise ValueError("134-F1R1-C1 wrong predecessor")
+        return after[relative]
+    return predecessor
+
+
+def _arch134_f1r1_c1_current_source_pin(relative: str, predecessor: str) -> str:
+    return _arch134_f1r1_c1_resolve(
+        relative,
+        predecessor,
+        ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS,
+        ARCH134_F1R1_C1_SOURCE_PIN_OVERRIDES,
+        ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS_SHA256,
+        ARCH134_F1R1_C1_SOURCE_PIN_OVERRIDES_SHA256,
+    )
+
+
+def _arch134_f1r1_c1_current_inventory_test_pin(relative: str, predecessor: str) -> str:
+    return _arch134_f1r1_c1_resolve(
+        relative,
+        predecessor,
+        ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS,
+        ARCH134_F1R1_C1_TEST_PIN_OVERRIDES,
+        ARCH134_F1R1_C1_PREDECESSOR_TEST_PINS_SHA256,
+        ARCH134_F1R1_C1_TEST_PIN_OVERRIDES_SHA256,
+    )
+
+
+def _arch134_f1r1_c1_active_inventory() -> None:
+    before = ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+    after = ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS
+
+    def digest(v: tuple[str, ...]) -> str:
+        return hashlib.sha256(
+            ast.dump(
+                ast.parse(repr(v), mode="eval").body, include_attributes=False
+            ).encode()
+        ).hexdigest()
+
+    if (
+        digest(before) != ARCH134_F1R1_B_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        or after
+        != (
+            before[: before.index(ARCH134_F1R1_B_NAME)]
+            + (ARCH134_F1R1_C1_NAME,)
+            + before[before.index(ARCH134_F1R1_B_NAME) :]
+        )
+        or digest(after) != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
+        or tuple(ACTIVE_CI_CHECKPOINTS) != after
+        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != digest(after)
+    ):
+        raise ValueError("134-F1R1-C1 active inventory drift")
+
+
+def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch134_f1r1_c1_active_inventory()
+        for relative, pin in ARCH134_F1R1_C1_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("134-F1R1-C1 source drift: " + relative)
+        for relative, before in ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS.items():
+            expected = _arch134_f1r1_c1_current_source_pin(relative, before)
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append("134-F1R1-C1 shared successor drift: " + relative)
+        tree = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(tree)
+        for name, expected in ARCH134_F1R1_C1_RUNNER_AST_PINS.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append("134-F1R1-C1 runner AST drift: " + name)
+        spec = _checkpoint_specs()[ARCH134_F1R1_C1_NAME]
+        if (
+            spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or spec.remote_branch != ARCH134_F1R1_C1_BRANCH
+            or spec.tests != ARCH134_F1R1_C1_TESTS
+            or spec.ruff_paths != ARCH134_F1R1_C1_RUFF_PATHS
+            or spec.authority_check is not _arch134_f1r1_c1_authority_check
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+            or not _batch_workflow_is_reviewed(
+                (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        ):
+            failures.append("134-F1R1-C1 source-only registration drift")
+    except (OSError, ValueError, TypeError, KeyError, SyntaxError):
+        failures.append("134-F1R1-C1 authority unavailable")
+    return tuple(failures)
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,
@@ -15521,6 +16054,17 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_F1R1_C1_NAME: CheckpointSpec(
+            name=ARCH134_F1R1_C1_NAME,
+            description="Architecture 134-F1R1-C1 qualification operator source only",
+            tests=ARCH134_F1R1_C1_TESTS,
+            ruff_paths=ARCH134_F1R1_C1_RUFF_PATHS,
+            authority_check=_arch134_f1r1_c1_authority_check,
+            remote_branch=ARCH134_F1R1_C1_BRANCH,
+            preflight=None,
+            execute=None,
+            remote_head_env=None,
+        ),
         ARCH134_F1R1_B_NAME: CheckpointSpec(
             name=ARCH134_F1R1_B_NAME,
             description=("Architecture 134-F1R1-B host qualification source only"),

@@ -490,6 +490,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         "arch134-alpaca-authentication-qualification": "robinhood",
         "arch134-armed-paper-mvp": "robinhood",
         "arch134-f1r1-b-host-qualification": "robinhood",
+        "arch134-f1r1-c1-qualification-operator": "robinhood",
         "arch134-production-paper-runtime": "robinhood",
         "arch134-production-paper-runtime-acl": "robinhood",
     }
@@ -517,8 +518,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 70
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 70
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 71
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 71
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")
@@ -639,7 +640,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         is None
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 70
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 71
     assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
         runner.ARCH134_ARMED_PAPER_NAME,
         runner.ARCH134_PRODUCTION_STRATEGY_NAME,
@@ -650,7 +651,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
     )
     assert (
         runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        == "6ef20a733aecfc8396c6b22465ba9ce40b68c9b2496bd8d1915c6bcfa5efd12e"
+        == runner.ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
     )
     root = Path(runner.__file__).resolve().parents[1]
     for check in (

@@ -373,7 +373,7 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         "arch134-production-strategy-decision",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 70
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 71
     assert (
         checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-7]
         == checkpoint_runner.ARCH134_AUTH_NAME
@@ -386,10 +386,10 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 194,
-        "robinhood": 105,
+        "full": 195,
+        "robinhood": 106,
         "legacy": 222,
-        "exhaustive": 416,
+        "exhaustive": 417,
     }
     assert "tests/review_paper/test_production_strategy_cycle.py" in profiles["full"]
     assert (

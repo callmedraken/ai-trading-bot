@@ -16977,7 +16977,7 @@ ARCH134_D1S3_SOURCE_PINS: Final = {
         "db952ba9b1ebb4dcb8d5fe7c0f43c10f3173b843"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
-        "01b527429c42ce2fb519a330bedd942bc32b571e"
+        "c2d6d758a22e16f1cad9b0241b46490ac1b0d945"
     ),
 }
 ARCH134_D1S3_RUNNER_AST_PINS: Final = {
@@ -17052,7 +17052,7 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
     "42a36d2d2b37928bf7456866141e5274c23bfb421d79be6417b457badec82df3"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "f96a66f207ee80750f555326d00bcacd4d7feb43a5570c15e33184fa6989656f"
+    "0460e09e0d5537888e81becf2557df1ca10b54fb6deea2bf5d9eb1ee16acbb19"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
     "e632a51c1e9515a5128fac0bf3273ac3043765254fb131f96d22f9403b4cc446"

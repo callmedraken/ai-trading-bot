@@ -464,8 +464,7 @@ def test_current_document_exception_is_exact_and_predecessor_maps_are_unchanged(
     current_nodes = {
         node.target.id: node
         for node in ast.parse(current).body
-        if isinstance(node, ast.AnnAssign)
-        and isinstance(node.target, ast.Name)
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
     }
     assert before_nodes
     assert all(

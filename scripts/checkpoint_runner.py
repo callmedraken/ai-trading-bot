@@ -17148,14 +17148,14 @@ ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
         "c3298836d98c1848c3603b8c8d952ea1cfb5e307"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
-        "35c59239da85c8d97a59bcefdd99ca413cffbb5f"
+        "c2187d9bdda26558336811315dbcf78cbc679b69"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
         "5259e9e39f7ba4a15431f51eb0e237a32bad4693"
     ),
 }
 ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "8b7662e143d4a9bb9eb4da3273f93bf1d36e41ab79df6302fe952bf41c03b45e"
+    "78160f78e99b3572d028c9c8ee5df58a0a58cbe8079730aff56f4744a16375bb"
 )
 ARCH132_R3K_RUNNER_AST_PINS: Final = {
     "_arch134_d1s3_shared_successor_pin": (

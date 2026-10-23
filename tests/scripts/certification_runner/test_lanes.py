@@ -545,7 +545,7 @@ def test_r3k_successor_overlay_is_exact_and_intentionally_unmapped() -> None:
     root = Path(checkpoint.__file__).resolve().parents[1]
     expected = {
         "scripts/run_test_certification.py": (
-            "e853303076bb9c8ab5f721d60dd98301cca795c0"
+            "a6b3857f832af47fccaf3c13203ecae1c813a22e"
         ),
         "tests/scripts/certification_runner/helpers.py": (
             "c3298836d98c1848c3603b8c8d952ea1cfb5e307"

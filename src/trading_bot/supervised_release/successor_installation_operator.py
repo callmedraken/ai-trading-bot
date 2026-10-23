@@ -1001,6 +1001,7 @@ def _preflight() -> dict[str, object]:
 def _execute() -> dict[str, object]:
     try:
         declaration = derive_successor_declaration()
+        _administrator_host()
         boundary = _protected_boundary(declaration)
         if boundary.declaration != declaration:
             raise RuntimeError("protected declaration mismatch")

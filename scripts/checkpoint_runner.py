@@ -17017,16 +17017,16 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
 }
 ARCH134_D1S3_SOURCE_PINS: Final = {
     "docs/architecture/134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "97fdbbd41139c8a991123fe3304b811d0e47de1c"
+        "eaba721d1bc1caee5b77997b2a198e206b6c5c21"
     ),
     "docs/validation/arch134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "e55b89c8821303f8cdf0c58404e752c70ee2ffd8"
+        "c29ba9e18b84cf5a26adb4a87f43e095f5235ce2"
     ),
     "src/trading_bot/supervised_release/successor_installation_operator.py": (
-        "3c251fd128ad4d76327b3862f5faa760598810e5"
+        "f70d8b3d6a1f66d1cb92dba6b653477c1a12e383"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
-        "5a2f085bf6cdcd74aca7e9c754ff0c554f9cdf16"
+        "e4a650b4dbb1b11ae478ca1984166ce5ca7b5c60"
     ),
     "src/trading_bot/supervised_release/successor_native_read.py": (
         "9bc57b4f529856a354fa3fb209e4394abe7271bb"
@@ -17107,7 +17107,7 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
     "54d1b8c49f978ab840cb4f7b0ebe563c4ce31652b180d9ee10192ae9595861b9"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "3ea33fbd70f593711e750d364c146e5a7ff24bf9ce5238b556c744c9d0b40503"
+    "65d0fe57538c212259b7c00562eb014b4b0dfa4918abcabbe604071b647cb974"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
     "93f64320227091759e7998a9ccf643f20e7c575f95f8c48efeed99474067a80c"

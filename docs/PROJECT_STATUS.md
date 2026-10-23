@@ -2,7 +2,7 @@
 
 ## Current checkpoint
 
-D1S2 is SOURCE ACCEPTED and integrated into current `develop` at:
+D1S2 is SOURCE ACCEPTED and integrated into `develop` at:
 
 ```text
 HEAD 2b697b79e6bdbc964d2b0414ced057628e6c2da7
@@ -12,202 +12,104 @@ preserved failed D1S2 source attempt 39765888238 / attempt 1
 post-merge develop CI 39839904057 / attempt 1 / SUCCESS
 ```
 
-The active source-only successor checkpoint is
+The active source-only checkpoint is
 `arch134-f1r1-d1s3-successor-release-installation-operator` on
-`feature/robinhood-production-paper-134f1r1-successor-installation-operator-current`.
-D1S3 is pending ChatGPT exact-source acceptance. It adds source for a future
-protected immutable-release installation/readiness boundary; this checkpoint
-has performed no installation, publication, successor-root provisioning,
-runtime start, scheduler, credential, provider, paper, broker, D1, D2, or live
-effect. Successor execution remains unauthorized.
-
-## Architecture 132-R3K current-local topology successor
-
-Published R3J remains preserved but certification-rejected: its source gate
-was terminal green, while its one authorized canonical local ROBINHOOD run
-failed the unchanged 300-second hygiene ceiling. R3K is the intentionally
-unmapped topology successor on exact R3J base HEAD
-`de627d741891972b35fec458dbb9e66d46d1f4ac` / tree
-`45bf73e5136d69ae8a1e1246340ac3b4f6791f41`. Its source-owned model normalizes
-the sole raw R3J-D1 zero (`tests/domain/test_positions.py`) from 0 ms to the
-strict positive 1-ms minimum, for 109 modules and 856950 ms total, then uses
-four deterministic whole-module lanes. R3K remains pending its one atomic
-publication and terminal source gate; it does not change D1S3 product behavior.
-
-R4 remains unpublished and parked, with its existing seven-file draft
-untouched in
+`feature/robinhood-production-paper-134f1r1-successor-installation-operator-current`,
+worktree
 `F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
-D1S3 remains NOT SOURCE ACCEPTED and its FULL obligation remains pending.
-`develop` remains accepted D1S2 at the HEAD/TREE recorded above. Protected
-effects remain zero, and live remains NO-GO.
+R4 is integrated on accepted R3K. D1S3 remains **NOT SOURCE ACCEPTED** pending
+R4 terminal mapped CI and ChatGPT exact-source review. D1S3 FULL remains pending
+and has not run. Develop remains accepted D1S2.
 
-## Architecture 132-R3J topology correction
+## Accepted certification base and R4 recovery
 
-R3J is a separate certification-topology prerequisite on exact R3 HEAD
-`b40038c16a93f9bd9eb46cba5a30c14ba23b48ec` / tree
-`f3fada1c83feb2ed04b9397a4c795db8454e8a69`. It replaces current ROBINHOOD
-byte-size placement with the reviewed frozen timing model and does not modify
-D1S3 production behavior. The R3J branch is intentionally unmapped and does
-not satisfy the pending D1S3 FULL obligation.
+R3 remains preserved at `b40038c16a93f9bd9eb46cba5a30c14ba23b48ec` /
+`f3fada1c83feb2ed04b9397a4c795db8454e8a69`, CI `39903070805` attempt 1
+SUCCESS. ChatGPT source review rejected its Administrator-after-latch ordering.
+R3J remains published but certification-rejected for exceeding the unchanged
+300-second wall ceiling. Their history and evidence remain preserved.
 
-R4 remains unpublished and parked in its separate worktree; no R4 source,
-test, or focused-run changes are included here. D1S3 remains NOT SOURCE
-ACCEPTED. `develop` remains accepted D1S2 at the HEAD/TREE recorded above.
-All protected effects remain zero: no production preflight, execute,
-installation, successor-root provisioning, scheduler access or mutation,
-credential access, provider request, paper mutation, broker effect, D1/D2
-effect, or live effect. Live remains NO-GO.
+Architecture 132-R3K is **SOURCE/CERTIFICATION ACCEPTED** at:
+
+```text
+HEAD 5c57d49e31b1f0e5174bdc826b933118494e2456
+TREE 905c5a0006d0311b68d9a48947761b949bbcba5a
+```
+
+Accepted canonical ROBINHOOD: 109 modules, four timing-aware lanes with
+27/30/26/26 modules and modeled totals 214237/214237/214240/214236 ms.
+The timing model has 109 positive entries totaling 856950 ms, SHA256
+`0c0c79f710ab8b3a9ffc08de4720c026f257e2ffefc8dc6989c3a70fba2d2898`.
+The accepted run recorded 10756 passed, zero skipped/failed/errors;
+child elapsed 265.180/271.006/271.025/273.364 seconds; wall 276.789 seconds;
+headroom 23.211 seconds. Historical lane pins remain inactive.
+
+The parked seven-file R4 draft was backed up and read back outside the worktree
+before exact-path restoration. Local D1S3 was then fast-forwarded through the
+existing R3J/R3K ancestry, without rebase or history rewrite, and R4 was
+reconciled from that immutable backup. The earlier byte-size lane-change STOP
+is superseded by accepted R3K timing placement; final R4 must reproduce all four
+accepted ordered lane hashes exactly. No timing weights, lane count, planner,
+ownership, predecessor maps, or R3J/R3K overlays change.
+
+R4 restores the production order: accepted source derivation -> Administrator
+host admission -> read-only protected boundary construction ->
+`execute_installation` authorization/read-only eligibility -> durable attempt
+consumption -> installer. A definite non-Administrator rejection is
+`BLOCKED / NOT_STARTED`, calls neither execution nor installer, and creates or
+consumes no attempt latch. Boundary failure and authorization rejection remain
+pre-entry. Consumed/ambiguous evidence remains fail-closed with no retry.
+The R3/R3A native readiness model remains unchanged.
+
+## Successor contract and preserved boundary
 
 The D1 successor contract remains exactly two fixed sessions, 2026-11-02 and
-2026-11-03, SPY long-only synthetic review-paper, with explicit manual starts,
-fresh installed-release/runtime/host admission, and append-only parent/session
-evidence. The manual lifecycle is RUNNING -> STOPPED after reboot/login ->
-optional read-only reconciliation -> explicit start -> fresh admission ->
-RUNNING. Task Scheduler, boot/logon triggers, service auto-start, `--resume`,
-automatic recovery, catch-up, and retry after ambiguity remain absent.
+2026-11-03, SPY long-only synthetic review-paper, explicit manual starts, fresh
+installed-release/runtime/host admission, and append-only parent/session
+evidence. Lifecycle: RUNNING -> STOPPED after reboot/login -> optional read-only
+reconciliation -> explicit start -> fresh admission -> RUNNING. No scheduler,
+service, boot/logon, resume, automatic recovery, catch-up, or ambiguous retry
+capability is added.
 
-## D1S2 readiness bridge
+D1S2 composes accepted Architecture-133 release/bundle/inventory/binding,
+installed-image and runtime admission, F1R1-A/B, and successor-root observation.
+D1S3 adds the source for a later protected immutable-release installation
+operator. It observes exact FINAL/staging paths and uses a fresh D1S3 one-shot
+attempt. Exact ACK and independent post-install observation remain mandatory.
+The closed installed-readiness result remains
+`READY_FOR_D1_SUCCESSOR_INSTALLED_RELEASE_PREFLIGHT`.
 
-D1S2 supplies a successor-specific pure composition around the accepted
-Architecture-133 release declaration, bundle/inventory verification,
-RuntimeBinding, installed-release observation, runtime admission,
-Architecture133HostBinding, F1R1-A, F1R1-B, and D1 manual-start/read-only
-successor-root observation. It does not reuse or mutate the historical
-Architecture-133 AG installation operator.
+The future root `F:\AITradingBot\Arch133\arch134-f1r1-d1-successor-soak-v1`
+remains uncreated. Exact installation plus an absent root returns only
+`READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`; D1S3 never provisions it.
+Exact existing roots may proceed only through D1S2 read-only readiness.
+Root phase/date invariants remain empty -> session 01 and progression ->
+session 02; `ACTIVE_CURRENT_EXACT` never grants a fresh start.
+The Architecture-133 launcher remains inert/fail-closed, with no provider/paper
+wiring. The two current coordination documents alone remain mutable under the
+D1S3 overlay; every other pinned source/test/workflow/AST/document stays exact.
 
-The future accepted release source is supplied by an explicit remote/ref/
-HEAD/tree policy; no future SHA is guessed. Installation observation is split
-into `INSTALL_REQUIRED`, `ALREADY_INSTALLED_EXACT`, `BLOCKED`, and
-`INDETERMINATE`. The exact final release path and `.installing` staging path
-are read only. The future successor root remains
-`F:\AITradingBot\Arch133\arch134-f1r1-d1-successor-soak-v1`; it is not created
-by this checkpoint. C2 and old-F1 evidence cannot substitute.
-
-The closed positive result is
-`READY_FOR_D1_SUCCESSOR_INSTALLED_RELEASE_PREFLIGHT`. It requires the exact
-accepted source policy, complete bundle/inventory, canonical binding, exact
-installed-image observation, production runtime/process evidence,
-Architecture-133 host binding, F1R1-A, F1R1-B, exact D1 `STORE_IDENTITY`,
-successor namespace, repeated no-drift observation, and zero protected
-effects. It grants only ChatGPT review of a later protected installation /
-readiness boundary and grants no provider or paper authority.
-
-The Architecture-133 launcher remains unchanged and inert/fail-closed after
-runtime-admission import. D1S2 explicitly classifies the launcher/runtime-host
-gap; effectful quote/paper wiring is deferred until installed readiness is
-accepted.
-
-## D1S3 successor installation operator
-
-D1S3 constructs the complete accepted-source release declaration, independently
-replays `ReleaseBundle` / `VerifiedRelease`, constructs the canonical
-`RuntimeBinding`, and classifies the exact immutable final and `.installing`
-paths. It uses a fresh D1S3-specific one-shot attempt namespace and calls the
-accepted Architecture-133 installation engine at most once, only after a later
-reviewed authorization interlock. ACK identity, post-install re-observation,
-and the exact successor-root read-only classification are required.
-
-The frozen future root is
-`F:\AITradingBot\Arch133\arch134-f1r1-d1-successor-soak-v1`; it remains
-uncreated. If the immutable release is installed while that root is absent,
-the closed result is
-`READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`. D1S3 never provisions the
-root. An exact existing root may proceed only through the accepted D1S2
-read-only readiness composition. C2 and old-F1 evidence cannot substitute.
-
-The two current coordination documents, `docs/PROJECT_STATUS.md` and
-`docs/AI_TRADING_BOT_HANDOFF.md`, are mutable coordination surfaces under the
-D1S3 successor overlay and are not executable blob authority. All other
-source, workflow, test, AST, inventory, architecture, and validation pins
-remain exact and fail closed.
-
-The Architecture-133 launcher remains unchanged and inert/fail-closed after
-runtime-admission import. D1S3 does not wire provider or paper behavior into
-it and creates no scheduler, service, boot, logon, or resume behavior.
-
-## D1S3-R1 recovery state
-
-D1S3 remains not source accepted. The initial D1S3 publication, C1, and C2
-attempts remain preserved; C2 exposed both a predecessor-authority short
-circuit and a Robinhood lane-hygiene issue. D1S3-R1 is this explicitly
-ChatGPT-reviewed recovery checkpoint. It restores validation of the accepted
-predecessor overlays before any terminal D1S3 successor substitution and adds
-only the reviewed D1 session-execution Robinhood lane pin.
-
-Current `develop` remains accepted D1S2 at HEAD
-`2b697b79e6bdbc964d2b0414ced057628e6c2da7`, tree
-`e510210070874ade43a240457645939650e457d8`. No installation has run, the
-successor root remains absent, and the original F1 and C2 evidence remains
-untouched. Provider, credential, paper, broker, D1, D2, and live effects
-remain unauthorized; live remains NO-GO.
-
-## D1S3-R2 recovery state
-
-D1S3-R1 remains preserved as terminal-red CI evidence. R1 restored the
-predecessor-authority ordering and its reviewed Robinhood lane hygiene was
-successful: the two lanes completed in 278.765 and 278.779 seconds, with a
-280.368-second wall below the unchanged 300-second ceiling. The remaining R1
-failure was the accepted D1S2 source-overlay rollback test: setting
-`ARCH134_D1S2_SOURCE_PINS` to `None` incorrectly raised `D1S2 source overlay
-drift` instead of restoring the validated D1S1 predecessor result.
-
-D1S3-R2 is the explicitly ChatGPT-reviewed source-only recovery. It restores
-the accepted `None` rollback sentinel only after exact D1S2 predecessor-map and
-predecessor-blob validation, while retaining R1's fail-closed behavior for
-malformed non-`None` overlays and all D1S3 predecessor-authority checks. D1S3
-remains NOT SOURCE ACCEPTED pending terminal CI and ChatGPT exact-source review.
-No installation or successor-root provisioning has occurred; all protected
-effects remain zero, and provider, paper, broker, D1, D2, and live authority
-remain unauthorized.
-
-## D1S3-R3 native read-only recovery
-
-R2 is terminal green at `c09ddb9efde8f3297d3e5ab35200126f5f017bd8` /
-`d31d7a80359326d525b686c67960a918c233e223`, CI `39868108451`. ChatGPT
-exact-source review rejected D1S3 because its production protected-boundary
-composition was not supplied. All earlier failed publications remain intact.
-
-The reviewed R3A model distinguishes permanent per-child consumption from
-root-level continuation, phase-complete evidence, quiescent parent/session-01
-progression, and `ACTIVE_CURRENT_EXACT` with no fresh-start authority. R3 adds
-the required exact phase/date invariant: empty root -> session 01; progression-
-ready root -> session 02. A proved mismatch is
-`BLOCKED / MANUAL_START_SESSION_MISMATCH`, retaining root/process observations.
-
-R3 supplies source-owned read-only native installation/image, fixed-root replay,
-current runtime/substrate, and exact process-ownership adapters. Pre-install
-assessment needs no runtime process. Exact installation with an absent root
-returns `READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`; it never provisions.
-Full readiness still requires genuinely applicable immutable manual runtime
-admission. No native production preflight or execute was invoked in source work.
-
-D1S3 remains NOT SOURCE ACCEPTED pending terminal R3 mapped CI and ChatGPT
-exact-source review. FULL remains pending until that acceptance. Develop
-remains accepted D1S2. All protected effects remain zero; original F1/C2
-evidence is untouched; successor execution is unauthorized; live remains NO-GO.
-
-Next owner: ChatGPT exact-source review after the single combined R3 publication
-reaches terminal CI. On red, preserve evidence and stop; no automatic R3-C1/C2.
-Only after source acceptance may the fresh FULL obligation be satisfied before
-any merge/release-readiness boundary or protected preflight review.
-
-## Preserved operational boundary
-
-Original F1 remains `FINAL / INDETERMINATE / CONSUMED`; its D1R7/D1R8 attempts
-and evidence are never retried, repaired, or reused. C2 remains consumed
-immutable evidence. Both original F1 and C2 evidence are untouched. The
-successor root remains uncreated, provider/paper/broker execution remains
-unauthorized, D1S3 source tests use injected fakes only, and all protected
-effect counters remain zero. Architecture 145 remains separate/offline for
-strategy-quality research. Live remains NO-GO.
+Original F1 remains FINAL / INDETERMINATE / CONSUMED. C2 remains consumed,
+immutable and non-reusable; both evidence namespaces remain untouched.
+Architecture 145 remains separate/offline. All protected effect counters remain
+zero: installation, release publication, successor-root provisioning, scheduler
+reads/mutations, real credential reads, provider requests, paper mutations,
+broker, D1 operational, D2 and live effects, original F1 and C2 evidence mutations.
+No protected preflight or execute has run. Successor execution remains
+unauthorized and live remains **NO-GO**.
 
 ## Next step
 
-Owner: ChatGPT. Review the exact combined R3 source/diff, phase/date invariant,
-native no-effect composition, predecessor overlays, focused evidence, and
-terminal mapped ROBINHOOD gate. FULL remains pending until source acceptance. Only after SOURCE ACCEPTED may ChatGPT review the
-separate read-only protected preflight. Only after that preflight may an
-immutable-release installation effect be considered within exact reviewed
-bounds. Successor/provider/paper execution remains unauthorized.
+Owner: ChatGPT exact-source review after the single R4 commit/push and terminal
+mapped CI. Require source-static, active-tests, canonical four-lane ROBINHOOD
+and source-gates PASS, full-tests SKIPPED, zero failed/errors, and canonical wall
+below 300 seconds. On red, preserve the attempt and STOP; no automatic correction
+or second publication. No duplicate local canonical ROBINHOOD or FULL is run.
+
+Only if R4/D1S3 is SOURCE ACCEPTED: run exactly one fresh FULL against that exact
+accepted HEAD/tree; accept/reject FULL; merge into develop only after FULL PASS;
+verify exact post-merge HEAD/tree and CI; close status/handoff; then issue the
+separately reviewed READ-ONLY D1S3 production preflight. None of those later
+effects is performed by this source checkpoint.
 
 Also remove or update any tests and docs that referenced the old behavior.

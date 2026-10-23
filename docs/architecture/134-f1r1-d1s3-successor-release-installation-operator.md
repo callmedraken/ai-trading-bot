@@ -17,6 +17,16 @@ reads credentials or contacts providers, paper, broker, D1, D2, Scheduler, or
 live surfaces. The historical Architecture-133 AG installation operator is
 not repurposed or mutated.
 
+R4 integrates Administrator-before-latch recovery onto SOURCE/CERTIFICATION
+ACCEPTED Architecture 132-R3K, HEAD
+`5c57d49e31b1f0e5174bdc826b933118494e2456`, tree
+`905c5a0006d0311b68d9a48947761b949bbcba5a`. R3 was CI-green but
+source-rejected for Administrator-after-latch ordering; published R3J was
+certification-rejected. Current ROBINHOOD uses accepted R3K four-lane timing
+placement. D1S3 remains NOT SOURCE ACCEPTED pending R4 CI and ChatGPT review;
+FULL remains pending and has not run. Develop remains accepted D1S2; protected
+effects remain zero and live remains NO-GO.
+
 ## Source and release identity
 
 The protected dispatch admits only the exact remote
@@ -42,6 +52,14 @@ are absent, the fresh D1S3 attempt is available, source/host prerequisites and
 the exact release declaration pass, and all protected counters are zero.
 `ALREADY_INSTALLED_EXACT` never enters execute. Conflicts are `BLOCKED` or
 `INDETERMINATE` and are never repaired or retried.
+
+R4 production execute ordering is accepted source identity -> exact
+Administrator host admission through the existing `_administrator_host()` ->
+read-only protected boundary construction -> authorization and read-only D1S3
+preflight/eligibility -> durable latch consumption -> installer entry. A
+non-Administrator rejection or boundary-construction failure is pre-entry and
+cannot create or consume installation authority. Previously consumed or
+ambiguous attempt evidence remains fail-closed; no reset or retry is granted.
 
 The fixed D1S3 attempt namespace is
 `F:\AI\temp\arch134-f1r1-d1s3-installation-attempt\attempt.json`. Preflight

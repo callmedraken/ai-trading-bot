@@ -288,6 +288,7 @@ def test_successful_install_consumes_durable_latch_and_reobserves(tmp_path):
     calls = []
 
     def installer(release, binding):
+        assert subject.observe_attempt(attempt).state is subject.AttemptState.CONSUMED
         calls.append((release, binding))
         return InstallResult(
             InstallStatus.INSTALLED_VERIFIED,
@@ -356,6 +357,48 @@ def test_authorization_rejection_is_pre_entry_and_does_not_create_latch(tmp_path
     assert result["effect_disposition"] == "NOT_STARTED"
     assert not attempt.exists()
     assert calls == []
+
+
+@pytest.mark.parametrize("rejected", ["source", "administrator", "boundary", None])
+def test_execute_prerequisite_order(monkeypatch, tmp_path, rejected):
+    boundary, events = make_boundary(), []
+    attempt = tmp_path / "attempt.json"
+    observe = subject.observe_attempt
+    monkeypatch.setattr(subject, "observe_attempt", lambda: observe(attempt))
+
+    def call(step, value, *args, **kwargs):
+        events.append(step)
+        if step == rejected:
+            raise RuntimeError("pre-entry rejection")
+        if args:
+            assert args == (
+                (boundary.declaration,) if step == "boundary" else (boundary,)
+            )
+        if step == "execute":
+            assert kwargs == {"authorization": None}
+        return value
+
+    monkeypatch.delenv(subject.AUTH_ENV, raising=False)
+    for name, step, value in (
+        ("derive_successor_declaration", "source", boundary.declaration),
+        ("_administrator_host", "administrator", None),
+        ("_protected_boundary", "boundary", boundary),
+        ("execute_installation", "execute", {"status": "dispatch"}),
+    ):
+        monkeypatch.setattr(
+            subject, name, lambda *a, s=step, v=value, **kw: call(s, v, *a, **kw)
+        )
+    for name in ("consume_attempt", "install_release"):
+        monkeypatch.setattr(subject, name, lambda *_: pytest.fail("unexpected effect"))
+    result = runner._arch134_d1s3_execute()
+    order = ["source", "administrator", "boundary", "execute"]
+    assert events == (order if rejected is None else order[: order.index(rejected) + 1])
+    if rejected is None:
+        assert result == {"status": "dispatch"}
+    else:
+        assert result["status"] == "BLOCKED"
+        assert result["effect_disposition"] == "NOT_STARTED"
+    assert not attempt.exists()
 
 
 def test_ack_identity_mismatch_is_indeterminate_and_preserves_attempt(tmp_path):

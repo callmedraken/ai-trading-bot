@@ -141,4 +141,139 @@ predecessor maps/digests remain intact and are validated before substitution.
 The current-doc mutable exception remains exactly two paths. Source inventory,
 two Robinhood lanes, R1 placement pin, and the 300-second ceiling are unchanged.
 
+## Preserved D1S3-R4 parked draft recovery and verification
+
+R3 is preserved at `b40038c16a93f9bd9eb46cba5a30c14ba23b48ec` /
+`f3fada1c83feb2ed04b9397a4c795db8454e8a69`. Mapped CI `39903070805`,
+attempt 1, was terminal SUCCESS: source-static, active-tests, canonical
+ROBINHOOD and source-gates passed; full-tests skipped. ROBINHOOD recorded
+10,732 cases, 10,726 passed, 6 skipped, zero failed/errors, wall 296.425 seconds.
+ChatGPT exact-source review nevertheless rejected R3: the production execute
+wrapper did not admit Administrator host authority before D1S3 attempt
+consumption. The installer's later independent Administrator check was too late.
+
+R4 calls the existing `_administrator_host()` immediately after accepted source
+derivation and before protected boundary construction or `execute_installation()`.
+The production order is source -> Administrator -> read-only boundary ->
+authorization/read-only preflight -> durable one-shot latch -> installer.
+Administrator rejection and boundary-construction failure are pre-entry and
+cannot create or consume a latch. Existing consumed/ambiguous evidence still
+fails closed. The installation engine, durable latch functions/path and R3
+native observer source remain unchanged; no authority or effect is broadened.
+
+R4 is source-only and remains NOT SOURCE ACCEPTED pending R4 terminal CI and
+ChatGPT exact-source review. Before publication, the exact deterministic
+ROBINHOOD lane membership must match preserved R3; any movement stops R4
+before commit/push for ChatGPT review. No lane pins or 300-second ceiling change.
+FULL remains pending and must not run before source acceptance. Develop remains
+accepted D1S2. No protected preflight, execute, installation, root provisioning,
+runtime start, scheduler read/mutation, credential/provider/paper/broker/D1/D2/
+live effect or original F1/C2 evidence mutation occurred. Successor execution
+remains unauthorized and live remains NO-GO. All previous publications and
+their CI evidence remain preserved.
+
+R4 pre-publication gate result: STOP before staging/commit/push. The repository's
+read-only ROBINHOOD planner, using fresh Windows CI CRLF checkout snapshots,
+exactly reproduced preserved R3 and then found 71 of 109 modules changed lanes.
+Only the D1S3 test module changed weight: 45,332 -> 47,488 bytes. R3 lanes were
+54/55 modules (1,349,983/1,377,620 bytes); R4 plans 55/54 modules
+(1,382,196/1,347,563 bytes). No lane pin was changed. ChatGPT must review the
+exact before/after memberships and weights before any further publication work.
+Focused verification passed 117 D1S2/D1S3 cases and 412 retained Architecture-133
+installation/operator and checkpoint-runner cases. Changed-Python Ruff check,
+Ruff format check and diff check passed. R4 has no commit or CI run; HEAD/tree
+remain the R3 identities above with the bounded R4 diff uncommitted. No local
+canonical ROBINHOOD or FULL was run. Do not run full verification before source
+acceptance or publish while this lane-change STOP remains unresolved.
+
+Reviewed pre-publication R4 test compaction was attempted once and remains STOP.
+Only the new R4 wrapper-test setup was consolidated; all four prerequisite
+cases and latch/installer probes remain. Windows CI test-file weight is now
+47,247 bytes (R3 45,332; initial R4 47,488). Exact R3 reconstruction passed,
+but 30/109 modules still move. Counts alone return to 54/55; ordered hashes
+do not match. No further shrinking or topology change is authorized. Focused
+tests were not rerun because exact restoration was their explicit prerequisite;
+the 117/412 results above apply to the pre-compaction candidate only. Current
+compacted tests remain unverified. No staging/commit/push, canonical profile,
+protected operation or effect occurred. ChatGPT must review the exact residual
+plan difference and decide a separately reviewed certification-topology step.
+
+## Current R4 integration on accepted R3K
+
+The parked-draft STOP and byte-size plan evidence above remain historical.
+Architecture 132-R3J was published but certification-rejected. Architecture
+132-R3K is now SOURCE/CERTIFICATION ACCEPTED at HEAD
+`5c57d49e31b1f0e5174bdc826b933118494e2456`, tree
+`905c5a0006d0311b68d9a48947761b949bbcba5a`. Its canonical ROBINHOOD
+recorded 10756 passed, zero skipped/failed/errors; four child elapsed times
+265.180/271.006/271.025/273.364 seconds; wall 276.789 seconds, with 23.211
+seconds headroom below the unchanged 300-second ceiling.
+
+The seven-file parked R4 draft was completely backed up/read back before
+exact-path restoration. Only local D1S3 was fast-forwarded from preserved R3
+through existing R3J/R3K ancestry. R4 source/tests were reapplied from that
+immutable external backup; the old runner hunk was recomposed onto accepted
+R3K. Existing R3J/R3K dictionaries, digests and AST overlays remain intact.
+Only final D1S3 R4 source/document/test pins and their map digest change.
+D1S2 rollback None and mutable PROJECT_STATUS/HANDOFF exceptions are preserved.
+
+The product correction remains one Administrator admission call immediately
+after accepted source derivation and before boundary construction/execution.
+The compacted four prerequisite cases preserve source -> Administrator ->
+boundary -> execute ordering; rejection proves BLOCKED / NOT_STARTED, no
+execution/installer call and no latch creation/consumption. Existing tests retain
+authorization rejection, durable consume-before-installer, post-entry ambiguity/
+no-retry, and all R3/R3A native readiness behavior.
+
+Current source-owned plan proof must match accepted R3K exactly: 109 positive
+timing entries, 856950 ms total, map SHA256
+`0c0c79f710ab8b3a9ffc08de4720c026f257e2ffefc8dc6989c3a70fba2d2898`;
+27/30/26/26 modules, modeled totals 214237/214237/214240/214236 ms;
+ordered lane hashes as frozen in the R3K validation record. Changed D1S3 test
+bytes must have zero placement effect. Certification executable source, weights,
+lane count, inactive historical pins, ownership and ceiling remain unchanged.
+
+R4 remains NOT SOURCE ACCEPTED until terminal mapped CI plus ChatGPT exact-source
+review. Mapped CI owns canonical ROBINHOOD; no local canonical profile is run.
+D1S3 FULL remains pending and has not run. Develop remains accepted D1S2. All
+protected effects remain zero, including installation/publication, successor
+root provisioning, scheduler reads/mutations, real credentials, provider,
+paper, broker, D1 operational, D2, live and original F1/C2 evidence mutation.
+No protected preflight or execute occurs; live remains NO-GO.
+
+After green R4, ChatGPT reviews exact source. Only after source acceptance may
+one fresh FULL run on that exact HEAD/tree; only after accepted FULL may develop
+merge, exact post-merge verification/CI and docs closeout proceed, followed by
+the separately reviewed READ-ONLY D1S3 production preflight. On R4 CI red,
+preserve and STOP without a second publication or automatic C1/C2/R5.
+
+### Final integrated R4 focused verification
+
+The compacted final product/test blobs match the verified parked backup.
+Complete D1S3/D1S2 modules passed 117 cases (74/43), including all R3/R3A native
+readiness cases and all four prerequisite-order parameters. Source rejection,
+Administrator rejection and boundary failure stop at their exact prefix;
+success reaches execute only after all prerequisites. All rejection paths
+assert no attempt file, and latch/installer entry probes fail if reached.
+Retained authorization, consume-before-installer and post-entry ambiguity tests
+passed without changes to their contract.
+
+Retained verification passed 925 cases: original retained installation (181),
+installation operator (59), checkpoint core (75) and checkpoint CI (97) total
+412; additional installation reconciliation (12), R3K lanes (76), profiles (410)
+and source admission (15) total 513. Combined focused/retained result: 1042
+passed, zero skipped/failed/errors. Changed-Python Ruff lint/format and Git diff
+checks passed. These are focused tests, not local canonical certification.
+
+Final candidate source-owned ROBINHOOD planning passed exact R3K equality:
+27/30/26/26 modules; modeled totals 214237/214237/214240/214236 ms; ordered hashes
+`cc0a6556faf54386fe4e8c0a192ac0ad6543da814d5926e86f7c8bc867470a51`,
+`904166863dfa5354fad29773877c70eb991ba240b3f117ccb163766f8fc71198`,
+`a5620743bd21fbb59d16f0994290e2908bfeeba71bfc3a15bed0fb2cadb42aa3`,
+`e51754fe142e84fac06f2a27184aa948f1a2de73f5868f6fef45f3d174a62b45`.
+D1S3 changed test bytes have zero placement effect. The pre-commit proof calls
+the unchanged source-owned inventory/profile/plan functions against unpublished
+candidate bytes; the clean committed candidate also receives the normal CLI
+`--plan` admission before its one push. Neither path launches canonical tests.
+
 Also remove or update any tests and docs that referenced the old behavior.

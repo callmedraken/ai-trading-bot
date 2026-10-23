@@ -6,7 +6,7 @@ This document defines the source-only checkpoint
 `arch134-f1r1-d1s3-successor-release-installation-operator`. D1S2 is SOURCE
 ACCEPTED and integrated at HEAD
 `2b697b79e6bdbc964d2b0414ced057628e6c2da7`, tree
-`e510210070874ade43a240457645939650e457d8`. D1S3 feature CI is
+`e510210070874ade43a240457645939650e457d8`. D1S2 feature CI is
 `39767775803` attempt 1 SUCCESS; preserved failed run `39765888238` attempt 1;
 post-merge develop CI `39839904057` attempt 1 SUCCESS.
 
@@ -72,6 +72,53 @@ stop. Original F1 and C2 evidence cannot substitute.
 
 The lifecycle remains `RUNNING -> STOPPED -> optional read-only
 reconciliation -> explicit manual start -> fresh admission -> RUNNING`.
+
+## R3 native read-only composition
+
+`_protected_boundary()` composes one exact `SuccessorReleaseDeclaration`,
+`InstallationNativeObserver`, the accepted `WindowsObserver` image reader,
+`NativeRuntimeObserver`, and `NativeSuccessorRootObserver`. Construction is
+inert. Accepted-source HEAD/tree remain reviewed environment interlocks; R3
+does not guess its future publication identity. Git's slash-form worktree
+path is normalized before comparison with the fixed Windows worktree.
+
+Installation observation reuses Architecture-133 no-follow read sessions,
+parent policy and immutable-image replay, checks the pinned production Python
+without executing it, and rechecks exact FINAL/staging absence or identity.
+The original `ReleasePaths` installer grammar is unchanged. The separate
+`D1S3ReadPaths` adapter grants only fixed production ancestors, the exact D1
+root and three permitted filenames, and the fixed runtime subtree. It reuses
+`WindowsReadSession` handle/ACL/namespace/byte primitives and exposes no writes.
+
+Root facts are pinned and compared on repeated reads. Empty/absent roots are
+observations only. Nonempty roots use the accepted `snapshot`/JSONL replay,
+including lineage, fixed ordinals/dates, parent/grant prefixes, prior-child
+progression, final cross-digests/counters, and actual installed image/Python/
+store identities. Only an exact benign session-01 final before child-02 grant
+is `ALREADY_BOUND_EXACT`; all-three filenames alone never suffice. Completed/
+halted series are `CONSUMED`, not malformed. Invalid canonical evidence is
+`MALFORMED`; unreadable/unprovable facts remain `INDETERMINATE`.
+
+Active replay queries only its exact recorded PID/birth with read-only process
+APIs. Definite exit/PID reuse/wrong executable is consumed. A different live
+production PID is still unproven because its imports/substrate cannot be
+admitted from a process handle. `ACTIVE_CURRENT_EXACT` requires this exact
+current manual process plus fresh Architecture-133 runtime admission; it
+never grants a fresh start. No arbitrary Python process is selected or started.
+
+Runtime observation permits only the current immutable production interpreter,
+exact original `-I -S -B` launcher invocation, cwd, fixed paths, module origins,
+standard non-impersonating Trading token, full bounded substrate/dependency
+inventory, configuration absence, and repeated no-drift observations. The
+accepted launcher remains inert/fail-closed. Installation-only preflight does
+not invent runtime evidence; full readiness remains unavailable until a
+genuinely applicable separately reviewed manual runtime exists.
+
+Pre-install absence can return `INSTALL_REQUIRED`/execute eligibility with no
+runtime process. Exact installation plus absent successor root reports the
+closed `READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW` readiness field and
+never creates the root. The installation engine/latch effect scope and durable
+one-shot ordering remain unchanged; execute adds no process or trading effect.
 
 ## Mutable current-document policy
 

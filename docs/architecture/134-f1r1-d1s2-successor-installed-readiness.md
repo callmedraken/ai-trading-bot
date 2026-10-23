@@ -74,6 +74,7 @@ The observer distinguishes:
 - `ABSENT_ELIGIBLE`;
 - `EMPTY_FRESH_ADMITTED`;
 - `ALREADY_BOUND_EXACT`;
+- `ACTIVE_CURRENT_EXACT`;
 - `CONFLICTING_FOREIGN`;
 - `ALIAS_OR_REPARSE`;
 - `WRONG_PARENT_OR_POLICY`;
@@ -85,10 +86,60 @@ The observer distinguishes:
 Positive root observation requires the exact production path and parent,
 directory kind, local NTFS storage, no reparse point or alias, one link, the
 accepted owner and protected image ACL, stable object identity, and either the
-empty fresh namespace or the exact D1 parent/session namespace with
-`STORE_IDENTITY`. A second read detects replacement or drift. The C2 root
+empty fresh namespace or the quiescent progression-ready parent/session-01
+namespace with `STORE_IDENTITY`. Active reservations are not positive fresh-
+manual-start readiness. A second read detects replacement or drift. The C2 root
 `F:\AI\temp\qualification\arch134-f1r1-host-isolation`, old-F1 namespaces,
 and historical qualification evidence cannot substitute.
+
+## R3A root-state refinement and R3 session binding
+
+ChatGPT reviewed the unpublished R3A refinement in principle and required the
+additional R3 phase/date invariant below. These are successor refinements;
+the original D1S2 source did not explicitly implement them. The accepted D1
+controller/evidence codecs and fixed tuple remain unchanged.
+
+Child reservation consumption is permanent and per-attempt. Root-level
+`consumed` means no legally usable current continuation or future fixed-ordinal
+grant remains. A progressing child 01 remains consumed while the same parent
+can still admit exactly one fresh child 02 from a fresh manual process.
+`evidence_complete=True` means phase-complete canonical replay, not completion
+of both sessions or the entire series.
+
+| Current phase | Exact filenames | Fresh-start classification |
+| --- | --- | --- |
+| Before session 01 | none | `EMPTY_FRESH_ADMITTED` |
+| Session 01 active in its exact owning process | parent + session 01 | `ACTIVE_CURRENT_EXACT`; no fresh start |
+| Benign session 01 final, before session 02 reservation | parent + session 01 | `ALREADY_BOUND_EXACT` |
+| Session 02 active in its exact owning process | parent + both sessions | `ACTIVE_CURRENT_EXACT`; no fresh start |
+| `SERIES_COMPLETED` or `SERIES_HALTED` | exact replayed phase namespace | `CONSUMED`; no fresh start |
+
+`ALREADY_BOUND_EXACT` means only quiescent progression-ready exact state:
+`names == (PARENT_NAME, SESSION_NAMES[0])`, exact `STORE_IDENTITY`, phase-complete
+evidence, `consumed=False`, and `malformed=False`, with the existing exact
+physical-root/security/stability facts. Session 01 must end in `NO_SIGNAL`,
+`RISK_REJECTED`, or `PAPER_EXECUTED`; the parent must contain its exact
+`SESSION_01_FINAL`, no `SESSION_02_GRANT_INTENT`, no session-02 file, and no
+series terminal. Filenames alone never establish those facts.
+
+`ACTIVE_CURRENT_EXACT` means a replay-valid nonterminal reservation bound to
+the exact currently observed owning manual process, exact parent/grant prefix,
+and exact prior progression. Only that process may legally continue the
+already-consumed child. D1S2 fresh-start readiness returns
+`BLOCKED / CURRENT_MANUAL_START_ACTIVE`, not positive installed-release
+preflight readiness. It creates no continuation or effect authority.
+
+A gone/mismatched owner after reservation is `CONSUMED`; unprovable ownership
+or liveness is `INDETERMINATE`. Active/orphaned reservations never become new
+start authority and never permit a second reservation of the same ordinal.
+The R3 native observer derives these facts from actual parent/session replay
+and exact process observation. Pure D1S2 checks the relationship independently:
+`EMPTY_FRESH_ADMITTED` requires the admitted process date `SESSIONS[0]`, and
+`ALREADY_BOUND_EXACT` requires `SESSIONS[1]`. Both exact observations are retained
+when a mismatch returns `BLOCKED / MANUAL_START_SESSION_MISMATCH`; it cannot
+produce a RUNNING manual-start transition. Positive result construction also
+rejects an inconsistent phase/date pair. Native adapter code belongs to D1S3;
+this D1S2 module remains pure and effect-free.
 
 ## Readiness composition
 

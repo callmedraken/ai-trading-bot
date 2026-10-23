@@ -48,6 +48,28 @@ The D1S2 proof must show:
 The launcher remains unchanged and inert/fail-closed. The runtime-host gap is
 classified rather than silently converted into operational capability.
 
+## R3A semantics and R3 phase/date verification
+
+The [D1S2 architecture refinement](../architecture/134-f1r1-d1s2-successor-installed-readiness.md#r3a-root-state-refinement-and-r3-session-binding)
+defines the reviewed phase semantics. Child reservations remain permanently
+consumed per attempt; root-level `consumed` describes remaining legal
+continuation/fixed-ordinal progression, and `evidence_complete` is phase-complete
+replay. `ALREADY_BOUND_EXACT` is only quiescent parent + session 01.
+`ACTIVE_CURRENT_EXACT` maps to `BLOCKED / CURRENT_MANUAL_START_ACTIVE`.
+
+The exact next-date matrix is mandatory in pure composition and the positive
+result invariant: empty + session 01 and progression + session 02 are READY;
+the other two pairs are `BLOCKED / MANUAL_START_SESSION_MISMATCH`, preserve
+the exact observed root/process, and confer no manual-start transition.
+Tests retain active, consumed, indeterminate, malformed, replacement/drift,
+historical-namespace rejection, and zero-effect behavior.
+
+The corrected pre-native focused boundary passed 123 D1S2/D1S1 cases, with
+eight publication-authority cases deferred until the combined R3 pin update.
+R3 reconciles those exact source/AST/blob consumers before its single push;
+no deferred source-authority assertion is presented as source acceptance.
+No local canonical ROBINHOOD, FULL, protected preflight, or execute is run.
+
 ## Focused verification
 
 The new D1S2 tests use injected fakes and a fresh external pytest basetemp

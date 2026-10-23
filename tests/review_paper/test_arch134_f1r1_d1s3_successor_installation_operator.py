@@ -3,10 +3,12 @@
 import ast
 import inspect
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import test_supervised_runtime_host_admission as production_fixtures
 from test_supervised_release_installation import accepted
 
 from scripts import checkpoint_runner as runner
@@ -35,6 +37,8 @@ from trading_bot.supervised_release.installation_contract import (
     InstallResult,
     InstallStatus,
 )
+
+production_setup = production_fixtures.setup
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE_HEAD = "2b697b79e6bdbc964d2b0414ced057628e6c2da7"
@@ -130,7 +134,7 @@ def test_exact_predecessor_identity_and_fixed_effect_boundary():
     assert all(value == 0 for _, value in subject.ZERO_PROTECTED_EFFECTS)
 
 
-def test_d1s2_modules_are_not_modified_by_successor_operator():
+def test_d1s2_semantic_refinement_is_exact_and_d1s1_modules_remain_frozen():
     paths = (
         "src/trading_bot/review_paper/successor_readiness.py",
         "src/trading_bot/review_paper/successor_soak_contract.py",
@@ -148,7 +152,10 @@ def test_d1s2_modules_are_not_modified_by_successor_operator():
             .strip()
         )
         current = runner._git_blob_sha1(ROOT / relative)
-        assert current == base
+        if relative.endswith("/successor_readiness.py"):
+            assert current == runner.ARCH134_D1S3_SHARED_SUCCESSOR_PINS[relative]
+        else:
+            assert current == base
 
 
 def test_install_required_preflight_is_closed_and_read_only(tmp_path):
@@ -182,7 +189,11 @@ def test_already_installed_exact_never_becomes_execute_eligible(tmp_path):
     boundary = make_boundary(installation=installation)
     result = subject.assess_d1s3_preflight(boundary)
     assert result.status is subject.OperatorStatus.PASS
-    assert result.reason is subject.OperatorReason.ALREADY_INSTALLED_EXACT
+    assert result.reason is subject.OperatorReason.SUCCESSOR_ROOT_PROVISIONING_REVIEW
+    assert (
+        result.to_dict()["readiness_status"]
+        == "READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW"
+    )
     assert not result.execute_eligible
 
     calls = []
@@ -208,7 +219,7 @@ def test_exact_existing_successor_root_routes_only_through_d1s2_readiness(
             SuccessorStoreClassification.ALREADY_BOUND_EXACT,
             identity=(7, 901),
             parent_identity=(7, 800),
-            names=(PARENT_NAME, *SESSION_NAMES),
+            names=(PARENT_NAME, SESSION_NAMES[0]),
             store_identity=STORE_IDENTITY,
             evidence_complete=True,
         )
@@ -567,3 +578,702 @@ def test_removing_d1s3_overlay_restores_d1s2_fail_closed_behavior(monkeypatch):
     monkeypatch.setattr(runner, "ARCH134_D1S3_SOURCE_PINS", {})
     monkeypatch.setattr(runner, "ARCH134_D1S3_RUNNER_AST_PINS", {})
     assert runner._arch134_d1s2_authority_check(ROOT)
+
+
+class RootReadFake:
+    """Only logical fixed-path read facts; disposable D1 bytes are copied in."""
+
+    def __init__(self, harness, *, absent=False):
+        from trading_bot.supervised_release.installation_contract import (
+            IMAGE_ACES,
+            ObjectFacts,
+        )
+        from trading_bot.supervised_release.model import DURABLE_DATA_ROOT
+
+        self.h = harness
+        self.nodes = dict(harness.source.native.nodes)
+        self.nodes[DURABLE_DATA_ROOT] = ObjectFacts(
+            DURABLE_DATA_ROOT,
+            "directory",
+            (7, 800),
+            IMAGE_ACES[0][0],
+            True,
+            IMAGE_ACES,
+        )
+        if not absent:
+            self.nodes[subject.PRODUCTION_ROOT] = ObjectFacts(
+                subject.PRODUCTION_ROOT,
+                "directory",
+                (7, 900),
+                IMAGE_ACES[0][0],
+                True,
+                IMAGE_ACES,
+            )
+        self.payloads = {}
+        self.events = []
+        self.extra_names = ()
+        self.sync()
+
+    def sync(self):
+        from dataclasses import replace
+
+        root = self.nodes.get(subject.PRODUCTION_ROOT)
+        if root is None:
+            return
+        for index, name in enumerate((PARENT_NAME, *SESSION_NAMES), 1):
+            data = self.h.storage.read(name)
+            if data is not None:
+                path = subject.PRODUCTION_ROOT + "\\" + name
+                self.payloads[path] = data
+                self.nodes[path] = replace(
+                    root,
+                    path=path,
+                    kind="file",
+                    identity=(7, 900 + index),
+                    size=len(data),
+                )
+
+    def read_session(self):
+        from contextlib import nullcontext
+
+        return nullcontext(self)
+
+    def object(self, path, *, directory):
+        self.events.append(("object", path))
+        return self.nodes.get(path)
+
+    def names(self, path):
+        self.events.append(("names", path))
+        assert path == subject.PRODUCTION_ROOT
+        return (
+            tuple(
+                name
+                for name in (PARENT_NAME, *SESSION_NAMES)
+                if path + "\\" + name in self.payloads
+            )
+            + self.extra_names
+        )
+
+    def read(self, path, limit):
+        self.events.append(("read", path))
+        data = self.payloads[path]
+        assert len(data) <= limit
+        return data
+
+
+class ManualRuntimeFake:
+    def __init__(self, harness, ownership=None):
+        from trading_bot.supervised_release.successor_native_read import Ownership
+
+        self.h = harness
+        self.ownership = ownership or Ownership.CURRENT_EXACT
+        self.owners = []
+
+    def observe_process(self):
+        return self.h.source.runtime.observe_process()
+
+    def observe_substrate(self):
+        return self.h.source.runtime.observe_substrate()
+
+    def observe_manual_process(self):
+        return self.h.observations.process
+
+    def observe_owner(self, process):
+        from trading_bot.supervised_release.successor_native_read import Ownership
+
+        self.owners.append(process)
+        return (
+            self.ownership
+            if process == self.h.observations.process
+            else Ownership.GONE_OR_MISMATCHED
+        )
+
+
+@pytest.fixture
+def native_harness(production_setup, tmp_path, monkeypatch):
+    import test_arch134_f1r1_d1s1_successor_soak as d1
+
+    from trading_bot.supervised_release import observer
+    from trading_bot.supervised_release import successor_native_read as native
+
+    h = d1.harness.__wrapped__(production_setup, tmp_path, monkeypatch)
+    monkeypatch.setattr(native, "hashlib", observer.hashlib)
+    declaration = SuccessorReleaseDeclaration(
+        SuccessorSourcePolicy(
+            subject.SOURCE_REMOTE,
+            subject.SOURCE_REF,
+            h.source.release.expected_source_head,
+            h.source.release.expected_source_tree,
+            h.source.release.expected_source_paths,
+        ),
+        h.source.release,
+        h.source.binding,
+    )
+    return h, declaration, d1, native
+
+
+def root_adapter(native_harness, *, ownership=None, absent=False):
+    h, declaration, _, native = native_harness
+    reader = RootReadFake(h, absent=absent)
+    runtime = ManualRuntimeFake(h, ownership)
+    observer = native.NativeSuccessorRootObserver(
+        declaration,
+        runtime,
+        reader=reader,
+        image_observer=h.source.native,
+    )
+    return observer, reader, runtime
+
+
+def test_native_factory_is_inert_and_supplies_all_real_observers(
+    native_harness, monkeypatch
+):
+    _, declaration, _, native = native_harness
+    monkeypatch.setattr(
+        native,
+        "windows_libraries",
+        lambda: pytest.fail("native read during construction"),
+    )
+    boundary = subject._protected_boundary(declaration)
+    assert boundary.declaration is declaration
+    assert isinstance(
+        boundary.installation_observer, subject.InstallationNativeObserver
+    )
+    assert isinstance(boundary.runtime_observer, native.NativeRuntimeObserver)
+    assert isinstance(boundary.successor_observer, native.NativeSuccessorRootObserver)
+    assert boundary.installation_observer._native is boundary.image_observer
+
+
+def test_native_empty_and_absent_root_are_read_only(native_harness):
+    _, _, _, native = native_harness
+    for absent, classification in (
+        (False, SuccessorStoreClassification.EMPTY_FRESH_ADMITTED),
+        (True, SuccessorStoreClassification.ABSENT_ELIGIBLE),
+    ):
+        observer, reader, runtime = root_adapter(native_harness, absent=absent)
+        before = dict(reader.nodes), dict(reader.payloads)
+        first = observer.observe_root()
+        assert first.classification is classification
+        assert observer.observe_root() == first
+        assert before == (reader.nodes, reader.payloads)
+        assert runtime.owners == []
+        assert not hasattr(reader, "reserve") and not hasattr(reader, "write")
+        assert isinstance(observer._reader, RootReadFake)
+    assert native.D1S3ReadSession.__bases__[0].__name__ == "WindowsReadSession"
+
+
+@pytest.mark.parametrize(
+    "disposition", ["NO_SIGNAL", "RISK_REJECTED", "PAPER_REQUIRED"]
+)
+def test_native_progression_requires_actual_parent_child_replay(
+    native_harness, disposition
+):
+    h, _, d1, _ = native_harness
+    d1.start(h, d1.contract.QuoteDisposition(disposition))
+    observer, reader, runtime = root_adapter(native_harness)
+    root = observer.observe_root()
+    assert root.classification is SuccessorStoreClassification.ALREADY_BOUND_EXACT
+    assert root.names == (PARENT_NAME, SESSION_NAMES[0])
+    assert root.store_identity == STORE_IDENTITY and root.evidence_complete
+    assert not root.consumed and not root.malformed
+    assert runtime.owners == []
+    assert any(event[0] == "read" for event in reader.events)
+
+
+@pytest.mark.parametrize("ordinal", [1, 2])
+@pytest.mark.parametrize(
+    "ownership", ["CURRENT_EXACT", "GONE_OR_MISMATCHED", "UNPROVEN"]
+)
+def test_native_active_reservation_binds_ordinal_process_and_grant_prefix(
+    native_harness, ordinal, ownership
+):
+    h, _, d1, native = native_harness
+    if ordinal == 2:
+        d1.start(h)
+        d1.second_process(h)
+    observations = []
+
+    def quote():
+        observer, _, runtime = root_adapter(
+            native_harness, ownership=native.Ownership(ownership)
+        )
+        result = observer.observe_root()
+        observations.append(result)
+        assert runtime.owners == [h.observations.process]
+        return d1.contract.QuoteDisposition.NO_SIGNAL
+
+    d1.start(h, quote=quote)
+    result = observations[0]
+    assert (
+        result.classification
+        is {
+            "CURRENT_EXACT": SuccessorStoreClassification.ACTIVE_CURRENT_EXACT,
+            "GONE_OR_MISMATCHED": SuccessorStoreClassification.CONSUMED,
+            "UNPROVEN": SuccessorStoreClassification.INDETERMINATE,
+        }[ownership]
+    )
+    assert result.names == (
+        (PARENT_NAME, SESSION_NAMES[0])
+        if ordinal == 1
+        else (PARENT_NAME, *SESSION_NAMES)
+    )
+    assert result.consumed is (ownership == "GONE_OR_MISMATCHED")
+
+
+@pytest.mark.parametrize("halted", [False, True])
+def test_native_terminal_replay_is_consumed_not_malformed(native_harness, halted):
+    h, _, d1, _ = native_harness
+    if halted:
+        d1.start(h, guard=lambda: False)
+    else:
+        d1.start(h)
+        d1.second_process(h)
+        d1.start(h)
+    observer, _, runtime = root_adapter(native_harness)
+    root = observer.observe_root()
+    assert root.classification is SuccessorStoreClassification.CONSUMED
+    assert root.consumed and root.evidence_complete and not root.malformed
+    assert runtime.owners == []
+
+
+@pytest.mark.parametrize(
+    "mutation", ["partial", "foreign", "fake_names", "grant_prefix", "runtime_identity"]
+)
+def test_native_noncanonical_or_false_evidence_never_promotes_filenames(
+    native_harness, mutation
+):
+    import json
+
+    h, _, d1, _ = native_harness
+    d1.start(h)
+    observer, reader, _ = root_adapter(native_harness)
+    parent = subject.PRODUCTION_ROOT + "\\" + PARENT_NAME
+    child = subject.PRODUCTION_ROOT + "\\" + SESSION_NAMES[0]
+    if mutation == "partial":
+        reader.payloads[parent] = reader.payloads[parent][:-1]
+    elif mutation == "fake_names":
+        reader.payloads[parent] = b"{}\n{}\n"
+        reader.payloads[child] = b"{}\n{}\n"
+    elif mutation == "grant_prefix":
+        rows = [json.loads(line) for line in reader.payloads[child].splitlines()]
+        rows[0]["grant_prefix"] = "f" * 64
+        reader.payloads[child] = b"".join(
+            d1.contract.canonical(row) + b"\n" for row in rows
+        )
+    elif mutation == "runtime_identity":
+        reader.payloads[parent] = reader.payloads[parent].replace(
+            b'"store_identity":[7,900]', b'"store_identity":[7,999]'
+        )
+    else:
+        reader.payloads[parent] = reader.payloads[parent].replace(
+            b'"kind":"PARENT"', b'"kind":"FOREIGN"'
+        )
+    root = observer.observe_root()
+    assert root.classification is SuccessorStoreClassification.MALFORMED
+    assert root.malformed
+
+
+def test_native_alias_policy_foreign_names_and_replacement_reject(native_harness):
+    from dataclasses import replace
+
+    h, _, d1, _ = native_harness
+    d1.start(h)
+    observer, reader, _ = root_adapter(native_harness)
+    baseline = observer.observe_root()
+    assert baseline.classification is SuccessorStoreClassification.ALREADY_BOUND_EXACT
+    reader.nodes[subject.PRODUCTION_ROOT] = replace(
+        reader.nodes[subject.PRODUCTION_ROOT], identity=(7, 999)
+    )
+    assert (
+        observer.observe_root().classification
+        is SuccessorStoreClassification.REPLACED_OBJECT
+    )
+    for field, value, classification in (
+        ("reparse", True, SuccessorStoreClassification.ALIAS_OR_REPARSE),
+        ("links", 2, SuccessorStoreClassification.ALIAS_OR_REPARSE),
+        ("owner", "foreign", SuccessorStoreClassification.WRONG_PARENT_OR_POLICY),
+    ):
+        observer, reader, _ = root_adapter(native_harness)
+        reader.nodes[subject.PRODUCTION_ROOT] = replace(
+            reader.nodes[subject.PRODUCTION_ROOT], **{field: value}
+        )
+        assert observer.observe_root().classification is classification
+    observer, reader, _ = root_adapter(native_harness)
+    reader.extra_names = ("old-f1.jsonl",)
+    assert (
+        observer.observe_root().classification
+        is SuccessorStoreClassification.CONFLICTING_FOREIGN
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        r"F:\AI\temp\qualification\arch134-f1r1-host-isolation",
+        r"F:\AITradingBot\Arch133\old-f1",
+        subject.PRODUCTION_ROOT + r"\..\foreign",
+        subject.PRODUCTION_ROOT.lower(),
+        subject.PRODUCTION_ROOT + r"\successor-parent-v1.jsonl:alias",
+    ],
+)
+def test_native_paths_exclude_historical_and_aliased_roots(native_harness, path):
+    _, _, _, native = native_harness
+    with pytest.raises(ValueError):
+        native.D1S3ReadPaths().admit(path)
+
+
+@pytest.mark.parametrize("installed", [False, True])
+def test_registered_preflight_reaches_native_installation_only_boundary(
+    native_harness, monkeypatch, installed
+):
+    from trading_bot.supervised_release import native_read
+
+    h, declaration, _, native = native_harness
+    if not installed:
+        final = declaration.binding.to_dict()["release_root"]
+        h.source.native.nodes = {
+            path: row
+            for path, row in h.source.native.nodes.items()
+            if path != final and not path.startswith(final + "\\")
+        }
+    reader = RootReadFake(h, absent=True)
+    before = dict(h.source.native.nodes), dict(reader.nodes), dict(reader.payloads)
+    monkeypatch.setattr(subject, "_administrator_host", lambda: None)
+    monkeypatch.setattr(subject, "derive_successor_declaration", lambda: declaration)
+    monkeypatch.setattr(
+        subject,
+        "observe_attempt",
+        lambda: subject.AttemptObservation(
+            subject.AttemptState.AVAILABLE, str(subject.ATTEMPT_PATH)
+        ),
+    )
+    monkeypatch.setattr(native_read, "WindowsObserver", lambda: h.source.native)
+    monkeypatch.setattr(native, "D1S3NativeReader", lambda declaration: reader)
+    monkeypatch.setattr(
+        native.NativeRuntimeObserver,
+        "observe_substrate",
+        lambda *_: pytest.fail("fabricated runtime"),
+    )
+    monkeypatch.setattr(
+        subject.subprocess, "run", lambda *a, **kw: pytest.fail("process start")
+    )
+    result = runner._arch134_d1s3_preflight()
+    assert result["status"] == "PASS"
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert result["primary"]["execute_eligible"] is (not installed)
+    assert result["primary"]["installation_classification"] == (
+        "ALREADY_INSTALLED_EXACT" if installed else "INSTALL_REQUIRED"
+    )
+    if installed:
+        assert (
+            result["primary"]["readiness_status"]
+            == "READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW"
+        )
+    assert before == (h.source.native.nodes, reader.nodes, reader.payloads)
+    assert all(count == 0 for _, count in result["primary"]["protected_effects"])
+
+
+@pytest.mark.parametrize("progressed", [False, True])
+def test_full_native_root_composition_requires_real_applicable_runtime_facts(
+    native_harness, progressed
+):
+    h, declaration, d1, _ = native_harness
+    if progressed:
+        d1.start(h)
+        d1.second_process(h)
+    root, _, runtime = root_adapter(native_harness)
+    boundary = subject.D1S3Boundary(
+        declaration,
+        subject.InstallationNativeObserver(
+            declaration.release, declaration.binding, h.source.native
+        ),
+        h.source.native,
+        runtime,
+        root,
+    )
+    result = subject.assess_d1s3_preflight(
+        boundary,
+        attempt=subject.AttemptObservation(subject.AttemptState.AVAILABLE, "inert"),
+    )
+    assert result.readiness.ready
+    assert (
+        result.readiness.process.observed_date
+        == d1.contract.SESSIONS[1 if progressed else 0]
+    )
+    assert not result.execute_eligible
+    h.source.runtime.process = replace(
+        h.source.runtime.process,
+        executable=r"F:\AI\ai-trading-bot\.venv\Scripts\python.exe",
+    )
+    result = subject.assess_d1s3_preflight(
+        boundary,
+        attempt=subject.AttemptObservation(subject.AttemptState.AVAILABLE, "inert"),
+    )
+    assert result.status is subject.OperatorStatus.BLOCKED
+    assert not result.readiness.ready and result.readiness.manual_start_state is None
+
+
+def test_native_runtime_never_selects_mutable_or_arbitrary_python(
+    native_harness, monkeypatch
+):
+    _, declaration, _, native = native_harness
+    runtime = native.NativeRuntimeObserver(declaration)
+    monkeypatch.setattr(
+        native,
+        "windows_libraries",
+        lambda: pytest.fail("native access before mutable rejection"),
+    )
+    for observe in (
+        runtime.observe_process,
+        runtime.observe_substrate,
+        runtime.observe_manual_process,
+    ):
+        with pytest.raises(ValueError, match="current process"):
+            observe()
+
+
+def test_native_adapter_capability_surface_is_read_only(native_harness):
+    _, _, _, native = native_harness
+    text = inspect.getsource(native)
+    tree = ast.parse(text)
+    forbidden = {
+        "mkdir",
+        "unlink",
+        "rename",
+        "write_bytes",
+        "write_text",
+        "reserve",
+        "Popen",
+        "run",
+        "start",
+        "CreateProcessW",
+        "WriteFile",
+        "CreateDirectoryW",
+        "SetSecurityInfo",
+        "CreateServiceW",
+    }
+    calls = {
+        node.func.attr
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+    }
+    assert not calls & forbidden
+    assert '"OpenProcess"' in text and '"GetProcessTimes"' in text
+    assert '"CreateProcess' not in text
+    assert "installation_operator" not in text
+
+
+@pytest.mark.parametrize(
+    "case,expected",
+    [
+        ("current", "CURRENT_EXACT"),
+        ("pid_reuse", "GONE_OR_MISMATCHED"),
+        ("exited", "GONE_OR_MISMATCHED"),
+        ("mutable_image", "GONE_OR_MISMATCHED"),
+        ("other_live", "UNPROVEN"),
+        ("denied", "UNPROVEN"),
+        ("gone", "GONE_OR_MISMATCHED"),
+        ("oversized_pid", "UNPROVEN"),
+    ],
+)
+def test_native_owner_probe_queries_only_exact_replayed_pid(
+    native_harness, monkeypatch, case, expected
+):
+    _, _, d1, native = native_harness
+    calls = []
+    process = d1.admission.ManualProcessObservation(
+        2**40 if case == "oversized_pid" else 100,
+        "windows-filetime:1000",
+        d1.contract.SESSIONS[0],
+    )
+
+    def opened(access, inherit, pid):
+        calls.append((access, inherit, pid))
+        assert access == 0x1000 and not inherit and pid == process.pid
+        return None if case in {"denied", "gone"} else 42
+
+    def times(handle, creation, *rest):
+        creation._obj.value = 1001 if case == "pid_reuse" else 1000
+        return 1
+
+    def exit_code(handle, code):
+        code._obj.value = 0 if case == "exited" else 259
+        return 1
+
+    def image(handle, flags, text, size):
+        text.value = (
+            r"F:\AI\mutable\python.exe"
+            if case == "mutable_image"
+            else native.PRODUCTION_PYTHON
+        )
+        return 1
+
+    functions = {
+        "OpenProcess": opened,
+        "GetProcessTimes": times,
+        "GetExitCodeProcess": exit_code,
+        "QueryFullProcessImageNameW": image,
+        "CloseHandle": lambda h: calls.append(("close", h)) or 1,
+    }
+    monkeypatch.setattr(native, "windows_libraries", lambda: (object(), object()))
+    monkeypatch.setattr(native, "bind", lambda lib, name, args, result: functions[name])
+    monkeypatch.setattr(
+        native,
+        "close_native_handle",
+        lambda kernel, handle: functions["CloseHandle"](handle),
+    )
+    monkeypatch.setattr(
+        native.ctypes, "get_last_error", lambda: 87 if case == "gone" else 5
+    )
+    monkeypatch.setattr(
+        native.os, "getpid", lambda: 101 if case == "other_live" else 100
+    )
+    assert native.observe_exact_owner(process) is native.Ownership(expected)
+    if case == "oversized_pid":
+        assert calls == []
+    elif case not in {"gone", "denied"}:
+        assert calls[-1] == ("close", 42)
+
+
+def test_native_runtime_collects_closed_current_process_and_substrate(
+    native_harness, monkeypatch
+):
+    from contextlib import nullcontext
+
+    from trading_bot.arch133_verifier.token import TradingTokenObservation
+    from trading_bot.supervised_release.installation_contract import (
+        IMAGE_ACES,
+        ObjectFacts,
+        ReleasePaths,
+    )
+    from trading_bot.supervised_release.runtime_admission import (
+        RuntimeStatus,
+        admit_runtime_host,
+    )
+
+    h, declaration, _, native = native_harness
+    final = ReleasePaths(declaration.release_id).final
+    launcher = (
+        final
+        + "\\"
+        + declaration.release.manifest.launcher_relative_path.replace("/", "\\")
+    )
+    nodes = {}
+    for index, row in enumerate(h.source.runtime.substrate.objects, 1):
+        nodes[row.path] = ObjectFacts(
+            row.path, row.kind.value, (7, 100 + index), row.owner_sid, True, IMAGE_ACES
+        )
+
+    class RuntimeReader:
+        def read_session(self):
+            return nullcontext(self)
+
+        def object(self, path, *, directory):
+            return nodes.get(path)
+
+        def names(self, path):
+            prefix = path + "\\"
+            return tuple(
+                key[len(prefix) :]
+                for key in nodes
+                if key.startswith(prefix) and "\\" not in key[len(prefix) :]
+            )
+
+    state = SimpleNamespace(
+        platform="win32",
+        executable=native.PRODUCTION_PYTHON,
+        argv=[launcher],
+        orig_argv=[native.PRODUCTION_PYTHON, "-I", "-S", "-B", launcher],
+        flags=SimpleNamespace(isolated=1, no_site=1),
+        dont_write_bytecode=True,
+        pycache_prefix=native.NO_PYCACHE,
+        version_info=(3, 14, 3),
+        path=[
+            final + r"\src",
+            native.SITE_PACKAGES,
+            native.LIB_ROOT,
+            native.RUNTIME_ROOT,
+        ],
+        modules={
+            "sys": SimpleNamespace(__spec__=SimpleNamespace(origin="built-in")),
+            "trading_bot": SimpleNamespace(
+                __file__=final + r"\src\trading_bot\__init__.py"
+            ),
+        },
+    )
+    token = TradingTokenObservation(native.TRADING_SID, 1, False, False, ())
+    monkeypatch.setattr(native, "sys", state)
+    monkeypatch.setattr(native.os, "getcwd", lambda: final)
+    monkeypatch.setattr(
+        native,
+        "WindowsTradingTokenObserver",
+        lambda: SimpleNamespace(observe=lambda: token),
+    )
+    runtime = native.NativeRuntimeObserver(
+        declaration, reader=RuntimeReader(), image_observer=h.source.native
+    )
+    result = admit_runtime_host(
+        declaration.release,
+        declaration.binding,
+        h.source.installed,
+        image_observer=h.source.native,
+        runtime_observer=runtime,
+    )
+    assert result.status is RuntimeStatus.VERIFIED
+    process = runtime.observe_process()
+    substrate = runtime.observe_substrate()
+    assert process.executable == native.PRODUCTION_PYTHON
+    assert process.project_modules_complete and not process.site_main_called
+    assert substrate.inventory_complete and substrate.dependencies_complete
+    assert substrate.before_fingerprint == substrate.after_fingerprint
+    state.orig_argv = [r"F:\AI\mutable\python.exe", launcher]
+    with pytest.raises(ValueError):
+        runtime.observe_process()
+
+
+def test_native_empty_root_namespace_drift_is_not_admitted(native_harness):
+    observer, reader, _ = root_adapter(native_harness)
+    calls = 0
+    original = reader.names
+
+    def drift(path):
+        nonlocal calls
+        calls += 1
+        return original(path) if calls == 1 else ("foreign.jsonl",)
+
+    reader.names = drift
+    assert (
+        observer.observe_root().classification
+        is SuccessorStoreClassification.REPLACED_OBJECT
+    )
+
+
+def test_native_overlay_validates_d1s2_own_source_predecessor_before_substitution(
+    monkeypatch,
+):
+    pins = dict(runner.ARCH134_D1S2_SOURCE_PINS)
+    pins["src/trading_bot/review_paper/successor_readiness.py"] = "a" * 40
+    monkeypatch.setattr(runner, "ARCH134_D1S2_SOURCE_PINS", pins)
+    assert runner._arch134_d1s2_authority_check(ROOT)
+    assert runner._arch134_d1s3_authority_check(ROOT)
+
+
+def test_native_runtime_paths_admit_canonical_timezone_data_not_ads(native_harness):
+    _, _, _, native = native_harness
+    path = native.SITE_PACKAGES + r"\tzdata\zoneinfo\Etc\GMT+10"
+    assert native.D1S3ReadPaths().admit(path) == path
+    for tail in ("file:stream", "file.", "file ", "CON .txt", "part\\..\\foreign"):
+        with pytest.raises(ValueError):
+            native.D1S3ReadPaths().admit(native.RUNTIME_ROOT + "\\" + tail)
+
+
+def test_native_unreadable_root_remains_closed_indeterminate(native_harness):
+    observer, reader, _ = root_adapter(native_harness)
+
+    def unreadable():
+        raise PermissionError("private host error must not escape")
+
+    reader.read_session = unreadable
+    value = observer.observe_root()
+    assert value.classification is SuccessorStoreClassification.INDETERMINATE
+    assert not value.stable and not value.evidence_complete

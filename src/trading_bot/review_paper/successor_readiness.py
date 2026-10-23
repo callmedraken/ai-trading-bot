@@ -26,6 +26,7 @@ from trading_bot.review_paper.successor_soak_admission import (
     StoreObservation,
 )
 from trading_bot.review_paper.successor_soak_contract import (
+    PARENT_NAME,
     PRODUCTION_ROOT,
     SESSION_NAMES,
     SESSIONS,
@@ -341,6 +342,7 @@ class SuccessorStoreClassification(StrEnum):
     ABSENT_ELIGIBLE = "ABSENT_ELIGIBLE"
     EMPTY_FRESH_ADMITTED = "EMPTY_FRESH_ADMITTED"
     ALREADY_BOUND_EXACT = "ALREADY_BOUND_EXACT"
+    ACTIVE_CURRENT_EXACT = "ACTIVE_CURRENT_EXACT"
     CONFLICTING_FOREIGN = "CONFLICTING_FOREIGN"
     ALIAS_OR_REPARSE = "ALIAS_OR_REPARSE"
     WRONG_PARENT_OR_POLICY = "WRONG_PARENT_OR_POLICY"
@@ -352,7 +354,20 @@ class SuccessorStoreClassification(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SuccessorRootObservation:
-    """Closed facts for the exact future durable successor namespace."""
+    """Closed facts for the exact future durable successor namespace.
+
+    ``consumed`` is a root/series fact: no legally usable current continuation
+    or future fixed-ordinal grant remains. Each child reservation is permanently
+    consumed independently; a progressing child 01 never becomes reusable.
+    ``evidence_complete`` means replay-valid evidence for the current phase,
+    not completion of both sessions. The read-only observer must derive these
+    facts from exact replay and process ownership, never filenames alone.
+
+    ALREADY_BOUND_EXACT is quiescent progression-ready state after a benign
+    child 01 final and before child 02 reservation. ACTIVE_CURRENT_EXACT binds
+    a nonterminal reservation to its exact current owning manual process;
+    only that process may continue it, with no fresh-start authority.
+    """
 
     classification: SuccessorStoreClassification
     path: str = PRODUCTION_ROOT
@@ -399,6 +414,8 @@ class SuccessorRootObserver(Protocol):
 
 
 def _exact_successor_root(value: SuccessorRootObservation) -> bool:
+    """Validate closed facts for a fresh manual start, not an active attempt."""
+
     if (
         value.classification
         not in {
@@ -430,7 +447,7 @@ def _exact_successor_root(value: SuccessorRootObservation) -> bool:
             and value.malformed is False
         )
     return (
-        value.names == ("successor-parent-v1.jsonl", *SESSION_NAMES)
+        value.names == (PARENT_NAME, SESSION_NAMES[0])
         and value.store_identity == STORE_IDENTITY
         and value.evidence_complete is True
         and value.consumed is False
@@ -519,10 +536,12 @@ class ReadinessReason(StrEnum):
     INSTALLATION_BLOCKED = "INSTALLATION_BLOCKED"
     INSTALLATION_UNPROVEN = "INSTALLATION_UNPROVEN"
     SUCCESSOR_STORE_NOT_READY = "SUCCESSOR_STORE_NOT_READY"
+    CURRENT_MANUAL_START_ACTIVE = "CURRENT_MANUAL_START_ACTIVE"
     SUCCESSOR_STORE_UNPROVEN = "SUCCESSOR_STORE_UNPROVEN"
     SUCCESSOR_STORE_DRIFT = "SUCCESSOR_STORE_DRIFT"
     HOST_ADMISSION_REJECTED = "HOST_ADMISSION_REJECTED"
     MANUAL_PROCESS_REJECTED = "MANUAL_PROCESS_REJECTED"
+    MANUAL_START_SESSION_MISMATCH = "MANUAL_START_SESSION_MISMATCH"
 
 
 @dataclass(frozen=True, slots=True)
@@ -577,7 +596,13 @@ class SuccessorReadinessResult:
                 or self.store is None
                 or not _exact_successor_root(self.store)
                 or type(self.process) is not ManualProcessObservation
-                or self.process.observed_date not in SESSIONS
+                or self.process.observed_date
+                != SESSIONS[
+                    0
+                    if self.store.classification
+                    is SuccessorStoreClassification.EMPTY_FRESH_ADMITTED
+                    else 1
+                ]
                 or self.lineage.material.durable_store_identities != (STORE_IDENTITY,)
                 or self.manual_start_state != ("RUNNING", "STOPPED", "RUNNING")
             ):
@@ -719,6 +744,20 @@ def assess_successor_readiness(
         process = bridge.last_process
         if root is None or process is None:
             raise ValueError("successor observations incomplete")
+        expected_session = SESSIONS[
+            0
+            if root.classification is SuccessorStoreClassification.EMPTY_FRESH_ADMITTED
+            else 1
+        ]
+        if process.observed_date != expected_session:
+            return _result(
+                ReadinessStatus.BLOCKED,
+                ReadinessReason.MANUAL_START_SESSION_MISMATCH,
+                declaration=declaration,
+                installation=installation,
+                store=root,
+                process=process,
+            )
         a_result = admit_installed_runtime(
             manual.host.material,
             expected_runtime_id=manual.host.runtime_id,
@@ -747,7 +786,12 @@ def assess_successor_readiness(
             manual_start_state=("RUNNING", "STOPPED", "RUNNING"),
         )
     except StoreObservationError as exc:
-        if exc.classification is SuccessorStoreClassification.INDETERMINATE:
+        if exc.classification is SuccessorStoreClassification.ACTIVE_CURRENT_EXACT:
+            status, reason = (
+                ReadinessStatus.BLOCKED,
+                ReadinessReason.CURRENT_MANUAL_START_ACTIVE,
+            )
+        elif exc.classification is SuccessorStoreClassification.INDETERMINATE:
             status, reason = (
                 ReadinessStatus.INDETERMINATE,
                 ReadinessReason.SUCCESSOR_STORE_UNPROVEN,

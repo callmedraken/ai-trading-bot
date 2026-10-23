@@ -16913,6 +16913,9 @@ ARCH134_D1S3_MUTABLE_CURRENT_DOCS: Final = (
 )
 # Exact D1S3 successor blobs.  The predecessor and D1S2 dictionaries above are
 # never rewritten.
+ARCH134_D1S3_D1S2_SOURCE_PINS_SHA256: Final = (
+    "33c58bfecbdc5df3e070b047d05f6ed19cfa1f53cfc26986610c64bcf8067086"
+)
 ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
     "scripts/run_test_certification.py": ("1df5ae3743df66568eaebc3962ae7fd74c660e80"),
     "tests/runtime/checkpoint_runner/helpers.py": (
@@ -16999,19 +17002,34 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
         "e51173234962aa9e279a4aac046f80f123550dd5"
     ),
+    "src/trading_bot/review_paper/successor_readiness.py": (
+        "5f63fbb8535595a9ceed6cab8fa6014c08585b27"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+        "a0f8801fed30c53010e61ba56adeae97470f5908"
+    ),
+    "docs/architecture/134-f1r1-d1s2-successor-installed-readiness.md": (
+        "63d2453600fde1611158fe91794e3590d79818f3"
+    ),
+    "docs/validation/arch134-f1r1-d1s2-successor-installed-readiness.md": (
+        "3c6b7c01bad8a87dc3be6a4726a4157271d26065"
+    ),
 }
 ARCH134_D1S3_SOURCE_PINS: Final = {
     "docs/architecture/134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "e62f3deec6b7f04f511ae60fc22664b485ecfdac"
+        "97fdbbd41139c8a991123fe3304b811d0e47de1c"
     ),
     "docs/validation/arch134-f1r1-d1s3-successor-release-installation-operator.md": (
-        "6db7311c3a2f521896c9053d41ae3712a8c0d1b6"
+        "e55b89c8821303f8cdf0c58404e752c70ee2ffd8"
     ),
     "src/trading_bot/supervised_release/successor_installation_operator.py": (
-        "db952ba9b1ebb4dcb8d5fe7c0f43c10f3173b843"
+        "3c251fd128ad4d76327b3862f5faa760598810e5"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
-        "75581a8906f2a4da96b7d9f9a79a497f752801f8"
+        "5a2f085bf6cdcd74aca7e9c754ff0c554f9cdf16"
+    ),
+    "src/trading_bot/supervised_release/successor_native_read.py": (
+        "9bc57b4f529856a354fa3fb209e4394abe7271bb"
     ),
 }
 ARCH134_D1S3_RUNNER_AST_PINS: Final = {
@@ -17043,7 +17061,7 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
         "2c53ffed23c375ac36b31770f60dbe813d3c5e4079efac0390ccc2ef7de2df65"
     ),
     "_arch134_d1s2_authority_check": (
-        "9c560922641c63825e1d1994952af9ed0058341ff2638ea3ae90b50085c967f6"
+        "5f2e127b292f504555b294921a82d573ce634e0548f6537b26a9701b6170e739"
     ),
     "_arch134_d1s3_preflight": (
         "b4ffbfea6a5765f76992b5e91b4ce9abd92ff39aaa238e367034c5155359d927"
@@ -17086,13 +17104,13 @@ ARCH134_D1S3_RUNNER_AST_PINS: Final = {
     ),
 }
 ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "ea1d2a1965312355e233d11acca0ba64b2aa7a7e5e13c423b18163ef5972bfa7"
+    "54d1b8c49f978ab840cb4f7b0ebe563c4ce31652b180d9ee10192ae9595861b9"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "71ce4ac451c69b5b1fa2aaf5fa1905569425c886af3eb844d87bdd69f6c7229f"
+    "3ea33fbd70f593711e750d364c146e5a7ff24bf9ce5238b556c744c9d0b40503"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
-    "3a96dc8344c6e6f1088784ae013db248aea042c6be0ce4a30e674601e9f2dc32"
+    "93f64320227091759e7998a9ccf643f20e7c575f95f8c48efeed99474067a80c"
 )
 ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
     "eb795b69055a41ad13b0595e47721b57aed2337d12bc15a187ed0c48748768dd"
@@ -17103,6 +17121,7 @@ ARCH134_D1S3_TESTS: Final = (
 )
 ARCH134_D1S3_RUFF_PATHS: Final = (
     *ARCH134_D1S2_RUFF_PATHS,
+    "src/trading_bot/supervised_release/successor_native_read.py",
     "src/trading_bot/supervised_release/successor_installation_operator.py",
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
 )
@@ -17227,6 +17246,14 @@ def _arch134_d1s2_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _arch134_d1s2_active_inventory()
         if (
+            type(ARCH134_D1S2_SOURCE_PINS) is not dict
+            or hashlib.sha256(
+                json.dumps(ARCH134_D1S2_SOURCE_PINS, sort_keys=True).encode()
+            ).hexdigest()
+            != ARCH134_D1S3_D1S2_SOURCE_PINS_SHA256
+        ):
+            raise ValueError("D1S2 accepted own-source map drift")
+        if (
             any(
                 ARCH134_D1S2_PREDECESSOR_PINS[path] != ARCH134_D1S1_SUCCESSOR_PINS[path]
                 for path in ARCH134_D1S1_SHARED_PATHS
@@ -17253,7 +17280,7 @@ def _arch134_d1s2_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = (
                 _arch134_d1s2_source_pin(relative, predecessor)
                 if predecessor is not None
-                else pin
+                else (_arch134_d1s3_shared_successor_pin(relative) or pin)
             )
             if _git_blob_sha1(repo_root / relative) != expected:
                 failures.append("D1S2 source drift: " + relative)

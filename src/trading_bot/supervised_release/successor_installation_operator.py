@@ -256,7 +256,13 @@ class D1S3PreflightResult:
                 else None
             ),
             "readiness_status": (
-                self.readiness.status.value if self.readiness else None
+                self.readiness.status.value
+                if self.readiness
+                else (
+                    "READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW"
+                    if self.reason is OperatorReason.SUCCESSOR_ROOT_PROVISIONING_REVIEW
+                    else None
+                )
             ),
             "protected_effects": [list(item) for item in self.protected_effects],
             "execute_eligible": self.execute_eligible,
@@ -280,6 +286,11 @@ class InstallationNativeObserver:
         replay_inputs(self._release, self._binding)
         with self._native.read_session(paths) as session:
             parent = observe_parent(session)
+            from trading_bot.supervised_release.successor_native_read import (
+                observe_runtime_binary,
+            )
+
+            observe_runtime_binary(session, parent.identity[0])
             staging = session.object(paths.staging, directory=True)
             if staging is None:
                 staging_file = session.object(paths.staging, directory=False)
@@ -310,6 +321,12 @@ class InstallationNativeObserver:
                         paths.staging,
                         final_identity=final_file.identity,
                     )
+            if (
+                observe_parent(session) != parent
+                or session.object(paths.final, directory=True) != final
+                or session.object(paths.staging, directory=True) is not None
+            ):
+                raise ValueError("installation observation drift")
         if final is None:
             return InstallationObservation(
                 InstallationReadiness.INSTALL_REQUIRED,
@@ -444,7 +461,8 @@ def derive_successor_declaration(
     if _live_remote_head(repo_root) != accepted_head:
         raise ValueError("successor live remote HEAD mismatch")
     if (
-        _git(repo_root, "rev-parse", "--show-toplevel") != str(WORKTREE.resolve())
+        Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve()
+        != WORKTREE.resolve()
         or _git(repo_root, "branch", "--show-current") != BRANCH
         or _git(repo_root, "remote", "get-url", "origin") != SOURCE_REMOTE
         or _git(repo_root, "status", "--porcelain=v1", "--untracked-files=all")
@@ -604,7 +622,7 @@ def _root_safe(value: SuccessorRootObservation) -> bool:
         )
     return (
         value.classification is SuccessorStoreClassification.ALREADY_BOUND_EXACT
-        and value.names == (PARENT_NAME, *SESSION_NAMES)
+        and value.names == (PARENT_NAME, SESSION_NAMES[0])
         and value.store_identity == STORE_IDENTITY
         and value.evidence_complete is True
         and value.consumed is False
@@ -715,7 +733,7 @@ def assess_d1s3_preflight(
         if root.classification is SuccessorStoreClassification.ABSENT_ELIGIBLE:
             return D1S3PreflightResult(
                 OperatorStatus.PASS,
-                OperatorReason.ALREADY_INSTALLED_EXACT,
+                OperatorReason.SUCCESSOR_ROOT_PROVISIONING_REVIEW,
                 declaration,
                 installation,
                 attempt,
@@ -929,17 +947,36 @@ def _administrator_host() -> None:
     administrator_sid()
 
 
-def _protected_boundary() -> D1S3Boundary:
-    """Host-specific observer composition is a separately reviewed seam."""
+def _protected_boundary(
+    declaration: SuccessorReleaseDeclaration | None = None,
+) -> D1S3Boundary:
+    """Compose inert read-only native observers for the exact accepted release."""
 
-    raise RuntimeError("D1S3 host observation composition is not supplied")
+    from trading_bot.supervised_release.native_read import WindowsObserver
+    from trading_bot.supervised_release.successor_native_read import (
+        NativeRuntimeObserver,
+        NativeSuccessorRootObserver,
+    )
+
+    declaration = derive_successor_declaration() if declaration is None else declaration
+    if type(declaration) is not SuccessorReleaseDeclaration:
+        raise TypeError("exact successor declaration required")
+    image = WindowsObserver()
+    runtime = NativeRuntimeObserver(declaration, image_observer=image)
+    return D1S3Boundary(
+        declaration,
+        InstallationNativeObserver(declaration.release, declaration.binding, image),
+        image,
+        runtime,
+        NativeSuccessorRootObserver(declaration, runtime, image_observer=image),
+    )
 
 
 def _preflight() -> dict[str, object]:
     try:
         _administrator_host()
         declaration = derive_successor_declaration()
-        boundary = _protected_boundary()
+        boundary = _protected_boundary(declaration)
         if boundary.declaration != declaration:
             raise ValueError("protected declaration mismatch")
         result = assess_d1s3_preflight(boundary)
@@ -964,7 +1001,7 @@ def _preflight() -> dict[str, object]:
 def _execute() -> dict[str, object]:
     try:
         declaration = derive_successor_declaration()
-        boundary = _protected_boundary()
+        boundary = _protected_boundary(declaration)
         if boundary.declaration != declaration:
             raise RuntimeError("protected declaration mismatch")
         return execute_installation(boundary, authorization=os.environ.get(AUTH_ENV))

@@ -88,4 +88,57 @@ and non-reusable. The next action after terminal source-gate success is
 ChatGPT exact-source review; only after SOURCE ACCEPTED may a separate
 read-only protected preflight be reviewed.
 
+## D1S3-R3 native read-only recovery
+
+R2 is terminal green at `c09ddb9efde8f3297d3e5ab35200126f5f017bd8` /
+`d31d7a80359326d525b686c67960a918c233e223`, CI `39868108451`. ChatGPT
+exact-source review rejected D1S3 because its production protected-boundary
+composition was not supplied. All earlier failed publications remain intact.
+
+The reviewed R3A model distinguishes permanent per-child consumption from
+root-level continuation, phase-complete evidence, quiescent parent/session-01
+progression, and `ACTIVE_CURRENT_EXACT` with no fresh-start authority. R3 adds
+the required exact phase/date invariant: empty root -> session 01; progression-
+ready root -> session 02. A proved mismatch is
+`BLOCKED / MANUAL_START_SESSION_MISMATCH`, retaining root/process observations.
+
+R3 supplies source-owned read-only native installation/image, fixed-root replay,
+current runtime/substrate, and exact process-ownership adapters. Pre-install
+assessment needs no runtime process. Exact installation with an absent root
+returns `READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`; it never provisions.
+Full readiness still requires genuinely applicable immutable manual runtime
+admission. No native production preflight or execute was invoked in source work.
+
+D1S3 remains NOT SOURCE ACCEPTED pending terminal R3 mapped CI and ChatGPT
+exact-source review. FULL remains pending until that acceptance. Develop
+remains accepted D1S2. All protected effects remain zero; original F1/C2
+evidence is untouched; successor execution is unauthorized; live remains NO-GO.
+
+Next owner: ChatGPT exact-source review after the single combined R3 publication
+reaches terminal CI. On red, preserve evidence and stop; no automatic R3-C1/C2.
+Only after source acceptance may the fresh FULL obligation be satisfied before
+any merge/release-readiness boundary or protected preflight review.
+
+R3 source tests derive empty, progression, active-01/02, completed/halted,
+malformed and alias/replacement classifications from injected native facts and
+actual disposable D1 replay bytes. Exact-owner tests cover PID reuse, exit,
+wrong executable, denied/unprovable queries, oversized PIDs and handle closure.
+Current-process/substrate observations are exercised through accepted runtime
+admission with injected Win32/token/filesystem seams; mutable Python rejects.
+Registered preflight reaches the real native factory under injected read-only
+adapters and proves no latch/root/release/process creation. Full D1S2 readiness
+retains exact phase/date and genuine applicable runtime requirements.
+
+Retained local verification passed 1,133 affected Architecture-133 installation/
+runtime, F1R1-A/B/C1, D1S1, checkpoint authority, and profile/lane cases. The
+combined D1S2/D1S3 focused run passed 111 cases before the final runtime-path
+and unreadable-state refinements; eight affected refinement cases also passed.
+Final source/pin/Ruff checks and the complete affected D1S2/D1S3 modules are
+required before the single R3 commit/push. No local canonical profile is run.
+
+Only the unaccepted D1S3 overlay supersedes the reviewed D1S2 source/docs/tests;
+predecessor maps/digests remain intact and are validated before substitution.
+The current-doc mutable exception remains exactly two paths. Source inventory,
+two Robinhood lanes, R1 placement pin, and the 300-second ceiling are unchanged.
+
 Also remove or update any tests and docs that referenced the old behavior.

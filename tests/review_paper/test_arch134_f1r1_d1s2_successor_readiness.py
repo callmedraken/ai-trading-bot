@@ -222,24 +222,175 @@ def test_successor_root_indeterminate_is_not_promoted(setup):
     assert result.reason is subject.ReadinessReason.SUCCESSOR_STORE_UNPROVEN
 
 
-def test_bound_successor_namespace_requires_exact_store_identity(setup):
+def test_quiescent_progression_ready_namespace_requires_exact_store_identity(setup):
+    # Child 01 stays consumed. These injected phase-complete replay facts
+    # describe only the one remaining fixed-ordinal grant for a fresh child 02.
     boundary, _, _, successor = setup
     successor.root = subject.SuccessorRootObservation(
         subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT,
         identity=(7, 901),
         parent_identity=(7, 800),
-        names=(PARENT_NAME, *SESSION_NAMES),
+        names=(PARENT_NAME, SESSION_NAMES[0]),
         store_identity=STORE_IDENTITY,
         evidence_complete=True,
     )
+    successor.process = replace(successor.process, observed_date=SESSIONS[1])
     result = subject.assess_successor_readiness(boundary)
     assert result.ready
+    assert subject._exact_successor_root(successor.root)
+    assert result.store.names == (PARENT_NAME, SESSION_NAMES[0])
+    assert result.store.consumed is False
+    assert result.store.evidence_complete is True
+    assert result.process.observed_date == SESSIONS[1]
 
     successor.root = replace(
         successor.root, store_identity=replace(STORE_IDENTITY, sha256="f" * 64)
     )
     result = subject.assess_successor_readiness(boundary)
     assert result.status is subject.ReadinessStatus.BLOCKED
+
+
+@pytest.mark.parametrize(
+    "names",
+    [
+        (PARENT_NAME, *SESSION_NAMES),
+        (PARENT_NAME,),
+        (SESSION_NAMES[0],),
+        (SESSION_NAMES[0], PARENT_NAME),
+        (PARENT_NAME, SESSION_NAMES[1]),
+    ],
+)
+def test_bound_filenames_alone_do_not_grant_fresh_start_readiness(setup, names):
+    boundary, _, _, successor = setup
+    successor.root = subject.SuccessorRootObservation(
+        subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT,
+        identity=(7, 901),
+        parent_identity=(7, 800),
+        names=names,
+        store_identity=STORE_IDENTITY,
+        evidence_complete=True,
+    )
+    assert not subject._exact_successor_root(successor.root)
+    result = subject.assess_successor_readiness(boundary)
+    assert not result.ready
+    assert result.status is subject.ReadinessStatus.BLOCKED
+    assert result.reason is subject.ReadinessReason.SUCCESSOR_STORE_NOT_READY
+
+
+@pytest.mark.parametrize(
+    "facts",
+    [
+        {"store_identity": None},
+        {"evidence_complete": False},
+        {"consumed": True},
+        {"malformed": True},
+        {"stable": False},
+    ],
+)
+def test_progression_ready_namespace_requires_all_closed_phase_facts(setup, facts):
+    boundary, _, _, successor = setup
+    successor.root = replace(
+        subject.SuccessorRootObservation(
+            subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT,
+            identity=(7, 901),
+            parent_identity=(7, 800),
+            names=(PARENT_NAME, SESSION_NAMES[0]),
+            store_identity=STORE_IDENTITY,
+            evidence_complete=True,
+        ),
+        **facts,
+    )
+    assert not subject._exact_successor_root(successor.root)
+    result = subject.assess_successor_readiness(boundary)
+    assert not result.ready
+    assert result.status is subject.ReadinessStatus.BLOCKED
+
+
+@pytest.mark.parametrize(
+    "names", [(PARENT_NAME, SESSION_NAMES[0]), (PARENT_NAME, *SESSION_NAMES)]
+)
+def test_exact_current_active_attempt_blocks_a_fresh_manual_start(setup, names):
+    boundary, _, _, successor = setup
+    classification = subject.SuccessorStoreClassification("ACTIVE_CURRENT_EXACT")
+    successor.root = subject.SuccessorRootObservation(
+        classification,
+        identity=(7, 901),
+        parent_identity=(7, 800),
+        names=names,
+        store_identity=STORE_IDENTITY,
+        evidence_complete=True,
+        consumed=False,
+    )
+    # Root-level continuation remains possible only in the owning process;
+    # this never reopens that process's permanently consumed child reservation.
+    assert not subject._exact_successor_root(successor.root)
+    result = subject.assess_successor_readiness(boundary)
+    assert result.status is subject.ReadinessStatus.BLOCKED
+    assert result.reason is subject.ReadinessReason.CURRENT_MANUAL_START_ACTIVE
+    assert result.store is successor.root
+    assert not result.ready
+    assert result.manual_start_state is None
+    assert successor.process_reads == 0
+    assert all(value == 0 for _, value in result.protected_effects)
+
+
+@pytest.mark.parametrize(
+    "classification,status,reason",
+    [
+        (
+            subject.SuccessorStoreClassification.CONSUMED,
+            subject.ReadinessStatus.BLOCKED,
+            subject.ReadinessReason.SUCCESSOR_STORE_NOT_READY,
+        ),
+        (
+            subject.SuccessorStoreClassification.INDETERMINATE,
+            subject.ReadinessStatus.INDETERMINATE,
+            subject.ReadinessReason.SUCCESSOR_STORE_UNPROVEN,
+        ),
+    ],
+)
+def test_orphaned_or_unproven_active_reservation_cannot_become_fresh_start(
+    setup, classification, status, reason
+):
+    boundary, _, _, successor = setup
+    # The future native observer must distinguish a gone/mismatched owner
+    # (CONSUMED) from unprovable ownership/liveness (INDETERMINATE).
+    successor.root = subject.SuccessorRootObservation(
+        classification,
+        identity=(7, 901),
+        parent_identity=(7, 800),
+        names=(PARENT_NAME, SESSION_NAMES[0]),
+        store_identity=STORE_IDENTITY,
+        evidence_complete=True,
+        consumed=classification is subject.SuccessorStoreClassification.CONSUMED,
+    )
+    result = subject.assess_successor_readiness(boundary)
+    assert result.status is status
+    assert result.reason is reason
+    assert not result.ready
+    assert not subject._exact_successor_root(successor.root)
+
+
+@pytest.mark.parametrize(
+    "names", [(PARENT_NAME, SESSION_NAMES[0]), (PARENT_NAME, *SESSION_NAMES)]
+)
+def test_replay_valid_terminal_series_remains_consumed(setup, names):
+    boundary, _, _, successor = setup
+    # Either an early halt or the full two-child terminal series has no grant.
+    successor.root = subject.SuccessorRootObservation(
+        subject.SuccessorStoreClassification.CONSUMED,
+        identity=(7, 901),
+        parent_identity=(7, 800),
+        names=names,
+        store_identity=STORE_IDENTITY,
+        evidence_complete=True,
+        consumed=True,
+    )
+    assert not subject._exact_successor_root(successor.root)
+    result = subject.assess_successor_readiness(boundary)
+    assert result.status is subject.ReadinessStatus.BLOCKED
+    assert result.reason is subject.ReadinessReason.SUCCESSOR_STORE_NOT_READY
+    assert not result.ready
 
 
 def test_replaced_root_is_detected_between_read_only_observations(setup):
@@ -432,3 +583,46 @@ def test_removing_d1s2_overlay_restores_d1s1_resolution(monkeypatch):
     assert runner._arch134_d1s2_source_pin(source_path, source_predecessor) == (
         source_predecessor
     )
+
+
+@pytest.mark.parametrize(
+    "classification,date_index,ready",
+    [
+        (subject.SuccessorStoreClassification.EMPTY_FRESH_ADMITTED, 0, True),
+        (subject.SuccessorStoreClassification.EMPTY_FRESH_ADMITTED, 1, False),
+        (subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT, 1, True),
+        (subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT, 0, False),
+    ],
+)
+def test_root_phase_binds_exact_next_manual_session(
+    setup, classification, date_index, ready
+):
+    boundary, source, _, successor = setup
+    if classification is subject.SuccessorStoreClassification.ALREADY_BOUND_EXACT:
+        successor.root = replace(
+            successor.root,
+            classification=classification,
+            names=(PARENT_NAME, SESSION_NAMES[0]),
+            store_identity=STORE_IDENTITY,
+            evidence_complete=True,
+        )
+    successor.process = replace(successor.process, observed_date=SESSIONS[date_index])
+    root, process = successor.root, successor.process
+    events = len(source.native.events)
+    result = subject.assess_successor_readiness(boundary)
+    assert result.ready is ready
+    assert result.store is root and result.process is process
+    assert successor.root == root and successor.process == process
+    assert all(value == 0 for _, value in result.protected_effects)
+    assert not any(
+        event[0] in {"write", "publish", "create_directory", "file_create"}
+        for event in source.native.events[events:]
+    )
+    if not ready:
+        assert result.status is subject.ReadinessStatus.BLOCKED
+        assert result.reason is subject.ReadinessReason.MANUAL_START_SESSION_MISMATCH
+        assert result.manual_start_state is None
+    else:
+        other = replace(process, observed_date=SESSIONS[1 - date_index])
+        with pytest.raises(ValueError, match="positive readiness proof"):
+            replace(result, process=other)

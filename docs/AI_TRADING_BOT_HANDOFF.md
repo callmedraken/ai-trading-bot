@@ -120,6 +120,37 @@ review. Develop remains accepted D1S2; no installation or successor-root
 provisioning occurred; all protected effects remain zero; and provider, paper,
 broker, D1, D2, and live authority remain unauthorized.
 
+## D1S3-R3 native read-only recovery
+
+R2 is terminal green at `c09ddb9efde8f3297d3e5ab35200126f5f017bd8` /
+`d31d7a80359326d525b686c67960a918c233e223`, CI `39868108451`. ChatGPT
+exact-source review rejected D1S3 because its production protected-boundary
+composition was not supplied. All earlier failed publications remain intact.
+
+The reviewed R3A model distinguishes permanent per-child consumption from
+root-level continuation, phase-complete evidence, quiescent parent/session-01
+progression, and `ACTIVE_CURRENT_EXACT` with no fresh-start authority. R3 adds
+the required exact phase/date invariant: empty root -> session 01; progression-
+ready root -> session 02. A proved mismatch is
+`BLOCKED / MANUAL_START_SESSION_MISMATCH`, retaining root/process observations.
+
+R3 supplies source-owned read-only native installation/image, fixed-root replay,
+current runtime/substrate, and exact process-ownership adapters. Pre-install
+assessment needs no runtime process. Exact installation with an absent root
+returns `READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW`; it never provisions.
+Full readiness still requires genuinely applicable immutable manual runtime
+admission. No native production preflight or execute was invoked in source work.
+
+D1S3 remains NOT SOURCE ACCEPTED pending terminal R3 mapped CI and ChatGPT
+exact-source review. FULL remains pending until that acceptance. Develop
+remains accepted D1S2. All protected effects remain zero; original F1/C2
+evidence is untouched; successor execution is unauthorized; live remains NO-GO.
+
+Next owner: ChatGPT exact-source review after the single combined R3 publication
+reaches terminal CI. On red, preserve evidence and stop; no automatic R3-C1/C2.
+Only after source acceptance may the fresh FULL obligation be satisfied before
+any merge/release-readiness boundary or protected preflight review.
+
 ## Review and next step
 
 The D1S3 runner is mapped to ROBINHOOD. Its successor overlay preserves the
@@ -128,8 +159,9 @@ coordination documents mutable, and updates the exact inventory, AST, and test
 consumers. Retained Architecture-133/F1R1-A/B/C1, D1S1, and D1S2 focused tests
 remain part of the source checkpoint.
 
-Owner: ChatGPT. Perform exact-source review of the D1S3 commit/diff, terminal
-mapped CI, and source identity/current-document overlay. Only after SOURCE
+Owner: ChatGPT. Review the exact combined R3 source/diff, phase/date invariant,
+native no-effect composition, predecessor overlays, focused evidence, and
+terminal mapped ROBINHOOD gate. FULL remains pending until source acceptance. Only after SOURCE
 ACCEPTED may ChatGPT review the separate read-only protected preflight. Only
 after that preflight may an immutable-release installation effect be considered
 within exact reviewed bounds.

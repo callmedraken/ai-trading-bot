@@ -241,6 +241,8 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             else:
                 expected = runner.balance_robinhood(selected)
             assert tuple(lanes.values()) == expected
+            if name == "robinhood":
+                assert tuple(map(len, lanes.values())) == (27, 30, 26, 26)
 
 
 @pytest.mark.parametrize(

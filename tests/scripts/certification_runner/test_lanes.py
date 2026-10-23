@@ -54,27 +54,41 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "b4e7b62c1c63e273546cc83c324be6634d7809a8194540b27f950117dce73c99"
+        == "0c0c79f710ab8b3a9ffc08de4720c026f257e2ffefc8dc6989c3a70fba2d2898"
     )
     lanes = runner.balance_robinhood(tuple(reversed(selected)))
-    assert tuple(map(len, lanes)) == (54, 55)
+    assert tuple(map(len, lanes)) == (27, 30, 26, 26)
     assert tuple(sum(weights[module] for module in lane) for lane in lanes) == (
-        271842,
-        271842,
+        214237,
+        214237,
+        214240,
+        214236,
     )
     assert tuple(_ordered_lane_hash(lane) for lane in lanes) == (
-        "91b85f6104620e3040821b3a55cf9b8875e54c9d47b6ac0532e4808c5d46eb24",
-        "96bae036e5cd7f7b5148a3402151351c16a1bcc3a01b412d58f8de941147e99f",
+        "cc0a6556faf54386fe4e8c0a192ac0ad6543da814d5926e86f7c8bc867470a51",
+        "904166863dfa5354fad29773877c70eb991ba240b3f117ccb163766f8fc71198",
+        "a5620743bd21fbb59d16f0994290e2908bfeeba71bfc3a15bed0fb2cadb42aa3",
+        "e51754fe142e84fac06f2a27184aa948f1a2de73f5868f6fef45f3d174a62b45",
     )
-    assert (
-        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
-        in lanes[1]
-    )
+    assert "tests/domain/test_positions.py" in lanes[0]
+    assert "tests/review_paper/test_d1_session_execution.py" in lanes[0]
     assert runner.build_lanes(root, selected, "robinhood") == {
-        "robinhood-1": lanes[0],
-        "robinhood-2": lanes[1],
+        f"robinhood-{index}": lane for index, lane in enumerate(lanes, start=1)
     }
     runner.validate_partitions(selected, lanes)
+
+
+def test_robinhood_r3k_normalizes_only_raw_zero_to_positive_minimum() -> None:
+    raw = dict(runner.ROBINHOOD_MODULE_TIMINGS_MS)
+    raw["tests/domain/test_positions.py"] = 0
+    assert sum(raw.values()) == 856949
+    assert [module for module, value in raw.items() if value == 0] == [
+        "tests/domain/test_positions.py"
+    ]
+    normalized = {module: max(1, value) for module, value in raw.items()}
+    assert normalized == dict(runner.ROBINHOOD_MODULE_TIMINGS_MS)
+    assert sum(normalized.values()) == 856950
+    assert all(value > 0 for value in normalized.values())
 
 
 def test_robinhood_reversed_inventory_and_fixture_byte_size_cannot_change_lanes(
@@ -106,12 +120,22 @@ def test_robinhood_future_module_uses_fallback_and_remains_covered() -> None:
     assert sum(future in lane for lane in lanes) == 1
 
 
-@pytest.mark.parametrize("value", [True, False, 0, -1, 1.0, "1", None, [], {}])
+@pytest.mark.parametrize("value", [True, False, -1, 1.0, "1", None, [], {}])
 def test_robinhood_invalid_timing_values_fail_closed(monkeypatch, value) -> None:
     module = "tests/domain/test_market.py"
     monkeypatch.setattr(runner, "ROBINHOOD_MODULE_TIMINGS_MS", ((module, value),))
     with pytest.raises(runner.CertificationError, match="positive integers"):
         runner.balance_robinhood((module,))
+
+
+def test_robinhood_zero_timing_value_fails_closed(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runner,
+        "ROBINHOOD_MODULE_TIMINGS_MS",
+        (("tests/domain/test_market.py", 0),),
+    )
+    with pytest.raises(runner.CertificationError, match="positive integers"):
+        runner.balance_robinhood(("tests/domain/test_market.py",))
 
 
 @pytest.mark.parametrize(
@@ -378,6 +402,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
         expected_current = checkpoint._arch132_r3j_current_shared_successor_pin(
             module, expected_current
         )
+        expected_current = checkpoint._arch132_r3k_current_shared_successor_pin(
+            module, expected_current
+        )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
@@ -430,6 +457,9 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
         expected_current = checkpoint._arch132_r3j_current_shared_successor_pin(
             module, expected_current
         )
+        expected_current = checkpoint._arch132_r3k_current_shared_successor_pin(
+            module, expected_current
+        )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
     assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
         "unchanged"
@@ -472,8 +502,8 @@ def test_r3j_successor_overlay_is_exact_and_intentionally_unmapped() -> None:
     root = Path(checkpoint.__file__).resolve().parents[1]
     expected = {
         "scripts/run_test_certification.py": "7cff6bb635c0faf0eb30edfb298170490d8f523e",
-        "tests/scripts/certification_runner/test_lanes.py": checkpoint._git_blob_sha1(
-            root / "tests/scripts/certification_runner/test_lanes.py"
+        "tests/scripts/certification_runner/test_lanes.py": (
+            "6de60ef0b897e1688d9245dcbc35e8696a9b6249"
         ),
         "tests/scripts/certification_runner/test_profiles.py": (
             "5c2cb07adca1b3fda437a77b2cf355b325006794"
@@ -509,6 +539,69 @@ def test_r3j_successor_overlay_is_exact_and_intentionally_unmapped() -> None:
     assert checkpoint._arch134_d1s3_authority_check(root) == ()
 
 
+def test_r3k_successor_overlay_is_exact_and_intentionally_unmapped() -> None:
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    expected = {
+        "scripts/run_test_certification.py": (
+            "e853303076bb9c8ab5f721d60dd98301cca795c0"
+        ),
+        "tests/scripts/certification_runner/helpers.py": (
+            "c3298836d98c1848c3603b8c8d952ea1cfb5e307"
+        ),
+        "tests/scripts/certification_runner/test_profiles.py": (
+            "5259e9e39f7ba4a15431f51eb0e237a32bad4693"
+        ),
+    }
+    predecessors = {
+        "scripts/run_test_certification.py": (
+            "7cff6bb635c0faf0eb30edfb298170490d8f523e"
+        ),
+        "tests/scripts/certification_runner/helpers.py": (
+            "8936dedd1ba334558aff97724db8221a0fe3480e"
+        ),
+        "tests/scripts/certification_runner/test_profiles.py": (
+            "5c2cb07adca1b3fda437a77b2cf355b325006794"
+        ),
+    }
+    actual = checkpoint.ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS
+    assert set(actual) == {
+        *expected,
+        "tests/scripts/certification_runner/test_lanes.py",
+    }
+    assert {key: value for key, value in actual.items() if key in expected} == expected
+    assert len(actual["tests/scripts/certification_runner/test_lanes.py"]) == 40
+    assert (
+        hashlib.sha256(json.dumps(actual, sort_keys=True).encode()).hexdigest()
+        == checkpoint.ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS_SHA256
+    )
+    for relative, successor in expected.items():
+        assert (
+            checkpoint._arch132_r3k_current_shared_successor_pin(
+                relative, predecessors[relative]
+            )
+            == successor
+        )
+        with pytest.raises(ValueError, match="R3K"):
+            checkpoint._arch132_r3k_current_shared_successor_pin(relative, "a" * 40)
+    assert checkpoint.ARCH132_R3K_RUNNER_AST_PINS
+    assert (
+        checkpoint.resolve_ci_checkpoint(
+            checkpoint._checkpoint_specs(),
+            "feature/test-suite-arch132-r3k-robinhood-four-lane-hygiene-current",
+            "push",
+        )
+        is None
+    )
+    assert (
+        "feature/test-suite-arch132-r3k-robinhood-four-lane-hygiene-current"
+        not in checkpoint.ACTIVE_CI_CHECKPOINTS
+    )
+    assert checkpoint.resolve_ci_certification_profile(None) is None
+    assert checkpoint._arch134_d1s3_authority_check(root) == ()
+
+
 def test_robinhood_historical_pin_constants_are_exact_but_inactive() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
@@ -528,10 +621,10 @@ def test_robinhood_historical_pin_constants_are_exact_but_inactive() -> None:
     assert runner.ROBINHOOD_D1S3_LANE_PINS == {
         "tests/review_paper/test_d1_session_execution.py": 0
     }
-    # These two reviewed historical targets differ from the R3J timing model,
+    # These reviewed historical targets differ from the R3K timing model,
     # proving build_lanes no longer applies any byte-size-era overlay.
     assert (
         "tests/review_paper/test_arch133_scheduler_installation.py"
-        in lanes["robinhood-1"]
+        in lanes["robinhood-4"]
     )
-    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-2"]
+    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]

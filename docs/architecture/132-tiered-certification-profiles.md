@@ -1,5 +1,94 @@
 # Architecture 132 — Tiered certification profiles
 
+## Architecture 132-R3K — four-lane current-local ROBINHOOD topology
+
+R3K is the certification-topology successor to published R3J. It is based
+exactly on R3J HEAD `de627d741891972b35fec458dbb9e66d46d1f4ac` and tree
+`45bf73e5136d69ae8a1e1246340ac3b4f6791f41`. R3J's source implementation was
+structurally correct, but its one authorized canonical local ROBINHOOD run
+failed the unchanged 300-second hygiene ceiling. R3K changes only current
+ROBINHOOD placement and its certification evidence; D1S3 product behavior is
+unchanged, R4 remains unpublished and parked in its separate worktree, and no
+protected operation is added.
+
+### Raw R3J-D1 diagnostic evidence
+
+The preserved diagnostic evidence is
+`F:\AI\temp\certification\arch132-r3j-d1-isolated-186da70cc66942dfb26a763f150958f6`.
+Its `robinhood-1.xml`, `robinhood-2.xml`, and `analysis.json` were independently
+reconciled using the exact R3J interpreter
+`F:\AI\ai-trading-bot\.venv\Scripts\python.exe` (Python 3.14.3). The evidence
+contains 109 unique canonical modules and exactly 856949 ms of testcase work.
+Exactly one module measured zero milliseconds:
+`tests/domain/test_positions.py = 0 ms`. All other modules retain their exact
+positive evidence-derived integer totals.
+
+The R3J GitHub-derived timing table and its two-lane result remain historical
+R3J evidence only. They are not a second current timing authority and are not
+used by R3K placement.
+
+### Canonical R3K positive source-placement model
+
+Architecture-132 source timing weights are positive placement estimates. A
+measured zero-duration module is therefore normalized to the reviewed positive
+1-ms minimum before it becomes frozen source data. This is evidence
+normalization, not a relaxation of runtime validation: a zero supplied directly
+to `ROBINHOOD_MODULE_TIMINGS_MS` remains rejected fail-closed, as do bool,
+negative, malformed, duplicate, noncanonical, and stale entries.
+
+The canonical R3K source table has 109 unique tuple-pair entries, all positive,
+with `tests/domain/test_positions.py = 1 ms` and every other value copied
+exactly from the raw evidence. Its total is 856950 ms. The sorted compact JSON
+map material (`sort_keys=True`, separators `,`/`:`, UTF-8, no trailing newline)
+has SHA256:
+
+```text
+0c0c79f710ab8b3a9ffc08de4720c026f257e2ffefc8dc6989c3a70fba2d2898
+```
+
+R3K applies the unchanged deterministic whole-module greedy algorithm directly
+to four lanes: descending frozen/fallback milliseconds, ascending canonical
+path, lowest modeled total, then lowest lane index. The exact current-local
+model is:
+
+```text
+robinhood-1  27 modules  214237 ms  cc0a6556faf54386fe4e8c0a192ac0ad6543da814d5926e86f7c8bc867470a51
+robinhood-2  30 modules  214237 ms  904166863dfa5354fad29773877c70eb991ba240b3f117ccb163766f8fc71198
+robinhood-3  26 modules  214240 ms  a5620743bd21fbb59d16f0994290e2908bfeeba71bfc3a15bed0fb2cadb42aa3
+robinhood-4  26 modules  214236 ms  e51754fe142e84fac06f2a27184aa948f1a2de73f5868f6fef45f3d174a62b45
+total        109 modules  856950 ms
+```
+
+The exact ordered lane membership is frozen in
+`docs/validation/arch132-r3k-robinhood-four-lane-topology.md` and is derived
+from the source table, not manually pinned. Reversed inventory input and
+existing-module byte-size changes produce the same ordered lanes. Future
+admitted modules absent from the table receive `ROBINHOOD_FALLBACK_MS = 1000`
+for placement and remain covered exactly once.
+
+### Four-lane decision and rejected three-lane model
+
+The raw evidence gives a two-lane mathematical lower bound of
+`856949 / 2 = 428474.5 ms`; two lanes are impossible. The raw three-lane lower
+bound is `285649.667 ms`, and the normalized model is `856950 / 3 = 285650 ms`.
+Three lanes are rejected without a publication attempt: they leave only about
+14.35 seconds below the 300-second ceiling, while isolated child/process
+overhead was already 8.197 s and 8.422 s and the observed two-child concurrent
+slowdown was +7.960% JUnit work (+8.337% child elapsed). Four lanes are the
+smallest evidence-backed topology with credible sub-300-second margin. R3K
+selects four directly; it does not try three first and has no automatic fifth
+lane path.
+
+The 300-second hygiene ceiling is unchanged. ROBINHOOD ownership, directory
+ownership, required-module semantics, selected inventory, FULL membership,
+LEGACY membership, EXHAUSTIVE membership, JUnit validation, historical lane
+pin constants, and protected fail-closed behavior remain unchanged. The four
+historical `ROBINHOOD_*_LANE_PINS` dictionaries remain provenance only and no
+R3K lane pin is added or applied. R3K remains intentionally unmapped from
+`ACTIVE_CI_CHECKPOINTS` and `CI_CERTIFICATION_PROFILES`; source-gate fallback
+remains the broad safety net. R3J remains preserved as published but
+certification-rejected evidence, and R3K has no D1S3 source-acceptance effect.
+
 ## Architecture 132-R3J — ROBINHOOD timing-aware lane stabilization
 
 R3J is a certification-topology-only correction on the exact R3 product

@@ -20,6 +20,24 @@ worktree
 `F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
 D1S3 is pending ChatGPT exact-source acceptance.
 
+## Architecture 132-R3K current-local topology successor
+
+Published R3J remains preserved but certification-rejected: its source gate
+was terminal green, but its one authorized canonical local ROBINHOOD run
+failed the unchanged 300-second hygiene ceiling. R3K is the intentionally
+unmapped topology successor based exactly on R3J HEAD
+`de627d741891972b35fec458dbb9e66d46d1f4ac` / tree
+`45bf73e5136d69ae8a1e1246340ac3b4f6791f41`. It normalizes only the raw
+R3J-D1 zero for `tests/domain/test_positions.py` to a strict 1-ms source
+weight, retains 109 modules and 856950 ms total, and selects four deterministic
+whole-module lanes. R3K remains pending its single atomic publication and
+terminal source gate; no D1S3 product behavior changes.
+
+The R4 draft remains unpublished and parked, untouched, in the separate
+worktree named above. D1S3 remains NOT SOURCE ACCEPTED; D1S3 FULL remains
+pending; `develop` remains accepted D1S2; protected effects remain zero; and
+live remains NO-GO.
+
 ## Architecture 132-R3J prerequisite topology correction
 
 R3J is a separate, intentionally unmapped certification-topology checkpoint

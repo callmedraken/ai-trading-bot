@@ -341,7 +341,12 @@ def _fixture_profiles() -> dict[str, tuple[str, ...]]:
 def _lane_names(profile: str) -> tuple[str, ...]:
     return {
         "full": ("broad-1", "broad-2", "broad-3", "broad-4"),
-        "robinhood": ("robinhood-1", "robinhood-2"),
+        "robinhood": (
+            "robinhood-1",
+            "robinhood-2",
+            "robinhood-3",
+            "robinhood-4",
+        ),
         "legacy": ("legacy-1", "legacy-2", "serial"),
         "exhaustive": ("broad-1", "broad-2", "serial"),
     }[profile]

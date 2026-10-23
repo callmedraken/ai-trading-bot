@@ -21,6 +21,26 @@ has performed no installation, publication, successor-root provisioning,
 runtime start, scheduler, credential, provider, paper, broker, D1, D2, or live
 effect. Successor execution remains unauthorized.
 
+## Architecture 132-R3K current-local topology successor
+
+Published R3J remains preserved but certification-rejected: its source gate
+was terminal green, while its one authorized canonical local ROBINHOOD run
+failed the unchanged 300-second hygiene ceiling. R3K is the intentionally
+unmapped topology successor on exact R3J base HEAD
+`de627d741891972b35fec458dbb9e66d46d1f4ac` / tree
+`45bf73e5136d69ae8a1e1246340ac3b4f6791f41`. Its source-owned model normalizes
+the sole raw R3J-D1 zero (`tests/domain/test_positions.py`) from 0 ms to the
+strict positive 1-ms minimum, for 109 modules and 856950 ms total, then uses
+four deterministic whole-module lanes. R3K remains pending its one atomic
+publication and terminal source gate; it does not change D1S3 product behavior.
+
+R4 remains unpublished and parked, with its existing seven-file draft
+untouched in
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
+D1S3 remains NOT SOURCE ACCEPTED and its FULL obligation remains pending.
+`develop` remains accepted D1S2 at the HEAD/TREE recorded above. Protected
+effects remain zero, and live remains NO-GO.
+
 ## Architecture 132-R3J topology correction
 
 R3J is a separate certification-topology prerequisite on exact R3 HEAD

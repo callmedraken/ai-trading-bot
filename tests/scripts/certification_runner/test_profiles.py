@@ -239,19 +239,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             if name == "full":
                 expected = runner.balance_full(selected)
             else:
-                expected = runner.apply_lane_pins(
-                    runner.apply_lane_pins(
-                        runner.apply_lane_pins(
-                            runner.apply_lane_pins(
-                                runner.balance_broad(root, selected),
-                                runner.ROBINHOOD_LANE_PINS,
-                            ),
-                            runner.ROBINHOOD_F1_LANE_PINS,
-                        ),
-                        runner.ROBINHOOD_F1R1_B_LANE_PINS,
-                    ),
-                    runner.ROBINHOOD_D1S3_LANE_PINS,
-                )
+                expected = runner.balance_robinhood(selected)
             assert tuple(lanes.values()) == expected
 
 

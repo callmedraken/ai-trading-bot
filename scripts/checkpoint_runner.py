@@ -17115,6 +17115,30 @@ ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
 ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
     "eb795b69055a41ad13b0595e47721b57aed2337d12bc15a187ed0c48748768dd"
 )
+
+# Architecture 132-R3J is an intentionally unmapped successor of the accepted
+# D1S3 source.  Keep the accepted D1S3 dictionaries/digests immutable and
+# layer only the three current certification consumers changed by R3J.
+ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
+    "scripts/run_test_certification.py": "7cff6bb635c0faf0eb30edfb298170490d8f523e",
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "6de60ef0b897e1688d9245dcbc35e8696a9b6249"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "5c2cb07adca1b3fda437a77b2cf355b325006794"
+    ),
+}
+ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS_SHA256: Final = (
+    "54c3e8db394db857390382c59dc0d349398d863d1d4356da9be02fd346f8b4b8"
+)
+ARCH132_R3J_RUNNER_AST_PINS: Final = {
+    "_arch134_d1s3_shared_successor_pin": (
+        "0e1e393fac88d13c8a3d98ba4ed66e9420520019b60ca06d46d49ca5a55f035c"
+    ),
+    "_arch134_d1s3_authority_check": (
+        "62d01ea64367f83399b22e384b8a87787a8c6ea905cedf03fd6ad838014cfdbb"
+    ),
+}
 ARCH134_D1S3_TESTS: Final = (
     *ARCH134_D1S2_TESTS,
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
@@ -17134,7 +17158,48 @@ def _arch134_d1s3_mutable_current_doc(relative: str) -> bool:
 def _arch134_d1s3_shared_successor_pin(relative: str) -> str | None:
     if _arch134_d1s3_mutable_current_doc(relative):
         return None
-    return ARCH134_D1S3_SHARED_SUCCESSOR_PINS.get(relative)
+    successor = ARCH134_D1S3_SHARED_SUCCESSOR_PINS.get(relative)
+    if successor is None:
+        return None
+    return _arch132_r3j_current_shared_successor_pin(relative, successor)
+
+
+def _arch132_r3j_current_shared_successor_pin(relative: str, predecessor: str) -> str:
+    before = {
+        relative: ARCH134_D1S3_SHARED_SUCCESSOR_PINS[relative]
+        for relative in ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS
+    }
+    after = ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS
+    if (
+        type(after) is not dict
+        or before
+        != {
+            "scripts/run_test_certification.py": (
+                "1df5ae3743df66568eaebc3962ae7fd74c660e80"
+            ),
+            "tests/scripts/certification_runner/test_lanes.py": (
+                "d8be16e5a25d13d990eb75b31d4be240c8e3ee75"
+            ),
+            "tests/scripts/certification_runner/test_profiles.py": (
+                "78c9a6f80bc2c1ea1c5c8ee097bcb28913f47327"
+            ),
+        }
+        or set(after) != set(before)
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in after.values()
+        )
+    ):
+        raise ValueError("R3J current shared successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("R3J wrong D1S3 shared predecessor")
+        return after[relative]
+    return predecessor
 
 
 def _arch134_d1s2_current_source_pin(relative: str, predecessor: str) -> str:
@@ -17384,7 +17449,9 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH134_D1S3_SHARED_SUCCESSOR_PINS.items():
             if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS:
                 failures.append("D1S3 current-doc pin reintroduced: " + relative)
-            elif _git_blob_sha1(repo_root / relative) != pin:
+            elif _git_blob_sha1(repo_root / relative) != (
+                _arch132_r3j_current_shared_successor_pin(relative, pin)
+            ):
                 failures.append("D1S3 shared successor drift: " + relative)
         for relative, pin in ARCH134_D1S3_SOURCE_PINS.items():
             if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS:
@@ -17465,6 +17532,7 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_D1S3_RUNNER_AST_PINS.items():
+            expected = ARCH132_R3J_RUNNER_AST_PINS.get(name, expected)
             if (
                 name not in functions
                 or hashlib.sha256(

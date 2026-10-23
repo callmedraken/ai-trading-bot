@@ -20,6 +20,23 @@ worktree
 `F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
 D1S3 is pending ChatGPT exact-source acceptance.
 
+## Architecture 132-R3J prerequisite topology correction
+
+R3J is a separate, intentionally unmapped certification-topology checkpoint
+based on exact R3 HEAD `b40038c16a93f9bd9eb46cba5a30c14ba23b48ec` / tree
+`f3fada1c83feb2ed04b9397a4c795db8454e8a69`. It stabilizes current ROBINHOOD
+placement from the preserved R3 timing evidence only. It does not change D1S3
+production behavior and does not satisfy D1S3 source acceptance or its pending
+FULL obligation.
+
+The unpublished R4 draft remains parked and untouched in
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-successor-installation-operator-current`.
+R3J does not enter, restore, stash, reset, stage, commit, or push that
+worktree. `develop` remains accepted D1S2. All protected effects remain zero;
+no production preflight, execute, installation, successor-root provisioning,
+scheduler, credential, provider, paper, broker, D1/D2, or live effect has
+occurred. Live remains NO-GO.
+
 Original F1 remains `FINAL / INDETERMINATE / CONSUMED`. C2 remains consumed and
 non-reusable immutable evidence; neither namespace is a D1S3 authority. The
 successor root remains uncreated. No production installation has occurred.

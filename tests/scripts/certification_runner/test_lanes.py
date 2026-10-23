@@ -1,3 +1,5 @@
+import hashlib
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,8 +10,6 @@ from scripts import run_test_certification as runner
 from .helpers import (
     _fixture_profiles,
     _inventory,
-    _lane_names,
-    _profile_inventory,
 )
 
 
@@ -37,41 +37,116 @@ def test_missing_serial_and_duplicate_or_overlap_fail(tmp_path: Path) -> None:
         runner.validate_partitions(("a", "b"), (("a",), ()))
 
 
-def test_robinhood_has_two_deterministic_balanced_nonempty_lanes(
-    tmp_path: Path,
-) -> None:
-    inventory = _profile_inventory(tmp_path, "robinhood")
-    raw = runner.balance_broad(tmp_path, inventory)
-    weights = [
-        sum((tmp_path / module).stat().st_size for module in lane) for lane in raw
-    ]
-    assert abs(weights[0] - weights[1]) <= max(
-        (tmp_path / module).stat().st_size for module in inventory
+def _ordered_lane_hash(modules: tuple[str, ...]) -> str:
+    return hashlib.sha256(
+        ("".join(f"{module}\n" for module in modules)).encode()
+    ).hexdigest()
+
+
+def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    weights = runner.robinhood_module_weights(selected)
+    assert len(selected) == len(runner.ROBINHOOD_MODULE_TIMINGS_MS) == 109
+    assert set(weights) == set(selected)
+    assert runner.ROBINHOOD_FALLBACK_MS == 1000
+    assert (
+        hashlib.sha256(
+            json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        == "b4e7b62c1c63e273546cc83c324be6634d7809a8194540b27f950117dce73c99"
     )
+    lanes = runner.balance_robinhood(tuple(reversed(selected)))
+    assert tuple(map(len, lanes)) == (54, 55)
+    assert tuple(sum(weights[module] for module in lane) for lane in lanes) == (
+        271842,
+        271842,
+    )
+    assert tuple(_ordered_lane_hash(lane) for lane in lanes) == (
+        "91b85f6104620e3040821b3a55cf9b8875e54c9d47b6ac0532e4808c5d46eb24",
+        "96bae036e5cd7f7b5148a3402151351c16a1bcc3a01b412d58f8de941147e99f",
+    )
+    assert (
+        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+        in lanes[1]
+    )
+    assert runner.build_lanes(root, selected, "robinhood") == {
+        "robinhood-1": lanes[0],
+        "robinhood-2": lanes[1],
+    }
+    runner.validate_partitions(selected, lanes)
 
-    lanes = runner.build_lanes(tmp_path, inventory, "robinhood")
-    assert tuple(lanes) == _lane_names("robinhood")
-    assert all(lanes.values())
-    assert lanes == runner.build_lanes(tmp_path, inventory, "robinhood")
-    runner.validate_partitions(inventory, tuple(lanes.values()))
-    for module, target in runner.ROBINHOOD_LANE_PINS.items():
-        if module in inventory:
-            assert module in tuple(lanes.values())[target]
 
-
-def test_reviewed_lane_pins_override_size_proxy_without_changing_partition(
+def test_robinhood_reversed_inventory_and_fixture_byte_size_cannot_change_lanes(
     tmp_path: Path,
 ) -> None:
-    modules = tuple(runner.ROBINHOOD_LANE_PINS)
-    for index, module in enumerate(modules):
-        path = tmp_path / module
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(b"x" * (100 - index))
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    fixture = (
+        tmp_path
+        / "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    )
+    fixture.parent.mkdir(parents=True, exist_ok=True)
+    fixture.write_bytes(b"x")
+    before = runner.build_lanes(tmp_path, selected, "robinhood")
+    fixture.write_bytes(b"changed fixture bytes " * 10000)
+    after = runner.build_lanes(tmp_path, tuple(reversed(selected)), "robinhood")
+    assert before == after
 
-    lanes = runner.build_lanes(tmp_path, modules, "robinhood")
-    runner.validate_partitions(modules, tuple(lanes.values()))
-    for module, target in runner.ROBINHOOD_LANE_PINS.items():
-        assert module in tuple(lanes.values())[target]
+
+def test_robinhood_future_module_uses_fallback_and_remains_covered() -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    current = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    future = "tests/review_paper/test_future_supported.py"
+    selected = tuple(sorted((*current, future)))
+    weights = runner.robinhood_module_weights(selected)
+    assert weights[future] == 1000
+    lanes = runner.balance_robinhood(selected)
+    runner.validate_partitions(selected, lanes)
+    assert sum(future in lane for lane in lanes) == 1
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.0, "1", None, [], {}])
+def test_robinhood_invalid_timing_values_fail_closed(monkeypatch, value) -> None:
+    module = "tests/domain/test_market.py"
+    monkeypatch.setattr(runner, "ROBINHOOD_MODULE_TIMINGS_MS", ((module, value),))
+    with pytest.raises(runner.CertificationError, match="positive integers"):
+        runner.balance_robinhood((module,))
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        None,
+        {},
+        (("tests/domain/test_market.py",),),
+        ((None, 1),),
+        (("tests\\domain\\test_market.py", 1),),
+        (("tests/domain/./test_market.py", 1),),
+        (("tests//domain/test_market.py", 1),),
+        (("tests/domain/../domain/test_market.py", 1),),
+        (("Tests/domain/test_market.py", 1),),
+        (("/tests/domain/test_market.py", 1),),
+        (("tests/domain/test_market.py", 1), ("tests/domain/test_market.py", 2)),
+        (("tests/domain/test_market.py", 1), ("tests/domain/./test_market.py", 2)),
+    ],
+)
+def test_robinhood_malformed_duplicate_timing_tables_fail_closed(monkeypatch, table):
+    monkeypatch.setattr(runner, "ROBINHOOD_MODULE_TIMINGS_MS", table)
+    with pytest.raises(runner.CertificationError):
+        runner.robinhood_module_weights(("tests/domain/test_market.py",))
+
+
+def test_robinhood_stale_timing_module_fails_before_children(monkeypatch) -> None:
+    monkeypatch.setattr(
+        runner,
+        "ROBINHOOD_MODULE_TIMINGS_MS",
+        (("tests/domain/test_removed.py", 1),),
+    )
+    with pytest.raises(
+        runner.CertificationError, match="Stale ROBINHOOD timing module"
+    ):
+        runner.build_lanes(Path("."), ("tests/domain/test_market.py",), "robinhood")
 
 
 def test_lane_pins_reject_invalid_lane_number() -> None:
@@ -300,6 +375,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
             expected_current = checkpoint._arch144_current_inventory_test_pin(
                 module, pin
             )
+        expected_current = checkpoint._arch132_r3j_current_shared_successor_pin(
+            module, expected_current
+        )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
@@ -349,6 +427,9 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
             expected_current = checkpoint._arch134_f1_current_inventory_test_pin(
                 module, pin
             )
+        expected_current = checkpoint._arch132_r3j_current_shared_successor_pin(
+            module, expected_current
+        )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
     assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
         "unchanged"
@@ -385,96 +466,72 @@ def test_r3i_preserves_all_arch139_through_143_predecessor_constants_and_ci_rout
     assert checkpoint.resolve_ci_certification_profile(None) is None
 
 
-def test_f1_parent_outlier_placement_preserves_r3h_and_two_lane_coverage():
+def test_r3j_successor_overlay_is_exact_and_intentionally_unmapped() -> None:
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    expected = {
+        "scripts/run_test_certification.py": "7cff6bb635c0faf0eb30edfb298170490d8f523e",
+        "tests/scripts/certification_runner/test_lanes.py": checkpoint._git_blob_sha1(
+            root / "tests/scripts/certification_runner/test_lanes.py"
+        ),
+        "tests/scripts/certification_runner/test_profiles.py": (
+            "5c2cb07adca1b3fda437a77b2cf355b325006794"
+        ),
+    }
+    assert checkpoint.ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS == expected
+    assert (
+        hashlib.sha256(json.dumps(expected, sort_keys=True).encode()).hexdigest()
+        == checkpoint.ARCH132_R3J_CURRENT_SHARED_SUCCESSOR_PINS_SHA256
+    )
+    for relative, successor in expected.items():
+        predecessor = checkpoint.ARCH134_D1S3_SHARED_SUCCESSOR_PINS[relative]
+        assert (
+            checkpoint._arch132_r3j_current_shared_successor_pin(relative, predecessor)
+            == successor
+        )
+        with pytest.raises(ValueError, match="R3J"):
+            checkpoint._arch132_r3j_current_shared_successor_pin(relative, "a" * 40)
+    assert checkpoint.ARCH132_R3J_RUNNER_AST_PINS
+    assert (
+        checkpoint.resolve_ci_checkpoint(
+            checkpoint._checkpoint_specs(),
+            "feature/test-suite-arch132-r3j-robinhood-timing-hygiene-current",
+            "push",
+        )
+        is None
+    )
+    assert (
+        "feature/test-suite-arch132-r3j-robinhood-timing-hygiene-current"
+        not in checkpoint.ACTIVE_CI_CHECKPOINTS
+    )
+    assert checkpoint.resolve_ci_certification_profile(None) is None
+    assert checkpoint._arch134_d1s3_authority_check(root) == ()
+
+
+def test_robinhood_historical_pin_constants_are_exact_but_inactive() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    assert runner.ROBINHOOD_LANE_PINS == {
+        "tests/runtime/checkpoint_runner/test_arch131.py": 0,
+        "tests/runtime/checkpoint_runner/test_arch133_h_k.py": 0,
+        "tests/runtime/checkpoint_runner/test_arch133_l_m.py": 1,
+        "tests/review_paper/test_arch133_scheduler_installation.py": 1,
+    }
+    lanes = runner.build_lanes(root, selected, "robinhood")
     assert runner.ROBINHOOD_F1_LANE_PINS == {
         "tests/review_paper/test_five_session_soak.py": 0
     }
-    assert set(runner.ROBINHOOD_F1_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
-    lanes = runner.build_lanes(root, selected, "robinhood")
-    assert tuple(lanes) == ("robinhood-1", "robinhood-2")
-    runner.validate_partitions(selected, tuple(lanes.values()))
-    for module, index in {
-        **runner.ROBINHOOD_LANE_PINS,
-        **runner.ROBINHOOD_F1_LANE_PINS,
-        **runner.ROBINHOOD_F1R1_B_LANE_PINS,
-    }.items():
-        assert module in tuple(lanes.values())[index]
-
-
-def test_f1r1_b_pin_is_exact_and_applied_after_r3h_and_f1():
-    root = Path(runner.__file__).resolve().parents[1]
-    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
     assert runner.ROBINHOOD_F1R1_B_LANE_PINS == {
         "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": 0
     }
-    assert set(runner.ROBINHOOD_F1R1_B_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
-    assert set(runner.ROBINHOOD_F1R1_B_LANE_PINS).isdisjoint(
-        runner.ROBINHOOD_F1_LANE_PINS
-    )
-    baseline = runner.apply_lane_pins(
-        runner.apply_lane_pins(
-            runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
-        ),
-        runner.ROBINHOOD_F1_LANE_PINS,
-    )
-    baseline = runner.apply_lane_pins(baseline, runner.ROBINHOOD_F1R1_B_LANE_PINS)
-    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_D1S3_LANE_PINS)
-    lanes = runner.build_lanes(root, selected, "robinhood")
-    assert tuple(lanes.values()) == expected
-    runner.validate_partitions(selected, tuple(lanes.values()))
-    assert all(lanes.values())
-    assert (
-        "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py"
-        in lanes["robinhood-1"]
-    )
-    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]
-    with pytest.raises(runner.CertificationError, match="lane 0 or 1"):
-        runner.apply_lane_pins(
-            (("a.py",), ("b.py",)),
-            {"a.py": 2},
-        )
-
-
-def test_d1s3_pin_is_exact_last_and_full_topology_is_unchanged(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    root = Path(runner.__file__).resolve().parents[1]
-    selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
     assert runner.ROBINHOOD_D1S3_LANE_PINS == {
         "tests/review_paper/test_d1_session_execution.py": 0
     }
-    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(runner.ROBINHOOD_LANE_PINS)
-    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(
-        runner.ROBINHOOD_F1_LANE_PINS
+    # These two reviewed historical targets differ from the R3J timing model,
+    # proving build_lanes no longer applies any byte-size-era overlay.
+    assert (
+        "tests/review_paper/test_arch133_scheduler_installation.py"
+        in lanes["robinhood-1"]
     )
-    assert set(runner.ROBINHOOD_D1S3_LANE_PINS).isdisjoint(
-        runner.ROBINHOOD_F1R1_B_LANE_PINS
-    )
-    baseline = runner.apply_lane_pins(
-        runner.apply_lane_pins(
-            runner.apply_lane_pins(
-                runner.balance_broad(root, selected), runner.ROBINHOOD_LANE_PINS
-            ),
-            runner.ROBINHOOD_F1_LANE_PINS,
-        ),
-        runner.ROBINHOOD_F1R1_B_LANE_PINS,
-    )
-    expected = runner.apply_lane_pins(baseline, runner.ROBINHOOD_D1S3_LANE_PINS)
-    lanes = runner.build_lanes(root, selected, "robinhood")
-    assert tuple(lanes.values()) == expected
-    assert tuple(lanes) == ("robinhood-1", "robinhood-2")
-    assert all(lanes.values())
-    runner.validate_partitions(selected, tuple(lanes.values()))
-    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]
-
-    full = runner.select_inventory(runner.discover_inventory(root), "full")
-    full_lanes = runner.build_lanes(root, full, "full")
-    assert tuple(full_lanes.values()) == runner.balance_full(full)
-
-    monkeypatch.setattr(runner, "ROBINHOOD_D1S3_LANE_PINS", {})
-    with pytest.raises(AssertionError):
-        assert runner.ROBINHOOD_D1S3_LANE_PINS == {
-            "tests/review_paper/test_d1_session_execution.py": 0
-        }
+    assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-2"]

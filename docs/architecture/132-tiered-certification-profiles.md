@@ -1,5 +1,55 @@
 # Architecture 132 — Tiered certification profiles
 
+## Architecture 132-R3J — ROBINHOOD timing-aware lane stabilization
+
+R3J is a certification-topology-only correction on the exact R3 product
+inventory. It does not change D1S3 production behavior, publish R4, or add a
+protected operation. The unpublished R4 draft remains parked in its separate
+worktree and is not part of this checkpoint.
+
+R4 exposed structural instability in the old ROBINHOOD byte-size proxy. The
+affected selected test module changed from 45,332 to 47,488 and then 47,247
+bytes during the R4 work, moving 71/109 modules on the initial R4 comparison
+and 30/109 after R4 compaction. Further test shrinking was rejected because it
+would optimize source bytes rather than measured certification work.
+
+R3J freezes the preserved canonical ROBINHOOD timing evidence from GitHub run
+`39903070805`, artifact `canonical-certification-robinhood`, exact R3 HEAD
+`b40038c16a93f9bd9eb46cba5a30c14ba23b48ec`, and artifact digest
+`sha256:5b8af9ad5c731cd74c3c83f6c635cd0c9c6eef6f9558bbad3d3ded20e5cd1a6f`.
+The two XML files derive 109 module totals and 543684 positive integer
+milliseconds. The sorted compact JSON timing map SHA256 is
+`b4e7b62c1c63e273546cc83c324be6634d7809a8194540b27f950117dce73c99`.
+
+The source-owned R3J model sorts descending frozen or 1000-ms fallback weight,
+then canonical path, and greedily assigns whole modules to the lowest modeled
+lane total with the lowest lane index as the tie-break. It never reads module
+byte size, mutable timing files, JUnit, or prior CI artifacts at runtime.
+The exact R3 inventory result is:
+
+```text
+robinhood-1  54 modules  271842 ms  91b85f6104620e3040821b3a55cf9b8875e54c9d47b6ac0532e4808c5d46eb24
+robinhood-2  55 modules  271842 ms  96bae036e5cd7f7b5148a3402151351c16a1bcc3a01b412d58f8de941147e99f
+total        109 modules 543684 ms
+```
+
+The D1S3 operator module remains in `robinhood-2` with its preserved 10946-ms
+weight. New future supported ROBINHOOD modules receive exactly 1000 ms as a
+placement estimate and remain covered exactly once. ROBINHOOD ownership,
+required baseline, two-lane whole-module topology, JUnit validation, and the
+unchanged 300-second hygiene ceiling remain unchanged. FULL's timing table and
+four-lane topology, LEGACY/EXHAUSTIVE topology, serial safety rules, and
+protected rejection remain unchanged.
+
+The historical `ROBINHOOD_LANE_PINS`, `ROBINHOOD_F1_LANE_PINS`,
+`ROBINHOOD_F1R1_B_LANE_PINS`, and `ROBINHOOD_D1S3_LANE_PINS` constants remain
+byte-for-byte preserved as provenance. R3J supersedes them for current
+ROBINHOOD placement; `build_lanes(..., "robinhood")` does not apply them and
+R3J adds no new pin. The R3J branch is intentionally unmapped from
+`ACTIVE_CI_CHECKPOINTS` and `CI_CERTIFICATION_PROFILES`, so source-gate CI
+uses the reviewed unmapped broad fallback. R3J does not satisfy the separate
+D1S3 FULL obligation.
+
 ## 2026-10-18 — Architecture 132-R3I FULL-only timing-aware hygiene correction
 
 R3I changes only CURRENT FULL placement to four deterministic nonempty

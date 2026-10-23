@@ -21,6 +21,23 @@ has performed no installation, publication, successor-root provisioning,
 runtime start, scheduler, credential, provider, paper, broker, D1, D2, or live
 effect. Successor execution remains unauthorized.
 
+## Architecture 132-R3J topology correction
+
+R3J is a separate certification-topology prerequisite on exact R3 HEAD
+`b40038c16a93f9bd9eb46cba5a30c14ba23b48ec` / tree
+`f3fada1c83feb2ed04b9397a4c795db8454e8a69`. It replaces current ROBINHOOD
+byte-size placement with the reviewed frozen timing model and does not modify
+D1S3 production behavior. The R3J branch is intentionally unmapped and does
+not satisfy the pending D1S3 FULL obligation.
+
+R4 remains unpublished and parked in its separate worktree; no R4 source,
+test, or focused-run changes are included here. D1S3 remains NOT SOURCE
+ACCEPTED. `develop` remains accepted D1S2 at the HEAD/TREE recorded above.
+All protected effects remain zero: no production preflight, execute,
+installation, successor-root provisioning, scheduler access or mutation,
+credential access, provider request, paper mutation, broker effect, D1/D2
+effect, or live effect. Live remains NO-GO.
+
 The D1 successor contract remains exactly two fixed sessions, 2026-11-02 and
 2026-11-03, SPY long-only synthetic review-paper, with explicit manual starts,
 fresh installed-release/runtime/host admission, and append-only parent/session

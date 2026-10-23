@@ -167,13 +167,13 @@ baselines.
 - **ROBINHOOD:** when ChatGPT declares a coherent Architecture 131 integration
   boundary, before protected Robinhood qualification, and after material changes
   to shared domain/execution/ledger/risk foundations used by Architecture 131.
-  `--profile robinhood` preserves the current 49-module required baseline in two
-  nonempty deterministic lanes with the accepted R3H placement overlay.
+  `--profile robinhood` preserves the current 49-module required baseline in four
+  nonempty deterministic timing-aware lanes with the accepted R3K model.
   Missing/renamed baseline modules fail closed; new owned tests enter
   automatically.
 - **FULL:** the default `--profile full` certifies all CURRENTLY SUPPORTED
-  functionality in exactly four deterministic nonempty whole-module timing-aware
-  lanes (`broad-1` through `broad-4`), with no historical Windows serial lane.
+  functionality in exactly six deterministic nonempty whole-module timing-aware
+  lanes (`broad-1` through `broad-6`), with no historical Windows serial lane.
   Use after certification-topology changes, at coherent
   current-product boundaries, before major develop/release integration or
   consequential production/live-readiness transitions, after sufficiently broad

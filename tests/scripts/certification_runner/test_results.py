@@ -103,6 +103,8 @@ def test_failed_child_sets_failed_summary(
             "broad-2": {"exit_code": 0},
             "broad-3": {"exit_code": 0},
             "broad-4": {"exit_code": 0},
+            "broad-5": {"exit_code": 0},
+            "broad-6": {"exit_code": 0},
         },
     )
     monkeypatch.setattr(
@@ -320,7 +322,7 @@ def test_github_actions_temp_root_outside_runner_temp_is_rejected(
     "outcome",
     ["pass", "nonzero", "timeout", "missing_junit", "malformed_junit", "cases"],
 )
-def test_four_child_totals_and_single_child_failure_fail_certification(
+def test_six_child_totals_and_single_child_failure_fail_certification(
     tmp_path, monkeypatch, outcome
 ):
     _profile_inventory(tmp_path, "full")
@@ -333,15 +335,15 @@ def test_four_child_totals_and_single_child_failure_fail_certification(
             "exit_code": 0,
             "counts": dict(cases=i + 2, passed=i, skipped=2, failed=0, errors=0),
         }
-        for i in range(1, 5)
+        for i in range(1, 7)
     }
     if outcome != "pass":
-        child = children["broad-4"]
+        child = children["broad-6"]
         child["error"] = outcome
         if outcome == "nonzero":
             child["exit_code"] = 1
         if outcome == "cases":
-            child["counts"].update(cases=8, failed=1, errors=1)
+            child["counts"].update(cases=10, failed=1, errors=1)
         if outcome in {"missing_junit", "malformed_junit"}:
             child.pop("counts")
     monkeypatch.setattr(runner, "run_children", lambda *args: children)
@@ -359,16 +361,16 @@ def test_four_child_totals_and_single_child_failure_fail_certification(
         expected_feature_ref=None,
         expected_feature_head=None,
         timeout_seconds=1,
-        evidence_dir=tmp_path.parent / f"{tmp_path.name}-four-child-totals",
+        evidence_dir=tmp_path.parent / f"{tmp_path.name}-six-child-totals",
         temp_root=tmp_path,
         profile="full",
         plan=False,
     )
     summary = runner.run(args)
     assert summary["status"] == ("passed" if outcome == "pass" else "failed")
-    expected = dict(cases=18, passed=10, skipped=8, failed=0, errors=0)
+    expected = dict(cases=33, passed=21, skipped=12, failed=0, errors=0)
     if outcome == "cases":
-        expected.update(cases=20, failed=1, errors=1)
+        expected.update(cases=35, failed=1, errors=1)
     if outcome in {"missing_junit", "malformed_junit"}:
-        expected.update(cases=12, passed=6, skipped=6)
+        expected.update(cases=25, passed=15, skipped=10)
     assert summary["totals"] == expected

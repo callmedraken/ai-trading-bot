@@ -191,44 +191,70 @@ def test_empty_lane_never_launches_pytest(
         runner.run_children(SimpleNamespace(), lanes, tmp_path)
 
 
-def test_full_four_lane_evidence_model_is_exact_and_repeatable() -> None:
-    import hashlib
-    import json
-
+def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     weights = runner.full_module_weights(inventory)
     assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 198
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
     assert runner.FULL_FALLBACK_MS == 1000
+    assert sum(weights.values()) == 1231440
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "d6656504a4307b958821a6659226621e7e5137351ca948909864b428e8da03f6"
+        == "65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9"
     )
     lanes = runner.build_lanes(root, inventory, "full")
-    assert tuple(lanes) == ("broad-1", "broad-2", "broad-3", "broad-4")
-    assert all(lanes.values())
+    assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 7))
+    assert all(lanes.values()) and "serial" not in lanes
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (49, 50, 50, 49)
-    assert tuple(
-        sum(weights[module] for module in lane) for lane in lanes.values()
-    ) == (287477, 287477, 287477, 287476)
-    # The sole 0-ms measured module uses the reviewed positive 1-ms minimum.
-    assert weights["tests/test_config.py"] == 1
-    raw = dict(weights, **{"tests/test_config.py": 0})
-    for count, expected in (
-        (2, (574953, 574953)),
-        (3, (383302, 383302, 383302)),
-        (4, (287477, 287477, 287476, 287476)),
-    ):
-        totals = [0] * count
-        for module in sorted(raw, key=lambda name: (-raw[name], name)):
-            index = min(range(count), key=lambda lane: (totals[lane], lane))
-            totals[index] += raw[module]
-        assert tuple(totals) == expected
+    assert tuple(map(len, lanes.values())) == (32, 32, 33, 33, 34, 34)
+    totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
+    assert totals == (205240,) * 6
+    assert tuple(_ordered_lane_hash(lane) for lane in lanes.values()) == (
+        "b86fdc382015ef5845e761a6c671f8a9cd27c195ac37e900b2c709b41f68fd37",
+        "40730d6b3d85600efdf972b84f5335e88d93b97915f6f6e9922bdf291176b64e",
+        "a1da558ff6aee18e08a3e949f331e8743e0c02897d621107ad3d5f92237e454f",
+        "3791a2a803e6a9c48cb41133a4f1568ed78a201a29aa536f547eb1d19edad0ef",
+        "dc0fd920b76c118293b943065b4be59d804b7fc6da8bca8919b0725cc9aaeb57",
+        "e5364bb6b084ae092926a3bc480b43a5c5c40ca0a9e5909b16d85e02fa0b4f6f",
+    )
+    assert max(totals) + 81674 == 286914 < 300000
+    # Only this module measured zero in the preserved R4 FULL XML.
+    assert weights["tests/domain/test_proposals.py"] == 1
+    raw = dict(weights, **{"tests/domain/test_proposals.py": 0})
+    assert sum(raw.values()) == 1231439
+    assert [module for module, ms in raw.items() if ms == 0] == [
+        "tests/domain/test_proposals.py"
+    ]
+    assert {module: max(1, ms) for module, ms in raw.items()} == weights
+
+
+def test_full_fixture_byte_size_cannot_change_six_lane_placement(tmp_path) -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    selected = runner.select_inventory(runner.discover_inventory(root), "full")
+    fixture = tmp_path / selected[0]
+    fixture.parent.mkdir(parents=True)
+    fixture.write_bytes(b"x")
+    before = runner.build_lanes(tmp_path, selected, "full")
+    fixture.write_bytes(b"changed fixture bytes " * 10000)
+    assert before == runner.build_lanes(tmp_path, tuple(reversed(selected)), "full")
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.0, "1", None])
+def test_full_fallback_must_be_positive_integer(monkeypatch, value) -> None:
+    monkeypatch.setattr(runner, "FULL_FALLBACK_MS", value)
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ())
+    with pytest.raises(runner.CertificationError, match="fallback"):
+        runner.full_module_weights(("tests/domain/test_future.py",))
+
+
+def test_full_duplicate_inventory_is_rejected(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ())
+    with pytest.raises(runner.CertificationError, match="Duplicate FULL"):
+        runner.balance_full(("tests/domain/test_future.py",) * 2)
 
 
 def test_full_fixture_matches_frozen_timing_membership() -> None:
@@ -239,14 +265,16 @@ def test_full_fixture_matches_frozen_timing_membership() -> None:
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
     original = runner.FULL_MODULE_TIMINGS_MS
-    modules = tuple(f"tests/domain/test_{letter}.py" for letter in "abcdef")
+    modules = tuple(f"tests/domain/test_{letter}.py" for letter in "abcdefgh")
     monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ((modules[1], 1000),))
     assert runner.full_module_weights(modules) == dict.fromkeys(modules, 1000)
     expected = (
-        (modules[0], modules[4]),
-        (modules[1], modules[5]),
+        (modules[0], modules[6]),
+        (modules[1], modules[7]),
         (modules[2],),
         (modules[3],),
+        (modules[4],),
+        (modules[5],),
     )
     assert runner.balance_full(tuple(reversed(modules))) == expected
     monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", original)
@@ -258,7 +286,9 @@ def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> N
     )
     assert set(selected) == {*current, future}
     assert runner.full_module_weights(selected)[future] == 1000
-    runner.validate_partitions(selected, runner.balance_full(selected))
+    lanes = runner.balance_full(selected)
+    runner.validate_partitions(selected, lanes)
+    assert sum(future in lane for lane in lanes) == 1
 
 
 @pytest.mark.parametrize("value", [True, False, 0, -1, 1.0, "1", None, [], {}])
@@ -405,6 +435,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
         expected_current = checkpoint._arch132_r3k_current_shared_successor_pin(
             module, expected_current
         )
+        expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
+            module, expected_current
+        )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
@@ -458,6 +491,9 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
             module, expected_current
         )
         expected_current = checkpoint._arch132_r3k_current_shared_successor_pin(
+            module, expected_current
+        )
+        expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
             module, expected_current
         )
         assert checkpoint._git_blob_sha1(root / module) == expected_current
@@ -628,3 +664,106 @@ def test_robinhood_historical_pin_constants_are_exact_but_inactive() -> None:
         in lanes["robinhood-4"]
     )
     assert "tests/review_paper/test_d1_session_execution.py" in lanes["robinhood-1"]
+
+
+def test_r3l_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch):
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(checkpoint.__file__).resolve().parents[1]
+    pins = checkpoint.ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS
+    assert set(pins) == {
+        "scripts/run_test_certification.py",
+        "tests/scripts/certification_runner/helpers.py",
+        "tests/scripts/certification_runner/test_lanes.py",
+    }
+    assert (
+        hashlib.sha256(json.dumps(pins, sort_keys=True).encode()).hexdigest()
+        == checkpoint.ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS_SHA256
+    )
+    for relative, successor in pins.items():
+        predecessor = checkpoint.ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS[relative]
+        assert checkpoint._git_blob_sha1(root / relative) == successor
+        assert (
+            checkpoint._arch132_r3l_current_shared_successor_pin(relative, predecessor)
+            == successor
+        )
+        with pytest.raises(ValueError, match="R3L"):
+            checkpoint._arch132_r3l_current_shared_successor_pin(relative, "a" * 40)
+    assert (
+        checkpoint._arch132_r3l_current_shared_successor_pin("other", "unchanged")
+        == "unchanged"
+    )
+    branch = "feature/test-suite-arch132-r3l-full-six-lane-hygiene-current"
+    assert branch not in checkpoint.ACTIVE_CI_CHECKPOINTS
+    assert (
+        checkpoint.resolve_ci_checkpoint(checkpoint._checkpoint_specs(), branch, "push")
+        is None
+    )
+    assert checkpoint.resolve_ci_certification_profile(None) is None
+    assert checkpoint._arch134_d1s3_authority_check(root) == ()
+    monkeypatch.setattr(checkpoint, "ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS", {})
+    with pytest.raises(ValueError, match="R3L"):
+        checkpoint._arch132_r3l_current_shared_successor_pin("other", "unchanged")
+    assert checkpoint._arch134_d1s3_authority_check(root)
+
+
+def test_r3l_preserves_r4_product_and_predecessor_topology_contracts() -> None:
+    import ast
+    import subprocess
+
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(runner.__file__).resolve().parents[1]
+    base = "e515f2d4b8f75ee04b95f7e89162e37c7890e0a4"
+
+    def frozen_nodes(text):
+        return {
+            node.name
+            if isinstance(node, ast.FunctionDef)
+            else node.target.id: ast.dump(node, include_attributes=False)
+            for node in ast.parse(text).body
+            if isinstance(node, ast.FunctionDef)
+            or (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name))
+        }
+
+    for relative in (
+        "src/trading_bot/supervised_release/successor_installation_operator.py",
+        "src/trading_bot/supervised_release/successor_native_read.py",
+    ):
+        before = subprocess.run(
+            ["git", "show", f"{base}:{relative}"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert (root / relative).read_bytes().replace(b"\r\n", b"\n") == before
+    before_runner = subprocess.run(
+        ["git", "show", f"{base}:scripts/run_test_certification.py"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    before_nodes = frozen_nodes(before_runner)
+    after_nodes = frozen_nodes(Path(runner.__file__).read_text())
+    for name in (
+        "robinhood_module_weights",
+        "balance_robinhood",
+        "balance_broad",
+        "separate_serial",
+        "classify_inventory",
+        "build_lanes",
+    ):
+        assert after_nodes[name] == before_nodes[name]
+    before_checkpoint = subprocess.run(
+        ["git", "show", f"{base}:scripts/checkpoint_runner.py"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    before_nodes = frozen_nodes(before_checkpoint)
+    after_nodes = frozen_nodes(Path(checkpoint.__file__).read_text())
+    for name, node in before_nodes.items():
+        if name.startswith(("ARCH132_R3J_", "ARCH132_R3K_", "ARCH134_D1S3_")):
+            assert after_nodes[name] == node

@@ -340,7 +340,7 @@ def _fixture_profiles() -> dict[str, tuple[str, ...]]:
 
 def _lane_names(profile: str) -> tuple[str, ...]:
     return {
-        "full": ("broad-1", "broad-2", "broad-3", "broad-4"),
+        "full": tuple(f"broad-{index}" for index in range(1, 7)),
         "robinhood": (
             "robinhood-1",
             "robinhood-2",

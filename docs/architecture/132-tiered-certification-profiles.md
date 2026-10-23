@@ -1,5 +1,62 @@
 # Architecture 132 — Tiered certification profiles
 
+## Architecture 132-R3L — six-lane current-local FULL topology
+
+R3L is the certification-only successor of ChatGPT SOURCE ACCEPTED D1S3-R4
+HEAD e515f2d4b8f75ee04b95f7e89162e37c7890e0a4 / tree
+ee326a61a87f543e85a00ec162bbf990bf17e507. Its one fresh four-lane FULL
+was functionally passing (13,131 passed, 3 symlink-capability skips, zero
+failures/errors across 198 modules) but failed the unchanged 300-second
+ceiling at 356.885 seconds. R4 product source stays accepted; merge remains
+blocked pending exact R3L source review and one successful six-lane FULL.
+
+The sole current-local FULL timing authority is the preserved R4 evidence:
+F:\AI\temp\certification\arch134-d1s3-r4-full-86ff71accd8f4c468c9807361333c795.
+All four lane inventories reconcile to exactly 198 unique selected modules
+and 1,231,439 raw testcase milliseconds. Only
+tests/domain/test_proposals.py measured zero. It normalizes to 1 ms before
+source freezing, producing 198 positive tuple-pair entries totaling
+1,231,440 ms. Sorted compact JSON timing-map SHA256:
+65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9.
+This supersedes the previous active FULL table (1,149,907 ms); there is one
+active FULL map, with the unchanged 1000-ms future-module fallback.
+
+Four lanes have a raw testcase lower bound of 307.85975 seconds and cannot
+meet the ceiling. Five lanes were modeled only: 246.288 seconds per lane,
+with the reported child-work lower bound 267.9152 seconds and insufficient
+credible contention margin. Six lanes are selected directly, without a
+four/five/seven-lane runtime alternative. Their exact module counts are
+32/32/33/33/34/34, each modeled at 205240 ms. The conservative pre-edit bound
+205240 + 81674 = 286914 ms passes with 13086 ms remaining. This is a design
+admission check; actual runtime acceptance remains wall strictly <300 seconds.
+
+FULL now uses exactly broad-1 through broad-6, six deterministic nonempty
+whole-module lanes, with no serial lane. The existing descending timing /
+ascending path / lowest total / lowest index greedy algorithm preserves
+assignment order. No runtime JUnit reads, adaptive state, byte-size placement,
+lane pins, ownership changes, removed tests, or skip policy are introduced.
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE ownership remains 198/109/222/420 modules;
+the frozen required baselines remain 122/49.
+
+Accepted R3K ROBINHOOD is unchanged: 109 modules, four lanes with
+27/30/26/26 modules, 856950 ms total, and timing-map SHA256
+0c0c79f710ab8b3a9ffc08de4720c026f257e2ffefc8dc6989c3a70fba2d2898.
+LEGACY/EXHAUSTIVE retain their exact historical serial safety and planner.
+R3J/R3K maps/digests/AST data and R4 Administrator-before-latch/native product
+pins remain frozen. The exact R3L overlay covers only the three changed
+current pinned certification consumers; current-doc mutability, D1S2 None
+rollback, D1S3 registration and mapped ROBINHOOD remain intact.
+
+R3L is intentionally unmapped from ACTIVE_CI_CHECKPOINTS and
+CI_CERTIFICATION_PROFILES. One atomic publication uses normal broad fallback
+source CI. Only terminal green permits one canonical local six-lane FULL on
+that exact pushed tree. That later run is not duplicated by fallback CI.
+No merge or protected preflight/effect is part of R3L implementation.
+The historical sections below retain their then-current topology facts.
+Exact raw/normalized timings, both analysis models, membership and hashes are
+in [R3L validation](../validation/arch132-r3l-full-six-lane-topology.md).
+
+
 ## Architecture 132-R3K — four-lane current-local ROBINHOOD topology
 
 R3K is the certification-topology successor to published R3J. It is based
@@ -439,12 +496,12 @@ The older two-broad-plus-one-serial all-repository FULL layout is historical
 provenance. It predates the current/legacy ownership split and must not be
 reintroduced for routine current-product verification.
 
-The latest reviewed certification topology is Architecture 132-R3I:
+The latest reviewed current topology is R3L FULL and R3K ROBINHOOD:
 
-- FULL runs four deterministic nonempty whole-module timing-aware lanes,
-  `broad-1`, `broad-2`, `broad-3`, and `broad-4`, with no serial lane;
-- ROBINHOOD runs exactly two deterministic nonempty lanes, `robinhood-1` and
-  `robinhood-2`, with the accepted R3H placement overlay and no serial lane;
+- FULL runs six deterministic nonempty whole-module timing-aware lanes,
+  `broad-1` through `broad-6`, with no serial lane;
+- ROBINHOOD runs exactly four deterministic nonempty timing-aware lanes,
+  `robinhood-1` through `robinhood-4`, with accepted R3K and no serial lane;
 - LEGACY and EXHAUSTIVE alone retain the exact five-module serial safety lane.
 
 A canonical current-product certification therefore uses
@@ -2198,10 +2255,10 @@ full union legacy == exhaustive
 exhaustive == complete discovered repository inventory
 ```
 
-FULL uses four deterministic nonempty whole-module timing-aware lanes as
-specified by R3I above. Robinhood retains two deterministic lanes with the
-accepted R3H placement overlay. Both have no serial lane. Robinhood and the
-historical LEGACY/EXHAUSTIVE broad lanes retain descending-file-size balancing
+FULL uses six deterministic nonempty whole-module timing-aware lanes as
+specified by R3L above. Robinhood retains four deterministic timing-aware lanes
+under accepted R3K. Both have no serial lane. Only the historical
+LEGACY/EXHAUSTIVE broad lanes retain descending-file-size balancing
 with stable path/lane ties and whole-file allocation. LEGACY and EXHAUSTIVE
 retain the exact historical two-broad-plus-serial topology and five-module
 serial allowlist:

@@ -17165,6 +17165,28 @@ ARCH132_R3K_RUNNER_AST_PINS: Final = {
         "623313cea7b9d6b7a816515507c36477a9c03a68596c52e84b4d22638bbda1ac"
     ),
 }
+# Architecture 132-R3L supersedes only current FULL certification consumers.
+# R3J/R3K dictionaries, digests, native source and the R4 product pins stay frozen.
+ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
+    "scripts/run_test_certification.py": ("bfa2222bc5597a581868c6c5865ca329a6a420bb"),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "7f9978b9acf7eda03e90cfb6695b287e2759be27"
+    ),
+}
+ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS_SHA256: Final = (
+    "c400527c0eed30ae99efea171edad3affc4eeb022f39dbf2e342e2e952d0cd3f"
+)
+ARCH132_R3L_RUNNER_AST_PINS: Final = {
+    "_arch134_d1s3_shared_successor_pin": (
+        "618f3937ce8b762d75f01b0c6d6212019f718360a107f8731d733c8c4eea9835"
+    ),
+    "_arch134_d1s3_authority_check": (
+        "34e26902999fa993b33326d2327db11e3da767b0f9770f7707e02f54e949130a"
+    ),
+}
 ARCH134_D1S3_TESTS: Final = (
     *ARCH134_D1S2_TESTS,
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
@@ -17188,7 +17210,8 @@ def _arch134_d1s3_shared_successor_pin(relative: str) -> str | None:
     if successor is None:
         return None
     successor = _arch132_r3j_current_shared_successor_pin(relative, successor)
-    return _arch132_r3k_current_shared_successor_pin(relative, successor)
+    successor = _arch132_r3k_current_shared_successor_pin(relative, successor)
+    return _arch132_r3l_current_shared_successor_pin(relative, successor)
 
 
 def _arch132_r3j_current_shared_successor_pin(relative: str, predecessor: str) -> str:
@@ -17263,6 +17286,39 @@ def _arch132_r3k_current_shared_successor_pin(relative: str, predecessor: str) -
             raise ValueError("R3K wrong R3J shared predecessor")
         return after[relative]
     return _arch132_r3j_current_shared_successor_pin(relative, predecessor)
+
+
+def _arch132_r3l_current_shared_successor_pin(relative: str, predecessor: str) -> str:
+    before = {
+        "scripts/run_test_certification.py": "a6b3857f832af47fccaf3c13203ecae1c813a22e",
+        "tests/scripts/certification_runner/helpers.py": (
+            "c3298836d98c1848c3603b8c8d952ea1cfb5e307"
+        ),
+        "tests/scripts/certification_runner/test_lanes.py": (
+            "c2187d9bdda26558336811315dbcf78cbc679b69"
+        ),
+    }
+    after = ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS
+    if (
+        type(after) is not dict
+        or set(after) != set(before)
+        or before
+        != {path: ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS[path] for path in before}
+        or hashlib.sha256(json.dumps(after, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS_SHA256
+        or any(
+            type(pin) is not str
+            or len(pin) != 40
+            or any(character not in "0123456789abcdef" for character in pin)
+            for pin in after.values()
+        )
+    ):
+        raise ValueError("R3L current shared successor overlay drift")
+    if relative in after:
+        if predecessor != before[relative]:
+            raise ValueError("R3L wrong R3K shared predecessor")
+        return after[relative]
+    return predecessor
 
 
 def _arch134_d1s2_current_source_pin(relative: str, predecessor: str) -> str:
@@ -17595,8 +17651,11 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_D1S3_RUNNER_AST_PINS.items():
-            expected = ARCH132_R3K_RUNNER_AST_PINS.get(
-                name, ARCH132_R3J_RUNNER_AST_PINS.get(name, expected)
+            expected = ARCH132_R3L_RUNNER_AST_PINS.get(
+                name,
+                ARCH132_R3K_RUNNER_AST_PINS.get(
+                    name, ARCH132_R3J_RUNNER_AST_PINS.get(name, expected)
+                ),
             )
             if (
                 name not in functions

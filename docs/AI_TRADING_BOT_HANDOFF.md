@@ -2,76 +2,101 @@
 
 ## Verified boundary
 
-D1S3-R4 remains ChatGPT **SOURCE ACCEPTED** at:
+Architecture 134-F1R1-D1S3-R4 plus Architecture 132-R3L is accepted and
+integrated.
 
-    HEAD e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
-    TREE ee326a61a87f543e85a00ec162bbf990bf17e507
-    parent / accepted R3K 5c57d49e31b1f0e5174bdc826b933118494e2456
+Exact accepted/certified executable identity:
 
-Its one fresh FULL failed timing only: 198 modules, 13,134 cases, 13,131
-passed, three explicit symlink-capability skips, zero failed/errors,
-356.885 s wall. The exact evidence remains preserved at
-F:\AI\temp\certification\arch134-d1s3-r4-full-86ff71accd8f4c468c9807361333c795.
-It is never rerun unchanged. R4 Administrator-before-latch/native semantics
-remain accepted and unchanged. Merge remains blocked pending R3L acceptance.
+    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
+    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
+    parent / accepted R4 e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
 
-Develop remains accepted D1S2:
+D1S3-R4 preserves the accepted Administrator-before-latch ordering:
 
-    HEAD 2b697b79e6bdbc964d2b0414ced057628e6c2da7
-    TREE e510210070874ade43a240457645939650e457d8
+    exact source admission
+    -> Administrator host admission
+    -> native read-only protected boundary
+    -> execute_installation
+    -> authorization/read-only eligibility
+    -> durable one-shot latch
+    -> installer entry
 
-## Required certification successor
+A definite non-Administrator host remains BLOCKED / NOT_STARTED and cannot
+consume the D1S3 installation attempt latch.
 
-Architecture 132-R3L is the isolated certification-topology successor on
-feature/test-suite-arch132-r3l-full-six-lane-hygiene-current, worktree
-F:\AI\worktrees\ai-trading-bot-arch132-r3l-full-six-lane-hygiene-current.
-It refreshes only current FULL timing from the exact R4 JUnit evidence:
-198 tuple entries, 1231439 raw ms, one raw zero (test_proposals.py) normalized
-to 1 ms, canonical total 1231440 ms, SHA256
+Architecture 132-R3L is SOURCE/CERTIFICATION ACCEPTED. Its six-lane current
+FULL model uses 198 positive timing entries, canonical total 1231440 ms and
+timing-map SHA256
 65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9.
-Six lanes have 32/32/33/33/34/34 modules and 205240 ms each; the conservative
-pre-edit stress check is 286914 ms. The actual ceiling stays strictly <300 s.
-Four is mathematically insufficient; five is analysis-only and rejected.
+The accepted model is 32/32/33/33/34/34 modules at exactly 205240 modeled ms
+per lane.
 
-R3K remains SOURCE/CERTIFICATION ACCEPTED. Its ROBINHOOD map, four lanes,
-109 modules and 27/30/26/26 membership are unchanged. LEGACY/EXHAUSTIVE,
-ownership, serial safety, R3J/R3K history, R4 product/native pins, D1S2 None
-rollback, current-doc exception and mapped D1S3 ROBINHOOD remain unchanged.
-See [R3L validation](validation/arch132-r3l-full-six-lane-topology.md) for
-complete raw/canonical timing material, both ordered models and exact hashes.
+The one successful canonical R3L FULL covered all 198 modules exactly once:
+13,145 cases, 13,142 passed, three explicit symlink-capability skips, zero
+failed/errors, 240.311 s wall and 59.689 s headroom.
 
-## Preserved operational boundary
+The D1S3 feature branch was fast-forwarded without a new commit to the exact
+R3L tree. Mapped run 40038165748, attempt 1, passed source-static,
+active-tests, four-lane ROBINHOOD and source-gates; FULL was correctly skipped.
+ROBINHOOD covered 10,771 cases, 10,765 passed, six skips, zero failed/errors,
+with 243.228 s wall and 56.772 s headroom.
+
+Develop was then fast-forwarded to the same exact accepted tree. Post-merge
+Checkpoint Source Gates run 40039433032, attempt 1, completed SUCCESS:
+source-static, all four broad fallback shards and source-gates passed; mapped
+active/certification jobs were correctly skipped for develop.
+
+## Certification lineage
+
+R3J remains preserved as published but certification-rejected. R3K remains the
+accepted current four-lane timing-aware ROBINHOOD topology: 109 modules and
+27/30/26/26 membership, canonical total 856950 ms.
+
+The earlier R4 four-lane FULL timing failure remains preserved and must not be
+rerun unchanged:
+F:\AI\temp\certification\arch134-d1s3-r4-full-86ff71accd8f4c468c9807361333c795
+
+R3L supersedes only current FULL timing/placement. LEGACY/EXHAUSTIVE,
+ownership, serial-safety contracts, D1S2 None rollback, R3J/R3K history, R4
+product/native pins and all protected fail-closed boundaries remain unchanged.
+
+## Operational boundary
 
 The D1 successor remains two fixed manual-start SPY synthetic review-paper
-sessions, 2026-11-02 and 2026-11-03. Reboot/login stops operation; any later
-start requires fresh installed-release/runtime/host admission. No scheduler,
-service, resume, recovery, catch-up or ambiguous retry capability is added.
-The successor root remains uncreated; the installed-readiness result and
-separate root-provisioning review boundary remain unchanged. The immutable
-Architecture-133 launcher remains inert/fail-closed without provider/paper wiring.
+sessions on 2026-11-02 and 2026-11-03. Reboot/login stops operation. No
+scheduler/service/autostart/resume/catch-up or ambiguous retry behavior exists.
+
+The successor root has not been created. No production immutable release has
+been installed by D1S3. No protected execute has occurred. Credentials,
+providers, paper state, broker operations, D1/D2 effects and live effects all
+remain untouched.
 
 Original F1 remains FINAL / INDETERMINATE / CONSUMED. C2 remains consumed,
-immutable and non-reusable. No protected preflight/execute or protected
-progression occurred: installation/publication, successor provisioning,
-scheduler reads/mutations, credentials, provider/paper/broker/D1/D2/live effects
-and original F1/C2 evidence mutations remain zero. Architecture 145 remains
-separate/offline; live remains **NO-GO**.
+immutable and non-reusable. Architecture 145 remains separate/offline. Live
+remains **NO-GO**.
 
-## Next step
+## Next action
 
-Owner: Codex / Sol High for this bounded R3L implementation. Complete focused
-verification and exact unpublished FULL/ROBINHOOD plan-only checks, then one
-atomic R3L commit/push. R3L is intentionally unmapped: normal broad fallback
-CI must reach terminal green before exactly one canonical local six-lane FULL
-on that pushed exact HEAD/tree. No pre-publication canonical FULL or
-ROBINHOOD rerun. On red or failed FULL, preserve evidence and STOP.
+Run only the separately reviewed READ-ONLY D1S3 production preflight against:
 
-Owner after handoff: ChatGPT exact-review of R3L source and FULL evidence.
-Only if accepted, fast-forward the existing D1S3 branch from R4 to that R3L
-commit without a new commit, push it once for mapped four-lane ROBINHOOD CI,
-then review the exact tree and integrate into develop under reviewed merge
-authority. Verify post-merge source/CI, close both current docs, then issue the
-separately reviewed READ-ONLY production preflight. This implementation does
-not fast-forward D1S3, merge or perform protected progression.
+    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
+    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
 
-Also remove or update any tests and docs that referenced the old behavior.
+The preflight is observation/admission only. It may inspect exact
+source/install/runtime/successor-root/manual-process state but must not:
+
+- install or publish a release;
+- create/provision the successor root;
+- launch runtime;
+- consume the installation attempt latch;
+- access credentials or providers;
+- mutate paper state;
+- place broker orders;
+- create D1/D2/live effects.
+
+A safe pre-install result may be INSTALL_REQUIRED. After any future separately
+authorized exact installation, root absence may yield
+READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW. Neither result itself grants
+installation, provisioning or successor execution authority.
+
+No protected execute or installation is authorized by this handoff.

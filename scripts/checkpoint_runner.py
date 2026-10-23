@@ -17143,7 +17143,7 @@ ARCH132_R3J_RUNNER_AST_PINS: Final = {
 # the R3J map/digest and AST pins immutable, then overlay only the current
 # certification consumers whose topology assertions changed for four lanes.
 ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
-    "scripts/run_test_certification.py": ("e853303076bb9c8ab5f721d60dd98301cca795c0"),
+    "scripts/run_test_certification.py": ("a6b3857f832af47fccaf3c13203ecae1c813a22e"),
     "tests/scripts/certification_runner/helpers.py": (
         "c3298836d98c1848c3603b8c8d952ea1cfb5e307"
     ),
@@ -17155,7 +17155,7 @@ ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
     ),
 }
 ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "9e6fcdca63c802cff96a93f7c592efbef13a05a882f2e32fdb2e2fd203c504a8"
+    "8b7662e143d4a9bb9eb4da3273f93bf1d36e41ab79df6302fe952bf41c03b45e"
 )
 ARCH132_R3K_RUNNER_AST_PINS: Final = {
     "_arch134_d1s3_shared_successor_pin": (

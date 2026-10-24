@@ -67,6 +67,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
                 "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
                 "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
+                "tests/review_paper/test_successor_publication_recovery.py",
                 "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
                 "tests/review_paper/test_supervised_release_foundation.py",
                 "tests/review_paper/test_supervised_release_bundle.py",
@@ -98,7 +99,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
             )
         )
     )
-    assert len(selected) == 109
+    assert len(selected) == 110
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -155,6 +156,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
                 "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
                 "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
+                "tests/review_paper/test_successor_publication_recovery.py",
                 "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
                 "tests/review_paper/test_supervised_release_foundation.py",
                 "tests/review_paper/test_supervised_release_bundle.py",
@@ -215,10 +217,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 198,
-        "robinhood": 109,
+        "full": 199,
+        "robinhood": 110,
         "legacy": 222,
-        "exhaustive": 420,
+        "exhaustive": 421,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
@@ -242,7 +244,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 expected = runner.balance_robinhood(selected)
             assert tuple(lanes.values()) == expected
             if name == "robinhood":
-                assert tuple(map(len, lanes.values())) == (27, 30, 26, 26)
+                assert tuple(map(len, lanes.values())) == (28, 27, 29, 26)
 
 
 @pytest.mark.parametrize(

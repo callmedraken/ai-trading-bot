@@ -698,7 +698,7 @@ def test_source_authority_and_source_only_registration():
         "arch133-robinhood-reprovision-indeterminate-reconciliation",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 74
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 75
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
 
 

@@ -2,143 +2,57 @@
 
 ## Verified boundary
 
-Architecture 134-F1R1-D1S3-R4 plus Architecture 132-R3L is accepted and
-integrated.
+Corrected D1S3 is accepted/integrated at HEAD
+`ad4c3d3334048054df6d8f046040349619c277f2`, tree
+`b4cbf3039171673d3fba44e4999b172e658a4f91`. Administrator-before-latch ordering,
+correct durable-parent admission, R3L six-lane FULL and R3K four-lane ROBINHOOD
+remain intact.
 
-Exact accepted/certified executable identity:
+D1S3 preflight passed INSTALL_REQUIRED. It attempted a latch read and established
+AVAILABLE from absence; it did not create, consume or mutate the latch. The later
+protected installation consumed its attempt and stopped INDETERMINATE at
+PUBLICATION / MAY_HAVE_OCCURRED. Automatic retry and installation rerun are
+forbidden. Subsequent preflight was BLOCKED / INSTALLATION_BLOCKED, attempt
+CONSUMED.
 
-    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
-    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
-    parent / accepted R4 e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
+Preserved observations: exact FINAL absent, exact STAGING present with identity
+`(1855336320, 281474982917732)`, stable namespace and two identical immutable
+staging replays without error. Registered R5 preflight must reprove these facts;
+chat observations are not authority. Exact incident paths/digests and image/source
+constants live in [R5 architecture](architecture/134-f1r1-d1s3-r5-successor-release-publication-recovery.md).
 
-D1S3-R4 preserves the accepted Administrator-before-latch ordering:
+## Active source-only work
 
-    exact source admission
-    -> Administrator host admission
-    -> native read-only protected boundary
-    -> execute_installation
-    -> authorization/read-only eligibility
-    -> durable one-shot latch
-    -> installer entry
+Branch:
+`feature/robinhood-production-paper-134f1r1-d1s3-r5-publication-recovery-current`.
+Worktree:
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s3-r5-publication-recovery-current`.
+Checkpoint: `arch134-f1r1-d1s3-r5-successor-release-publication-recovery`.
 
-A definite non-Administrator host remains BLOCKED / NOT_STARTED and cannot
-consume the D1S3 installation attempt latch.
+R5 supplies its own one-shot latch, read-only post-consumption reconciliation
+and one narrow handle-relative no-replace publication seam. It is source-only,
+pending terminal mapped CI and exact-source review. No recovery execute or
+production preflight has run. Original D1S3 authority remains permanently
+non-reusable; historical 133-AJ modules remain byte-identical.
 
-Architecture 132-R3L is SOURCE/CERTIFICATION ACCEPTED. Its six-lane current
-FULL model uses 198 positive timing entries, canonical total 1231440 ms and
-timing-map SHA256
-65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9.
-The accepted model is 32/32/33/33/34/34 modules at exactly 205240 modeled ms
-per lane.
+## Next action and stop boundary
 
-The one successful canonical R3L FULL covered all 198 modules exactly once:
-13,145 cases, 13,142 passed, three explicit symlink-capability skips, zero
-failed/errors, 240.311 s wall and 59.689 s headroom.
+Owner: ChatGPT exact GitHub source review after the one planned ordinary push
+reaches terminal mapped ROBINHOOD/source-gates. Review exact commit/diff,
+predecessor authority preservation, focused evidence and canonical CI. Do not
+rerun identical certification locally. Source, incident, image/security or
+namespace ambiguity stops progression.
 
-The D1S3 feature branch was fast-forwarded without a new commit to the exact
-R3L tree. Mapped run 40038165748, attempt 1, passed source-static,
-active-tests, four-lane ROBINHOOD and source-gates; FULL was correctly skipped.
-ROBINHOOD covered 10,771 cases, 10,765 passed, six skips, zero failed/errors,
-with 243.228 s wall and 56.772 s headroom.
+Only after source acceptance may a separately reviewed registered R5 read-only
+preflight use its actual accepted HEAD/tree. No protected execute is authorized
+here. Publication success grants no successor-root provisioning or runtime start.
+Root remains uncreated; its future reserve/append policy needs separate review
+because IMAGE_ACES grants Trading read/execute only.
 
-Develop was then fast-forwarded to the same exact accepted tree. Post-merge
-Checkpoint Source Gates run 40039433032, attempt 1, completed SUCCESS:
-source-static, all four broad fallback shards and source-gates passed; mapped
-active/certification jobs were correctly skipped for develop.
+Original F1 remains FINAL / INDETERMINATE / CONSUMED; C2 remains consumed and
+immutable. Fixed 2026-11-02/03 successor sessions retain manual start/reboot-stop/
+fresh-admission behavior. Scheduler, credentials, provider, paper, broker, D1/D2
+and live actions remain excluded. Live remains NO-GO.
 
-## Retained macro progression
-
-    145-A SOURCE ACCEPTED and integrated
-    -> finish 134-F1R1 operational-confidence hardening
-    -> fresh F1 successor soak
-    -> 145-B results/campaign bundle
-    -> Research Results GUI
-    -> large strategy campaigns
-
-D1S3 is the remaining bounded operational sub-path inside 134-F1R1, not the
-end-state roadmap. Architecture 145 remains operationally separate and live
-remains NO-GO.
-
-## Certification lineage
-
-R3J remains preserved as published but certification-rejected. R3K remains the
-accepted current four-lane timing-aware ROBINHOOD topology: 109 modules and
-27/30/26/26 membership, canonical total 856950 ms.
-
-The earlier R4 four-lane FULL timing failure remains preserved and must not be
-rerun unchanged:
-F:\AI\temp\certification\arch134-d1s3-r4-full-86ff71accd8f4c468c9807361333c795
-
-R3L supersedes only current FULL timing/placement. LEGACY/EXHAUSTIVE,
-ownership, serial-safety contracts, D1S2 None rollback, R3J/R3K history, R4
-product/native pins and all protected fail-closed boundaries remain unchanged.
-
-## Operational boundary
-
-The D1 successor remains two fixed manual-start SPY synthetic review-paper
-sessions on 2026-11-02 and 2026-11-03. Reboot/login stops operation. No
-scheduler/service/autostart/resume/catch-up or ambiguous retry behavior exists.
-
-The successor root has not been created. No production immutable release has
-been installed by D1S3. No protected execute has occurred. Credentials,
-providers, paper state, broker operations, D1/D2 effects and live effects all
-remain untouched.
-
-Original F1 remains FINAL / INDETERMINATE / CONSUMED. C2 remains consumed,
-immutable and non-reusable. Architecture 145 remains separate/offline. Live
-remains **NO-GO**.
-
-## Next action
-## Latest read-only D1S3 production preflight finding
-
-The registered elevated read-only D1S3 preflight reached source/host
-observation against:
-
-    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
-    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
-
-Source identity was stable and the closed result was:
-
-    PRIMARY_STATUS=BLOCKED
-    PRIMARY_REASON=SUCCESSOR_ROOT_BLOCKED
-    installation_classification=INSTALL_REQUIRED
-    attempt_state=AVAILABLE
-    successor_root_classification=WRONG_PARENT_OR_POLICY
-    execute_eligible=false
-    protected_effect_counters=0
-    production_effects=NOT_RUN
-    protected_execution=NOT_AUTHORIZED
-
-The successor root was absent. Native read-only localization proved that the
-retained `F:\AITradingBot\Arch133` parent is the exact protected,
-Administrators-owned, local NTFS, persistent-ACL, non-reparse, single-link
-`ADMIN_SYSTEM_ONLY` parent with `ADMIN_ACES`. The source defect confused this
-durable-parent policy with the immutable successor image policy. Historical
-133-K `ROOT_ACES` is incompatible and was not imported, invoked, or applied.
-The resolution is source correction, not ACL mutation.
-
-No protected operation occurred: the release was not installed, the successor
-root was not created, the D1S3 latch was not read or consumed, credentials and
-providers were not accessed, paper/broker state was not mutated, and no D1/D2/
-live effect occurred. The preflight remains read-only and fail-closed.
-
-The immediate next step is exact review of the bounded source correction, then
-a fresh read-only D1S3 preflight against its exact accepted source. It may
-inspect exact source/install/runtime/successor-root/manual-process state but
-must not:
-
-- install or publish a release;
-- create/provision the successor root;
-- launch runtime;
-- consume the installation attempt latch;
-- access credentials or providers;
-- mutate paper state;
-- place broker orders;
-- create D1/D2/live effects.
-
-A safe pre-install result may be INSTALL_REQUIRED. After any future separately
-authorized exact installation, root absence may yield
-READY_FOR_D1_SUCCESSOR_ROOT_PROVISIONING_REVIEW. Neither result itself grants
-installation, provisioning or successor execution authority.
-
-No protected execute or installation is authorized by this handoff.
+Roadmap: F1R1 recovery/hardening -> fresh F1 successor soak -> 145-B -> Research
+Results GUI -> large strategy campaigns. Accepted 145-A remains separate/offline.

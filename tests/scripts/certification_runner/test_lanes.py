@@ -46,6 +46,13 @@ def _ordered_lane_hash(modules: tuple[str, ...]) -> str:
 def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
+    assert "tests/review_paper/test_successor_publication_recovery.py" in selected
+    current = selected
+    selected = tuple(
+        m
+        for m in selected
+        if m != "tests/review_paper/test_successor_publication_recovery.py"
+    )
     weights = runner.robinhood_module_weights(selected)
     assert len(selected) == len(runner.ROBINHOOD_MODULE_TIMINGS_MS) == 109
     assert set(weights) == set(selected)
@@ -76,6 +83,15 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         f"robinhood-{index}": lane for index, lane in enumerate(lanes, start=1)
     }
     runner.validate_partitions(selected, lanes)
+
+    current_lanes = runner.build_lanes(root, current, "robinhood")
+    runner.validate_partitions(current, tuple(current_lanes.values()))
+    assert (
+        runner.robinhood_module_weights(current)[
+            "tests/review_paper/test_successor_publication_recovery.py"
+        ]
+        == runner.ROBINHOOD_FALLBACK_MS
+    )
 
 
 def test_robinhood_r3k_normalizes_only_raw_zero_to_positive_minimum() -> None:
@@ -194,6 +210,13 @@ def test_empty_lane_never_launches_pytest(
 def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
+    assert "tests/review_paper/test_successor_publication_recovery.py" in inventory
+    current = inventory
+    inventory = tuple(
+        m
+        for m in inventory
+        if m != "tests/review_paper/test_successor_publication_recovery.py"
+    )
     weights = runner.full_module_weights(inventory)
     assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 198
     assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
@@ -230,6 +253,15 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         "tests/domain/test_proposals.py"
     ]
     assert {module: max(1, ms) for module, ms in raw.items()} == weights
+
+    current_lanes = runner.build_lanes(root, current, "full")
+    runner.validate_partitions(current, tuple(current_lanes.values()))
+    assert (
+        runner.full_module_weights(current)[
+            "tests/review_paper/test_successor_publication_recovery.py"
+        ]
+        == runner.FULL_FALLBACK_MS
+    )
 
 
 def test_full_fixture_byte_size_cannot_change_six_lane_placement(tmp_path) -> None:
@@ -438,7 +470,9 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests():
         expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
             module, expected_current
         )
-        assert checkpoint._git_blob_sha1(root / module) == expected_current
+        assert checkpoint._git_blob_sha1(
+            root / module
+        ) == checkpoint._arch134_r5_blob_pin(module, expected_current)
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
         == "unchanged"
@@ -496,7 +530,9 @@ def test_arch144_current_inventory_successor_is_exact_and_current():
         expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
             module, expected_current
         )
-        assert checkpoint._git_blob_sha1(root / module) == expected_current
+        assert checkpoint._git_blob_sha1(
+            root / module
+        ) == checkpoint._arch134_r5_blob_pin(module, expected_current)
     assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
         "unchanged"
     )
@@ -682,7 +718,9 @@ def test_r3l_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch):
     )
     for relative, successor in pins.items():
         predecessor = checkpoint.ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS[relative]
-        assert checkpoint._git_blob_sha1(root / relative) == successor
+        assert checkpoint._git_blob_sha1(
+            root / relative
+        ) == checkpoint._arch134_r5_blob_pin(relative, successor)
         assert (
             checkpoint._arch132_r3l_current_shared_successor_pin(relative, predecessor)
             == successor

@@ -132,6 +132,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH134_R5_NAME,
         "arch133-robinhood-supervised-release-installation-operator",
         "arch133-robinhood-supervised-release-publication-recovery",
         "arch133-robinhood-supervised-release-installation-reconciliation",
@@ -374,6 +375,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             )
         if spec.name == runner.ARCH134_D1S3_NAME:
             expected_branch = runner.ARCH134_D1S3_BRANCH
+        if spec.name == runner.ARCH134_R5_NAME:
+            expected_branch = runner.ARCH134_R5_BRANCH
         if spec.name == "arch134-f1r1-d1s1-successor-soak-source":
             expected_branch = runner.ARCH134_D1S1_BRANCH
         if spec.name == "arch134-f1r1-c1-qualification-operator":
@@ -914,6 +917,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH144C_NAME,
             runner.ARCH145A_NAME,
             runner.ARCH134_F1R1_B_NAME,
+            runner.ARCH134_R5_NAME,
             runner.ARCH134_D1S3_NAME,
             runner.ARCH134_D1S2_NAME,
             runner.ARCH134_D1S1_NAME,
@@ -1393,6 +1397,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 in {
                     runner.ARCH134_F1R1_B_NAME,
                     runner.ARCH134_F1R1_C1_NAME,
+                    runner.ARCH134_R5_NAME,
                     runner.ARCH134_D1S3_NAME,
                     runner.ARCH134_D1S2_NAME,
                     runner.ARCH134_D1S1_NAME,
@@ -1482,7 +1487,7 @@ def test_arch144c_source_only_route_authority_and_frozen_v1():
 def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch):
     path = "tests/runtime/checkpoint_runner/test_core.py"
     before = runner.ARCH144C_PREDECESSOR_TEST_PINS[path]
-    successor = runner.ARCH134_D1S3_SHARED_SUCCESSOR_PINS[path]
+    successor = runner._arch134_d1s3_shared_successor_pin(path)
     assert runner._arch144c_current_inventory_test_pin(path, before) == successor
     with pytest.raises(ValueError):
         runner._arch144c_current_inventory_test_pin(path, "a" * 40)
@@ -1613,6 +1618,10 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
         "              arch133-robinhood-supervised-release-installation-operator `\n",
         "              arch134-f1r1-d1s3-successor-release-installation-operator `\n"
         "              arch133-robinhood-supervised-release-installation-operator `\n",
+    ).replace(
+        "              arch134-f1r1-d1s2-successor-installed-readiness `\n",
+        "              arch134-f1r1-d1s3-r5-successor-release-publication-recovery `\n"
+        "              arch134-f1r1-d1s2-successor-installed-readiness `\n",
     )
     assert runner._batch_workflow_is_reviewed(current)
     assert "pull_request:" in current
@@ -1624,9 +1633,8 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     assert "feature/robinhood-*" in current
     assert "feature/test-suite-*" in current
     candidate = runner._git_blob_sha1(path)
-    assert (
-        candidate
-        == runner.ARCH134_D1S3_SHARED_SUCCESSOR_PINS[runner.ARCH145A_D1R6_WORKFLOW_PATH]
+    assert candidate == runner._arch134_d1s3_shared_successor_pin(
+        runner.ARCH145A_D1R6_WORKFLOW_PATH
     )
     assert (
         runner._arch145a_d1r6_workflow_successor(

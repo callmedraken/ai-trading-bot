@@ -88,32 +88,38 @@ effects and original F1/C2 evidence mutations remain zero. Architecture 145
 remains separate/offline; live remains **NO-GO**.
 
 ## Next step
-## Latest read-only preflight launch note
+## Latest read-only D1S3 production preflight finding
 
-The latest attempted D1S3 preflight launch stopped in an external
-non-elevated-Administrator pre-screen before `ops.ps1` / the unified runner was
-invoked. It therefore produced no runner preflight evidence, did not read or
-change the D1S3 installation latch, created no protected effect, consumed no
-installation authority, and created no retry ambiguity. It is a pre-run host
-launch failure, not a consumed or indeterminate protected attempt, so no
-reconciliation checkpoint is required.
-
-The corrected launch path is to start an elevated Administrator PowerShell and
-invoke the registered D1S3 `ops.ps1 preflight` directly. The registered
-preflight owns its own Administrator/source/host admission and evidence capture;
-do not insert another external Administrator pre-screen.
-
-
-The next boundary is a separately reviewed READ-ONLY D1S3 production preflight
-against the exact accepted executable source/tree:
+The registered elevated read-only D1S3 preflight reached source/host
+observation against the accepted executable source:
 
     HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
     TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
 
-The preflight may inspect exact source/install/runtime/root/manual-process state
-only. It must not install a release, create the successor root, launch runtime,
-consume the installation attempt latch, access credentials/providers, mutate
-paper state, place broker orders or create any live/D1/D2 effect.
+Source identity was stable. The observed result was:
+
+    PRIMARY_STATUS=BLOCKED
+    PRIMARY_REASON=SUCCESSOR_ROOT_BLOCKED
+    installation_classification=INSTALL_REQUIRED
+    attempt_state=AVAILABLE
+    successor_root_classification=WRONG_PARENT_OR_POLICY
+    execute_eligible=false
+    protected_effect_counters=0
+    production_effects=NOT_RUN
+    protected_execution=NOT_AUTHORIZED
+
+The successor root was absent. Read-only native localization proved that the
+retained `F:\AITradingBot\Arch133` durable parent is local NTFS, persistent,
+non-reparse, single-link, identity-stable, protected, owned by Administrators,
+and uses the exact `ADMIN_SYSTEM_ONLY` / `ADMIN_ACES` policy. The blocker was a
+source parent-vs-child policy mismatch: the native D1S3 observer had required
+the retained parent to use the immutable successor image ACL. Historical 133-K
+`ROOT_ACES` is incompatible and was not imported, invoked, or applied. The
+resolution is a source correction, not production ACL mutation.
+
+The preflight did not install a release, create the successor root, read the
+latch, consume installation authority, access credentials/providers, mutate
+paper state, place broker orders, or create any D1/D2/live effect.
 
 Expected safe outcomes remain fail-closed:
 - INSTALL_REQUIRED when the exact immutable release is absent and host/source
@@ -122,4 +128,7 @@ Expected safe outcomes remain fail-closed:
   authorized exact release installation when the successor root is absent;
 - full successor readiness only after separately reviewed later boundaries.
 
-No protected execute or installation is authorized by this closeout.
+The immediate next milestone is this bounded source-only parent-policy
+correction, followed by exact source review and a fresh read-only preflight
+against the corrected source. No protected execute or installation is
+authorized by this closeout.

@@ -21,6 +21,7 @@ from pathlib import PureWindowsPath
 from zoneinfo import ZoneInfo
 
 from trading_bot.arch133_acl.read_only import (
+    ADMIN_ACES,
     ADMINISTRATORS_SID,
     SYSTEM_SID,
     TRADING_SID,
@@ -315,7 +316,14 @@ class NativeSuccessorRootObserver:
                     DURABLE_DATA_ROOT,
                     directory=True,
                     volume=observe_parent(session).identity[0],
+                    image_policy=False,
                 )
+                if (
+                    parent.owner != ADMINISTRATORS_SID
+                    or parent.protected is not True
+                    or parent.aces != ADMIN_ACES
+                ):
+                    raise ValueError("durable parent policy rejected")
                 root = session.object(PRODUCTION_ROOT, directory=True)
                 if root is None:
                     value = SuccessorRootObservation(

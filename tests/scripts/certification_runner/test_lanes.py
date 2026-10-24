@@ -726,9 +726,10 @@ def test_r3l_preserves_r4_product_and_predecessor_topology_contracts() -> None:
             or (isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name))
         }
 
+    # The installation operator remains frozen from accepted R4.  The native
+    # read adapter is the deliberately changed D1S3 source in this correction.
     for relative in (
         "src/trading_bot/supervised_release/successor_installation_operator.py",
-        "src/trading_bot/supervised_release/successor_native_read.py",
     ):
         before = subprocess.run(
             ["git", "show", f"{base}:{relative}"],
@@ -764,6 +765,15 @@ def test_r3l_preserves_r4_product_and_predecessor_topology_contracts() -> None:
     ).stdout
     before_nodes = frozen_nodes(before_checkpoint)
     after_nodes = frozen_nodes(Path(checkpoint.__file__).read_text())
+    intentionally_updated = {
+        "ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS",
+        "ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS_SHA256",
+        "ARCH134_D1S3_SOURCE_PINS",
+        "ARCH134_D1S3_SOURCE_PINS_SHA256",
+    }
     for name, node in before_nodes.items():
-        if name.startswith(("ARCH132_R3J_", "ARCH132_R3K_", "ARCH134_D1S3_")):
+        if (
+            name.startswith(("ARCH132_R3J_", "ARCH132_R3K_", "ARCH134_D1S3_"))
+            and name not in intentionally_updated
+        ):
             assert after_nodes[name] == node

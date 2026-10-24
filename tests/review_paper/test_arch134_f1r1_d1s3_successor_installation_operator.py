@@ -31,6 +31,7 @@ from trading_bot.review_paper.successor_soak_contract import (
 from trading_bot.supervised_release import successor_installation_operator as subject
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.installation_contract import (
+    IMAGE_ACES,
     InstallDisposition,
     InstalledEvidence,
     InstallReason,
@@ -627,10 +628,8 @@ class RootReadFake:
     """Only logical fixed-path read facts; disposable D1 bytes are copied in."""
 
     def __init__(self, harness, *, absent=False):
-        from trading_bot.supervised_release.installation_contract import (
-            IMAGE_ACES,
-            ObjectFacts,
-        )
+        from trading_bot.arch133_acl.read_only import ADMIN_ACES
+        from trading_bot.supervised_release.installation_contract import ObjectFacts
         from trading_bot.supervised_release.model import DURABLE_DATA_ROOT
 
         self.h = harness
@@ -641,7 +640,7 @@ class RootReadFake:
             (7, 800),
             IMAGE_ACES[0][0],
             True,
-            IMAGE_ACES,
+            ADMIN_ACES,
         )
         if not absent:
             self.nodes[subject.PRODUCTION_ROOT] = ObjectFacts(
@@ -803,6 +802,75 @@ def test_native_empty_and_absent_root_are_read_only(native_harness):
         assert not hasattr(reader, "reserve") and not hasattr(reader, "write")
         assert isinstance(observer._reader, RootReadFake)
     assert native.D1S3ReadSession.__bases__[0].__name__ == "WindowsReadSession"
+
+
+def test_native_absent_root_requires_exact_admin_system_only_parent(native_harness):
+    observer, reader, _ = root_adapter(native_harness, absent=True)
+    value = observer.observe_root()
+    assert value.classification is SuccessorStoreClassification.ABSENT_ELIGIBLE
+    assert value.parent_identity == reader.nodes[subject.DURABLE_DATA_ROOT].identity
+
+
+def test_native_exact_admin_system_only_parent_reaches_install_required_assessment(
+    native_harness,
+):
+    h, declaration, _, _ = native_harness
+    root, _, runtime = root_adapter(native_harness, absent=True)
+    installation = InstallationFake(
+        declaration, [InstallationReadiness.INSTALL_REQUIRED]
+    )
+    boundary = subject.D1S3Boundary(
+        declaration,
+        installation,
+        h.source.native,
+        runtime,
+        root,
+    )
+    result = subject.assess_d1s3_preflight(
+        boundary,
+        attempt=subject.AttemptObservation(subject.AttemptState.AVAILABLE, "inert"),
+    )
+    assert result.status is subject.OperatorStatus.PASS
+    assert result.reason is subject.OperatorReason.INSTALL_REQUIRED
+    assert result.execute_eligible
+    assert result.attempt.state is subject.AttemptState.AVAILABLE
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("owner", "foreign"),
+        ("protected", False),
+        ("aces", ()),
+        ("aces", IMAGE_ACES),
+        ("reparse", True),
+        ("links", 2),
+        ("local", False),
+        ("filesystem", "ReFS"),
+        ("persistent_acls", False),
+        ("identity", (8, 800)),
+        ("identity", (7, 0)),
+    ],
+)
+def test_native_durable_parent_policy_is_closed(native_harness, field, value):
+    observer, reader, _ = root_adapter(native_harness, absent=True)
+    reader.nodes[subject.DURABLE_DATA_ROOT] = replace(
+        reader.nodes[subject.DURABLE_DATA_ROOT], **{field: value}
+    )
+    result = observer.observe_root()
+    assert result.classification is SuccessorStoreClassification.WRONG_PARENT_OR_POLICY
+    assert not result.stable
+
+
+def test_native_successor_root_retains_immutable_image_policy(native_harness):
+    from trading_bot.arch133_acl.read_only import ADMIN_ACES
+
+    observer, reader, _ = root_adapter(native_harness)
+    reader.nodes[subject.PRODUCTION_ROOT] = replace(
+        reader.nodes[subject.PRODUCTION_ROOT], aces=ADMIN_ACES
+    )
+    result = observer.observe_root()
+    assert result.classification is SuccessorStoreClassification.WRONG_PARENT_OR_POLICY
 
 
 @pytest.mark.parametrize(
@@ -1079,6 +1147,16 @@ def test_native_adapter_capability_surface_is_read_only(native_harness):
     _, _, _, native = native_harness
     text = inspect.getsource(native)
     tree = ast.parse(text)
+    imports = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module
+    }
+    function_names = {
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
     forbidden = {
         "mkdir",
         "unlink",
@@ -1104,6 +1182,16 @@ def test_native_adapter_capability_surface_is_read_only(native_harness):
     assert '"OpenProcess"' in text and '"GetProcessTimes"' in text
     assert '"CreateProcess' not in text
     assert "installation_operator" not in text
+    assert "ROOT_ACES" not in text
+    assert "arch133_reprovision_recovery" not in text
+    assert not function_names & {
+        "create_directory",
+        "write_file",
+        "repair",
+        "provision",
+    }
+    assert "trading_bot.arch133_reprovision_recovery" not in imports
+    assert "trading_bot.arch133_acl.root_policy_apply" not in imports
 
 
 @pytest.mark.parametrize(

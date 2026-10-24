@@ -89,26 +89,43 @@ immutable and non-reusable. Architecture 145 remains separate/offline. Live
 remains **NO-GO**.
 
 ## Next action
-## Latest preflight launch classification
+## Latest read-only D1S3 production preflight finding
 
-The latest attempted D1S3 preflight launch was stopped by an external
-non-elevated-Administrator pre-screen before `ops.ps1` / the unified runner was
-invoked. Runner invoked: NO. Installation latch read: NO. Latch changed: NO.
-Protected effect: NO. Installation authority consumed: NO. Retry ambiguity: NO.
-
-This is a pre-run host-launch failure and requires no reconciliation. The next
-attempt must start from elevated Administrator PowerShell and invoke the
-registered D1S3 `ops.ps1 preflight` directly so the runner owns
-Administrator/source/host admission and structured evidence capture.
-
-
-Run only the separately reviewed READ-ONLY D1S3 production preflight against:
+The registered elevated read-only D1S3 preflight reached source/host
+observation against:
 
     HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
     TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
 
-The preflight is observation/admission only. It may inspect exact
-source/install/runtime/successor-root/manual-process state but must not:
+Source identity was stable and the closed result was:
+
+    PRIMARY_STATUS=BLOCKED
+    PRIMARY_REASON=SUCCESSOR_ROOT_BLOCKED
+    installation_classification=INSTALL_REQUIRED
+    attempt_state=AVAILABLE
+    successor_root_classification=WRONG_PARENT_OR_POLICY
+    execute_eligible=false
+    protected_effect_counters=0
+    production_effects=NOT_RUN
+    protected_execution=NOT_AUTHORIZED
+
+The successor root was absent. Native read-only localization proved that the
+retained `F:\AITradingBot\Arch133` parent is the exact protected,
+Administrators-owned, local NTFS, persistent-ACL, non-reparse, single-link
+`ADMIN_SYSTEM_ONLY` parent with `ADMIN_ACES`. The source defect confused this
+durable-parent policy with the immutable successor image policy. Historical
+133-K `ROOT_ACES` is incompatible and was not imported, invoked, or applied.
+The resolution is source correction, not ACL mutation.
+
+No protected operation occurred: the release was not installed, the successor
+root was not created, the D1S3 latch was not read or consumed, credentials and
+providers were not accessed, paper/broker state was not mutated, and no D1/D2/
+live effect occurred. The preflight remains read-only and fail-closed.
+
+The immediate next step is exact review of the bounded source correction, then
+a fresh read-only D1S3 preflight against its exact accepted source. It may
+inspect exact source/install/runtime/successor-root/manual-process state but
+must not:
 
 - install or publish a release;
 - create/provision the successor root;

@@ -17026,10 +17026,10 @@ ARCH134_D1S3_SOURCE_PINS: Final = {
         "f70d8b3d6a1f66d1cb92dba6b653477c1a12e383"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
-        "e4a650b4dbb1b11ae478ca1984166ce5ca7b5c60"
+        "9e83157c7d92073dc72123decf1b41250656d9ea"
     ),
     "src/trading_bot/supervised_release/successor_native_read.py": (
-        "9bc57b4f529856a354fa3fb209e4394abe7271bb"
+        "34de5e9e3cc14aad8dba40c4671e04693b83804d"
     ),
 }
 ARCH134_D1S3_RUNNER_AST_PINS: Final = {
@@ -17107,7 +17107,7 @@ ARCH134_D1S3_SHARED_SUCCESSOR_PINS_SHA256: Final = (
     "54d1b8c49f978ab840cb4f7b0ebe563c4ce31652b180d9ee10192ae9595861b9"
 )
 ARCH134_D1S3_SOURCE_PINS_SHA256: Final = (
-    "65d0fe57538c212259b7c00562eb014b4b0dfa4918abcabbe604071b647cb974"
+    "f47342daaef26eca28c73a0a3eb0a34ccec66451fce21028b40635d096db431a"
 )
 ARCH134_D1S3_RUNNER_AST_PINS_SHA256: Final = (
     "93f64320227091759e7998a9ccf643f20e7c575f95f8c48efeed99474067a80c"
@@ -17173,11 +17173,11 @@ ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS: Final = {
         "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
-        "7f9978b9acf7eda03e90cfb6695b287e2759be27"
+        "684b4650fa267c3cb3ad27818ccc0cd035f6cde3"
     ),
 }
 ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS_SHA256: Final = (
-    "c400527c0eed30ae99efea171edad3affc4eeb022f39dbf2e342e2e952d0cd3f"
+    "1661234776b689bcc3c8dd304157f15f79e191cde81634539c55f75b1e75c95f"
 )
 ARCH132_R3L_RUNNER_AST_PINS: Final = {
     "_arch134_d1s3_shared_successor_pin": (

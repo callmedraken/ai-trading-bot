@@ -1,5 +1,27 @@
 # Architecture 132 — Tiered certification profiles
 
+## Current accepted closeout — Architecture 132-R3L
+
+Architecture 132-R3L is SOURCE/CERTIFICATION ACCEPTED and integrated. The
+accepted/certified executable identity inherited by D1S3 is:
+
+    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
+    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
+    parent / accepted D1S3-R4 e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
+
+The successful canonical six-lane FULL covered all 198 selected modules exactly
+once: 13,145 cases, 13,142 passed, three explicit symlink-capability skips, zero
+failed/errors, 240.311 seconds wall and 59.689 seconds headroom under the
+unchanged 300-second ceiling. The D1S3 branch was then fast-forwarded to this
+exact tree; mapped Checkpoint Source Gates run 40038165748 attempt 1 passed
+source-static, active tests, canonical four-lane ROBINHOOD and source-gates.
+Develop integration run 40039433032 attempt 1 also completed SUCCESS.
+
+The R3L section below intentionally preserves its pre-acceptance design and
+evidence chronology. Statements there that merge remained blocked or FULL was
+pending are historical, not current authority.
+
+
 ## Architecture 132-R3L — six-lane current-local FULL topology
 
 R3L is the certification-only successor of ChatGPT SOURCE ACCEPTED D1S3-R4

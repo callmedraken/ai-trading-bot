@@ -46,6 +46,19 @@ Checkpoint Source Gates run 40039433032, attempt 1, completed SUCCESS:
 source-static, all four broad fallback shards and source-gates passed; mapped
 active/certification jobs were correctly skipped for develop.
 
+## Retained macro progression
+
+    145-A SOURCE ACCEPTED and integrated
+    -> finish 134-F1R1 operational-confidence hardening
+    -> fresh F1 successor soak
+    -> 145-B results/campaign bundle
+    -> Research Results GUI
+    -> large strategy campaigns
+
+D1S3 is the remaining bounded operational sub-path inside 134-F1R1, not the
+end-state roadmap. Architecture 145 remains operationally separate and live
+remains NO-GO.
+
 ## Certification lineage
 
 R3J remains preserved as published but certification-rejected. R3K remains the
@@ -76,6 +89,18 @@ immutable and non-reusable. Architecture 145 remains separate/offline. Live
 remains **NO-GO**.
 
 ## Next action
+## Latest preflight launch classification
+
+The latest attempted D1S3 preflight launch was stopped by an external
+non-elevated-Administrator pre-screen before `ops.ps1` / the unified runner was
+invoked. Runner invoked: NO. Installation latch read: NO. Latch changed: NO.
+Protected effect: NO. Installation authority consumed: NO. Retry ambiguity: NO.
+
+This is a pre-run host-launch failure and requires no reconciliation. The next
+attempt must start from elevated Administrator PowerShell and invoke the
+registered D1S3 `ops.ps1 preflight` directly so the runner owns
+Administrator/source/host admission and structured evidence capture.
+
 
 Run only the separately reviewed READ-ONLY D1S3 production preflight against:
 

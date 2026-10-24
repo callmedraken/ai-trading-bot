@@ -11,8 +11,13 @@ authorization by not executing it and calling it out for manual review.
 
 This does not broaden a command, authorize unexpected effects or ambiguous/
 partial-state repair, permit automatic retry after ambiguity/partially consumed
-effects, override real-money NO-GO, or turn source/commit authority into merge,
-rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+effects, override real-money NO-GO, or make source/commit authority alone
+sufficient for integration. Separately, the user has granted ChatGPT standing
+authorization for an ordinary reviewed feature-branch merge into `develop`
+after ChatGPT independently determines exact review, required certification,
+and merge readiness are complete. That integration authorization does not
+extend to Codex, rebase, amend, force-push, pull-request mutation, protected
+effects, or ambiguity repair/retry. Unexpected, ambiguous, partially completed,
 source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
 Protected source/effect separation, prerequisite checks and reviewed interlocks
 remain mandatory. Source or preflight PASS alone grants no effect authority.
@@ -1280,10 +1285,13 @@ diagnose an operator gate failure.
 ## Unified checkpoint runner
 
 Architecture 129 replaces routine one-off verification scripts with the
-checked-in repository launcher and runner:
+checked-in repository launcher and runner. The following examples are
+non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
+`.\ops.ps1 status` is authoritative:
 
 ```powershell
 .\ops.ps1 status
+.\ops.ps1 preflight arch134-f1r1-d1s3-successor-release-installation-operator
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair
@@ -1314,12 +1322,15 @@ Local Windows work remains necessary for host-specific qualification such as
 ACLs, Task Scheduler, real account tokens, and protected filesystem state. Those
 operations use the runner's registered `preflight` layer and, only where
 separately source-reviewed, checkpoint-specific protected `execute` dispatches.
-The current protected dispatches are limited to
-`arch128-parent-acl-repair` and `arch128-r4`. A source or preflight PASS never
-grants protected production authority; fresh approval within the exact reviewed
-bounds under the standing rule and the exact reviewed authorization interlock
-remain mandatory. For a reviewed bounded local command, the user's decision to
-execute supplies that approval; all effect gates and STOP conditions remain.
+The live `_checkpoint_specs()` registry and `.\ops.ps1 status` output are the
+authoritative current inventory; prose/example lists are non-exhaustive. A
+registered preflight owns its own Administrator/source/host admission and
+evidence capture, so do not add an external pre-screen that can abort before
+the runner records the attempt. A source or preflight PASS never grants
+protected production authority; approval within the exact reviewed bounds under
+the standing rule and the exact reviewed authorization interlock remains
+mandatory. For a reviewed bounded local command, the user's decision to execute
+supplies that approval; all effect gates and STOP conditions remain.
 
 Checkpoint evidence is external to the repository. The preferred development
 host root is `F:\AI\temp\ai-trading-bot-checkpoints`; CI uses its runner

@@ -1,5 +1,32 @@
 # Architecture 134-F1R1-D1S3 — successor release installation operator
 
+## Current accepted closeout
+
+Architecture 134-F1R1-D1S3-R4 is SOURCE ACCEPTED and Architecture 132-R3L is
+SOURCE/CERTIFICATION ACCEPTED. Their accepted executable identity is:
+
+    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
+    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
+    parent / accepted R4 e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
+
+Mapped D1S3 CI 40038165748 attempt 1 passed source-static, active tests,
+canonical four-lane ROBINHOOD and source-gates after the R3L fast-forward.
+Develop integration CI 40039433032 attempt 1 also completed SUCCESS. The
+successful R3L canonical FULL covered 198 modules exactly once with 13,145
+cases, 13,142 passed, three explicit symlink-capability skips, zero
+failures/errors and 240.311 seconds wall.
+
+No protected preflight/execute, release installation, successor-root
+provisioning, runtime start, credential/provider/paper/broker/D1/D2/live effect
+or original F1/C2 evidence mutation is granted by this source closeout. The
+next operational boundary is the registered READ-ONLY D1S3 production preflight
+against the exact identity above.
+
+The detailed R1-R4 material below is preserved as historical checkpoint
+chronology. Earlier statements that D1S3/R4 was not source accepted, FULL was
+pending, or develop remained at D1S2 are not current authority.
+
+
 ## Status and boundary
 
 This document defines the source-only checkpoint

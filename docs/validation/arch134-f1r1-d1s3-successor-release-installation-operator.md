@@ -2,6 +2,24 @@
 
 Checkpoint: `arch134-f1r1-d1s3-successor-release-installation-operator`
 
+## Current accepted closeout
+
+D1S3-R4 is SOURCE ACCEPTED and R3L is SOURCE/CERTIFICATION ACCEPTED.
+
+    HEAD a6b6791db9237e4df6b0768ba1013d30052d00a7
+    TREE 7dcd80ce63ffcf188621d8149779c08721aaceb4
+    parent / accepted R4 e515f2d4b8f75ee04b95f7e89162e37c7890e0a4
+
+R3L canonical FULL passed: 198 modules, 13,145 cases, 13,142 passed, three
+symlink-capability skips, zero failures/errors, 240.311 seconds wall. D1S3
+mapped run 40038165748 attempt 1 and develop integration run 40039433032
+attempt 1 completed SUCCESS.
+
+The next boundary is the registered READ-ONLY D1S3 production preflight. The
+R1/R2/R3/R4 sections below remain historical records; their earlier
+pre-publication status statements do not override this closeout.
+
+
 This is a source-only ROBINHOOD-mapped checkpoint. It must prove exact D1S2
 predecessor identity, source remote/ref/HEAD/tree admission, clean source
 inventory, deterministic release declaration, canonical binding, fixed

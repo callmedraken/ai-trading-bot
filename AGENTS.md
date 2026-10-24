@@ -11,8 +11,13 @@ authorization by not executing it and calling it out for manual review.
 
 This does not broaden a command, authorize unexpected effects or ambiguous/
 partial-state repair, permit automatic retry after ambiguity/partially consumed
-effects, override real-money NO-GO, or turn source/commit authority into merge,
-rebase, amend or force-push authority. Unexpected, ambiguous, partially completed,
+effects, override real-money NO-GO, or make source/commit authority alone
+sufficient for integration. Separately, the user has granted ChatGPT standing
+authorization for an ordinary reviewed feature-branch merge into `develop`
+after ChatGPT independently determines exact review, required certification,
+and merge readiness are complete. That integration authorization does not
+extend to Codex, rebase, amend, force-push, pull-request mutation, protected
+effects, or ambiguity repair/retry. Unexpected, ambiguous, partially completed,
 source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
 Protected source/effect separation, prerequisite checks and reviewed interlocks
 remain mandatory. Source or preflight PASS alone grants no effect authority.
@@ -282,7 +287,7 @@ standing rule; never present a protected effect as ordinary verification.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
 - After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
 - `develop` remains the sole primary/default startup integration reference. The former `feature/project-history-storage-foundation` compatibility/history mirror is retired at final synchronized tip `19e5859fa83656cc50dbe69f89f3badd57841165` and must not be recreated or used as an integration/startup ref. Historical references to that branch are retrieval context only. Pending feature checkpoints do not move `develop`.
-- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority never implies merge/rebase/amend/force-push or PR mutation authority.
+- After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority alone does not grant integration; the separate standing ChatGPT merge authorization above applies only after independent merge-readiness review and never permits rebase/amend/force-push or PR mutation.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
 - Codex is primarily a bounded implementation agent for changes already scoped and discussed.
 - After Codex ordinary-pushes a branch that has a CI/source gate, its implementation handoff is not complete merely because the run is `queued` or `in_progress`. Codex should wait/poll until the relevant CI run reaches a terminal state. GitHub CI is an admission gate, not an iterative debugger: one logical checkpoint gets one fully prepared atomic commit/push and one push-triggered CI run. If that run fails, inspect the exact failing job/logs and STOP that checkpoint attempt. **Do not automatically end the delegated task merely because the attempt ended.** When the failure is fully classified as bounded/mechanical, no protected effect or semantic/authority ambiguity exists, and the corrective scope is directly implied by the preserved failure evidence, Codex should declare a separate corrective C1 (and, if needed, one further bounded C2), return to focused/local verification, create one new atomic commit/push for that corrective checkpoint, and poll its CI to terminal before handing back. Hand back on terminal green, on semantic/security/authority uncertainty, on unexpected remote/effect state, or after the bounded C1/C2 allowance is exhausted. Never rerun unchanged CI, amend/overwrite failed evidence, hide a red gate behind an "in progress" handoff, or use repeated pushes for ordinary pre-CI debugging.
@@ -572,10 +577,12 @@ For checkpoints registered by Architecture 129, use the repository-root
 `ops.ps1` launcher and `scripts/checkpoint_runner.py` instead of generating a
 new PowerShell verification wrapper.
 
-Current registered examples:
+Non-exhaustive registered examples. The live `_checkpoint_specs()` registry,
+surfaced by `.\ops.ps1 status`, is authoritative:
 
 ```powershell
 .\ops.ps1 status
+.\ops.ps1 preflight arch134-f1r1-d1s3-successor-release-installation-operator
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair
@@ -589,10 +596,16 @@ Current registered examples:
 .\ops.ps1 preflight arch128-r7
 ```
 
+The example list above is deliberately non-exhaustive. Do not infer the current
+protected-dispatch inventory from prose or examples; `_checkpoint_specs()` and
+`.\ops.ps1 status` are authoritative. A registered preflight owns its own
+Administrator/source/host admission and evidence capture; do not insert an
+external pre-screen that can abort before the runner records the attempt.
+
 The `execute` surface is protected, checkpoint-specific, and never implied by a
-source/preflight PASS. It may be invoked only after authorization within the exact reviewed bounds under the standing rule at
-the effect boundary and with the checkpoint's exact reviewed authorization
-interlock.
+source/preflight PASS. It may be invoked only after authorization within the
+exact reviewed bounds under the standing rule at the effect boundary and with
+the checkpoint's exact reviewed authorization interlock.
 
 The unified runner owns the mandatory combined Ruff behavior: both
 `ruff check --no-cache` and `ruff format --check --no-cache` run before the

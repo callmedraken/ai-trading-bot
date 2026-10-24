@@ -38,6 +38,21 @@ accepted/certified tree above. Post-merge Checkpoint Source Gates run
 fallback shards and source-gates passed; mapped active/certification jobs were
 correctly skipped on develop.
 
+## Macro progression
+
+The retained product/research progression is:
+
+    145-A SOURCE ACCEPTED and integrated
+    -> finish 134-F1R1 operational-confidence hardening
+    -> fresh F1 successor soak
+    -> 145-B results/campaign bundle
+    -> Research Results GUI
+    -> large strategy campaigns
+
+The remaining D1S3 work is a bounded sub-path inside 134-F1R1; it is not the
+project destination. Architecture 145 remains operationally separate from the
+F1R1 production-soak path, and no research eligibility grants live authority.
+
 ## Preserved certification history
 
 R3J remains preserved as a published but certification-rejected two-lane
@@ -73,6 +88,21 @@ effects and original F1/C2 evidence mutations remain zero. Architecture 145
 remains separate/offline; live remains **NO-GO**.
 
 ## Next step
+## Latest read-only preflight launch note
+
+The latest attempted D1S3 preflight launch stopped in an external
+non-elevated-Administrator pre-screen before `ops.ps1` / the unified runner was
+invoked. It therefore produced no runner preflight evidence, did not read or
+change the D1S3 installation latch, created no protected effect, consumed no
+installation authority, and created no retry ambiguity. It is a pre-run host
+launch failure, not a consumed or indeterminate protected attempt, so no
+reconciliation checkpoint is required.
+
+The corrected launch path is to start an elevated Administrator PowerShell and
+invoke the registered D1S3 `ops.ps1 preflight` directly. The registered
+preflight owns its own Administrator/source/host admission and evidence capture;
+do not insert another external Administrator pre-screen.
+
 
 The next boundary is a separately reviewed READ-ONLY D1S3 production preflight
 against the exact accepted executable source/tree:

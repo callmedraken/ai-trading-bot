@@ -92,6 +92,58 @@ from code deployment.
   mutated, cleaned or reused without a separately reviewed housekeeping or
   diagnostic boundary.
 
+### Rename-free immutable-release publication — normative non-regression
+
+This is a **current normative architecture rule**, adopted after the repeated
+Architecture-133 Windows rename incidents and the 2026-10-24
+Architecture-134-F1R1-D1S3/R5 publication incidents. It is not merely historical
+guidance.
+
+The forward production-release path MUST be rename-free at the release-directory
+identity boundary:
+
+- a production release/deployment receives one unique immutable directory path
+  before materialization begins;
+- that same directory identity/path is the path later admitted for runtime use;
+- no directory rename/move/reparent, STAGE->ACTIVE, ACTIVE->ARCHIVE,
+  `.installing`->FINAL, alias swap, junction/symlink swap, or replace-existing
+  filesystem operation may be required to convert an untrusted/materializing
+  release into a runnable release;
+- "publication" is a logical admission/binding decision after exact verification,
+  not a filesystem namespace transition;
+- the runtime may bind to an exact verified immutable path only after complete
+  read-only verification; it must never infer readiness from a directory name;
+- if materialization fails or becomes ambiguous, preserve that unique directory
+  and its evidence as inert/non-runnable. A later attempt uses a new unique path.
+  Do not repair, rename, promote, clean, or retry the consumed directory as a
+  prerequisite for forward progress;
+- scheduler/runtime rebinding may select a different already-verified immutable
+  release, but rebinding must not rename either release.
+
+The D1S3 installation publication and D1S3-R5 preserved-image publication
+mechanisms are **retired forward paths**. Their consumed latches, reports, staging
+directory, source, and tests remain incident/history evidence. They confer no
+future retry or compatibility authority. Historical Architecture-125/133 rename
+qualification/recovery modules are precedent/evidence only and MUST NOT be copied
+back into a current deployment path.
+
+The first rename-free successor implementation MUST add machine-enforced
+non-regression coverage. At minimum, current-product deployment authority/tests
+must reject any implementation that makes the runtime-bound release directory
+depend on `FileRenameInfo`/`SetFileInformationByHandle`, `MoveFile*`,
+`os.rename`/`Path.rename`, replace-existing directory publication, or an
+equivalent namespace-promotion step. It must also prove that retired D1S3/R5 and
+historical 125/133 publication operators cannot be selected as the current
+forward deployment dispatcher.
+
+A future decision to reintroduce directory-rename publication is an explicit
+**architecture reversal**, not a correction, cleanup, compatibility fix, or
+backport. It requires all of the following before implementation: a new
+architecture decision explaining why the rename-free model is insufficient,
+explicit user approval of that reversal, disposable-host qualification of the
+exact proposed primitive, a migration/non-regression plan, and fresh source/
+protected-effect review. Without all of those, reintroduction is a STOP.
+
 ## Safety requirements
 
 - Never place real-money orders during tests or ordinary development.

@@ -2,109 +2,107 @@
 
 ## Current checkpoint
 
-Architecture 134-F1R1-D1S3-R5 plus bounded C1 is **SOURCE ACCEPTED**.
+Architecture 134-F1R1 has reached a **rename-publication retirement / rename-free
+pivot**.
 
-Accepted executable/source identity:
+The last accepted R5 executable source remains:
 
     branch feature/robinhood-production-paper-134f1r1-d1s3-r5-publication-recovery-current
-    base   ad4c3d3334048054df6d8f046040349619c277f2
-    HEAD   ca30771c0cb441b7e4f9dc63f4cc784771cdcd44
-    TREE   663782b1f1dd7f0d849637846fb40fbbf8a46c86
-    direct parent 2ca63594fc00fbc3dda941f1c07aa8156d0b1875
-    commits above base 2
+    accepted source HEAD ca30771c0cb441b7e4f9dc63f4cc784771cdcd44
+    accepted source TREE 663782b1f1dd7f0d849637846fb40fbbf8a46c86
+    docs-closeout parent 24b390d1db62264d60a9c79e6ad67303bb996e19
 
-Corrected D1S3 remains accepted/integrated at HEAD
-`ad4c3d3334048054df6d8f046040349619c277f2`, tree
-`b4cbf3039171673d3fba44e4999b172e658a4f91`. Administrator-before-latch ordering,
-correct durable-parent admission, accepted R3L six-lane FULL and R3K four-lane
-ROBINHOOD remain intact, with 122/49 required baselines and the 300-second ceiling.
+R5 mapped CI #702 / run `40078441427`, attempt 1 was terminal green:
+10,874 canonical ROBINHOOD cases, 10,868 passed, 6 skipped, 0 failed/errors,
+244.382 seconds. Source acceptance is not in question.
 
-D1S3 read-only preflight passed INSTALL_REQUIRED. It attempted to read the latch
-and established AVAILABLE from absence; it did not create, consume or mutate it.
-The later protected installation attempt is permanently CONSUMED: execute stopped
-INDETERMINATE at PUBLICATION / MAY_HAVE_OCCURRED /
-PRESERVE_INSTALLATION_EVIDENCE_NO_RETRY. Installation cannot be rerun.
-Subsequent preflight was BLOCKED / INSTALLATION_BLOCKED.
+## Production incident and retirement decision
 
-Preserved read-only localization proved exact FINAL absent and exact STAGING
-present at identity `(1855336320, 281474982917732)`, with a stable repeated
-namespace and two identical immutable staging replays without error. Exact report
-paths/SHA256 values and image constants are frozen in the
-[R5 architecture](architecture/134-f1r1-d1s3-r5-successor-release-publication-recovery.md).
+Corrected D1S3 had already materialized and repeatedly verified an exact immutable
+staging release, but its one-shot installation stopped INDETERMINATE at
+PUBLICATION and the original installation latch became permanently CONSUMED.
 
-R5 supplies a separate one-shot recovery latch, read-only consumed-attempt
-reconciliation and one narrow handle-relative no-replace publication seam.
-Historical `installation_reconciliation.py`, `publication_recovery.py` and
-`native_publication.py` remain byte-identical to the accepted predecessor and
-cannot substitute for R5. The D1S3 installation latch is never reused.
+R5 was then intentionally reduced to one task: independently reprove that exact
+preserved staging image and issue one separate no-replace publication attempt.
 
-## Certification and bounded C1
+Registered R5 preflight on 2026-10-24 returned:
 
-Initial R5 source `2ca63594fc00fbc3dda941f1c07aa8156d0b1875`, tree
-`45babb6a6736dac03b426d132f2791b56f4bc5e0`, produced preserved mapped CI
-#701 / run `40077868296`, attempt 1: source-static passed, while active tests and
-canonical ROBINHOOD failed only because seven positive source-admission fixture
-cases assumed the fixed operator worktree on the relocated GitHub runner checkout.
-That failed run was not rerun unchanged.
+    PASS / READY_FOR_EXACT_PRESERVED_RELEASE_PUBLICATION
+    IDENTITY_STABLE=True
 
-Bounded C1 changed only the R5 source-admission test fixture, its validation note
-and corresponding blob pins. Production recovery/native code, authority semantics
-and predecessor maps were unchanged. Replacement mapped CI #702 / run
-`40078441427`, attempt 1 is terminal green:
+The one-shot R5 protected execute then returned:
 
-- source-static PASS;
-- active-tests PASS;
-- certification-tests PASS;
-- source-gates PASS;
-- full-tests intentionally SKIPPED by mapped routing;
-- canonical ROBINHOOD: 110 modules in 28/27/29/26 lanes;
-- 10,874 cases / 10,868 passed / 6 skipped / 0 failed / 0 errors;
-- wall 244.382 seconds, below the unchanged 300-second hygiene ceiling;
-- canonical artifact ID 12554615460, SHA256
-  `38bbdc9f95f008c40f2ff811ba1f99abc9f0d63ba14309cf31f7310b18097a91`.
+    INDETERMINATE
+    PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY
+    MAY_HAVE_OCCURRED
+    IDENTITY_STABLE=True
 
-No duplicate local canonical certification is required.
+Evidence:
+`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\execute-20261024T091006.081295Z\report.json`.
+
+The registered post-attempt R5 preflight returned:
+
+    BLOCKED / CONSUMED_RECOVERY_ATTEMPT
+    IDENTITY_STABLE=True
+
+Evidence:
+`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\preflight-20261024T091402.387900Z\report.json`.
+
+Under the accepted R5 state machine this closes the current namespace as consumed
+R5 authority with exact STAGING still present and FINAL absent. Do not rerun R5,
+rerun D1S3 installation, manually rename, delete, repair or clean either incident.
+
+The rename/publication mechanism is now retired as a forward F1R1 path. This is
+formalized in
+[the rename-free pivot decision](architecture/134-f1r1-rename-free-immutable-release-pivot.md)
+and as a normative non-regression rule in `AGENTS.md` and
+`docs/AI_DEVELOPMENT_WORKFLOW.md`.
+
+## Forward architecture
+
+Keep immutable production releases, but remove directory publication/promotion.
+
+The successor model is:
+
+    accepted source
+    -> fresh unique immutable deployment path
+    -> materialize in that same path
+    -> flush/seal/verify
+    -> persist exact admission evidence
+    -> explicitly bind runtime to that same exact path
+
+No `.installing`->FINAL, STAGE->ACTIVE, ACTIVE->ARCHIVE, alias/junction/symlink
+swap or equivalent directory namespace promotion may be required to make a
+release runnable. A failed deployment stays inert and preserved; a new attempt
+uses a new unique path.
+
+The next rename-free checkpoint must add machine-enforced authority/tests so an
+older branch/helper cannot silently reintroduce rename publication.
 
 ## Operational boundary and roadmap
 
-No R5 production preflight or protected recovery execute has run yet. Source
-acceptance does not authorize publication. The successor root remains uncreated.
-Its future durable reserve/append policy still needs separate architecture review
-because IMAGE_ACES grants Trading read/execute only. R5 changes no root policy and
-starts no runtime.
-
-The fixed manual-start SPY synthetic review-paper successor sessions remain
-2026-11-02/03; reboot/login stops operation and any later start requires fresh
-admission. Original F1 remains FINAL / INDETERMINATE / CONSUMED; C2 remains
-consumed and immutable. Scheduler, credentials, provider, paper, broker, D1/D2
-and live effects remain excluded. Live remains **NO-GO**. Architecture 145
-remains separate/offline.
+No further D1S3/R5 protected execute is authorized. Successor root remains
+uncreated and still requires a separate write-authority/ACL review before
+provisioning. Runtime start, scheduler effects, credentials/provider access,
+paper/broker effects, D1/D2 and live effects remain unauthorized. Original F1 is
+FINAL / INDETERMINATE / CONSUMED; C2 remains consumed and immutable. Live remains
+**NO-GO**.
 
     145-A SOURCE ACCEPTED and integrated
-    -> F1R1 recovery/hardening
-    -> fresh F1 successor soak
+    -> F1R1 rename-free immutable deployment
+    -> exact deployment admission
+    -> successor-root write-authority review
+    -> fresh manual-start F1 successor soak
     -> 145-B results/campaign bundle
     -> Research Results GUI
     -> large strategy campaigns
 
 ## Next step
 
-The next boundary is the separately reviewed **registered read-only R5 production
-preflight**. It may reprove exact current R5 source, the frozen consumed D1S3
-incident, Administrator admission, exact preserved FINAL/STAGING namespace,
-immutable image evidence and the separate R5 latch state. It must not create the
-R5 latch, publish/rename the image, provision the successor root, start runtime,
-access credentials/providers, mutate paper/broker state, or create D1/D2/live
-effects.
+Design and implement the rename-free immutable-deployment successor checkpoint.
+Do not build D1S3-R6 as another rename qualification/recovery attempt.
 
-Expected current result, if the preserved state has not changed:
-
-    PASS / READY_FOR_EXACT_PRESERVED_RELEASE_PUBLICATION
-    execute_eligible = true
-    R5 latch = AVAILABLE
-    FINAL absent
-    exact STAGING present
-
-Any BLOCKED or INDETERMINATE result stops progression and is reconciled read-only.
-A PASS does not authorize protected publication execute; that remains a separate
-explicitly reviewed effect boundary.
+The successor source must create a fresh unique immutable path, verify it without
+renaming it, bind runtime explicitly to that exact path only after verification,
+and machine-enforce the rename-free non-regression rule. No production deployment
+effect is authorized by this documentation checkpoint.

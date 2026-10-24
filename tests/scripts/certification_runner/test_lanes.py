@@ -51,7 +51,11 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     selected = tuple(
         m
         for m in selected
-        if m != "tests/review_paper/test_successor_publication_recovery.py"
+        if m
+        not in {
+            "tests/review_paper/test_successor_publication_recovery.py",
+            "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+        }
     )
     weights = runner.robinhood_module_weights(selected)
     assert len(selected) == len(runner.ROBINHOOD_MODULE_TIMINGS_MS) == 109
@@ -84,6 +88,13 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     }
     runner.validate_partitions(selected, lanes)
 
+    direct = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    )
+    assert direct in current
+    assert (
+        runner.robinhood_module_weights(current)[direct] == runner.ROBINHOOD_FALLBACK_MS
+    )
     current_lanes = runner.build_lanes(root, current, "robinhood")
     runner.validate_partitions(current, tuple(current_lanes.values()))
     assert (
@@ -215,7 +226,11 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     inventory = tuple(
         m
         for m in inventory
-        if m != "tests/review_paper/test_successor_publication_recovery.py"
+        if m
+        not in {
+            "tests/review_paper/test_successor_publication_recovery.py",
+            "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+        }
     )
     weights = runner.full_module_weights(inventory)
     assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 198

@@ -1,106 +1,80 @@
 # AI Trading Bot — Current Handoff
 
-## Verified boundary
+## Implementation boundary
 
-Architecture 134-F1R1 has pivoted away from filesystem rename publication.
+D1S4 rename-free direct installation source implementation is complete. Terminal
+feature CI and ChatGPT exact-source review remain pending. The final post-CI
+handoff supplies publication identity/evidence; no SOURCE ACCEPTED claim is made.
 
-Accepted R5 source remains `ca30771c0cb441b7e4f9dc63f4cc784771cdcd44` /
-`663782b1f1dd7f0d849637846fb40fbbf8a46c86`; mapped CI #702 /
-`40078441427` was terminal green. The issue is operational, not source
-certification.
+Use only:
+`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
 
-The R5 registered preflight proved the exact preserved staging release ready for
-one publication attempt. That protected attempt then stopped:
+Branch:
+`feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
 
-    PRIMARY_STATUS=INDETERMINATE
-    PRIMARY_REASON=PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY
-    EFFECT_DISPOSITION=MAY_HAVE_OCCURRED
-    IDENTITY_STABLE=True
+Required base/direct parent:
+`1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
+`1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
 
-Execute evidence:
-`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\execute-20261024T091006.081295Z\report.json`.
+Exactly one final implementation commit and one ordinary first push are planned.
+No intermediate design commit or remote branch bootstrap is permitted. The
+planning branch at `f1a7282d4ff42e58f257d59d1c734329d628688e` is unchanged historical
+reference. The stale main checkout and its untracked artifacts remain out of scope.
 
-The required registered reconciliation then returned:
+## Implemented operator contract
 
-    PRIMARY_STATUS=BLOCKED
-    PRIMARY_REASON=CONSUMED_RECOVERY_ATTEMPT
-    IDENTITY_STABLE=True
+Registered checkpoint:
+`arch134-f1r1-d1s4-rename-free-direct-installation`
 
-Reconciliation evidence:
-`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\preflight-20261024T091402.387900Z\report.json`.
+Operator/native modules:
+`src/trading_bot/supervised_release/successor_direct_installation.py` and
+`src/trading_bot/supervised_release/successor_native_direct_write.py`.
 
-Accepted R5 semantics therefore establish consumed R5 authority with exact
-STAGING still present and FINAL absent. R5 execute must never be run again.
+Attempt schema:
+`arch134-f1r1-d1s4-rename-free-direct-install-attempt/v1`
 
-## Normative pivot
+Derived path:
+`F:\AI\temp\arch134-f1r1-d1s4-direct-install-attempt-<release-id>.json`
 
-The forward release architecture is now **rename-free**. Read
-[Architecture 134-F1R1 rename-free pivot](architecture/134-f1r1-rename-free-immutable-release-pivot.md)
-plus the normative rules in `AGENTS.md` and
-`docs/AI_DEVELOPMENT_WORKFLOW.md` before any new deployment work.
+Source interlocks:
+`AI_TRADING_BOT_ARCH134_F1R1_D1S4_ACCEPTED_HEAD` and
+`AI_TRADING_BOT_ARCH134_F1R1_D1S4_ACCEPTED_TREE`.
 
-Do not create another rename-recovery checkpoint.
+Protected execute interlock:
+`AI_TRADING_BOT_ARCH134_F1R1_D1S4_DIRECT_INSTALL_AUTHORIZATION` =
+`ARCH134_F1R1_D1S4_ONE_RENAME_FREE_IMMUTABLE_RELEASE_INSTALL_AUTHORIZED`.
 
-Do not use or adapt as a current deployment path:
+No production interlock was set during implementation. The operator durably
+consumes and reads back its latch before native import. It creates only the
+exact final tree, closes all materialization handles, and independently verifies
+that same tree twice. All consumed states forbid automatic retry. The registered
+preflight is production-read-only, including after consumed success or failure.
 
-- D1S3 `.installing`->FINAL publication;
-- R5 preserved-image publication;
-- Architecture-133 ACTIVE/STAGE/ARCHIVE rename operators;
-- Architecture-125 historical protected replacement rename choreography;
-- any alias/junction/symlink/current-name swap required to make a release
-  runnable.
+The feature route owns canonical ROBINHOOD in CI. Do not duplicate it locally.
+The validation record contains focused evidence and exact changed paths. Final
+HEAD/TREE/parent, commit count, remote/clean-state proof and terminal CI identity,
+modules/cases/pass/skip/fail/error/wall/artifact are post-commit facts delivered in
+the final handoff, per the user's explicit documentation resolution.
 
-The new model keeps immutable production copies but gives each deployment one
-unique path that never changes. Materialize, seal and verify that same path;
-runtime admission then binds explicitly to it. A failed path stays inert and
-preserved, while a later attempt uses a new unique path.
 
-The first rename-free implementation must add machine-enforced authority/tests
-that reject reintroduction of the retired primitives in the current production
-deployment path. Reintroducing directory publication later requires an explicit
-architecture-reversal decision and explicit user approval; it cannot arrive via
-an old branch, compatibility patch, C1/C2 correction or "temporary" workaround.
+Focused verification is complete: 1,622 unique cases are green, including
+121 D1S4 cases. Whole-repository Ruff lint/format and diff checks pass.
+Final canonical ROBINHOOD results remain owned by the single feature CI run.
 
-## Preserved incident boundary
+## Preserved boundaries and next owner
 
-Do not:
+No real D1S4 production preflight/execute occurred. D1S3/R5 incident latches,
+reports, staging/final namespace and behavioral source were untouched. Historical
+publication is not a forward deployment dispatcher. No successor-root,
+scheduler/service/startup, runtime-start, credential/provider, paper/broker,
+D1/D2 or live effect occurred. Live remains NO-GO.
 
-- rerun D1S3 installation;
-- rerun R5 publication;
-- delete or rewrite either consumed latch;
-- manually rename the preserved staging directory;
-- delete/repair/clean the preserved staging/final namespace;
-- reuse historical 125/133 recovery operators;
-- provision successor root;
-- start runtime;
-- touch scheduler, credentials/providers, paper/broker, D1/D2 or live effects.
+Next owner: **ChatGPT exact-source review**, after terminal feature CI. Retrieve
+the exact final commit/diff and CI evidence directly. Accept only if justified;
+then separately determine develop integration, develop CI, registered read-only
+D1S4 production preflight and the later one-shot protected review. Codex stops at
+the implementation handoff and performs none of those subsequent steps.
 
-The preserved incident is evidence, not a blocker that must be repaired before
-forward progress.
-
-## Next milestone
-
-Next: **rename-free F1R1 immutable deployment source checkpoint**.
-
-Required contract:
-
-    fresh unique immutable deployment path
-    -> create/materialize only there
-    -> flush and seal
-    -> exact repeated verification
-    -> durable admission evidence
-    -> runtime binds to that exact unchanged path
-
-No directory promotion/rename step exists.
-
-After source acceptance and separate host qualification:
-
-    exact rename-free deployment admission
-    -> successor-root write-authority/ACL review
-    -> manual-start fresh F1 successor soak
-    -> 145-B
-    -> Research Results GUI
-    -> large strategy campaigns
-
-Original F1 remains FINAL / INDETERMINATE / CONSUMED; C2 remains consumed and
-immutable; live remains NO-GO.
+Later progression: exact deployment admission -> successor-root ACL review ->
+fresh manual-start F1 successor soak -> 145-B -> Research Results GUI -> large
+strategy campaigns.

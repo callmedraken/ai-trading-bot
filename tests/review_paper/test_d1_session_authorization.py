@@ -768,12 +768,12 @@ def test_checkpoint_profile_inventory_and_frozen_authority():
     )
     assert runner.resolve_ci_certification_profile(q.CHECKPOINT) == "robinhood"
     assert runner._arch134_d1r7_authority_check(ROOT) == ()
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 75
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 76
     inventory = certification.discover_inventory(ROOT)
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 199, "robinhood": 110, "legacy": 222, "exhaustive": 421}
+    } == {"full": 200, "robinhood": 111, "legacy": 222, "exhaustive": 422}
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
     for name, expected in runner.ARCH134_D1R7_PREDECESSOR_DIGESTS.items():
         assert (

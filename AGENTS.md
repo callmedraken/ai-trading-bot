@@ -634,7 +634,7 @@ surfaced by `.\ops.ps1 status`, is authoritative:
 
 ```powershell
 .\ops.ps1 status
-.\ops.ps1 preflight arch134-f1r1-d1s3-successor-release-installation-operator
+.\ops.ps1 preflight arch134-f1r1-d1s4-rename-free-direct-installation
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair

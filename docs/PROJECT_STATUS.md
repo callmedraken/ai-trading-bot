@@ -2,107 +2,63 @@
 
 ## Current checkpoint
 
-Architecture 134-F1R1 has reached a **rename-publication retirement / rename-free
-pivot**.
+Architecture **134-F1R1-D1S4 — Rename-Free Direct Immutable Release Installation**
+has completed source implementation. Terminal feature CI and ChatGPT exact-source
+review remain pending. Source acceptance and host qualification have not occurred.
 
-The last accepted R5 executable source remains:
+Required implementation base: `1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
+`1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
 
-    branch feature/robinhood-production-paper-134f1r1-d1s3-r5-publication-recovery-current
-    accepted source HEAD ca30771c0cb441b7e4f9dc63f4cc784771cdcd44
-    accepted source TREE 663782b1f1dd7f0d849637846fb40fbbf8a46c86
-    docs-closeout parent 24b390d1db62264d60a9c79e6ad67303bb996e19
+Active local branch:
+`feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`.
 
-R5 mapped CI #702 / run `40078441427`, attempt 1 was terminal green:
-10,874 canonical ROBINHOOD cases, 10,868 passed, 6 skipped, 0 failed/errors,
-244.382 seconds. Source acceptance is not in question.
+The implementation creates the source-derived final release directory directly,
+uses a separate release-bound one-shot latch, closes all materialization handles,
+and requires two independent final-image replays. Runtime continues to bind the
+same exact immutable `release_root(release_id)` through existing admission.
+Readiness is verified evidence; no filesystem publication occurs.
 
-## Production incident and retirement decision
+Source-graph and authority tests reject retired D1S3/R5 and historical 125/133
+operators in the D1S4 forward path. The registered feature maps to CI-owned
+ROBINHOOD certification with the existing 300-second ceiling. Final identity and
+terminal CI facts belong to the post-commit handoff, as explicitly agreed with
+the user; they must not be inferred from this pre-publication source document.
 
-Corrected D1S3 had already materialized and repeatedly verified an exact immutable
-staging release, but its one-shot installation stopped INDETERMINATE at
-PUBLICATION and the original installation latch became permanently CONSUMED.
+Detailed implementation, verification and preserved incident provenance:
+[Architecture D1S4](architecture/134-f1r1-d1s4-rename-free-immutable-release-installation.md)
+and [validation record](validation/arch134-f1r1-d1s4-rename-free-immutable-release-installation-plan.md).
 
-R5 was then intentionally reduced to one task: independently reprove that exact
-preserved staging image and issue one separate no-replace publication attempt.
 
-Registered R5 preflight on 2026-10-24 returned:
+Focused verification is complete: 1,622 unique cases are green, including
+121 D1S4 cases. Whole-repository Ruff lint/format and diff checks pass.
+Final canonical ROBINHOOD results remain owned by the single feature CI run.
 
-    PASS / READY_FOR_EXACT_PRESERVED_RELEASE_PUBLICATION
-    IDENTITY_STABLE=True
+## Production boundary
 
-The one-shot R5 protected execute then returned:
+No real D1S4 production preflight or execute occurred. D1S3/R5 installation and
+publication attempts remain consumed, preserved incident history; their evidence
+and namespace were untouched. No retry, rename, repair, promotion or cleanup is
+authorized. The superseded planning branch remains reference history only.
 
-    INDETERMINATE
-    PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY
-    MAY_HAVE_OCCURRED
-    IDENTITY_STABLE=True
-
-Evidence:
-`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\execute-20261024T091006.081295Z\report.json`.
-
-The registered post-attempt R5 preflight returned:
-
-    BLOCKED / CONSUMED_RECOVERY_ATTEMPT
-    IDENTITY_STABLE=True
-
-Evidence:
-`F:\AI\temp\ai-trading-bot-checkpoints\arch134-f1r1-d1s3-r5-successor-release-publication-recovery\preflight-20261024T091402.387900Z\report.json`.
-
-Under the accepted R5 state machine this closes the current namespace as consumed
-R5 authority with exact STAGING still present and FINAL absent. Do not rerun R5,
-rerun D1S3 installation, manually rename, delete, repair or clean either incident.
-
-The rename/publication mechanism is now retired as a forward F1R1 path. This is
-formalized in
-[the rename-free pivot decision](architecture/134-f1r1-rename-free-immutable-release-pivot.md)
-and as a normative non-regression rule in `AGENTS.md` and
-`docs/AI_DEVELOPMENT_WORKFLOW.md`.
-
-## Forward architecture
-
-Keep immutable production releases, but remove directory publication/promotion.
-
-The successor model is:
-
-    accepted source
-    -> fresh unique immutable deployment path
-    -> materialize in that same path
-    -> flush/seal/verify
-    -> persist exact admission evidence
-    -> explicitly bind runtime to that same exact path
-
-No `.installing`->FINAL, STAGE->ACTIVE, ACTIVE->ARCHIVE, alias/junction/symlink
-swap or equivalent directory namespace promotion may be required to make a
-release runnable. A failed deployment stays inert and preserved; a new attempt
-uses a new unique path.
-
-The next rename-free checkpoint must add machine-enforced authority/tests so an
-older branch/helper cannot silently reintroduce rename publication.
-
-## Operational boundary and roadmap
-
-No further D1S3/R5 protected execute is authorized. Successor root remains
-uncreated and still requires a separate write-authority/ACL review before
-provisioning. Runtime start, scheduler effects, credentials/provider access,
-paper/broker effects, D1/D2 and live effects remain unauthorized. Original F1 is
-FINAL / INDETERMINATE / CONSUMED; C2 remains consumed and immutable. Live remains
-**NO-GO**.
-
-    145-A SOURCE ACCEPTED and integrated
-    -> F1R1 rename-free immutable deployment
-    -> exact deployment admission
-    -> successor-root write-authority review
-    -> fresh manual-start F1 successor soak
-    -> 145-B results/campaign bundle
-    -> Research Results GUI
-    -> large strategy campaigns
+Successor-root provisioning, scheduler/service/startup changes, runtime start,
+credentials/provider access, paper/broker effects and D1/D2 effects remain
+unauthorized. Original F1 is FINAL / INDETERMINATE / CONSUMED; C2 remains consumed
+and immutable. Live remains **NO-GO**.
 
 ## Next step
 
-Design and implement the rename-free immutable-deployment successor checkpoint.
-Do not build D1S3-R6 as another rename qualification/recovery attempt.
+After the single final implementation commit/push and terminal feature CI,
+ChatGPT owns exact-source review. Only if accepted may ChatGPT determine
+integration readiness and later separately review the registered read-only D1S4
+production preflight. Codex does not perform those later steps.
 
-The successor source must create a fresh unique immutable path, verify it without
-renaming it, bind runtime explicitly to that exact path only after verification,
-and machine-enforce the rename-free non-regression rule. No production deployment
-effect is authorized by this documentation checkpoint.
+    exact-source review / acceptance if justified
+    -> reviewed develop integration and develop CI
+    -> registered read-only D1S4 host preflight
+    -> separately reviewed one-shot direct install
+    -> exact deployment admission
+    -> successor-root write-authority/ACL review
+    -> fresh manual-start F1 successor soak
+    -> 145-B
+    -> Research Results GUI
+    -> large strategy campaigns

@@ -17847,17 +17847,17 @@ ARCH134_R5_BLOB_PINS: Final = {
         "061dc8a6e4a3e572257c3120eecd7d3f1bc09127"
     ),
     ("tests/review_paper/test_successor_publication_recovery.py"): (
-        "9c9db56d27cb453a72d7f29944ee4be942b2a19d"
+        "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
     ),
     ("docs/architecture/134-f1r1-d1s3-r5-successor-release-publication-recovery.md"): (
         "f617dd9fa5d427cebad30cef2a867a2593d19208"
     ),
     (
         "docs/validation/arch134-f1r1-d1s3-r5-successor-release-publication-recovery.md"
-    ): ("9ec8ce19330f0b7c934462049ba95d78750005eb"),
+    ): ("3da256913f33c051437a372668bd5cd738231f5a"),
 }
 ARCH134_R5_BLOB_PINS_SHA256: Final = (
-    "b4f8e8e47ebc65d613f7f9dee5371ac9b803644513e35970f0be3e77b0a65ccf"
+    "7ecdf7e487e3d5287942ebf2aecc9fb100760720ac1737033bf43076b35fc482"
 )
 ARCH134_R5_AST_PREDECESSORS: Final = {
     ("_supervised_installation_operator_authority_check"): (

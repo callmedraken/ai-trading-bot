@@ -152,6 +152,10 @@ def test_frozen_incident_and_separate_authority():
     assert str(r.ATTEMPT_PATH) == (
         r"F:\AI\temp\arch134-f1r1-d1s3-r5-publication-recovery-attempt\attempt.json"
     )
+    assert r.WORKTREE == Path(
+        r"F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-"
+        r"d1s3-r5-publication-recovery-current"
+    )
 
 
 def reports():
@@ -867,7 +871,19 @@ def test_wrong_native_parent_rejected(monkeypatch):
 @pytest.mark.parametrize(
     "fault", ["head", "tree", "branch", "origin", "dirty", "remote", "predecessor"]
 )
-def test_exact_current_source_admission_rejects_drift(monkeypatch, fault):
+def test_exact_current_source_admission_rejects_drift(monkeypatch, tmp_path, fault):
+    # Exercise a relocated source fixture on every host, including the operator
+    # machine. The production WORKTREE constant is independently frozen above.
+    source_root = tmp_path / "ci-checkout"
+    monkeypatch.setattr(r, "WORKTREE", source_root)
+    monkeypatch.setattr(
+        r,
+        "__file__",
+        str(
+            source_root
+            / "src/trading_bot/supervised_release/successor_publication_recovery.py"
+        ),
+    )
     monkeypatch.setenv(r.REMOTE_HEAD_ENV, "a" * 40)
     monkeypatch.setenv(r.SOURCE_TREE_ENV, "b" * 40)
     monkeypatch.setattr(r, "_safe_ancestors", lambda p: None)
@@ -899,4 +915,15 @@ def test_exact_current_source_admission_rejects_drift(monkeypatch, fault):
     }[fault]
     values[key] = "wrong"
     with pytest.raises(ValueError):
+        r.admit_source()
+
+
+def test_wrong_import_origin_rejected_before_git_observation(monkeypatch, tmp_path):
+    monkeypatch.setenv(r.REMOTE_HEAD_ENV, "a" * 40)
+    monkeypatch.setenv(r.SOURCE_TREE_ENV, "b" * 40)
+    monkeypatch.setattr(r, "WORKTREE", tmp_path / "expected")
+    monkeypatch.setattr(r, "__file__", str(tmp_path / "other" / "module.py"))
+    monkeypatch.setattr(r, "_safe_ancestors", lambda path: None)
+    monkeypatch.setattr(r, "_git", lambda *args: pytest.fail("Git before origin fence"))
+    with pytest.raises(ValueError, match="R5_IMPORT_SOURCE_REJECTED"):
         r.admit_source()

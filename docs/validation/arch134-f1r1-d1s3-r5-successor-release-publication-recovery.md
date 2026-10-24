@@ -37,4 +37,25 @@ reviewed registered read-only preflight must independently prove the incident
 and image; the ad hoc diagnostic is not authority. Successor-root policy and
 provisioning remain separate architecture/effect boundaries.
 
+## Preserved initial CI and bounded C1
+
+Initial source `2ca63594fc00fbc3dda941f1c07aa8156d0b1875`, tree
+`45babb6a6736dac03b426d132f2791b56f4bc5e0`, push run #701 /
+`40077868296`, attempt 1, is terminal FAILURE and remains preserved.
+Source-static passed. Active tests recorded 2,139 passed / 7 failed. Canonical
+ROBINHOOD selected 110 modules in 28/27/29/26-module lanes: 10,873 cases,
+10,860 passed, six skipped, seven failed, zero errors, 164.587 seconds wall.
+The unchanged 300-second hygiene gate passed.
+
+All seven failures were the positive source-admission test fixture raising
+R5_IMPORT_SOURCE_REJECTED because it assumed the fixed operator worktree on a
+relocated CI checkout. C1 supplies an explicitly relocated synthetic source root
+and matching imported-module path to that fixture on every host. A separate
+negative case rejects a mismatched import origin before Git observation, and
+the real production worktree constant remains independently frozen. Production
+admission/recovery/native code, authority semantics and predecessor maps are
+unchanged. Only this test, its R5 blob pin and this validation record change.
+No production preflight or recovery execute runs in C1. The replacement ordinary
+push owns one fresh mapped ROBINHOOD run; the failed run is never rerun unchanged.
+
 Also remove or update any tests and docs that referenced the old behavior.

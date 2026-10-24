@@ -1,6 +1,23 @@
 # Architecture 145 / RCL-8 — robust historical qualification for bounded live-canary eligibility
 
-Status: **DESIGN FROZEN; source implementation is next.**
+Status: **145-A SOURCE ACCEPTED and integrated; 145-B is the deferred results/campaign-bundle boundary.**
+
+## Current accepted closeout
+
+Architecture 145-A is SOURCE ACCEPTED at HEAD
+`ef66dc848fd3bc031220c7e8ccd4f462d762e829`, tree
+`a63fb5bdcdf3d9a38645ffa07a91e2a55099f0d3`. Feature Checkpoint Source Gates
+run 39565023105 attempt 1 completed SUCCESS, and develop integration run
+39668161308 attempt 1 completed SUCCESS. The accepted 145-A evidence remains
+pure/offline and grants no provider, broker, paper, scheduler, promotion or
+real-money authority.
+
+The retained macro path is to finish Architecture 134-F1R1 operational
+confidence, complete the fresh F1 successor soak, then return to Architecture
+145-B for the results/campaign bundle before Research Results GUI and large
+strategy campaigns. The original design material below remains authoritative
+for 145-A semantics; its old pre-implementation status line is superseded by
+this closeout.
 
 ## Objective
 

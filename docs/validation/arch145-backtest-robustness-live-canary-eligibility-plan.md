@@ -1,6 +1,21 @@
 # Architecture 145 / RCL-8 — robust historical qualification validation plan
 
-Status: **DESIGN FROZEN; source implementation is next.**
+Status: **145-A SOURCE ACCEPTED and integrated; 145-B results/campaign-bundle validation is deferred until after the fresh F1 successor soak.**
+
+## Current accepted closeout
+
+Architecture 145-A is SOURCE ACCEPTED at HEAD
+`ef66dc848fd3bc031220c7e8ccd4f462d762e829`, tree
+`a63fb5bdcdf3d9a38645ffa07a91e2a55099f0d3`. Feature Checkpoint Source Gates
+run 39565023105 attempt 1 and develop integration run 39668161308 attempt 1
+completed SUCCESS. The accepted source remains offline/pure and does not grant
+operational or live authority.
+
+The next Architecture-145 checkpoint is not another 145-A implementation pass.
+After the separately owned 134-F1R1 successor soak completes and its evidence is
+accepted, proceed to 145-B results/campaign-bundle work; then Research Results
+GUI; then large strategy campaigns. The validation requirements below remain
+the historical 145-A acceptance contract.
 
 ## Acceptance objective
 

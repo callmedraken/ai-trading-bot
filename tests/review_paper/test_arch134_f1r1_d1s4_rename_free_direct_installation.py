@@ -1084,3 +1084,24 @@ def test_pre_fence_failure_has_no_native_effect_or_latch(host, monkeypatch, phas
 def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
     monkeypatch.setattr(runner, mapping, {})
     assert runner._arch134_d1s4_authority_check(ROOT)
+
+
+def test_predecessor_c1_inventory_uses_current_d1s4_overlay():
+    assert (
+        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        == runner.ARCH134_D1S4_ACTIVE_SHA256
+    )
+    assert (
+        runner.ARCH134_R5_ACTIVE_CI_CHECKPOINTS_SHA256
+        != runner.ARCH134_D1S4_ACTIVE_SHA256
+    )
+    runner._arch134_f1r1_c1_active_inventory()
+    assert runner._arch134_f1r1_c1_authority_check(ROOT) == ()
+
+
+def test_direct_authority_checks_predecessor_c1_inventory(monkeypatch):
+    def reject():
+        raise ValueError("injected predecessor C1 inventory drift")
+
+    monkeypatch.setattr(runner, "_arch134_f1r1_c1_active_inventory", reject)
+    assert "D1S4 authority unavailable" in runner._arch134_d1s4_authority_check(ROOT)

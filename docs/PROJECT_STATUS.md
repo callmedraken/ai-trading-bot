@@ -3,8 +3,9 @@
 ## Current checkpoint
 
 Architecture **134-F1R1-D1S4 — Rename-Free Direct Immutable Release Installation**
-has completed source implementation. Terminal feature CI and ChatGPT exact-source
-review remain pending. Source acceptance and host qualification have not occurred.
+has completed its source implementation and a user-authorized mechanical C1.
+Replacement feature CI and ChatGPT exact-source review remain pending. Source
+acceptance and host qualification have not occurred.
 
 Required implementation base: `1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
 `1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
@@ -29,9 +30,17 @@ Detailed implementation, verification and preserved incident provenance:
 and [validation record](validation/arch134-f1r1-d1s4-rename-free-immutable-release-installation-plan.md).
 
 
-Focused verification is complete: 1,622 unique cases are green, including
-121 D1S4 cases. Whole-repository Ruff lint/format and diff checks pass.
-Final canonical ROBINHOOD results remain owned by the single feature CI run.
+The initial source `613766837f13d3667d20c76aab2a56331933383e` /
+`91e63ed40510dc03523e5c4a76f9f3133cc6839f` remains preserved. Its CI #708 /
+`40130002889`, attempt 1 failed one stale predecessor inventory validator after
+10,988 passed / 6 skipped; all 121 original D1S4 cases passed.
+
+The user authorized correction through green. Separate C1 fixes the comparand,
+adds the missed validator to D1S4 source authority, and adds two regression tests.
+Focused C1 verification passed 351 cases, including all 123 current D1S4 cases.
+Whole-repository Ruff lint/format and diff checks pass. The corrective commit/push
+owns replacement canonical ROBINHOOD; no local duplicate certification runs.
+Native/operator behavior and all protected boundaries are unchanged.
 
 ## Production boundary
 
@@ -47,7 +56,8 @@ and immutable. Live remains **NO-GO**.
 
 ## Next step
 
-After the single final implementation commit/push and terminal feature CI,
+Complete the separate C1 atomic commit/push and await terminal replacement CI.
+The original failed source/run remain immutable evidence. After terminal green,
 ChatGPT owns exact-source review. Only if accepted may ChatGPT determine
 integration readiness and later separately review the registered read-only D1S4
 production preflight. Codex does not perform those later steps.

@@ -99,8 +99,8 @@ Expected route:
 
 The 300-second canonical hygiene ceiling remains unchanged.
 
-Any failed CI attempt is preserved. Do not rerun unchanged. Any mechanical C1
-requires ChatGPT classification/review before another push.
+Any failed CI attempt is preserved. Do not rerun unchanged. Any mechanical correction is a separately classified checkpoint. The user has
+explicitly authorized the bounded D1S4 C1 correction described below.
 Semantic/native/authority uncertainty returns to ChatGPT immediately.
 
 ## Handoff evidence
@@ -156,7 +156,7 @@ Source interlocks: `AI_TRADING_BOT_ARCH134_F1R1_D1S4_ACCEPTED_HEAD` and
 Execute interlock: `AI_TRADING_BOT_ARCH134_F1R1_D1S4_DIRECT_INSTALL_AUTHORIZATION`
 = `ARCH134_F1R1_D1S4_ONE_RENAME_FREE_IMMUTABLE_RELEASE_INSTALL_AUTHORIZED`.
 
-### Focused results
+### Initial implementation focused results
 
 **1,622 unique focused cases are green**, including all **121 D1S4
 cases**. Final effective results: 0 failed, 0 errors, 0 skipped. No full suite,
@@ -274,5 +274,92 @@ Host/native acceptance remains a separately reviewed later boundary. ChatGPT own
 exact-source acceptance and all subsequent integration/host decisions. After the
 terminal feature run, Codex returns the exact identity/CI/clean-state handoff and
 stops without merge, rebase, amend, force-push, PR mutation or protected effects.
+
+## Corrective C1 — completed focused validation
+
+The user explicitly authorized continued correction of red CI through green.
+C1 is source-only, based exactly on the original published source:
+
+    parent HEAD 613766837f13d3667d20c76aab2a56331933383e
+    parent TREE 91e63ed40510dc03523e5c4a76f9f3133cc6839f
+
+Same branch: `feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`.
+Same prepared worktree as the initial implementation; the main checkout remains
+out of scope. No merge/rebase/amend/force-push/PR mutation is authorized.
+
+### Preserved failed canonical evidence
+
+CI #708 / run `40130002889`, attempt 1 is preserved terminal FAILURE:
+111 ROBINHOOD modules; 10,995 cases; 10,988 passed / 6 skipped / 1 failed /
+0 errors; wall 167.629 seconds (below 300). Source-static and all 546 active
+cases passed; full-tests was intentionally skipped. All 121 original D1S4 cases
+passed. The single failure was:
+
+`tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py::test_c1_registration_overlays_and_frozen_dictionaries`
+
+At line 521, `_arch134_f1r1_c1_authority_check` returned authority unavailable
+because `_arch134_f1r1_c1_active_inventory` compared the current tuple digest
+against the old R5 digest. Exact failed evidence remains in artifact
+`canonical-certification-robinhood`, ID `12574732296`, SHA-256
+`30af9ffd0863d7d6514fcd3e06a3c7391bc7fa5ed26343f61389d8fa98637832`, preserved locally
+under `F:\AI\temp\d1s4-ci-708-canonical-6e7c9a7ff6a34bc18ce2ed8d349186c6`.
+No unchanged CI rerun was requested.
+
+### Correction and regression coverage
+
+- Require the reviewed current D1S4 inventory digest in the pure predecessor C1
+  inventory validator, retaining its exact historical before/after tuple checks.
+- Invoke that validator from D1S4 source authority so the same missing consumer
+  fails the fast source gate before a future canonical run.
+- Add positive regression coverage joining the current inventory and predecessor
+  C1 authority; add a negative test proving D1S4 authority fails closed when the
+  predecessor validator rejects.
+- Update only exact successor AST/source pins and their digest. Historical R5,
+  D1S3, D1S2 and earlier predecessor dictionaries/digests remain unchanged.
+- D1S4 operator/native behavioral source is byte-for-byte unchanged.
+
+### Focused and static results
+
+**351 passed / 0 failed / 0 errors / 0 skipped in 49.87 seconds.** This includes
+all **123** current D1S4 cases, the complete original failed consumer module, and
+the two directly affected shared runner modules. Exact focused invocation:
+
+```powershell
+& 'F:\AI\temp\d1s4-source-tools-8b2bf88a90644779b7dfde54b7d17bd9\Scripts\python.exe' -B -m pytest -q `
+  tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py `
+  tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py `
+  tests/runtime/checkpoint_runner/test_core.py `
+  tests/runtime/checkpoint_runner/test_ci.py `
+  --basetemp='F:\AI\temp\pytest\d1s4-c1-focused-e9032e19c41b4fe49e9bc13ff30aad32\base' `
+  --junitxml='F:\AI\temp\pytest\d1s4-c1-focused-e9032e19c41b4fe49e9bc13ff30aad32\results.xml' `
+  -p no:cacheprovider --tb=short --maxfail=3
+```
+
+This records the completed command; its existing evidence path must not be
+reused. Any required later run must choose a fresh external purpose/GUID root.
+Logs/JUnit are preserved beside that basetemp. Whole-repository Ruff lint and
+format-check, `git diff --check`, and final source-authority checks: PASS.
+Canonical ROBINHOOD/FULL was not run locally. No profile ownership, baseline,
+module inventory, lane policy or 300-second ceiling changed.
+
+### Exact corrective paths and publication
+
+C1 changes only:
+
+- `scripts/checkpoint_runner.py`
+- `tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py`
+- `docs/architecture/134-f1r1-d1s4-rename-free-immutable-release-installation.md`
+- `docs/validation/arch134-f1r1-d1s4-rename-free-immutable-release-installation-plan.md`
+- `docs/PROJECT_STATUS.md`
+- `docs/AI_TRADING_BOT_HANDOFF.md`
+
+The separate C1 normal commit/ordinary push owns the replacement mapped
+ROBINHOOD run. Final C1 source/CI identities and terminal totals are post-commit
+facts delivered in the final handoff, as explicitly agreed. Failed #708 remains
+preserved. This source does not claim SOURCE ACCEPTED.
+
+No production preflight/execute, release-tree create, successor-root, scheduler,
+runtime-start, credentials/provider, paper/broker, D1/D2 or live effect occurred.
+D1S3/R5 incident evidence and the stale main checkout remain untouched.
 
 Also remove or update any tests and docs that referenced the old behavior.

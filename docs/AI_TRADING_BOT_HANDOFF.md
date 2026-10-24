@@ -2,9 +2,9 @@
 
 ## Implementation boundary
 
-D1S4 rename-free direct installation source implementation is complete. Terminal
-feature CI and ChatGPT exact-source review remain pending. The final post-CI
-handoff supplies publication identity/evidence; no SOURCE ACCEPTED claim is made.
+D1S4 rename-free direct installation and its user-authorized mechanical C1 are
+implemented. Replacement feature CI and ChatGPT exact-source review remain
+pending. The final post-CI handoff supplies publication identity/evidence; no SOURCE ACCEPTED claim is made.
 
 Use only:
 `F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
@@ -12,12 +12,19 @@ Use only:
 Branch:
 `feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
 
-Required base/direct parent:
+Required initial implementation base/direct parent:
 `1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
 `1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
 
-Exactly one final implementation commit and one ordinary first push are planned.
-No intermediate design commit or remote branch bootstrap is permitted. The
+The initial implementation was one normal commit and one ordinary first push:
+`613766837f13d3667d20c76aab2a56331933383e` /
+`91e63ed40510dc03523e5c4a76f9f3133cc6839f`. Its terminal-red CI #708 /
+`40130002889`, attempt 1 remains
+preserved. The user explicitly authorized correction through green.
+
+Separate C1 has that exact source as its direct parent and adds one normal
+corrective commit/ordinary push. Do not amend/rewrite or rerun the failed source.
+No intermediate design commit or remote branch bootstrap occurred. The
 planning branch at `f1a7282d4ff42e58f257d59d1c734329d628688e` is unchanged historical
 reference. The stale main checkout and its untracked artifacts remain out of scope.
 
@@ -57,9 +64,16 @@ modules/cases/pass/skip/fail/error/wall/artifact are post-commit facts delivered
 the final handoff, per the user's explicit documentation resolution.
 
 
-Focused verification is complete: 1,622 unique cases are green, including
-121 D1S4 cases. Whole-repository Ruff lint/format and diff checks pass.
-Final canonical ROBINHOOD results remain owned by the single feature CI run.
+The original canonical run selected 111 modules and recorded 10,988 passed /
+6 skipped / 1 failed / 0 errors in 167.629 seconds. All 121 original D1S4 cases
+passed. The failure was the old R5 digest comparand in
+`_arch134_f1r1_c1_active_inventory`.
+
+C1 fixes that pure current-inventory comparison, includes the missed predecessor
+validator in D1S4 source authority, adds two regression cases and refreshes exact
+successor pins. Focused verification passed 351 cases (all 123 current D1S4 cases
+included). Ruff/diff checks pass. Native/operator behavioral source is unchanged.
+C1's ordinary push owns replacement canonical ROBINHOOD; never duplicate it locally.
 
 ## Preserved boundaries and next owner
 
@@ -69,7 +83,10 @@ publication is not a forward deployment dispatcher. No successor-root,
 scheduler/service/startup, runtime-start, credential/provider, paper/broker,
 D1/D2 or live effect occurred. Live remains NO-GO.
 
-Next owner: **ChatGPT exact-source review**, after terminal feature CI. Retrieve
+Current action: complete the user-authorized C1 atomic publication and wait for
+terminal replacement CI. Preserve/classify a red replacement and continue only
+within the reviewed mechanical corrective scope; stop on semantic/native/effect
+uncertainty. Next owner after terminal green: **ChatGPT exact-source review**. Retrieve
 the exact final commit/diff and CI evidence directly. Accept only if justified;
 then separately determine develop integration, develop CI, registered read-only
 D1S4 production preflight and the later one-shot protected review. Codex stops at

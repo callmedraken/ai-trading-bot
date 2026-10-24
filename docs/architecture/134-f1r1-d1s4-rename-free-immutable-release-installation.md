@@ -276,8 +276,11 @@ verification during implementation.
 
 Register D1S4 in the unified checkpoint runner and map its one ordinary feature
 push to canonical `ROBINHOOD` certification. Do not duplicate the canonical
-profile locally when CI owns it. Preserve any red run. Do not immediately correct/push: ChatGPT must classify
-any mechanical C1 request before a separate corrective checkpoint.
+profile locally when CI owns it. Preserve and classify any red run. The user explicitly authorized correction of
+the terminal-red D1S4 run through a separate bounded mechanical C1. Its atomic
+commit/push preserves the original failed source and run; it does not amend or
+retry the original checkpoint. Semantic/native/authority uncertainty remains a
+STOP; no protected effect is authorized.
 
 The implementation should be one atomic logical source checkpoint and must not
 perform any real D1S4 production preflight or execute. After terminal CI, ChatGPT
@@ -336,5 +339,38 @@ user's explicit resolution, those are supplied in the final post-CI handoff;
 this atomic committed document does not predict its own identity or future CI.
 No source acceptance is asserted here. The intended handoff state is
 `IMPLEMENTED / ONE ATOMIC COMMIT / ONE PUSH / PENDING CHATGPT EXACT-SOURCE REVIEW`.
+
+## D1S4 corrective C1 — stale predecessor inventory validator
+
+The original implementation `613766837f13d3667d20c76aab2a56331933383e` / `91e63ed40510dc03523e5c4a76f9f3133cc6839f` was published once.
+Its feature CI #708 / run `40130002889`, attempt 1, failed one canonical test:
+`test_c1_registration_overlays_and_frozen_dictionaries`. All 121 original D1S4
+cases passed. The preserved canonical run selected 111 modules and recorded
+10,988 passed / 6 skipped / 1 failed / 0 errors in 167.629 seconds.
+
+The failure was a missed current-inventory comparand in
+`_arch134_f1r1_c1_active_inventory`: it still selected the historical R5 digest
+while the current registered tuple correctly uses the D1S4 digest. The user
+explicitly authorized continuing the classified mechanical correction until CI
+is green.
+
+C1 changes only that pure current-inventory comparison, includes this previously
+missed validator in `_arch134_d1s4_authority_check`, adds two regression tests,
+and refreshes the exact successor AST/source pins. Frozen predecessor maps and
+historical tuple checks are preserved. The D1S4 operator/native source, runtime
+binding, one-shot latch, mutation ordering, immutable security and rename-free
+rules are unchanged.
+
+C1 is a separate normal corrective commit with direct parent `613766837f13d3667d20c76aab2a56331933383e` and
+parent tree `91e63ed40510dc03523e5c4a76f9f3133cc6839f`, on the same branch/worktree. The initial one-commit/one-push
+checkpoint remains immutable evidence; C1 adds one ordinary commit/push without
+rewriting it. Canonical ROBINHOOD remains CI-owned. Focused verification passed
+351 cases (including all 123 current D1S4 cases and the original failed C1
+consumer); combined whole-repository Ruff and diff checks pass.
+
+No real production preflight/execute or other protected effect occurred. C1's
+final HEAD/TREE and terminal replacement CI identity/results are post-commit
+facts supplied in the final handoff, under the user's existing documentation
+resolution. ChatGPT exact-source review remains pending after terminal CI.
 
 Also remove or update any tests and docs that referenced the old behavior.

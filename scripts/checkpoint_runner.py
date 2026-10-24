@@ -15977,12 +15977,7 @@ def _arch134_f1r1_c1_active_inventory() -> None:
         )
         or digest(after) != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
         or tuple(ACTIVE_CI_CHECKPOINTS) != _arch134_d1s2_active_inventory()
-        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        != (
-            ARCH134_R5_ACTIVE_CI_CHECKPOINTS_SHA256
-            if ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256
-            else ARCH134_D1S2_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
-        )
+        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_D1S4_ACTIVE_SHA256
     ):
         raise ValueError("134-F1R1-C1 active inventory drift")
 
@@ -18239,6 +18234,9 @@ ARCH134_D1S4_AST_PREDECESSORS: Final = {
     "_arch134_d1s2_active_inventory": (
         "6bad939eb5da74cb60fdb5632b781e6b83f12c48641df10952600ba38276fcca"
     ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "bd25552fe8614a9f3d57ed00fc5c5bb560d26eb12b4de8360adc8efb2037b330"
+    ),
     "_arch134_r5_active_inventory": (
         "ebe190f25caf6cc267197043cb38932b2fd7920d125ba7b07584bb31f1992fe7"
     ),
@@ -18264,6 +18262,9 @@ ARCH134_D1S4_AST_PREDECESSORS: Final = {
 ARCH134_D1S4_AST_PINS: Final = {
     "_arch134_d1s2_active_inventory": (
         "53ffd54621593348f5ae8b5a7fcaa4524c8d58b9ee006f4a186f58926271af2c"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "4913f09c43c90b5fa8b88bd5abc47e7cbc698713b2f732d24bba7543deda0b7d"
     ),
     "_arch134_r5_active_inventory": (
         "6a08f81b5c9f6764e0eeb5eb31a25c12987eab1ec689be7305737e336716c9cd"
@@ -18304,19 +18305,19 @@ ARCH134_D1S4_NEW_AST_PINS: Final = {
         "0bd91f30e280fcd4b2b20975516e6a197dc3a9b0453b11a646aac3fe8bd215cc"
     ),
     "_arch134_d1s4_authority_check": (
-        "284b6d29140e43244e8cf4487c44c773c98c0f4d906fa377bee809ee4fd74d8a"
+        "0d5f09dc600da4a819d77be3491e158425766878fc96cc4faecf946e78c611da"
     ),
 }
 ARCH134_D1S4_SOURCE_PINS: Final = {
     "AGENTS.md": ("bc21572f254e2a9a66bbb0031c69ac13d9d7bfec"),
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("b7c7b62ca081c8725db3309a02672d409e4a2a2b"),
     ("docs/architecture/134-f1r1-d1s4-rename-free-immutable-release-installation.md"): (
-        "65f3ee9e8749707fcc5282f59f11b7ac24004b98"
+        "97638a4c4e50524a289b814b966e5d82c6605745"
     ),
     (
         "docs/validation/arch134-f1r1-d1s4-rename-free-immutable-release-"
         "installation-plan.md"
-    ): ("5f01ef0530b23ce3c227ed8afcf76b728f3e7fa0"),
+    ): ("4166c078fcf5c8731cdbc07ccd0ebb3f7d6760ad"),
     ("src/trading_bot/supervised_release/successor_direct_installation.py"): (
         "aa58385c790f3b10cbf6899e0a26d6324d89b28a"
     ),
@@ -18324,11 +18325,11 @@ ARCH134_D1S4_SOURCE_PINS: Final = {
         "37628c4510af512fa677bbee38d7646da1495681"
     ),
     ("tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"): (
-        "b02d3b729bbbc4a70f003a068ff044d379b3a0da"
+        "c5821950d4665e19f5d84f3dbc42d432cf30a43a"
     ),
 }
 ARCH134_D1S4_MAPS_SHA256: Final = (
-    "388b7fd8393d15f9ef52fe33b66bff3427b690441274e5371c13562d2fab166f"
+    "6c62f865aa46bc47c9b70fa0f2f860a2e16b7aa1dc8d3cb74245e7838771098b"
 )
 ARCH134_D1S4_ACTIVE_SHA256: Final = (
     "a0ffa460ec970bf82d68d0486692cab7509c426fe238320782e2e1158c9c76d8"
@@ -18527,6 +18528,7 @@ def _arch134_d1s4_graph_check(repo_root: Path) -> tuple[str, ...]:
 def _arch134_d1s4_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = list(_arch134_r5_authority_check(repo_root))
     try:
+        _arch134_f1r1_c1_active_inventory()
         maps = (
             ARCH134_D1S4_BLOB_PREDECESSORS,
             ARCH134_D1S4_BLOB_PINS,

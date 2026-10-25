@@ -440,10 +440,10 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         for name in ("full", "robinhood", "legacy", "exhaustive")
     }
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 202,
+        "full": 203,
         "robinhood": 112,
         "legacy": 222,
-        "exhaustive": 424,
+        "exhaustive": 425,
     }
     assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
     assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]

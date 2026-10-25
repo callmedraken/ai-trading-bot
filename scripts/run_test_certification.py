@@ -529,6 +529,7 @@ FULL_EXACT_MODULES = (
     "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
     "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_r3m_c2.py",
     "tests/scripts/certification_runner/test_children.py",
     "tests/scripts/certification_runner/test_lanes.py",
     "tests/scripts/certification_runner/test_profiles.py",

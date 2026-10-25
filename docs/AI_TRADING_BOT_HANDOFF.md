@@ -48,9 +48,15 @@ Initial R3M source 4429578c98c227e25b084b81379cf69d89f414b0 / tree
 two historical AST-freeze assertions still required the old workflow checker.
 The C1 source `fa04f04c6544078acb25c5daad0ce08e3e13e4a2` is preserved with
 successful #723 / 40189452322 / attempt 1 but remains pending ChatGPT review.
-C2 exists solely to close first-attempt provenance: its reusable candidate must
-be the original attempt 1, and a coherent unchanged-source attempt 2 falls
-back. C2 requires focused checks and its own one atomic publication/terminal CI.
+C2 source `0b3ac6a9761c1a7433200bfc3f4d4d4a9a149860` is preserved with terminal
+failed #724 / 40219349487 / attempt 1. C2's first-attempt-only semantic
+correction remains intact; #724 failed solely because the new C2 provenance
+test module lacked current FULL inventory ownership. C3 is the separately
+reviewed inventory-admission correction: `tests/runtime/checkpoint_runner/test_r3m_c2.py`
+is FULL-only, current inventory is `203 / 112 / 222 / 425`, and the six-lane
+FULL/four-lane ROBINHOOD topology is unchanged. C3 requires focused checks and
+its own one atomic publication/terminal CI. No production candidate is frozen
+and no protected or external effect is authorized.
 
 ## Protected boundary
 
@@ -62,11 +68,12 @@ attempts remain untouched. No production generation is frozen for the weekend.
 
 ## Next owner / next step
 
-ChatGPT performs exact GitHub source/CI review of the final R3M commit and
-reviews its fail-closed metadata proof, workflow aggregation, additive pin overlay,
-focused evidence and accepted 146-A closeout. Any selected certification must be
-complete before integration. Stop this delegated task at IMPLEMENTED / PUBLISHED /
-TERMINAL CI / PENDING CHATGPT EXACT-SOURCE REVIEW. Do not begin 146-B.
+ChatGPT performs exact GitHub source/CI review of the final R3M C3 commit and
+reviews its fail-closed metadata proof, workflow aggregation, additive C3 pin
+overlay, focused evidence, exact current inventory admission and accepted
+146-A closeout. Any selected certification must be complete before integration.
+Stop this delegated task at IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING
+CHATGPT EXACT-SOURCE REVIEW. Do not begin 146-B.
 
 Sunday night: separately freeze then-current terminal-green develop for reviewed
 fresh-successor deployment admission. No executable authority comes from this

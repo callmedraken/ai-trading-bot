@@ -12658,10 +12658,17 @@ def _arch144_current_inventory_test_pin(relative: str, predecessor: str) -> str:
             expected = ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]
         if predecessor != expected:
             raise ValueError("144 wrong before current inventory pin")
-        return _arch134_f1_current_inventory_test_pin(
+        current = _arch134_f1_current_inventory_test_pin(
             relative, ARCH144_CURRENT_INVENTORY_TEST_PIN_OVERRIDES[relative]
         )
-    return _arch134_f1_current_inventory_test_pin(relative, predecessor)
+    else:
+        current = _arch134_f1_current_inventory_test_pin(relative, predecessor)
+    if relative in ARCH132_R3M_C3_BLOB_PREDECESSORS and current in (
+        ARCH132_R3M_C3_BLOB_PREDECESSORS[relative],
+        ARCH132_R3M_C3_BLOB_PINS[relative],
+    ):
+        return _arch132_r3m_c3_pin(relative, current, ast_pin=False)
+    return current
 
 
 def _arch134_d1r5_test_pin(relative: str, predecessor: str) -> str:
@@ -20196,6 +20203,11 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
 
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
     # Admit only the exact already-resolved current successor.
+    if relative in ARCH132_R3M_C3_BLOB_PREDECESSORS and predecessor in (
+        ARCH132_R3M_C3_BLOB_PREDECESSORS[relative],
+        ARCH132_R3M_C3_BLOB_PINS[relative],
+    ):
+        return _arch132_r3m_c3_pin(relative, predecessor, ast_pin=False)
     if (
         relative in ARCH132_R3M_C1_BLOB_PINS
         and predecessor == ARCH132_R3M_C1_BLOB_PINS[relative]
@@ -20677,14 +20689,16 @@ def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
             actual = hashlib.sha256(
                 ast.dump(functions[key], include_attributes=False).encode()
             ).hexdigest()
-            if actual != _arch132_r3m_c1_pin(key, pin, ast_pin=True):
+            if actual != _arch132_r3m_c3_pin(
+                key, _arch132_r3m_pin(key, pin, ast_pin=True), ast_pin=True
+            ):
                 failures.append("R3M runner AST drift: " + key)
         for relative, pin in {
             **ARCH132_R3M_BLOB_PINS,
             **ARCH132_R3M_FROZEN_SOURCE_PINS,
         }.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c1_pin(
-                relative, pin, ast_pin=False
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
+                relative, _arch132_r3m_pin(relative, pin, ast_pin=False), ast_pin=False
             ):
                 failures.append("R3M source drift: " + relative)
         if not _batch_workflow_is_reviewed(
@@ -20805,7 +20819,9 @@ def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
         }.items():
             if hashlib.sha256(
                 ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3m_c2_pin(key, pin, ast_pin=True):
+            ).hexdigest() != _arch132_r3m_c3_pin(
+                key, _arch132_r3m_c2_pin(key, pin, ast_pin=True), ast_pin=True
+            ):
                 failures.append("R3M C1 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
             if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c2_pin(
@@ -20922,21 +20938,201 @@ def _arch132_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
             **ARCH132_R3M_C2_AST_PINS,
             **ARCH132_R3M_C2_NEW_AST_PINS,
         }.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch132_r3m_c3_pin(key, pin, ast_pin=True):
                 failures.append("R3M C2 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C2_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
+                relative, pin, ast_pin=False
+            ):
                 failures.append("R3M C2 source drift: " + relative)
         for relative, pin in ARCH132_R3M_C2_NEW_BLOB_PINS.items():
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("R3M C2 new source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M C2 authority unavailable")
+    failures.extend(_arch132_r3m_c3_authority_check(repo_root))
+    return tuple(failures)
+
+
+# C3 preserves the C2 first-attempt correction and adds only current FULL
+# inventory admission plus its current assertion/docs successors.
+ARCH132_R3M_C3_AST_PREDECESSORS: Final = {
+    "_arch146a_shared_blob_pin": (
+        "4fca63d9a83baa4e28f0fd16ac394a96e7bd61ff99963ba110fea6a7d9423f1f"
+    ),
+    "_arch132_r3m_c1_authority_check": (
+        "763d1c4e8e1ae758990a65cc21cd9e0646e31e70807394c4a1c1a344159c6dd8"
+    ),
+    "_arch132_r3m_authority_check": (
+        "e8a9152060429e941b7e859d3fc61d0047ba9e6faca0be5618a9408f206c71ca"
+    ),
+    "_arch132_r3m_c2_authority_check": (
+        "ee9742b2ee600d9a79ad3a137943abde76eb0118d4fe0c1c7ef05c1e166ee84d"
+    ),
+    "_arch144_current_inventory_test_pin": (
+        "ea85122a31c69ce1cc6474d6bd918426a76fd673cdb82d82e1205c1ac46065c0"
+    ),
+}
+ARCH132_R3M_C3_AST_PINS: Final = {
+    "_arch146a_shared_blob_pin": (
+        "764acedc36f6992533e7932cca44e9b0a23b1268e3e2f2801048aecc8b33c870"
+    ),
+    "_arch132_r3m_c1_authority_check": (
+        "868c13b07a6f280b8ce53a41f0f70f3c3d6e220fdc7fa1def231e4df1735fcab"
+    ),
+    "_arch132_r3m_authority_check": (
+        "20a5a6eacd3bd6f0ad04a9216339d9c9f5ba0c02a2aa71bae137deda68c4a83c"
+    ),
+    "_arch132_r3m_c2_authority_check": (
+        "e1c2f9f6b0b9382696b84b613d25a02fd5622b1f42bc87328f567aa28bf31fc7"
+    ),
+    "_arch144_current_inventory_test_pin": (
+        "f24f850fd56706bd070deef661f29d3165cd660b4272d9aa9e3859cb71758366"
+    ),
+}
+ARCH132_R3M_C3_BLOB_PREDECESSORS: Final = {
+    "scripts/run_test_certification.py": ("bfa2222bc5597a581868c6c5865ca329a6a420bb"),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "23bf43ddd4590f7f49dd07aae55d3593e9ef8581"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "ecfc462b052536ec09c19b01909b842d65233b0d"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "bdc67831813ee75dec408049f066e35c7cbda4c5"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "e2b7ba58e2f5d68239c39c2415c7d016b2ca53bc"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "e3ba31e9d7d50d95dae33958354d55473636ee93"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "8957925d8f6538ab6266ff20e76bc7fca9e67dbb"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "da9b8a9a2c425df03d4648635f0458bdc71d3e7b"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "c235f96b9290f969a756f419ed4ec96ab6863d52"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "0fd8c520c3fb78c4fe63b01159e384f26b59ab1d"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "85c4da9a1cf25c29b9fca2c3d3acff71c61bb9ad"
+    ),
+    "docs/PROJECT_STATUS.md": "8e71eb18e0a136fc1b40497a53a86f3e457ea17e",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "9c1346707b72eb8bc0bb8a85cd3c87b3ce075723",
+}
+ARCH132_R3M_C3_BLOB_PINS: Final = {
+    "scripts/run_test_certification.py": ("d283c8b9f793e86740bfc7023466e02cfdbb7e34"),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "c34094da4ab11769b59a93c5c2f511e9af3496c1"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "3c1b9f8bef5ccf3e23a38f3adbacbdbd2d69425c"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "1432b94e79953de74954a8d536b2161824a17f2c"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "e7240299d331a181f2c8b1d9e696f5505f4ac618"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "f2ab4bedb66e4d96c76cc95d93f3b434efb8e617"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "74c06b5acf3aabf18fe5beaadb7c847578bdfc26"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "6e8749dca91e027de16ab64de01704d1ebd5ff9f"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "7dcc429cc48f36baed4094719b2953dfdaefae85"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "f94ae514a5eba8a72b193cf88773a50c55ceb557"
+    ),
+    "docs/PROJECT_STATUS.md": "0c7730f985bd21a6de106fcede695aee0fdc774e",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "b67896b51686579ae5bc3ca674e58ce71f68a83d",
+}
+ARCH132_R3M_C3_NEW_AST_PINS: Final = {
+    "_arch132_r3m_c3_maps": (
+        "6d200b4e2d677054a5f08a2ff2749b329ed4bd464dfd5b907f1e95f84300cd55"
+    ),
+    "_arch132_r3m_c3_pin": (
+        "85ad079958267e6ab5af9985678b5d91f718828642f37b7f18a6fa06d9ca1002"
+    ),
+    "_arch132_r3m_c3_authority_check": (
+        "ad4a28e77430fd1e22871f8fc02ff2cad2a85367013df855808477d79c6db54a"
+    ),
+}
+ARCH132_R3M_C3_MAPS_SHA256: Final = (
+    "09ece4253cb8df807cb1aab82fce5a4ddfb3d564a35698f1f6150031e3e421a5"
+)
+
+
+def _arch132_r3m_c3_maps() -> None:
+    maps = (
+        ARCH132_R3M_C3_AST_PREDECESSORS,
+        ARCH132_R3M_C3_AST_PINS,
+        ARCH132_R3M_C3_BLOB_PREDECESSORS,
+        ARCH132_R3M_C3_BLOB_PINS,
+        ARCH132_R3M_C3_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3M_C3_MAPS_SHA256
+        or set(ARCH132_R3M_C3_AST_PREDECESSORS) != set(ARCH132_R3M_C3_AST_PINS)
+        or set(ARCH132_R3M_C3_BLOB_PREDECESSORS) != set(ARCH132_R3M_C3_BLOB_PINS)
+    ):
+        raise ValueError("R3M C3 exact successor maps drift")
+
+
+def _arch132_r3m_c3_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3m_c3_maps()
+    before = (
+        ARCH132_R3M_C3_AST_PREDECESSORS if ast_pin else ARCH132_R3M_C3_BLOB_PREDECESSORS
+    )
+    after = ARCH132_R3M_C3_AST_PINS if ast_pin else ARCH132_R3M_C3_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3M C3 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3m_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch132_r3m_c3_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3M_C3_AST_PINS,
+            **ARCH132_R3M_C3_NEW_AST_PINS,
+        }.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3M C3 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3M C3 source drift: " + relative)
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3M C3 authority unavailable")
     return tuple(failures)
 
 

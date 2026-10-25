@@ -969,7 +969,7 @@ def test_checkpoint_inventory_and_explicit_successor():
     assert {
         p: len(certification.select_inventory(inventory, p))
         for p in certification.PROFILES
-    } == {"full": 202, "robinhood": 112, "legacy": 222, "exhaustive": 424}
+    } == {"full": 203, "robinhood": 112, "legacy": 222, "exhaustive": 425}
     assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
 

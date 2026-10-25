@@ -24,7 +24,7 @@ See [Architecture 146](architecture/146-historical-research-data-custody.md) and
 
 ## Current workflow checkpoint
 
-Architecture 132-R3M — develop integration certification reuse C2 is
+Architecture 132-R3M — develop integration certification reuse corrective C3 is
 **IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING CHATGPT EXACT-SOURCE REVIEW**.
 Reusable feature certification is the original push-triggered first attempt
 only: the run, detail and required jobs must each report `run_attempt == 1`.
@@ -34,8 +34,14 @@ ownership and the six-lane FULL/four-lane ROBINHOOD topology remain unchanged.
 Initial R3M source `4429578c98c227e25b084b81379cf69d89f414b0` is preserved with
 failed #722 / `40188805213` / attempt 1. C1 source
 `fa04f04c6544078acb25c5daad0ce08e3e13e4a2` is preserved with successful #723 /
-`40189452322` / attempt 1 but remains pending ChatGPT review. C2 exists solely
-to close first-attempt provenance.
+`40189452322` / attempt 1 but remains pending ChatGPT review. C2 source
+`0b3ac6a9761c1a7433200bfc3f4d4d4a9a149860` is preserved with terminal failed
+#724 / `40219349487` / attempt 1. C2's first-attempt-only semantic correction
+remains intact; #724 failed solely because the new C2 provenance test module
+lacked current FULL inventory ownership. C3 is the separately reviewed
+inventory-admission correction: `tests/runtime/checkpoint_runner/test_r3m_c2.py`
+is FULL-only, with current inventory `203 / 112 / 222 / 425` and unchanged
+six-lane FULL/four-lane ROBINHOOD topology.
 See [Architecture 132](architecture/132-tiered-certification-profiles.md).
 
 ## Production boundary
@@ -57,7 +63,8 @@ follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-ChatGPT reviews the exact published R3M C2 source, terminal CI, additive
-authority overlay, reuse/fallback tests and preserved #722/#723 evidence.
-Accept/integrate only after that review and any selected certification are
-complete. Do not begin 146-B here.
+ChatGPT reviews the exact published R3M C3 source, terminal CI, additive
+authority overlay, reuse/fallback tests, current inventory admission and
+preserved #722/#723/#724 evidence. No production candidate is frozen and no
+protected or external effect is authorized. Accept/integrate only after that
+review and any selected certification are complete. Do not begin 146-B here.

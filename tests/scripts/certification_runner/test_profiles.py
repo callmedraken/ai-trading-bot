@@ -126,6 +126,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
         sorted(
             (
                 *_EXPECTED_FULL,
+                "tests/runtime/checkpoint_runner/test_r3m_c2.py",
                 _PUBLISHED_PREPARE_TEST,
                 _PREPARE_OPERATOR_TEST,
                 _SUPERVISED_QUALIFICATION_TEST,
@@ -222,10 +223,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 202,
+        "full": 203,
         "robinhood": 112,
         "legacy": 222,
-        "exhaustive": 424,
+        "exhaustive": 425,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

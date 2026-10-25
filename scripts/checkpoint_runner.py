@@ -17508,12 +17508,15 @@ def _arch134_d1s3_shared_successor_pin(relative: str) -> str | None:
         return None
     successor = _arch132_r3j_current_shared_successor_pin(relative, successor)
     successor = _arch132_r3k_current_shared_successor_pin(relative, successor)
-    return _arch146a_shared_blob_pin(
-        relative,
-        _arch134_r5_blob_pin(
-            relative, _arch132_r3l_current_shared_successor_pin(relative, successor)
-        ),
+    resolved = _arch134_r5_blob_pin(
+        relative, _arch132_r3l_current_shared_successor_pin(relative, successor)
     )
+    if relative in ARCH132_R3M_C3_BLOB_PREDECESSORS and resolved in (
+        ARCH132_R3M_C3_BLOB_PREDECESSORS[relative],
+        ARCH132_R3M_C3_BLOB_PINS[relative],
+    ):
+        return _arch132_r3m_c3_pin(relative, resolved, ast_pin=False)
+    return _arch146a_shared_blob_pin(relative, resolved)
 
 
 def _arch132_r3j_current_shared_successor_pin(relative: str, predecessor: str) -> str:
@@ -20203,11 +20206,6 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
 
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
     # Admit only the exact already-resolved current successor.
-    if relative in ARCH132_R3M_C3_BLOB_PREDECESSORS and predecessor in (
-        ARCH132_R3M_C3_BLOB_PREDECESSORS[relative],
-        ARCH132_R3M_C3_BLOB_PINS[relative],
-    ):
-        return _arch132_r3m_c3_pin(relative, predecessor, ast_pin=False)
     if (
         relative in ARCH132_R3M_C1_BLOB_PINS
         and predecessor == ARCH132_R3M_C1_BLOB_PINS[relative]
@@ -20922,6 +20920,34 @@ def _arch132_r3m_c2_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
         if predecessor not in (before[key], after[key]):
             raise ValueError("R3M C2 wrong exact predecessor")
         return after[key]
+    c3_before = (
+        ARCH132_R3M_C3_AST_PREDECESSORS if ast_pin else ARCH132_R3M_C3_BLOB_PREDECESSORS
+    )
+    c3_after = ARCH132_R3M_C3_AST_PINS if ast_pin else ARCH132_R3M_C3_BLOB_PINS
+    prior_keys = (
+        {
+            *ARCH132_R3M_C1_AST_PREDECESSORS,
+            *ARCH132_R3M_C1_AST_PINS,
+            *ARCH132_R3M_C1_NEW_AST_PINS,
+            *ARCH132_R3M_C2_AST_PREDECESSORS,
+            *ARCH132_R3M_C2_AST_PINS,
+            *ARCH132_R3M_C2_NEW_AST_PINS,
+        }
+        if ast_pin
+        else {
+            *ARCH132_R3M_C1_BLOB_PREDECESSORS,
+            *ARCH132_R3M_C1_BLOB_PINS,
+            *ARCH132_R3M_C2_BLOB_PREDECESSORS,
+            *ARCH132_R3M_C2_BLOB_PINS,
+            *ARCH132_R3M_C2_NEW_BLOB_PINS,
+        }
+    )
+    if (
+        key in c3_before
+        and key not in prior_keys
+        and predecessor in (c3_before[key], c3_after[key])
+    ):
+        return c3_after[key]
     return predecessor
 
 
@@ -20959,11 +20985,14 @@ def _arch132_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
 # C3 preserves the C2 first-attempt correction and adds only current FULL
 # inventory admission plus its current assertion/docs successors.
 ARCH132_R3M_C3_AST_PREDECESSORS: Final = {
-    "_arch146a_shared_blob_pin": (
-        "4fca63d9a83baa4e28f0fd16ac394a96e7bd61ff99963ba110fea6a7d9423f1f"
+    "_arch134_d1s3_shared_successor_pin": (
+        "a9964da105d85b32d6735e6eeab8d6a3c608befea22eb31f22845e7c96505481"
     ),
     "_arch132_r3m_c1_authority_check": (
         "763d1c4e8e1ae758990a65cc21cd9e0646e31e70807394c4a1c1a344159c6dd8"
+    ),
+    "_arch132_r3m_c2_pin": (
+        "5c1a0bf690e9cc2168329d522f63afa88dd9ac297a73b0208d8beb78bc645a2a"
     ),
     "_arch132_r3m_authority_check": (
         "e8a9152060429e941b7e859d3fc61d0047ba9e6faca0be5618a9408f206c71ca"
@@ -20976,11 +21005,14 @@ ARCH132_R3M_C3_AST_PREDECESSORS: Final = {
     ),
 }
 ARCH132_R3M_C3_AST_PINS: Final = {
-    "_arch146a_shared_blob_pin": (
-        "764acedc36f6992533e7932cca44e9b0a23b1268e3e2f2801048aecc8b33c870"
+    "_arch134_d1s3_shared_successor_pin": (
+        "c4d2c5141c8527759bbb01f712c84f63f5f1796d8caf3cfafd93219d6f0529ec"
     ),
     "_arch132_r3m_c1_authority_check": (
         "868c13b07a6f280b8ce53a41f0f70f3c3d6e220fdc7fa1def231e4df1735fcab"
+    ),
+    "_arch132_r3m_c2_pin": (
+        "c58f03d84da67581592560fe5db2f61ebf907c055d4cd0a0aaf4e1dbf1d6d788"
     ),
     "_arch132_r3m_authority_check": (
         "20a5a6eacd3bd6f0ad04a9216339d9c9f5ba0c02a2aa71bae137deda68c4a83c"
@@ -21074,7 +21106,7 @@ ARCH132_R3M_C3_NEW_AST_PINS: Final = {
     ),
 }
 ARCH132_R3M_C3_MAPS_SHA256: Final = (
-    "09ece4253cb8df807cb1aab82fce5a4ddfb3d564a35698f1f6150031e3e421a5"
+    "42c532216417bec1d7fcbfa2afbbf20a236a7ec46a276f86a1958cb48c26f0ed"
 )
 
 

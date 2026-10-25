@@ -1,108 +1,57 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint
+## Current integrated checkpoint
 
-Architecture 134-F1R1-D1S4-R1 is accepted, operationally complete and reconciled.
-The shared namespace ACL recovery succeeded; its one-shot durable attempt is
-permanently CONSUMED; the compromised D1S4 FINAL and two historical .installing
-roots remain preserved incident evidence.
+Architecture 146-A — historical research dataset manifest and partition
+enforcement is **SOURCE ACCEPTED / INTEGRATED**.
 
-Architecture 134-F1R1-D1S4 Fresh Successor Source is SOURCE ACCEPTED and
-integrated. Exact accepted source:
+    HEAD 6906ba01bfb6a353029d695e584b2097587b81b9
+    TREE aa1efe5057e047e0d1778f2422e45f26cbc9f5d6
 
-    HEAD b18c6e32606828beeebc540a93c9f05e3e024323
-    TREE b082c15bc697bf289fc7997b3d7bf87050082dc3
+Feature CI #720 / 40178730059 / attempt 1: SUCCESS, including canonical FULL
+(13,759 passed, 6 skipped, zero failed/errors). Develop integration CI #721 /
+40179588325 / attempt 1: SUCCESS. Primary local develop is reconciled to that
+same exact HEAD/tree. Initial feature #718 and corrective C1 #719 remain
+preserved failed evidence; C2 supplied the accepted reference solver environment.
 
-Feature CI #714 / 40167976672 attempt 1 and develop integration CI #715 /
-40169150780 attempt 1 are terminal SUCCESS. The post-acceptance status/handoff
-closeout is develop commit a637f1b34565a715c14874d0f9a9686388319c16,
-tree e870cc8f28138076d1e247eb92358d88a89c2f26; docs-only Source Gates #716 /
-40169845896 attempt 1 is terminal SUCCESS.
+146-A adds immutable synthetic-tested dataset/partition manifests and snapshots,
+external integrity/session verification, distinct physical/logical fingerprints,
+OPEN-only commitments and additive Architecture-145 policy binding. Accepted
+145-A schemas and serialized identities stay frozen. NYSE historical-calendar
+limitations and acquisition/provenance requirements remain explicit.
+See [Architecture 146](architecture/146-historical-research-data-custody.md) and
+[validation](validation/arch146-historical-research-data-custody-plan.md).
 
-## Architecture 146 historical-data prerequisite
+## Current workflow checkpoint
 
-The weekend offline robustness diagnostic is blocked because
-F:\AI\ai-trading-bot\data is empty and repository CSVs are synthetic
-fixtures/examples.
-
-Architecture 146 — Historical Research Data Custody and Partition Contract is
-DESIGN ACCEPTED as a documentation-only checkpoint. It is not Architecture
-145-B and grants no acquisition, holdout, promotion or production authority.
-
-The frozen v1 design uses SPY only, Alpaca historical stock bars with exact
-1Day/RAW/SIP/USD/asof=- semantics, and a same-vendor corporate-action sidecar.
-Coverage/partition boundaries are fixed before acquisition/results:
-
-    DEVELOPMENT  [2016-01-01T00:00:00Z, 2020-01-01T00:00:00Z)
-    WALK_FORWARD [2020-01-01T00:00:00Z, 2024-01-01T00:00:00Z)
-    FINAL_HOLDOUT[2024-01-01T00:00:00Z, 2026-10-24T00:00:00Z)
-
-Development-visible normalized data will contain only DEVELOPMENT + WALK_FORWARD
-rows under F:\AI\ai-trading-bot\data\research\arch146-v1. Final-holdout
-bytes are designed for separate protected custody under
-F:\AI\research-holdout\arch146-v1; neither path is created by the design.
-
-The design records an important compatibility requirement: Architecture 145-A
-binds one logical historical_data_fingerprint across all three partitions, while
-physically split files have distinct current fingerprints. A new additive
-Architecture-146 manifest/snapshot enforcement layer is therefore required; do
-not reinterpret or rewrite accepted 145-A schemas.
-
-Details:
-[Architecture 146](architecture/146-historical-research-data-custody.md) and
-[validation plan](validation/arch146-historical-research-data-custody-plan.md).
+Architecture 132-R3M — develop integration certification reuse is implemented
+for feature publication and terminal CI, **pending ChatGPT exact-source review**.
+Develop keeps mandatory integration/static/authority and terminal gates; one
+exact successful mapped feature certification can replace redundant broad
+execution only with complete, unambiguous provenance. Every unproved case falls
+back to ordinary develop broad testing. Feature certification ownership and the
+six-lane FULL/four-lane ROBINHOOD topology remain unchanged.
+See [Architecture 132](architecture/132-tiered-certification-profiles.md).
 
 ## Production boundary
 
-No production deployment generation is frozen for the weekend. Normal safe-side
-source/research development may continue on develop. Sunday night, select the
-then-current exact terminal-green develop HEAD/TREE as the deployment candidate.
+Architecture 134-F1R1-D1S4 Fresh Successor Source remains accepted/integrated at
+b18c6e32606828beeebc540a93c9f05e3e024323 /
+b082c15bc697bf289fc7997b3d7bf87050082dc3. R1 is reconciled and permanently
+CONSUMED; preserved incident releases remain inert evidence.
 
-No real-host successor preflight, latch creation, production materialization,
-ACL mutation, scheduler/runtime mutation, credential/provider access,
-paper/broker effect, D1/D2 effect or live effect is authorized here. Live remains
-NO-GO.
+No production deployment generation is frozen for the weekend. Sunday night,
+select the then-current exact terminal-green develop HEAD/tree for the separately
+reviewed deployment-admission sequence. Live remains NO-GO.
 
-Architecture 145-B remains deferred until the fresh F1 successor soak; Research
-Results GUI follows 145-B, then large strategy campaigns.
+Architecture 146-B is **NOT STARTED**. No acquisition, holdout access, ACL
+mutation, promotion, deployment, production/runtime/scheduler or paper/broker/live
+authority follows from 146-A acceptance or R3M. Architecture 145-B remains
+separate and deferred until the fresh F1 successor soak; Research Results GUI
+follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-Implement **Architecture 146-A — historical research dataset manifest and
-partition enforcement** as a pure/source-only checkpoint using synthetic fixtures
-only. It must add immutable manifest/commitment models and external verification
-without network access, real data, real holdout paths, ACL mutation or
-Architecture-145 schema changes.
-
-Only after 146-A source acceptance/integration may a separately reviewed 146-B
-acquisition/custody checkpoint be designed/run.
-
-The production lane remains unfrozen until Sunday-night market-open preparation.
-
-## Architecture 146-A feature source pending review
-
-The additive synthetic-only implementation is being published from
-`feature/research-arch146-a-historical-research-dataset-enforcement-current`,
-based exactly on develop `724e027af44457fcc76f0055d9cc037f9f933a42` /
-`eb561d6fd2b6812f54d333dfd7e12d2b5f532a44`. It adds strict immutable
-partition manifests/snapshots, external integrity/session verification, distinct
-physical and full logical fingerprints, an OPEN-only commitment boundary and an
-additive Architecture-145 policy binding. Architecture-145 source stays frozen.
-
-The checkpoint has source-only dispatch and CI-owned FULL. Terminal CI and
-ChatGPT exact-source review are still required before acceptance/integration.
-Existing NYSE historical-calendar limitations and future acquisition/provenance
-requirements remain explicit in the Architecture-146 implementation notes.
-
-Initial publication 472d569 / push run 718 attempt 1 is preserved as terminal
-failed evidence. Corrective C1 addresses the frozen timing fixture, conditional
-FULL SciPy dependency, and read-only predecessor-prefix reconciliation.
-
-C1 publication 83318d0 / run 719 attempt 1 is also preserved. Its active tests
-passed; FULL exposed 11 solver-version identity/fixture differences. Corrective
-C2 pins the accepted SciPy 1.18.0 / NumPy 2.5.1 CI reference environment and
-preserves all identities and fixture bytes.
-
-Immediate next step: publish focused-verified C2 once and require terminal
-CI-owned FULL success, then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
-holdout, create eligibility, or cross any host/production/trading boundary.
+ChatGPT reviews the exact published R3M source, terminal CI, additive authority
+overlay, reuse/fallback tests and 146-A closeout. Accept/integrate only after that
+review and any selected certification are complete. Do not begin 146-B here.

@@ -99,6 +99,9 @@ env:
 
 jobs:
   source-static:
+    permissions:
+      contents: read
+      actions: read
     runs-on: windows-latest
     timeout-minutes: 10
     outputs:
@@ -106,6 +109,7 @@ jobs:
       route: ${{ steps.route.outputs.route }}
       checkpoint: ${{ steps.route.outputs.checkpoint }}
       certification_profile: ${{ steps.route.outputs.certification_profile }}
+      reuse_certification: ${{ steps.reuse.outputs.reuse_certification }}
 
     steps:
       - name: Check out repository
@@ -146,6 +150,31 @@ jobs:
               handle.write(f"route={route}\n")
               handle.write(f"checkpoint={checkpoint or ''}\n")
               handle.write(f"certification_profile={certification_profile or ''}\n")
+          '@
+          $Code | python -B -
+          exit $LASTEXITCODE
+
+      - name: Prove exact develop certification reuse
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHANGE_MODE: ${{ steps.changes.outputs.mode }}
+          REUSE_EVIDENCE: ${{ runner.temp }}/develop-integration-reuse.json
+        shell: powershell
+        run: |
+          $Code = @'
+          import json
+          import os
+          from pathlib import Path
+          from scripts import checkpoint_runner as runner
+
+          evidence = runner.resolve_develop_ci_reuse(Path.cwd(), os.environ["CHANGE_MODE"])
+          Path(os.environ["REUSE_EVIDENCE"]).write_text(
+              json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"reuse_certification={str(evidence['reuse']).lower()}\n")
+          print(f"DEVELOP_CERTIFICATION_REUSE={evidence['reuse']} REASON={evidence['reason']}")
           '@
           $Code | python -B -
           exit $LASTEXITCODE
@@ -204,6 +233,7 @@ jobs:
         with:
           name: checkpoint-source-gate-static
           path: |
+            ${{ runner.temp }}/develop-integration-reuse.json
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/report.json
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stdout.txt
             ${{ runner.temp }}/ai-trading-bot-checkpoints/**/commands/*.stderr.txt
@@ -258,7 +288,7 @@ jobs:
 
   full-tests:
     needs: source-static
-    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile == ''
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile == '' && needs.source-static.outputs.reuse_certification != 'true'
     runs-on: windows-latest
     timeout-minutes: 20
     strategy:
@@ -334,6 +364,7 @@ jobs:
           if-no-files-found: ignore
 
   certification-tests:
+    name: certification-tests (${{ needs.source-static.outputs.checkpoint }} / ${{ needs.source-static.outputs.certification_profile }})
     needs: source-static
     if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile != ''
     runs-on: windows-latest
@@ -470,6 +501,9 @@ jobs:
           ACTIVE_RESULT: ${{ needs.active-tests.result }}
           FULL_RESULT: ${{ needs.full-tests.result }}
           CERT_RESULT: ${{ needs.certification-tests.result }}
+          REUSE: ${{ needs.source-static.outputs.reuse_certification }}
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
           MODE: ${{ needs.source-static.outputs.mode }}
           ROUTE: ${{ needs.source-static.outputs.route }}
           CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}
@@ -478,6 +512,14 @@ jobs:
           test "$STATIC_RESULT" = "success"
 
           if [ "$MODE" = "DOCS_ONLY" ]; then
+            test "$ACTIVE_RESULT" = "skipped"
+            test "$FULL_RESULT" = "skipped"
+            test "$CERT_RESULT" = "skipped"
+          elif [ "$REUSE" = "true" ]; then
+            test "$EVENT" = "push"
+            test "$REF" = "refs/heads/develop"
+            test "$ROUTE" = "FULL"
+            test -z "$CERT_PROFILE"
             test "$ACTIVE_RESULT" = "skipped"
             test "$FULL_RESULT" = "skipped"
             test "$CERT_RESULT" = "skipped"

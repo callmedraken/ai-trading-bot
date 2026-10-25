@@ -1602,8 +1602,26 @@ def test_arch134_f1r1_a_overlays_fail_closed_and_restore_predecessor(
 def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     root = Path(runner.__file__).resolve().parents[1]
     path = root / runner.ARCH145A_D1R6_WORKFLOW_PATH
-    # Project out 146-A to retain the exact 145 predecessor proof.
-    current = path.read_text(encoding="utf-8").replace(
+    # Retain the historical 145 proof against its exact accepted C2 successor.
+    # R3M's current workflow is independently pinned and verified below.
+    accepted = subprocess.run(
+        [
+            "git",
+            "show",
+            "6906ba01bfb6a353029d695e584b2097587b81b9:"
+            + runner.ARCH145A_D1R6_WORKFLOW_PATH,
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    data = accepted.encode("utf-8")
+    assert (
+        hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        == runner.ARCH132_R3M_BLOB_PREDECESSORS[runner.ARCH145A_D1R6_WORKFLOW_PATH]
+    )
+    current = accepted.replace(
         "              arch146-a-historical-research-dataset-enforcement \x60\n", ""
     )
     # C1's independently pinned dependency step is additive to this old proof.

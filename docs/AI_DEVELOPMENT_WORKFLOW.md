@@ -27,6 +27,36 @@ reviewed safe step within scope. A separate new authorization message is not
 universally required for reviewed bounded operator actions. Historical accounts
 of separate authorization remain historical and do not override this current rule.
 
+## Architecture 132-R3M — exact develop certification reuse
+
+A develop push retains mandatory source-static classification, exact local
+HEAD/tree/branch and origin admission, fast-forward ancestry proof, full-batch
+static/authority verification, workflow topology checks and terminal source-gates.
+Only redundant broad execution may be skipped. Reuse is optional and requires
+one terminal-success push run from an exact registered checkpoint in the reviewed
+feature/robinhood-*, feature/research-* or feature/test-suite-* family, for the
+identical commit SHA and tree in the exact repository/workflow. Source-static,
+active-tests, source-gates and the explicitly checkpoint/profile-named canonical
+certification job and its execution/hygiene steps must all have succeeded in the
+same exact run attempt. The source-owned profile mapping remains authoritative.
+
+GitHub Actions metadata is read with job-scoped actions:read. The lookup uses
+bounded complete metadata pages and records the selected run/attempt/jobs in
+source-static's develop-integration-reuse.json evidence. Missing, malformed,
+truncated, unavailable, stale or ambiguous evidence means ordinary four-shard
+develop broad fallback. SHA changes, including tree-equivalent commits, are
+ineligible. Caller-supplied run IDs and artifact names are not certification proof.
+Older runs without the explicit checkpoint/profile job binding also fall back.
+
+Feature FULL/ROBINHOOD execution, active source-only checkpoints, docs-only and
+pull_request routing remain unchanged. FULL retains six timing-aware lanes;
+ROBINHOOD retains four; neither has a serial lane. The 300-second ceilings,
+inventories and predecessor authority pins stay intact through an additive R3M
+overlay. This checkpoint's reviewed test-suite branch uses normal broad source
+CI; no new feature certification mapping or local canonical run is introduced.
+ChatGPT owns exact-source review and any selected certification before integration.
+No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
+
 ## CI-owned selected certification — normative expedited path
 
 For reviewed coherent integration checkpoints, the source gate may own the
@@ -46,7 +76,7 @@ For a mapped non-docs push:
 
 For an unmapped active non-docs push, retain active-tests plus the four-shard
 broad checkpoint-union safety net. FULL fallback retains the four-shard broad
-path. Docs-only retains the reviewed cheap path.
+path unless the exact develop-only R3M provenance proof above succeeds. Docs-only retains the reviewed cheap path.
 
 A terminal-green CI-owned canonical certification on the exact source satisfies
 that profile obligation. Do not ask the human operator to rerun the same profile
@@ -135,11 +165,11 @@ The accepted workflow contract is:
 - an explicitly mapped integration checkpoint additionally routes to the
   source-owned canonical `certification-tests` profile and skips the redundant
   four-shard checkpoint-union batch;
-- unmapped active and broad/fallback source changes retain the four
-  duration-balanced `full-tests` shards `[0, 1, 2, 3]`;
+- unmapped active and broad/fallback source changes without reusable exact
+  develop certification retain the four duration-balanced `full-tests` shards `[0, 1, 2, 3]`;
 - `source-gates` is only the terminal aggregator and must depend on
   `source-static`, `active-tests`, `full-tests`, and `certification-tests`,
-  requiring the exact applicable combination;
+  requiring the exact applicable combination, including develop-only R3M reuse;
 - exact route resolution, source-gate phase controls, concurrency cancellation,
   exit-code propagation, and the terminal aggregator remain fail closed;
 - docs-only changes may skip test jobs only through the reviewed docs-only

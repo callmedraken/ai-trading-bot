@@ -1,5 +1,35 @@
 # Architecture 132 — Tiered certification profiles
 
+## Architecture 132-R3M — exact develop certification reuse
+
+A develop push retains mandatory source-static classification, exact local
+HEAD/tree/branch and origin admission, fast-forward ancestry proof, full-batch
+static/authority verification, workflow topology checks and terminal source-gates.
+Only redundant broad execution may be skipped. Reuse is optional and requires
+one terminal-success push run from an exact registered checkpoint in the reviewed
+feature/robinhood-*, feature/research-* or feature/test-suite-* family, for the
+identical commit SHA and tree in the exact repository/workflow. Source-static,
+active-tests, source-gates and the explicitly checkpoint/profile-named canonical
+certification job and its execution/hygiene steps must all have succeeded in the
+same exact run attempt. The source-owned profile mapping remains authoritative.
+
+GitHub Actions metadata is read with job-scoped actions:read. The lookup uses
+bounded complete metadata pages and records the selected run/attempt/jobs in
+source-static's develop-integration-reuse.json evidence. Missing, malformed,
+truncated, unavailable, stale or ambiguous evidence means ordinary four-shard
+develop broad fallback. SHA changes, including tree-equivalent commits, are
+ineligible. Caller-supplied run IDs and artifact names are not certification proof.
+Older runs without the explicit checkpoint/profile job binding also fall back.
+
+Feature FULL/ROBINHOOD execution, active source-only checkpoints, docs-only and
+pull_request routing remain unchanged. FULL retains six timing-aware lanes;
+ROBINHOOD retains four; neither has a serial lane. The 300-second ceilings,
+inventories and predecessor authority pins stay intact through an additive R3M
+overlay. This checkpoint's reviewed test-suite branch uses normal broad source
+CI; no new feature certification mapping or local canonical run is introduced.
+ChatGPT owns exact-source review and any selected certification before integration.
+No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
+
 ## Current accepted closeout — Architecture 132-R3L
 
 Architecture 132-R3L is SOURCE/CERTIFICATION ACCEPTED and integrated. The

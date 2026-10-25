@@ -419,7 +419,8 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
         ),
         pytest.param(
             "if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
-            "needs.source-static.outputs.certification_profile == ''",
+            "needs.source-static.outputs.certification_profile == '' && "
+            "needs.source-static.outputs.reuse_certification != 'true'",
             "if: needs.source-static.outputs.mode != 'DOCS_ONLY'",
             id="profile-skips-broad",
         ),
@@ -877,10 +878,666 @@ def test_arch146a_c2_maps_and_wrong_predecessors_fail_closed(monkeypatch):
         (False, runner.ARCH146A_C2_BLOB_PREDECESSORS, runner.ARCH146A_C2_BLOB_PINS),
     ):
         for key, pin in before.items():
-            assert runner._arch146a_c2_pin(key, pin, ast_pin=ast_pin) == after[key]
+            assert runner._arch146a_c2_pin(
+                key, pin, ast_pin=ast_pin
+            ) == runner._arch132_r3m_pin(key, after[key], ast_pin=ast_pin)
             with pytest.raises(ValueError, match="C2 wrong exact predecessor"):
                 runner._arch146a_c2_pin(key, "0" * len(pin), ast_pin=ast_pin)
     monkeypatch.setattr(runner, "ARCH146A_C2_BLOB_PINS", {})
     with pytest.raises(ValueError, match="C2 exact successor maps"):
         runner._arch146a_c2_maps()
     assert runner._arch146a_authority_check(root)
+
+
+# R3M provenance fixtures are synthetic GitHub responses, with no live API dependency.
+def _reuse_fixture(profile="full"):
+    checkpoint = (
+        runner.ARCH146A_NAME if profile == "full" else runner.ARCH134_FRESH_NAME
+    )
+    branch = runner._checkpoint_specs()[checkpoint].remote_branch
+    head, tree, repository_id = "a" * 40, "b" * 40, 123
+    repo = {"full_name": "callmedraken/ai-trading-bot", "id": repository_id}
+    workflow = {
+        "id": 456,
+        "name": "Checkpoint Source Gates",
+        "path": ".github/workflows/checkpoint-source-gates.yml",
+        "state": "active",
+    }
+    run = {
+        "id": 100,
+        "run_attempt": 1,
+        "repository": repo,
+        "head_repository": repo,
+        "name": workflow["name"],
+        "workflow_id": workflow["id"],
+        "path": workflow["path"],
+        "head_sha": head,
+        "head_branch": branch,
+        "event": "push",
+        "status": "completed",
+        "conclusion": "success",
+    }
+    required = {
+        "source-static": [
+            "Resolve source gate route",
+            "Verify active checkpoint static authority",
+        ],
+        "active-tests": ["Verify active checkpoint tests"],
+        f"certification-tests ({checkpoint} / {profile})": [
+            "Run canonical certification profile",
+            "Enforce canonical certification hygiene budget",
+        ],
+        "source-gates": ["Require source gate success"],
+    }
+    jobs = [
+        {
+            "name": name,
+            "run_id": 100,
+            "run_attempt": 1,
+            "head_sha": head,
+            "status": "completed",
+            "conclusion": "success",
+            "steps": [
+                {"name": step, "status": "completed", "conclusion": "success"}
+                for step in steps
+            ],
+        }
+        for name, steps in required.items()
+    ]
+    prefix = "repos/callmedraken/ai-trading-bot"
+    runs_path = (
+        f"{prefix}/actions/workflows/456/runs?head_sha={head}&event=push&per_page=100"
+    )
+    jobs_path = f"{prefix}/actions/runs/100/attempts/1/jobs?per_page=100"
+    responses = {
+        prefix: repo,
+        f"{prefix}/actions/workflows/checkpoint-source-gates.yml": workflow,
+        f"{prefix}/git/commits/{head}": {"sha": head, "tree": {"sha": tree}},
+        f"{prefix}/git/ref/heads/develop": {
+            "ref": "refs/heads/develop",
+            "object": {"type": "commit", "sha": head},
+        },
+        runs_path: {"total_count": 1, "workflow_runs": [run]},
+        f"{prefix}/actions/runs/100": dict(run),
+        jobs_path: {"total_count": len(jobs), "jobs": jobs},
+    }
+    args = dict(
+        head=head,
+        tree=tree,
+        current_run_id=200,
+        repository_id=repository_id,
+        lookup=responses.__getitem__,
+    )
+    return args, responses, run, jobs, runs_path, jobs_path
+
+
+@pytest.mark.parametrize("profile", ["full", "robinhood"])
+def test_r3m_exact_feature_certification_reused(profile):
+    args, _, _, _, _, _ = _reuse_fixture(profile)
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["head"] == args["head"] and result["tree"] == args["tree"]
+    assert result["run_id"] == 100 and result["run_attempt"] == 1
+    assert result["profile"] == profile
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "sha",
+        "tree_only",
+        "tree",
+        "repository",
+        "repository_id",
+        "head_repository",
+        "workflow",
+        "workflow_path",
+        "event",
+        "manual",
+        "branch",
+        "unregistered",
+        "queued",
+        "in_progress",
+        "failure",
+        "cancelled",
+        "static_missing",
+        "static_failed",
+        "aggregate_missing",
+        "aggregate_failed",
+        "cert_missing",
+        "cert_failed",
+        "profile",
+        "old_unbound_job",
+        "active_missing",
+        "step_failed",
+        "hygiene_missing",
+        "job_sha",
+        "job_run",
+        "job_attempt",
+        "duplicate_job",
+        "duplicate_step",
+        "ambiguous",
+        "malformed",
+        "unavailable",
+        "lookup_failure",
+        "truncated_runs",
+        "truncated_jobs",
+        "run_detail",
+        "develop_changed",
+        "workflow_metadata",
+    ],
+)
+def test_r3m_ineligible_provenance_falls_back(mutation):
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, jobs_path = _reuse_fixture()
+    if mutation in {"sha", "tree_only"}:
+        run["head_sha"] = "c" * 40  # Same tree never compensates for a different SHA.
+    elif mutation == "tree":
+        responses[f"repos/callmedraken/ai-trading-bot/git/commits/{args['head']}"][
+            "tree"
+        ]["sha"] = "c" * 40
+    elif mutation in {"repository", "repository_id", "head_repository"}:
+        key = "head_repository" if mutation == "head_repository" else "repository"
+        run[key] = {"full_name": "wrong/repository", "id": 999}
+    elif mutation == "workflow":
+        run["workflow_id"] = 999
+    elif mutation == "workflow_path":
+        run["path"] = ".github/workflows/other.yml"
+    elif mutation in {"event", "manual"}:
+        run["event"] = "workflow_dispatch" if mutation == "manual" else "pull_request"
+    elif mutation in {"branch", "unregistered"}:
+        run["head_branch"] = (
+            "feature/unreviewed" if mutation == "branch" else "feature/research-unknown"
+        )
+    elif mutation in {"queued", "in_progress"}:
+        run["status"] = mutation
+    elif mutation in {"failure", "cancelled"}:
+        run["conclusion"] = mutation
+    elif mutation.endswith("_missing") and mutation != "hygiene_missing":
+        index = {
+            "static_missing": 0,
+            "active_missing": 1,
+            "cert_missing": 2,
+            "aggregate_missing": 3,
+        }[mutation]
+        jobs.pop(index)
+        responses[jobs_path]["total_count"] = len(jobs)
+    elif mutation.endswith("_failed") and mutation != "step_failed":
+        jobs[{"static_failed": 0, "cert_failed": 2, "aggregate_failed": 3}[mutation]][
+            "conclusion"
+        ] = "failure"
+    elif mutation in {"profile", "old_unbound_job"}:
+        jobs[2]["name"] = (
+            "certification-tests"
+            if mutation == "old_unbound_job"
+            else jobs[2]["name"].replace(" / full)", " / robinhood)")
+        )
+    elif mutation == "step_failed":
+        jobs[0]["steps"][0]["conclusion"] = "failure"
+    elif mutation == "hygiene_missing":
+        jobs[2]["steps"].pop()
+    elif mutation in {"job_sha", "job_run", "job_attempt"}:
+        key = {
+            "job_sha": "head_sha",
+            "job_run": "run_id",
+            "job_attempt": "run_attempt",
+        }[mutation]
+        jobs[2][key] = "c" * 40 if key == "head_sha" else 999
+    elif mutation == "duplicate_job":
+        jobs.append(deepcopy(jobs[0]))
+        responses[jobs_path]["total_count"] = len(jobs)
+    elif mutation == "duplicate_step":
+        jobs[0]["steps"].append(deepcopy(jobs[0]["steps"][0]))
+    elif mutation == "ambiguous":
+        other = deepcopy(run)
+        other["id"] = 101
+        responses[runs_path]["workflow_runs"].append(other)
+        responses[runs_path]["total_count"] = 2
+        prefix = "repos/callmedraken/ai-trading-bot/actions/runs/101"
+        responses[prefix] = deepcopy(other)
+        other_jobs = deepcopy(jobs)
+        for job in other_jobs:
+            job["run_id"] = 101
+        responses[f"{prefix}/attempts/1/jobs?per_page=100"] = {
+            "total_count": len(jobs),
+            "jobs": other_jobs,
+        }
+    elif mutation == "malformed":
+        responses[runs_path] = {"workflow_runs": "bad"}
+    elif mutation == "unavailable":
+        responses[runs_path] = None
+    elif mutation == "lookup_failure":
+
+        def unavailable(endpoint):
+            raise TimeoutError("synthetic unavailable metadata")
+
+        args["lookup"] = unavailable
+    elif mutation in {"truncated_runs", "truncated_jobs"}:
+        responses[runs_path if mutation == "truncated_runs" else jobs_path][
+            "total_count"
+        ] = 101
+    elif mutation == "run_detail":
+        responses["repos/callmedraken/ai-trading-bot/actions/runs/100"][
+            "run_attempt"
+        ] = 2
+    elif mutation == "develop_changed":
+        responses["repos/callmedraken/ai-trading-bot/git/ref/heads/develop"]["object"][
+            "sha"
+        ] = "c" * 40
+    else:
+        responses[
+            "repos/callmedraken/ai-trading-bot/actions/workflows/checkpoint-source-gates.yml"
+        ]["name"] = "Other workflow"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize(
+    "mode,event,ref",
+    [
+        ("DOCS_ONLY", "push", "refs/heads/develop"),
+        ("FULL", "pull_request", "refs/pull/1/merge"),
+        ("FULL", "workflow_dispatch", "refs/heads/develop"),
+        ("FULL", "push", "refs/heads/feature/research-synthetic"),
+    ],
+)
+def test_r3m_other_routes_never_lookup_provenance(
+    tmp_path, monkeypatch, mode, event, ref
+):
+    monkeypatch.setenv("GITHUB_EVENT_NAME", event)
+    monkeypatch.setenv("GITHUB_REF", ref)
+    monkeypatch.setattr(
+        runner, "_github_ci_metadata", lambda _: pytest.fail("unexpected API call")
+    )
+    assert runner.resolve_develop_ci_reuse(tmp_path, mode)["reuse"] is False
+
+
+def _develop_reuse_context(tmp_path, monkeypatch):
+    args, responses, *_ = _reuse_fixture()
+    repo = "callmedraken/ai-trading-bot"
+    env = {
+        "GITHUB_EVENT_NAME": "push",
+        "GITHUB_REF": "refs/heads/develop",
+        "GITHUB_REF_NAME": "develop",
+        "GITHUB_REPOSITORY": repo,
+        "GITHUB_SERVER_URL": "https://github.com",
+        "GITHUB_WORKFLOW": "Checkpoint Source Gates",
+        "GITHUB_WORKFLOW_REF": (
+            f"{repo}/.github/workflows/checkpoint-source-gates.yml@refs/heads/develop"
+        ),
+        "GITHUB_SHA": args["head"],
+        "GITHUB_RUN_ID": "200",
+        "GITHUB_REPOSITORY_ID": "123",
+    }
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+    event = {
+        "before": "c" * 40,
+        "after": args["head"],
+        "ref": "refs/heads/develop",
+        "forced": False,
+        "deleted": False,
+    }
+    path = tmp_path / "event.json"
+    path.write_text(json.dumps(event), encoding="utf-8")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(path))
+    state = {
+        "head": args["head"],
+        "tree": args["tree"],
+        "branch": "develop",
+        "porcelain": "",
+    }
+    monkeypatch.setattr(runner, "_git_state", lambda _: state.copy())
+    monkeypatch.setattr(
+        runner,
+        "_git_output",
+        lambda _, *a: f"https://github.com/{repo}.git" if a[0] == "remote" else "",
+    )
+    monkeypatch.setattr(runner, "_github_ci_metadata", responses.__getitem__)
+    return state, path, event
+
+
+def test_r3m_develop_integration_admits_exact_clean_fast_forward(tmp_path, monkeypatch):
+    _develop_reuse_context(tmp_path, monkeypatch)
+    assert runner.resolve_develop_ci_reuse(tmp_path, "FULL")["reuse"] is True
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "head",
+        "tree",
+        "branch",
+        "dirty",
+        "origin",
+        "forced",
+        "deleted",
+        "base",
+        "ancestry",
+        "changed",
+    ],
+)
+def test_r3m_develop_context_mismatch_cannot_reuse(tmp_path, monkeypatch, mutation):
+    state, path, event = _develop_reuse_context(tmp_path, monkeypatch)
+    if mutation in {"head", "tree"}:
+        state[mutation] = "d" * 40
+    elif mutation == "branch":
+        state["branch"] = "feature/research-synthetic"
+    elif mutation == "dirty":
+        state["porcelain"] = " M source.py"
+    elif mutation == "origin":
+        monkeypatch.setattr(runner, "_git_output", lambda *a: "wrong")
+    elif mutation in {"forced", "deleted", "base"}:
+        event["before" if mutation == "base" else mutation] = (
+            "0" * 40 if mutation == "base" else True
+        )
+        path.write_text(json.dumps(event), encoding="utf-8")
+    elif mutation == "ancestry":
+
+        def git(_, *args):
+            if args[0] == "merge-base":
+                raise RuntimeError("not an ancestor")
+            return "https://github.com/callmedraken/ai-trading-bot.git"
+
+        monkeypatch.setattr(runner, "_git_output", git)
+    else:
+        values = iter([state.copy(), {**state, "tree": "d" * 40}])
+        monkeypatch.setattr(runner, "_git_state", lambda _: next(values))
+    assert runner.resolve_develop_ci_reuse(tmp_path, "FULL")["reuse"] is False
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("needs.source-static.outputs.reuse_certification != 'true'", "true"),
+        ('test "$REF" = "refs/heads/develop"', "true"),
+        ('test "$EVENT" = "push"', "true"),
+        ('test "$ROUTE" = "FULL"', "true"),
+        ('test -z "$CERT_PROFILE"', "true"),
+        (
+            "REUSE: ${{ needs.source-static.outputs.reuse_certification }}",
+            "REUSE: true",
+        ),
+        (
+            'resolve_develop_ci_reuse(Path.cwd(), os.environ["CHANGE_MODE"])',
+            '{"reuse": True}',
+        ),
+        ("      actions: read", "      actions: write"),
+        (
+            "name: certification-tests "
+            "(${{ needs.source-static.outputs.checkpoint }} / "
+            "${{ needs.source-static.outputs.certification_profile }})",
+            "name: certification-tests",
+        ),
+    ],
+)
+def test_r3m_reuse_workflow_mutations_fail_authority(old, new):
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    assert workflow.count(old) == 1
+    assert not runner._batch_workflow_is_reviewed(workflow.replace(old, new, 1))
+
+
+def test_r3m_exact_successor_authority_and_frozen_certification_source(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch132_r3m_authority_check(root) == ()
+    for ast_pin, before, after in (
+        (True, runner.ARCH132_R3M_AST_PREDECESSORS, runner.ARCH132_R3M_AST_PINS),
+        (False, runner.ARCH132_R3M_BLOB_PREDECESSORS, runner.ARCH132_R3M_BLOB_PINS),
+    ):
+        for key, pin in before.items():
+            assert runner._arch132_r3m_pin(key, pin, ast_pin=ast_pin) == after[key]
+            with pytest.raises(ValueError, match="R3M wrong exact predecessor"):
+                runner._arch132_r3m_pin(key, "0" * len(pin), ast_pin=ast_pin)
+    monkeypatch.setattr(runner, "ARCH132_R3M_AST_PINS", {})
+    assert runner._arch132_r3m_authority_check(root)
+
+
+@pytest.mark.parametrize(
+    "mode,route,profile,reuse,active,broad,canonical,event,ref,passed",
+    [
+        (
+            "FULL",
+            "FULL",
+            "",
+            "true",
+            "skipped",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            True,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "false",
+            "skipped",
+            "success",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            True,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "false",
+            "skipped",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            False,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "true",
+            "skipped",
+            "skipped",
+            "skipped",
+            "pull_request",
+            "refs/pull/1/merge",
+            False,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "true",
+            "skipped",
+            "skipped",
+            "skipped",
+            "workflow_dispatch",
+            "refs/heads/develop",
+            False,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "true",
+            "skipped",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/feature/research-synthetic",
+            False,
+        ),
+        (
+            "FULL",
+            "ACTIVE",
+            "full",
+            "false",
+            "success",
+            "skipped",
+            "success",
+            "push",
+            "refs/heads/feature/research-synthetic",
+            True,
+        ),
+        (
+            "FULL",
+            "ACTIVE",
+            "robinhood",
+            "false",
+            "success",
+            "skipped",
+            "success",
+            "push",
+            "refs/heads/feature/robinhood-synthetic",
+            True,
+        ),
+        (
+            "FULL",
+            "ACTIVE",
+            "full",
+            "false",
+            "success",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/feature/research-synthetic",
+            False,
+        ),
+        (
+            "FULL",
+            "ACTIVE",
+            "",
+            "false",
+            "success",
+            "success",
+            "skipped",
+            "push",
+            "refs/heads/feature/research-synthetic",
+            True,
+        ),
+        (
+            "FULL",
+            "ACTIVE",
+            "full",
+            "true",
+            "skipped",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            False,
+        ),
+        (
+            "DOCS_ONLY",
+            "FULL",
+            "",
+            "false",
+            "skipped",
+            "skipped",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            True,
+        ),
+        (
+            "DOCS_ONLY",
+            "FULL",
+            "",
+            "false",
+            "skipped",
+            "skipped",
+            "skipped",
+            "pull_request",
+            "refs/pull/1/merge",
+            True,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "false",
+            "skipped",
+            "success",
+            "skipped",
+            "pull_request",
+            "refs/pull/1/merge",
+            True,
+        ),
+        (
+            "FULL",
+            "FULL",
+            "",
+            "",
+            "skipped",
+            "success",
+            "skipped",
+            "push",
+            "refs/heads/develop",
+            True,
+        ),
+    ],
+)
+def test_r3m_terminal_aggregator_executes_exact_route_policy(
+    mode,
+    route,
+    profile,
+    reuse,
+    active,
+    broad,
+    canonical,
+    event,
+    ref,
+    passed,
+):
+    import os
+    import shutil
+    import textwrap
+
+    if os.name == "nt":
+        bash = str(Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe")
+    else:
+        bash = shutil.which("bash")
+    assert bash, "Bash is required to verify the actual source-gates script"
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    script = textwrap.dedent(
+        workflow.split("  source-gates:\n", 1)[1].split("        run: |\n", 1)[1]
+    )
+    env = {
+        **os.environ,
+        "STATIC_RESULT": "success",
+        "MODE": mode,
+        "ROUTE": route,
+        "CERT_PROFILE": profile,
+        "REUSE": reuse,
+        "ACTIVE_RESULT": active,
+        "FULL_RESULT": broad,
+        "CERT_RESULT": canonical,
+        "EVENT": event,
+        "REF": ref,
+    }
+    result = subprocess.run(
+        (bash, "-c", script), env=env, capture_output=True, text=True
+    )
+    assert (result.returncode == 0) is passed, result.stderr
+    env["STATIC_RESULT"] = "failure"
+    assert (
+        subprocess.run((bash, "-c", script), env=env, capture_output=True).returncode
+        != 0
+    )
+
+
+def test_r3m_metadata_client_is_read_only_and_lookup_failures_fall_back(monkeypatch):
+    def run(argv, **kwargs):
+        assert argv == ("gh", "api", "--hostname", "github.com", "repos/synthetic")
+        assert kwargs == dict(capture_output=True, text=True, timeout=30, check=True)
+        return subprocess.CompletedProcess(argv, 0, '{"id": 123}', "")
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
+    assert runner._github_ci_metadata("repos/synthetic") == {"id": 123}

@@ -348,6 +348,257 @@ def resolve_ci_certification_profile(checkpoint: str | None) -> str | None:
     return profile
 
 
+def _github_ci_metadata(endpoint: str) -> object:
+    """Read GitHub Actions metadata; never emit authentication or API error text."""
+    result = subprocess.run(
+        ("gh", "api", "--hostname", "github.com", endpoint),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    if len(result.stdout) > 2_000_000:
+        raise ValueError("GitHub metadata exceeds the bounded lookup")
+    return json.loads(result.stdout)
+
+
+def find_reusable_ci_certification(
+    specs: Mapping[str, CheckpointSpec],
+    *,
+    head: str,
+    tree: str,
+    current_run_id: int,
+    repository_id: int,
+    lookup: Callable[[str], object],
+) -> dict[str, object]:
+    """Prove one exact mapped feature certification, otherwise retain broad CI."""
+    fallback = {"reuse": False, "reason": "provenance_not_proven"}
+    repository = "callmedraken/ai-trading-bot"
+    prefix = f"repos/{repository}"
+    path = ".github/workflows/checkpoint-source-gates.yml"
+
+    def require(condition: object) -> None:
+        if not condition:
+            raise ValueError("Incomplete integration provenance")
+
+    def page(value: object, field: str) -> list[dict]:
+        require(type(value) is dict)
+        items = value[field]
+        require(type(items) is list and all(type(item) is dict for item in items))
+        require(type(value["total_count"]) is int)
+        # More than one bounded page is deliberately ineligible, never truncated proof.
+        require(value["total_count"] == len(items) <= 100)
+        return items
+
+    def same_repository(value: object) -> bool:
+        return (
+            type(value) is dict
+            and value.get("full_name") == repository
+            and type(value.get("id")) is int
+            and value["id"] == repository_id
+        )
+
+    try:
+        require(type(head) is str and re.fullmatch("[0-9a-f]{40}", head))
+        require(type(tree) is str and re.fullmatch("[0-9a-f]{40}", tree))
+        require(type(current_run_id) is int and current_run_id > 0)
+        require(type(repository_id) is int and repository_id > 0)
+        require(same_repository(lookup(prefix)))
+        workflow = lookup(f"{prefix}/actions/workflows/checkpoint-source-gates.yml")
+        require(type(workflow) is dict)
+        require(type(workflow["id"]) is int and workflow["id"] > 0)
+        require(workflow["name"] == "Checkpoint Source Gates")
+        require(workflow["path"] == path and workflow["state"] == "active")
+        commit = lookup(f"{prefix}/git/commits/{head}")
+        require(commit["sha"] == head and commit["tree"]["sha"] == tree)
+        develop = lookup(f"{prefix}/git/ref/heads/develop")
+        require(develop["ref"] == "refs/heads/develop")
+        require(develop["object"]["type"] == "commit")
+        require(develop["object"]["sha"] == head)
+        runs = page(
+            lookup(
+                f"{prefix}/actions/workflows/{workflow['id']}/runs"
+                f"?head_sha={head}&event=push&per_page=100"
+            ),
+            "workflow_runs",
+        )
+        candidates = []
+        for run in runs:
+            # Develop's own runs are never a source of feature certification.
+            if run.get("id") == current_run_id or run.get("head_branch") == "develop":
+                continue
+            branch = run["head_branch"]
+            require(type(branch) is str)
+            if not branch.startswith(
+                ("feature/robinhood-", "feature/research-", "feature/test-suite-")
+            ):
+                continue
+            checkpoint = resolve_ci_checkpoint(specs, branch, "push")
+            profile = resolve_ci_certification_profile(checkpoint)
+            if checkpoint is None or profile is None:
+                continue
+            if not (
+                same_repository(run["repository"])
+                and same_repository(run["head_repository"])
+                and run["name"] == workflow["name"]
+                and run["workflow_id"] == workflow["id"]
+                and run["path"] == path
+                and run["head_sha"] == head
+                and run["event"] == "push"
+                and run["status"] == "completed"
+                and run["conclusion"] == "success"
+            ):
+                continue
+            run_id, attempt = run["id"], run["run_attempt"]
+            require(type(run_id) is int and 0 < run_id < current_run_id)
+            require(type(attempt) is int and attempt > 0)
+            detail = lookup(f"{prefix}/actions/runs/{run_id}")
+            for key in (
+                "id",
+                "run_attempt",
+                "repository",
+                "head_repository",
+                "name",
+                "workflow_id",
+                "path",
+                "head_sha",
+                "head_branch",
+                "event",
+                "status",
+                "conclusion",
+            ):
+                require(detail[key] == run[key])
+            jobs = page(
+                lookup(
+                    f"{prefix}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"
+                ),
+                "jobs",
+            )
+            by_name = {job["name"]: job for job in jobs}
+            require(len(by_name) == len(jobs))
+            certification = f"certification-tests ({checkpoint} / {profile})"
+            required = {
+                "source-static": (
+                    "Resolve source gate route",
+                    "Verify active checkpoint static authority",
+                ),
+                "active-tests": ("Verify active checkpoint tests",),
+                certification: (
+                    "Run canonical certification profile",
+                    "Enforce canonical certification hygiene budget",
+                ),
+                "source-gates": ("Require source gate success",),
+            }
+            eligible = True
+            for name, steps in required.items():
+                job = by_name.get(name, {})
+                if not (
+                    job.get("status") == "completed"
+                    and job.get("conclusion") == "success"
+                    and job.get("run_id") == run_id
+                    and job.get("run_attempt") == attempt
+                    and job.get("head_sha") == head
+                ):
+                    eligible = False
+                    break
+                step_list = job["steps"]
+                require(type(step_list) is list)
+                step_map = {step["name"]: step for step in step_list}
+                require(len(step_map) == len(step_list))
+                if not all(
+                    step_map.get(step, {}).get("conclusion") == "success"
+                    and step_map[step].get("status") == "completed"
+                    for step in steps
+                ):
+                    eligible = False
+                    break
+            if eligible:
+                candidates.append(
+                    {
+                        "reuse": True,
+                        "reason": "exact_feature_certification",
+                        "repository": repository,
+                        "repository_id": repository_id,
+                        "head": head,
+                        "tree": tree,
+                        "workflow_id": workflow["id"],
+                        "run_id": run_id,
+                        "run_attempt": attempt,
+                        "branch": branch,
+                        "checkpoint": checkpoint,
+                        "profile": profile,
+                        "run": detail,
+                        "jobs": jobs,
+                    }
+                )
+        if len(candidates) != 1:
+            return {"reuse": False, "reason": "no_unique_certification"}
+        return candidates[0]
+    except Exception:
+        # API, parsing and incomplete-evidence failures can only request more tests.
+        return fallback
+
+
+def resolve_develop_ci_reuse(repo_root: Path, mode: str) -> dict[str, object]:
+    """Admit develop's current push context before considering optional reuse."""
+    fallback = {"reuse": False, "reason": "not_eligible_develop_push"}
+    repository = "callmedraken/ai-trading-bot"
+    if not (
+        mode == "FULL"
+        and os.environ.get("GITHUB_EVENT_NAME") == "push"
+        and os.environ.get("GITHUB_REF") == "refs/heads/develop"
+        and os.environ.get("GITHUB_REF_NAME") == "develop"
+        and os.environ.get("GITHUB_REPOSITORY") == repository
+        and os.environ.get("GITHUB_SERVER_URL") == "https://github.com"
+        and os.environ.get("GITHUB_WORKFLOW") == "Checkpoint Source Gates"
+        and os.environ.get("GITHUB_WORKFLOW_REF")
+        == (
+            f"{repository}/.github/workflows/checkpoint-source-gates.yml"
+            "@refs/heads/develop"
+        )
+    ):
+        return fallback
+    try:
+        before = _git_state(repo_root)
+        head = before["head"]
+        if (
+            before["porcelain"]
+            or before["branch"] != "develop"
+            or head != os.environ.get("GITHUB_SHA")
+            or _git_output(repo_root, "remote", "get-url", "origin")
+            != f"https://github.com/{repository}"
+            and _git_output(repo_root, "remote", "get-url", "origin")
+            != f"https://github.com/{repository}.git"
+        ):
+            return fallback
+        event = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text("utf-8"))
+        base = event["before"]
+        if not (
+            event["ref"] == "refs/heads/develop"
+            and event["after"] == head
+            and event["forced"] is False
+            and event["deleted"] is False
+            and type(base) is str
+            and re.fullmatch("[0-9a-f]{40}", base)
+            and base != "0" * 40
+        ):
+            return fallback
+        _git_output(repo_root, "merge-base", "--is-ancestor", base, str(head))
+        result = find_reusable_ci_certification(
+            _checkpoint_specs(),
+            head=str(head),
+            tree=str(before["tree"]),
+            current_run_id=int(os.environ["GITHUB_RUN_ID"]),
+            repository_id=int(os.environ["GITHUB_REPOSITORY_ID"]),
+            lookup=_github_ci_metadata,
+        )
+        if _git_state(repo_root) != before:
+            return {"reuse": False, "reason": "integration_source_changed"}
+        return result
+    except Exception:
+        return {"reuse": False, "reason": "integration_provenance_unavailable"}
+
+
 def _batch_workflow_is_reviewed(workflow: str) -> bool:
     # Freeze active routing, CI-owned certification, broad fallback and aggregation.
     # The frozen D1R5 fallback stays unchanged; D1R6/D1R7/D1R8/F1 route dynamically.
@@ -392,7 +643,8 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
     full_header = (
         "    needs: source-static\n"
         "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
-        "needs.source-static.outputs.certification_profile == ''\n"
+        "needs.source-static.outputs.certification_profile == '' && "
+        "needs.source-static.outputs.reuse_certification != 'true'\n"
         "    runs-on: windows-latest\n"
         "    timeout-minutes: 20\n"
         "    strategy:\n"
@@ -401,6 +653,9 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "        shard: [0, 1, 2, 3]\n"
     )
     certification_header = (
+        "    name: certification-tests "
+        "(${{ needs.source-static.outputs.checkpoint }} / "
+        "${{ needs.source-static.outputs.certification_profile }})\n"
         "    needs: source-static\n"
         "    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && "
         "needs.source-static.outputs.certification_profile != ''\n"
@@ -477,6 +732,9 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "          ACTIVE_RESULT: ${{ needs.active-tests.result }}\n"
         "          FULL_RESULT: ${{ needs.full-tests.result }}\n"
         "          CERT_RESULT: ${{ needs.certification-tests.result }}\n"
+        "          REUSE: ${{ needs.source-static.outputs.reuse_certification }}\n"
+        "          EVENT: ${{ github.event_name }}\n"
+        "          REF: ${{ github.ref }}\n"
         "          MODE: ${{ needs.source-static.outputs.mode }}\n"
         "          ROUTE: ${{ needs.source-static.outputs.route }}\n"
         "          CERT_PROFILE: "
@@ -486,6 +744,14 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         '          test "$STATIC_RESULT" = "success"\n'
         "\n"
         '          if [ "$MODE" = "DOCS_ONLY" ]; then\n'
+        '            test "$ACTIVE_RESULT" = "skipped"\n'
+        '            test "$FULL_RESULT" = "skipped"\n'
+        '            test "$CERT_RESULT" = "skipped"\n'
+        '          elif [ "$REUSE" = "true" ]; then\n'
+        '            test "$EVENT" = "push"\n'
+        '            test "$REF" = "refs/heads/develop"\n'
+        '            test "$ROUTE" = "FULL"\n'
+        '            test -z "$CERT_PROFILE"\n'
         '            test "$ACTIVE_RESULT" = "skipped"\n'
         '            test "$FULL_RESULT" = "skipped"\n'
         '            test "$CERT_RESULT" = "skipped"\n'
@@ -504,7 +770,26 @@ def _batch_workflow_is_reviewed(workflow: str) -> bool:
         "          fi\n"
     )
     return (
-        active_job.startswith(active_header + "\n    steps:\n")
+        workflow.count("      - name: Prove exact develop certification reuse\n") == 1
+        and hashlib.sha256(
+            workflow.partition(
+                "      - name: Prove exact develop certification reuse\n"
+            )[2]
+            .partition("      - name: Validate docs-only range\n")[0]
+            .encode()
+        ).hexdigest()
+        == "0cf6a2b45d90f88d472912805e742a2744508a8c832039a804ac28ea506ab744"
+        and (
+            "      reuse_certification: "
+            "${{ steps.reuse.outputs.reuse_certification }}\n"
+        )
+        in workflow
+        and (
+            "  source-static:\n    permissions:\n"
+            "      contents: read\n      actions: read\n"
+        )
+        in workflow
+        and active_job.startswith(active_header + "\n    steps:\n")
         and full_job.startswith(full_header + "\n    steps:\n")
         and certification_job.startswith(certification_header + "\n    steps:\n")
         and workflow.count("  active-tests:\n") == 1
@@ -19909,6 +20194,11 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
     # Admit only the exact already-resolved current successor.
     if (
+        relative in ARCH132_R3M_BLOB_PINS
+        and predecessor == ARCH132_R3M_BLOB_PINS[relative]
+    ):
+        return _arch132_r3m_pin(relative, predecessor, ast_pin=False)
+    if (
         relative in ARCH146A_C2_BLOB_PINS
         and predecessor == ARCH146A_C2_BLOB_PINS[relative]
     ):
@@ -20220,8 +20510,8 @@ def _arch146a_c2_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor not in (before[key], after[key]):
             raise ValueError("146-A C2 wrong exact predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch132_r3m_pin(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch146a_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -20233,16 +20523,168 @@ def _arch146a_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
     )
     for key, pin in {**ARCH146A_C2_AST_PINS, **ARCH146A_C2_NEW_AST_PINS}.items():
-        if (
-            hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest()
-            != pin
-        ):
+        if hashlib.sha256(
+            ast.dump(functions[key], include_attributes=False).encode()
+        ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
             failures.append("146-A C2 runner AST drift: " + key)
     for relative, pin in ARCH146A_C2_BLOB_PINS.items():
-        if _git_blob_sha1(repo_root / relative) != pin:
+        if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
+            relative, pin, ast_pin=False
+        ):
             failures.append("146-A C2 source drift: " + relative)
+    failures.extend(_arch132_r3m_authority_check(repo_root))
+    return tuple(failures)
+
+
+# R3M is additive: accepted 146-A/C1/C2 maps and all older pins stay literal.
+ARCH132_R3M_AST_PREDECESSORS: Final = {
+    "_batch_workflow_is_reviewed": (
+        "57c4cee4ecf55d5c3884daeedac64576cfa00b2b80b5322f563acd8b00b8c552"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "6b5c100ec349f781ef7a4ee5922ccf7ecef8e7b6f4ed8c8744299d1cfadb168a"
+    ),
+    "_arch146a_c2_pin": (
+        "f60f21ce6a513f526c4190ce7b38a7af345a2e3747f6c286346c1fbb7d4d6730"
+    ),
+    "_arch146a_c2_authority_check": (
+        "0eb00d176580bcb1139cebdbba3fe580adebbd639e7e0c42bb160c45012ca508"
+    ),
+}
+ARCH132_R3M_AST_PINS: Final = {
+    "_batch_workflow_is_reviewed": (
+        "3f910a44262aa76ee52b25158492a3b4061b1d0274414d8c2fb850725091c87d"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "d767755d7c915e38433ddb3313c2ee7cd0052c4c46a57451a47bdbd526719707"
+    ),
+    "_arch146a_c2_pin": (
+        "881d3d088368ea297d38ee79adc4fe29e093cd5925732b1639098dbd4ef5a410"
+    ),
+    "_arch146a_c2_authority_check": (
+        "bf7519eb032a390390325b88b228ff6a9939120691e409f0a80efc1a836c8c23"
+    ),
+}
+ARCH132_R3M_BLOB_PREDECESSORS: Final = {
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "26a4214d6c48aae63c913ff8d7559f6a33f84807"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("82866c73d518e5015d0c150eddf4c29028a44250"),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "1646a190191e75a15170203b2eb6c95629567722"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "3db0824024048513ee999f4fa5e2a61f68fff478"
+    ),
+}
+ARCH132_R3M_BLOB_PINS: Final = {
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "d2606ab9462b8462c654129b2368f016a300c250"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("4629ebbac8096ad9a517c12ad9e529c03194e197"),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "7a1d0280b5675d6d30bb2014699e31454eedc91a"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "07f0add06e908c3f390f0bc01ec8cb0b654dc440"
+    ),
+}
+ARCH132_R3M_NEW_AST_PINS: Final = {
+    "_github_ci_metadata": (
+        "944aca5b2d1b3c8a8f6cb89021bd1990b0d255f95f0cddea09c4536cd7ad8a3d"
+    ),
+    "find_reusable_ci_certification": (
+        "4ee68f2f02f122883fd355b30f7253f944b727346aa8013bbfdb49dabcdd9c21"
+    ),
+    "resolve_develop_ci_reuse": (
+        "c5007300f6dffcab9f38889c925e29131686ba3ff9e9fd071ec22dd12fdee6a0"
+    ),
+    "_arch132_r3m_maps": (
+        "6e0273a18ccd3839849ad1bb5fb2e4f096d3092aadc69c6e9629d364c4b250d7"
+    ),
+    "_arch132_r3m_pin": (
+        "12b1aea17e67f8d3724a56d03cb70e58500eeced4824370479998d807a431dce"
+    ),
+    "_arch132_r3m_authority_check": (
+        "5720b25140270afb84d1e5dfcc4cbe799add878f967d56eca9e0396950cc1ab5"
+    ),
+}
+ARCH132_R3M_FROZEN_SOURCE_PINS: Final = {
+    "scripts/run_test_certification.py": ("bfa2222bc5597a581868c6c5865ca329a6a420bb"),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "01ae41fa37083e9bc548fedbaae6178328458dff"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "8957925d8f6538ab6266ff20e76bc7fca9e67dbb"
+    ),
+    "pyproject.toml": ("2aa7ed624c5afa07283ae17763fc66a2dad4f82e"),
+}
+ARCH132_R3M_MAPS_SHA256: Final = (
+    "4da47bfe990ae9270415a54ee63af0896d0888a9bdef25124745491c7f1e10c6"
+)
+
+
+def _arch132_r3m_maps() -> None:
+    maps = (
+        ARCH132_R3M_AST_PREDECESSORS,
+        ARCH132_R3M_AST_PINS,
+        ARCH132_R3M_BLOB_PREDECESSORS,
+        ARCH132_R3M_BLOB_PINS,
+        ARCH132_R3M_NEW_AST_PINS,
+        ARCH132_R3M_FROZEN_SOURCE_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3M_MAPS_SHA256
+        or set(ARCH132_R3M_AST_PREDECESSORS) != set(ARCH132_R3M_AST_PINS)
+        or set(ARCH132_R3M_BLOB_PREDECESSORS) != set(ARCH132_R3M_BLOB_PINS)
+    ):
+        raise ValueError("R3M exact successor maps drift")
+
+
+def _arch132_r3m_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3m_maps()
+    before = ARCH132_R3M_AST_PREDECESSORS if ast_pin else ARCH132_R3M_BLOB_PREDECESSORS
+    after = ARCH132_R3M_AST_PINS if ast_pin else ARCH132_R3M_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3M wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch132_r3m_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {**ARCH132_R3M_AST_PINS, **ARCH132_R3M_NEW_AST_PINS}.items():
+            actual = hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest()
+            if actual != pin:
+                failures.append("R3M runner AST drift: " + key)
+        for relative, pin in {
+            **ARCH132_R3M_BLOB_PINS,
+            **ARCH132_R3M_FROZEN_SOURCE_PINS,
+        }.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3M source drift: " + relative)
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("R3M workflow topology drift")
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3M authority unavailable")
     return tuple(failures)
 
 

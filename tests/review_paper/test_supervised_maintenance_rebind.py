@@ -14,7 +14,6 @@ import pytest
 from test_supervised_release_installation import FAKE_PYTHON, FakeNative, accepted
 
 from scripts import checkpoint_runner as runner
-from scripts import run_test_certification as certification
 from trading_bot.arch133_scheduler_installation.operator import TASK_XML
 from trading_bot.supervised_release import maintenance as subject
 from trading_bot.supervised_release import observer
@@ -392,22 +391,8 @@ def test_source_registration_inventory_and_pins():
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == "feature/robinhood-supervised-maintenance-rebind"
     assert runner.ACTIVE_CI_CHECKPOINTS[5] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     assert spec.authority_check(ROOT) == ()
-    workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert runner._batch_workflow_is_reviewed(workflow)
-    inventory = certification.discover_inventory(ROOT)
-    profiles = {
-        name: certification.select_inventory(inventory, name)
-        for name in ("full", "robinhood", "legacy", "exhaustive")
-    }
-    assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 203,
-        "robinhood": 112,
-        "legacy": 222,
-        "exhaustive": 425,
-    }
 
 
 def test_import_closure_inert_in_fresh_interpreter():

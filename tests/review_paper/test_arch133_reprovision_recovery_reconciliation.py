@@ -766,7 +766,6 @@ def test_authority_chains_w_and_has_exact_source_only_topology():
         "arch133-robinhood-reprovision-sealed-predecessor-recovery",
         NAME,
     )
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
 
 

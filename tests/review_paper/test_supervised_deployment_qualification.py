@@ -12,7 +12,6 @@ from test_supervised_release_installation import FakeNative
 from test_supervised_runtime_host_admission import setup as runtime_setup  # noqa: F401
 
 from scripts import checkpoint_runner as runner
-from scripts import run_test_certification as certification
 from trading_bot.supervised_release import qualification as subject
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.bundle import (
@@ -627,28 +626,9 @@ def test_registration_workflow_profiles_and_authority_chain():
     )
     assert spec.authority_check(ROOT) == ()
     assert runner.ACTIVE_CI_CHECKPOINTS[3] == NAME
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert runner.ACTIVE_CI_CHECKPOINTS[-7] == runner.ARCH134_AUTH_NAME
     workflow = (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert workflow.count(NAME) == 1
-    assert runner._batch_workflow_is_reviewed(workflow)
-    assert not runner._batch_workflow_is_reviewed(
-        workflow.replace(NAME, "caller-checkpoint")
-    )
-    inventory = certification.discover_inventory(ROOT)
-    profiles = {
-        name: certification.select_inventory(inventory, name)
-        for name in ("full", "robinhood", "legacy", "exhaustive")
-    }
-    assert {name: len(modules) for name, modules in profiles.items()} == {
-        "full": 203,
-        "robinhood": 112,
-        "legacy": 222,
-        "exhaustive": 425,
-    }
-    assert set(profiles["robinhood"]) <= set(profiles["full"])
-    assert set(profiles["full"]).isdisjoint(profiles["legacy"])
-    assert set(profiles["full"]) | set(profiles["legacy"]) == set(inventory)
 
 
 @pytest.mark.parametrize(

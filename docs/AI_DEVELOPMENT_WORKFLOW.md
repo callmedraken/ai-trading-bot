@@ -27,7 +27,7 @@ reviewed safe step within scope. A separate new authorization message is not
 universally required for reviewed bounded operator actions. Historical accounts
 of separate authorization remain historical and do not override this current rule.
 
-## Architecture 132-R3M — exact develop certification reuse
+## Architecture 132-R3M — predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local
 HEAD/tree/branch and origin admission, fast-forward ancestry proof, full-batch
@@ -60,6 +60,38 @@ overlay. This checkpoint's reviewed test-suite branch uses normal broad source
 CI; no new feature certification mapping or local canonical run is introduced.
 ChatGPT owns exact-source review and any selected certification before integration.
 No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
+
+## Architecture 132-R3N — workflow throughput and current-contract consolidation
+
+R3N preserves R3M's exact develop-push admission and extends the reusable
+feature evidence set. A develop push may reuse either one exact first-attempt
+mapped FULL/ROBINHOOD certification or one exact first-attempt broad feature
+source gate. Broad reuse requires the same repository identity, active workflow
+identity, push event, exact SHA/tree, admitted feature branch family, terminal
+success, source-static success, exactly one each of broad shards 0/1/2/3,
+successful execution and hygiene steps for every shard, skipped active-tests and
+certification-tests, successful source-gates, and one unique qualifying run.
+Attempt 2 or later, malformed/truncated/ambiguous/unavailable metadata, missing
+jobs or steps, and any mismatch fall back to the normal four-shard develop run.
+Artifact names are never provenance.
+
+Before publication, `ops.ps1 admit` runs the cheap non-effectful R3N admission:
+exact branch/origin/base identity and ancestry, clean tracked/index state,
+changed-path classification, diff/Ruff checks, current authority and workflow
+topology, inventory/profile reconciliation, nonempty FULL/ROBINHOOD/
+LEGACY/EXHAUSTIVE lane construction, and the small current contract tests. It
+does not execute protected effects or canonical FULL/ROBINHOOD certification.
+
+One logical checkpoint still receives one prepared atomic commit/push and one
+CI admission. A red attempt is preserved; a bounded mechanical correction is a
+separately named checkpoint with fresh focused verification and a fresh
+pre-publication admission. Codex remains owner across such corrections until
+terminal green, without an arbitrary C1/C2/C3 cap. Non-reproducible,
+semantic/security/authority, protected-effect, unexpected-state, or
+material-scope failures stop for ChatGPT review. Current certification counts,
+lane topology, and workflow-contract assertions are owned by the current
+certification/profile/lane/CI test surfaces; historical review-paper tests
+retain predecessor and incident evidence only.
 
 ## CI-owned selected certification — normative expedited path
 
@@ -364,18 +396,19 @@ poll the relevant push-triggered workflow/source gate to a **terminal** state
 before reporting the checkpoint complete, accepting the closeout, or advancing
 to the next checkpoint. `queued` and `in_progress` are not completion. The
 push is the checkpoint's single planned CI admission attempt, not an iterative
-debug loop. On failure, inspect the exact job/log evidence and STOP that
-checkpoint attempt. That does **not** require ending the same delegated Codex
-task when the failure is fully classified as bounded/mechanical and no
-protected-effect, semantic, authority, or remote-state ambiguity exists. In that
-case Codex should explicitly declare a separate corrective C1, return to
-focused/local verification, create one new atomic commit/push for that
-corrective checkpoint, and poll its CI to terminal. One further bounded C2 may
-follow under the same rules when C1 exposes another purely mechanical stale
-pin/inventory/topology assertion. Hand back on terminal green, unexpected or
-ambiguous state, semantic/security/authority uncertainty, or exhaustion of the
-C1/C2 allowance. Never rerun unchanged CI or rewrite failed evidence. On
-success, verify the run belongs to the exact pushed HEAD.
+debug loop. On failure, preserve the terminal-red attempt, inspect and classify
+the exact job/log evidence, and do not automatically end the same delegated
+Codex task merely because the attempt ended. If the failure is reproduced and
+fully classified as bounded/mechanical, declare the next separately named
+corrective checkpoint, add or retain a deterministic regression where
+practical, rerun the complete focused/local pre-publication gate, create one
+new atomic commit/push, and poll its CI to terminal. Codex remains owner across
+bounded mechanical corrective checkpoints until terminal green; there is no
+arbitrary C1/C2/C3 cap. Hand back on terminal green, a non-reproducible or
+unclassified failure, semantic/security/authority or remote-state ambiguity,
+protected effects, or material scope expansion. Never rerun unchanged CI,
+rewrite failed evidence, amend, rebase or force-push. On success, verify the
+run belongs to the exact pushed HEAD.
 Delegate to Luna/Astra/Sol High only when implementation size, discovery,
 isolation, or architecture/security sensitivity makes delegation materially
 useful.
@@ -443,10 +476,15 @@ Codex is the bounded implementation agent. It should:
   relevant run to a terminal state rather than handing back an `in_progress`
   run as completion;
 - treat that push as the logical checkpoint's one planned GitHub CI admission
-  attempt; do not use repeated pushes as the normal debugging loop;
-- if the source gate fails, inspect the preserved evidence and STOP that attempt;
-  return to focused/local verification, then declare any later correction as a
-  separate corrective checkpoint before another ordinary push;
+  attempt; preserve a terminal-red attempt and never rerun unchanged CI;
+- if the source gate fails, inspect and classify the preserved evidence. When
+  the failure is reproducible and bounded/mechanical, Codex remains owner,
+  adds or retains a deterministic regression where practical, reruns the
+  complete focused/local pre-publication gate, and declares the next correction
+  as a separate corrective checkpoint before another ordinary push. Continue
+  automatically through such corrections until terminal green; there is no
+  arbitrary C1/C2/C3 cap. Stop for non-reproducible, semantic, security,
+  authority, protected-effect, unexpected-state or material-scope failures;
 - stop before broad local certification unless the task explicitly says
   otherwise.
 

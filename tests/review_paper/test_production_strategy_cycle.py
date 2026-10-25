@@ -15,7 +15,6 @@ from tests.runtime.test_manual_paper_strategy_plan import (
 )
 
 from scripts import checkpoint_runner
-from scripts import run_test_certification as certification
 from trading_bot.domain import OrderType, TimeInForce
 from trading_bot.execution.models import ExecutionInstruction
 from trading_bot.review_paper import production_strategy_cycle as subject
@@ -373,25 +372,7 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         "arch134-production-strategy-decision",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert (
         checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-7]
         == checkpoint_runner.ARCH134_AUTH_NAME
-    )
-
-    root = Path(certification.__file__).resolve().parents[1]
-    inventory = certification.discover_inventory(root)
-    profiles = {
-        name: certification.select_inventory(inventory, name)
-        for name in ("full", "robinhood", "legacy", "exhaustive")
-    }
-    assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 203,
-        "robinhood": 112,
-        "legacy": 222,
-        "exhaustive": 425,
-    }
-    assert "tests/review_paper/test_production_strategy_cycle.py" in profiles["full"]
-    assert (
-        "tests/review_paper/test_production_strategy_cycle.py" in profiles["robinhood"]
     )

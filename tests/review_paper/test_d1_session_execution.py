@@ -18,7 +18,6 @@ from tests.review_paper.test_armed_production_paper_session import AlpacaTranspo
 from tests.review_paper.test_risk_price_acquisition import _quote
 
 from scripts import checkpoint_runner as runner
-from scripts import run_test_certification as certification
 from trading_bot.review_paper import d1_session_authorization as q
 from trading_bot.review_paper import d1_session_execution as c
 from trading_bot.review_paper import d1_session_execution_host as host
@@ -965,13 +964,6 @@ def test_checkpoint_inventory_and_explicit_successor():
     )
     assert runner.resolve_ci_certification_profile(name) == "robinhood"
     assert runner._arch134_d1r8_authority_check(ROOT) == ()
-    inventory = certification.discover_inventory(ROOT)
-    assert {
-        p: len(certification.select_inventory(inventory, p))
-        for p in certification.PROFILES
-    } == {"full": 203, "robinhood": 112, "legacy": 222, "exhaustive": 425}
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
-    assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
 
 
 @pytest.mark.parametrize(

@@ -2,46 +2,43 @@
 
 ## Current integrated checkpoint
 
-Architecture 146-A — historical research dataset manifest and partition
-enforcement is **SOURCE ACCEPTED / INTEGRATED**.
+Architecture 132-R3M — exact develop certification reuse is **SOURCE ACCEPTED /
+INTEGRATED**.
 
-    HEAD 6906ba01bfb6a353029d695e584b2097587b81b9
-    TREE aa1efe5057e047e0d1778f2422e45f26cbc9f5d6
+    HEAD 029d72e81a1589e8bd3b3134531682f500087810
+    TREE ea120b292a9252e3234ab4db8b64ff2c89851fea
 
-Feature CI #720 / 40178730059 / attempt 1: SUCCESS, including canonical FULL
-(13,759 passed, 6 skipped, zero failed/errors). Develop integration CI #721 /
-40179588325 / attempt 1: SUCCESS. Primary local develop is reconciled to that
-same exact HEAD/tree. Initial feature #718 and corrective C1 #719 remain
-preserved failed evidence; C2 supplied the accepted reference solver environment.
+Feature chronology is preserved as #722 failure, #723 success, #724 failure,
+#725 failure, #726 failure and #727 terminal success. Develop integration #728 /
+40233946706 / attempt 1: SUCCESS. Primary local develop was reconciled to the
+same exact HEAD/tree before R3N began. The final #728 broad execution was a
+bootstrap duplication because R3M recognized only mapped canonical feature
+evidence; R3N extends reuse to exact successful broad feature source gates.
 
-146-A adds immutable synthetic-tested dataset/partition manifests and snapshots,
-external integrity/session verification, distinct physical/logical fingerprints,
-OPEN-only commitments and additive Architecture-145 policy binding. Accepted
-145-A schemas and serialized identities stay frozen. NYSE historical-calendar
-limitations and acquisition/provenance requirements remain explicit.
-See [Architecture 146](architecture/146-historical-research-data-custody.md) and
-[validation](validation/arch146-historical-research-data-custody-plan.md).
+The accepted R3M source preserves exact repository/workflow/SHA/tree and
+first-attempt-only mapped certification reuse, with fail-closed fallback for
+missing, malformed, ambiguous or unavailable evidence. Architecture 146-A
+remains historical context; Architecture 146-B is not started here.
 
 ## Current workflow checkpoint
 
-Architecture 132-R3M — develop integration certification reuse corrective C3 is
-**IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING CHATGPT EXACT-SOURCE REVIEW**.
-Reusable feature certification is the original push-triggered first attempt
-only: the run, detail and required jobs must each report `run_attempt == 1`.
-Unchanged-source reruns are never reusable integration evidence; every unproved
-case falls back to ordinary develop broad testing. Feature certification
-ownership and the six-lane FULL/four-lane ROBINHOOD topology remain unchanged.
-Initial R3M source `4429578c98c227e25b084b81379cf69d89f414b0` is preserved with
-failed #722 / `40188805213` / attempt 1. C1 source
-`fa04f04c6544078acb25c5daad0ce08e3e13e4a2` is preserved with successful #723 /
-`40189452322` / attempt 1 but remains pending ChatGPT review. C2 source
-`0b3ac6a9761c1a7433200bfc3f4d4d4a9a149860` is preserved with terminal failed
-#724 / `40219349487` / attempt 1. C2's first-attempt-only semantic correction
-remains intact; #724 failed solely because the new C2 provenance test module
-lacked current FULL inventory ownership. C3 is the separately reviewed
-inventory-admission correction: `tests/runtime/checkpoint_runner/test_r3m_c2.py`
-is FULL-only, with current inventory `203 / 112 / 222 / 425` and unchanged
-six-lane FULL/four-lane ROBINHOOD topology.
+Architecture 132-R3N — workflow throughput and current-contract consolidation
+is **IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING CHATGPT EXACT-SOURCE
+REVIEW**. R3N preserves exact mapped FULL/ROBINHOOD reuse and adds exact
+successful broad feature-gate reuse. Broad reuse requires original attempt 1,
+exact repository/workflow/SHA/tree and branch family, source-static success,
+all four shard execution and hygiene steps, skipped active/certification jobs,
+source-gates success and one unique run; anything incomplete or ambiguous falls
+back to ordinary broad testing.
+
+The cheap `ops.ps1 admit` gate covers exact branch/origin/base identity,
+cleanliness, path classification, diff/Ruff/current authority/workflow checks,
+inventory/profile reconciliation, nonempty six/four lane construction and the
+small current contract tests. It does not run protected effects, canonical
+FULL/ROBINHOOD or the broad checkpoint union. Current inventory remains
+`203 / 112 / 222 / 425`; current profile counts and lane topology are owned by
+the current certification/profile/lane/CI tests. Historical Architecture-133/
+134 chronology and predecessor/incident assertions remain preserved.
 See [Architecture 132](architecture/132-tiered-certification-profiles.md).
 
 ## Production boundary
@@ -63,8 +60,9 @@ follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-ChatGPT reviews the exact published R3M C3 source, terminal CI, additive
-authority overlay, reuse/fallback tests, current inventory admission and
-preserved #722/#723/#724 evidence. No production candidate is frozen and no
-protected or external effect is authorized. Accept/integrate only after that
-review and any selected certification are complete. Do not begin 146-B here.
+ChatGPT reviews the exact published R3N source, terminal CI, additive
+authority overlay, pre-publication admission, mapped/broad reuse and fallback
+tests, centralized current-contract assertions, and preserved #722–#728
+evidence. No production candidate is frozen and no protected or external effect
+is authorized. Accept/integrate only after that exact-source review is
+complete. Do not begin 146-B here.

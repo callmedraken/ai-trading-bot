@@ -322,6 +322,20 @@ CI_TEST_DURATION_WEIGHTS: Final = {
 SOURCE_GATE_PHASE_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_PHASE"
 SOURCE_GATE_SHARD_INDEX_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX"
 SOURCE_GATE_SHARD_COUNT_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT"
+ARCH132_R3N_ADMISSION_NAME: Final = "arch132-r3n-prepublication-admission"
+ARCH132_R3N_BRANCH: Final = "feature/test-suite-arch132-r3n-workflow-throughput-current"
+ARCH132_R3N_BASE_HEAD: Final = "029d72e81a1589e8bd3b3134531682f500087810"
+ARCH132_R3N_BASE_TREE: Final = "ea120b292a9252e3234ab4db8b64ff2c89851fea"
+ARCH132_R3N_ADMISSION_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = (
+    "scripts/checkpoint_runner.py",
+    "scripts/run_test_certification.py",
+    *ARCH132_R3N_ADMISSION_TESTS,
+)
 
 
 def resolve_ci_checkpoint(
@@ -371,7 +385,14 @@ def find_reusable_ci_certification(
     repository_id: int,
     lookup: Callable[[str], object],
 ) -> dict[str, object]:
-    """Prove one exact mapped feature certification, otherwise retain broad CI."""
+    """Prove one exact feature gate, otherwise retain broad CI.
+
+    A mapped active checkpoint may reuse its canonical profile evidence.  An
+    unregistered feature branch may reuse only the exact four-shard FULL
+    source-gate topology; every other shape falls back to the normal broad
+    run.  The output remains named ``reuse_certification`` for workflow
+    compatibility, but ``reuse_kind`` distinguishes the two proofs.
+    """
     fallback = {"reuse": False, "reason": "provenance_not_proven"}
     repository = "callmedraken/ai-trading-bot"
     prefix = f"repos/{repository}"
@@ -396,6 +417,33 @@ def find_reusable_ci_certification(
             and value.get("full_name") == repository
             and type(value.get("id")) is int
             and value["id"] == repository_id
+        )
+
+    def completed_success(
+        by_name: Mapping[str, dict],
+        name: str,
+        steps: tuple[str, ...],
+        run_id: int,
+        attempt: int,
+    ) -> bool:
+        job = by_name.get(name, {})
+        if not (
+            job.get("status") == "completed"
+            and job.get("conclusion") == "success"
+            and job.get("run_id") == run_id
+            and job.get("run_attempt") == attempt
+            and job.get("run_attempt") == 1
+            and job.get("head_sha") == head
+        ):
+            return False
+        step_list = job["steps"]
+        require(type(step_list) is list)
+        step_map = {step["name"]: step for step in step_list}
+        require(len(step_map) == len(step_list))
+        return all(
+            step_map.get(step, {}).get("conclusion") == "success"
+            and step_map[step].get("status") == "completed"
+            for step in steps
         )
 
     try:
@@ -435,7 +483,9 @@ def find_reusable_ci_certification(
                 continue
             checkpoint = resolve_ci_checkpoint(specs, branch, "push")
             profile = resolve_ci_certification_profile(checkpoint)
-            if checkpoint is None or profile is None:
+            mapped = checkpoint is not None and profile is not None
+            broad = checkpoint is None and profile is None
+            if not mapped and not broad:
                 continue
             if not (
                 same_repository(run["repository"])
@@ -478,62 +528,85 @@ def find_reusable_ci_certification(
             )
             by_name = {job["name"]: job for job in jobs}
             require(len(by_name) == len(jobs))
-            certification = f"certification-tests ({checkpoint} / {profile})"
-            required = {
-                "source-static": (
-                    "Resolve source gate route",
-                    "Verify active checkpoint static authority",
-                ),
-                "active-tests": ("Verify active checkpoint tests",),
-                certification: (
-                    "Run canonical certification profile",
-                    "Enforce canonical certification hygiene budget",
-                ),
-                "source-gates": ("Require source gate success",),
-            }
-            eligible = True
-            for name, steps in required.items():
-                job = by_name.get(name, {})
-                if not (
-                    job.get("status") == "completed"
-                    and job.get("conclusion") == "success"
-                    and job.get("run_id") == run_id
-                    and job.get("run_attempt") == attempt
-                    and job.get("run_attempt") == 1
-                    and job.get("head_sha") == head
-                ):
-                    eligible = False
-                    break
-                step_list = job["steps"]
-                require(type(step_list) is list)
-                step_map = {step["name"]: step for step in step_list}
-                require(len(step_map) == len(step_list))
-                if not all(
-                    step_map.get(step, {}).get("conclusion") == "success"
-                    and step_map[step].get("status") == "completed"
-                    for step in steps
-                ):
-                    eligible = False
-                    break
-            if eligible:
-                candidates.append(
-                    {
-                        "reuse": True,
-                        "reason": "exact_feature_certification",
-                        "repository": repository,
-                        "repository_id": repository_id,
-                        "head": head,
-                        "tree": tree,
-                        "workflow_id": workflow["id"],
-                        "run_id": run_id,
-                        "run_attempt": attempt,
-                        "branch": branch,
-                        "checkpoint": checkpoint,
-                        "profile": profile,
-                        "run": detail,
-                        "jobs": jobs,
-                    }
+            if mapped:
+                certification = f"certification-tests ({checkpoint} / {profile})"
+                required = {
+                    "source-static": (
+                        "Resolve source gate route",
+                        "Verify active checkpoint static authority",
+                    ),
+                    "active-tests": ("Verify active checkpoint tests",),
+                    certification: (
+                        "Run canonical certification profile",
+                        "Enforce canonical certification hygiene budget",
+                    ),
+                    "source-gates": ("Require source gate success",),
+                }
+                require(set(by_name) == set(required))
+                eligible = all(
+                    completed_success(by_name, name, steps, run_id, attempt)
+                    for name, steps in required.items()
                 )
+            else:
+                broad_jobs = {
+                    "source-static": (
+                        "Resolve source gate route",
+                        "Prove exact develop certification reuse",
+                        "Verify full batch static authority",
+                    ),
+                    "active-tests": (),
+                    **{
+                        f"full-tests ({index})": (
+                            "Record broad test shard start",
+                            "Verify full batch test shard",
+                            "Enforce broad test hygiene budget",
+                        )
+                        for index in range(4)
+                    },
+                    "certification-tests ( / )": (),
+                    "source-gates": ("Require source gate success",),
+                }
+                require(set(by_name) == set(broad_jobs))
+                eligible = all(
+                    completed_success(by_name, name, steps, run_id, attempt)
+                    for name, steps in broad_jobs.items()
+                    if name not in {"active-tests", "certification-tests ( / )"}
+                )
+                eligible = eligible and all(
+                    by_name[name].get("status") == "completed"
+                    and by_name[name].get("conclusion") == "skipped"
+                    and by_name[name].get("run_id") == run_id
+                    and by_name[name].get("run_attempt") == attempt
+                    and by_name[name].get("head_sha") == head
+                    for name in ("active-tests", "certification-tests ( / )")
+                )
+            if eligible:
+                evidence = {
+                    "reuse": True,
+                    "reason": (
+                        "exact_feature_certification"
+                        if mapped
+                        else "exact_feature_broad_source_gate"
+                    ),
+                    "reuse_kind": (
+                        "mapped_certification" if mapped else "broad_source_gate"
+                    ),
+                    "repository": repository,
+                    "repository_id": repository_id,
+                    "head": head,
+                    "tree": tree,
+                    "workflow_id": workflow["id"],
+                    "run_id": run_id,
+                    "run_attempt": attempt,
+                    "branch": branch,
+                    "checkpoint": checkpoint,
+                    "profile": profile or "",
+                    "run": detail,
+                    "jobs": jobs,
+                }
+                if broad:
+                    evidence["shards"] = [0, 1, 2, 3]
+                candidates.append(evidence)
         if len(candidates) != 1:
             return {"reuse": False, "reason": "no_unique_certification"}
         return candidates[0]
@@ -21010,6 +21083,11 @@ ARCH132_R3M_C3_AST_PREDECESSORS: Final = {
     "_arch144_current_inventory_test_pin": (
         "ea85122a31c69ce1cc6474d6bd918426a76fd673cdb82d82e1205c1ac46065c0"
     ),
+    "find_reusable_ci_certification": (
+        "ae0f6f4c8aed399ad66849deb68950e8054400f6eea833c369be5fddf47af063"
+    ),
+    "_parser": ("d7e2540860ac3b38070c65c025dde4aaa31f9cc7dc222a35c0036b48e22bddc7"),
+    "main": ("7327e8425a2c6b9f65250bc004b694a6f39a4c79cd654df9425ce73df0efd810"),
 }
 ARCH132_R3M_C3_AST_PINS: Final = {
     "_arch134_d1s3_shared_successor_pin": (
@@ -21033,6 +21111,11 @@ ARCH132_R3M_C3_AST_PINS: Final = {
     "_arch144_current_inventory_test_pin": (
         "f24f850fd56706bd070deef661f29d3165cd660b4272d9aa9e3859cb71758366"
     ),
+    "find_reusable_ci_certification": (
+        "14d44cc54686b2daa0dc92cec322f552b0d29d27a5a454d4811e4c0bdc9469b2"
+    ),
+    "_parser": ("2d897ea89b5822acdeae23fc618bc98f983f63cb8c4574ed294166a2ceee1925"),
+    "main": ("f3f6d6294a587a7f9025e05c3e20810797c4f366154f66dcaed89dbaba0b830f"),
 }
 ARCH132_R3M_C3_BLOB_PREDECESSORS: Final = {
     "scripts/run_test_certification.py": ("bfa2222bc5597a581868c6c5865ca329a6a420bb"),
@@ -21080,6 +21163,32 @@ ARCH132_R3M_C3_BLOB_PREDECESSORS: Final = {
     ),
     "docs/PROJECT_STATUS.md": "8e71eb18e0a136fc1b40497a53a86f3e457ea17e",
     "docs/AI_TRADING_BOT_HANDOFF.md": "9c1346707b72eb8bc0bb8a85cd3c87b3ce075723",
+    "AGENTS.md": "2a1837544c2c5205a85b9057ac649b293af89e38",
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": "7b66d8a42d816f33e40d9861cfd086dc4b43055e",
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "627942d088f609cc6debb3fbd501fdd1b4a3cf5f"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "f46d973e100742c8409b601209b980d112155287"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "be084b09630be7a6c0e8b087ae2d6dba2020c519"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "646e0e11898fdd6ccd0ccecd4b080df98f2c9b43"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "55aebd0998d43a5abd7c5cbcd205f9c8e1c4b262"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "dbaa8f45acafbdd6c500d0994696eacc739efc6b"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "a6831797ae6493ecd8a6b21c75da379c80b5cb6c"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "06d3c1a393919d9d0082865691cae7f073950199"
+    ),
 }
 ARCH132_R3M_C3_BLOB_PINS: Final = {
     "scripts/run_test_certification.py": ("d283c8b9f793e86740bfc7023466e02cfdbb7e34"),
@@ -21090,43 +21199,69 @@ ARCH132_R3M_C3_BLOB_PINS: Final = {
         "3c1b9f8bef5ccf3e23a38f3adbacbdbd2d69425c"
     ),
     "tests/review_paper/test_d1_session_execution.py": (
-        "1432b94e79953de74954a8d536b2161824a17f2c"
+        "e3259ba082f5d702c507fa194bd739a627053baf"
     ),
     "tests/review_paper/test_d1_session_authorization.py": (
-        "e7240299d331a181f2c8b1d9e696f5505f4ac618"
+        "60110e41b86f1e96734bc4a0da526755ecc97ab6"
     ),
     "tests/review_paper/test_pre_market_wake_overnight.py": (
-        "f2ab4bedb66e4d96c76cc95d93f3b434efb8e617"
+        "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
     ),
     "tests/scripts/certification_runner/test_profiles.py": (
         "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
     ),
     "tests/review_paper/test_production_strategy_cycle.py": (
-        "74c06b5acf3aabf18fe5beaadb7c847578bdfc26"
+        "9ed65e1cc0223b340028a1b2addae8c23fdf7de5"
     ),
     "tests/review_paper/test_supervised_deployment_qualification.py": (
-        "6e8749dca91e027de16ab64de01704d1ebd5ff9f"
+        "8af8ee7bdcfd5413fbcc1592538034128beba676"
     ),
     "tests/review_paper/test_supervised_maintenance_rebind.py": (
-        "7dcc429cc48f36baed4094719b2953dfdaefae85"
+        "0e4b2a80c79a3a776e585e0aa10471549127c946"
     ),
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
-        "f94ae514a5eba8a72b193cf88773a50c55ceb557"
+        "b7d6163f2f7f22255fe04d89cda60031a6a42308"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
-        "1c54a9cb6238339ea572d966f370b86c8c7bdd8d"
+        "9249dd7820c933e66e11ff5de0eb522e94198e04"
     ),
     "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
-        "68f105df1308461d2c58de3df72f39540da882d1"
+        "e0d43393816a6da9a755a685007d9a87d34d1388"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "9b41330fe25e1a3d6fad9ba11c477c497be5bd61"
+        "c90a3c36f2c9af824c2ce4939f090cf679b5b6a9"
     ),
     "tests/scripts/certification_runner/test_lanes.py": (
         "6ef03c56497055a8edf7d2378c87c44d55800b53"
     ),
-    "docs/PROJECT_STATUS.md": "0c7730f985bd21a6de106fcede695aee0fdc774e",
-    "docs/AI_TRADING_BOT_HANDOFF.md": "b67896b51686579ae5bc3ca674e58ce71f68a83d",
+    "docs/PROJECT_STATUS.md": "29e59e0b0a656fa566cd0ff162b02391ffe08020",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "df3878014dd662a93fb39427646aaf1ef5aca6de",
+    "AGENTS.md": "9f8344a6215c3353a79e19b9592134da7291b408",
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": "99d48d3078d22e02cd5ae3248ac0b5ed5218261c",
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "de8e2b5fb9740d9d462dfda1eed77d74d5ea0922"
+    ),
+    "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py": (
+        "5c72b6c5423ffca421da3af078bab01b8c2399dc"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "696b4a7967bf10d0306b9b6fb4385fafac5d429e"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "190db93d553d9a4f02ec1b8bd94112bcc1964ebf"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py": (
+        "bf8a9d5e4dcd8d9c634a24b5cd04cc1b28a908d2"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "3a421d5a8cb93a3d64d8cdad5c9d0986e11b9ea1"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "0c3bc741f8f6dd0bb4a402126862898ed0838812"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "d8f57b8acb16e8c2233df0b30bc7b6d5ed79079f"
+    ),
 }
 ARCH132_R3M_C3_NEW_AST_PINS: Final = {
     "_arch132_r3m_c3_maps": (
@@ -21138,9 +21273,15 @@ ARCH132_R3M_C3_NEW_AST_PINS: Final = {
     "_arch132_r3m_c3_authority_check": (
         "ad4a28e77430fd1e22871f8fc02ff2cad2a85367013df855808477d79c6db54a"
     ),
+    "_arch132_r3n_admission_authority_check": (
+        "2f5cefa598ef0517954b6393f6c626f24cb5c6c61db215517fdaa5b933f2346a"
+    ),
+    "prepublication_admission": (
+        "1642e738d21dae96da9de5c6fd2b92906bf99ad0773248709298abd7e228426b"
+    ),
 }
 ARCH132_R3M_C3_MAPS_SHA256: Final = (
-    "c59367121946f0a717b7226a026a6ff2f491f518e93ba337a3c2c5ed07907e93"
+    "19426e36daf336b75304b6c94b0d54e890272108c1f07877e7fe7a70eb7a73d5"
 )
 
 
@@ -21199,6 +21340,71 @@ def _arch132_r3m_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
                 failures.append("R3M C3 source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M C3 authority unavailable")
+    return tuple(failures)
+
+
+def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Check cheap, source-only admission before a feature publication."""
+    failures: list[str] = []
+    try:
+        state = _git_state(repo_root)
+        if state["branch"] != ARCH132_R3N_BRANCH:
+            failures.append("R3N branch identity drift")
+        if state["porcelain"]:
+            failures.append("R3N worktree is not clean")
+        origin = _git_output(repo_root, "remote", "get-url", "origin")
+        if origin not in {
+            "https://github.com/callmedraken/ai-trading-bot",
+            "https://github.com/callmedraken/ai-trading-bot.git",
+        }:
+            failures.append("R3N origin identity drift")
+        if (
+            _git_output(repo_root, "rev-parse", "origin/develop")
+            != ARCH132_R3N_BASE_HEAD
+        ):
+            failures.append("R3N origin/develop head drift")
+        if (
+            _git_output(repo_root, "rev-parse", f"{ARCH132_R3N_BASE_HEAD}^{{tree}}")
+            != ARCH132_R3N_BASE_TREE
+        ):
+            failures.append("R3N base tree drift")
+        _git_output(
+            repo_root,
+            "merge-base",
+            "--is-ancestor",
+            ARCH132_R3N_BASE_HEAD,
+            "HEAD",
+        )
+        changed = tuple(
+            path
+            for path in _git_output(
+                repo_root, "diff", "--name-only", f"{ARCH132_R3N_BASE_HEAD}..HEAD"
+            ).splitlines()
+            if path
+        )
+        if not changed or classify_changed_paths(changed) != "FULL":
+            failures.append("R3N changed-path classification drift")
+        failures.extend(_arch132_r3m_authority_check(repo_root))
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("R3N workflow topology drift")
+
+        from scripts import run_test_certification as certification
+
+        inventory = certification.discover_inventory(repo_root)
+        profiles = {
+            profile: certification.select_inventory(inventory, profile)
+            for profile in certification.PROFILES
+        }
+        certification.validate_classification(inventory, profiles)
+        for profile, selected in profiles.items():
+            lanes = certification.build_lanes(repo_root, selected, profile)
+            if not lanes or any(not modules for modules in lanes.values()):
+                failures.append(f"R3N empty {profile} certification lane")
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError, SyntaxError) as exc:
+        failures.append(f"R3N admission unavailable: {type(exc).__name__}")
     return tuple(failures)
 
 
@@ -23282,6 +23488,24 @@ def verify_checkpoint(
     return passed, report_path
 
 
+def prepublication_admission(
+    *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path]:
+    """Run the cheap, non-effectful R3N admission gate."""
+    spec = CheckpointSpec(
+        name=ARCH132_R3N_ADMISSION_NAME,
+        description=("Architecture 132-R3N source-only pre-publication admission"),
+        tests=ARCH132_R3N_ADMISSION_TESTS,
+        ruff_paths=ARCH132_R3N_ADMISSION_RUFF_PATHS,
+        authority_check=_arch132_r3n_admission_authority_check,
+    )
+    return verify_checkpoint(
+        spec,
+        repo_root=repo_root,
+        evidence_root=evidence_root,
+    )
+
+
 def batch_requirements(
     specs: Sequence[CheckpointSpec],
 ) -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -24008,6 +24232,12 @@ def _parser(specs: Mapping[str, CheckpointSpec]) -> argparse.ArgumentParser:
         changes = subparsers.add_parser(command, help="source-only CI change gate")
         changes.add_argument("--evidence-root", type=Path)
 
+    admission = subparsers.add_parser(
+        "admit",
+        help="run the Architecture 132-R3N pre-publication admission gate",
+    )
+    admission.add_argument("--evidence-root", type=Path)
+
     preflight_specs = sorted(
         name for name, spec in specs.items() if spec.preflight is not None
     )
@@ -24070,6 +24300,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 repo_root=repo_root,
                 evidence_root=evidence_root,
                 docs_only=args.command == "verify-docs",
+            )
+            return 0 if passed else 1
+        if args.command == "admit":
+            passed, _ = prepublication_admission(
+                repo_root=repo_root,
+                evidence_root=evidence_root,
             )
             return 0 if passed else 1
         spec = specs[args.checkpoint]

@@ -971,6 +971,66 @@ def _reuse_fixture(profile="full"):
     return args, responses, run, jobs, runs_path, jobs_path
 
 
+def _broad_reuse_fixture():
+    args, responses, run, jobs, runs_path, jobs_path = _reuse_fixture()
+    branch = "feature/test-suite-arch132-r3n-unregistered"
+    run["head_branch"] = branch
+    responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["head_branch"] = (
+        branch
+    )
+    broad_steps = {
+        "source-static": (
+            "Resolve source gate route",
+            "Prove exact develop certification reuse",
+            "Verify full batch static authority",
+        ),
+        "active-tests": (),
+        **{
+            f"full-tests ({index})": (
+                "Record broad test shard start",
+                "Verify full batch test shard",
+                "Enforce broad test hygiene budget",
+            )
+            for index in range(4)
+        },
+        "certification-tests ( / )": (),
+        "source-gates": ("Require source gate success",),
+    }
+    jobs[:] = [
+        {
+            "name": name,
+            "run_id": 100,
+            "run_attempt": 1,
+            "head_sha": args["head"],
+            "status": "completed",
+            "conclusion": "skipped"
+            if name in {"active-tests", "certification-tests ( / )"}
+            else "success",
+            "steps": [
+                {"name": step, "status": "completed", "conclusion": "success"}
+                for step in step_names
+            ],
+        }
+        for name, step_names in broad_steps.items()
+    ]
+    responses[jobs_path]["total_count"] = len(jobs)
+    return args, responses, run, jobs, runs_path, jobs_path
+
+
+def test_r3n_prepublication_admission_contract():
+    parser = runner._parser(runner._checkpoint_specs())
+    args = parser.parse_args(["admit"])
+    assert args.command == "admit"
+    assert runner.ARCH132_R3N_BRANCH.startswith("feature/test-suite-")
+    assert runner.ARCH132_R3N_BASE_HEAD == ("029d72e81a1589e8bd3b3134531682f500087810")
+    assert runner.ARCH132_R3N_BASE_TREE == ("ea120b292a9252e3234ab4db8b64ff2c89851fea")
+    assert runner.ARCH132_R3N_ADMISSION_TESTS == (
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/scripts/certification_runner/test_lanes.py",
+    )
+
+
 @pytest.mark.parametrize("profile", ["full", "robinhood"])
 def test_r3m_exact_feature_certification_reused(profile):
     args, _, _, _, _, _ = _reuse_fixture(profile)
@@ -979,6 +1039,72 @@ def test_r3m_exact_feature_certification_reused(profile):
     assert result["head"] == args["head"] and result["tree"] == args["tree"]
     assert result["run_id"] == 100 and result["run_attempt"] == 1
     assert result["profile"] == profile
+
+
+def test_r3n_exact_feature_broad_source_gate_reused():
+    args, _, _, _, _, _ = _broad_reuse_fixture()
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["reason"] == "exact_feature_broad_source_gate"
+    assert result["reuse_kind"] == "broad_source_gate"
+    assert result["profile"] == ""
+    assert result["shards"] == [0, 1, 2, 3]
+    assert result["run_attempt"] == 1
+
+
+@pytest.mark.parametrize(
+    "mutation", ["attempt_two", "missing_shard", "duplicate_shard"]
+)
+def test_r3n_broad_source_gate_topology_is_exact(mutation):
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, jobs_path = _broad_reuse_fixture()
+    if mutation == "attempt_two":
+        run["run_attempt"] = 2
+        responses["repos/callmedraken/ai-trading-bot/actions/runs/100"][
+            "run_attempt"
+        ] = 2
+    elif mutation == "missing_shard":
+        jobs.pop(2)
+        responses[jobs_path]["total_count"] = len(jobs)
+    else:
+        jobs.append(deepcopy(jobs[2]))
+        responses[jobs_path]["total_count"] = len(jobs)
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize(
+    "mutation", ["shard_hygiene", "active_not_skipped", "cert_not_skipped"]
+)
+def test_r3n_broad_source_gate_execution_contract_is_exact(mutation):
+    args, responses, _, jobs, _, _ = _broad_reuse_fixture()
+    if mutation == "shard_hygiene":
+        jobs[2]["steps"][-1]["conclusion"] = "failure"
+    elif mutation == "active_not_skipped":
+        jobs[1]["conclusion"] = "success"
+    else:
+        jobs[6]["conclusion"] = "success"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize("mutation", ["ambiguous", "malformed", "unavailable"])
+def test_r3n_broad_source_gate_metadata_fail_closed(mutation):
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, jobs_path = _broad_reuse_fixture()
+    if mutation == "ambiguous":
+        other = deepcopy(run)
+        other["id"] = 101
+        responses[runs_path]["workflow_runs"].append(other)
+        responses[runs_path]["total_count"] = 2
+    elif mutation == "malformed":
+        responses[runs_path] = {"workflow_runs": "bad"}
+    else:
+        responses[runs_path] = None
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
 
 
 @pytest.mark.parametrize(

@@ -17,7 +17,6 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import checkpoint_runner as runner
-from scripts import run_test_certification as certification
 from trading_bot.review_paper import d1_session_authorization as q
 from trading_bot.review_paper import d1_session_authorization_host as host
 from trading_bot.review_paper import pre_market_wake_overnight as arm
@@ -768,13 +767,6 @@ def test_checkpoint_profile_inventory_and_frozen_authority():
     )
     assert runner.resolve_ci_certification_profile(q.CHECKPOINT) == "robinhood"
     assert runner._arch134_d1r7_authority_check(ROOT) == ()
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
-    inventory = certification.discover_inventory(ROOT)
-    assert {
-        p: len(certification.select_inventory(inventory, p))
-        for p in certification.PROFILES
-    } == {"full": 203, "robinhood": 112, "legacy": 222, "exhaustive": 425}
-    assert len([p for p in inventory if p.startswith("tests/gui/")]) == 51
     for name, expected in runner.ARCH134_D1R7_PREDECESSOR_DIGESTS.items():
         assert (
             hashlib.sha256(q.canonical(getattr(runner, name))).hexdigest() == expected

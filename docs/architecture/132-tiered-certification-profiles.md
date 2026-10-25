@@ -1,6 +1,6 @@
 # Architecture 132 — Tiered certification profiles
 
-## Architecture 132-R3M — exact develop certification reuse
+## Architecture 132-R3M — predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local
 HEAD/tree/branch and origin admission, fast-forward ancestry proof, full-batch
@@ -33,6 +33,55 @@ overlay. This checkpoint's reviewed test-suite branch uses normal broad source
 CI; no new feature certification mapping or local canonical run is introduced.
 ChatGPT owns exact-source review and any selected certification before integration.
 No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
+
+## Architecture 132-R3N — workflow throughput and current-contract consolidation
+
+R3N is the accepted/integrated R3M successor at:
+
+    HEAD 029d72e81a1589e8bd3b3134531682f500087810
+    TREE ea120b292a9252e3234ab4db8b64ff2c89851fea
+
+R3M's preserved feature chronology is #722 failure, #723 success, #724
+failure, #725 failure, #726 failure and #727 terminal success. Develop
+integration #728 / `40233946706` / attempt 1 succeeded, and primary local
+develop was reconciled to the same exact identity before R3N work began. The
+final bootstrap broad execution in #728 is preserved because R3M recognized
+only mapped canonical feature evidence; it is not a requirement for an exact
+future broad feature gate.
+
+R3N keeps R3M's fail-closed develop admission and exact mapped FULL/ROBINHOOD
+reuse, and additionally admits exact successful broad feature source-gate
+evidence. Broad reuse requires the same repository ID/full name, active
+workflow ID/path/name, push event, original attempt (`run_attempt == 1`), exact
+SHA/tree, admitted feature branch family, terminal success, successful
+source-static and source-gates jobs, exactly one each of broad shards 0/1/2/3
+with successful execution and hygiene steps, skipped active-tests and
+certification-tests, and one unique qualifying run. Missing, malformed,
+truncated, ambiguous or unavailable evidence, and all attempt-2-or-later runs,
+fall back to the normal broad develop route. Artifact names are not proof.
+
+The current non-effectful pre-publication admission is `ops.ps1 admit`. It
+checks exact branch/origin/base identity and ancestry, clean tracked/index
+state, changed-path classification, diff/Ruff checks, current authority and
+workflow topology, inventory/profile reconciliation, and nonempty
+FULL/ROBINHOOD/LEGACY/EXHAUSTIVE lane construction. It runs only the small
+current profile/lane/CI contract tests; it does not run protected effects,
+provider/broker/live paths, canonical FULL/ROBINHOOD, or the broad checkpoint
+union. Current count/topology assertions live in
+`tests/scripts/certification_runner/test_profiles.py`,
+`test_lanes.py`, and `tests/runtime/checkpoint_runner/test_ci.py`. Historical
+Architecture-133/134 tests retain predecessor, authority, and incident
+evidence without re-owning current counts or workflow AST merely because
+current source changed.
+
+One logical checkpoint receives one atomic commit/push and one CI admission.
+Terminal-red evidence is retained. A reproducible bounded mechanical
+correction is separately named and must pass the complete focused/local
+pre-publication gate before its new atomic push; Codex continues across such
+corrections until terminal green without an arbitrary C1/C2/C3 cap. Semantic,
+security, authority, protected-effect, unexpected-state, non-reproducible or
+material-scope failures stop for ChatGPT review. No provider, holdout, ACL,
+scheduler, runtime, broker or live authority follows R3N.
 
 ## Current accepted closeout — Architecture 132-R3L
 

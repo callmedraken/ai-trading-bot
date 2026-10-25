@@ -19,6 +19,7 @@ from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID
 from trading_bot.strategies import MovingAverageCrossoverConfig
 from trading_bot.supervised_release import successor_direct_installation as d
 from trading_bot.supervised_release import successor_native_direct_write as native
+from trading_bot.supervised_release import successor_source as fresh
 from trading_bot.supervised_release.binding import RuntimeBinding
 from trading_bot.supervised_release.bundle import (
     ReleaseBundle,
@@ -1088,7 +1089,8 @@ def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
 
 def test_predecessor_c1_inventory_uses_current_d1s4_overlay():
     assert (
-        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 == runner.ARCH134_ACL_ACTIVE_SHA256
+        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        == runner.ARCH134_FRESH_ACTIVE_SHA256
     )
     assert (
         runner.ARCH134_R5_ACTIVE_CI_CHECKPOINTS_SHA256
@@ -1193,3 +1195,313 @@ def test_real_malformed_latch_has_sanitized_attempt_localization(host):
     assert row["status"] == "INDETERMINATE"
     assert row["admission_stage"] == "ATTEMPT_OBSERVATION"
     assert row["admission_code"] == "LATCH_UNPROVEN"
+
+
+# Post-R1 fresh successor source: no native host or installation dispatch.
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "head",
+        "tree",
+        "branch",
+        "origin",
+        "status",
+        "index",
+        "base",
+        "remote",
+        "flags",
+        "root",
+        "interlock",
+    ],
+)
+def test_fresh_exact_source_admission_rejects_each_mismatch(monkeypatch, bad):
+    monkeypatch.setenv(fresh.REMOTE_HEAD_ENV, "a" * 40)
+    monkeypatch.setenv(fresh.SOURCE_TREE_ENV, "b" * 40)
+    mapping = {
+        ("rev-parse", "HEAD"): b"a" * 40,
+        ("rev-parse", "HEAD^{tree}"): b"b" * 40,
+        ("branch", "--show-current"): fresh.BRANCH.encode(),
+        ("remote", "get-url", "origin"): fresh.ORIGIN.encode(),
+        ("status", "--porcelain=v1", "--untracked-files=all"): b"",
+        ("diff", "--cached", "--name-only"): b"",
+        ("merge-base", fresh.BASE_HEAD, "HEAD"): fresh.BASE_HEAD.encode(),
+        ("rev-parse", fresh.BASE_HEAD + "^{tree}"): fresh.BASE_TREE.encode(),
+        ("rev-parse", "--show-toplevel"): str(ROOT).encode(),
+        ("ls-files", "-v", "-z"): b"H source.py\0",
+        ("ls-remote", "origin", "refs/heads/" + fresh.BRANCH): (
+            "a" * 40 + "\trefs/heads/" + fresh.BRANCH
+        ).encode(),
+    }
+    monkeypatch.setattr(fresh, "WORKTREE", ROOT)
+    assert fresh.admit_source.__module__ == fresh.__name__
+    keys = list(mapping)
+    chosen = {
+        "head": 0,
+        "tree": 1,
+        "branch": 2,
+        "origin": 3,
+        "status": 4,
+        "index": 5,
+        "base": 6,
+        "root": 8,
+        "flags": 9,
+        "remote": 10,
+    }
+    monkeypatch.setattr(fresh, "_git", lambda *args: mapping[args])
+    assert fresh.admit_source() == ("a" * 40, "b" * 40)
+    if bad == "interlock":
+        monkeypatch.setenv(fresh.REMOTE_HEAD_ENV, "wrong")
+    else:
+        mapping[keys[chosen[bad]]] = b"wrong"
+    with pytest.raises(ValueError):
+        fresh.admit_source()
+
+
+@pytest.mark.parametrize("drift", [False, True])
+def test_fresh_reconstructs_complete_exact_source_release(monkeypatch, tmp_path, drift):
+    seed = accepted()
+    for item in seed.bundle.files:
+        if item.relative_path != "manifest.json":
+            path = tmp_path / item.relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(item.data)
+    monkeypatch.setattr(fresh, "WORKTREE", tmp_path)
+    observations = []
+
+    def admit():
+        observations.append(1)
+        return (
+            ("a" * 40, "b" * 40)
+            if not drift or len(observations) == 1
+            else ("c" * 40, "b" * 40)
+        )
+
+    monkeypatch.setattr(fresh, "admit_source", admit)
+    rows = b"\0".join(
+        b"100644 blob " + b"1" * 40 + b"\t" + name.encode()
+        for name in seed.expected_source_paths
+    )
+    monkeypatch.setattr(fresh, "_git", lambda *args: rows)
+
+    def collect(root, *, declaration):
+        assert root == tmp_path
+        assert (
+            tuple(row.relative_path for row in declaration.source_inventory)
+            == seed.expected_source_paths
+        )
+        assert (
+            declaration.source_head == "a" * 40 and declaration.source_tree == "b" * 40
+        )
+        files = [
+            item for item in seed.bundle.files if item.relative_path != "manifest.json"
+        ]
+        manifest = ReleaseFile("manifest.json", declaration.to_json().encode())
+        return VerifiedRelease(
+            ReleaseBundle(
+                tuple(sorted((*files, manifest), key=lambda row: row.relative_path))
+            ),
+            manifest.sha256,
+            "a" * 40,
+            "b" * 40,
+            seed.expected_source_paths,
+        )
+
+    monkeypatch.setattr(fresh, "collect_release_bundle", collect)
+    if drift:
+        with pytest.raises(fresh.ObservationDrift):
+            fresh.reconstruct_release()
+    else:
+        release, binding = fresh.reconstruct_release()
+        assert binding.verified_release == release
+        assert binding.to_dict()["release_root"] == release_root(
+            release.manifest.release_id
+        )
+
+
+def test_fresh_source_report_and_derivations_never_access_host(monkeypatch):
+    release = accepted()
+    monkeypatch.setattr(
+        fresh, "reconstruct_release", lambda: (release, RuntimeBinding(release))
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("source-only report attempted filesystem/native operation")
+
+    monkeypatch.setattr(Path, "open", forbidden)
+    monkeypatch.setattr(Path, "lstat", forbidden)
+    monkeypatch.setattr(d, "preflight", forbidden)
+    monkeypatch.setattr(d, "execute_once", forbidden)
+    monkeypatch.setattr(native, "materialize_release", forbidden)
+    report = fresh.source_report()
+    assert report == fresh.source_report()
+    assert report["source_head"] == release.expected_source_head
+    assert report["source_tree"] == release.expected_source_tree
+    assert (
+        report["manifest"]["source_inventory_sha256"]
+        == release.manifest.source_inventory_sha256
+    )
+    assert report["release_id"] not in fresh.INCIDENT_RELEASE_IDS
+    assert report["final_path"] == release_root(release.manifest.release_id)
+    assert report["final_path"] not in fresh.INCIDENT_ROOTS
+    assert fresh.attempt_path(release) == d.attempt_path(release)
+    assert fresh.attempt_bytes(release) == d.attempt_bytes(release)
+    for key in [
+        "runtime_binding_eligible",
+        "successor_soak_eligible",
+        "execute_eligible",
+    ]:
+        assert report[key] is False
+    assert (
+        report["attempt_observation"] == report["final_path_observation"] == "NOT_RUN"
+    )
+    assert report["effect_disposition"] == "NOT_STARTED"
+    assert report["automatic_retry"] == "NOT_AUTHORIZED"
+    assert not hasattr(fresh, "preflight") and not hasattr(fresh, "execute_once")
+
+
+@pytest.mark.parametrize(
+    "head,tree", [(fresh.BASE_HEAD, "b" * 40), ("a" * 40, fresh.BASE_TREE)]
+)
+def test_fresh_source_generation_rejects_predecessor(monkeypatch, head, tree):
+    monkeypatch.setenv(fresh.REMOTE_HEAD_ENV, head)
+    monkeypatch.setenv(fresh.SOURCE_TREE_ENV, tree)
+    with pytest.raises(ValueError, match="FRESH_SOURCE_REQUIRED"):
+        fresh.admit_source()
+    with pytest.raises(ValueError, match="HISTORICAL_RELEASE_FORBIDDEN"):
+        fresh.attempt_path(accepted(head, tree))
+
+
+@pytest.mark.parametrize("ordinal", range(3))
+def test_fresh_source_rejects_every_incident_id(monkeypatch, ordinal):
+    release = accepted()
+    identifiers = list(fresh.INCIDENT_RELEASE_IDS)
+    identifiers[ordinal] = release.manifest.release_id
+    monkeypatch.setattr(fresh, "INCIDENT_RELEASE_IDS", tuple(identifiers))
+    with pytest.raises(ValueError, match="HISTORICAL_RELEASE_FORBIDDEN"):
+        fresh.attempt_bytes(release)
+
+
+@pytest.mark.parametrize(
+    "payload,absence,expected",
+    [
+        (None, True, "AVAILABLE"),
+        (None, False, "INDETERMINATE"),
+        (b"", False, "INDETERMINATE"),
+        (b"{}", False, "INDETERMINATE"),
+        ("exact", False, "CONSUMED"),
+        ("exact", True, "INDETERMINATE"),
+        ("old", False, "INDETERMINATE"),
+        ("r1", False, "INDETERMINATE"),
+    ],
+)
+def test_fresh_attempt_semantics_are_one_shot_and_release_bound(
+    payload, absence, expected
+):
+    release = accepted()
+    if payload == "exact":
+        payload = fresh.attempt_bytes(release)
+    elif payload == "old":
+        payload = d.attempt_bytes(accepted("c" * 40, "e" * 40))
+    elif payload == "r1":
+        payload = (
+            b'{"schema":"arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-attempt/v1",'
+            b'"status":"CONSUMED"}'
+        )
+    assert fresh.classify_attempt(release, payload, absence_proven=absence) == expected
+
+
+def test_fresh_source_registration_preserves_predecessors():
+    spec = runner._checkpoint_specs()[fresh.CHECKPOINT]
+    assert spec.remote_branch == fresh.BRANCH
+    assert spec.preflight is None and spec.execute is None
+    assert (
+        runner.resolve_ci_checkpoint(runner._checkpoint_specs(), fresh.BRANCH, "push")
+        == fresh.CHECKPOINT
+    )
+    assert runner.CI_CERTIFICATION_PROFILES[fresh.CHECKPOINT] == "robinhood"
+    assert runner._arch134_fresh_graph_check(ROOT) == ()
+    assert runner._arch134_fresh_authority_check(ROOT) == ()
+    for check in [
+        runner._arch134_acl_authority_check,
+        runner._arch134_d1s4_authority_check,
+    ]:
+        assert check(ROOT) == ()
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        (
+            "from trading_bot.supervised_release.successor_direct_installation "
+            "import execute_once"
+        ),
+        "from trading_bot.supervised_release import successor_native_direct_write",
+        "from trading_bot import shared_namespace_acl_recovery",
+        "from trading_bot.supervised_release import successor_publication_recovery",
+        "from trading_bot.runtime import scheduler",
+        "from trading_bot.robinhood import provider",
+        "from trading_bot.arch133_rename import qualification",
+        "os.rename()",
+        "Path('fake').open('wb')",
+        "SetSecurityInfo()",
+        "Path.mkdir()",
+        "Path.write_bytes()",
+        "materialize_release()",
+        "bind(library, 'MoveFileW', [], None)",
+    ],
+)
+def test_fresh_source_graph_rejects_effects(monkeypatch, payload):
+    original = Path.read_text
+
+    def read(path, *args, **kwargs):
+        result = original(path, *args, **kwargs)
+        return result + "\n" + payload if path.name == "successor_source.py" else result
+
+    monkeypatch.setattr(Path, "read_text", read)
+    assert runner._arch134_fresh_graph_check(ROOT)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        "BLOB_PREDECESSORS",
+        "BLOB_PINS",
+        "AST_PREDECESSORS",
+        "AST_PINS",
+        "SOURCE_PINS",
+        "NEW_AST_PINS",
+    ],
+)
+def test_fresh_source_authority_fails_closed(monkeypatch, mapping):
+    monkeypatch.setattr(runner, "ARCH134_FRESH_" + mapping, {})
+    assert runner._arch134_fresh_authority_check(ROOT)
+
+
+def test_fresh_exact_incident_inventory_and_python_declaration(monkeypatch):
+    assert fresh.INCIDENT_RELEASE_IDS == (
+        "release-18d5d329c1d458558e98d7effe523c3b",
+        "release-cb94451fc3295a97afffe9fac5d09ff3",
+        "release-03c42597246752319956ab96e01ed61c",
+    )
+    assert fresh.INCIDENT_ROOTS == tuple(
+        release_root(identifier) + (".installing" if index else "")
+        for index, identifier in enumerate(fresh.INCIDENT_RELEASE_IDS)
+    )
+    release = accepted()
+    monkeypatch.setattr(fresh, "PYTHON_SHA256", "f" * 64)
+    with pytest.raises(ValueError, match="PRODUCTION_PYTHON_DECLARATION_DRIFT"):
+        fresh.attempt_path(release)
+
+
+def test_fresh_current_docs_do_not_grant_executable_authority(monkeypatch):
+    original = runner._git_blob_sha1
+
+    def blob(path):
+        if path.name in {"PROJECT_STATUS.md", "AI_TRADING_BOT_HANDOFF.md"}:
+            pytest.fail("mutable current docs must not be executable blob pins")
+        return original(path)
+
+    monkeypatch.setattr(runner, "_git_blob_sha1", blob)
+    assert runner._arch134_fresh_authority_check(ROOT) == ()

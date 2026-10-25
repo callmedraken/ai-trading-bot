@@ -132,6 +132,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
         runner.ARCH134_D1S4_NAME,
         runner.ARCH134_R5_NAME,
@@ -379,6 +380,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH134_D1S3_BRANCH
         if spec.name == runner.ARCH134_R5_NAME:
             expected_branch = runner.ARCH134_R5_BRANCH
+        if spec.name == runner.ARCH134_FRESH_NAME:
+            expected_branch = runner.ARCH134_FRESH_BRANCH
         if spec.name == runner.ARCH134_ACL_NAME:
             expected_branch = runner.ARCH134_ACL_BRANCH
         if spec.name == runner.ARCH134_D1S4_NAME:
@@ -924,6 +927,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
             runner.ARCH145A_NAME,
             runner.ARCH134_F1R1_B_NAME,
             runner.ARCH134_R5_NAME,
+            runner.ARCH134_FRESH_NAME,
             runner.ARCH134_ACL_NAME,
             runner.ARCH134_D1S4_NAME,
             runner.ARCH134_D1S3_NAME,
@@ -1393,6 +1397,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-d1r6-overnight-wake-arming",
                 "arch134-d1r5-pre-market-wake-qualification",
                 "arch134-alpaca-authentication-qualification",
+                runner.ARCH134_FRESH_NAME,
                 runner.ARCH134_ACL_NAME,
                 runner.ARCH134_D1S4_NAME,
             }
@@ -1634,6 +1639,7 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
         "              arch134-f1r1-d1s2-successor-installed-readiness `\n",
     ).replace(
         "              arch134-f1r1-d1s3-r5-successor-release-publication-recovery `\n",
+        "              arch134-f1r1-d1s4-fresh-successor-source `\n"
         "              arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery `\n"
         "              arch134-f1r1-d1s4-rename-free-direct-installation `\n"
         "              arch134-f1r1-d1s3-r5-successor-release-publication-recovery `\n",

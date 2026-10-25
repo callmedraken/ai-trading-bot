@@ -373,7 +373,7 @@ def test_checkpoint_and_certification_inventory_are_exact() -> None:
         "arch134-production-strategy-decision",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 77
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 78
     assert (
         checkpoint_runner.ACTIVE_CI_CHECKPOINTS[-7]
         == checkpoint_runner.ARCH134_AUTH_NAME

@@ -634,7 +634,7 @@ surfaced by `.\ops.ps1 status`, is authoritative:
 
 ```powershell
 .\ops.ps1 status
-.\ops.ps1 preflight arch134-f1r1-d1s4-rename-free-direct-installation
+.\ops.ps1 verify arch134-f1r1-d1s4-fresh-successor-source
 .\ops.ps1 verify arch128-parent-acl-repair
 .\ops.ps1 verify arch128-r4
 .\ops.ps1 preflight arch128-parent-acl-repair
@@ -653,6 +653,11 @@ protected-dispatch inventory from prose or examples; `_checkpoint_specs()` and
 `.\ops.ps1 status` are authoritative. A registered preflight owns its own
 Administrator/source/host admission and evidence capture; do not insert an
 external pre-screen that can abort before the runner records the attempt.
+
+The current post-R1 successor is SOURCE ONLY and has no preflight/execute
+dispatch. Historical D1S4/R1 host registrations retain predecessor meaning;
+they are not fresh-successor deployment authority. ChatGPT must review the new
+exact source and later deployment-admission boundary before real-host work.
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a
 source/preflight PASS. It may be invoked only after authorization within the

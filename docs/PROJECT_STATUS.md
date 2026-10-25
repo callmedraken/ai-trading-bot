@@ -94,6 +94,10 @@ ChatGPT exact-source review are still required before acceptance/integration.
 Existing NYSE historical-calendar limitations and future acquisition/provenance
 requirements remain explicit in the Architecture-146 implementation notes.
 
-Immediate next step: complete one atomic feature publication and terminal CI,
-then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
+Initial publication 472d569 / push run 718 attempt 1 is preserved as terminal
+failed evidence. Corrective C1 addresses the frozen timing fixture, conditional
+FULL SciPy dependency, and read-only predecessor-prefix reconciliation.
+
+Immediate next step: publish the focused-verified C1 once, wait for its terminal
+CI-owned FULL result, then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
 holdout, create eligibility, or cross any host/production/trading boundary.

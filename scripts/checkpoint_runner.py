@@ -9012,7 +9012,7 @@ def _supervised_installation_reconciliation_authority_check(
             or spec.authority_check
             is not _supervised_installation_reconciliation_authority_check
             or tuple(
-                ACTIVE_CI_CHECKPOINTS[
+                _arch146a_predecessor_active_inventory()[
                     : 2 if ARCH134_D1S3_ACTIVE_CI_CHECKPOINTS_SHA256 else 1
                 ]
             )
@@ -19902,15 +19902,20 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor != before[key]:
             raise ValueError("146-A wrong exact predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch146a_c1_pin(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
-    # The predecessor resolver may already have applied this overlay.
+    # The predecessor resolver may already have applied either successor.
+    if (
+        relative in ARCH146A_C1_BLOB_PINS
+        and predecessor == ARCH146A_C1_BLOB_PINS[relative]
+    ):
+        return _arch146a_c1_pin(relative, predecessor, ast_pin=False)
     if relative in ARCH146A_BLOB_PINS and predecessor == ARCH146A_BLOB_PINS[relative]:
         _arch146a_maps()
-        return predecessor
+        return _arch146a_c1_pin(relative, predecessor, ast_pin=False)
     return _arch146a_overlay(relative, predecessor, ast_pin=False)
 
 
@@ -19953,16 +19958,16 @@ def _arch146a_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         )
         for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
                 failures.append("146-A runner AST drift: " + key)
         for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != _arch146a_c1_pin(
+                relative, pin, ast_pin=False
+            ):
                 failures.append("146-A source drift: " + relative)
+        failures.extend(_arch146a_c1_authority_check(repo_root))
         failures.extend(_arch145a_authority_check(repo_root))
         spec = _checkpoint_specs()[ARCH146A_NAME]
         if (
@@ -19985,6 +19990,142 @@ def _arch146a_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("146-A source-only registration drift")
     except (ValueError, KeyError, TypeError, OSError, SyntaxError):
         failures.append("146-A authority unavailable")
+    return tuple(failures)
+
+
+# 146-A corrective C1 preserves the failed #718 publication and all its literal
+# predecessor maps. Only exact test/workflow/registry successors are admitted.
+ARCH146A_C1_AST_PREDECESSORS: Final = {
+    "_arch146a_authority_check": (
+        "8a36b31efed4d08040354bfc6c747198a1d10be8f1627514ae2368ec99b0e214"
+    ),
+    "_arch146a_overlay": (
+        "2d0f67ec04f8f93cd6640ee8883fdc9d6087efa9bc21b4c307dfb66758553aa8"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "b2fc26205a075b68500f2c61092672ea287826bf76ad08ade326123a68e03edd"
+    ),
+    "_supervised_installation_reconciliation_authority_check": (
+        "b028fa3543603919120fa20414700be57f5a642b773d49411ebe6c1cc1bc2a76"
+    ),
+}
+ARCH146A_C1_AST_PINS: Final = {
+    "_arch146a_authority_check": (
+        "2b6ce1d9d38aa4ad8f6b0207ca082d00c115007e36a99e2dd8a69925fa99fa15"
+    ),
+    "_arch146a_overlay": (
+        "9967ab52cfbe3a3ffc97811c428d468eb65532a91f49429a427f21a2c0c9f1c7"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "a2129f2525263bff2ae762d3f400207bfe28968e3cc7639afeb9e78d3b4c9950"
+    ),
+    "_supervised_installation_reconciliation_authority_check": (
+        "076ae8e1448c95ac2933f88923cc89aa37c6b883e7293e959e4965cd93af9734"
+    ),
+}
+ARCH146A_C1_BLOB_PREDECESSORS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "2ca64fa557dfe65e5583211f259f9ee87a75a7da"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "5a969ed49f48b2cb524af00c66064ee10101a2dc"
+    ),
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py": (
+        "f0deae5f2bd4bf3656d3c6921446779076a5530b"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "3d12f4f5423dadd6302ea965daa26804a57a2b96"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "7c0b82e9dac79bde71443b853303d096a1a180ee"
+    ),
+    "docs/validation/arch146-historical-research-data-custody-plan.md": (
+        "2ad443aa39a7870f3f2f8412b86fc41b244abb99"
+    ),
+}
+ARCH146A_C1_BLOB_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "4f317b44f54f4c27c7128583ce89e1e2bcb1e403"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "01ae41fa37083e9bc548fedbaae6178328458dff"
+    ),
+    "tests/review_paper/test_supervised_release_installation_reconciliation.py": (
+        "507fa5cac33f19a3e936ade24787d4db1cd75afb"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a7c378d90aa1befa5e71f033175459520d375ffb"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "26a4214d6c48aae63c913ff8d7559f6a33f84807"
+    ),
+    "docs/validation/arch146-historical-research-data-custody-plan.md": (
+        "424e6f957200f9bcb54e88b16ffe7e1abc225f44"
+    ),
+}
+ARCH146A_C1_NEW_AST_PINS: Final = {
+    "_arch146a_c1_authority_check": (
+        "44a2efacb4cbd789a6ff9f88fb88e83e6d104f77c93d476c0ca2780110723a0c"
+    ),
+    "_arch146a_c1_maps": (
+        "2193bd323a3cb5e8561956c1a6e2d6e097a636a673f75a06d20d5ba829d008f5"
+    ),
+    "_arch146a_c1_pin": (
+        "f987a51663f501f79b98bd6c0199d743f76a0cb4135b2d2c7a84b59ea381614c"
+    ),
+}
+ARCH146A_C1_MAPS_SHA256: Final = (
+    "1349b04532c8e86de64305f2c41bbef1bf3f40c79444c648134aea62c44368eb"
+)
+
+
+def _arch146a_c1_maps() -> None:
+    maps = (
+        ARCH146A_C1_AST_PREDECESSORS,
+        ARCH146A_C1_AST_PINS,
+        ARCH146A_C1_BLOB_PREDECESSORS,
+        ARCH146A_C1_BLOB_PINS,
+        ARCH146A_C1_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH146A_C1_MAPS_SHA256
+        or set(ARCH146A_C1_AST_PREDECESSORS) != set(ARCH146A_C1_AST_PINS)
+        or set(ARCH146A_C1_BLOB_PREDECESSORS) != set(ARCH146A_C1_BLOB_PINS)
+    ):
+        raise ValueError("146-A C1 exact successor maps drift")
+
+
+def _arch146a_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch146a_c1_maps()
+    before = ARCH146A_C1_AST_PREDECESSORS if ast_pin else ARCH146A_C1_BLOB_PREDECESSORS
+    after = ARCH146A_C1_AST_PINS if ast_pin else ARCH146A_C1_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("146-A C1 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch146a_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    _arch146a_c1_maps()
+    failures = []
+    functions = _top_level_functions(
+        ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    )
+    for key, pin in {**ARCH146A_C1_AST_PINS, **ARCH146A_C1_NEW_AST_PINS}.items():
+        if (
+            hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest()
+            != pin
+        ):
+            failures.append("146-A C1 runner AST drift: " + key)
+    for relative, pin in ARCH146A_C1_BLOB_PINS.items():
+        if _git_blob_sha1(repo_root / relative) != pin:
+            failures.append("146-A C1 source drift: " + relative)
     return tuple(failures)
 
 

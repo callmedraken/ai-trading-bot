@@ -1606,6 +1606,12 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     current = path.read_text(encoding="utf-8").replace(
         "              arch146-a-historical-research-dataset-enforcement \x60\n", ""
     )
+    # C1's independently pinned dependency step is additive to this old proof.
+    marker = "      - name: Install FULL optimizer dependency\n"
+    added = current.partition(marker)[2].partition(
+        "      - name: Run canonical certification profile\n"
+    )[0]
+    current = current.replace(marker + added, "", 1)
     predecessor = subprocess.run(
         [
             "git",

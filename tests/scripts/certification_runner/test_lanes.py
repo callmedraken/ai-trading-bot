@@ -53,7 +53,6 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         for m in selected
         if m
         not in {
-            "tests/experiments/test_historical_research_dataset.py",
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
@@ -233,11 +232,13 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     assert "tests/review_paper/test_successor_publication_recovery.py" in inventory
     current = inventory
+    assert "tests/experiments/test_historical_research_dataset.py" in current
     inventory = tuple(
         m
         for m in inventory
         if m
         not in {
+            "tests/experiments/test_historical_research_dataset.py",
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
@@ -280,6 +281,12 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     ]
     assert {module: max(1, ms) for module, ms in raw.items()} == weights
 
+    assert (
+        runner.full_module_weights(current)[
+            "tests/experiments/test_historical_research_dataset.py"
+        ]
+        == runner.FULL_FALLBACK_MS
+    )
     current_lanes = runner.build_lanes(root, current, "full")
     runner.validate_partitions(current, tuple(current_lanes.values()))
     assert (

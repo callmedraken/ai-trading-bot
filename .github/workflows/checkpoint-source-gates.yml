@@ -358,6 +358,17 @@ jobs:
             "ruff>=0.6,<1.0" `
             "tzdata>=2024.1,<2027.0"
 
+      - name: Install FULL optimizer dependency
+        if: needs.source-static.outputs.certification_profile == 'full'
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check "scipy>=1.17,<1.19"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          python -m pip check
+          exit $LASTEXITCODE
+
       - name: Run canonical certification profile
         env:
           CERT_PROFILE: ${{ needs.source-static.outputs.certification_profile }}

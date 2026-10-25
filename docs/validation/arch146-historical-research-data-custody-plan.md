@@ -211,3 +211,24 @@ calendar discrepancy separately; synthetic PASS does not certify real coverage.
 Opaque raw-page and corporate-action digest verification is integrity evidence,
 not proof of provider pagination, normalization economics or corporate-action
 admissibility. No real data, acquisition or holdout authority follows.
+
+## Corrective C1 after preserved run 718
+
+Initial source 472d5698435313e531fe2afd201959869b113f12 / tree
+db0b8aa73c2233a873ec28eb1eba04d4ea8a8b2e and push run 718 /
+40176547184 attempt 1 are preserved as terminal failed evidence.
+
+C1 repairs only the frozen FULL timing-fixture projection, the missing declared
+optimization-cpu dependency in FULL CI, and the 133-AI predecessor-prefix check
+following the added source-only checkpoint. The new research module stays in
+current FULL and uses its existing fallback timing weight. SciPy installation
+is conditional on FULL and fails closed; optimizer source/semantics do not change.
+AI remains read-only and AJ remains retired/closed. No protected dispatcher or
+effect authority is added.
+
+The initial 146-A and earlier pin maps remain literal immutable predecessors.
+A separate C1 overlay records exact old/new workflow, test and runner AST pins.
+Both bounded current-state documents are reviewed for this corrective checkpoint.
+The replacement publication retains CI-owned FULL and requires terminal green
+plus ChatGPT exact-source review before acceptance. No local FULL rerun or
+146-B acquisition is part of C1.

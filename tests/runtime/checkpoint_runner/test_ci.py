@@ -798,3 +798,49 @@ def test_arch146a_source_mutation_is_rejected(tmp_path):
         (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
     )
     assert runner._arch146a_authority_check(tmp_path)
+
+
+def test_arch146a_c1_full_dependency_is_declared_conditional_and_fail_closed():
+    import tomllib
+
+    root = Path(runner.__file__).resolve().parents[1]
+    config = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    (requirement,) = config["project"]["optional-dependencies"]["optimization-cpu"]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    step = workflow.split("      - name: Install FULL optimizer dependency\n", 1)[
+        1
+    ].split("      - name: Run canonical certification profile\n", 1)[0]
+    assert "if: needs.source-static.outputs.certification_profile == 'full'" in step
+    assert f'python -m pip install --disable-pip-version-check "{requirement}"' in step
+    assert "if ($LASTEXITCODE -ne 0)" in step
+    assert "python -m pip check\n          exit $LASTEXITCODE" in step
+    assert runner._batch_workflow_is_reviewed(workflow)
+
+
+def test_arch146a_c1_exact_successors_and_frozen_failed_maps():
+    root = Path(runner.__file__).resolve().parents[1]
+    runner._arch146a_maps()
+    runner._arch146a_c1_maps()
+    assert runner._arch146a_c1_authority_check(root) == ()
+    assert runner._arch146a_authority_check(root) == ()
+    for ast_pin, before, after in (
+        (True, runner.ARCH146A_C1_AST_PREDECESSORS, runner.ARCH146A_C1_AST_PINS),
+        (False, runner.ARCH146A_C1_BLOB_PREDECESSORS, runner.ARCH146A_C1_BLOB_PINS),
+    ):
+        for key, pin in before.items():
+            assert runner._arch146a_c1_pin(key, pin, ast_pin=ast_pin) == after[key]
+            assert (
+                runner._arch146a_c1_pin(key, after[key], ast_pin=ast_pin) == after[key]
+            )
+            with pytest.raises(ValueError, match="C1 wrong exact predecessor"):
+                runner._arch146a_c1_pin(key, "0" * len(pin), ast_pin=ast_pin)
+
+
+def test_arch146a_c1_missing_successor_map_fails_closed(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    monkeypatch.setattr(runner, "ARCH146A_C1_AST_PINS", {})
+    with pytest.raises(ValueError, match="C1 exact successor maps"):
+        runner._arch146a_c1_maps()
+    assert runner._arch146a_authority_check(root)

@@ -451,7 +451,8 @@ def find_reusable_ci_certification(
                 continue
             run_id, attempt = run["id"], run["run_attempt"]
             require(type(run_id) is int and 0 < run_id < current_run_id)
-            require(type(attempt) is int and attempt > 0)
+            # Only the original push-triggered attempt is reusable evidence.
+            require(type(attempt) is int and attempt == 1)
             detail = lookup(f"{prefix}/actions/runs/{run_id}")
             for key in (
                 "id",
@@ -468,6 +469,7 @@ def find_reusable_ci_certification(
                 "conclusion",
             ):
                 require(detail[key] == run[key])
+            require(detail["run_attempt"] == 1)
             jobs = page(
                 lookup(
                     f"{prefix}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100"
@@ -497,6 +499,7 @@ def find_reusable_ci_certification(
                     and job.get("conclusion") == "success"
                     and job.get("run_id") == run_id
                     and job.get("run_attempt") == attempt
+                    and job.get("run_attempt") == 1
                     and job.get("head_sha") == head
                 ):
                     eligible = False
@@ -20783,8 +20786,8 @@ def _arch132_r3m_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor not in (before[key], after[key]):
             raise ValueError("R3M C1 wrong exact predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch132_r3m_c2_pin(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -20800,18 +20803,140 @@ def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
             **ARCH132_R3M_C1_AST_PINS,
             **ARCH132_R3M_C1_NEW_AST_PINS,
         }.items():
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch132_r3m_c2_pin(key, pin, ast_pin=True):
+                failures.append("R3M C1 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c2_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3M C1 source drift: " + relative)
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3M C1 authority unavailable")
+    failures.extend(_arch132_r3m_c2_authority_check(repo_root))
+    return tuple(failures)
+
+
+# C2 preserves failed #722, successful C1 #723, and every earlier literal map.
+ARCH132_R3M_C2_AST_PREDECESSORS: Final = {
+    "find_reusable_ci_certification": (
+        "4ee68f2f02f122883fd355b30f7253f944b727346aa8013bbfdb49dabcdd9c21"
+    ),
+    "_arch132_r3m_c1_pin": (
+        "21cddda4cd9e27a743dfb4aba6561e07d2d4115d9967cd440eed70ca844b6eb5"
+    ),
+    "_arch132_r3m_c1_authority_check": (
+        "e722f575b762c80bbbde8370d2ca81d3797cda9db3ab703c9ea301e80a540f9c"
+    ),
+}
+ARCH132_R3M_C2_AST_PINS: Final = {
+    "find_reusable_ci_certification": (
+        "ae0f6f4c8aed399ad66849deb68950e8054400f6eea833c369be5fddf47af063"
+    ),
+    "_arch132_r3m_c1_pin": (
+        "3fff7b4dcc2f43aecb2c9f72bef0ad392781dad24edaa407f9eab879d53e2d00"
+    ),
+    "_arch132_r3m_c1_authority_check": (
+        "763d1c4e8e1ae758990a65cc21cd9e0646e31e70807394c4a1c1a344159c6dd8"
+    ),
+}
+ARCH132_R3M_C2_BLOB_PREDECESSORS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("4629ebbac8096ad9a517c12ad9e529c03194e197"),
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "fa1afdc945d932b3a60064d2b63b08d3646da14d"
+    ),
+    "docs/PROJECT_STATUS.md": "85098f7af74a07750cdb736b7ce5bebef897d3bd",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "01dc058528f86fa9d9c7dbbb57063edfd386683f",
+}
+ARCH132_R3M_C2_BLOB_PINS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": "7b66d8a42d816f33e40d9861cfd086dc4b43055e",
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "627942d088f609cc6debb3fbd501fdd1b4a3cf5f"
+    ),
+    "docs/PROJECT_STATUS.md": "8e71eb18e0a136fc1b40497a53a86f3e457ea17e",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "9c1346707b72eb8bc0bb8a85cd3c87b3ce075723",
+}
+ARCH132_R3M_C2_NEW_BLOB_PINS: Final = {
+    "tests/runtime/checkpoint_runner/test_r3m_c2.py": (
+        "a360fc14a1a8b3d8e92beec50eba6c09eb5c795f"
+    ),
+}
+ARCH132_R3M_C2_NEW_AST_PINS: Final = {
+    "_arch132_r3m_c2_maps": (
+        "7ba713e32e4247712e8d419337ce135e35a161ab2df0486e33e4522bdb058da3"
+    ),
+    "_arch132_r3m_c2_pin": (
+        "5c1a0bf690e9cc2168329d522f63afa88dd9ac297a73b0208d8beb78bc645a2a"
+    ),
+    "_arch132_r3m_c2_authority_check": (
+        "ee9742b2ee600d9a79ad3a137943abde76eb0118d4fe0c1c7ef05c1e166ee84d"
+    ),
+}
+ARCH132_R3M_C2_MAPS_SHA256: Final = (
+    "7465e7d0a3998feb0c6331a135aa2c5b2c3283a20f62782746a969c00661e0fc"
+)
+
+
+def _arch132_r3m_c2_maps() -> None:
+    maps = (
+        ARCH132_R3M_C2_AST_PREDECESSORS,
+        ARCH132_R3M_C2_AST_PINS,
+        ARCH132_R3M_C2_BLOB_PREDECESSORS,
+        ARCH132_R3M_C2_BLOB_PINS,
+        ARCH132_R3M_C2_NEW_AST_PINS,
+        ARCH132_R3M_C2_NEW_BLOB_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3M_C2_MAPS_SHA256
+        or set(ARCH132_R3M_C2_AST_PREDECESSORS) != set(ARCH132_R3M_C2_AST_PINS)
+        or set(ARCH132_R3M_C2_BLOB_PREDECESSORS) != set(ARCH132_R3M_C2_BLOB_PINS)
+    ):
+        raise ValueError("R3M C2 exact successor maps drift")
+
+
+def _arch132_r3m_c2_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3m_c2_maps()
+    before = (
+        ARCH132_R3M_C2_AST_PREDECESSORS if ast_pin else ARCH132_R3M_C2_BLOB_PREDECESSORS
+    )
+    after = ARCH132_R3M_C2_AST_PINS if ast_pin else ARCH132_R3M_C2_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3M C2 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch132_r3m_c2_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3M_C2_AST_PINS,
+            **ARCH132_R3M_C2_NEW_AST_PINS,
+        }.items():
             if (
                 hashlib.sha256(
                     ast.dump(functions[key], include_attributes=False).encode()
                 ).hexdigest()
                 != pin
             ):
-                failures.append("R3M C1 runner AST drift: " + key)
-        for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
+                failures.append("R3M C2 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3M_C2_BLOB_PINS.items():
             if _git_blob_sha1(repo_root / relative) != pin:
-                failures.append("R3M C1 source drift: " + relative)
+                failures.append("R3M C2 source drift: " + relative)
+        for relative, pin in ARCH132_R3M_C2_NEW_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3M C2 new source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
-        failures.append("R3M C1 authority unavailable")
+        failures.append("R3M C2 authority unavailable")
     return tuple(failures)
 
 

@@ -24,13 +24,18 @@ See [Architecture 146](architecture/146-historical-research-data-custody.md) and
 
 ## Current workflow checkpoint
 
-Architecture 132-R3M — develop integration certification reuse is implemented
-for feature publication and terminal CI, **pending ChatGPT exact-source review**.
-Develop keeps mandatory integration/static/authority and terminal gates; one
-exact successful mapped feature certification can replace redundant broad
-execution only with complete, unambiguous provenance. Every unproved case falls
-back to ordinary develop broad testing. Feature certification ownership and the
-six-lane FULL/four-lane ROBINHOOD topology remain unchanged.
+Architecture 132-R3M — develop integration certification reuse C2 is
+**IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING CHATGPT EXACT-SOURCE REVIEW**.
+Reusable feature certification is the original push-triggered first attempt
+only: the run, detail and required jobs must each report `run_attempt == 1`.
+Unchanged-source reruns are never reusable integration evidence; every unproved
+case falls back to ordinary develop broad testing. Feature certification
+ownership and the six-lane FULL/four-lane ROBINHOOD topology remain unchanged.
+Initial R3M source `4429578c98c227e25b084b81379cf69d89f414b0` is preserved with
+failed #722 / `40188805213` / attempt 1. C1 source
+`fa04f04c6544078acb25c5daad0ce08e3e13e4a2` is preserved with successful #723 /
+`40189452322` / attempt 1 but remains pending ChatGPT review. C2 exists solely
+to close first-attempt provenance.
 See [Architecture 132](architecture/132-tiered-certification-profiles.md).
 
 ## Production boundary
@@ -52,6 +57,7 @@ follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-ChatGPT reviews the exact published R3M source, terminal CI, additive authority
-overlay, reuse/fallback tests and 146-A closeout. Accept/integrate only after that
-review and any selected certification are complete. Do not begin 146-B here.
+ChatGPT reviews the exact published R3M C2 source, terminal CI, additive
+authority overlay, reuse/fallback tests and preserved #722/#723 evidence.
+Accept/integrate only after that review and any selected certification are
+complete. Do not begin 146-B here.

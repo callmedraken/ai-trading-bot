@@ -35,10 +35,14 @@ static/authority verification, workflow topology checks and terminal source-gate
 Only redundant broad execution may be skipped. Reuse is optional and requires
 one terminal-success push run from an exact registered checkpoint in the reviewed
 feature/robinhood-*, feature/research-* or feature/test-suite-* family, for the
-identical commit SHA and tree in the exact repository/workflow. Source-static,
-active-tests, source-gates and the explicitly checkpoint/profile-named canonical
-certification job and its execution/hygiene steps must all have succeeded in the
-same exact run attempt. The source-owned profile mapping remains authoritative.
+identical commit SHA and tree in the exact repository/workflow. Reusable feature
+certification is limited to the original push-triggered first attempt: the run,
+run detail and every required job must report `run_attempt == 1`. An unchanged-
+source rerun, including a coherent successful attempt 2, is never reusable
+integration evidence. Source-static, active-tests, source-gates and the
+explicitly checkpoint/profile-named canonical certification job and its
+execution/hygiene steps must all have succeeded in that same first attempt. The
+source-owned profile mapping remains authoritative.
 
 GitHub Actions metadata is read with job-scoped actions:read. The lookup uses
 bounded complete metadata pages and records the selected run/attempt/jobs in

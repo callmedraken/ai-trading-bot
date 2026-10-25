@@ -30,7 +30,10 @@ Implementation/publication requires one atomic commit/push and terminal CI;
 ChatGPT exact-source review remains pending. Ordinary feature mapped FULL and
 ROBINHOOD retain canonical ownership. Develop's integration gate always runs;
 only duplicate broad tests can be replaced by a complete proof of one exact-SHA,
-exact-tree, exact-repository/workflow, registered feature push certification.
+exact-tree, exact-repository/workflow, registered feature push certification from
+the original push-triggered first attempt. The run, detail and required jobs
+must all report `run_attempt == 1`; unchanged-source reruns are never reusable
+integration evidence.
 Missing/invalid/ambiguous API evidence falls back to normal broad testing.
 The selected run/attempt/jobs are retained in source-static evidence. No artifact
 filename, branch name or tree-only match substitutes for certification.
@@ -43,9 +46,11 @@ Initial R3M source 4429578c98c227e25b084b81379cf69d89f414b0 / tree
 1c087b9aa9c95f55b47d7a359ec5488cf06d88eb is preserved with failed source gate
 #722 / 40188805213 / attempt 1. Static authority and two broad shards passed;
 two historical AST-freeze assertions still required the old workflow checker.
-Declared C1 updates those assertions to prove the exact R3M successor and adds
-only their mechanical authority/test overlay. Reuse semantics are unchanged.
-C1 requires focused checks and its own one atomic publication/terminal CI.
+The C1 source `fa04f04c6544078acb25c5daad0ce08e3e13e4a2` is preserved with
+successful #723 / 40189452322 / attempt 1 but remains pending ChatGPT review.
+C2 exists solely to close first-attempt provenance: its reusable candidate must
+be the original attempt 1, and a coherent unchanged-source attempt 2 falls
+back. C2 requires focused checks and its own one atomic publication/terminal CI.
 
 ## Protected boundary
 

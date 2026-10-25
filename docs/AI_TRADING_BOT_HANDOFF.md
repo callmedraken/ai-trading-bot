@@ -39,6 +39,14 @@ The R3M test-suite branch retains normal broad source CI. No duplicate local
 canonical FULL/ROBINHOOD is part of this implementation task. See the
 [R3M workflow contract](AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3m--exact-develop-certification-reuse).
 
+Initial R3M source 4429578c98c227e25b084b81379cf69d89f414b0 / tree
+1c087b9aa9c95f55b47d7a359ec5488cf06d88eb is preserved with failed source gate
+#722 / 40188805213 / attempt 1. Static authority and two broad shards passed;
+two historical AST-freeze assertions still required the old workflow checker.
+Declared C1 updates those assertions to prove the exact R3M successor and adds
+only their mechanical authority/test overlay. Reuse semantics are unchanged.
+C1 requires focused checks and its own one atomic publication/terminal CI.
+
 ## Protected boundary
 
 146-B: **NOT STARTED**. Do not acquire/import market data, access real holdout

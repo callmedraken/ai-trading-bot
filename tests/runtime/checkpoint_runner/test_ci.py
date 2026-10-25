@@ -1289,7 +1289,9 @@ def test_r3m_exact_successor_authority_and_frozen_certification_source(monkeypat
         (False, runner.ARCH132_R3M_BLOB_PREDECESSORS, runner.ARCH132_R3M_BLOB_PINS),
     ):
         for key, pin in before.items():
-            assert runner._arch132_r3m_pin(key, pin, ast_pin=ast_pin) == after[key]
+            assert runner._arch132_r3m_pin(
+                key, pin, ast_pin=ast_pin
+            ) == runner._arch132_r3m_c1_pin(key, after[key], ast_pin=ast_pin)
             with pytest.raises(ValueError, match="R3M wrong exact predecessor"):
                 runner._arch132_r3m_pin(key, "0" * len(pin), ast_pin=ast_pin)
     monkeypatch.setattr(runner, "ARCH132_R3M_AST_PINS", {})
@@ -1541,3 +1543,23 @@ def test_r3m_metadata_client_is_read_only_and_lookup_failures_fall_back(monkeypa
 
     monkeypatch.setattr(runner.subprocess, "run", run)
     assert runner._github_ci_metadata("repos/synthetic") == {"id": 123}
+
+
+def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch132_r3m_c1_authority_check(root) == ()
+    assert runner._arch132_r3m_authority_check(root) == ()
+    for ast_pin, before, after in (
+        (True, runner.ARCH132_R3M_C1_AST_PREDECESSORS, runner.ARCH132_R3M_C1_AST_PINS),
+        (
+            False,
+            runner.ARCH132_R3M_C1_BLOB_PREDECESSORS,
+            runner.ARCH132_R3M_C1_BLOB_PINS,
+        ),
+    ):
+        for key, pin in before.items():
+            assert runner._arch132_r3m_c1_pin(key, pin, ast_pin=ast_pin) == after[key]
+            with pytest.raises(ValueError, match="R3M C1 wrong exact predecessor"):
+                runner._arch132_r3m_c1_pin(key, "0" * len(pin), ast_pin=ast_pin)
+    monkeypatch.setattr(runner, "ARCH132_R3M_C1_AST_PINS", {})
+    assert runner._arch132_r3m_c1_authority_check(root)

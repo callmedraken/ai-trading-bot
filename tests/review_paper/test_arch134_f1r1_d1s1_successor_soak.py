@@ -1,6 +1,7 @@
 """Disposable-only D1S1 source contract, ordering and publication integration."""
 
 import ast
+import hashlib
 import json
 import socket
 import subprocess
@@ -679,8 +680,18 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
         for name, node in functions.items()
         if ast.dump(node) != ast.dump(new_functions[name])
     }
+    # R3M intentionally replaces only this predecessor workflow checker.
+    # Verify the exact successor, rather than weakening the frozen-function proof.
+    workflow_key = "_batch_workflow_is_reviewed"
+    assert (
+        hashlib.sha256(
+            ast.dump(new_functions[workflow_key], include_attributes=False).encode()
+        ).hexdigest()
+        == runner.ARCH132_R3M_AST_PINS[workflow_key]
+    )
     assert changed == (
-        set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
+        {workflow_key}
+        | set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
         | set(runner.ARCH134_D1S2_PREDECESSOR_AST_PINS)
         | (
             set(runner.ARCH134_D1S3_RUNNER_AST_PINS)

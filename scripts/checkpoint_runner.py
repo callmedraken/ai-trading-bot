@@ -20194,6 +20194,11 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
     # Admit only the exact already-resolved current successor.
     if (
+        relative in ARCH132_R3M_C1_BLOB_PINS
+        and predecessor == ARCH132_R3M_C1_BLOB_PINS[relative]
+    ):
+        return _arch132_r3m_c1_pin(relative, predecessor, ast_pin=False)
+    if (
         relative in ARCH132_R3M_BLOB_PINS
         and predecessor == ARCH132_R3M_BLOB_PINS[relative]
     ):
@@ -20652,8 +20657,8 @@ def _arch132_r3m_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor not in (before[key], after[key]):
             raise ValueError("R3M wrong exact predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch132_r3m_c1_pin(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -20669,13 +20674,15 @@ def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
             actual = hashlib.sha256(
                 ast.dump(functions[key], include_attributes=False).encode()
             ).hexdigest()
-            if actual != pin:
+            if actual != _arch132_r3m_c1_pin(key, pin, ast_pin=True):
                 failures.append("R3M runner AST drift: " + key)
         for relative, pin in {
             **ARCH132_R3M_BLOB_PINS,
             **ARCH132_R3M_FROZEN_SOURCE_PINS,
         }.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c1_pin(
+                relative, pin, ast_pin=False
+            ):
                 failures.append("R3M source drift: " + relative)
         if not _batch_workflow_is_reviewed(
             (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
@@ -20685,6 +20692,126 @@ def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("R3M workflow topology drift")
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M authority unavailable")
+    failures.extend(_arch132_r3m_c1_authority_check(repo_root))
+    return tuple(failures)
+
+
+# C1 preserves terminal failed #722 and every initial R3M literal map.
+ARCH132_R3M_C1_AST_PREDECESSORS: Final = {
+    "_arch146a_shared_blob_pin": (
+        "d767755d7c915e38433ddb3313c2ee7cd0052c4c46a57451a47bdbd526719707"
+    ),
+    "_arch132_r3m_pin": (
+        "12b1aea17e67f8d3724a56d03cb70e58500eeced4824370479998d807a431dce"
+    ),
+    "_arch132_r3m_authority_check": (
+        "5720b25140270afb84d1e5dfcc4cbe799add878f967d56eca9e0396950cc1ab5"
+    ),
+}
+ARCH132_R3M_C1_AST_PINS: Final = {
+    "_arch146a_shared_blob_pin": (
+        "4fca63d9a83baa4e28f0fd16ac394a96e7bd61ff99963ba110fea6a7d9423f1f"
+    ),
+    "_arch132_r3m_pin": (
+        "7603492fae48cfdfd0c1c820a2fdbc3f4d3c7b19bb30c659e91f814bfda16997"
+    ),
+    "_arch132_r3m_authority_check": (
+        "e8a9152060429e941b7e859d3fc61d0047ba9e6faca0be5618a9408f206c71ca"
+    ),
+}
+ARCH132_R3M_C1_BLOB_PREDECESSORS: Final = {
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "11b5b467394e2d793dc1a47dc9997cd381c294b0"
+    ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "b3deed01805a263784ebcab6c87f0ecfc1862457"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "07f0add06e908c3f390f0bc01ec8cb0b654dc440"
+    ),
+}
+ARCH132_R3M_C1_BLOB_PINS: Final = {
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "68d3a1ec997d4c8ba277cda57e0ad8e03e945cc6"
+    ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "012c1664d1d79822ab78b4e6fda172f480ea8dd6"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "35445d8c3054e6015e454bd124c5e58b989e6a8f"
+    ),
+}
+ARCH132_R3M_C1_NEW_AST_PINS: Final = {
+    "_arch132_r3m_c1_maps": (
+        "7235e81dbbc0fca82d236f0dca11b3fc7131aa3dc478717f6d6102f38db20025"
+    ),
+    "_arch132_r3m_c1_pin": (
+        "21cddda4cd9e27a743dfb4aba6561e07d2d4115d9967cd440eed70ca844b6eb5"
+    ),
+    "_arch132_r3m_c1_authority_check": (
+        "e722f575b762c80bbbde8370d2ca81d3797cda9db3ab703c9ea301e80a540f9c"
+    ),
+}
+ARCH132_R3M_C1_MAPS_SHA256: Final = (
+    "1c9604847351d99ee5757db37de59f467a6be46ce34c003a46ea8976ef776c0e"
+)
+
+
+def _arch132_r3m_c1_maps() -> None:
+    maps = (
+        ARCH132_R3M_C1_AST_PREDECESSORS,
+        ARCH132_R3M_C1_AST_PINS,
+        ARCH132_R3M_C1_BLOB_PREDECESSORS,
+        ARCH132_R3M_C1_BLOB_PINS,
+        ARCH132_R3M_C1_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3M_C1_MAPS_SHA256
+        or set(ARCH132_R3M_C1_AST_PREDECESSORS) != set(ARCH132_R3M_C1_AST_PINS)
+        or set(ARCH132_R3M_C1_BLOB_PREDECESSORS) != set(ARCH132_R3M_C1_BLOB_PINS)
+    ):
+        raise ValueError("R3M C1 exact successor maps drift")
+
+
+def _arch132_r3m_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3m_c1_maps()
+    before = (
+        ARCH132_R3M_C1_AST_PREDECESSORS if ast_pin else ARCH132_R3M_C1_BLOB_PREDECESSORS
+    )
+    after = ARCH132_R3M_C1_AST_PINS if ast_pin else ARCH132_R3M_C1_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3M C1 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch132_r3m_c1_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3M_C1_AST_PINS,
+            **ARCH132_R3M_C1_NEW_AST_PINS,
+        }.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3M C1 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3M C1 source drift: " + relative)
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3M C1 authority unavailable")
     return tuple(failures)
 
 

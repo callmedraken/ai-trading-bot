@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import io
 import json
 import os
@@ -589,6 +590,14 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
     }
     permitted = set(runner.ARCH134_F1R1_C1_RUNNER_AST_PINS)
     permitted.update(runner.ARCH134_D1S3_RUNNER_AST_PINS)
+    workflow_key = "_batch_workflow_is_reviewed"
+    assert (
+        hashlib.sha256(
+            ast.dump(current_functions[workflow_key], include_attributes=False).encode()
+        ).hexdigest()
+        == runner.ARCH132_R3M_AST_PINS[workflow_key]
+    )
+    permitted.add(workflow_key)
     for name, function in frozen_functions.items():
         if name not in permitted:
             assert ast.dump(function) == ast.dump(current_functions[name]), name

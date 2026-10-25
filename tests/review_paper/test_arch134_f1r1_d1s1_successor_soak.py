@@ -633,8 +633,8 @@ def test_checkpoint_profile_and_exact_authority_consumers():
     assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS
     assert runner._arch134_d1s1_authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
-    assert len(certification.select_inventory(inventory, "full")) == 200
-    assert len(certification.select_inventory(inventory, "robinhood")) == 111
+    assert len(certification.select_inventory(inventory, "full")) == 201
+    assert len(certification.select_inventory(inventory, "robinhood")) == 112
     assert (
         "feature/robinhood-*"
         in (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()

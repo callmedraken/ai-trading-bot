@@ -2,73 +2,64 @@
 
 ## Current checkpoint
 
-Architecture **134-F1R1-D1S4 — Rename-Free Direct Immutable Release Installation**
-has completed its source implementation and a user-authorized mechanical C1.
-Replacement feature CI and ChatGPT exact-source review remain pending. Source
-acceptance and host qualification have not occurred.
+D1S4 source plus C1 was accepted/integrated at
+`30a410d9023324ebe5c23e6a8ff128353b9ebf1f`, tree
+`cf50b0b7b84428d9e502ed5bd85307001bc866ed`. The one-shot direct installation
+completed PASS / DIRECT_INSTALL_VERIFIED / CONFIRMED / IDENTITY_STABLE=True for
+`release-18d5d329c1d458558e98d7effe523c3b`. Its installation attempt is permanently
+consumed and must never be retried.
 
-Required implementation base: `1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
-`1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
+A later fresh registered read-only preflight was BLOCKED /
+READ_ONLY_ADMISSION_REJECTED. Localization found external John FullControl CI/OI
+ACL drift on F:\AITradingBot and its releases directory. Source, Administrator,
+replay inputs and the consumed installation latch remained valid. Runtime and
+production Python were outside the drift set. The compromised FINAL and both
+historical .installing roots remain preserved incident evidence, never repair
+or runtime-admission targets.
 
-Active local branch:
-`feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`.
+Architecture **134-F1R1-D1S4-R1 — Shared Namespace ACL Recovery** is implemented
+as source only, pending publication, canonical CI and ChatGPT exact-source review.
+Focused verification covers 1,878 unique green affected cases (124 R1 / 135
+D1S4); whole-repository Ruff lint/format and diff checks pass.
+It admits only the two frozen identities/pre-descriptor hashes/ACE tuples and
+removes only the exact reviewed John ACE by applying ADMIN_ACES / IMAGE_ACES.
+Read-only preflight, reviewed-plan digest, independent durable one-shot latch,
+private exclusive-handle DACL-only mutation and repeated non-target readback are
+separate gates. Repair never restores trust in the compromised FINAL.
 
-The implementation creates the source-derived final release directory directly,
-uses a separate release-bound one-shot latch, closes all materialization handles,
-and requires two independent final-image replays. Runtime continues to bind the
-same exact immutable `release_root(release_id)` through existing admission.
-Readiness is verified evidence; no filesystem publication occurs.
+Active branch:
+`feature/robinhood-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current`.
+Final source identity: PENDING FINAL COMMIT.
+Terminal CI: PENDING FIRST/ONLY PUSH.
 
-Source-graph and authority tests reject retired D1S3/R5 and historical 125/133
-operators in the D1S4 forward path. The registered feature maps to CI-owned
-ROBINHOOD certification with the existing 300-second ceiling. Final identity and
-terminal CI facts belong to the post-commit handoff, as explicitly agreed with
-the user; they must not be inferred from this pre-publication source document.
-
-Detailed implementation, verification and preserved incident provenance:
-[Architecture D1S4](architecture/134-f1r1-d1s4-rename-free-immutable-release-installation.md)
-and [validation record](validation/arch134-f1r1-d1s4-rename-free-immutable-release-installation-plan.md).
-
-
-The initial source `613766837f13d3667d20c76aab2a56331933383e` /
-`91e63ed40510dc03523e5c4a76f9f3133cc6839f` remains preserved. Its CI #708 /
-`40130002889`, attempt 1 failed one stale predecessor inventory validator after
-10,988 passed / 6 skipped; all 121 original D1S4 cases passed.
-
-The user authorized correction through green. Separate C1 fixes the comparand,
-adds the missed validator to D1S4 source authority, and adds two regression tests.
-Focused C1 verification passed 351 cases, including all 123 current D1S4 cases.
-Whole-repository Ruff lint/format and diff checks pass. The corrective commit/push
-owns replacement canonical ROBINHOOD; no local duplicate certification runs.
-Native/operator behavior and all protected boundaries are unchanged.
+Detailed frozen incident/contract:
+[Architecture R1](architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md)
+and [validation](validation/arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-plan.md).
+Earlier architecture/validation records describe their historical checkpoints;
+this current document supersedes their pending acceptance/host wording.
 
 ## Production boundary
 
-No real D1S4 production preflight or execute occurred. D1S3/R5 installation and
-publication attempts remain consumed, preserved incident history; their evidence
-and namespace were untouched. No retry, rename, repair, promotion or cleanup is
-authorized. The superseded planning branch remains reference history only.
-
-Successor-root provisioning, scheduler/service/startup changes, runtime start,
-credentials/provider access, paper/broker effects and D1/D2 effects remain
-unauthorized. Original F1 is FINAL / INDETERMINATE / CONSUMED; C2 remains consumed
-and immutable. Live remains **NO-GO**.
+Reconciliation remains blocked on external shared-namespace ACL drift. No real
+R1 production preflight or recovery ran during implementation. D1S4 execute,
+D1S3/R5 publication, cleanup/re-ACL/reuse of incident releases, runtime start,
+scheduler changes, credentials/provider, paper/broker and D1/D2 effects are not
+part of R1 source work. Original F1 is FINAL / INDETERMINATE / CONSUMED; C2
+remains consumed and immutable. Live remains **NO-GO**.
 
 ## Next step
 
-Complete the separate C1 atomic commit/push and await terminal replacement CI.
-The original failed source/run remain immutable evidence. After terminal green,
-ChatGPT owns exact-source review. Only if accepted may ChatGPT determine
-integration readiness and later separately review the registered read-only D1S4
-production preflight. Codex does not perform those later steps.
+Complete the one atomic R1 commit/one push and wait for terminal CI-owned
+ROBINHOOD; do not duplicate it locally. On red preserve evidence and stop for
+ChatGPT classification. On green ChatGPT reviews the exact commit/diff/evidence.
+Codex stops at IMPLEMENTED / ONE ATOMIC COMMIT / ONE PUSH /
+PENDING CHATGPT EXACT-SOURCE REVIEW, without integration or host operations.
 
-    exact-source review / acceptance if justified
-    -> reviewed develop integration and develop CI
-    -> registered read-only D1S4 host preflight
-    -> separately reviewed one-shot direct install
-    -> exact deployment admission
-    -> successor-root write-authority/ACL review
-    -> fresh manual-start F1 successor soak
-    -> 145-B
-    -> Research Results GUI
-    -> large strategy campaigns
+    exact-source review -> reviewed develop integration -> develop CI
+    -> registered read-only R1 production preflight
+    -> separate one-shot protected ACL-recovery review/execute
+    -> registered read-only reconciliation
+    -> only if recovered: fresh successor source/new HEAD/TREE/release ID/path
+    -> exact deployment admission -> successor-root write-authority/ACL review
+    -> fresh manual-start F1 successor soak -> 145-B
+    -> Research Results GUI -> large strategy campaigns

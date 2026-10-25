@@ -430,7 +430,7 @@ def test_f1_checkpoint_is_source_only_and_robinhood_owned():
     assert runner.ACTIVE_CI_CHECKPOINTS.count(spec.name) == 1
     assert runner._arch134_f1_authority_check(root) == ()
     inventory = certification.discover_inventory(root)
-    assert len(certification.select_inventory(inventory, "robinhood")) == 111
+    assert len(certification.select_inventory(inventory, "robinhood")) == 112
     assert runner._batch_workflow_is_reviewed(
         (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
     )

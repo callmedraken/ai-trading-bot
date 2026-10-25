@@ -95,6 +95,22 @@ RISK_MATERIAL = (
 )
 
 
+class AdmissionFailure(ValueError):
+    """Closed stage/code diagnostics; never retain an exception payload."""
+
+    def __init__(self, stage: str, *, drift: bool = False) -> None:
+        super().__init__("ADMISSION_REJECTED")
+        self.stage = stage
+        self.drift = drift
+
+
+def _at_stage(stage, function, *args, **kwargs):
+    try:
+        return function(*args, **kwargs)
+    except (Exception, KeyboardInterrupt, SystemExit) as exc:
+        raise AdmissionFailure(stage, drift=isinstance(exc, ObservationDrift)) from None
+
+
 class ObservationDrift(ValueError):
     """Repeated exact observations disagree; no effect authority survives."""
 
@@ -392,22 +408,26 @@ def observe_python(session: ReadSession, volume: int) -> ObjectFacts:
 def observe_namespace(release: VerifiedRelease, binding: RuntimeBinding) -> Namespace:
     paths = replay_inputs(release, binding)
     with WindowsObserver().read_session(paths) as session:
-        parent = observe_parent(session)
-        python = observe_python(session, parent.identity[0])
-        names = session.names(RELEASES_BASE)
+        parent = _at_stage("PARENT_OBSERVATION", observe_parent, session)
+        python = _at_stage(
+            "PRODUCTION_PYTHON_OBSERVATION", observe_python, session, parent.identity[0]
+        )
+        names = _at_stage("NAMESPACE_ENUMERATION", session.names, RELEASES_BASE)
         if (
             type(names) is not tuple
             or len(names) > 20002
             or any(type(name) is not str for name in names)
             or len({name.casefold() for name in names}) != len(names)
         ):
-            raise ValueError("NAMESPACE_REJECTED")
-        final = session.object(paths.final, directory=True)
+            raise AdmissionFailure("NAMESPACE_ENUMERATION")
+        final = _at_stage(
+            "FINAL_OBJECT_OBSERVATION", session.object, paths.final, directory=True
+        )
         if (paths.release_id in names) != (final is not None) or any(
             name.casefold() == paths.release_id.casefold() and name != paths.release_id
             for name in names
         ):
-            raise ObservationDrift("FINAL_NAMESPACE_DRIFT")
+            raise AdmissionFailure("FINAL_OBJECT_OBSERVATION", drift=True)
         if (
             session.object(paths.final, directory=True) != final
             or session.names(RELEASES_BASE) != names
@@ -452,6 +472,8 @@ def _result(
     eligible=False,
     final_classification="UNOBSERVED",
     effect="NOT_STARTED",
+    admission_stage=None,
+    admission_code=None,
 ) -> dict[str, object]:
     return {
         "status": status,
@@ -460,6 +482,8 @@ def _result(
         "protected_effects": [list(row) for row in ZERO_PROTECTED_EFFECTS],
         "primary": {
             "schema": SCHEMA,
+            "admission_stage": admission_stage,
+            "admission_code": admission_code,
             "status": status,
             "reason": reason,
             "source_head": release.expected_source_head if release else None,
@@ -503,17 +527,24 @@ def preflight() -> dict[str, object]:
     release = binding = attempt = namespace = evidence = None
     classification = "UNOBSERVED"
     stable = False
+    stage = "SOURCE_ADMISSION"
+    diagnostic_stage = diagnostic_code = None
     try:
         source = admit_source()
+        stage = "RELEASE_RECONSTRUCTION"
         release, binding = reconstruct_release()
         if source != (release.expected_source_head, release.expected_source_tree):
             raise ObservationDrift("SOURCE_REPLAY_DRIFT")
+        stage = "ADMINISTRATOR_ADMISSION"
         require_administrator()
+        stage = "PARENT_OBSERVATION"
         namespace = observe_namespace(release, binding)
+        stage = "ATTEMPT_OBSERVATION"
         attempt = observe_attempt(release)
         classification = "ABSENT" if namespace.final is None else "PRESENT_UNVERIFIED"
         image_error = False
         if attempt.classification == "CONSUMED" and namespace.final is not None:
+            stage = "FINAL_IMAGE_REPLAY"
             try:
                 first = verify_final(release, binding, namespace)
                 second = verify_final(release, binding, namespace)
@@ -524,8 +555,11 @@ def preflight() -> dict[str, object]:
             except ObservationDrift:
                 raise
             except (Exception, KeyboardInterrupt, SystemExit):
+                diagnostic_stage = stage
+                diagnostic_code = "ADMISSION_REJECTED"
                 image_error = True
                 classification = "PARTIAL_OR_CONFLICTING"
+        stage = "REPEAT_ADMISSION"
         if (
             observe_namespace(release, binding) != namespace
             or observe_attempt(release) != attempt
@@ -534,6 +568,8 @@ def preflight() -> dict[str, object]:
             raise ObservationDrift("ADMISSION_OBSERVATION_DRIFT")
         stable = True
         if attempt.classification == "INDETERMINATE":
+            diagnostic_stage = "ATTEMPT_OBSERVATION"
+            diagnostic_code = "LATCH_UNPROVEN"
             status, reason, eligible = "INDETERMINATE", "LATCH_UNPROVEN", False
         elif attempt.classification == "AVAILABLE":
             eligible = namespace.final is None
@@ -563,18 +599,25 @@ def preflight() -> dict[str, object]:
             stable=stable,
             eligible=eligible,
             final_classification=classification,
+            admission_stage=diagnostic_stage,
+            admission_code=diagnostic_code,
         )
     except (Exception, KeyboardInterrupt, SystemExit) as exc:
+        drift = isinstance(exc, ObservationDrift) or (
+            isinstance(exc, AdmissionFailure) and exc.drift
+        )
         return _result(
-            "INDETERMINATE" if isinstance(exc, ObservationDrift) else "BLOCKED",
-            "OBSERVATION_DRIFT"
-            if isinstance(exc, ObservationDrift)
-            else "READ_ONLY_ADMISSION_REJECTED",
+            "INDETERMINATE" if drift else "BLOCKED",
+            "OBSERVATION_DRIFT" if drift else "READ_ONLY_ADMISSION_REJECTED",
             release=release,
             binding=binding,
             attempt=attempt,
             namespace=namespace,
             final_classification=classification,
+            admission_stage=exc.stage
+            if isinstance(exc, AdmissionFailure) and stage != "REPEAT_ADMISSION"
+            else stage,
+            admission_code="OBSERVATION_DRIFT" if drift else "ADMISSION_REJECTED",
         )
 
 

@@ -219,6 +219,7 @@ _EXPECTED_ACTIVE_CI_CHECKPOINTS = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
     "arch134-f1r1-d1s4-rename-free-direct-installation",
     "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
     "arch134-f1r1-d1s2-successor-installed-readiness",

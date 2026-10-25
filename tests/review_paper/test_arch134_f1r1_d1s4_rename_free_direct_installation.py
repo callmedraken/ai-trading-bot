@@ -1088,8 +1088,7 @@ def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
 
 def test_predecessor_c1_inventory_uses_current_d1s4_overlay():
     assert (
-        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-        == runner.ARCH134_D1S4_ACTIVE_SHA256
+        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 == runner.ARCH134_ACL_ACTIVE_SHA256
     )
     assert (
         runner.ARCH134_R5_ACTIVE_CI_CHECKPOINTS_SHA256
@@ -1105,3 +1104,92 @@ def test_direct_authority_checks_predecessor_c1_inventory(monkeypatch):
 
     monkeypatch.setattr(runner, "_arch134_f1r1_c1_active_inventory", reject)
     assert "D1S4 authority unavailable" in runner._arch134_d1s4_authority_check(ROOT)
+
+
+@pytest.mark.parametrize(
+    "stage",
+    [
+        "SOURCE_ADMISSION",
+        "RELEASE_RECONSTRUCTION",
+        "ADMINISTRATOR_ADMISSION",
+        "PARENT_OBSERVATION",
+        "PRODUCTION_PYTHON_OBSERVATION",
+        "NAMESPACE_ENUMERATION",
+        "FINAL_OBJECT_OBSERVATION",
+        "ATTEMPT_OBSERVATION",
+        "FINAL_IMAGE_REPLAY",
+        "REPEAT_ADMISSION",
+    ],
+)
+def test_read_only_failure_stage_is_closed_and_sanitized(host, monkeypatch, stage):
+    def reject(*args, **kwargs):
+        raise OSError("SECRET arbitrary native error and user-selected path")
+
+    targets = {
+        "SOURCE_ADMISSION": "admit_source",
+        "RELEASE_RECONSTRUCTION": "reconstruct_release",
+        "ADMINISTRATOR_ADMISSION": "require_administrator",
+        "PARENT_OBSERVATION": "observe_parent",
+        "PRODUCTION_PYTHON_OBSERVATION": "observe_python",
+        "ATTEMPT_OBSERVATION": "observe_attempt",
+    }
+    if stage in targets:
+        monkeypatch.setattr(d, targets[stage], reject)
+    elif stage == "NAMESPACE_ENUMERATION":
+        monkeypatch.setattr(host, "names", reject)
+    elif stage == "FINAL_OBJECT_OBSERVATION":
+        original = host.object
+
+        def observe(path, *, directory):
+            if path == host.paths.final:
+                reject()
+            return original(path, directory=directory)
+
+        monkeypatch.setattr(host, "object", observe)
+    elif stage == "FINAL_IMAGE_REPLAY":
+        d.consume_attempt(host.release)
+        host.seed()
+        monkeypatch.setattr(d, "verify_final", reject)
+    else:
+        original = d.observe_namespace
+        calls = 0
+
+        def repeat(*args):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                reject()
+            return original(*args)
+
+        monkeypatch.setattr(d, "observe_namespace", repeat)
+    result = d.preflight()
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["admission_stage"] == stage
+    assert result["primary"]["admission_code"] == "ADMISSION_REJECTED"
+    assert "SECRET" not in json.dumps(result)
+    assert "arbitrary" not in json.dumps(result)
+
+
+def test_actual_shared_ancestor_john_full_control_incident_fails_closed(host):
+    from trading_bot import shared_namespace_acl_recovery as recovery
+
+    runtime_before = host.nodes[r"F:\AITradingBot\runtime"]
+    python_before = host.nodes[PRODUCTION_PYTHON]
+    for index, path in enumerate(recovery.TARGET_PATHS):
+        row = host.nodes[path]
+        host.nodes[path] = replace(row, aces=recovery.PRE_ACES[index])
+    result = d.preflight()
+    assert result["status"] == "BLOCKED"
+    assert result["primary"]["reason"] == "READ_ONLY_ADMISSION_REJECTED"
+    assert result["primary"]["admission_stage"] == "PARENT_OBSERVATION"
+    assert result["primary"]["execute_eligible"] is False
+    assert host.nodes[r"F:\AITradingBot\runtime"] == runtime_before
+    assert host.nodes[PRODUCTION_PYTHON] == python_before
+
+
+def test_real_malformed_latch_has_sanitized_attempt_localization(host):
+    d.attempt_path(host.release).write_bytes(b"malformed")
+    row = d.preflight()["primary"]
+    assert row["status"] == "INDETERMINATE"
+    assert row["admission_stage"] == "ATTEMPT_OBSERVATION"
+    assert row["admission_code"] == "LATCH_UNPROVEN"

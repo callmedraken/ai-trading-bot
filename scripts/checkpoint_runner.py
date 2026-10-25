@@ -12,6 +12,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -135,7 +136,7 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "a0ffa460ec970bf82d68d0486692cab7509c426fe238320782e2e1158c9c76d8"
+    "53dfc4a9f50292c79866b19985e1950921f99e2ffd58a3a391bb00bee083cc8b"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
@@ -198,6 +199,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch133-robinhood-windows-rename-qualification",
     "arch133-robinhood-closed-descendant-rename-qualification",
     "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
     "arch134-f1r1-d1s4-rename-free-direct-installation",
     "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
     "arch134-f1r1-d1s2-successor-installed-readiness",
@@ -222,6 +224,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery": "robinhood",
     "arch134-f1r1-d1s4-rename-free-direct-installation": "robinhood",
     "arch134-f1r1-d1s3-r5-successor-release-publication-recovery": "robinhood",
     "arch134-f1r1-d1s3-successor-release-installation-operator": "robinhood",
@@ -15079,7 +15082,7 @@ def _arch145a_predecessor_active_checkpoint_inventory() -> tuple[str, ...]:
         )
         if (
             tuple(ACTIVE_CI_CHECKPOINTS) != successor
-            or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_D1S4_ACTIVE_SHA256
+            or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_ACL_ACTIVE_SHA256
         ):
             raise ValueError("D1S3 active checkpoint successor overlay drift")
         return successor
@@ -15977,7 +15980,7 @@ def _arch134_f1r1_c1_active_inventory() -> None:
         )
         or digest(after) != ARCH134_F1R1_C1_SUCCESSOR_ACTIVE_CI_CHECKPOINTS_SHA256
         or tuple(ACTIVE_CI_CHECKPOINTS) != _arch134_d1s2_active_inventory()
-        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_D1S4_ACTIVE_SHA256
+        or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_ACL_ACTIVE_SHA256
     ):
         raise ValueError("134-F1R1-C1 active inventory drift")
 
@@ -17392,7 +17395,7 @@ def _arch134_d1s2_active_inventory() -> tuple[str, ...]:
         successor = _arch134_r5_active_inventory((ARCH134_D1S3_NAME, *after))
         if (
             tuple(ACTIVE_CI_CHECKPOINTS) != successor
-            or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_D1S4_ACTIVE_SHA256
+            or REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256 != ARCH134_ACL_ACTIVE_SHA256
         ):
             raise ValueError("D1S3 exact active inventory drift")
         return successor
@@ -18359,8 +18362,8 @@ def _arch134_d1s4_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor != before[key]:
             raise ValueError("D1S4 wrong accepted predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch134_acl_overlay(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch134_d1s4_active_inventory(predecessor: tuple[str, ...]) -> tuple[str, ...]:
@@ -18378,13 +18381,9 @@ def _arch134_d1s4_active_inventory(predecessor: tuple[str, ...]) -> tuple[str, .
             ast.parse(repr(current), mode="eval").body, include_attributes=False
         ).encode()
     ).hexdigest()
-    if (
-        tuple(ACTIVE_CI_CHECKPOINTS) != current
-        or digest != ARCH134_D1S4_ACTIVE_SHA256
-        or digest != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
-    ):
+    if digest != ARCH134_D1S4_ACTIVE_SHA256:
         raise ValueError("D1S4 current inventory drift")
-    return current
+    return _arch134_acl_active_inventory(current)
 
 
 def _arch134_d1s4_preflight() -> dict[str, object]:
@@ -18543,6 +18542,7 @@ def _arch134_d1s4_authority_check(repo_root: Path) -> tuple[str, ...]:
         ):
             failures.append("D1S4 authority map digest drift")
         for relative, pin in ARCH134_D1S4_SOURCE_PINS.items():
+            pin = _arch134_acl_overlay(relative, pin, ast_pin=False)
             if (
                 relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS
                 or _git_blob_sha1(repo_root / relative) != pin
@@ -18554,6 +18554,7 @@ def _arch134_d1s4_authority_check(repo_root: Path) -> tuple[str, ...]:
             )
         )
         for name, pin in {**ARCH134_D1S4_AST_PINS, **ARCH134_D1S4_NEW_AST_PINS}.items():
+            pin = _arch134_acl_overlay(name, pin, ast_pin=True)
             if (
                 hashlib.sha256(
                     ast.dump(functions[name], include_attributes=False).encode()
@@ -18577,6 +18578,538 @@ def _arch134_d1s4_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("D1S4 dispatcher registration drift")
     except (ValueError, KeyError, TypeError, OSError, SyntaxError):
         failures.append("D1S4 authority unavailable")
+    return tuple(failures)
+
+
+# R1 overlays preserve the D1S4 and older accepted dictionaries verbatim.
+ARCH134_ACL_NAME: Final = "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery"
+ARCH134_ACL_BRANCH: Final = (
+    "feature/robinhood-production-paper-134f1r1-"
+    "d1s4-r1-shared-namespace-acl-recovery-current"
+)
+ARCH134_ACL_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+)
+ARCH134_ACL_RUFF_PATHS: Final = (
+    *COMMON_RUFF_PATHS,
+    "src/trading_bot/shared_namespace_acl_recovery.py",
+    "src/trading_bot/shared_namespace_acl_native.py",
+    "src/trading_bot/supervised_release/successor_direct_installation.py",
+    "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
+)
+ARCH134_ACL_ACTIVE_SHA256: Final = (
+    "53dfc4a9f50292c79866b19985e1950921f99e2ffd58a3a391bb00bee083cc8b"
+)
+ARCH134_ACL_BLOB_PREDECESSORS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "b0604484bc1c702520082995b1b6c241e7c4cf08"
+    ),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("f8fdbc1d9c3332e54056f4e02580cdb94a29ccbe"),
+    "docs/PROJECT_STATUS.md": ("9c9f288a7c463c11bfece61576ac525bdf80318d"),
+    ("src/trading_bot/supervised_release/successor_direct_installation.py"): (
+        "aa58385c790f3b10cbf6899e0a26d6324d89b28a"
+    ),
+    ("tests/review_paper/test_arch133_closed_descendant_rename_qualification.py"): (
+        "b22a291e4917a7aab85e7ad7ebeec435a3eaec98"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "56629aac568beeffa4b61bac33d9266eb30a7b9b"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "9c4940c96fa5f372b11df0760a0fa32817fc3dc1"
+    ),
+    ("tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py"): (
+        "f1045dfdcfde1c24a4258af6a9e2e44dc956eba9"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "34ab841338c6fbb3acccf1560766ced660e00c74"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "145a6eceba5477169b0040a4ee90f98ae8cc3ee3"
+    ),
+    ("tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"): (
+        "c5821950d4665e19f5d84f3dbc42d432cf30a43a"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "c6056bfb8ee302bcfa3a510c1bf48411bf6fd4cf"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "8e6d427a4aa862a680e96c11bfcb5c3a464d6503"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "0d8548f0140cdb80e3a3a57ed475dc5c21ddd608"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "7513764b4d7823bac8b58f2a28762fd19bc50b06"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "b63202c94a8f94271f2e5b44be957e69a92a4ea1"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8fc4143f179212f4dbcabf4ea365104e8c9d1246"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "415a6aa1ce15dbdb06bce10bd6f260abe47459e3"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "5434deccb1efe2d5f8ecf34896ec577f0db67aed"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "a5dd84c0d53303fd678332c4fbbc3f856932077a"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "41c7216f6c9327af9ec4915ebfa20f54f9f1edcc"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "2498d29ec2d808224f3c3306f55cb69594f63830"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "b39c56f97f23e12ad505ffce3c0180be9a4a3583"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "1da939e0ecaf1b0f4a5adf9fc8bebefbc3abb3e4"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "2ee579c39056036aadfbfe519403c766f887c8c7"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "8345483633a4f9048c7700991c9a6f691ab6c733"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "2c3b05f79ac39d9130f7c09212b60ae6a5be230c"
+    ),
+}
+ARCH134_ACL_BLOB_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "af2cc333252737da5c216d5a6d5031347e2e663e"
+    ),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("7d9e90edabf63b030f44eb3e00044f4a900a6c05"),
+    "docs/PROJECT_STATUS.md": ("fde74d959bc32bd345d3fb95e06dad74d4222eab"),
+    ("src/trading_bot/supervised_release/successor_direct_installation.py"): (
+        "9224a85a80a605cbc35553337aaf00afb3c6217d"
+    ),
+    ("tests/review_paper/test_arch133_closed_descendant_rename_qualification.py"): (
+        "a45954d28fe8595bfb1797ccf8f5bebdfba07438"
+    ),
+    "tests/review_paper/test_arch133_reprovision_reconciliation.py": (
+        "50d4e8c6a3398ea09962eac8bf1aa3b8a11e05a5"
+    ),
+    "tests/review_paper/test_arch133_reprovision_recovery.py": (
+        "d69f2366fb0f6639c4b45afdb62bd182ab507b6f"
+    ),
+    ("tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py"): (
+        "5154fea3c8fbaf64e2131ed62ac9f6a8291d8482"
+    ),
+    "tests/review_paper/test_arch133_windows_rename_qualification.py": (
+        "51813c1ce9df1fdb29e247db4eb994803e8b05e6"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "cd0cd3336a1bfd94e65469dc0dd60d9e8ec5e797"
+    ),
+    ("tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"): (
+        "9cf552e14d8e4a21581dd2c0cb46dd66a5ce9236"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "a7fb51a482d5ccec63a94bab69bf7cc9cbce59e7"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "087ae200bb5d066a70587c73561995ad03d9681c"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "a6831797ae6493ecd8a6b21c75da379c80b5cb6c"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "5ee50265434116e6030abecd099061d4a79e01ea"
+    ),
+    "tests/review_paper/test_production_strategy_cycle.py": (
+        "c043d4510648ba19285547ca022d771f2770a283"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "5df60ae4ef986ea6601d5bb9f975f453f2e74d13"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "d1084fb52c04103b760f43831fa3a51926107793"
+    ),
+    "tests/review_paper/test_supervised_release_installation.py": (
+        "2e535321c450e8b5b4b42746ba8b690f9bbc0861"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "0bd1d8f1dfb13ceced393c3d53313b13cce41645"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "fbff0a66df41044103bea718275fee24883b647f"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "ae06f1c6625d665e16402d029c5ccd4079f6360e"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "92fb56ee92b4aeb482be594763efd0b8b1057088"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "e48f539f6578197fe6a54ddc7f0f2371d4cfc76d"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "eebedf3f681850b3818e766a62ea05f3f99cf13f"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "7263f9ff95a74f3ce3582fcd29599b7794c9ad5e"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "7119361fe77d1fb4eec153e19fa65a582467fd75"
+    ),
+}
+ARCH134_ACL_AST_PREDECESSORS: Final = {
+    "_arch134_d1s2_active_inventory": (
+        "53ffd54621593348f5ae8b5a7fcaa4524c8d58b9ee006f4a186f58926271af2c"
+    ),
+    "_arch134_d1s4_active_inventory": (
+        "03dfada68aabebda5117153c57ae225318a2e6f3c08ac62e126219177dfd2055"
+    ),
+    "_arch134_d1s4_authority_check": (
+        "0d5f09dc600da4a819d77be3491e158425766878fc96cc4faecf946e78c611da"
+    ),
+    "_arch134_d1s4_overlay": (
+        "b926242acba3586417020d76d01d5fc7e5ca019c5f3dac294899b55645b5437b"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "4913f09c43c90b5fa8b88bd5abc47e7cbc698713b2f732d24bba7543deda0b7d"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "c0ad60057da6d9bbf49ac372bc3049ff20c9fe810bdf739567e724fc34f342c8"
+    ),
+    "_checkpoint_specs": (
+        "349837855bbe88143312bca6d10f3768f04b0fd00d092b80a24b4fb73561bdaf"
+    ),
+    "execute_checkpoint": (
+        "6e2b1fe8363b78dac16e2a41ffdb396dfa326667ec70da58ffa9f144ee25b4d5"
+    ),
+}
+ARCH134_ACL_AST_PINS: Final = {
+    "_arch134_d1s2_active_inventory": (
+        "febd037e0ad71517d5f36cb03db993e51ded821223bb2f57886e32bfb90f0dc8"
+    ),
+    "_arch134_d1s4_active_inventory": (
+        "c389c4c3d05d93592b444ddfc969b0105f3e27728a8d8aea03978b436b4034ad"
+    ),
+    "_arch134_d1s4_authority_check": (
+        "0381a111e293b8ce39fdcc8ad336bce35bb03d63a43c113e42e03455cf7c81e3"
+    ),
+    "_arch134_d1s4_overlay": (
+        "590201a010b0d2bfd064e48a99fd2a5edcda7e60023d9c8d57b5f328ec7386bd"
+    ),
+    "_arch134_f1r1_c1_active_inventory": (
+        "c6e037f4dcb749a1400a77b96bed441f59e551f65cbebb6cebe445fd919c6c19"
+    ),
+    "_arch145a_predecessor_active_checkpoint_inventory": (
+        "b627ac830a4f1968300fe437e72b912c30f0898aefd2098c98fa4ea4188c522c"
+    ),
+    "_checkpoint_specs": (
+        "f0e8f714a1eeeaa7d724803b0381402e5ad53ff927b7a35072f4190f9a86f0ca"
+    ),
+    "execute_checkpoint": (
+        "a908dd81b09da6e25c9b61cfffc349ecf2a8a2e51877b60bf4be65d52e05c4a9"
+    ),
+}
+ARCH134_ACL_NEW_AST_PINS: Final = {
+    "_arch134_acl_active_inventory": (
+        "5d5561e5cc3c41d8c801a91769fe03ff33e69d33124f8095c487b3f37166fed9"
+    ),
+    "_arch134_acl_authority_check": (
+        "04be6722d946ff21e0ebbe4c9d85826a9126caca072e42e0ae03884dc42c6d17"
+    ),
+    "_arch134_acl_execute": (
+        "15c940324b1dd156d77152ca5c72b44bae404e3a2d1eef28ca09301c3790d9c1"
+    ),
+    "_arch134_acl_graph_check": (
+        "ad9365a8e162df8fcc5b904016f4b96657ee5b4878e4d3a9a421f32c30ea4d14"
+    ),
+    "_arch134_acl_overlay": (
+        "b6ae4b90d9695e1d33a64fcef7f4a751b5a323b6699fb202fcc84e7ceab687b5"
+    ),
+    "_arch134_acl_preflight": (
+        "f7ba853b67def29b3ed201309e24e37a77d4642233f3a6b1f4c12617c53e04a8"
+    ),
+}
+ARCH134_ACL_SOURCE_PINS: Final = {
+    ("docs/architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md"): (
+        "c685301318379530b2a388dc71ac580db9b1fd29"
+    ),
+    ("docs/validation/arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-plan.md"): (
+        "97dd74d41b341c0f51422fe7c709336c4c13121c"
+    ),
+    "src/trading_bot/shared_namespace_acl_native.py": (
+        "b792e0bf4a533f97df7d4e957a70058a044095ab"
+    ),
+    "src/trading_bot/shared_namespace_acl_recovery.py": (
+        "f9f0bfde8b9f9488627dc26e54c4232e45fd91ef"
+    ),
+    ("tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"): (
+        "ac7ea8c31b5c476ac4c83dd670a660214113b782"
+    ),
+}
+ARCH134_ACL_MAPS_SHA256: Final = (
+    "a13966e0b5a6761f3b7fb6e05c115e72473ed094a3f8cb057e4602340578ee29"
+)
+
+
+def _arch134_acl_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    maps = (
+        ARCH134_ACL_BLOB_PREDECESSORS,
+        ARCH134_ACL_BLOB_PINS,
+        ARCH134_ACL_AST_PREDECESSORS,
+        ARCH134_ACL_AST_PINS,
+        ARCH134_ACL_SOURCE_PINS,
+        ARCH134_ACL_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH134_ACL_MAPS_SHA256
+    ):
+        raise ValueError("R1 authority map digest drift")
+    before = ARCH134_ACL_AST_PREDECESSORS if ast_pin else ARCH134_ACL_BLOB_PREDECESSORS
+    after = ARCH134_ACL_AST_PINS if ast_pin else ARCH134_ACL_BLOB_PINS
+    if set(before) != set(after):
+        raise ValueError("R1 overlay namespace drift")
+    if key in before:
+        if predecessor != before[key]:
+            raise ValueError("R1 wrong accepted predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch134_acl_active_inventory(predecessor: tuple[str, ...]) -> tuple[str, ...]:
+    def digest(value):
+        return hashlib.sha256(
+            ast.dump(
+                ast.parse(repr(value), mode="eval").body, include_attributes=False
+            ).encode()
+        ).hexdigest()
+
+    if digest(predecessor) != ARCH134_D1S4_ACTIVE_SHA256:
+        raise ValueError("R1 predecessor inventory drift")
+    position = predecessor.index(ARCH134_D1S4_NAME)
+    current = (*predecessor[:position], ARCH134_ACL_NAME, *predecessor[position:])
+    if (
+        tuple(ACTIVE_CI_CHECKPOINTS) != current
+        or digest(current) != ARCH134_ACL_ACTIVE_SHA256
+        or digest(current) != REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+    ):
+        raise ValueError("R1 current inventory drift")
+    return current
+
+
+def _arch134_acl_preflight() -> dict[str, object]:
+    from trading_bot.shared_namespace_acl_recovery import preflight
+
+    return preflight()
+
+
+def _arch134_acl_execute() -> dict[str, object]:
+    from trading_bot.shared_namespace_acl_recovery import (
+        execute_once,
+    )
+
+    return execute_once()
+
+
+def _arch134_acl_graph_check(repo_root: Path) -> tuple[str, ...]:
+    base = "trading_bot.supervised_release."
+    roots = {
+        "trading_bot.shared_namespace_acl_recovery",
+        "trading_bot.shared_namespace_acl_native",
+    }
+    safe_acl = {
+        "trading_bot.arch133_acl",
+        "trading_bot.arch133_acl.read_only",
+        "trading_bot.arch133_acl.administrator",
+    }
+    forbidden_modules = {
+        base + value
+        for value in (
+            "installer",
+            "native_write",
+            "installation_operator",
+            "publication_recovery",
+            "native_publication",
+            "successor_installation_operator",
+            "successor_publication_recovery",
+            "successor_native_publication",
+            "successor_direct_installation",
+            "successor_native_direct_write",
+        )
+    }
+    forbidden_calls = {
+        "apply_root_policy_status",
+        "SetNamedSecurityInfo",
+        "SetFileSecurity",
+        "SetFileInformationByHandle",
+        "FileRenameInfo",
+        "rename",
+        "replace",
+        "unlink",
+        "remove",
+        "rmdir",
+        "mkdir",
+        "makedirs",
+        "move",
+        "delete",
+        "publish",
+        "promote",
+        "symlink",
+        "link",
+        "symlink_to",
+        "hardlink_to",
+        "__import__",
+        "import_module",
+        "eval",
+        "exec",
+        "getattr",
+        "setattr",
+    }
+    native_allowlist = {
+        "SetSecurityInfo",
+        "GetAclInformation",
+        "GetSecurityInfo",
+        "LocalFree",
+        "CloseHandle",
+        "GetVolumeInformationByHandleW",
+        "GetSecurityDescriptorLength",
+        "GetFileType",
+        "GetSecurityDescriptorControl",
+        "ConvertStringSecurityDescriptorToSecurityDescriptorW",
+        "GetFinalPathNameByHandleW",
+        "GetAce",
+        "GetSecurityDescriptorDacl",
+        "GetFileInformationByHandle",
+        "ConvertSidToStringSidW",
+        "CreateFileW",
+        "GetDriveTypeW",
+    }
+    safe_modules = {"trading_bot", "trading_bot.config", *roots, *safe_acl}
+    pending, seen, failures = list(roots), set(), []
+    while pending:
+        module = pending.pop()
+        if module.startswith("scripts"):
+            failures.append("R1 historical operator import: " + module)
+            continue
+        if module in seen or not module.startswith("trading_bot"):
+            continue
+        seen.add(module)
+        path = repo_root / "src" / Path(*module.split("."))
+        source = path.with_suffix(".py")
+        if not source.is_file():
+            source = path / "__init__.py"
+        if (
+            module in forbidden_modules
+            or (
+                module.startswith("trading_bot.arch133_")
+                and module not in safe_acl
+                and (source.is_file() or module.rpartition(".")[0] not in safe_acl)
+            )
+            or module.startswith(
+                (
+                    "trading_bot.runtime",
+                    "trading_bot.review_paper",
+                    "trading_bot.robinhood",
+                    "trading_bot.brokers",
+                )
+            )
+        ):
+            failures.append("R1 forbidden import: " + module)
+            continue
+        if len(seen) > 4096:
+            return ("R1 graph budget exceeded",)
+        if not source.is_file():
+            continue
+        if module not in safe_modules:
+            failures.append("R1 unreviewed dependency: " + module)
+            continue
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                pending.extend(alias.name for alias in node.names)
+            if isinstance(node, ast.ImportFrom):
+                if node.level:
+                    failures.append("R1 relative import rejected")
+                imported = node.module or ""
+                pending.append(imported)
+                pending.extend(imported + "." + alias.name for alias in node.names)
+            if module in roots:
+                token = (
+                    node.attr
+                    if isinstance(node, ast.Attribute)
+                    else node.id
+                    if isinstance(node, ast.Name)
+                    else node.value
+                    if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    else None
+                )
+                if token in forbidden_calls or (
+                    isinstance(token, str)
+                    and token.startswith(("MoveFile", "TreeSet", "SetNamed"))
+                ):
+                    failures.append("R1 forbidden capability: " + str(token))
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id in {"bind", "_bind"}
+                ):
+                    if (
+                        len(node.args) < 2
+                        or not isinstance(node.args[1], ast.Constant)
+                        or node.args[1].value not in native_allowlist
+                    ):
+                        failures.append("R1 native allowlist rejected")
+        pieces = module.split(".")
+        pending.extend(".".join(pieces[:n]) for n in range(1, len(pieces)))
+    return tuple(sorted(set(failures)))
+
+
+def _arch134_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_arch134_d1s4_authority_check(repo_root))
+    try:
+        _arch134_acl_overlay("", "", ast_pin=False)
+        _arch134_f1r1_c1_active_inventory()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {**ARCH134_ACL_AST_PINS, **ARCH134_ACL_NEW_AST_PINS}.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R1 runner AST drift: " + key)
+        for relative, pin in {
+            **ARCH134_ACL_BLOB_PINS,
+            **ARCH134_ACL_SOURCE_PINS,
+        }.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R1 source drift: " + relative)
+        failures.extend(_arch134_acl_graph_check(repo_root))
+        spec = _checkpoint_specs()[ARCH134_ACL_NAME]
+        if (
+            spec.preflight is not _arch134_acl_preflight
+            or spec.execute is not _arch134_acl_execute
+            or spec.authority_check is not _arch134_acl_authority_check
+            or spec.remote_branch != ARCH134_ACL_BRANCH
+            or spec.tests != ARCH134_ACL_TESTS
+            or spec.ruff_paths != ARCH134_ACL_RUFF_PATHS
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+            or not _batch_workflow_is_reviewed(
+                (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                    encoding="utf-8"
+                )
+            )
+        ):
+            failures.append("R1 registration drift")
+    except (ValueError, KeyError, TypeError, OSError, SyntaxError):
+        failures.append("R1 authority unavailable")
     return tuple(failures)
 
 
@@ -18693,6 +19226,19 @@ def _checkpoint_specs() -> dict[str, CheckpointSpec]:
         "tests/runtime/test_d10_arch128_r8_readonly.py",
     )
     return {
+        ARCH134_ACL_NAME: CheckpointSpec(
+            name=ARCH134_ACL_NAME,
+            description=(
+                "Fixed shared namespace ACL recovery; preserved releases never trusted"
+            ),
+            tests=ARCH134_ACL_TESTS,
+            ruff_paths=ARCH134_ACL_RUFF_PATHS,
+            authority_check=_arch134_acl_authority_check,
+            remote_branch=ARCH134_ACL_BRANCH,
+            preflight=_arch134_acl_preflight,
+            execute=_arch134_acl_execute,
+            remote_head_env="AI_TRADING_BOT_ARCH134_F1R1_D1S4_R1_ACCEPTED_HEAD",
+        ),
         ARCH134_D1S4_NAME: CheckpointSpec(
             name=ARCH134_D1S4_NAME,
             description="Rename-free direct immutable release installation",
@@ -21066,6 +21612,16 @@ def execute_checkpoint(
             f"found: {state_before['porcelain']}"
         )
 
+    if spec.name == ARCH134_ACL_NAME:
+        from trading_bot import shared_namespace_acl_recovery as recovery
+
+        if spec != _checkpoint_specs()[ARCH134_ACL_NAME]:
+            raise RuntimeError("R1 registration rejected")
+        if os.environ.get(recovery.AUTH_ENV) != recovery.AUTH_VALUE:
+            raise RuntimeError("R1 authorization interlock rejected")
+        if re.fullmatch(r"[0-9a-f]{64}", os.environ.get(recovery.PLAN_ENV, "")) is None:
+            raise RuntimeError("R1 reviewed-plan interlock rejected")
+
     if spec.name == ARCH134_D1S4_NAME:
         from trading_bot.supervised_release import (
             successor_direct_installation as direct,
@@ -21238,7 +21794,7 @@ def execute_checkpoint(
                 "disposition": "PRESERVE_PUBLICATION_EVIDENCE_NO_RETRY",
             },
         }
-    if spec.name == ARCH134_D1S4_NAME and not identity_stable:
+    if spec.name in {ARCH134_D1S4_NAME, ARCH134_ACL_NAME} and not identity_stable:
         result = {
             **result,
             "status": "INDETERMINATE",
@@ -21248,7 +21804,11 @@ def execute_checkpoint(
                 **result.get("primary", {}),
                 "status": "INDETERMINATE",
                 "reason": "RUNNER_SOURCE_DRIFT",
-                "disposition": "PRESERVE_DIRECT_INSTALLATION_EVIDENCE_NO_RETRY",
+                "disposition": (
+                    "PRESERVE_SHARED_NAMESPACE_ACL_RECOVERY_EVIDENCE_NO_RETRY"
+                )
+                if spec.name == ARCH134_ACL_NAME
+                else "PRESERVE_DIRECT_INSTALLATION_EVIDENCE_NO_RETRY",
                 "execute_eligible": False,
             },
         }

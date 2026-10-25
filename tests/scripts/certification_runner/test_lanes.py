@@ -55,6 +55,7 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         not in {
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+            "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
         }
     )
     weights = runner.robinhood_module_weights(selected)
@@ -94,6 +95,14 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     assert direct in current
     assert (
         runner.robinhood_module_weights(current)[direct] == runner.ROBINHOOD_FALLBACK_MS
+    )
+    recovery = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
+    )
+    assert recovery in current
+    assert (
+        runner.robinhood_module_weights(current)[recovery]
+        == runner.ROBINHOOD_FALLBACK_MS
     )
     current_lanes = runner.build_lanes(root, current, "robinhood")
     runner.validate_partitions(current, tuple(current_lanes.values()))
@@ -230,6 +239,7 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         not in {
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+            "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
         }
     )
     weights = runner.full_module_weights(inventory)

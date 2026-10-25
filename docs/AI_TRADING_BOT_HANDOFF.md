@@ -1,97 +1,82 @@
 # AI Trading Bot — Current Handoff
 
-## Implementation boundary
+## Source implementation boundary
 
-D1S4 rename-free direct installation and its user-authorized mechanical C1 are
-implemented. Replacement feature CI and ChatGPT exact-source review remain
-pending. The final post-CI handoff supplies publication identity/evidence; no SOURCE ACCEPTED claim is made.
+D1S4 plus C1 was accepted and integrated at
+30a410d9023324ebe5c23e6a8ff128353b9ebf1f /
+cf50b0b7b84428d9e502ed5bd85307001bc866ed. Its direct installation completed
+PASS / DIRECT_INSTALL_VERIFIED / CONFIRMED / IDENTITY_STABLE=True for
+release-18d5d329c1d458558e98d7effe523c3b. D1S4 execute is permanently consumed.
+
+Later registered read-only admission was BLOCKED /
+READ_ONLY_ADMISSION_REJECTED. External John FullControl CI/OI drift affects the
+two shared directories; runtime/Python are outside that drift set. The exact
+incident facts and two-target recovery contract are recorded in
+[Architecture R1](architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md).
+Reconciliation is blocked; the compromised FINAL and two .installing siblings
+remain immutable incident evidence. No repair can make them trusted through R1.
+
+R1 source implementation and focused/static verification are complete locally,
+pending publication. All 1,878 unique affected cases are green, including 124 R1
+and 135 D1S4 cases; Ruff/format/diff and exact authority checks pass. Final source identity: PENDING FINAL COMMIT.
+Terminal CI: PENDING FIRST/ONLY PUSH.
+No R1 SOURCE ACCEPTED or native-host acceptance claim is made.
 
 Use only:
-`F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
+F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current
 
 Branch:
-`feature/robinhood-production-paper-134f1r1-d1s4-rename-free-direct-install-current`
+feature/robinhood-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current
 
-Required initial implementation base/direct parent:
-`1e9b6a0638f00ddb009bdb7934039b7a9047e678`, tree
-`1ef95f954cfce509a6b90639b8bb9599e2e9206f`.
-
-The initial implementation was one normal commit and one ordinary first push:
-`613766837f13d3667d20c76aab2a56331933383e` /
-`91e63ed40510dc03523e5c4a76f9f3133cc6839f`. Its terminal-red CI #708 /
-`40130002889`, attempt 1 remains
-preserved. The user explicitly authorized correction through green.
-
-Separate C1 has that exact source as its direct parent and adds one normal
-corrective commit/ordinary push. Do not amend/rewrite or rerun the failed source.
-No intermediate design commit or remote branch bootstrap occurred. The
-planning branch at `f1a7282d4ff42e58f257d59d1c734329d628688e` is unchanged historical
-reference. The stale main checkout and its untracked artifacts remain out of scope.
+Required base/direct parent is the accepted identity above. The stale main
+checkout and all other worktrees/artifacts remain outside the edit boundary.
 
 ## Implemented operator contract
 
-Registered checkpoint:
-`arch134-f1r1-d1s4-rename-free-direct-installation`
+Checkpoint: arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery.
+Modules: shared_namespace_acl_recovery.py and shared_namespace_acl_native.py
+under src/trading_bot. These leaf modules avoid the provider-bearing release facade. D1S4 read-only failures now include
+closed admission_stage/admission_code diagnostics for ten distinct stages.
 
-Operator/native modules:
-`src/trading_bot/supervised_release/successor_direct_installation.py` and
-`src/trading_bot/supervised_release/successor_native_direct_write.py`.
+R1 preflight admits only the frozen two-object drift policy and unchanged fixed
+incident scope. Its canonical reviewed plan binds source, identities, hashes,
+pre/post tuples and preserved observations. Execute requires exact authorization
+plus reviewed-plan SHA-256, consumes a new exclusive flushed/fsynced/closed/read
+back latch, then mutates only two exclusive pinned handles with DACL/protection
+flags and no owner rewrite. All ambiguity is terminal and no-retry. All result
+states set runtime/soak eligibility false for the preserved incident releases.
 
-Attempt schema:
-`arch134-f1r1-d1s4-rename-free-direct-install-attempt/v1`
+Source interlocks: AI_TRADING_BOT_ARCH134_F1R1_D1S4_R1_ACCEPTED_HEAD / ACCEPTED_TREE.
+Reviewed-plan interlock: AI_TRADING_BOT_ARCH134_F1R1_D1S4_R1_REVIEWED_PLAN_SHA256.
+Execute interlock: AI_TRADING_BOT_ARCH134_F1R1_D1S4_R1_ACL_RECOVERY_AUTHORIZATION
+= ARCH134_F1R1_D1S4_R1_ONE_SHARED_NAMESPACE_ACL_RECOVERY_AUTHORIZED.
 
-Derived path:
-`F:\AI\temp\arch134-f1r1-d1s4-direct-install-attempt-<release-id>.json`
+Latch: F:\AI\temp\arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-attempt.json.
+No production interlock was set. Fake-host tests use disposable injected seams.
+The final [validation record](validation/arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-plan.md)
+contains focused evidence. CI owns canonical ROBINHOOD; never duplicate locally.
+Final identity/terminal CI are post-commit observations supplied externally;
+no second docs commit merely to backfill them.
 
-Source interlocks:
-`AI_TRADING_BOT_ARCH134_F1R1_D1S4_ACCEPTED_HEAD` and
-`AI_TRADING_BOT_ARCH134_F1R1_D1S4_ACCEPTED_TREE`.
+## Next owner and preserved boundaries
 
-Protected execute interlock:
-`AI_TRADING_BOT_ARCH134_F1R1_D1S4_DIRECT_INSTALL_AUTHORIZATION` =
-`ARCH134_F1R1_D1S4_ONE_RENAME_FREE_IMMUTABLE_RELEASE_INSTALL_AUTHORIZED`.
+Complete exactly one normal atomic implementation commit/one ordinary push,
+then poll its mapped run to terminal. On red preserve the run and stop for
+ChatGPT classification; no unchanged rerun or automatic C1. On green hand back
+HEAD/TREE/parent/count/changed paths/local checks/remote/clean state plus exact
+CI identity/results/totals/wall/artifact. Codex stops pending ChatGPT exact-source
+review and performs none of the following integration or host actions.
 
-No production interlock was set during implementation. The operator durably
-consumes and reads back its latch before native import. It creates only the
-exact final tree, closes all materialization handles, and independently verifies
-that same tree twice. All consumed states forbid automatic retry. The registered
-preflight is production-read-only, including after consumed success or failure.
+ChatGPT next action: retrieve the exact feature commit/diff and canonical CI
+evidence, verify source/one-shot/native graph/incident non-regression, accept
+only if justified, then determine reviewed develop integration/develop CI.
+Only later: registered read-only R1 production preflight -> separate protected
+review/one-shot ACL recovery -> registered reconciliation -> only if recovered,
+a new successor source/HEAD/TREE/release ID/path -> deployment admission ->
+successor-root write-authority/ACL review -> fresh manual F1 successor soak ->
+145-B -> Research Results GUI -> large strategy campaigns.
 
-The feature route owns canonical ROBINHOOD in CI. Do not duplicate it locally.
-The validation record contains focused evidence and exact changed paths. Final
-HEAD/TREE/parent, commit count, remote/clean-state proof and terminal CI identity,
-modules/cases/pass/skip/fail/error/wall/artifact are post-commit facts delivered in
-the final handoff, per the user's explicit documentation resolution.
-
-
-The original canonical run selected 111 modules and recorded 10,988 passed /
-6 skipped / 1 failed / 0 errors in 167.629 seconds. All 121 original D1S4 cases
-passed. The failure was the old R5 digest comparand in
-`_arch134_f1r1_c1_active_inventory`.
-
-C1 fixes that pure current-inventory comparison, includes the missed predecessor
-validator in D1S4 source authority, adds two regression cases and refreshes exact
-successor pins. Focused verification passed 351 cases (all 123 current D1S4 cases
-included). Ruff/diff checks pass. Native/operator behavioral source is unchanged.
-C1's ordinary push owns replacement canonical ROBINHOOD; never duplicate it locally.
-
-## Preserved boundaries and next owner
-
-No real D1S4 production preflight/execute occurred. D1S3/R5 incident latches,
-reports, staging/final namespace and behavioral source were untouched. Historical
-publication is not a forward deployment dispatcher. No successor-root,
-scheduler/service/startup, runtime-start, credential/provider, paper/broker,
-D1/D2 or live effect occurred. Live remains NO-GO.
-
-Current action: complete the user-authorized C1 atomic publication and wait for
-terminal replacement CI. Preserve/classify a red replacement and continue only
-within the reviewed mechanical corrective scope; stop on semantic/native/effect
-uncertainty. Next owner after terminal green: **ChatGPT exact-source review**. Retrieve
-the exact final commit/diff and CI evidence directly. Accept only if justified;
-then separately determine develop integration, develop CI, registered read-only
-D1S4 production preflight and the later one-shot protected review. Codex stops at
-the implementation handoff and performs none of those subsequent steps.
-
-Later progression: exact deployment admission -> successor-root ACL review ->
-fresh manual-start F1 successor soak -> 145-B -> Research Results GUI -> large
-strategy campaigns.
+No real R1/D1S4 preflight/execute, incident repair, scheduler, runtime start,
+credential/provider, paper/broker, D1/D2 or live effect occurred during this
+implementation. D1S3/R5, F1 and C2 consumed authorities remain consumed.
+Live remains NO-GO.

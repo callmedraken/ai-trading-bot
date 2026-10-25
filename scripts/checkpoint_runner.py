@@ -20671,7 +20671,9 @@ def _arch132_r3m_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
         if predecessor not in (before[key], after[key]):
             raise ValueError("R3M wrong exact predecessor")
         predecessor = after[key]
-    return _arch132_r3m_c1_pin(key, predecessor, ast_pin=ast_pin)
+    return _arch132_r3m_c3_pin(
+        key, _arch132_r3m_c1_pin(key, predecessor, ast_pin=ast_pin), ast_pin=ast_pin
+    )
 
 
 def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -20822,8 +20824,10 @@ def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
             ):
                 failures.append("R3M C1 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c2_pin(
-                relative, pin, ast_pin=False
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
+                relative,
+                _arch132_r3m_c2_pin(relative, pin, ast_pin=False),
+                ast_pin=False,
             ):
                 failures.append("R3M C1 source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
@@ -20988,6 +20992,9 @@ ARCH132_R3M_C3_AST_PREDECESSORS: Final = {
     "_arch134_d1s3_shared_successor_pin": (
         "a9964da105d85b32d6735e6eeab8d6a3c608befea22eb31f22845e7c96505481"
     ),
+    "_arch132_r3m_pin": (
+        "7603492fae48cfdfd0c1c820a2fdbc3f4d3c7b19bb30c659e91f814bfda16997"
+    ),
     "_arch132_r3m_c1_authority_check": (
         "763d1c4e8e1ae758990a65cc21cd9e0646e31e70807394c4a1c1a344159c6dd8"
     ),
@@ -21008,8 +21015,11 @@ ARCH132_R3M_C3_AST_PINS: Final = {
     "_arch134_d1s3_shared_successor_pin": (
         "c4d2c5141c8527759bbb01f712c84f63f5f1796d8caf3cfafd93219d6f0529ec"
     ),
+    "_arch132_r3m_pin": (
+        "d6034efe03843d33e014997ee632a1151d886e585bf5c4e3733294f975057ab7"
+    ),
     "_arch132_r3m_c1_authority_check": (
-        "868c13b07a6f280b8ce53a41f0f70f3c3d6e220fdc7fa1def231e4df1735fcab"
+        "814ec031d278b727992963bf3c7abe6bc1b5ccc971fcae94f7b10b643c5b2b45"
     ),
     "_arch132_r3m_c2_pin": (
         "c58f03d84da67581592560fe5db2f61ebf907c055d4cd0a0aaf4e1dbf1d6d788"
@@ -21056,6 +21066,18 @@ ARCH132_R3M_C3_BLOB_PREDECESSORS: Final = {
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "85c4da9a1cf25c29b9fca2c3d3acff71c61bb9ad"
     ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "68d3a1ec997d4c8ba277cda57e0ad8e03e945cc6"
+    ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "012c1664d1d79822ab78b4e6fda172f480ea8dd6"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "35445d8c3054e6015e454bd124c5e58b989e6a8f"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "01ae41fa37083e9bc548fedbaae6178328458dff"
+    ),
     "docs/PROJECT_STATUS.md": "8e71eb18e0a136fc1b40497a53a86f3e457ea17e",
     "docs/AI_TRADING_BOT_HANDOFF.md": "9c1346707b72eb8bc0bb8a85cd3c87b3ce075723",
 }
@@ -21091,6 +21113,18 @@ ARCH132_R3M_C3_BLOB_PINS: Final = {
     "tests/review_paper/test_supervised_runtime_host_admission.py": (
         "f94ae514a5eba8a72b193cf88773a50c55ceb557"
     ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "1c54a9cb6238339ea572d966f370b86c8c7bdd8d"
+    ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "68f105df1308461d2c58de3df72f39540da882d1"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "9b41330fe25e1a3d6fad9ba11c477c497be5bd61"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "6ef03c56497055a8edf7d2378c87c44d55800b53"
+    ),
     "docs/PROJECT_STATUS.md": "0c7730f985bd21a6de106fcede695aee0fdc774e",
     "docs/AI_TRADING_BOT_HANDOFF.md": "b67896b51686579ae5bc3ca674e58ce71f68a83d",
 }
@@ -21106,7 +21140,7 @@ ARCH132_R3M_C3_NEW_AST_PINS: Final = {
     ),
 }
 ARCH132_R3M_C3_MAPS_SHA256: Final = (
-    "42c532216417bec1d7fcbfa2afbbf20a236a7ec46a276f86a1958cb48c26f0ed"
+    "c59367121946f0a717b7226a026a6ff2f491f518e93ba337a3c2c5ed07907e93"
 )
 
 

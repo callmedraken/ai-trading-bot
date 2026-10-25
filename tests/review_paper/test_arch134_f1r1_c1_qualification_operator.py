@@ -590,6 +590,8 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
     }
     permitted = set(runner.ARCH134_F1R1_C1_RUNNER_AST_PINS)
     permitted.update(runner.ARCH134_D1S3_RUNNER_AST_PINS)
+    permitted.update(runner.ARCH132_R3M_C3_AST_PINS)
+    permitted.update(runner.ARCH132_R3M_C3_NEW_AST_PINS)
     workflow_key = "_batch_workflow_is_reviewed"
     assert (
         hashlib.sha256(

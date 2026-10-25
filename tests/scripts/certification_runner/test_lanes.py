@@ -245,37 +245,39 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         }
     )
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == len(runner.FULL_MODULE_TIMINGS_MS) == 198
-    assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
+    assert len(inventory) == 199
+    assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS} | {
+        "tests/runtime/checkpoint_runner/test_r3m_c2.py"
+    }
     assert runner.FULL_FALLBACK_MS == 1000
-    assert sum(weights.values()) == 1231440
+    assert sum(weights.values()) == 1232440
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9"
+        == "c736db12c1762b220c8493b182d1b6a0a7592a57658fc8eddbb20f8aafc19b2d"
     )
     lanes = runner.build_lanes(root, inventory, "full")
     assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 7))
     assert all(lanes.values()) and "serial" not in lanes
     assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (32, 32, 33, 33, 34, 34)
+    assert tuple(map(len, lanes.values())) == (32, 32, 33, 34, 34, 34)
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
-    assert totals == (205240,) * 6
+    assert totals == (205407, 205407, 205407, 205407, 205406, 205406)
     assert tuple(_ordered_lane_hash(lane) for lane in lanes.values()) == (
-        "b86fdc382015ef5845e761a6c671f8a9cd27c195ac37e900b2c709b41f68fd37",
-        "40730d6b3d85600efdf972b84f5335e88d93b97915f6f6e9922bdf291176b64e",
-        "a1da558ff6aee18e08a3e949f331e8743e0c02897d621107ad3d5f92237e454f",
-        "3791a2a803e6a9c48cb41133a4f1568ed78a201a29aa536f547eb1d19edad0ef",
-        "dc0fd920b76c118293b943065b4be59d804b7fc6da8bca8919b0725cc9aaeb57",
-        "e5364bb6b084ae092926a3bc480b43a5c5c40ca0a9e5909b16d85e02fa0b4f6f",
+        "4370c172de1ed35b513bfe0601686f6a37687a1c8e71410677a437f333b0c652",
+        "44fbd5262637ce9aaafe064c5a084136b51720a8f481f6df8bd957ab17bc00a7",
+        "b9114c371658362d7725838357d91b7d829e1432a3be89ffe9feb8a222c64605",
+        "d16bcf154b0d51989ac7429f84e7f8a15606ab9e63334158974f900248081c53",
+        "dcd467076a0069d80279aa2df4e3490ddc1f28f190135f169fc6d6ddaa434bf2",
+        "7c0122c95d1f0961f95aaa84d5966b39c893d5d0a4de62f6bcf9f575ec6cd89b",
     )
-    assert max(totals) + 81674 == 286914 < 300000
+    assert max(totals) + 81674 == 287081 < 300000
     # Only this module measured zero in the preserved R4 FULL XML.
     assert weights["tests/domain/test_proposals.py"] == 1
     raw = dict(weights, **{"tests/domain/test_proposals.py": 0})
-    assert sum(raw.values()) == 1231439
+    assert sum(raw.values()) == 1232439
     assert [module for module, ms in raw.items() if ms == 0] == [
         "tests/domain/test_proposals.py"
     ]

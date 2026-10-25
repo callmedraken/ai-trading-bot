@@ -634,7 +634,7 @@ def test_checkpoint_profile_and_exact_authority_consumers():
     assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS[1:]
     assert runner._arch134_d1s1_authority_check(ROOT) == ()
     inventory = certification.discover_inventory(ROOT)
-    assert len(certification.select_inventory(inventory, "full")) == 202
+    assert len(certification.select_inventory(inventory, "full")) == 203
     assert len(certification.select_inventory(inventory, "robinhood")) == 112
     assert (
         "feature/robinhood-*"
@@ -693,6 +693,7 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
         {workflow_key}
         | set(runner.ARCH134_D1S1_PREDECESSOR_AST_PINS)
         | set(runner.ARCH134_D1S2_PREDECESSOR_AST_PINS)
+        | (set(runner.ARCH132_R3M_C3_AST_PREDECESSORS) & changed)
         | (
             set(runner.ARCH134_D1S3_RUNNER_AST_PINS)
             - {

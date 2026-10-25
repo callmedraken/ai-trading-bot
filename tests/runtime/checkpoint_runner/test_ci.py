@@ -769,10 +769,10 @@ def test_arch146a_registration_and_additive_successor_authority():
         == runner.ARCH134_FRESH_ACTIVE_SHA256
     )
     for key, pin in runner.ARCH146A_AST_PREDECESSORS.items():
-        assert (
-            runner._arch146a_overlay(key, pin, ast_pin=True)
-            == runner.ARCH146A_AST_PINS[key]
+        expected = runner.ARCH132_R3M_C3_AST_PINS.get(
+            key, runner.ARCH146A_AST_PINS[key]
         )
+        assert runner._arch146a_overlay(key, pin, ast_pin=True) == expected
         with pytest.raises(ValueError, match="predecessor"):
             runner._arch146a_overlay(key, "0" * 64, ast_pin=True)
 
@@ -1289,9 +1289,9 @@ def test_r3m_exact_successor_authority_and_frozen_certification_source(monkeypat
         (False, runner.ARCH132_R3M_BLOB_PREDECESSORS, runner.ARCH132_R3M_BLOB_PINS),
     ):
         for key, pin in before.items():
-            assert runner._arch132_r3m_pin(
-                key, pin, ast_pin=ast_pin
-            ) == runner._arch132_r3m_c1_pin(key, after[key], ast_pin=ast_pin)
+            expected = runner._arch132_r3m_c1_pin(key, after[key], ast_pin=ast_pin)
+            expected = runner._arch132_r3m_c3_pin(key, expected, ast_pin=ast_pin)
+            assert runner._arch132_r3m_pin(key, pin, ast_pin=ast_pin) == expected
             with pytest.raises(ValueError, match="R3M wrong exact predecessor"):
                 runner._arch132_r3m_pin(key, "0" * len(pin), ast_pin=ast_pin)
     monkeypatch.setattr(runner, "ARCH132_R3M_AST_PINS", {})

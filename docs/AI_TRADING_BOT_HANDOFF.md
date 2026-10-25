@@ -1,87 +1,111 @@
 # AI Trading Bot — Current Handoff
 
-## Current source boundary
+## Current integrated source
 
-Architecture 134-F1R1-D1S4-R1 recovery/reconciliation is accepted and complete;
-its durable recovery attempt is permanently CONSUMED. Incident release material
-remains preserved and untrusted.
+Current develop before this Architecture-146 design checkpoint:
 
-Architecture 134-F1R1-D1S4 Fresh Successor Source is SOURCE ACCEPTED and
-integrated into `develop` at:
+    HEAD a637f1b34565a715c14874d0f9a9686388319c16
+    TREE e870cc8f28138076d1e247eb92358d88a89c2f26
+    docs-only Source Gates #716 / 40169845896 attempt 1: SUCCESS
 
-    HEAD b18c6e32606828beeebc540a93c9f05e3e024323
-    TREE b082c15bc697bf289fc7997b3d7bf87050082dc3
-    DIRECT PARENT 47370fcb24baa0359ac741ee3ba2a14da6438f8d
+The preceding fresh-successor source is accepted/integrated at
+b18c6e32606828beeebc540a93c9f05e3e024323 /
+b082c15bc697bf289fc7997b3d7bf87050082dc3. R1 is reconciled and permanently
+consumed. Preserved incident releases remain immutable/untrusted.
 
-Accepted source branch:
-`feature/robinhood-production-paper-134f1r1-d1s4-fresh-successor-source-current`.
+## Architecture 146 design decision
 
-Feature publication CI #714 / 40167976672 attempt 1 is terminal SUCCESS.
-Canonical ROBINHOOD artifact 12589725766 covered 112 modules / 11,222 cases:
-11,216 passed, 6 skipped, 0 failed/errors; artifact SHA256
-5edc36760e543cd2db525742a78952f0f5a5cd104a8e91f94eb776c1c485eec2.
+The attempted weekend offline robustness diagnostic correctly stopped before
+research because no approved local historical dataset exists. The repository
+data directory is empty and repository CSV files are fixtures/examples.
 
-ChatGPT fast-forwarded `develop` to that exact accepted commit. Develop
-integration CI #715 / 40169150780 attempt 1 is terminal SUCCESS: source-static,
-full-tests (0..3) and source-gates passed; active-tests and certification-tests
-were correctly skipped on the broad fallback integration route.
+Architecture 146 — Historical Research Data Custody and Partition Contract is a
+documentation-only accepted design. It is separate from Architecture 145-B.
 
-The fresh source implementation remains source-only. It admits exact clean
-source/worktree/branch/origin/remote identity, reconstructs the current immutable
-release manifest/inventory and derives prospective release/final/attempt
-identities. It excludes all three preserved incident release IDs. The dispatcher
-has preflight=None and execute=None; no old D1S4/R1 latch can grant fresh
-authority. Runtime binding, successor-soak and execute eligibility remain false.
+v1 research data is frozen as:
 
-Frozen incident objects remain:
+    symbol      SPY
+    vendor      Alpaca Market Data API
+    bars        /v2/stocks/SPY/bars
+    timeframe   1Day
+    adjustment  raw
+    asof        -
+    feed        sip
+    currency    USD
+    sort        asc
+    pagination  complete
 
-- `F:\AITradingBot\releases\release-18d5d329c1d458558e98d7effe523c3b`
-- `F:\AITradingBot\releases\release-cb94451fc3295a97afffe9fac5d09ff3.installing`
-- `F:\AITradingBot\releases\release-03c42597246752319956ab96e01ed61c.installing`
+Same-vendor corporate actions are mandatory provenance from
+/v1/corporate-actions for SPY.
 
-Do not repair, delete, rename, reuse, bind, promote or derive fresh authority
-from any of them.
+Frozen chronological roles:
 
-## Weekend operating boundary
+    DEVELOPMENT  [2016-01-01T00:00:00Z, 2020-01-01T00:00:00Z)
+    WALK_FORWARD [2020-01-01T00:00:00Z, 2024-01-01T00:00:00Z)
+    FINAL_HOLDOUT[2024-01-01T00:00:00Z, 2026-10-24T00:00:00Z)
 
-Do **not** freeze a production deployment generation yet.
+Development-visible root:
 
-Normal project development may continue on `develop` through the weekend,
-including bounded source-only/offline research work that does not require
-market-open evidence or a fixed deployment candidate. If `develop` advances,
-the future deployment release identity must be regenerated from that later exact
-HEAD/TREE.
+    F:\AI\ai-trading-bot\data\research\arch146-v1
 
-Architecture 145-B is still deferred until the fresh F1 successor soak is
-complete and accepted. Research Results GUI follows 145-B, then large strategy
-campaigns. Do not reorder that accepted macro path.
+It may contain only vendor/open bytes, normalized OPEN SPY.csv and non-price
+holdout commitments. OPEN contains DEVELOPMENT + WALK_FORWARD only.
 
-No real-host successor preflight, installation execute, latch creation,
-production materialization, scheduler/runtime mutation, provider/broker effect or
-live effect is authorized during this weekend development window. Live remains
-NO-GO.
+Future physical holdout custody root:
 
-## Sunday-night handoff
+    F:\AI\research-holdout\arch146-v1
 
-Immediately before preparing for the next market-open session:
+The design requires a protected Administrators+SYSTEM-only DACL when that root is
+later created under separate host authority. No root/ACL/data exists merely
+because the design names it.
 
-1. resolve the then-current remote `develop` HEAD/TREE and require terminal
-   green CI for that exact tip;
-2. freeze only that exact tip as the deployment candidate;
-3. create the fresh deployment-admission source checkpoint that emits/pins the
-   concrete deterministic release ID, immutable final path and fresh
-   release-derived attempt path;
-4. publish once, wait for terminal CI, perform ChatGPT exact-source review, then
-   integrate only after merge-readiness;
-5. wait for terminal develop integration CI;
-6. only then review and run the separate read-only real-host deployment
-   admission;
-7. preserve a STOP on any unexpected material, source drift, consumed/
-   indeterminate attempt or parent/Python policy mismatch;
-8. separately review successor-root write authority before any materialization;
-9. proceed to the fresh manual F1 successor soak only after those gates pass.
+## Critical compatibility finding
 
-The deployment candidate is intentionally **not** b18c6e3... by fiat; it is the
-exact current `develop` source selected Sunday night.
+CSVHistoricalDataProvider validates the complete CSV before request filtering, so
+a mixed open+holdout CSV is forbidden for development.
 
-Until then, continue safe project progress without production effects.
+Architecture 145-A also binds one logical historical_data_fingerprint across all
+three partitions. Current physical partition fingerprints differ because request
+bounds and OHLCV are fingerprint material. Do not rewrite 145-A or pretend the
+UUIDs are interchangeable.
+
+Architecture 146-A must add an immutable additive dataset snapshot/partition
+manifest layer that externally proves OPEN + HOLDOUT membership in one logical
+snapshot, preserves each physical partition's own fingerprint, and supplies a
+privileged full logical fingerprint for later Architecture-145 policy lineage.
+
+## No-effect boundary
+
+This design does not authorize:
+
+- provider/network or credential access;
+- data acquisition/import;
+- creation of either data root;
+- holdout reads;
+- ACL mutation;
+- backtests/campaigns;
+- Architecture 145 holdout admission or eligibility;
+- Architecture 145-B;
+- production deployment/effects;
+- paper/broker/live effects.
+
+No production deployment generation is frozen during the weekend.
+
+## Next owner / next step
+
+Next source checkpoint:
+**Architecture 146-A — historical research dataset manifest and partition
+enforcement**.
+
+Use a new feature worktree from the then-current terminal-green develop tip. It
+is pure/source-only with synthetic fixtures. Add deterministic canonical
+manifest/snapshot models and external verification. Do not call Alpaca, use real
+credentials, create F:\AI\research-holdout, inspect real holdout data, run a real
+backtest, modify Architecture-145 schemas or start 145-B.
+
+After one atomic publication and terminal CI, ChatGPT performs exact-source
+review. Real data acquisition remains a separately reviewed future 146-B
+checkpoint.
+
+Sunday night remains the production-mode transition: freeze only the then-current
+terminal-green develop tip for the fresh deployment-admission sequence.

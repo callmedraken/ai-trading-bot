@@ -232,3 +232,25 @@ Both bounded current-state documents are reviewed for this corrective checkpoint
 The replacement publication retains CI-owned FULL and requires terminal green
 plus ChatGPT exact-source review before acceptance. No local FULL rerun or
 146-B acquisition is part of C1.
+
+## Corrective C2 — preserve the accepted solver identity environment
+
+C1 source 83318d00b18264dfdf7d06725ee660383578c92f / tree
+130e4e9d57c491373b8352ca44b19f1cf0d79614 and push run 719 /
+40177945971 attempt 1 are preserved. C1 passed its active job and removed the
+initial missing-backend/registration failures. FULL reached 13,746 passed,
+6 skipped, 11 failed, 0 errors in 228.131 seconds.
+
+Those 11 failures bind the accepted solver identity in historical UUID/serializer
+fixtures. C1's floating range installed SciPy 1.18.1 / NumPy 2.5.4; accepted
+fixtures explicitly record scipy-highs-1.18.0 and the passing local reference
+environment has SciPy 1.18.0 / NumPy 2.5.1. C2 pins those exact CI-only versions
+within the existing supported optional SciPy range. It does not change solver
+source/identity material, fixture bytes, schemas, ranking, prices or strategies.
+The conditional FULL-only dependency gate and fail-closed pip checks remain.
+
+C2 adds a separate exact successor overlay; 146-A/C1 literal maps are preserved.
+Focused verification covers the 11 failed fixture cases and affected workflow/
+source-authority consumers before its single replacement publication. Canonical
+FULL stays CI-owned with unchanged supported inventories and lane topology.
+Source acceptance/integration and real acquisition remain separate.

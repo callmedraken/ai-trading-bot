@@ -129,6 +129,11 @@ Initial publication 472d569 / push run 718 attempt 1 is preserved as terminal
 failed evidence. Corrective C1 addresses the frozen timing fixture, conditional
 FULL SciPy dependency, and read-only predecessor-prefix reconciliation.
 
-Immediate next step: publish the focused-verified C1 once, wait for its terminal
-CI-owned FULL result, then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
+C1 publication 83318d0 / run 719 attempt 1 is also preserved. Its active tests
+passed; FULL exposed 11 solver-version identity/fixture differences. Corrective
+C2 pins the accepted SciPy 1.18.0 / NumPy 2.5.1 CI reference environment and
+preserves all identities and fixture bytes.
+
+Immediate next step: publish focused-verified C2 once and require terminal
+CI-owned FULL success, then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
 holdout, create eligibility, or cross any host/production/trading boundary.

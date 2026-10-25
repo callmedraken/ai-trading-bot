@@ -813,7 +813,12 @@ def test_arch146a_c1_full_dependency_is_declared_conditional_and_fail_closed():
         1
     ].split("      - name: Run canonical certification profile\n", 1)[0]
     assert "if: needs.source-static.outputs.certification_profile == 'full'" in step
-    assert f'python -m pip install --disable-pip-version-check "{requirement}"' in step
+    # CI fixes the fixture-producing backend version inside the supported range.
+    assert requirement == "scipy>=1.17,<1.19"
+    assert (
+        "python -m pip install --disable-pip-version-check "
+        '"numpy==2.5.1" "scipy==1.18.0"' in step
+    )
     assert "if ($LASTEXITCODE -ne 0)" in step
     assert "python -m pip check\n          exit $LASTEXITCODE" in step
     assert runner._batch_workflow_is_reviewed(workflow)
@@ -830,10 +835,12 @@ def test_arch146a_c1_exact_successors_and_frozen_failed_maps():
         (False, runner.ARCH146A_C1_BLOB_PREDECESSORS, runner.ARCH146A_C1_BLOB_PINS),
     ):
         for key, pin in before.items():
-            assert runner._arch146a_c1_pin(key, pin, ast_pin=ast_pin) == after[key]
-            assert (
-                runner._arch146a_c1_pin(key, after[key], ast_pin=ast_pin) == after[key]
-            )
+            assert runner._arch146a_c1_pin(
+                key, pin, ast_pin=ast_pin
+            ) == runner._arch146a_c2_pin(key, after[key], ast_pin=ast_pin)
+            assert runner._arch146a_c1_pin(
+                key, after[key], ast_pin=ast_pin
+            ) == runner._arch146a_c2_pin(key, after[key], ast_pin=ast_pin)
             with pytest.raises(ValueError, match="C1 wrong exact predecessor"):
                 runner._arch146a_c1_pin(key, "0" * len(pin), ast_pin=ast_pin)
 
@@ -843,4 +850,37 @@ def test_arch146a_c1_missing_successor_map_fails_closed(monkeypatch):
     monkeypatch.setattr(runner, "ARCH146A_C1_AST_PINS", {})
     with pytest.raises(ValueError, match="C1 exact successor maps"):
         runner._arch146a_c1_maps()
+    assert runner._arch146a_authority_check(root)
+
+
+def test_arch146a_c2_solver_pin_matches_accepted_fixture_provenance():
+    import re
+
+    root = Path(runner.__file__).resolve().parents[1]
+    fixture = root / "tests/fixtures/cli/historical-experiment-audit-v3-compact.json"
+    identities = set(
+        re.findall(r"scipy-highs-[0-9.]+", fixture.read_text(encoding="utf-8"))
+    )
+    assert identities == {"scipy-highs-1.18.0"}
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    assert '"numpy==2.5.1" "scipy==1.18.0"' in workflow
+
+
+def test_arch146a_c2_maps_and_wrong_predecessors_fail_closed(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch146a_c2_authority_check(root) == ()
+    assert runner._arch146a_authority_check(root) == ()
+    for ast_pin, before, after in (
+        (True, runner.ARCH146A_C2_AST_PREDECESSORS, runner.ARCH146A_C2_AST_PINS),
+        (False, runner.ARCH146A_C2_BLOB_PREDECESSORS, runner.ARCH146A_C2_BLOB_PINS),
+    ):
+        for key, pin in before.items():
+            assert runner._arch146a_c2_pin(key, pin, ast_pin=ast_pin) == after[key]
+            with pytest.raises(ValueError, match="C2 wrong exact predecessor"):
+                runner._arch146a_c2_pin(key, "0" * len(pin), ast_pin=ast_pin)
+    monkeypatch.setattr(runner, "ARCH146A_C2_BLOB_PINS", {})
+    with pytest.raises(ValueError, match="C2 exact successor maps"):
+        runner._arch146a_c2_maps()
     assert runner._arch146a_authority_check(root)

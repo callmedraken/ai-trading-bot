@@ -19907,7 +19907,12 @@ def _arch146a_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
 
 
 def _arch146a_shared_blob_pin(relative: str, predecessor: str) -> str:
-    # The predecessor resolver may already have applied either successor.
+    # Admit only the exact already-resolved current successor.
+    if (
+        relative in ARCH146A_C2_BLOB_PINS
+        and predecessor == ARCH146A_C2_BLOB_PINS[relative]
+    ):
+        return _arch146a_c2_pin(relative, predecessor, ast_pin=False)
     if (
         relative in ARCH146A_C1_BLOB_PINS
         and predecessor == ARCH146A_C1_BLOB_PINS[relative]
@@ -20103,8 +20108,8 @@ def _arch146a_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
     if key in before:
         if predecessor not in (before[key], after[key]):
             raise ValueError("146-A C1 wrong exact predecessor")
-        return after[key]
-    return predecessor
+        predecessor = after[key]
+    return _arch146a_c2_pin(key, predecessor, ast_pin=ast_pin)
 
 
 def _arch146a_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
@@ -20116,16 +20121,128 @@ def _arch146a_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
     )
     for key, pin in {**ARCH146A_C1_AST_PINS, **ARCH146A_C1_NEW_AST_PINS}.items():
+        if hashlib.sha256(
+            ast.dump(functions[key], include_attributes=False).encode()
+        ).hexdigest() != _arch146a_c2_pin(key, pin, ast_pin=True):
+            failures.append("146-A C1 runner AST drift: " + key)
+    for relative, pin in ARCH146A_C1_BLOB_PINS.items():
+        if _git_blob_sha1(repo_root / relative) != _arch146a_c2_pin(
+            relative, pin, ast_pin=False
+        ):
+            failures.append("146-A C1 source drift: " + relative)
+    failures.extend(_arch146a_c2_authority_check(repo_root))
+    return tuple(failures)
+
+
+# Corrective C2 fixes only the certification environment's patch-version drift.
+# All 146-A/C1 maps and failed GitHub attempts remain immutable predecessors.
+ARCH146A_C2_AST_PREDECESSORS: Final = {
+    "_arch146a_c1_authority_check": (
+        "44a2efacb4cbd789a6ff9f88fb88e83e6d104f77c93d476c0ca2780110723a0c"
+    ),
+    "_arch146a_c1_pin": (
+        "f987a51663f501f79b98bd6c0199d743f76a0cb4135b2d2c7a84b59ea381614c"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "a2129f2525263bff2ae762d3f400207bfe28968e3cc7639afeb9e78d3b4c9950"
+    ),
+}
+ARCH146A_C2_AST_PINS: Final = {
+    "_arch146a_c1_authority_check": (
+        "72b1b2bdb54a2b8fe07e12790451debf8e71fc671e5e2520a7f344934de3bbc4"
+    ),
+    "_arch146a_c1_pin": (
+        "bc7f61385a4f22c58cd5558d097bc6728ae8e5c4da556448adc88388b522b75e"
+    ),
+    "_arch146a_shared_blob_pin": (
+        "6b5c100ec349f781ef7a4ee5922ccf7ecef8e7b6f4ed8c8744299d1cfadb168a"
+    ),
+}
+ARCH146A_C2_BLOB_PREDECESSORS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "4f317b44f54f4c27c7128583ce89e1e2bcb1e403"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a7c378d90aa1befa5e71f033175459520d375ffb"
+    ),
+    "docs/validation/arch146-historical-research-data-custody-plan.md": (
+        "424e6f957200f9bcb54e88b16ffe7e1abc225f44"
+    ),
+}
+ARCH146A_C2_BLOB_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "1646a190191e75a15170203b2eb6c95629567722"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "3db0824024048513ee999f4fa5e2a61f68fff478"
+    ),
+    "docs/validation/arch146-historical-research-data-custody-plan.md": (
+        "db9492bd86ef3a4c94f6f796cf537ec9b03141ea"
+    ),
+}
+ARCH146A_C2_NEW_AST_PINS: Final = {
+    "_arch146a_c2_authority_check": (
+        "0eb00d176580bcb1139cebdbba3fe580adebbd639e7e0c42bb160c45012ca508"
+    ),
+    "_arch146a_c2_maps": (
+        "a488394ef25a974690e101a2cf98fb9fd0ed8695f22e352980bdda4973fec443"
+    ),
+    "_arch146a_c2_pin": (
+        "f60f21ce6a513f526c4190ce7b38a7af345a2e3747f6c286346c1fbb7d4d6730"
+    ),
+}
+ARCH146A_C2_MAPS_SHA256: Final = (
+    "a50557c00e2217bf6becb099593656853d58ce4be64de111dc8c6d2ed4ac16ca"
+)
+
+
+def _arch146a_c2_maps() -> None:
+    maps = (
+        ARCH146A_C2_AST_PREDECESSORS,
+        ARCH146A_C2_AST_PINS,
+        ARCH146A_C2_BLOB_PREDECESSORS,
+        ARCH146A_C2_BLOB_PINS,
+        ARCH146A_C2_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH146A_C2_MAPS_SHA256
+        or set(ARCH146A_C2_AST_PREDECESSORS) != set(ARCH146A_C2_AST_PINS)
+        or set(ARCH146A_C2_BLOB_PREDECESSORS) != set(ARCH146A_C2_BLOB_PINS)
+    ):
+        raise ValueError("146-A C2 exact successor maps drift")
+
+
+def _arch146a_c2_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch146a_c2_maps()
+    before = ARCH146A_C2_AST_PREDECESSORS if ast_pin else ARCH146A_C2_BLOB_PREDECESSORS
+    after = ARCH146A_C2_AST_PINS if ast_pin else ARCH146A_C2_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("146-A C2 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch146a_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    _arch146a_c2_maps()
+    failures = []
+    functions = _top_level_functions(
+        ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    )
+    for key, pin in {**ARCH146A_C2_AST_PINS, **ARCH146A_C2_NEW_AST_PINS}.items():
         if (
             hashlib.sha256(
                 ast.dump(functions[key], include_attributes=False).encode()
             ).hexdigest()
             != pin
         ):
-            failures.append("146-A C1 runner AST drift: " + key)
-    for relative, pin in ARCH146A_C1_BLOB_PINS.items():
+            failures.append("146-A C2 runner AST drift: " + key)
+    for relative, pin in ARCH146A_C2_BLOB_PINS.items():
         if _git_blob_sha1(repo_root / relative) != pin:
-            failures.append("146-A C1 source drift: " + relative)
+            failures.append("146-A C2 source drift: " + relative)
     return tuple(failures)
 
 

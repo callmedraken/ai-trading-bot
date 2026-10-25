@@ -16,10 +16,15 @@ incident facts and two-target recovery contract are recorded in
 Reconciliation is blocked; the compromised FINAL and two .installing siblings
 remain immutable incident evidence. No repair can make them trusted through R1.
 
-R1 source implementation and focused/static verification are complete locally,
-pending publication. All 1,878 unique affected cases are green, including 124 R1
-and 135 D1S4 cases; Ruff/format/diff and exact authority checks pass. Final source identity: PENDING FINAL COMMIT.
-Terminal CI: PENDING FIRST/ONLY PUSH.
+R1 original source b79ba5972ec4300971d271573efcd50a15beb75a /
+a0b35e27ebdfa524daab590a9812be7b5924dab7 and successful CI #711 /
+40156759342, attempt 1 remain preserved. Exact-source review withheld acceptance
+for the latch reservation defect. A bounded correction above that exact direct
+parent now reserves only after exclusive create returns, marks spent before any
+later fallible operation, and preserves every acquired latch across restart.
+Pre-acquisition failure with proven absence is BLOCKED / NOT_STARTED; unprovable
+absence stays indeterminate. Correction HEAD/TREE/terminal CI are post-commit
+facts supplied externally; no standalone docs commit backfills them.
 No R1 SOURCE ACCEPTED or native-host acceptance claim is made.
 
 Use only:
@@ -28,8 +33,9 @@ F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-r1-shared-namespace
 Branch:
 feature/robinhood-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current
 
-Required base/direct parent is the accepted identity above. The stale main
-checkout and all other worktrees/artifacts remain outside the edit boundary.
+Original accepted base is the integrated identity above; correction direct
+parent is b79ba5972ec4300971d271573efcd50a15beb75a (two commits above base).
+The stale main checkout and all other worktrees/artifacts remain outside the edit boundary.
 
 ## Implemented operator contract
 
@@ -43,7 +49,10 @@ incident scope. Its canonical reviewed plan binds source, identities, hashes,
 pre/post tuples and preserved observations. Execute requires exact authorization
 plus reviewed-plan SHA-256, consumes a new exclusive flushed/fsynced/closed/read
 back latch, then mutates only two exclusive pinned handles with DACL/protection
-flags and no owner rewrite. All ambiguity is terminal and no-retry. All result
+flags and no owner rewrite. Reservation starts at successful exclusive create;
+all later metadata/write/flush/fsync/close/readback failures preserve the named
+latch and stay non-eligible after resetting process-local state. Acquired or
+unprovable authority is terminal and no-retry. All result
 states set runtime/soak eligibility false for the preserved incident releases.
 
 Source interlocks: AI_TRADING_BOT_ARCH134_F1R1_D1S4_R1_ACCEPTED_HEAD / ACCEPTED_TREE.
@@ -60,14 +69,16 @@ no second docs commit merely to backfill them.
 
 ## Next owner and preserved boundaries
 
-Complete exactly one normal atomic implementation commit/one ordinary push,
-then poll its mapped run to terminal. On red preserve the run and stop for
-ChatGPT classification; no unchanged rerun or automatic C1. On green hand back
-HEAD/TREE/parent/count/changed paths/local checks/remote/clean state plus exact
-CI identity/results/totals/wall/artifact. Codex stops pending ChatGPT exact-source
-review and performs none of the following integration or host actions.
+Complete exactly one normal atomic correction commit/one ordinary push on the
+existing R1 branch, then poll its mapped run to terminal. Preserve original
+source and #711. On red preserve the new run and stop; no unchanged rerun or
+automatic second correction. On green hand back correction HEAD/TREE/direct
+parent/2-commit count/changed paths/local checks/remote/clean state plus exact
+CI identity/results/totals/wall/artifact/digest. Stop at R1 CORRECTION IMPLEMENTED /
+PUBLISHED / PENDING CHATGPT EXACT-SOURCE RE-REVIEW without later host/integration
+actions.
 
-ChatGPT next action: retrieve the exact feature commit/diff and canonical CI
+ChatGPT next action: retrieve the exact correction commit/diff and canonical CI
 evidence, verify source/one-shot/native graph/incident non-regression, accept
 only if justified, then determine reviewed develop integration/develop CI.
 Only later: registered read-only R1 production preflight -> separate protected

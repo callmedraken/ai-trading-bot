@@ -1,13 +1,17 @@
 # Architecture 134-F1R1-D1S4-R1 — Shared Namespace ACL Recovery
 
-Status: IMPLEMENTED SOURCE; pending first publication, canonical CI and ChatGPT
-exact-source review. No real R1 preflight or protected recovery ran here.
-Final source identity: PENDING FINAL COMMIT.
-Terminal CI: PENDING FIRST/ONLY PUSH.
+Status: BOUNDED EXACT-SOURCE-REVIEW CORRECTION implemented; pending correction
+publication, canonical CI and ChatGPT exact-source re-review. Original source
+b79ba5972ec4300971d271573efcd50a15beb75a / tree
+a0b35e27ebdfa524daab590a9812be7b5924dab7 and successful CI #711 /
+40156759342, attempt 1 remain preserved. Review found the durable reservation
+defect corrected below; the original source is not accepted.
+No real R1 preflight or protected recovery ran here.
+Correction source/terminal CI: post-commit facts supplied in the final handoff.
 
 ## Accepted base and frozen incident
 
-Accepted/integrated D1S4 source and required R1 direct parent:
+Accepted/integrated D1S4 source and original R1 base:
 
     HEAD 30a410d9023324ebe5c23e6a8ff128353b9ebf1f
     TREE cf50b0b7b84428d9e502ed5bd85307001bc866ed
@@ -117,6 +121,23 @@ flushed, fsynced, closed and read back exactly with matching created identity
 before the mutation fence. A process lock and spent marker also close in-process
 races/ambiguity. Any existing/malformed/unprovable latch blocks execution. No
 D1S4, D1S3, R5 or Architecture-133 latch is reused or renewed.
+
+Reservation begins only when exclusive `xb` creation returns the acquired latch
+object. Read-only path/parent admission and payload construction precede that
+boundary; `_spent` becomes true immediately after creation, before context entry,
+fstat, write, flush, fsync, close or readback. The caller records reservation
+from that marker even when a later operation raises. Every post-create failure
+preserves the named object without deletion, truncation, replacement, rewrite,
+cleanup or retry. Fresh-process observation is CONSUMED for exact bytes or
+INDETERMINATE for partial/malformed/unprovable bytes; neither permits execute.
+
+A failure before acquisition with read-only proof of absent latch is BLOCKED /
+RECOVERY_ADMISSION_REJECTED / NOT_STARTED and does not claim consumed authority.
+If the failed create leaves an existing or unprovable object, result is
+INDETERMINATE / PARTIAL_OR_CONFLICTING_ACL_RECOVERY / NOT_STARTED. Only acquired
+reservation failures use PRESERVE_SHARED_NAMESPACE_ACL_RECOVERY_EVIDENCE_NO_RETRY.
+All these states forbid automatic retry and cause zero ACL mutation before the
+unchanged full-write/fsync/close/exact-readback/identity mutation fence.
 
 ## Isolated leaf namespace
 

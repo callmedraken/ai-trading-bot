@@ -18,9 +18,14 @@ historical .installing roots remain preserved incident evidence, never repair
 or runtime-admission targets.
 
 Architecture **134-F1R1-D1S4-R1 — Shared Namespace ACL Recovery** is implemented
-as source only, pending publication, canonical CI and ChatGPT exact-source review.
-Focused verification covers 1,878 unique green affected cases (124 R1 / 135
-D1S4); whole-repository Ruff lint/format and diff checks pass.
+as source only. Original b79ba5972ec4300971d271573efcd50a15beb75a /
+a0b35e27ebdfa524daab590a9812be7b5924dab7 and successful CI #711 /
+40156759342, attempt 1 are preserved. Exact-source review withheld acceptance
+for one latch reservation defect. Its bounded correction begins reservation
+only after exclusive latch creation; every acquired-latch failure stays closed
+across restart. Pre-acquisition failure with proven absence reports BLOCKED /
+NOT_STARTED without claiming consumed authority. Correction verification and
+publication facts belong to the final handoff; source re-review remains pending.
 It admits only the two frozen identities/pre-descriptor hashes/ACE tuples and
 removes only the exact reviewed John ACE by applying ADMIN_ACES / IMAGE_ACES.
 Read-only preflight, reviewed-plan digest, independent durable one-shot latch,
@@ -29,8 +34,7 @@ separate gates. Repair never restores trust in the compromised FINAL.
 
 Active branch:
 `feature/robinhood-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current`.
-Final source identity: PENDING FINAL COMMIT.
-Terminal CI: PENDING FIRST/ONLY PUSH.
+Correction identity and terminal CI: post-commit facts in the final handoff.
 
 Detailed frozen incident/contract:
 [Architecture R1](architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md)
@@ -49,11 +53,13 @@ remains consumed and immutable. Live remains **NO-GO**.
 
 ## Next step
 
-Complete the one atomic R1 commit/one push and wait for terminal CI-owned
-ROBINHOOD; do not duplicate it locally. On red preserve evidence and stop for
-ChatGPT classification. On green ChatGPT reviews the exact commit/diff/evidence.
-Codex stops at IMPLEMENTED / ONE ATOMIC COMMIT / ONE PUSH /
-PENDING CHATGPT EXACT-SOURCE REVIEW, without integration or host operations.
+Publish one normal correction commit with direct parent b79ba5972ec4300971d271573efcd50a15beb75a
+and one ordinary push on the existing R1 branch, then wait for terminal CI-owned
+ROBINHOOD; do not duplicate it locally. Preserve #711 unchanged. On red preserve
+evidence and stop; no automatic second correction or unchanged rerun. On green
+ChatGPT retrieves the exact correction/diff/evidence for re-review. Codex stops at
+R1 CORRECTION IMPLEMENTED / PUBLISHED / PENDING CHATGPT EXACT-SOURCE RE-REVIEW,
+without integration or host operations.
 
     exact-source review -> reviewed develop integration -> develop CI
     -> registered read-only R1 production preflight

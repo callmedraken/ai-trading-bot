@@ -18685,8 +18685,8 @@ ARCH134_ACL_BLOB_PINS: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
         "af2cc333252737da5c216d5a6d5031347e2e663e"
     ),
-    "docs/AI_TRADING_BOT_HANDOFF.md": ("7d9e90edabf63b030f44eb3e00044f4a900a6c05"),
-    "docs/PROJECT_STATUS.md": ("fde74d959bc32bd345d3fb95e06dad74d4222eab"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("7626682bf172a37b907da33368b40fc1608184b3"),
+    "docs/PROJECT_STATUS.md": ("f9a85a2f8785f5b4c2e13d868499e6266c0e2e2d"),
     ("src/trading_bot/supervised_release/successor_direct_installation.py"): (
         "9224a85a80a605cbc35553337aaf00afb3c6217d"
     ),
@@ -18834,23 +18834,23 @@ ARCH134_ACL_NEW_AST_PINS: Final = {
 }
 ARCH134_ACL_SOURCE_PINS: Final = {
     ("docs/architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md"): (
-        "c685301318379530b2a388dc71ac580db9b1fd29"
+        "a2710577f3592e17232e61e1c992793d27db1fcf"
     ),
     ("docs/validation/arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-plan.md"): (
-        "97dd74d41b341c0f51422fe7c709336c4c13121c"
+        "81984e089968b50bdefe59bc939fe958246dc764"
     ),
     "src/trading_bot/shared_namespace_acl_native.py": (
         "b792e0bf4a533f97df7d4e957a70058a044095ab"
     ),
     "src/trading_bot/shared_namespace_acl_recovery.py": (
-        "f9f0bfde8b9f9488627dc26e54c4232e45fd91ef"
+        "4a165381891679c74d394fa95696f1e0d01b2f15"
     ),
     ("tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"): (
-        "ac7ea8c31b5c476ac4c83dd670a660214113b782"
+        "6dc196faf07d9a70601718f3d194a85db70713c8"
     ),
 }
 ARCH134_ACL_MAPS_SHA256: Final = (
-    "a13966e0b5a6761f3b7fb6e05c115e72473ed094a3f8cb057e4602340578ee29"
+    "807d02369e042cd7decc41adee695381b8bfdc3259321e2c00bcdb803bf8a99e"
 )
 
 

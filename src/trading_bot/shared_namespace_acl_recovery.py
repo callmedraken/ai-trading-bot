@@ -244,10 +244,13 @@ def _consume_attempt(plan: dict[str, object]) -> None:
     global _spent
     if observe_attempt(plan) != "AVAILABLE":
         raise RecoveryRejected("ATTEMPT_UNAVAILABLE")
-    _spent = True
     _safe_ancestors(ATTEMPT_PATH)
     payload = _latch_payload(plan)
-    with ATTEMPT_PATH.open("xb") as handle:
+    handle = ATTEMPT_PATH.open("xb")
+    # Exclusive creation is the durable reservation boundary. Preserve the named
+    # object on every later failure, including context entry, metadata and close.
+    _spent = True
+    with handle:
         created = os.fstat(handle.fileno())
         if handle.write(payload) != len(payload):
             raise RecoveryRejected("LATCH_SHORT_WRITE")
@@ -549,8 +552,10 @@ def _execute_locked() -> dict[str, object]:
                     or observe_attempt(plan) != "AVAILABLE"
                 ):
                     raise RecoveryRejected("PINNED_PLAN_DRIFT")
-                reservation = True
-                _consume_attempt(plan)
+                try:
+                    _consume_attempt(plan)
+                finally:
+                    reservation = _spent
                 latch = observe_attempt(plan)
                 if (
                     latch != "CONSUMED"
@@ -629,9 +634,18 @@ def _execute_locked() -> dict[str, object]:
             readbacks=readbacks,
         )
     except (Exception, KeyboardInterrupt, SystemExit):
+        if not reservation and plan is not None:
+            # A failed create is not a reservation. Prove absence read-only;
+            # an existing or unprovable object still closes execute authority.
+            latch = observe_attempt(plan)
+        ambiguous = reservation or latch in {"CONSUMED", "INDETERMINATE"}
         return _result(
-            "INDETERMINATE" if reservation else "BLOCKED",
-            PRESERVE if reservation else "RECOVERY_ADMISSION_REJECTED",
+            "INDETERMINATE" if ambiguous else "BLOCKED",
+            PRESERVE
+            if reservation
+            else "PARTIAL_OR_CONFLICTING_ACL_RECOVERY"
+            if ambiguous
+            else "RECOVERY_ADMISSION_REJECTED",
             source=source,
             snapshot=before,
             plan=plan,

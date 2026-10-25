@@ -3,10 +3,13 @@
 Source/fake-host verification only. The authoritative incident and complete
 contract are recorded once in the matching architecture document.
 
-Accepted base/direct parent: 30a410d9023324ebe5c23e6a8ff128353b9ebf1f /
+Original accepted base: 30a410d9023324ebe5c23e6a8ff128353b9ebf1f /
 cf50b0b7b84428d9e502ed5bd85307001bc866ed.
-Final source identity: PENDING FINAL COMMIT.
-Terminal CI: PENDING FIRST/ONLY PUSH.
+Original source/direct correction parent: b79ba5972ec4300971d271573efcd50a15beb75a /
+a0b35e27ebdfa524daab590a9812be7b5924dab7.
+Preserved original CI: #711 / 40156759342, attempt 1, SUCCESS.
+Exact-source review withheld acceptance for one durable reservation defect.
+Correction identity/terminal CI are post-commit facts supplied externally.
 
 ## Local verification contract
 
@@ -14,8 +17,9 @@ Run focused R1 and retained D1S4/security/release/runner tests, then whole-repo
 Ruff lint, Ruff format check and git diff --check. Use a fresh GUID evidence
 root below F:\AI\temp\pytest for every pytest attempt. Preserve failed local
 evidence and rerun only affected behavior after correction. No Ruff --fix.
-No local canonical ROBINHOOD/FULL duplicate: the first/only branch push owns
-canonical ROBINHOOD. The 300-second ceiling and required 122/49 baselines remain.
+No local canonical ROBINHOOD/FULL duplicate: the correction push owns the next
+canonical ROBINHOOD; original #711 remains unchanged. The 300-second ceiling
+and required 122/49 baselines remain.
 
 The new module covers exact frozen incident admission, stable semantic plan,
 all target policy/identity/hash/path and non-target scope negatives, source/
@@ -115,7 +119,51 @@ Current admitted inventory is FULL 201 / ROBINHOOD 112 / LEGACY 222 /
 EXHAUSTIVE 423 modules. Required baseline tuples remain 122/49. The current
 ROBINHOOD deterministic lane counts are 29/29/28/26; no lane policy changed.
 
-## Exact changed paths
+## Bounded exact-source-review correction verification
+
+The defect was a process-only reservation before exclusive latch creation.
+Reservation now starts only after the exclusive create returns an acquired
+object, with spent marking before context entry or metadata. Pre-create
+admission/create failure with proven absence reports BLOCKED / NOT_STARTED;
+failed create with an existing/unprovable object stays indeterminate.
+
+Restart regressions cover parent/payload/create admission; competing partial,
+exact consumed and unprovable create observations; context entry, initial fstat,
+short/failed write, flush, fsync, close, readback exception/mismatch, readback
+identity drift and final created/named identity drift. Post-create exception,
+KeyboardInterrupt and SystemExit paths preserve the named file. Each resets
+_spent=False after removing injected faults, then proves preflight/execute
+non-eligibility, NOT_AUTHORIZED retry and zero pre-fence ACL calls. Successful
+restart no-retry behavior remains covered. Mutation fencing and native policy
+are unchanged. Each post-create test also proves its intended injected seam
+was reached, so caught assertions cannot masquerade as a tested failure.
+
+Correction focused evidence: 860 unique affected cases have green latest
+results (163 R1, 135 D1S4, 172 runner core/CI, 197 scratch ACL, 118 retained-root
+ACL recovery and 75 retained-root diagnostic). Initial seven-module run at
+F:\AI\temp\pytest\d1s4-r1-reservation-correction-2f5659d258f542b9a128827bda2f154c
+recorded 859 passed / 1 failed in 40.79 s. The strengthened success-restart test
+incorrectly required execute to observe the latch even though its recovered
+baseline rejects earlier. Only that test assertion changed; the implementation
+was unchanged. Fresh affected-test rerun at
+F:\AI\temp\pytest\d1s4-r1-reservation-final-targets-fbee4dba4d81402fa140c84a3995c152
+passed the corrected restart and exact-authority tests (2 passed, 2.73 s).
+The failed evidence remains preserved. Later seam-activation assertions are
+verified by the final targeted run; exact path/results belong to the handoff.
+Whole-repository Ruff lint and formatting (1,354 files), graph/exact authority
+and git diff --check pass; no local duplicate canonical certification ran.
+
+Correction exact changed paths:
+
+- docs/AI_TRADING_BOT_HANDOFF.md
+- docs/PROJECT_STATUS.md
+- docs/architecture/134-f1r1-d1s4-r1-shared-namespace-acl-recovery.md
+- docs/validation/arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery-plan.md
+- scripts/checkpoint_runner.py
+- src/trading_bot/shared_namespace_acl_recovery.py
+- tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py
+
+## Original implementation changed paths
 
 - .github/workflows/checkpoint-source-gates.yml
 - docs/AI_TRADING_BOT_HANDOFF.md
@@ -160,11 +208,13 @@ feature/robinhood-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery
 Worktree:
 F:\AI\worktrees\ai-trading-bot-production-paper-134f1r1-d1s4-r1-shared-namespace-acl-recovery-current
 
-Complete source/tests/docs/runner/profile mapping and focused/static verification
-before one atomic normal commit above the accepted base. Create the remote
-branch only through that final ordinary push. No standalone design commit or
-remote bootstrap. Preserve any failed feature run, inspect its exact failure and
-stop for ChatGPT classification; no unchanged rerun or automatic C1.
+This bounded exact-source-review correction changes only the durable reservation
+seam, its restart regressions, affected docs and exact R1 authority pins. Perform
+focused/static verification before one normal correction commit above original
+b79ba5972ec4300971d271573efcd50a15beb75a and one ordinary push to the existing
+branch (two commits above original accepted base). No amend/rebase/force-push,
+standalone docs commit or bootstrap. Preserve #711 unchanged. If the correction
+CI is red, preserve it and stop; no automatic second correction or unchanged rerun.
 
 External final handoff must report HEAD/TREE/direct parent/commit count/changed
 paths, local results, remote equality, clean index/worktree; terminal run/attempt,
@@ -173,7 +223,7 @@ wall time and artifact ID/digest. Self-identity and terminal CI are post-commit
 facts; no second docs commit solely to backfill them.
 
 Completion state:
-IMPLEMENTED / ONE ATOMIC COMMIT / ONE PUSH / PENDING CHATGPT EXACT-SOURCE REVIEW.
+R1 CORRECTION IMPLEMENTED / PUBLISHED / PENDING CHATGPT EXACT-SOURCE RE-REVIEW.
 
 No production R1/D1S4 preflight/execute or ACL mutation was run. Preserved incident
 objects/latches were not inspected by operator commands or modified. No scheduler,
@@ -182,7 +232,7 @@ Native Windows acceptance remains a separately reviewed later host boundary.
 
 ## Next review action
 
-ChatGPT retrieves the exact feature commit/diff and terminal mapped evidence,
+ChatGPT retrieves the exact correction commit/diff and terminal mapped evidence,
 checks the frozen incident, native containment, one-shot ordering, predecessor
 pins and sanitized diagnostics, and accepts only if justified. Only afterward:
 reviewed develop integration -> develop CI -> registered read-only R1 preflight

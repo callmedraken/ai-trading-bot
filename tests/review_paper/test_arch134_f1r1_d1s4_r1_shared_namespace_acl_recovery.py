@@ -440,6 +440,260 @@ def test_latch_or_pre_fence_ambiguity_never_mutates(host, monkeypatch, failure):
     assert result["effect_disposition"] == "NOT_STARTED"
 
 
+@pytest.mark.parametrize("failure", ["parents", "payload", "create"])
+def test_failure_before_exclusive_create_is_not_a_reservation(
+    host, monkeypatch, failure
+):
+    authorize(monkeypatch)
+    opens = []
+    original_open = Path.open
+    original_ancestors = r._safe_ancestors
+    ancestor_calls = 0
+
+    def fail():
+        assert r._spent is False
+        assert not r.ATTEMPT_PATH.exists()
+        raise OSError("SECRET pre-reservation")
+
+    def ancestors(path):
+        nonlocal ancestor_calls
+        ancestor_calls += 1
+        # Initial, pinned and consume observations precede explicit admission.
+        if failure == "parents" and ancestor_calls == 4:
+            fail()
+        return original_ancestors(path)
+
+    def opened(path, mode="r", *args, **kwargs):
+        if path == r.ATTEMPT_PATH and mode == "xb":
+            opens.append(mode)
+            assert failure == "create"
+            fail()
+        return original_open(path, mode, *args, **kwargs)
+
+    with monkeypatch.context() as fault:
+        fault.setattr(Path, "open", opened)
+        fault.setattr(r, "_safe_ancestors", ancestors)
+        if failure == "payload":
+            fault.setattr(r, "_latch_payload", lambda _plan: fail())
+        result = r.execute_once()
+    assert (result["status"], result["effect_disposition"]) == (
+        "BLOCKED",
+        "NOT_STARTED",
+    )
+    assert primary(result)["reason"] == "RECOVERY_ADMISSION_REJECTED"
+    assert primary(result)["latch_classification"] == "AVAILABLE"
+    assert opens == (["xb"] if failure == "create" else [])
+    assert r._spent is False
+    assert not r.ATTEMPT_PATH.exists()
+    assert not any(isinstance(event, tuple) for event in host.events)
+    monkeypatch.setattr(r, "_spent", False)
+    row = primary(r.preflight())
+    assert row["latch_classification"] == "AVAILABLE"
+    assert row["automatic_retry"] == "NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize("observation", ["partial", "consumed", "unprovable"])
+def test_failed_exclusive_create_never_assumes_absence(host, monkeypatch, observation):
+    authorize(monkeypatch)
+    original_open = Path.open
+    original_read = r._read_latch
+    create_failed = False
+
+    def opened(path, mode="r", *args, **kwargs):
+        nonlocal create_failed
+        if path == r.ATTEMPT_PATH and mode == "xb":
+            assert r._spent is False
+            if observation != "unprovable":
+                payload = (
+                    r._latch_payload(r.recovery_plan(SOURCE, host.rows))
+                    if observation == "consumed"
+                    else b"partial competing reservation"
+                )
+                with original_open(path, "xb") as handle:
+                    handle.write(payload)
+            create_failed = True
+            raise FileExistsError("SECRET competing or unprovable create")
+        return original_open(path, mode, *args, **kwargs)
+
+    def read():
+        if create_failed and observation == "unprovable":
+            raise OSError("SECRET inaccessible latch")
+        return original_read()
+
+    monkeypatch.setattr(Path, "open", opened)
+    monkeypatch.setattr(r, "_read_latch", read)
+    result = r.execute_once()
+    assert result["status"] == "INDETERMINATE"
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert primary(result)["reason"] == "PARTIAL_OR_CONFLICTING_ACL_RECOVERY"
+    assert r._spent is False  # This process acquired no reservation object.
+    assert not any(isinstance(event, tuple) for event in host.events)
+    monkeypatch.setattr(r, "_spent", False)
+    for report in (r.preflight(), r.execute_once()):
+        row = primary(report)
+        assert row["latch_classification"] != "AVAILABLE"
+        assert row["execute_eligible"] is False
+        assert report["automatic_retry"] == row["automatic_retry"] == "NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "enter",
+        "metadata",
+        "short_write",
+        "failed_write",
+        "flush",
+        "fsync",
+        "close",
+        "readback_failure",
+        "readback_mismatch",
+        "readback_drift",
+        "identity_drift",
+    ],
+)
+@pytest.mark.parametrize("error", [OSError, KeyboardInterrupt, SystemExit])
+def test_acquired_latch_failures_remain_closed_after_restart(
+    host, monkeypatch, failure, error
+):
+    authorize(monkeypatch)
+    original_open = Path.open
+    original_fstat = r.os.fstat
+    original_fsync = r.os.fsync
+    original_lstat = Path.lstat
+    original_read = r._read_latch
+    metadata_calls = named_calls = 0
+    faults_seen = []
+
+    def fail():
+        # Every fallible seam after exclusive create must see spent authority.
+        assert r._spent is True
+        assert r.ATTEMPT_PATH.exists()
+        faults_seen.append(failure)
+        raise error("SECRET post-create ambiguity")
+
+    class Writer:
+        def __init__(self, handle):
+            self.handle = handle
+
+        def __enter__(self):
+            assert r._spent is True
+            if failure == "enter":
+                self.handle.close()
+                fail()
+            return self
+
+        def fileno(self):
+            assert r._spent is True
+            return self.handle.fileno()
+
+        def write(self, payload):
+            assert r._spent is True
+            if failure in {"short_write", "failed_write"}:
+                count = self.handle.write(payload[:7])
+                if failure == "failed_write":
+                    fail()
+                faults_seen.append(failure)
+                return count
+            return self.handle.write(payload)
+
+        def flush(self):
+            assert r._spent is True
+            if failure == "flush":
+                fail()
+            self.handle.flush()
+
+        def __exit__(self, *_exc):
+            assert r._spent is True
+            self.handle.close()
+            if failure == "close":
+                fail()
+
+    def opened(path, mode="r", *args, **kwargs):
+        handle = original_open(path, mode, *args, **kwargs)
+        if path == r.ATTEMPT_PATH and mode == "xb":
+            assert r._spent is False
+            return Writer(handle)
+        return handle
+
+    def fstat(fd):
+        nonlocal metadata_calls
+        if r._spent:
+            metadata_calls += 1
+            if failure == "metadata" and metadata_calls == 1:
+                fail()
+        value = original_fstat(fd)
+        if failure == "readback_drift" and metadata_calls == 2:
+            faults_seen.append(failure)
+            return SimpleNamespace(
+                st_dev=value.st_dev,
+                st_ino=value.st_ino + 1,
+                st_size=value.st_size,
+                st_mtime_ns=value.st_mtime_ns,
+            )
+        return value
+
+    def fsync(fd):
+        assert r._spent is True
+        if failure == "fsync":
+            fail()
+        original_fsync(fd)
+
+    def read():
+        if r._spent:
+            if failure == "readback_failure":
+                fail()
+            if failure == "readback_mismatch":
+                faults_seen.append(failure)
+                return b"mismatched readback"
+        return original_read()
+
+    def lstat(path, *args, **kwargs):
+        nonlocal named_calls
+        value = original_lstat(path, *args, **kwargs)
+        if path == r.ATTEMPT_PATH and r._spent:
+            named_calls += 1
+            # Two exact readback observations, then created/named comparison.
+            if failure == "identity_drift" and named_calls == 3:
+                faults_seen.append(failure)
+                return SimpleNamespace(st_dev=value.st_dev, st_ino=value.st_ino + 1)
+        return value
+
+    with monkeypatch.context() as fault:
+        fault.setattr(Path, "open", opened)
+        fault.setattr(r.os, "fstat", fstat)
+        fault.setattr(r.os, "fsync", fsync)
+        fault.setattr(r, "_read_latch", read)
+        fault.setattr(Path, "lstat", lstat)
+        result = r.execute_once()
+    assert faults_seen == [failure]
+    assert result["status"] == "INDETERMINATE"
+    assert primary(result)["reason"] == r.PRESERVE
+    assert result["effect_disposition"] == "NOT_STARTED"
+    assert r._spent is True
+    assert r.ATTEMPT_PATH.is_file()
+    assert not any(isinstance(event, tuple) for event in host.events)
+    assert primary(result)["native_results"] == []
+    payload = r.ATTEMPT_PATH.read_bytes()
+    exact = r._latch_payload(r.recovery_plan(SOURCE, host.rows))
+    if failure in {"enter", "metadata", "short_write", "failed_write"}:
+        assert payload != exact
+    else:
+        assert payload == exact
+    monkeypatch.setattr(r, "_spent", False)
+    # Faults are removed: only the named durable object closes the new process.
+    for report in (r.preflight(), r.execute_once()):
+        row = primary(report)
+        assert row["latch_classification"] in {"CONSUMED", "INDETERMINATE"}
+        assert row["execute_eligible"] is False
+        assert report["automatic_retry"] == row["automatic_retry"] == "NOT_AUTHORIZED"
+        assert report["effect_disposition"] == "NOT_STARTED"
+        assert row["runtime_binding_eligible"] is False
+        assert row["successor_soak_eligible"] is False
+    assert r.ATTEMPT_PATH.read_bytes() == payload
+    assert not any(isinstance(event, tuple) for event in host.events)
+
+
 def test_no_target_or_path_override_and_no_incident_runtime_authority(host):
     for function in (
         r.preflight,
@@ -772,9 +1026,18 @@ def test_each_non_target_security_observation_is_bound_into_reviewed_plan(
 def test_consumed_latch_never_grants_a_new_attempt_after_restart(host, monkeypatch):
     authorize(monkeypatch)
     assert r.execute_once()["status"] == "PASS"
+    payload = r.ATTEMPT_PATH.read_bytes()
     monkeypatch.setattr(r, "_spent", False)
-    assert r.execute_once()["status"] == "BLOCKED"
-    assert primary(r.preflight())["execute_eligible"] is False
+    assert r.observe_attempt(r.recovery_plan(SOURCE, host.rows)) == "CONSUMED"
+    assert primary(r.preflight())["latch_classification"] == "CONSUMED"
+    blocked = r.execute_once()
+    assert blocked["status"] == "BLOCKED"
+    for report in (r.preflight(), blocked):
+        row = primary(report)
+        assert row["execute_eligible"] is False
+        assert report["automatic_retry"] == row["automatic_retry"] == "NOT_AUTHORIZED"
+    assert r.ATTEMPT_PATH.read_bytes() == payload
+    assert len([event for event in host.events if isinstance(event, tuple)]) == 2
 
 
 def test_reviewed_plan_drift_is_also_closed_in_read_only_preflight(host, monkeypatch):

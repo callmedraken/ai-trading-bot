@@ -1089,7 +1089,7 @@ def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
 
 def test_predecessor_c1_inventory_uses_current_d1s4_overlay():
     assert (
-        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        runner._arch146a_predecessor_active_digest()
         == runner.ARCH134_FRESH_ACTIVE_SHA256
     )
     assert (

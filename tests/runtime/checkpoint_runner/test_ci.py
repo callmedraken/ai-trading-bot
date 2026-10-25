@@ -384,7 +384,7 @@ def test_runtime_admission_checkpoint_is_first_and_source_only():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-runtime-host-admission"
-    assert runner.ACTIVE_CI_CHECKPOINTS[3] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[4] == name
     assert workflow.count(name) == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
@@ -397,7 +397,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
     name = "arch133-robinhood-supervised-release-installation"
-    assert runner.ACTIVE_CI_CHECKPOINTS[5] == name
+    assert runner.ACTIVE_CI_CHECKPOINTS[6] == name
     assert workflow.count(f"              {name} `\n") == 1
     assert runner._batch_workflow_is_reviewed(workflow)
     spec = runner._checkpoint_specs()[name]
@@ -482,6 +482,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH146A_NAME: "full",
         runner.ARCH134_FRESH_NAME: "robinhood",
         runner.ARCH134_ACL_NAME: "robinhood",
         runner.ARCH134_D1S4_NAME: "robinhood",
@@ -525,8 +526,8 @@ def test_reviewed_active_batch_digest_matches_single_canonical_tuple():
     ]
     assert len(values) == 1
     assert tuple(ast.literal_eval(values[0])) == runner.ACTIVE_CI_CHECKPOINTS
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 78
-    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 78
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
+    assert len(set(runner.ACTIVE_CI_CHECKPOINTS)) == 79
     assert (
         hashlib.sha256(
             ast.dump(values[0], include_attributes=False).encode("utf-8")
@@ -647,7 +648,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         is None
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "robinhood"
-    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 78
+    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 79
     assert runner.ACTIVE_CI_CHECKPOINTS[-6:] == (
         runner.ARCH134_ARMED_PAPER_NAME,
         runner.ARCH134_PRODUCTION_STRATEGY_NAME,
@@ -657,7 +658,7 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         runner.ARCH134_RUNTIME_ACL_NAME,
     )
     assert (
-        runner.REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256
+        runner._arch146a_predecessor_active_digest()
         == runner.ARCH134_FRESH_ACTIVE_SHA256
     )
     root = Path(runner.__file__).resolve().parents[1]
@@ -741,3 +742,59 @@ def test_d1r2_successor_authority_drift_fails_closed(monkeypatch, which):
             runner, "ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS", values
         )
     assert runner._arch134_production_paper_runtime_authority_check(root)
+
+
+def test_arch146a_registration_and_additive_successor_authority():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH146A_NAME]
+    assert spec.remote_branch == runner.ARCH146A_BRANCH
+    assert spec.preflight is spec.execute is spec.remote_head_env is None
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), spec.remote_branch, "push"
+        )
+        == spec.name
+    )
+    assert runner.resolve_ci_certification_profile(spec.name) == "full"
+    assert "tests/experiments/test_historical_research_dataset.py" in spec.tests
+    assert runner._arch146a_authority_check(root) == ()
+    assert runner._arch134_fresh_authority_check(root) == ()
+    assert (
+        runner._arch146a_predecessor_active_inventory()
+        == runner.ACTIVE_CI_CHECKPOINTS[1:]
+    )
+    assert (
+        runner._arch146a_predecessor_active_digest()
+        == runner.ARCH134_FRESH_ACTIVE_SHA256
+    )
+    for key, pin in runner.ARCH146A_AST_PREDECESSORS.items():
+        assert (
+            runner._arch146a_overlay(key, pin, ast_pin=True)
+            == runner.ARCH146A_AST_PINS[key]
+        )
+        with pytest.raises(ValueError, match="predecessor"):
+            runner._arch146a_overlay(key, "0" * 64, ast_pin=True)
+
+
+def test_arch146a_successor_maps_fail_closed(monkeypatch):
+    monkeypatch.setattr(runner, "ARCH146A_MAPS_SHA256", "0" * 64)
+    with pytest.raises(ValueError, match="map"):
+        runner._arch146a_maps()
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch146a_authority_check(root)
+
+
+def test_arch146a_source_mutation_is_rejected(tmp_path):
+    root = Path(runner.__file__).resolve().parents[1]
+    for relative in runner.ARCH146A_SOURCE_PINS:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (root / relative).read_text(encoding="utf-8") + "\n# mutation\n"
+        )
+    target = tmp_path / "scripts/checkpoint_runner.py"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    )
+    assert runner._arch146a_authority_check(tmp_path)

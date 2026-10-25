@@ -517,7 +517,7 @@ def test_source_registration_pins_chaining_topology():
     assert spec.execute is runner._supervised_installation_execute
     assert spec.remote_branch == subject.BRANCH and spec.remote_head_env is None
     assert spec.authority_check(ROOT) == ()
-    assert runner.ACTIVE_CI_CHECKPOINTS[1] == NAME
+    assert runner.ACTIVE_CI_CHECKPOINTS[2] == NAME
     assert runner._batch_workflow_is_reviewed(
         (ROOT / ".github/workflows/checkpoint-source-gates.yml").read_text()
     )

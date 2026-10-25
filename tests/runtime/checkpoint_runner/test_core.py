@@ -132,6 +132,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH146A_NAME,
         runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
         runner.ARCH134_D1S4_NAME,
@@ -406,6 +407,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = (
                 "feature/robinhood-production-paper-premarket-wake-qualification"
             )
+        if spec.name == runner.ARCH146A_NAME:
+            expected_branch = runner.ARCH146A_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -917,6 +920,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
         for name in runner.ACTIVE_CI_CHECKPOINTS
         if name
         not in {
+            runner.ARCH146A_NAME,
             runner.ARCH134_AUTH_NAME,
             runner.ARCH134_D1R5_NAME,
             runner.ARCH134_D1R6_NAME,
@@ -1388,6 +1392,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-armed-paper-mvp",
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
+                runner.ARCH146A_NAME,
                 "arch144-c-f1-paper-evidence-admission",
                 "arch145-a-research-robustness-live-canary-eligibility",
                 "arch134-f1r1-a-runtime-isolation",
@@ -1597,7 +1602,10 @@ def test_arch134_f1r1_a_overlays_fail_closed_and_restore_predecessor(
 def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     root = Path(runner.__file__).resolve().parents[1]
     path = root / runner.ARCH145A_D1R6_WORKFLOW_PATH
-    current = path.read_text(encoding="utf-8")
+    # Project out 146-A to retain the exact 145 predecessor proof.
+    current = path.read_text(encoding="utf-8").replace(
+        "              arch146-a-historical-research-dataset-enforcement \x60\n", ""
+    )
     predecessor = subprocess.run(
         [
             "git",
@@ -1644,6 +1652,8 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
         "              arch134-f1r1-d1s4-rename-free-direct-installation `\n"
         "              arch134-f1r1-d1s3-r5-successor-release-publication-recovery `\n",
     )
+    # Current authority includes the independently tested additive registration.
+    current = path.read_text(encoding="utf-8")
     assert runner._batch_workflow_is_reviewed(current)
     assert "pull_request:" in current
     assert "workflow_dispatch:" in current
@@ -1705,8 +1715,9 @@ def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers():
         )
         == runner.ARCH144C_TEST_PINS_SHA256
     )
-    assert runner._arch145a_predecessor_active_checkpoint_inventory() == (
-        runner.ACTIVE_CI_CHECKPOINTS
+    assert (
+        runner._arch145a_predecessor_active_checkpoint_inventory()
+        == (runner.ACTIVE_CI_CHECKPOINTS[1:])
     )
     assert runner._arch144c_authority_check(root) == ()
     assert runner._arch134_f1_authority_check(root) == ()
@@ -1794,8 +1805,9 @@ def test_arch134_f1r1_b_registration_and_active_successor_are_source_only():
     assert spec.execute is None
     assert spec.remote_head_env is None
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH134_F1R1_B_NAME] == ("robinhood")
-    assert runner._arch145a_predecessor_active_checkpoint_inventory() == (
-        runner.ACTIVE_CI_CHECKPOINTS
+    assert (
+        runner._arch145a_predecessor_active_checkpoint_inventory()
+        == (runner.ACTIVE_CI_CHECKPOINTS[1:])
     )
 
 

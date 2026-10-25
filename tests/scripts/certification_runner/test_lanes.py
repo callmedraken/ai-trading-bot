@@ -53,6 +53,7 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         for m in selected
         if m
         not in {
+            "tests/experiments/test_historical_research_dataset.py",
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",

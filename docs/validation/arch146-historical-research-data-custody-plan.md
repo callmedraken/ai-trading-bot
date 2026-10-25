@@ -186,3 +186,28 @@ feature worktree from the then-current reviewed develop tip, focused tests, Ruff
 check/format-check and diff-check, one atomic commit, one ordinary push and one
 terminal CI admission. No acquisition follows automatically from source
 acceptance.
+
+## 146-A source verification surface (pending review)
+
+Synthetic in-memory fixtures cover the two exact contracts, canonical rejection,
+field binding, physical containment/order/OHLCV, external raw/normalized/sidecar
+integrity, missing/unexpected sessions, distinct physical/full fingerprints,
+full reconstruction, OPEN-only commitments and the additive policy bridge.
+The accepted Architecture-145 source blob and its existing focused tests remain
+unchanged.
+
+The source-only checkpoint is
+`arch146-a-historical-research-dataset-enforcement` on
+`feature/research-arch146-a-historical-research-dataset-enforcement-current`.
+The branch uses the pre-existing `feature/research-*` push family. Exact runner
+registration selects CI-owned FULL; no duplicate local FULL/ROBINHOOD is needed.
+Preflight/execute/remote effect admission are absent. Current supported test
+inventory gains one experiments module automatically; historical required
+baselines and predecessor pin maps remain frozen behind an additive successor.
+
+Calendar coverage uses existing public NYSE rules, including their existing
+historical-calendar limitations. A real acquisition must reconcile any published
+calendar discrepancy separately; synthetic PASS does not certify real coverage.
+Opaque raw-page and corporate-action digest verification is integrity evidence,
+not proof of provider pagination, normalization economics or corporate-action
+admissibility. No real data, acquisition or holdout authority follows.

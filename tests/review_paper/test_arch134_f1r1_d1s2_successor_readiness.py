@@ -557,7 +557,7 @@ def test_d1s2_checkpoint_registration_and_predecessor_overlay():
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == runner.ARCH134_D1S2_BRANCH
     assert runner.resolve_ci_certification_profile(spec.name) == "robinhood"
-    assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS
+    assert runner._arch134_d1s2_active_inventory() == runner.ACTIVE_CI_CHECKPOINTS[1:]
     assert runner._arch134_d1s2_authority_check(ROOT) == ()
     assert runner.ARCH134_D1S1_PREDECESSOR_PINS_SHA256 == (
         "fe37fa5dde15617ca7814b2dc28b9d8c4b0bdb801eff860cac48c35b11d21d62"

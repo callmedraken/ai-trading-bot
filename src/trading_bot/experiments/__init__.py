@@ -101,6 +101,25 @@ from trading_bot.experiments.historical import (
     HistoricalExperimentSimulatorFactory,
     HistoricalExperimentVariant,
 )
+from trading_bot.experiments.historical_research_dataset import (
+    HISTORICAL_RESEARCH_DATASET_SNAPSHOT_NAMESPACE,
+    HISTORICAL_RESEARCH_DATASET_SNAPSHOT_SCHEMA,
+    HISTORICAL_RESEARCH_PARTITION_MANIFEST_NAMESPACE,
+    HISTORICAL_RESEARCH_PARTITION_MANIFEST_SCHEMA,
+    HistoricalResearchDatasetError,
+    HistoricalResearchDatasetSnapshot,
+    HistoricalResearchDatasetVerification,
+    HistoricalResearchPartitionManifest,
+    HistoricalResearchPartitionMaterial,
+    HistoricalResearchPartitionRole,
+    HistoricalResearchSessionCoverageError,
+    parse_historical_research_csv,
+    validate_historical_research_session_coverage,
+    verify_historical_research_dataset,
+    verify_historical_research_open_commitment,
+    verify_historical_research_partition,
+    verify_historical_research_policy_binding,
+)
 from trading_bot.experiments.pairwise import (
     HistoricalExperimentPairwiseComparator,
     HistoricalExperimentPairwiseDifference,
@@ -788,4 +807,25 @@ __all__ += [
     "simulate_research_execution_stress",
     "verify_research_execution_stress_result",
     "verify_research_strategy_live_canary_eligibility",
+]
+
+
+__all__ += [
+    "HISTORICAL_RESEARCH_DATASET_SNAPSHOT_NAMESPACE",
+    "HISTORICAL_RESEARCH_DATASET_SNAPSHOT_SCHEMA",
+    "HISTORICAL_RESEARCH_PARTITION_MANIFEST_NAMESPACE",
+    "HISTORICAL_RESEARCH_PARTITION_MANIFEST_SCHEMA",
+    "HistoricalResearchDatasetError",
+    "HistoricalResearchDatasetSnapshot",
+    "HistoricalResearchDatasetVerification",
+    "HistoricalResearchPartitionManifest",
+    "HistoricalResearchPartitionMaterial",
+    "HistoricalResearchPartitionRole",
+    "HistoricalResearchSessionCoverageError",
+    "parse_historical_research_csv",
+    "validate_historical_research_session_coverage",
+    "verify_historical_research_dataset",
+    "verify_historical_research_open_commitment",
+    "verify_historical_research_partition",
+    "verify_historical_research_policy_binding",
 ]

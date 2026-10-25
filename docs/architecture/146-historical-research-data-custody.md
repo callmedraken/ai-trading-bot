@@ -372,3 +372,39 @@ production.
 
 Only after 146-A source acceptance/integration may ChatGPT separately review an
 Architecture 146-B bounded acquisition/custody checkpoint.
+
+## 146-A implementation boundary (pending exact-source review)
+
+The additive public implementation is
+`trading_bot.experiments.historical_research_dataset`. Its immutable models use
+the two reserved schemas/namespaces above. Canonical JSON has sorted exact fields,
+compact separators, fixed microsecond UTC Z timestamps, lowercase digests and
+canonical UUID5 text. Normalized CSV uses the frozen header order, minimal
+positive plain Decimal text and unsigned integer volume. RAW price-return
+semantics are explicit; corporate actions remain opaque mandatory provenance.
+
+Partition verification reconciles every supplied normalized byte, ordered raw
+page digest, sidecar digest, bar metadata, physical fingerprint and expected
+session. It never sorts/filter-hides invalid rows. Session coverage deliberately
+uses the existing public NYSEMarketCalendar contract and exchange-local dates;
+unexpected acquisition/calendar differences must block for review. 146-A does
+not certify a published historical calendar or introduce exceptional-closure
+authority. That limitation must be reconciled before real acquisition admission.
+
+Full verification requires complete supplied OPEN plus FINAL_HOLDOUT material,
+reverifies both and reconstructs the existing public single-symbol fingerprint
+over their chronological concatenation with full request bounds. Its process-local
+non-price receipt can bind an existing 145 policy to exact full lineage/bounds.
+The receipt is not serializable custody authority and Python object privacy is
+not a host security boundary.
+
+OPEN-only verification consumes no holdout bytes. It verifies OPEN bytes and
+manifest membership while leaving the full fingerprint as a stored, unproven
+custodian commitment. Parsing either JSON contract alone proves neither physical
+integrity nor full-fingerprint truth. Page parsing/pagination completeness,
+vendor-to-normalized economic reconciliation, continuity-event admissibility,
+real custody and evidence-generation provenance remain future reviewed work.
+No 145 model, namespace, serializer or identity material changes.
+
+This source checkpoint remains pending ChatGPT exact-source review. It grants
+no acquisition, real holdout, ACL, strategy/backtest, eligibility or runtime effect.

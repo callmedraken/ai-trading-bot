@@ -78,3 +78,22 @@ Only after 146-A source acceptance/integration may a separately reviewed 146-B
 acquisition/custody checkpoint be designed/run.
 
 The production lane remains unfrozen until Sunday-night market-open preparation.
+
+## Architecture 146-A feature source pending review
+
+The additive synthetic-only implementation is being published from
+`feature/research-arch146-a-historical-research-dataset-enforcement-current`,
+based exactly on develop `724e027af44457fcc76f0055d9cc037f9f933a42` /
+`eb561d6fd2b6812f54d333dfd7e12d2b5f532a44`. It adds strict immutable
+partition manifests/snapshots, external integrity/session verification, distinct
+physical and full logical fingerprints, an OPEN-only commitment boundary and an
+additive Architecture-145 policy binding. Architecture-145 source stays frozen.
+
+The checkpoint has source-only dispatch and CI-owned FULL. Terminal CI and
+ChatGPT exact-source review are still required before acceptance/integration.
+Existing NYSE historical-calendar limitations and future acquisition/provenance
+requirements remain explicit in the Architecture-146 implementation notes.
+
+Immediate next step: complete one atomic feature publication and terminal CI,
+then ChatGPT exact-source review. Do not start 146-B acquisition, open a real
+holdout, create eligibility, or cross any host/production/trading boundary.

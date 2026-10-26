@@ -36,7 +36,11 @@ No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
 
 ## Architecture 132-R3N — workflow throughput and current-contract consolidation
 
-R3N is the accepted/integrated R3M successor at:
+R3N's initial implementation is preserved at the exact develop integration
+identity below. It remains pending ChatGPT exact-source acceptance; terminal
+R3N CI #729 / run `40238669278` / attempt 1 succeeded and is preserved
+unchanged. Architecture 132-R3N corrective C1 is the separately named source
+correction for the two general-throughput gaps found during that review.
 
     HEAD 029d72e81a1589e8bd3b3134531682f500087810
     TREE ea120b292a9252e3234ab4db8b64ff2c89851fea
@@ -51,23 +55,27 @@ future broad feature gate.
 
 R3N keeps R3M's fail-closed develop admission and exact mapped FULL/ROBINHOOD
 reuse, and additionally admits exact successful broad feature source-gate
-evidence. Broad reuse requires the same repository ID/full name, active
-workflow ID/path/name, push event, original attempt (`run_attempt == 1`), exact
-SHA/tree, admitted feature branch family, terminal success, successful
-source-static and source-gates jobs, exactly one each of broad shards 0/1/2/3
-with successful execution and hygiene steps, skipped active-tests and
-certification-tests, and one unique qualifying run. Missing, malformed,
-truncated, ambiguous or unavailable evidence, and all attempt-2-or-later runs,
-fall back to the normal broad develop route. Artifact names are not proof.
+evidence in both current broad shapes: registered ACTIVE plus the four broad
+shards, or unregistered FULL plus the four broad shards. Broad reuse requires
+the same repository ID/full name, active workflow ID/path/name, push event,
+original attempt (`run_attempt == 1`), exact SHA/tree, admitted feature branch
+family, terminal success, exact route-specific job topology, successful
+source-static/source-gates and required execution/hygiene steps, and one unique
+qualifying run. Missing, malformed, truncated, ambiguous or unavailable
+evidence, unexpected active/certification routing, and all attempt-2-or-later
+runs fall back to the normal broad develop route. Artifact names are not proof.
 
-The current non-effectful pre-publication admission is `ops.ps1 admit`. It
-checks exact branch/origin/base identity and ancestry, clean tracked/index
-state, changed-path classification, diff/Ruff checks, current authority and
-workflow topology, inventory/profile reconciliation, and nonempty
-FULL/ROBINHOOD/LEGACY/EXHAUSTIVE lane construction. It runs only the small
-current profile/lane/CI contract tests; it does not run protected effects,
-provider/broker/live paths, canonical FULL/ROBINHOOD, or the broad checkpoint
-union. Current count/topology assertions live in
+The current non-effectful pre-publication admission is the GENERAL ordinary-
+feature gate `ops.ps1 admit`, not an R3N-only gate. It performs a read-only
+remote identity check against the exact current `origin/develop` commit/tree,
+requires a clean strict descendant in one reviewed feature family and a
+nonempty feature diff, then checks changed-path classification, diff/Ruff
+checks, current authority and workflow topology, inventory/profile
+reconciliation, and nonempty FULL/ROBINHOOD/LEGACY/EXHAUSTIVE lane
+construction. It does not reset, rebase, merge, repair or rewrite source
+history; it runs only the small current profile/lane/CI contract tests and does
+not run protected effects, provider/broker/live paths, canonical
+FULL/ROBINHOOD, or the broad checkpoint union. Current count/topology assertions live in
 `tests/scripts/certification_runner/test_profiles.py`,
 `test_lanes.py`, and `tests/runtime/checkpoint_runner/test_ci.py`. Historical
 Architecture-133/134 tests retain predecessor, authority, and incident

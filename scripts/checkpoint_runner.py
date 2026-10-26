@@ -323,9 +323,18 @@ SOURCE_GATE_PHASE_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_PHASE"
 SOURCE_GATE_SHARD_INDEX_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_INDEX"
 SOURCE_GATE_SHARD_COUNT_ENV: Final = "AI_TRADING_BOT_SOURCE_GATE_SHARD_COUNT"
 ARCH132_R3N_ADMISSION_NAME: Final = "arch132-r3n-prepublication-admission"
-ARCH132_R3N_BRANCH: Final = "feature/test-suite-arch132-r3n-workflow-throughput-current"
-ARCH132_R3N_BASE_HEAD: Final = "029d72e81a1589e8bd3b3134531682f500087810"
-ARCH132_R3N_BASE_TREE: Final = "ea120b292a9252e3234ab4db8b64ff2c89851fea"
+REVIEWED_FEATURE_BRANCH_PREFIXES: Final = (
+    "feature/robinhood-",
+    "feature/research-",
+    "feature/test-suite-",
+)
+SOURCE_REPOSITORY: Final = "callmedraken/ai-trading-bot"
+SOURCE_ORIGIN_URLS: Final = frozenset(
+    {
+        f"https://github.com/{SOURCE_REPOSITORY}",
+        f"https://github.com/{SOURCE_REPOSITORY}.git",
+    }
+)
 ARCH132_R3N_ADMISSION_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/scripts/certification_runner/test_profiles.py",
@@ -387,14 +396,16 @@ def find_reusable_ci_certification(
 ) -> dict[str, object]:
     """Prove one exact feature gate, otherwise retain broad CI.
 
-    A mapped active checkpoint may reuse its canonical profile evidence.  An
-    unregistered feature branch may reuse only the exact four-shard FULL
-    source-gate topology; every other shape falls back to the normal broad
-    run.  The output remains named ``reuse_certification`` for workflow
-    compatibility, but ``reuse_kind`` distinguishes the two proofs.
+    A mapped active checkpoint may reuse its canonical profile evidence.  A
+    registered active checkpoint without a canonical profile may reuse the
+    exact active-plus-four-shard broad source-gate topology, and an unregistered
+    feature branch may reuse the exact four-shard broad source-gate topology.
+    Every other shape falls back to the normal broad run. The output remains
+    named ``reuse_certification`` for workflow compatibility, but
+    ``reuse_kind`` distinguishes the proofs.
     """
     fallback = {"reuse": False, "reason": "provenance_not_proven"}
-    repository = "callmedraken/ai-trading-bot"
+    repository = SOURCE_REPOSITORY
     prefix = f"repos/{repository}"
     path = ".github/workflows/checkpoint-source-gates.yml"
 
@@ -484,8 +495,9 @@ def find_reusable_ci_certification(
             checkpoint = resolve_ci_checkpoint(specs, branch, "push")
             profile = resolve_ci_certification_profile(checkpoint)
             mapped = checkpoint is not None and profile is not None
-            broad = checkpoint is None and profile is None
-            if not mapped and not broad:
+            registered_broad = checkpoint is not None and profile is None
+            unregistered_broad = checkpoint is None and profile is None
+            if not mapped and not registered_broad and not unregistered_broad:
                 continue
             if not (
                 same_repository(run["repository"])
@@ -552,9 +564,15 @@ def find_reusable_ci_certification(
                     "source-static": (
                         "Resolve source gate route",
                         "Prove exact develop certification reuse",
-                        "Verify full batch static authority",
+                        (
+                            "Verify active checkpoint static authority"
+                            if registered_broad
+                            else "Verify full batch static authority"
+                        ),
                     ),
-                    "active-tests": (),
+                    "active-tests": (
+                        ("Verify active checkpoint tests",) if registered_broad else ()
+                    ),
                     **{
                         f"full-tests ({index})": (
                             "Record broad test shard start",
@@ -570,15 +588,34 @@ def find_reusable_ci_certification(
                 eligible = all(
                     completed_success(by_name, name, steps, run_id, attempt)
                     for name, steps in broad_jobs.items()
-                    if name not in {"active-tests", "certification-tests ( / )"}
+                    if name != "certification-tests ( / )"
+                    and (registered_broad or name != "active-tests")
                 )
-                eligible = eligible and all(
-                    by_name[name].get("status") == "completed"
-                    and by_name[name].get("conclusion") == "skipped"
-                    and by_name[name].get("run_id") == run_id
-                    and by_name[name].get("run_attempt") == attempt
-                    and by_name[name].get("head_sha") == head
-                    for name in ("active-tests", "certification-tests ( / )")
+                if registered_broad:
+                    eligible = eligible and (
+                        by_name["active-tests"].get("status") == "completed"
+                        and by_name["active-tests"].get("conclusion") == "success"
+                        and by_name["active-tests"].get("run_id") == run_id
+                        and by_name["active-tests"].get("run_attempt") == attempt
+                        and by_name["active-tests"].get("head_sha") == head
+                    )
+                else:
+                    eligible = eligible and all(
+                        by_name[name].get("status") == "completed"
+                        and by_name[name].get("conclusion") == "skipped"
+                        and by_name[name].get("run_id") == run_id
+                        and by_name[name].get("run_attempt") == attempt
+                        and by_name[name].get("head_sha") == head
+                        for name in ("active-tests", "certification-tests ( / )")
+                    )
+                eligible = eligible and (
+                    by_name["certification-tests ( / )"].get("status") == "completed"
+                    and by_name["certification-tests ( / )"].get("conclusion")
+                    == "skipped"
+                    and by_name["certification-tests ( / )"].get("run_id") == run_id
+                    and by_name["certification-tests ( / )"].get("run_attempt")
+                    == attempt
+                    and by_name["certification-tests ( / )"].get("head_sha") == head
                 )
             if eligible:
                 evidence = {
@@ -604,8 +641,11 @@ def find_reusable_ci_certification(
                     "run": detail,
                     "jobs": jobs,
                 }
-                if broad:
+                if registered_broad:
+                    evidence["route"] = "ACTIVE"
+                elif unregistered_broad:
                     evidence["shards"] = [0, 1, 2, 3]
+                    evidence["route"] = "FULL"
                 candidates.append(evidence)
         if len(candidates) != 1:
             return {"reuse": False, "reason": "no_unique_certification"}
@@ -618,7 +658,7 @@ def find_reusable_ci_certification(
 def resolve_develop_ci_reuse(repo_root: Path, mode: str) -> dict[str, object]:
     """Admit develop's current push context before considering optional reuse."""
     fallback = {"reuse": False, "reason": "not_eligible_develop_push"}
-    repository = "callmedraken/ai-trading-bot"
+    repository = SOURCE_REPOSITORY
     if not (
         mode == "FULL"
         and os.environ.get("GITHUB_EVENT_NAME") == "push"
@@ -21344,46 +21384,71 @@ def _arch132_r3m_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
 
 
 def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
-    """Check cheap, source-only admission before a feature publication."""
+    """Check cheap, source-only admission before an ordinary feature publication."""
     failures: list[str] = []
     try:
+        if repo_root.resolve() != _REPOSITORY_ROOT.resolve():
+            failures.append("R3N repository root identity drift")
         state = _git_state(repo_root)
-        if state["branch"] != ARCH132_R3N_BRANCH:
-            failures.append("R3N branch identity drift")
+        branch = state["branch"]
+        if (
+            type(branch) is not str
+            or branch == "develop"
+            or not branch.startswith(REVIEWED_FEATURE_BRANCH_PREFIXES)
+        ):
+            failures.append("R3N reviewed feature branch identity drift")
         if state["porcelain"]:
             failures.append("R3N worktree is not clean")
         origin = _git_output(repo_root, "remote", "get-url", "origin")
-        if origin not in {
-            "https://github.com/callmedraken/ai-trading-bot",
-            "https://github.com/callmedraken/ai-trading-bot.git",
-        }:
+        if origin not in SOURCE_ORIGIN_URLS:
             failures.append("R3N origin identity drift")
-        if (
-            _git_output(repo_root, "rev-parse", "origin/develop")
-            != ARCH132_R3N_BASE_HEAD
-        ):
-            failures.append("R3N origin/develop head drift")
-        if (
-            _git_output(repo_root, "rev-parse", f"{ARCH132_R3N_BASE_HEAD}^{{tree}}")
-            != ARCH132_R3N_BASE_TREE
-        ):
-            failures.append("R3N base tree drift")
-        _git_output(
-            repo_root,
-            "merge-base",
-            "--is-ancestor",
-            ARCH132_R3N_BASE_HEAD,
-            "HEAD",
-        )
-        changed = tuple(
-            path
-            for path in _git_output(
-                repo_root, "diff", "--name-only", f"{ARCH132_R3N_BASE_HEAD}..HEAD"
-            ).splitlines()
-            if path
-        )
-        if not changed or classify_changed_paths(changed) != "FULL":
-            failures.append("R3N changed-path classification drift")
+        reviewed_develop_head = _remote_branch_head(repo_root, "develop")
+        if not re.fullmatch("[0-9a-f]{40}", reviewed_develop_head):
+            failures.append("R3N reviewed develop identity unavailable")
+        else:
+            reviewed_develop_commit = _git_output(
+                repo_root, "rev-parse", f"{reviewed_develop_head}^{{commit}}"
+            )
+            reviewed_develop_tree = _git_output(
+                repo_root, "rev-parse", f"{reviewed_develop_head}^{{tree}}"
+            )
+            if reviewed_develop_commit != reviewed_develop_head or not re.fullmatch(
+                "[0-9a-f]{40}", reviewed_develop_tree
+            ):
+                failures.append("R3N reviewed develop commit/tree unavailable")
+            else:
+                head = state["head"]
+                if type(head) is not str or not re.fullmatch("[0-9a-f]{40}", head):
+                    failures.append("R3N current HEAD identity unavailable")
+                elif head == reviewed_develop_head:
+                    failures.append("R3N feature HEAD is not a strict descendant")
+                else:
+                    _git_output(
+                        repo_root,
+                        "merge-base",
+                        "--is-ancestor",
+                        reviewed_develop_head,
+                        head,
+                    )
+                    if (
+                        _git_output(
+                            repo_root, "merge-base", head, reviewed_develop_head
+                        )
+                        != reviewed_develop_head
+                    ):
+                        failures.append("R3N develop ancestry drift")
+                    changed = tuple(
+                        path
+                        for path in _git_output(
+                            repo_root,
+                            "diff",
+                            "--name-only",
+                            f"{reviewed_develop_head}..{head}",
+                        ).splitlines()
+                        if path
+                    )
+                    if not changed or classify_changed_paths(changed) != "FULL":
+                        failures.append("R3N changed-path classification drift")
         failures.extend(_arch132_r3m_authority_check(repo_root))
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
@@ -21406,6 +21471,387 @@ def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
     except (OSError, RuntimeError, ValueError, KeyError, TypeError, SyntaxError) as exc:
         failures.append(f"R3N admission unavailable: {type(exc).__name__}")
     return tuple(failures)
+
+
+# R3N corrective C1 is a successor overlay. The R3M-C3 maps above remain an
+# immutable predecessor; current runtime authority dispatches through this
+# exact overlay so the predecessor evidence remains available for history.
+ARCH132_R3N_C1_AST_PREDECESSORS: Final = {
+    "find_reusable_ci_certification": (
+        "14d44cc54686b2daa0dc92cec322f552b0d29d27a5a454d4811e4c0bdc9469b2"
+    ),
+    "resolve_develop_ci_reuse": (
+        "c5007300f6dffcab9f38889c925e29131686ba3ff9e9fd071ec22dd12fdee6a0"
+    ),
+    "_arch132_r3n_admission_authority_check": (
+        "2f5cefa598ef0517954b6393f6c626f24cb5c6c61db215517fdaa5b933f2346a"
+    ),
+}
+ARCH132_R3N_C1_AST_PINS: Final = {
+    "find_reusable_ci_certification": (
+        "fb81742d566b2fb68301873a4783aa100598bd259438a614a423178091cd3b78"
+    ),
+    "resolve_develop_ci_reuse": (
+        "7af42343829f08bd38d886bd5acbe96b2c091623fc062715721319b39c4afa3e"
+    ),
+    "_arch132_r3n_admission_authority_check": (
+        "850b5e89a36ea01c513c318659c5d37e9b47cbe872892744cb35de49d461d2f0"
+    ),
+}
+ARCH132_R3N_C1_BLOB_PREDECESSORS: Final = {
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "c90a3c36f2c9af824c2ce4939f090cf679b5b6a9"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": "99d48d3078d22e02cd5ae3248ac0b5ed5218261c",
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "de8e2b5fb9740d9d462dfda1eed77d74d5ea0922"
+    ),
+    "docs/PROJECT_STATUS.md": "29e59e0b0a656fa566cd0ff162b02391ffe08020",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "df3878014dd662a93fb39427646aaf1ef5aca6de",
+}
+ARCH132_R3N_C1_BLOB_PINS: Final = {
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "aba57505c1006e37b662c3301e3bc5ba52910825"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": "735857b25b7f1721431467ff0d60f3ae2a5f0d52",
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "0497f135c9244cdf0d67d9434aab3729a7d7aebb"
+    ),
+    "docs/PROJECT_STATUS.md": "fc06128110b61838231ffe51c8af41980147aaf7",
+    "docs/AI_TRADING_BOT_HANDOFF.md": "985cef46cc34de964355fd5b752865bd07916d61",
+}
+ARCH132_R3N_C1_NEW_AST_PINS: Final = {
+    "_arch132_r3n_c1_maps": (
+        "520653ff60d3695217cc35201035b9e103c50122cb2cb41dfb5bca6abc3d3b1a"
+    ),
+    "_arch132_r3n_c1_pin": (
+        "38cc09db5f09f14a4aa08d8a6e566b43a2966521f85489a9e48f7093a04411bf"
+    ),
+    "_arch132_r3n_c1_authority_check": (
+        "b184b2bd1287a6e63157cbfd6f42647d15f0cba83da656c13c6276edfa738aa8"
+    ),
+    "_arch132_r3n_c1_shared_blob_pin": (
+        "88412bb95e80226de9e9c0df85cadd8d873f0d59df3096a7d418d1baefdb97f4"
+    ),
+    "_arch132_r3n_c1_d1s3_shared_successor_pin": (
+        "8a9b6c93c9d345533d994280049bb9ba10b048792509634f99e33388736aaa30"
+    ),
+    "_arch132_r3n_c1_r3m_authority_check": (
+        "a6e18960824cda6ab41dfa151246bbe57de71286cebad9ac689012fcefc7fc34"
+    ),
+    "_arch132_r3n_c1_arch146a_c2_authority_check": (
+        "db6135c5bc15155ffed5b4caeef10e945a8335a9dd51a8df425310f81a090849"
+    ),
+    "_arch132_r3n_c1_arch146a_authority_check": (
+        "7977153f78e8d47ad868cf418e8039c63373156f78dcfdfaa825d90d61812fd4"
+    ),
+    "_arch132_r3n_c1_r3m_c1_authority_check": (
+        "5464ca31a7efc9236741fa06f677b78c5c309f6b240e7082265e8499e5893606"
+    ),
+    "_arch132_r3n_c1_r5_authority_check": (
+        "4a1977876505c6692e483c4b24e1f0159476803cb8342f0854125a8e9eefc0d8"
+    ),
+}
+ARCH132_R3N_C1_MAPS_SHA256: Final = (
+    "f4595cf528a13a2f840daaa06febb1f904d5a78eb6d0aff21533c642a2343ba1"
+)
+
+
+def _arch132_r3n_c1_maps() -> None:
+    maps = (
+        ARCH132_R3N_C1_AST_PREDECESSORS,
+        ARCH132_R3N_C1_AST_PINS,
+        ARCH132_R3N_C1_BLOB_PREDECESSORS,
+        ARCH132_R3N_C1_BLOB_PINS,
+        ARCH132_R3N_C1_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3N_C1_MAPS_SHA256
+        or set(ARCH132_R3N_C1_AST_PREDECESSORS) != set(ARCH132_R3N_C1_AST_PINS)
+        or set(ARCH132_R3N_C1_BLOB_PREDECESSORS) != set(ARCH132_R3N_C1_BLOB_PINS)
+    ):
+        raise ValueError("R3N C1 exact successor maps drift")
+
+
+def _arch132_r3n_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3n_c1_maps()
+    before = (
+        ARCH132_R3N_C1_AST_PREDECESSORS if ast_pin else ARCH132_R3N_C1_BLOB_PREDECESSORS
+    )
+    after = ARCH132_R3N_C1_AST_PINS if ast_pin else ARCH132_R3N_C1_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3N C1 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3n_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3n_c1_maps()
+        source = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(source)
+        for key, pin in {
+            **ARCH132_R3N_C1_AST_PINS,
+            **ARCH132_R3N_C1_NEW_AST_PINS,
+        }.items():
+            actual = hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest()
+            if actual != pin:
+                failures.append("R3N C1 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3N C1 source drift: " + relative)
+
+        # The predecessor map remains a required integrity check. Only the
+        # exact C1 successor surfaces are replaced by this overlay.
+        _arch132_r3m_c3_maps()
+        skipped_ast = set(ARCH132_R3N_C1_AST_PREDECESSORS)
+        for key, pin in ARCH132_R3M_C3_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C1 predecessor AST drift: " + key)
+        for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C1 predecessor new AST drift: " + key)
+        skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
+        for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
+            if relative in skipped_blobs:
+                continue
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3N C1 predecessor source drift: " + relative)
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if not _batch_workflow_is_reviewed(workflow):
+            failures.append("R3N C1 workflow topology drift")
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C1 authority unavailable")
+    return tuple(failures)
+
+
+_ARCH146A_SHARED_BLOB_PIN_PRE_C1 = _arch146a_shared_blob_pin
+_ARCH134_D1S3_SHARED_SUCCESSOR_PIN_PRE_C1 = _arch134_d1s3_shared_successor_pin
+
+
+def _arch132_r3n_c1_shared_blob_pin(relative: str, predecessor: str) -> str:
+    """Apply the exact C1 source successor at the shared pin boundary."""
+    if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+        before = ARCH132_R3N_C1_BLOB_PREDECESSORS[relative]
+        after = ARCH132_R3N_C1_BLOB_PINS[relative]
+        if predecessor not in (before, after):
+            raise ValueError("R3N C1 wrong shared predecessor blob")
+        return after
+    return _ARCH146A_SHARED_BLOB_PIN_PRE_C1(relative, predecessor)
+
+
+def _arch132_r3n_c1_d1s3_shared_successor_pin(relative: str) -> str | None:
+    if relative in ARCH132_R3N_C1_BLOB_PINS:
+        return ARCH132_R3N_C1_BLOB_PINS[relative]
+    return _ARCH134_D1S3_SHARED_SUCCESSOR_PIN_PRE_C1(relative)
+
+
+def _arch132_r3n_c1_arch146a_c2_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch146a_c2_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH146A_C2_AST_PINS,
+            **ARCH146A_C2_NEW_AST_PINS,
+        }.items():
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
+                failures.append("R3N C1 146-A C2 runner AST drift: " + key)
+        for relative, pin in ARCH146A_C2_BLOB_PINS.items():
+            if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+                continue
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3N C1 146-A C2 source drift: " + relative)
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C1 146-A C2 authority unavailable")
+    failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+    return tuple(failures)
+
+
+def _arch132_r3n_c1_arch146a_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch146a_maps()
+        _arch146a_predecessor_active_inventory()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
+                failures.append("R3N C1 146-A runner AST drift: " + key)
+        for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
+            if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+                continue
+            if _git_blob_sha1(repo_root / relative) != _arch146a_c1_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3N C1 146-A source drift: " + relative)
+        failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+        failures.extend(_arch145a_authority_check(repo_root))
+        spec = _checkpoint_specs()[ARCH146A_NAME]
+        if (
+            spec.tests != ARCH146A_TESTS
+            or spec.ruff_paths != ARCH146A_RUFF_PATHS
+            or spec.remote_branch != ARCH146A_BRANCH
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "full"
+            or resolve_ci_checkpoint(_checkpoint_specs(), ARCH146A_BRANCH, "push")
+            != ARCH146A_NAME
+        ):
+            failures.append("R3N C1 146-A source-only registration drift")
+    except (ValueError, KeyError, TypeError, OSError, SyntaxError):
+        failures.append("R3N C1 146-A authority unavailable")
+    return tuple(failures)
+
+
+def _arch132_r3n_c1_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3m_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3M_AST_PINS,
+            **ARCH132_R3M_NEW_AST_PINS,
+        }.items():
+            if key in ARCH132_R3N_C1_AST_PREDECESSORS:
+                continue
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
+                failures.append("R3N C1 R3M runner AST drift: " + key)
+        for relative, pin in {
+            **ARCH132_R3M_BLOB_PINS,
+            **ARCH132_R3M_FROZEN_SOURCE_PINS,
+        }.items():
+            if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+                continue
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3N C1 R3M source drift: " + relative)
+        if not _batch_workflow_is_reviewed(
+            (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+                encoding="utf-8"
+            )
+        ):
+            failures.append("R3N C1 R3M workflow topology drift")
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C1 R3M authority unavailable")
+    failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+    return tuple(failures)
+
+
+def _arch132_r3n_c1_r3m_c1_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3m_c1_maps()
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C1 R3M C1 authority unavailable")
+    failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+    return tuple(failures)
+
+
+def _arch132_r3n_c1_r5_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch134_r5_active_inventory(
+            (ARCH134_D1S3_NAME, *ARCH134_D1S2_SUCCESSOR_ACTIVE_CI_CHECKPOINTS)
+        )
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for relative, expected in ARCH134_R5_BLOB_PINS.items():
+            if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+                continue
+            expected = _arch134_d1s4_overlay(relative, expected, ast_pin=False)
+            if _git_blob_sha1(repo_root / relative) != expected:
+                failures.append("R3N C1 R5 source drift: " + relative)
+        for name, expected in ARCH134_R5_AST_PINS.items():
+            expected = _arch134_d1s4_overlay(name, expected, ast_pin=True)
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append("R3N C1 R5 runner AST drift: " + name)
+        spec = _checkpoint_specs()[ARCH134_R5_NAME]
+        if (
+            spec.preflight is not _arch134_r5_preflight
+            or spec.execute is not _arch134_r5_execute
+            or spec.remote_branch != ARCH134_R5_BRANCH
+            or spec.remote_head_env != ARCH134_R5_REMOTE_HEAD_ENV
+            or spec.tests != ARCH134_R5_TESTS
+            or spec.ruff_paths != ARCH134_R5_RUFF_PATHS
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+            or SUPERVISED_PUBLICATION_RECOVERY_NAME in ACTIVE_CI_CHECKPOINTS
+        ):
+            failures.append("R3N C1 R5 registration drift")
+    except (ValueError, KeyError, OSError, TypeError, SyntaxError):
+        failures.append("R3N C1 R5 authority unavailable")
+    failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+    return tuple(failures)
+
+
+# The frozen R3M entry points remain in the source for predecessor review, but
+# current runtime pin and authority dispatch follow the reviewed C1 overlay.
+_arch132_r3m_c3_authority_check = _arch132_r3n_c1_authority_check
+_arch132_r3m_c1_authority_check = _arch132_r3n_c1_r3m_c1_authority_check
+_arch132_r3m_authority_check = _arch132_r3n_c1_r3m_authority_check
+_arch146a_shared_blob_pin = _arch132_r3n_c1_shared_blob_pin
+_arch134_d1s3_shared_successor_pin = _arch132_r3n_c1_d1s3_shared_successor_pin
+_arch146a_c2_authority_check = _arch132_r3n_c1_arch146a_c2_authority_check
+_arch146a_authority_check = _arch132_r3n_c1_arch146a_authority_check
+_arch134_r5_authority_check = _arch132_r3n_c1_r5_authority_check
 
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:

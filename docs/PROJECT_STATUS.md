@@ -22,17 +22,20 @@ remains historical context; Architecture 146-B is not started here.
 
 ## Current workflow checkpoint
 
-Architecture 132-R3N — workflow throughput and current-contract consolidation
-is **IMPLEMENTED / PUBLISHED / TERMINAL CI / PENDING CHATGPT EXACT-SOURCE
-REVIEW**. R3N preserves exact mapped FULL/ROBINHOOD reuse and adds exact
-successful broad feature-gate reuse. Broad reuse requires original attempt 1,
-exact repository/workflow/SHA/tree and branch family, source-static success,
-all four shard execution and hygiene steps, skipped active/certification jobs,
-source-gates success and one unique run; anything incomplete or ambiguous falls
-back to ordinary broad testing.
+Architecture 132-R3N corrective C1 is **IMPLEMENTED / PENDING PUBLICATION**;
+the initial R3N publication remains **PENDING CHATGPT EXACT-SOURCE REVIEW**.
+R3N terminal CI #729 / 40238669278 / attempt 1 remains preserved unchanged.
+C1 preserves mapped FULL/ROBINHOOD reuse and exact unregistered broad reuse,
+and adds exact registered ACTIVE plus four-shard broad reuse. Broad reuse
+requires original attempt 1, exact repository/workflow/SHA/tree and branch
+family, exact route-specific job topology, required source-static/active or
+shard execution and hygiene success, source-gates success and one unique run;
+anything incomplete or ambiguous falls back to ordinary broad testing.
 
-The cheap `ops.ps1 admit` gate covers exact branch/origin/base identity,
-cleanliness, path classification, diff/Ruff/current authority/workflow checks,
+The cheap `ops.ps1 admit` gate is a GENERAL ordinary-feature prepublication
+gate, not an R3N-only gate. It performs a read-only check of the exact current
+remote develop identity, clean strict-descendant feature ancestry, cleanliness,
+path classification, diff/Ruff/current authority/workflow checks,
 inventory/profile reconciliation, nonempty six/four lane construction and the
 small current contract tests. It does not run protected effects, canonical
 FULL/ROBINHOOD or the broad checkpoint union. Current inventory remains
@@ -60,9 +63,9 @@ follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-ChatGPT reviews the exact published R3N source, terminal CI, additive
-authority overlay, pre-publication admission, mapped/broad reuse and fallback
-tests, centralized current-contract assertions, and preserved #722–#728
-evidence. No production candidate is frozen and no protected or external effect
-is authorized. Accept/integrate only after that exact-source review is
-complete. Do not begin 146-B here.
+ChatGPT reviews the exact published R3N C1 source, terminal CI, additive
+authority overlay, general pre-publication admission, all three reuse shapes
+and fallback tests, centralized current-contract assertions, and preserved
+#722–#729 evidence. No production candidate is frozen and no protected or
+external effect is authorized. Accept/integrate only after that exact-source
+re-review is complete. Do not begin 146-B here.

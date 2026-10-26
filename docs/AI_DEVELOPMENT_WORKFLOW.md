@@ -64,23 +64,28 @@ No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
 ## Architecture 132-R3N — workflow throughput and current-contract consolidation
 
 R3N preserves R3M's exact develop-push admission and extends the reusable
-feature evidence set. A develop push may reuse either one exact first-attempt
-mapped FULL/ROBINHOOD certification or one exact first-attempt broad feature
-source gate. Broad reuse requires the same repository identity, active workflow
-identity, push event, exact SHA/tree, admitted feature branch family, terminal
-success, source-static success, exactly one each of broad shards 0/1/2/3,
-successful execution and hygiene steps for every shard, skipped active-tests and
-certification-tests, successful source-gates, and one unique qualifying run.
-Attempt 2 or later, malformed/truncated/ambiguous/unavailable metadata, missing
-jobs or steps, and any mismatch fall back to the normal four-shard develop run.
-Artifact names are never provenance.
+feature evidence set. A develop push may reuse one exact first-attempt mapped
+FULL/ROBINHOOD certification, one exact first-attempt registered ACTIVE plus
+four-shard broad feature gate, or one exact first-attempt unregistered
+four-shard broad feature gate. Broad reuse requires the same repository
+identity, active workflow identity, push event, exact SHA/tree, admitted feature
+branch family, terminal success, the exact route-specific job set, successful
+source-static/source-gates and required execution/hygiene steps, and one unique
+qualifying run. Attempt 2 or later, malformed/truncated/ambiguous/unavailable
+metadata, missing jobs or steps, unexpected active/certification routing, and
+any mismatch fall back to the normal four-shard develop run. Artifact names are
+never provenance.
 
-Before publication, `ops.ps1 admit` runs the cheap non-effectful R3N admission:
-exact branch/origin/base identity and ancestry, clean tracked/index state,
-changed-path classification, diff/Ruff checks, current authority and workflow
-topology, inventory/profile reconciliation, nonempty FULL/ROBINHOOD/
-LEGACY/EXHAUSTIVE lane construction, and the small current contract tests. It
-does not execute protected effects or canonical FULL/ROBINHOOD certification.
+`ops.ps1 admit` is the GENERAL ordinary-feature prepublication gate, not an
+R3N-only gate. It performs a read-only remote identity check against the exact
+current `origin/develop` commit/tree and admits only clean descendants in the
+reviewed `feature/robinhood-*`, `feature/research-*`, or `feature/test-suite-*`
+families with a nonempty feature diff. It then checks path classification,
+Ruff/diff checks, current authority and workflow topology,
+inventory/profile reconciliation, nonempty FULL/ROBINHOOD/LEGACY/EXHAUSTIVE
+lane construction, and the small current contract tests. It does not reset,
+rebase, merge, repair or rewrite source history, and it does not execute
+protected effects or canonical FULL/ROBINHOOD certification.
 
 One logical checkpoint still receives one prepared atomic commit/push and one
 CI admission. A red attempt is preserved; a bounded mechanical correction is a

@@ -759,7 +759,7 @@ def test_arch146a_registration_and_additive_successor_authority():
     assert runner.resolve_ci_certification_profile(spec.name) == "full"
     assert "tests/experiments/test_historical_research_dataset.py" in spec.tests
     assert runner._arch146a_authority_check(root) == ()
-    assert runner._arch134_fresh_authority_check(root) == ()
+    assert runner._arch134_r5_authority_check(root) == ()
     assert (
         runner._arch146a_predecessor_active_inventory()
         == runner.ACTIVE_CI_CHECKPOINTS[1:]
@@ -829,7 +829,7 @@ def test_arch146a_c1_exact_successors_and_frozen_failed_maps():
     root = Path(runner.__file__).resolve().parents[1]
     runner._arch146a_maps()
     runner._arch146a_c1_maps()
-    assert runner._arch146a_c1_authority_check(root) == ()
+    assert runner._arch132_r3n_c1_arch146a_c2_authority_check(root) == ()
     assert runner._arch146a_authority_check(root) == ()
     for ast_pin, before, after in (
         (True, runner.ARCH146A_C1_AST_PREDECESSORS, runner.ARCH146A_C1_AST_PINS),
@@ -971,9 +971,19 @@ def _reuse_fixture(profile="full"):
     return args, responses, run, jobs, runs_path, jobs_path
 
 
-def _broad_reuse_fixture():
+def _broad_reuse_fixture(*, registered=False):
     args, responses, run, jobs, runs_path, jobs_path = _reuse_fixture()
-    branch = "feature/test-suite-arch132-r3n-unregistered"
+    if registered:
+        checkpoint = runner.ARCH144C_NAME
+        branch = runner._checkpoint_specs()[checkpoint].remote_branch
+        assert branch is not None
+        assert (
+            runner.resolve_ci_checkpoint(runner._checkpoint_specs(), branch, "push")
+            == checkpoint
+        )
+        assert runner.resolve_ci_certification_profile(checkpoint) is None
+    else:
+        branch = "feature/test-suite-arch132-r3n-unregistered"
     run["head_branch"] = branch
     responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["head_branch"] = (
         branch
@@ -982,9 +992,13 @@ def _broad_reuse_fixture():
         "source-static": (
             "Resolve source gate route",
             "Prove exact develop certification reuse",
-            "Verify full batch static authority",
+            (
+                "Verify active checkpoint static authority"
+                if registered
+                else "Verify full batch static authority"
+            ),
         ),
-        "active-tests": (),
+        "active-tests": (("Verify active checkpoint tests",) if registered else ()),
         **{
             f"full-tests ({index})": (
                 "Record broad test shard start",
@@ -1003,9 +1017,12 @@ def _broad_reuse_fixture():
             "run_attempt": 1,
             "head_sha": args["head"],
             "status": "completed",
-            "conclusion": "skipped"
-            if name in {"active-tests", "certification-tests ( / )"}
-            else "success",
+            "conclusion": (
+                "skipped"
+                if name == "certification-tests ( / )"
+                or (name == "active-tests" and not registered)
+                else "success"
+            ),
             "steps": [
                 {"name": step, "status": "completed", "conclusion": "success"}
                 for step in step_names
@@ -1021,13 +1038,151 @@ def test_r3n_prepublication_admission_contract():
     parser = runner._parser(runner._checkpoint_specs())
     args = parser.parse_args(["admit"])
     assert args.command == "admit"
-    assert runner.ARCH132_R3N_BRANCH.startswith("feature/test-suite-")
-    assert runner.ARCH132_R3N_BASE_HEAD == ("029d72e81a1589e8bd3b3134531682f500087810")
-    assert runner.ARCH132_R3N_BASE_TREE == ("ea120b292a9252e3234ab4db8b64ff2c89851fea")
+    assert runner.REVIEWED_FEATURE_BRANCH_PREFIXES == (
+        "feature/robinhood-",
+        "feature/research-",
+        "feature/test-suite-",
+    )
+    assert runner.SOURCE_REPOSITORY == "callmedraken/ai-trading-bot"
     assert runner.ARCH132_R3N_ADMISSION_TESTS == (
         "tests/runtime/checkpoint_runner/test_ci.py",
         "tests/scripts/certification_runner/test_profiles.py",
         "tests/scripts/certification_runner/test_lanes.py",
+    )
+
+
+def _r3n_admission_fixture(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    context = {
+        "branch": "feature/test-suite-r3n-c1-example",
+        "porcelain": "",
+        "origin": "https://github.com/callmedraken/ai-trading-bot.git",
+        "remote_head": "b" * 40,
+        "object_available": True,
+        "is_ancestor": True,
+        "merge_base": "b" * 40,
+        "changed": "scripts/checkpoint_runner.py\n",
+        "authority": (),
+    }
+    state = {
+        "head": "a" * 40,
+        "tree": "c" * 40,
+        "branch": context["branch"],
+        "porcelain": context["porcelain"],
+    }
+
+    def git_state(_):
+        state.update(
+            branch=context["branch"],
+            porcelain=context["porcelain"],
+        )
+        return state.copy()
+
+    def remote_branch_head(_, branch):
+        assert branch == "develop"
+        return context["remote_head"]
+
+    original_git_output = runner._git_output
+
+    def git_output(_, *arguments):
+        if arguments == ("remote", "get-url", "origin"):
+            return context["origin"]
+        if arguments[:2] == ("rev-parse", "b" * 40 + "^{commit}"):
+            return "b" * 40 if context["object_available"] else "d" * 40
+        if arguments[:2] == ("rev-parse", "b" * 40 + "^{tree}"):
+            return "c" * 40 if context["object_available"] else "d" * 40
+        if arguments[:2] == ("merge-base", "--is-ancestor"):
+            if not context["is_ancestor"]:
+                raise RuntimeError("not an ancestor")
+            return ""
+        if arguments[:1] == ("merge-base",):
+            return context["merge_base"]
+        if arguments[:2] == ("diff", "--name-only"):
+            return context["changed"]
+        return original_git_output(_, *arguments)
+
+    monkeypatch.setattr(runner, "_git_state", git_state)
+    monkeypatch.setattr(runner, "_remote_branch_head", remote_branch_head)
+    monkeypatch.setattr(runner, "_git_output", git_output)
+    monkeypatch.setattr(
+        runner, "_arch132_r3m_authority_check", lambda _: context["authority"]
+    )
+    return root, context
+
+
+@pytest.mark.parametrize(
+    "branch",
+    [
+        "feature/research-arch146-b-example",
+        "feature/robinhood-example",
+        "feature/test-suite-example",
+    ],
+)
+def test_r3n_general_prepublication_admission_accepts_reviewed_feature_families(
+    monkeypatch, branch
+):
+    _, context = _r3n_admission_fixture(monkeypatch)
+    context["branch"] = branch
+    assert (
+        runner._arch132_r3n_admission_authority_check(
+            Path(runner.__file__).resolve().parents[1]
+        )
+        == ()
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "develop",
+        "unknown_branch",
+        "dirty",
+        "wrong_origin",
+        "stale_base",
+        "diverged_base",
+        "not_ancestor",
+        "empty_diff",
+        "malformed_identity",
+        "unavailable_identity",
+        "invalid_classification",
+        "invalid_topology",
+    ],
+)
+def test_r3n_general_prepublication_admission_rejects_invalid_state(
+    monkeypatch, mutation
+):
+    _, context = _r3n_admission_fixture(monkeypatch)
+    if mutation == "develop":
+        context["branch"] = "develop"
+    elif mutation == "unknown_branch":
+        context["branch"] = "feature/other-example"
+    elif mutation == "dirty":
+        context["porcelain"] = " M scripts/checkpoint_runner.py"
+    elif mutation == "wrong_origin":
+        context["origin"] = "https://github.com/other/repository.git"
+    elif mutation == "stale_base":
+        context["object_available"] = False
+    elif mutation == "diverged_base":
+        context["merge_base"] = "d" * 40
+    elif mutation == "not_ancestor":
+        context["is_ancestor"] = False
+    elif mutation == "empty_diff":
+        context["changed"] = ""
+    elif mutation == "malformed_identity":
+        context["remote_head"] = "malformed"
+    elif mutation == "unavailable_identity":
+
+        def unavailable(_, branch):
+            assert branch == "develop"
+            raise RuntimeError("remote unavailable")
+
+        monkeypatch.setattr(runner, "_remote_branch_head", unavailable)
+    elif mutation == "invalid_classification":
+        context["changed"] = "docs/example.md\n"
+    else:
+        context["authority"] = ("invalid current topology",)
+    assert runner._arch132_r3n_admission_authority_check(
+        Path(runner.__file__).resolve().parents[1]
     )
 
 
@@ -1050,6 +1205,101 @@ def test_r3n_exact_feature_broad_source_gate_reused():
     assert result["profile"] == ""
     assert result["shards"] == [0, 1, 2, 3]
     assert result["run_attempt"] == 1
+
+
+def test_r3n_registered_active_broad_source_gate_reused():
+    args, _, _, _, _, _ = _broad_reuse_fixture(registered=True)
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["reason"] == "exact_feature_broad_source_gate"
+    assert result["reuse_kind"] == "broad_source_gate"
+    assert result["route"] == "ACTIVE"
+    assert result["profile"] == ""
+    assert result["run_attempt"] == 1
+
+
+def _r3n_route_fixture(route):
+    if route == "mapped":
+        return _reuse_fixture()
+    return _broad_reuse_fixture(registered=route == "registered")
+
+
+@pytest.mark.parametrize("route", ["mapped", "registered", "unregistered"])
+def test_r3n_attempt_two_is_never_reusable(route):
+    args, responses, run, _, _, _ = _r3n_route_fixture(route)
+    run["run_attempt"] = 2
+    responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["run_attempt"] = 2
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize("route", ["registered", "unregistered"])
+@pytest.mark.parametrize("mutation", ["missing_shard", "duplicate_shard"])
+def test_r3n_broad_shard_cardinality_is_exact(route, mutation):
+    from copy import deepcopy
+
+    args, responses, _, jobs, _, jobs_path = _broad_reuse_fixture(
+        registered=route == "registered"
+    )
+    shard = next(job for job in jobs if job["name"] == "full-tests (0)")
+    if mutation == "missing_shard":
+        jobs.remove(shard)
+    else:
+        jobs.append(deepcopy(shard))
+    responses[jobs_path]["total_count"] = len(jobs)
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize("route", ["registered", "unregistered"])
+def test_r3n_broad_failed_shard_is_not_reusable(route):
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=route == "registered")
+    next(job for job in jobs if job["name"] == "full-tests (2)")["conclusion"] = (
+        "failure"
+    )
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize("route", ["registered", "unregistered"])
+def test_r3n_broad_failed_hygiene_is_not_reusable(route):
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=route == "registered")
+    next(job for job in jobs if job["name"] == "full-tests (1)")["steps"][-1][
+        "conclusion"
+    ] = "failure"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+def test_r3n_registered_active_failure_is_not_reusable():
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=True)
+    next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "failure"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+def test_r3n_registered_active_skip_is_not_reusable():
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=True)
+    next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "skipped"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+def test_r3n_unregistered_active_run_is_not_reusable():
+    args, _, _, jobs, _, _ = _broad_reuse_fixture()
+    next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "success"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
+
+
+@pytest.mark.parametrize("route", ["registered", "unregistered"])
+def test_r3n_broad_certification_run_is_not_reusable(route):
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=route == "registered")
+    next(job for job in jobs if job["name"] == "certification-tests ( / )")[
+        "conclusion"
+    ] = "success"
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
 
 
 @pytest.mark.parametrize(

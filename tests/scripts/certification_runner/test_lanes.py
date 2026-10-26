@@ -29,6 +29,8 @@ def _use_historical_d1s3_authority(
         ),
     )
     original_blob = checkpoint._git_blob_sha1
+    historical_d1s1 = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    historical_c1 = "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
     historical_blobs = {
         root / "tests/scripts/certification_runner/helpers.py": (
             "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
@@ -47,6 +49,10 @@ def _use_historical_d1s3_authority(
         root / "tests/runtime/checkpoint_runner/test_ci.py": (
             checkpoint.READONLY_BLOB_AFTER["tests/runtime/checkpoint_runner/test_ci.py"]
         ),
+        root / historical_d1s1: checkpoint.READONLY_BLOB_AFTER[historical_d1s1],
+        root / historical_c1: checkpoint.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
+            historical_c1
+        ],
     }
     monkeypatch.setattr(
         checkpoint,

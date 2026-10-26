@@ -26119,14 +26119,14 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
     ),
     "_arch134_r3n_prepublication_authority_check": (
-        "f5549b3af80f5ca1f35fd0fa10a266f711afca6ef7b46665be7406dd694d3d99"
+        "4ace08fab6b14c49746bce188a7334b3344883abe1d9a21ea9decc641064dae4"
     ),
     "prepublication_admission": (
         "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "54740eeceff8c4dd389b849a91ab7c13bd4473eba7a3cd14eaba1702631f4486"
+    "aaf02932745e86529f51f96dcc6acc66257685ddd3c89fcacdfbce5c8b325810"
 )
 
 
@@ -26411,6 +26411,10 @@ def _arch134_r3n_prepublication_authority_check(
         "tests/runtime/checkpoint_runner/test_ci.py",
         "Read-only admission shared source drift: "
         "tests/runtime/checkpoint_runner/test_core.py",
+        "Read-only admission predecessor blob drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+        "Read-only admission shared source drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
         "R3N C4 predecessor new AST drift: prepublication_admission",
         "R3N workflow topology drift",
     }

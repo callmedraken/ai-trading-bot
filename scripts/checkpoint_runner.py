@@ -26053,7 +26053,7 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
         "0fb317747114b403b728437a22496a8786212488"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "4d64f59d5ae4c6a296ef26680c6489a546c90dcc"
+        "2ee8ba7843cca815c6b86d158fdfcf677ac939d9"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "27e2f372c1946b660d85afbbe23abea7389d50c6"
@@ -26120,7 +26120,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "2e8bf01f9cf9cb4e6517eb937f157faab1fcf60be366dbc88ff3d74f7c2ec2a4"
+    "3375263470b32953dd58f6606c919668de4f1f032bc2cf20719b1ad3add7d177"
 )
 
 

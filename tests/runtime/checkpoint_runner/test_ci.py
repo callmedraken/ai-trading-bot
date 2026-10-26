@@ -809,6 +809,10 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
     historical_test_helpers = "tests/scripts/certification_runner/helpers.py"
     historical_test_profiles = "tests/scripts/certification_runner/test_profiles.py"
     historical_test_lanes = "tests/scripts/certification_runner/test_lanes.py"
+    historical_test_runtime = "tests/review_paper/test_production_paper_runtime.py"
+    historical_test_runtime_acl = (
+        "tests/review_paper/test_production_paper_runtime_acl.py"
+    )
     monkeypatch.setattr(
         runner,
         "_git_blob_sha1",
@@ -823,6 +827,10 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
             if path == root / historical_test_profiles
             else "6ef03c56497055a8edf7d2378c87c44d55800b53"
             if path == root / historical_test_lanes
+            else "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+            if path == root / historical_test_runtime
+            else "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+            if path == root / historical_test_runtime_acl
             else original_blob(path)
         ),
     )

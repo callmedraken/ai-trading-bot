@@ -31,6 +31,31 @@ def _use_historical_d1s3_authority(
     original_blob = checkpoint._git_blob_sha1
     historical_d1s1 = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
     historical_c1 = "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    historical_d1s2 = "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    historical_d1s3 = (
+        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    )
+    historical_d1_session_execution = "tests/review_paper/test_d1_session_execution.py"
+    historical_d1_session_authorization = (
+        "tests/review_paper/test_d1_session_authorization.py"
+    )
+    historical_pre_market_wake_overnight = (
+        "tests/review_paper/test_pre_market_wake_overnight.py"
+    )
+    historical_five_session_soak = "tests/review_paper/test_five_session_soak.py"
+    historical_production_paper_runtime = (
+        "tests/review_paper/test_production_paper_runtime.py"
+    )
+    historical_production_paper_runtime_acl = (
+        "tests/review_paper/test_production_paper_runtime_acl.py"
+    )
+    historical_pre_market_wake_qualification = (
+        "tests/review_paper/test_pre_market_wake_qualification.py"
+    )
+    historical_alpaca_authentication_qualification = (
+        "tests/review_paper/test_alpaca_authentication_qualification.py"
+    )
+    diagnostic_predecessors = checkpoint.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS
     historical_blobs = {
         root / "tests/scripts/certification_runner/helpers.py": (
             "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
@@ -52,6 +77,32 @@ def _use_historical_d1s3_authority(
         root / historical_d1s1: checkpoint.READONLY_BLOB_AFTER[historical_d1s1],
         root / historical_c1: checkpoint.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
             historical_c1
+        ],
+        root / historical_d1s2: diagnostic_predecessors[historical_d1s2],
+        root / historical_d1s3: diagnostic_predecessors[historical_d1s3],
+        root / historical_d1_session_execution: diagnostic_predecessors[
+            historical_d1_session_execution
+        ],
+        root / historical_d1_session_authorization: diagnostic_predecessors[
+            historical_d1_session_authorization
+        ],
+        root / historical_pre_market_wake_overnight: diagnostic_predecessors[
+            historical_pre_market_wake_overnight
+        ],
+        root / historical_five_session_soak: diagnostic_predecessors[
+            historical_five_session_soak
+        ],
+        root / historical_production_paper_runtime: diagnostic_predecessors[
+            historical_production_paper_runtime
+        ],
+        root / historical_production_paper_runtime_acl: diagnostic_predecessors[
+            historical_production_paper_runtime_acl
+        ],
+        root / historical_pre_market_wake_qualification: diagnostic_predecessors[
+            historical_pre_market_wake_qualification
+        ],
+        root / historical_alpaca_authentication_qualification: diagnostic_predecessors[
+            historical_alpaca_authentication_qualification
         ],
     }
     monkeypatch.setattr(

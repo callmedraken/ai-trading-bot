@@ -48,6 +48,30 @@ def _use_historical_predecessor_authority(
         / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
             "tests/runtime/checkpoint_runner/test_core.py"
         ],
+        root / "tests/review_paper/test_d1_session_authorization.py": (
+            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
+        ),
+        root / "tests/review_paper/test_d1_session_execution.py": (
+            "e3259ba082f5d702c507fa194bd739a627053baf"
+        ),
+        root / "tests/review_paper/test_five_session_soak.py": (
+            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
+        ),
+        root / "tests/review_paper/test_pre_market_wake_overnight.py": (
+            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
+        ),
+        root / "tests/review_paper/test_production_paper_runtime.py": (
+            "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+        ),
+        root / "tests/review_paper/test_production_paper_runtime_acl.py": (
+            "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+        ),
+        root / "tests/review_paper/test_alpaca_authentication_qualification.py": (
+            "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
+        ),
+        root / "tests/review_paper/test_pre_market_wake_qualification.py": (
+            "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
+        ),
         root / "tests/scripts/certification_runner/helpers.py": (
             "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
         ),

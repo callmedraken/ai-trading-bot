@@ -329,6 +329,48 @@ def test_diagnostic_overlay_bypass_and_unrelated_workflow_drift_fail_closed(
     assert runner._arch134_readonly_diagnostic_authority_check(root)
 
 
+def test_diagnostic_successor_routes_shared_and_direct_overlay_endpoints(
+    monkeypatch,
+):
+    root = runner.Path(runner.__file__).resolve().parents[1]
+    assert runner._arch146a_overlay is runner._arch134_readonly_diagnostic_overlay
+    assert (
+        runner._arch134_d1s3_shared_successor_pin
+        is runner._arch134_readonly_diagnostic_shared_successor_pin
+    )
+    for relative, pin in runner.ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS.items():
+        assert runner._arch134_readonly_diagnostic_shared_successor_pin(relative) == pin
+    relative = "docs/AI_DEVELOPMENT_WORKFLOW.md"
+    assert (
+        runner._arch134_readonly_diagnostic_overlay(
+            relative, runner.ARCH132_R3M_BLOB_PINS[relative], ast_pin=False
+        )
+        == runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS[relative]
+    )
+    relative = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    )
+    assert (
+        runner._arch134_readonly_diagnostic_pin(
+            relative,
+            runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[relative],
+            ast_pin=False,
+        )
+        == runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS[relative]
+    )
+    monkeypatch.setattr(
+        runner,
+        "_arch146a_overlay",
+        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY,
+    )
+    monkeypatch.setattr(
+        runner,
+        "_arch134_d1s3_shared_successor_pin",
+        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN,
+    )
+    assert runner._arch134_readonly_diagnostic_authority_check(root)
+
+
 def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
     root = runner.Path(runner.__file__).resolve().parents[1]
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
@@ -344,6 +386,14 @@ def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
     )
     assert runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(
         historical_workflow
+    )
+    assert (
+        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY
+        is not runner._arch134_readonly_diagnostic_overlay
+    )
+    assert (
+        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN
+        is not runner._arch134_readonly_diagnostic_shared_successor_pin
     )
     assert runner._arch132_r3m_authority_check(root)
     assert runner._arch132_r3n_c4_authority_check(root)

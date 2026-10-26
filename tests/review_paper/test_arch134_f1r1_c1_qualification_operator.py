@@ -590,6 +590,7 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
     permitted.update(runner.ARCH134_D1S3_RUNNER_AST_PINS)
     permitted.update(runner.ARCH132_R3M_C3_AST_PINS)
     permitted.update(runner.ARCH132_R3M_C3_NEW_AST_PINS)
+    permitted.update(runner.ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS)
     frozen_functions.pop("_batch_workflow_is_reviewed", None)
     for name, function in frozen_functions.items():
         if name not in permitted:

@@ -26040,6 +26040,12 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
         "34a27005e43b5d67c76061784e3cdfa393f94f0d"
     ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "e0d43393816a6da9a755a685007d9a87d34d1388"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "2353a5191e9f39593ab365c0b1855ad6a1509425"
+    ),
     "tests/scripts/certification_runner/helpers.py": (
         "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
     ),
@@ -26064,6 +26070,12 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
         "b125dedcc1664bd1e90b0e0adec62967222c2121"
     ),
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "d38c6a82ee64c800b8970f62f7b033b51badfbc7"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "e260aaa4344afd2124596b43dc93be9ed3bf07fc"
+    ),
     "tests/scripts/certification_runner/helpers.py": (
         "86abd4cb1bb932f064038281ec60c9591dd7939b"
     ),
@@ -26075,6 +26087,12 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS: Final = {
+    "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+        "e0d43393816a6da9a755a685007d9a87d34d1388"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "2353a5191e9f39593ab365c0b1855ad6a1509425"
+    ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "3737babdb35cb5992edcf87616da93d457af47b5"
     ),
@@ -26118,6 +26136,9 @@ ARCH134_READONLY_DIAGNOSTIC_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
+    "resolve_ci_checkpoint": (
+        "bec364378c16d0d213c291ee69cf6f256fb4df8c401d11d5371467f5b55e6d1c"
+    ),
     "_arch134_readonly_diagnostic_maps": (
         "f3745ca0ec9cb1a6d4544b8a0706388bcc4a8577593cf8077adbcc38f0a30ba9"
     ),
@@ -26137,7 +26158,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
     ),
     "_arch134_readonly_diagnostic_authority_check": (
-        "fd9c873d517294905428f704b9a82110e8dec8647f9bc57c17d1f6458470be3d"
+        "5166763bc83799b122a10cd54c8ac44cc772d49690f748eb857cfbf4235437a3"
     ),
     "_arch134_readonly_diagnostic_preflight": (
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
@@ -26146,14 +26167,17 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "4ace08fab6b14c49746bce188a7334b3344883abe1d9a21ea9decc641064dae4"
     ),
     "_arch134_readonly_diagnostic_shared_successor_pin": (
-        "f8c99f034d5ea78493c0e45fbfa437b37a9cb64bac229af355fdeda9f5c0ce0d"
+        "ac1decd8b7e367c0739e35c8d47949808e630339cf221226507faa34ba5b1fe2"
+    ),
+    "_arch134_readonly_diagnostic_overlay": (
+        "8717b776adb22af47c804f33eb1a5682adef9ce6117fd9abc66e500b1a8304f0"
     ),
     "prepublication_admission": (
         "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "d0744471b065e7e46fc027537a5b0e4c16e6c172abe3dd6b1ac60b00d7641442"
+    "0c49675421357565b852fdc53b87fa463fe54f10995178340349a1b6c3c6c08d"
 )
 
 
@@ -26202,16 +26226,42 @@ def _arch134_readonly_diagnostic_pin(
 _ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN = (
     _arch134_d1s3_shared_successor_pin
 )
+_ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY = _arch146a_overlay
 
 
 def _arch134_readonly_diagnostic_shared_successor_pin(relative: str) -> str | None:
-    predecessor = _ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN(relative)
-    if relative not in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS:
-        return predecessor
-    expected = ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS[relative]
-    if predecessor != expected:
-        raise ValueError("Architecture 134 diagnostic wrong shared predecessor")
-    return ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS[relative]
+    if relative in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS:
+        return ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS[relative]
+    return _ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN(relative)
+
+
+def _arch134_readonly_diagnostic_overlay(
+    key: str, predecessor: str, *, ast_pin: bool
+) -> str:
+    resolved = _ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY(
+        key, predecessor, ast_pin=ast_pin
+    )
+    if ast_pin:
+        return resolved
+    before = (
+        ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS
+        if key in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS
+        else ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS
+    )
+    after = (
+        ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS
+        if key in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS
+        else ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS
+    )
+    if key not in before:
+        return resolved
+    if resolved not in (before[key], after[key]):
+        raise ValueError("Architecture 134 diagnostic wrong exact overlay predecessor")
+    return after[key]
+
+
+_arch146a_overlay = _arch134_readonly_diagnostic_overlay
+_arch134_d1s3_shared_successor_pin = _arch134_readonly_diagnostic_shared_successor_pin
 
 
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
@@ -26410,6 +26460,9 @@ def _arch134_readonly_diagnostic_authority_check(
             or current.tests != ARCH134_READONLY_DIAGNOSTIC_TESTS
             or current.ruff_paths != ARCH134_READONLY_DIAGNOSTIC_RUFF
             or CI_CERTIFICATION_PROFILES.get(current.name) != "robinhood"
+            or _arch146a_overlay is not _arch134_readonly_diagnostic_overlay
+            or _arch134_d1s3_shared_successor_pin
+            is not _arch134_readonly_diagnostic_shared_successor_pin
             or resolve_ci_checkpoint(
                 _checkpoint_specs(), ARCH134_READONLY_DIAGNOSTIC_BRANCH, "push"
             )

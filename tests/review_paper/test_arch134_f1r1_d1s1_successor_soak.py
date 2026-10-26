@@ -690,6 +690,7 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
                 "_arch134_d1s3_shared_successor_pin",
             }
         )
+        | (set(runner.ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS) & changed)
     ) - {"_arch134_d1s1_authority_check"}
     for name, pin in runner.ARCH134_D1S1_PREDECESSOR_AST_PINS.items():
         if name in runner.ARCH134_D1S2_PREDECESSOR_AST_PINS:

@@ -34,6 +34,9 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         lambda workflow: historical(_historical_workflow_view(workflow)),
     )
     original_blob = runner._git_blob_sha1
+    historical_d1s4 = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    )
     historical_blobs = {
         root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
             "docs/AI_DEVELOPMENT_WORKFLOW.md"
@@ -45,6 +48,7 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
             "tests/runtime/checkpoint_runner/test_core.py"
         ],
+        root / historical_d1s4: runner.READONLY_BLOB_AFTER[historical_d1s4],
         root / "tests/scripts/certification_runner/helpers.py": (
             "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
         ),

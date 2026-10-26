@@ -333,10 +333,11 @@ def test_diagnostic_successor_routes_shared_and_direct_overlay_endpoints(
     monkeypatch,
 ):
     root = runner.Path(runner.__file__).resolve().parents[1]
-    assert runner._arch146a_overlay is runner._arch134_readonly_diagnostic_overlay
+    previous_overlay = runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY
+    assert runner._arch146a_overlay is previous_overlay
     assert (
         runner._arch134_d1s3_shared_successor_pin
-        is runner._arch134_readonly_diagnostic_shared_successor_pin
+        is runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN
     )
     for relative, pin in runner.ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS.items():
         assert runner._arch134_readonly_diagnostic_shared_successor_pin(relative) == pin
@@ -358,17 +359,30 @@ def test_diagnostic_successor_routes_shared_and_direct_overlay_endpoints(
         )
         == runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS[relative]
     )
+    calls: list[str] = []
+    shared_calls: list[str] = []
+    original_overlay = runner._arch134_readonly_diagnostic_overlay
+    original_shared = runner._arch134_readonly_diagnostic_shared_successor_pin
+
+    def traced_overlay(key, predecessor, *, ast_pin):
+        calls.append(key)
+        return original_overlay(key, predecessor, ast_pin=ast_pin)
+
+    def traced_shared(relative):
+        shared_calls.append(relative)
+        return original_shared(relative)
+
+    monkeypatch.setattr(runner, "_arch134_readonly_diagnostic_overlay", traced_overlay)
     monkeypatch.setattr(
-        runner,
-        "_arch146a_overlay",
-        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_OVERLAY,
+        runner, "_arch134_readonly_diagnostic_shared_successor_pin", traced_shared
     )
-    monkeypatch.setattr(
-        runner,
-        "_arch134_d1s3_shared_successor_pin",
-        runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN,
+    assert runner._arch134_readonly_diagnostic_authority_check(root) == ()
+    assert calls or shared_calls
+    assert runner._arch146a_overlay is previous_overlay
+    assert (
+        runner._arch134_d1s3_shared_successor_pin
+        is runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN
     )
-    assert runner._arch134_readonly_diagnostic_authority_check(root)
 
 
 def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
@@ -398,3 +412,9 @@ def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
     assert runner._arch132_r3m_authority_check(root)
     assert runner._arch132_r3n_c4_authority_check(root)
     assert runner._readonly_candidate_authority_check(root)
+    assert (
+        runner._arch134_d1s3_shared_successor_pin(
+            "tests/runtime/checkpoint_runner/test_ci.py"
+        )
+        == runner.READONLY_BLOB_AFTER["tests/runtime/checkpoint_runner/test_ci.py"]
+    )

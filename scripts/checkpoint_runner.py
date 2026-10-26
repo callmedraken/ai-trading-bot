@@ -26157,8 +26157,8 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     "_arch134_readonly_diagnostic_graph_check": (
         "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
     ),
-    "_arch134_readonly_diagnostic_authority_check": (
-        "5166763bc83799b122a10cd54c8ac44cc772d49690f748eb857cfbf4235437a3"
+    "_arch134_readonly_diagnostic_authority_body": (
+        "744b8de622a5a6e4d659fc9eee480d89cd988d919987da2e2995eac62d9d62ea"
     ),
     "_arch134_readonly_diagnostic_preflight": (
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
@@ -26172,12 +26172,15 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     "_arch134_readonly_diagnostic_overlay": (
         "8717b776adb22af47c804f33eb1a5682adef9ce6117fd9abc66e500b1a8304f0"
     ),
+    "_arch134_readonly_diagnostic_authority_check": (
+        "666b98afc804f595471f001f3c9b108459962ac15afa6c96a0cb491c285417ad"
+    ),
     "prepublication_admission": (
         "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "080d1a0c0bae3a3e0c7d93885c59ecefb9258b5f7309e7178dc2f09d7fe2ff30"
+    "bbe130fcd406f95bb426663da9a93053235a22509a5c15bbc0ed06cd35a7fc45"
 )
 
 
@@ -26258,10 +26261,6 @@ def _arch134_readonly_diagnostic_overlay(
     if resolved not in (before[key], after[key]):
         raise ValueError("Architecture 134 diagnostic wrong exact overlay predecessor")
     return after[key]
-
-
-_arch146a_overlay = _arch134_readonly_diagnostic_overlay
-_arch134_d1s3_shared_successor_pin = _arch134_readonly_diagnostic_shared_successor_pin
 
 
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
@@ -26437,7 +26436,7 @@ def _arch134_readonly_diagnostic_graph_check(repo_root: Path) -> tuple[str, ...]
     return tuple(sorted(set(failures)))
 
 
-def _arch134_readonly_diagnostic_authority_check(
+def _arch134_readonly_diagnostic_authority_body(
     repo_root: Path,
 ) -> tuple[str, ...]:
     failures = list(_arch134_readonly_diagnostic_predecessor_authority_check(repo_root))
@@ -26517,6 +26516,23 @@ def _arch134_readonly_diagnostic_authority_check(
     except (OSError, KeyError, TypeError, ValueError, SyntaxError):
         failures.append("Diagnostic successor authority unavailable")
     return tuple(sorted(set(failures)))
+
+
+def _arch134_readonly_diagnostic_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    global _arch134_d1s3_shared_successor_pin, _arch146a_overlay
+    previous_shared = _arch134_d1s3_shared_successor_pin
+    previous_overlay = _arch146a_overlay
+    _arch134_d1s3_shared_successor_pin = (
+        _arch134_readonly_diagnostic_shared_successor_pin
+    )
+    _arch146a_overlay = _arch134_readonly_diagnostic_overlay
+    try:
+        return _arch134_readonly_diagnostic_authority_body(repo_root)
+    finally:
+        _arch134_d1s3_shared_successor_pin = previous_shared
+        _arch146a_overlay = previous_overlay
 
 
 def _arch134_r3n_prepublication_authority_check(

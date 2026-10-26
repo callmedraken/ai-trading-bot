@@ -1,0 +1,100 @@
+{
+  "repository": {
+    "id": 1317968317,
+    "full_name": "callmedraken/ai-trading-bot"
+  },
+  "workflow": {
+    "id": 370646123,
+    "name": "Checkpoint Source Gates",
+    "path": ".github/workflows/checkpoint-source-gates.yml",
+    "state": "active"
+  },
+  "commit": {
+    "sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+    "tree": "80ebe3d10cdbb63828f08fe0909079c5aaefb8d6"
+  },
+  "develop": {
+    "ref": "refs/heads/develop",
+    "object": {
+      "type": "commit",
+      "sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc"
+    }
+  },
+  "run": {
+    "id": 40288823461,
+    "run_attempt": 1,
+    "name": "Checkpoint Source Gates",
+    "workflow_id": 370646123,
+    "path": ".github/workflows/checkpoint-source-gates.yml",
+    "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+    "head_branch": "feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-current",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success"
+  },
+  "jobs": [
+    {
+      "id": 121458803990,
+      "name": "source-static",
+      "run_id": 40288823461,
+      "run_attempt": 1,
+      "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {"name": "Resolve source gate route", "status": "completed", "conclusion": "success"},
+        {"name": "Verify active checkpoint static authority", "status": "completed", "conclusion": "success"}
+      ]
+    },
+    {
+      "id": 121458996526,
+      "name": "active-tests",
+      "run_id": 40288823461,
+      "run_attempt": 1,
+      "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {"name": "Verify active checkpoint tests", "status": "completed", "conclusion": "success"}
+      ]
+    },
+    {
+      "id": 121458996528,
+      "name": "certification-tests (arch134-fresh-successor-readonly-deployment-admission / robinhood)",
+      "run_id": 40288823461,
+      "run_attempt": 1,
+      "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {"name": "Install certification dependencies", "status": "completed", "conclusion": "success"},
+        {"name": "Install FULL optimizer dependency", "status": "completed", "conclusion": "skipped"},
+        {"name": "Run canonical certification profile", "status": "completed", "conclusion": "success"},
+        {"name": "Enforce canonical certification hygiene budget", "status": "completed", "conclusion": "success"},
+        {"name": "Upload canonical certification evidence", "status": "completed", "conclusion": "success"}
+      ]
+    },
+    {
+      "id": 121458998538,
+      "name": "full-tests",
+      "run_id": 40288823461,
+      "run_attempt": 1,
+      "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+      "status": "completed",
+      "conclusion": "skipped",
+      "steps": []
+    },
+    {
+      "id": 121460749560,
+      "name": "source-gates",
+      "run_id": 40288823461,
+      "run_attempt": 1,
+      "head_sha": "8a6791ba036a60f978d700bba0a2f1bc65a631bc",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {"name": "Require source gate success", "status": "completed", "conclusion": "success"}
+      ]
+    }
+  ]
+}

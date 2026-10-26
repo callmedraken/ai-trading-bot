@@ -1455,15 +1455,22 @@ non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
 .\ops.ps1 preflight arch128-r7
 ```
 
-The current fresh-successor observer checkpoint is
-`arch134-fresh-successor-readonly-deployment-admission`. It registers read-only
-preflight and no execute dispatch, with GitHub-owned ROBINHOOD certification.
-The inert predecessor successor-source checkpoint still has no host dispatch.
-Historical D1S4/R1 registrations retain predecessor meaning. Real-host observer
-invocation requires exact ChatGPT-accepted observer HEAD/tree and reviewed token
-policy after publication/integration; implementation tests do not invoke it.
-Bounded local Git/PowerShell diagnostic children are permitted, counted separately
-from forbidden runtime process starts/stops. No source PASS grants mutation.
+The current fresh-successor diagnostic checkpoint is
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic`. It registers
+read-only diagnostic preflight, `execute = None`, an exact feature branch and
+GitHub-owned canonical ROBINHOOD certification. The v1 predecessor remains
+coarse `BLOCKED / HOST`; only the successor emits a closed diagnostic code.
+The first real-host v1 attempt is preserved as immutable evidence and is not
+rerun. Implementation tests use fakes only and never invoke the real host
+observer, production namespace, scheduler/security state or protected runtime.
+No source PASS grants mutation.
+
+The exact #738 mapped ROBINHOOD run (`40288823461`, attempt 1) is reusable only
+when repository, workflow, event, SHA/tree, branch, profile, attempt, exact job
+topology, required steps and uniqueness all match. The mapped route requires the
+`full-tests` job to be completed with `skipped` conclusion and no steps. The
+later #739 `provenance_not_proven` broad fallback is preserved as a throughput
+defect, not weakened admission; its correction is batched in this checkpoint.
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
 combined Ruff diagnostics, evidence capture, and checkpoint authority checks

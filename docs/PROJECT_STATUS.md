@@ -1,52 +1,40 @@
 # AI Trading Bot — Project Status
 
-## Current integrated checkpoint
-
-Architecture 134 fresh-successor candidate/admission-design source
-is **SOURCE ACCEPTED / INTEGRATED**.
-
-    HEAD 745b027abfd5cf75ba113b5bb78880af5f55fcce
-    TREE 5f3b784d65d3052e3525fef7a7ed1bad93fa144a
-    Feature #735 / 40275506498 / attempt 1: SUCCESS
-    Develop #736 / 40276839124 / attempt 1: SUCCESS
-
-#736 proved DEVELOP_CERTIFICATION_REUSE=True with reason
-`exact_feature_broad_source_gate` and skipped active-tests, certification-tests
-and broad full-tests. No duplicate broad execution occurred. Primary local
-develop was reconciled to this exact HEAD/tree before this observer
-checkpoint. Preserved R3N chronology remains in the workflow/architecture
-records; no historical run or failed evidence is rewritten.
-
 ## Current source checkpoint
 
-Architecture 134 fresh-successor READ-ONLY deployment admission observer is
+Architecture 134 fresh-successor READ-ONLY deployment-admission diagnostic is
 **SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
-REVIEW**. Its frozen production source selection remains
-61836d6adadf25907c0347d42012bc4200a179ff /
-eabbf166db2d14ce7fed603df3f8b6762394e3c7, not newer develop or an installed image.
-Its own final implementation
-HEAD/tree and CI are post-publication handoff facts, separately reviewed.
+REVIEW**.
 
-Initial observer source b6797eba6e1ee47ccfa914a36d3a229d74661f48 /
-31b45de23822711acc0924ffe3f3590d5c5064c2 reached terminal-red feature
-#737 / 40286185979 / attempt 1. Source-static and active tests passed; canonical
-ROBINHOOD exposed nine stale registry-consumer assertions. C1 reconciles current
-registry tests and exact test authority only; observer behavior is unchanged.
+    base origin/develop HEAD 8a6791ba036a60f978d700bba0a2f1bc65a631bc
+    base tree 80ebe3d10cdbb63828f08fe0909079c5aaefb8d6
+    checkpoint arch134-fresh-successor-readonly-deployment-admission-diagnostic
+    branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
+    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
 
-The observer binds reviewed source, frozen inventory/manifest, consumed R1 closure,
-fixed no-follow namespace, principal/security, Python and quiescence observations.
-Stable read-only PASS grants only the next root write-authority/ACL review.
-There is no execute dispatch. Bounded local diagnostic children are permitted;
-runtime starts, production writes and provider/broker effects remain forbidden.
-See [the observer contract](architecture/134-fresh-successor-readonly-deployment-admission.md).
+The successor is source-only, read-only, has no execute dispatch and maps to
+GitHub-owned canonical ROBINHOOD certification. No real-host preflight,
+production namespace inspection, scheduler/security command, successor root,
+ACL mutation, provider/broker/live operation or Architecture 146-B work is
+performed here.
 
-`ops.ps1 admit` remains the general PRE-PUBLICATION gate on the clean committed
-feature candidate. Exact-base/branch/origin/cleanliness checks precede edits.
-The registered observer branch maps to canonical ROBINHOOD in GitHub CI;
-do not duplicate that certification locally. Develop may later reuse exact feature
-certification under existing first-attempt rules.
-Current inventory remains `203 / 112 / 222 / 425`; required baselines and lane
-construction are unchanged.
+The first real-host v1 observer attempt remains immutable evidence and must not
+be rerun: source HEAD/tree `8a6791ba036a60f978d700bba0a2f1bc65a631bc /
+80ebe3d10cdbb63828f08fe0909079c5aaefb8d6`, report SHA256
+`3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`, status
+`BLOCKED / HOST`, `diagnostic_process_starts = 23`, production effects
+`NOT_RUN` with zero observer counters and protected execution
+`NOT_AUTHORIZED` with false authority. The host subreason remains unknown.
+
+The accepted #738 mapped ROBINHOOD feature run is the exact reuse fixture:
+run `40288823461`, attempt 1, HEAD `8a6791ba036a60f978d700bba0a2f1bc65a631bc`.
+The later #739 develop integration safely reported
+`DEVELOP_CERTIFICATION_REUSE=False` with `provenance_not_proven` and used the
+broad fallback. That is a throughput/workflow defect, not a reason to weaken
+admission; its correction is batched into this successor.
+
+See [the diagnostic contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic.md)
+and [validation](validation/arch134-fresh-successor-readonly-deployment-admission-diagnostic.md).
 
 ## Production boundary
 
@@ -62,10 +50,9 @@ performed or authorized by this checkpoint. Architecture 146-B is NOT STARTED.
 
 ## Next step
 
-ChatGPT reviews the exact published admission-source commit/diff and terminal CI.
-After acceptance: develop integration + terminal gate, local-main reconciliation,
-then separately reviewed real-host READ-ONLY deployment admission. Root write
-and ACL authority review follows that admission; protected fresh materialization
-and manual-start F1 successor soak require their later reviewed bounds. Fresh
-F1 evidence precedes Architecture 145-B, Research Results GUI and large strategy
-campaigns. No later step is authorized by the source freeze.
+After the candidate is admitted, pushed and terminal CI is green, ChatGPT
+reviews the exact GitHub source/diff and terminal certification evidence.
+After acceptance: develop integration + terminal gate, primary-local
+reconciliation, then a separately reviewed real-host READ-ONLY diagnostic.
+Root-write/ACL review and any protected fresh materialization remain later
+reviewed boundaries. No later step is authorized by this source checkpoint.

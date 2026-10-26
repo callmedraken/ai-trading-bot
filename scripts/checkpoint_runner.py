@@ -223,11 +223,26 @@ ACTIVE_CI_CHECKPOINTS: Final = (
     "arch134-production-paper-runtime-acl",
 )
 
+# The diagnostic successor is the only current actionable observer checkpoint.
+# The v1 tuple remains frozen for predecessor authority and evidence semantics.
+ARCH134_READONLY_DIAGNOSTIC_NAME: Final = (
+    "arch134-fresh-successor-readonly-deployment-admission-diagnostic"
+)
+ARCH134_READONLY_DIAGNOSTIC_BRANCH: Final = (
+    "feature/robinhood-production-paper-fresh-successor-"
+    "readonly-deployment-admission-diagnostic-current"
+)
+CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH134_READONLY_DIAGNOSTIC_NAME,
+    *ACTIVE_CI_CHECKPOINTS[1:],
+)
+
 
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
     "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
+    ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
     "arch146-a-historical-research-dataset-enforcement": "full",
     "arch134-f1r1-d1s4-fresh-successor-source": "robinhood",
     "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery": "robinhood",
@@ -363,7 +378,10 @@ def resolve_ci_checkpoint(
     if event_name != "push" or type(branch) is not str or not branch:
         return None
     matches = [spec.name for spec in specs.values() if spec.remote_branch == branch]
-    if len(matches) != 1 or matches[0] not in ACTIVE_CI_CHECKPOINTS:
+    if len(matches) != 1 or matches[0] not in (
+        *CURRENT_ACTIVE_CI_CHECKPOINTS,
+        ACTIVE_CI_CHECKPOINTS[0],
+    ):
         return None
     return matches[0]
 
@@ -559,12 +577,27 @@ def find_reusable_ci_certification(
                         "Run canonical certification profile",
                         "Enforce canonical certification hygiene budget",
                     ),
+                    # The mapped route still materializes the reviewed
+                    # full-tests job with a skipped conclusion.  It is part
+                    # of the exact #738 topology and must be proven, rather
+                    # than silently ignored.
+                    "full-tests": (),
                     "source-gates": ("Require source gate success",),
                 }
                 require(set(by_name) == set(required))
                 eligible = all(
                     completed_success(by_name, name, steps, run_id, attempt)
                     for name, steps in required.items()
+                    if name != "full-tests"
+                )
+                skipped = by_name["full-tests"]
+                eligible = eligible and (
+                    skipped.get("status") == "completed"
+                    and skipped.get("conclusion") == "skipped"
+                    and skipped.get("run_id") == run_id
+                    and skipped.get("run_attempt") == attempt
+                    and skipped.get("head_sha") == head
+                    and skipped.get("steps") == []
                 )
             else:
                 broad_jobs = {
@@ -22011,7 +22044,7 @@ ARCH132_R3N_C4_AST_PREDECESSORS: Final = {
 }
 ARCH132_R3N_C4_AST_PINS: Final = {
     "find_reusable_ci_certification": (
-        "9839121da30528c2eb3e9d6f3ab6d4e688f3435c009357f884d7679c743b9125"
+        "c5e7f2d758dfb0590c8810957f2c84ce7b06ace04d547a2efcf07f8ff27f95a9"
     ),
 }
 ARCH132_R3N_C4_BLOB_PREDECESSORS: Final = {
@@ -22063,7 +22096,7 @@ ARCH132_R3N_C4_NEW_AST_PINS: Final = {
     ),
 }
 ARCH132_R3N_C4_MAPS_SHA256: Final = (
-    "54af67f73d64bb4934f2dbe11eaf31567279e69dcde10a0ad485ee4d3f9f50ff"
+    "df5464c1a729268936fe7fe1c1988b9aee58c601593971e10f62c6a7057858b3"
 )
 
 
@@ -25203,7 +25236,7 @@ READONLY_BLOB_BEFORE: Final = {
 }
 READONLY_BLOB_AFTER: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
-        "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
+        "0fb317747114b403b728437a22496a8786212488"
     ),
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("69b80e568efbfbeadaa004cccae2c12f849a6c17"),
     "tests/review_paper/test_arch133_scheduler_installation.py": (
@@ -25234,7 +25267,7 @@ READONLY_BLOB_AFTER: Final = {
         "ed93c46ccb929193b1779a8f6f16a686730d8c59"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "b7be985d19d535f0dd6837cc5cfb99615e24f5f0"
+        "3737babdb35cb5992edcf87616da93d457af47b5"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "57651c926b8e4cba9924aebb55424778f201f1d8"
@@ -25248,7 +25281,7 @@ READONLY_BLOB_AFTER: Final = {
 }
 READONLY_SOURCE_PINS: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
-        "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
+        "0fb317747114b403b728437a22496a8786212488"
     ),
     "docs/architecture/134-fresh-successor-readonly-deployment-admission.md": (
         "09a86522881879627370534a84fc4550d79fff69"
@@ -25478,7 +25511,7 @@ READONLY_AST_PINS: Final = {
         "0ebc772994af0b181575ee5e1750f934430c4e8d225a48d81c669ec4dc2dd94d"
     ),
     "_readonly_checkpoint_specs": (
-        "b90b18eab176c2f859c2b3c68010652acd67661b68ec48a4b465dca3c5ea1d9a"
+        "cefef65d69a7e7824df83f009f93579ea8270f90f86b65f538060033da95c648"
     ),
     "_readonly_maps": (
         "f3d5b0ef72591110591bf248583dd8559e08d0cb5842696a99a1b73e302162ab"
@@ -25493,7 +25526,7 @@ READONLY_AST_PINS: Final = {
         "e7f006a1e1f976c1a3be531300176632a21e1094ad75aa8d8ab7ddb2b96131ff"
     ),
     "_readonly_preflight_checkpoint": (
-        "5e6e1c314805e4d2a51da27d769d74580f617af2c3ebc065dab4e85aa8d3785f"
+        "ea45620778e4b1f155b05d5d7abb333bd0f42873166cd89e7d63a714921471d4"
     ),
     "_readonly_r3m_pin": (
         "df52faa37584cf46472ea6db78d12606209079b5fa63ed22c19dbdef6e1d38bd"
@@ -25503,7 +25536,7 @@ READONLY_AST_PINS: Final = {
     ),
 }
 READONLY_MAPS_SHA256: Final = (
-    "884c802521ed964402e5595b79f87170294535eebc4858c2855b751b8fe680ae"
+    "d6f186cfa8f4217f9f912d3e6c1edc4c1e9cb0bf0687aecaf06bd8adb994b73b"
 )
 READONLY_PREDECESSOR_ACTIVE: Final = (
     "arch146-a-historical-research-dataset-enforcement",
@@ -25875,7 +25908,7 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
     specs = _PRE_READONLY_SPECS()
     if READONLY_ADMISSION_NAME in specs:
         raise ValueError("Read-only admission duplicate registration")
-    return {
+    values = {
         READONLY_ADMISSION_NAME: CheckpointSpec(
             READONLY_ADMISSION_NAME,
             "Read-only fresh-successor host admission; next authority review only",
@@ -25889,19 +25922,48 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         **specs,
     }
+    if {
+        "ARCH134_READONLY_DIAGNOSTIC_NAME",
+        "ARCH134_READONLY_DIAGNOSTIC_TESTS",
+        "ARCH134_READONLY_DIAGNOSTIC_RUFF",
+        "_arch134_readonly_diagnostic_authority_check",
+        "_arch134_readonly_diagnostic_preflight",
+    }.issubset(globals()):
+        values = {
+            ARCH134_READONLY_DIAGNOSTIC_NAME: CheckpointSpec(
+                ARCH134_READONLY_DIAGNOSTIC_NAME,
+                "Read-only deployment-admission diagnostic "
+                "successor; no execute dispatch",
+                ARCH134_READONLY_DIAGNOSTIC_TESTS,
+                ARCH134_READONLY_DIAGNOSTIC_RUFF,
+                _arch134_readonly_diagnostic_authority_check,
+                _arch134_readonly_diagnostic_preflight,
+                None,
+                ARCH134_READONLY_DIAGNOSTIC_BRANCH,
+                "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
+            ),
+            **values,
+        }
+    return values
 
 
 def _readonly_preflight_checkpoint(
     spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
 ) -> tuple[bool, Path | None]:
-    if spec.name == READONLY_ADMISSION_NAME:
+    if spec.name in {
+        READONLY_ADMISSION_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_NAME,
+    }:
         from trading_bot.supervised_release.deployment_admission_source import (
             require_checkout_path,
         )
 
-        if spec != _checkpoint_specs()[
-            spec.name
-        ] or _readonly_candidate_authority_check(repo_root):
+        authority = (
+            _readonly_candidate_authority_check
+            if spec.name == READONLY_ADMISSION_NAME
+            else _arch134_readonly_diagnostic_authority_check
+        )
+        if spec != _checkpoint_specs()[spec.name] or authority(repo_root):
             raise RuntimeError("Read-only admission exact source/registration rejected")
         # Evidence is deliberately limited to a unique operator-selected external
         # development evidence path. Reject aliases before resolving/traversing.
@@ -25946,6 +26008,336 @@ _arch132_r3m_c3_authority_check = _readonly_candidate_authority_check
 _arch146a_predecessor_active_inventory = _readonly_predecessor_active_inventory
 _checkpoint_specs = _readonly_checkpoint_specs
 preflight_checkpoint = _readonly_preflight_checkpoint
+
+
+# Architecture 134 diagnostic successor.  The v1 observer registration and
+# authority chain above remain intact; this layer is the only current route.
+ARCH134_READONLY_DIAGNOSTIC_TESTS: Final = (
+    *READONLY_ADMISSION_TESTS,
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+)
+ARCH134_READONLY_DIAGNOSTIC_RUFF: Final = (
+    *READONLY_ADMISSION_RUFF,
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic.py",
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_host.py",
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+)
+
+# This overlay advances only the exact current workflow and runner surfaces
+# changed by this checkpoint.  The R3M predecessor dictionaries and literals
+# remain untouched; removing this overlay must expose the old topology drift.
+ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("69b80e568efbfbeadaa004cccae2c12f849a6c17"),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "b7be985d19d535f0dd6837cc5cfb99615e24f5f0"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("6082aba5392e64195b7fed3b05a5fdb6888b3f9e"),
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "0fb317747114b403b728437a22496a8786212488"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "1e95b0ab298bdc2ff81ece7177c5cf679d570b31"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS: Final = {
+    "_readonly_checkpoint_specs": (
+        "b90b18eab176c2f859c2b3c68010652acd67661b68ec48a4b465dca3c5ea1d9a"
+    ),
+    "_readonly_preflight_checkpoint": (
+        "5e6e1c314805e4d2a51da27d769d74580f617af2c3ebc065dab4e85aa8d3785f"
+    ),
+    "find_reusable_ci_certification": (
+        "9839121da30528c2eb3e9d6f3ab6d4e688f3435c009357f884d7679c743b9125"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_AST_PINS: Final = {
+    "_readonly_checkpoint_specs": (
+        "cefef65d69a7e7824df83f009f93579ea8270f90f86b65f538060033da95c648"
+    ),
+    "_readonly_preflight_checkpoint": (
+        "ea45620778e4b1f155b05d5d7abb333bd0f42873166cd89e7d63a714921471d4"
+    ),
+    "find_reusable_ci_certification": (
+        "c5e7f2d758dfb0590c8810957f2c84ce7b06ace04d547a2efcf07f8ff27f95a9"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
+    "_arch134_readonly_diagnostic_maps": (
+        "56beb76818271621868607fe825b2a9ba9357f56171628423511bd77c339f47d"
+    ),
+    "_arch134_readonly_diagnostic_pin": (
+        "c380c29b44c3ba682e32ee2ad35aa6fd7fcbc5dab98a1dbcf8864060cade5019"
+    ),
+    "_arch134_current_batch_workflow_is_reviewed": (
+        "b981e651d28ef9ddebe38e59c129131985e276764c6aa5988e48070fde6344f1"
+    ),
+    "_arch134_readonly_diagnostic_predecessor_authority_check": (
+        "7524919037174a659e3972dd5897646ae8367a80f3ee7e5cf57ffc2235fa37a6"
+    ),
+    "_arch134_readonly_diagnostic_graph_check": (
+        "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
+    ),
+    "_arch134_readonly_diagnostic_authority_check": (
+        "52b022cde8bbd4a5dd4c63bd525f4e83e3875b55372b51a0dffe54e5085806c4"
+    ),
+    "_arch134_readonly_diagnostic_preflight": (
+        "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
+    "34f04cefcbed6fe83f03dd7c3a314e01a49d567cb0e139feb14e023f999dd422"
+)
+
+
+def _arch134_readonly_diagnostic_maps() -> None:
+    maps = (
+        ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS,
+        ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS,
+        ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS,
+        ARCH134_READONLY_DIAGNOSTIC_AST_PINS,
+        ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256
+        or set(ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS)
+        != set(ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS)
+        or set(ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS)
+        != set(ARCH134_READONLY_DIAGNOSTIC_AST_PINS)
+    ):
+        raise ValueError("Architecture 134 diagnostic successor maps drift")
+
+
+def _arch134_readonly_diagnostic_pin(
+    key: str, predecessor: str, *, ast_pin: bool
+) -> str:
+    _arch134_readonly_diagnostic_maps()
+    before = (
+        ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS
+        if ast_pin
+        else ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS
+    )
+    after = (
+        ARCH134_READONLY_DIAGNOSTIC_AST_PINS
+        if ast_pin
+        else ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS
+    )
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("Architecture 134 diagnostic wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
+    active = tuple(
+        name
+        for name in CURRENT_ACTIVE_CI_CHECKPOINTS
+        if name
+        not in {
+            ARCH134_D1R6_NAME,
+            ARCH134_D1R7_NAME,
+            ARCH134_D1R8_NAME,
+            ARCH134_F1_NAME,
+            ARCH144C_NAME,
+        }
+    )
+    block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(f"              {name} `\n" for name in active[:-1])
+        + f"              {active[-1]}\n"
+    )
+    if workflow.count(block) != 1 or workflow.count(
+        "              " + ACTIVE_CI_CHECKPOINTS[0] + " `\n"
+    ):
+        return False
+    translated = workflow.replace(
+        ARCH134_READONLY_DIAGNOSTIC_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
+    )
+    return _batch_workflow_is_reviewed(translated)
+
+
+_ARCH134_PREVIOUS_PREDECESSOR_AUTHORITY = (
+    _deployment_candidate_predecessor_authority_check
+)
+_ARCH134_PREVIOUS_CANDIDATE_AUTHORITY = _readonly_candidate_authority_check
+
+
+def _arch134_readonly_diagnostic_predecessor_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures = list(_readonly_predecessor_authority_check(repo_root))
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if _arch134_current_batch_workflow_is_reviewed(workflow):
+        failures = [
+            failure
+            for failure in failures
+            if failure != "R3N C4 workflow topology drift"
+        ]
+    workflow_doc = "docs/AI_DEVELOPMENT_WORKFLOW.md"
+    workflow_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(workflow_doc)
+    if (
+        workflow_pin is not None
+        and _git_blob_sha1(repo_root / workflow_doc) == workflow_pin
+    ):
+        failures = [
+            failure
+            for failure in failures
+            if failure != "R3N C4 source drift: " + workflow_doc
+        ]
+    test_ci = "tests/runtime/checkpoint_runner/test_ci.py"
+    test_ci_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(test_ci)
+    if test_ci_pin is not None and _git_blob_sha1(repo_root / test_ci) == test_ci_pin:
+        failures = [
+            failure
+            for failure in failures
+            if failure != "R3N C4 source drift: " + test_ci
+        ]
+    return tuple(failures)
+
+
+def _arch134_readonly_diagnostic_graph_check(repo_root: Path) -> tuple[str, ...]:
+    forbidden = {
+        "rename",
+        "replace",
+        "move",
+        "mkdir",
+        "makedirs",
+        "unlink",
+        "rmdir",
+        "SetSecurityInfo",
+        "SetNamedSecurityInfoW",
+        "SetFileInformationByHandle",
+        "FileRenameInfo",
+        "CreateDirectoryW",
+        "WriteFile",
+        "AdjustTokenPrivileges",
+        "TerminateProcess",
+        "CreateProcessW",
+        "execute_once",
+        "materialize_release",
+        "consume_attempt",
+        "eval",
+        "exec",
+        "compile",
+    }
+    failures = []
+    for relative in (
+        "src/trading_bot/supervised_release/deployment_admission_diagnostic.py",
+        "src/trading_bot/supervised_release/deployment_admission_diagnostic_host.py",
+    ):
+        path = repo_root / relative
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            failures.append("Diagnostic successor source unavailable: " + relative)
+            continue
+        for node in ast.walk(tree):
+            name = (
+                node.id
+                if isinstance(node, ast.Name)
+                else node.attr
+                if isinstance(node, ast.Attribute)
+                else node.value
+                if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                else ""
+            )
+            if name in forbidden or (
+                isinstance(name, str) and name.startswith("MoveFile")
+            ):
+                failures.append("Diagnostic successor forbidden capability: " + name)
+    return tuple(sorted(set(failures)))
+
+
+def _arch134_readonly_diagnostic_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures = list(_arch134_readonly_diagnostic_predecessor_authority_check(repo_root))
+    try:
+        _arch134_readonly_diagnostic_maps()
+        specs = _readonly_checkpoint_specs()
+        predecessor = specs[READONLY_ADMISSION_NAME]
+        if (
+            predecessor.preflight is not _readonly_admission_preflight
+            or predecessor.execute is not None
+            or predecessor.remote_branch != READONLY_ADMISSION_BRANCH
+            or CI_CERTIFICATION_PROFILES.get(predecessor.name) != "robinhood"
+        ):
+            failures.append("Diagnostic predecessor registration drift")
+        current = _checkpoint_specs()[ARCH134_READONLY_DIAGNOSTIC_NAME]
+        if (
+            current.preflight is not _arch134_readonly_diagnostic_preflight
+            or current.execute is not None
+            or current.remote_branch != ARCH134_READONLY_DIAGNOSTIC_BRANCH
+            or current.tests != ARCH134_READONLY_DIAGNOSTIC_TESTS
+            or current.ruff_paths != ARCH134_READONLY_DIAGNOSTIC_RUFF
+            or CI_CERTIFICATION_PROFILES.get(current.name) != "robinhood"
+            or resolve_ci_checkpoint(
+                _checkpoint_specs(), ARCH134_READONLY_DIAGNOSTIC_BRANCH, "push"
+            )
+            != ARCH134_READONLY_DIAGNOSTIC_NAME
+        ):
+            failures.append("Diagnostic successor registration drift")
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        current_workflow = _arch134_current_batch_workflow_is_reviewed(workflow)
+        if current_workflow:
+            failures = [
+                failure
+                for failure in failures
+                if failure != "R3N C4 workflow topology drift"
+            ]
+        else:
+            failures.append("Diagnostic workflow topology drift")
+        if (
+            workflow.count("              " + ARCH134_READONLY_DIAGNOSTIC_NAME + " `\n")
+            != 1
+            or workflow.count(
+                "              arch134-fresh-successor-readonly-"
+                "deployment-admission `\n"
+            )
+            != 0
+        ):
+            failures.append("Diagnostic active inventory drift")
+        for relative, pin in ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("Diagnostic successor source drift: " + relative)
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for name, pin in {
+            **ARCH134_READONLY_DIAGNOSTIC_AST_PINS,
+            **ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS,
+        }.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("Diagnostic successor runner AST drift: " + name)
+        failures.extend(_arch134_readonly_diagnostic_graph_check(repo_root))
+    except (OSError, KeyError, TypeError, ValueError, SyntaxError):
+        failures.append("Diagnostic successor authority unavailable")
+    return tuple(sorted(set(failures)))
+
+
+def _arch134_readonly_diagnostic_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release.deployment_admission_diagnostic_host import (
+        preflight,
+    )
+
+    return preflight()
 
 
 def execute_checkpoint(

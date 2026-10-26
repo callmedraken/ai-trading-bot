@@ -21,6 +21,41 @@ from .helpers import (
 )
 
 
+def _use_historical_predecessor_authority(
+    monkeypatch: pytest.MonkeyPatch, root: Path
+) -> None:
+    historical = runner._batch_workflow_is_reviewed
+    monkeypatch.setattr(
+        runner,
+        "_batch_workflow_is_reviewed",
+        lambda workflow: historical(
+            workflow.replace(
+                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
+                runner.ACTIVE_CI_CHECKPOINTS[0],
+                1,
+            )
+        ),
+    )
+    original_blob = runner._git_blob_sha1
+    historical_blobs = {
+        root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
+            "docs/AI_DEVELOPMENT_WORKFLOW.md"
+        ],
+        root / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_ci.py"
+        ],
+        root
+        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_core.py"
+        ],
+    }
+    monkeypatch.setattr(
+        runner,
+        "_git_blob_sha1",
+        lambda path: historical_blobs.get(path, original_blob(path)),
+    )
+
+
 def test_build_verification_steps_runs_both_nonmutating_ruff_gates(
     tmp_path: Path,
 ) -> None:
@@ -133,6 +168,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
 
     assert set(specs) == {
         runner.READONLY_ADMISSION_NAME,
+        runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
         runner.ARCH146A_NAME,
         runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
@@ -412,6 +448,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH146A_BRANCH
         if spec.name == runner.READONLY_ADMISSION_NAME:
             expected_branch = runner.READONLY_ADMISSION_BRANCH
+        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_NAME:
+            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1382,6 +1420,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             if name
             in {
                 runner.READONLY_ADMISSION_NAME,
+                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
                 "arch133-robinhood-supervised-release-installation-operator",
                 "arch133-robinhood-supervised-release-publication-recovery",
                 "arch133-robinhood-supervised-release-installation-reconciliation",
@@ -1480,8 +1519,11 @@ def test_source_junit_evidence_is_external_and_additive(tmp_path):
     assert "--durations-min=0.0" in step.argv
 
 
-def test_arch144c_source_only_route_authority_and_frozen_v1():
+def test_arch144c_source_only_route_authority_and_frozen_v1(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH144C_NAME]
     assert spec.preflight is None and spec.execute is None
     assert spec.remote_branch == runner.ARCH144C_BRANCH
@@ -1525,8 +1567,11 @@ def test_arch144c_pin_successor_rejects_wrong_predecessor_and_drift(monkeypatch)
     assert runner._arch144c_authority_check(root)
 
 
-def test_arch145a_source_only_route_is_registered_and_inert():
+def test_arch145a_source_only_route_is_registered_and_inert(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH145A_NAME]
     assert spec.preflight is None and spec.execute is None
     assert spec.remote_branch == runner.ARCH145A_BRANCH
@@ -1542,8 +1587,11 @@ def test_arch145a_source_only_route_is_registered_and_inert():
     assert runner.ARCH145A_SOURCE_PINS.keys() == set(runner.ARCH145A_PATHS)
 
 
-def test_arch134_f1r1_a_source_only_route_is_registered_and_inert():
+def test_arch134_f1r1_a_source_only_route_is_registered_and_inert(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_A_NAME]
 
     assert runner._arch134_f1r1_a_authority_check(root) == ()
@@ -1604,8 +1652,11 @@ def test_arch134_f1r1_a_overlays_fail_closed_and_restore_predecessor(
         monkeypatch.undo()
 
 
-def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
+def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     path = root / runner.ARCH145A_D1R6_WORKFLOW_PATH
     # Retain the historical 145 proof against its exact accepted C2 successor.
     # R3M's current workflow is independently pinned and verified below.
@@ -1683,7 +1734,7 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     )
     # Current authority includes the independently tested additive registration.
     current = path.read_text(encoding="utf-8")
-    assert runner._batch_workflow_is_reviewed(current)
+    assert runner._arch134_current_batch_workflow_is_reviewed(current)
     assert "pull_request:" in current
     assert "workflow_dispatch:" in current
     assert "group: ${{ github.workflow }}-${{ github.ref }}" in current
@@ -1729,8 +1780,11 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed():
     assert runner._arch145a_authority_check(root) == ()
 
 
-def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers():
+def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     digest = lambda value: hashlib.sha256(  # noqa: E731
         json.dumps(value, sort_keys=True).encode()
     ).hexdigest()
@@ -1822,8 +1876,11 @@ def test_arch145a_successor_removal_restores_predecessor_failure(
     assert runner._arch144c_authority_check(root)
 
 
-def test_arch134_f1r1_b_registration_and_active_successor_are_source_only():
+def test_arch134_f1r1_b_registration_and_active_successor_are_source_only(
+    monkeypatch: pytest.MonkeyPatch,
+):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_B_NAME]
 
     assert runner._arch134_f1r1_b_authority_check(root) == ()

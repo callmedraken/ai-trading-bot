@@ -1,59 +1,34 @@
 # AI Trading Bot — Current Handoff
 
-## Verified integrated source
-
-Architecture 134 candidate/admission-design source is **SOURCE ACCEPTED / INTEGRATED**:
-
-    HEAD 745b027abfd5cf75ba113b5bb78880af5f55fcce
-    TREE 5f3b784d65d3052e3525fef7a7ed1bad93fa144a
-    Feature #735 / 40275506498 / attempt 1: SUCCESS
-    Develop #736 / 40276839124 / attempt 1: SUCCESS
-
-Primary local develop was reconciled to this exact HEAD/tree before the new
-observer checkpoint. #736 proved DEVELOP_CERTIFICATION_REUSE=True,
-reason `exact_feature_broad_source_gate`. Active-tests, certification-tests and
-broad full-tests were skipped; no duplicate broad execution occurred. Earlier
-R3M/R3N attempt chronology remains preserved in its architecture/workflow records.
-
 ## Active source-only checkpoint
 
-Architecture 134 fresh-successor READ-ONLY deployment admission observer is
+Architecture 134 fresh-successor READ-ONLY deployment-admission diagnostic is
 SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
 REVIEW.
 
-C1 — registry contract reconciliation follows preserved initial observer source
-b6797eba6e1ee47ccfa914a36d3a229d74661f48 /
-31b45de23822711acc0924ffe3f3590d5c5064c2. Feature #737 / 40286185979 / attempt 1
-is terminal FAILURE: source-static/active tests passed; ROBINHOOD reported nine
-stale registry-consumer assertions. All nine reproduced locally. C1 updates
-current test topology assertions and exact test pins without observer changes.
+C1 predecessor evidence is retained but this checkpoint advances to the
+diagnostic successor from exact base HEAD/TREE
+`8a6791ba036a60f978d700bba0a2f1bc65a631bc /
+80ebe3d10cdbb63828f08fe0909079c5aaefb8d6`.
 
-    branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-current
-    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-current
-    base HEAD/TREE: 745b027abfd5cf75ba113b5bb78880af5f55fcce /
-        5f3b784d65d3052e3525fef7a7ed1bad93fa144a
+    checkpoint arch134-fresh-successor-readonly-deployment-admission-diagnostic
+    branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
+    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
 
-The production candidate stays frozen at 61836d6adadf25907c0347d42012bc4200a179ff /
-eabbf166db2d14ce7fed603df3f8b6762394e3c7. This does not claim an installed image
-or predict the admission implementation's own commit/release identity. The
-accepted inert successor source remains b18c6e32606828beeebc540a93c9f05e3e024323 /
-b082c15bc697bf289fc7997b3d7bf87050082dc3. R1 remains reconciled and permanently
-CONSUMED. Incident roots and consumed generations cannot be selected or reused.
-
-The read-only observer implements repeated source/inventory, namespace, security,
-Python and scheduler/runtime quiescence collection. No host preflight is run in
-this checkpoint. PASS grants only root write-authority/ACL review. Historical
-D1S4/R1 dispatch cannot substitute. See [the observer contract](architecture/134-fresh-successor-readonly-deployment-admission.md)
-and [validation](validation/arch134-fresh-successor-readonly-deployment-admission.md).
+The first real-host v1 attempt is preserved and not rerun. Its report SHA256 is
+`3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`;
+it is BLOCKED/HOST with `diagnostic_process_starts = 23`, zero production
+effects and no protected authority. The host subreason remains unknown.
+See [the diagnostic contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic.md)
+and [validation](validation/arch134-fresh-successor-readonly-deployment-admission-diagnostic.md).
 
 Pre-edit checks establish exact base/branch/origin/cleanliness. PRE-PUBLICATION
 `ops.ps1 admit` runs after the one clean committed candidate and before push.
-The preserved pre-edit failure proved only that the unchanged gate rejects a
-branch exactly at develop; no source defect or published correction resulted.
-Required baselines, profile ownership and lane construction are unchanged.
-The new registered checkpoint maps to GitHub-owned canonical ROBINHOOD; do not
-duplicate it locally. Bounded read-only diagnostic child processes are explicitly
-permitted; runtime/process-control and production mutation counters stay zero.
+The exact #738 mapped ROBINHOOD run is `40288823461`, attempt 1. The later #739
+develop result reported `provenance_not_proven` and safely used the broad
+fallback. This is a throughput defect, not weakened admission; its correction
+is batched into this runner-touch checkpoint. Do not run canonical ROBINHOOD or
+FULL locally.
 
 ## Protected boundary
 

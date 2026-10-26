@@ -18,6 +18,37 @@ from .helpers import (
 )
 
 
+def _historical_workflow_view(workflow: str) -> str:
+    return workflow.replace(
+        runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
+        runner.ACTIVE_CI_CHECKPOINTS[0],
+        1,
+    )
+
+
+def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
+    historical = runner._batch_workflow_is_reviewed
+    monkeypatch.setattr(
+        runner,
+        "_batch_workflow_is_reviewed",
+        lambda workflow: historical(_historical_workflow_view(workflow)),
+    )
+    original_blob = runner._git_blob_sha1
+    historical_blobs = {
+        root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
+            "docs/AI_DEVELOPMENT_WORKFLOW.md"
+        ],
+        root / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_ci.py"
+        ],
+    }
+    monkeypatch.setattr(
+        runner,
+        "_git_blob_sha1",
+        lambda path: historical_blobs.get(path, original_blob(path)),
+    )
+
+
 @pytest.mark.parametrize(
     "paths,expected",
     [
@@ -203,7 +234,7 @@ def test_docs_gate_rejects_dirty_source(tmp_path, monkeypatch):
 def test_ci_workflow_fast_route_full_fallback_and_slim_artifacts():
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
-    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
     assert "workflow_dispatch:" in workflow
     assert "group: ${{ github.workflow }}-${{ github.ref }}" in workflow
     assert "cancel-in-progress: true" in workflow
@@ -292,7 +323,7 @@ def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mut
         )
     else:
         workflow = workflow.replace("shard: [0, 1, 2, 3]", "shard: [0, 1]")
-    assert not runner._batch_workflow_is_reviewed(workflow)
+    assert not runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
 
 
 @pytest.mark.parametrize("event_name", ["push", "pull_request"])
@@ -386,7 +417,7 @@ def test_runtime_admission_checkpoint_is_first_and_source_only():
     name = "arch133-robinhood-supervised-runtime-host-admission"
     assert runner.ACTIVE_CI_CHECKPOINTS[5] == name
     assert workflow.count(name) == 1
-    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.tests == runner.SUPERVISED_RUNTIME_ADMISSION_TESTS
@@ -399,7 +430,7 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     name = "arch133-robinhood-supervised-release-installation"
     assert runner.ACTIVE_CI_CHECKPOINTS[7] == name
     assert workflow.count(f"              {name} `\n") == 1
-    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.tests == runner.SUPERVISED_RELEASE_INSTALLATION_TESTS
@@ -484,6 +515,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
         runner.READONLY_ADMISSION_NAME: "robinhood",
+        runner.ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
         runner.ARCH146A_NAME: "full",
         runner.ARCH134_FRESH_NAME: "robinhood",
         runner.ARCH134_ACL_NAME: "robinhood",
@@ -594,7 +626,7 @@ def test_d1r1_frozen_predecessor_authority_material(name, digest):
     assert hashlib.sha256(payload).hexdigest() == digest
 
 
-def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
+def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
     armed = runner.ARCH134_ARMED_PAPER_RECOVERY_PIN_OVERRIDES
     assert set(armed) == {
         "src/trading_bot/review_paper/" + name
@@ -664,6 +696,23 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs():
         == runner.ARCH134_FRESH_ACTIVE_SHA256
     )
     root = Path(runner.__file__).resolve().parents[1]
+    historical = runner._batch_workflow_is_reviewed
+    monkeypatch.setattr(
+        runner,
+        "_batch_workflow_is_reviewed",
+        lambda workflow: historical(_historical_workflow_view(workflow)),
+    )
+    original_blob = runner._git_blob_sha1
+    historical_test_ci = "tests/runtime/checkpoint_runner/test_ci.py"
+    monkeypatch.setattr(
+        runner,
+        "_git_blob_sha1",
+        lambda path: (
+            runner.READONLY_BLOB_AFTER[historical_test_ci]
+            if path == root / historical_test_ci
+            else original_blob(path)
+        ),
+    )
     for check in (
         runner._arch134_armed_paper_authority_check,
         runner._arch134_production_paper_runtime_authority_check,
@@ -746,8 +795,9 @@ def test_d1r2_successor_authority_drift_fails_closed(monkeypatch, which):
     assert runner._arch134_production_paper_runtime_authority_check(root)
 
 
-def test_arch146a_registration_and_additive_successor_authority():
+def test_arch146a_registration_and_additive_successor_authority(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH146A_NAME]
     assert spec.remote_branch == runner.ARCH146A_BRANCH
     assert spec.preflight is spec.execute is spec.remote_head_env is None
@@ -823,11 +873,12 @@ def test_arch146a_c1_full_dependency_is_declared_conditional_and_fail_closed():
     )
     assert "if ($LASTEXITCODE -ne 0)" in step
     assert "python -m pip check\n          exit $LASTEXITCODE" in step
-    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
 
 
-def test_arch146a_c1_exact_successors_and_frozen_failed_maps():
+def test_arch146a_c1_exact_successors_and_frozen_failed_maps(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     runner._arch146a_maps()
     runner._arch146a_c1_maps()
     assert runner._arch132_r3n_c1_arch146a_c2_authority_check(root) == ()
@@ -872,6 +923,7 @@ def test_arch146a_c2_solver_pin_matches_accepted_fixture_provenance():
 
 def test_arch146a_c2_maps_and_wrong_predecessors_fail_closed(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch146a_c2_authority_check(root) == ()
     assert runner._arch146a_authority_check(root) == ()
     for ast_pin, before, after in (
@@ -928,6 +980,7 @@ def _reuse_fixture(profile="full"):
             "Run canonical certification profile",
             "Enforce canonical certification hygiene budget",
         ],
+        "full-tests": [],
         "source-gates": ["Require source gate success"],
     }
     jobs = [
@@ -937,11 +990,19 @@ def _reuse_fixture(profile="full"):
             "run_attempt": 1,
             "head_sha": head,
             "status": "completed",
-            "conclusion": "success",
-            "steps": [
-                {"name": step, "status": "completed", "conclusion": "success"}
-                for step in steps
-            ],
+            "conclusion": "skipped" if name == "full-tests" else "success",
+            "steps": (
+                []
+                if name == "full-tests"
+                else [
+                    {
+                        "name": step,
+                        "status": "completed",
+                        "conclusion": "success",
+                    }
+                    for step in steps
+                ]
+            ),
         }
         for name, steps in required.items()
     ]
@@ -970,6 +1031,175 @@ def _reuse_fixture(profile="full"):
         lookup=responses.__getitem__,
     )
     return args, responses, run, jobs, runs_path, jobs_path
+
+
+REAL_738_FIXTURE = (
+    Path(__file__).resolve().parents[2] / "fixtures/ci/arch134-readonly-real-738.json"
+)
+
+
+def _real_738_reuse_fixture():
+    fixture = json.loads(REAL_738_FIXTURE.read_text(encoding="utf-8"))
+    repository = fixture["repository"]
+    workflow = fixture["workflow"]
+    run = {
+        **fixture["run"],
+        "repository": repository,
+        "head_repository": repository,
+    }
+    jobs = fixture["jobs"]
+    prefix = "repos/callmedraken/ai-trading-bot"
+    head = fixture["commit"]["sha"]
+    runs_path = (
+        f"{prefix}/actions/workflows/{workflow['id']}/runs"
+        f"?head_sha={head}&event=push&per_page=100"
+    )
+    jobs_path = (
+        f"{prefix}/actions/runs/{run['id']}/attempts/{run['run_attempt']}"
+        "/jobs?per_page=100"
+    )
+    responses = {
+        prefix: repository,
+        f"{prefix}/actions/workflows/checkpoint-source-gates.yml": workflow,
+        f"{prefix}/git/commits/{head}": {
+            "sha": fixture["commit"]["sha"],
+            "tree": {"sha": fixture["commit"]["tree"]},
+        },
+        f"{prefix}/git/ref/heads/develop": fixture["develop"],
+        runs_path: {
+            "total_count": 1,
+            "workflow_runs": [run],
+        },
+        f"{prefix}/actions/runs/{run['id']}": dict(run),
+        jobs_path: {"total_count": len(jobs), "jobs": jobs},
+    }
+    return (
+        {
+            "head": head,
+            "tree": fixture["commit"]["tree"],
+            "current_run_id": run["id"] + 1,
+            "repository_id": repository["id"],
+            "lookup": responses.__getitem__,
+        },
+        responses,
+        run,
+        jobs,
+        runs_path,
+        jobs_path,
+    )
+
+
+def test_r3n_real_738_mapped_robinhood_metadata_is_reusable():
+    args, _, _, jobs, _, _ = _real_738_reuse_fixture()
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["reason"] == "exact_feature_certification"
+    assert result["profile"] == "robinhood"
+    assert result["run_id"] == 40288823461
+    assert result["run_attempt"] == 1
+    assert {job["name"] for job in jobs} == {
+        "source-static",
+        "active-tests",
+        (
+            "certification-tests (arch134-fresh-successor-readonly-deployment-"
+            "admission / robinhood)"
+        ),
+        "full-tests",
+        "source-gates",
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "attempt_two",
+        "repository",
+        "workflow",
+        "event",
+        "sha",
+        "tree",
+        "checkpoint",
+        "profile",
+        "certification_job",
+        "active_missing",
+        "active_failed",
+        "run_step_missing",
+        "run_step_failed",
+        "hygiene_missing",
+        "hygiene_failed",
+        "full_executed",
+        "duplicate",
+        "truncated",
+    ],
+)
+def test_r3n_real_738_mapped_metadata_mutations_fallback(mutation):
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, _ = _real_738_reuse_fixture()
+    detail = responses["repos/callmedraken/ai-trading-bot/actions/runs/40288823461"]
+    certification = next(
+        job for job in jobs if job["name"].startswith("certification-tests")
+    )
+    if mutation == "attempt_two":
+        run["run_attempt"] = detail["run_attempt"] = 2
+    elif mutation == "repository":
+        run["repository"] = detail["repository"] = {"id": 9, "full_name": "wrong/repo"}
+    elif mutation == "workflow":
+        run["workflow_id"] = detail["workflow_id"] = 9
+    elif mutation == "event":
+        run["event"] = detail["event"] = "workflow_dispatch"
+    elif mutation == "sha":
+        run["head_sha"] = detail["head_sha"] = "c" * 40
+    elif mutation == "tree":
+        responses["repos/callmedraken/ai-trading-bot/git/commits/" + args["head"]][
+            "tree"
+        ]["sha"] = "c" * 40
+    elif mutation == "checkpoint":
+        branch = runner._checkpoint_specs()[runner.ARCH146A_NAME].remote_branch
+        run["head_branch"] = detail["head_branch"] = branch
+    elif mutation == "profile":
+        certification["name"] = certification["name"].replace("robinhood", "full")
+    elif mutation == "certification_job":
+        certification["name"] = "certification-tests (wrong / robinhood)"
+    elif mutation == "active_missing":
+        jobs.remove(next(job for job in jobs if job["name"] == "active-tests"))
+        responses[runs_path]["total_count"] = len(jobs)
+    elif mutation == "active_failed":
+        next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = (
+            "failure"
+        )
+    elif mutation.startswith("run_step"):
+        steps = certification["steps"]
+        step = next(
+            step
+            for step in steps
+            if step["name"] == "Run canonical certification profile"
+        )
+        if mutation == "run_step_missing":
+            steps.remove(step)
+        else:
+            step["conclusion"] = "failure"
+    elif mutation.startswith("hygiene"):
+        steps = certification["steps"]
+        step = next(
+            step
+            for step in steps
+            if step["name"] == "Enforce canonical certification hygiene budget"
+        )
+        if mutation == "hygiene_missing":
+            steps.remove(step)
+        else:
+            step["conclusion"] = "failure"
+    elif mutation == "full_executed":
+        full = next(job for job in jobs if job["name"] == "full-tests")
+        full["conclusion"] = "success"
+    elif mutation == "duplicate":
+        responses[runs_path]["workflow_runs"].append(deepcopy(run))
+        responses[runs_path]["total_count"] = 2
+    else:
+        responses[runs_path] = {"workflow_runs": "truncated"}
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is False
 
 
 def _broad_reuse_fixture(*, registered=False):
@@ -1061,7 +1291,7 @@ def test_r3n_c4_broad_jobs_match_reviewed_732_topology(registered):
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )
-    assert runner._batch_workflow_is_reviewed(workflow)
+    assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
     assert workflow.count(f"    name: {certification}\n") == 1
     assert (
         runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
@@ -1194,6 +1424,7 @@ def _r3n_admission_fixture(monkeypatch):
     monkeypatch.setattr(
         runner, "_arch132_r3m_authority_check", lambda _: context["authority"]
     )
+    _use_historical_predecessor_authority(monkeypatch, root)
     return root, context
 
 
@@ -1746,6 +1977,7 @@ def test_r3m_reuse_workflow_mutations_fail_authority(old, new):
 
 def test_r3m_exact_successor_authority_and_frozen_certification_source(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3m_authority_check(root) == ()
     for ast_pin, before, after in (
         (True, runner.ARCH132_R3M_AST_PREDECESSORS, runner.ARCH132_R3M_AST_PINS),
@@ -2012,6 +2244,7 @@ def test_r3m_metadata_client_is_read_only_and_lookup_failures_fall_back(monkeypa
 
 def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3m_c1_authority_check(root) == ()
     assert runner._arch132_r3m_authority_check(root) == ()
     for ast_pin, before, after in (
@@ -2032,6 +2265,7 @@ def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch)
 
 def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3n_c4_authority_check(root) == ()
     assert runner._arch132_r3n_c3_authority_check(root) == ()
     assert runner._arch132_r3m_authority_check(root) == ()
@@ -2060,6 +2294,7 @@ def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
 
 def test_r3n_c4_skipped_name_drift_fails_authority(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     monkeypatch.setattr(
         runner, "REVIEWED_SKIPPED_CERTIFICATION_JOB", "certification-tests ( / )"
     )
@@ -2087,6 +2322,7 @@ def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
 
 def test_readonly_c1_exact_test_successors_do_not_hide_source_drift(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._readonly_candidate_authority_check(root) == ()
     relative = "tests/strategies/test_production_strategy_contract.py"
     assert (

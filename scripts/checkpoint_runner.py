@@ -22261,6 +22261,368 @@ _arch146a_overlay = _arch132_r3n_c4_shared_overlay
 _arch132_r3m_c2_authority_check = _arch132_r3n_c4_r3m_c2_authority_check
 
 
+# Source-only deployment-candidate successor. All predecessor dictionaries,
+# implementations, inventories and protected dispatch remain frozen.
+DEPLOYMENT_CANDIDATE_BLOB_PREDECESSORS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("d6d700f9756efdb26df99761ac7bf525f73840f9"),
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "5840477c906789f43ee5a6a0810e93c009f5ce8f"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
+        "0a08401b8f9ba5599d4a44609cdf313d37985cec"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "74bfdb7a33180fb8bee549a39c8a90837dc0b4bc"
+    ),
+}
+DEPLOYMENT_CANDIDATE_BLOB_PINS: Final = {
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("710a0f266bb5d5d6d86764c988974c1394c6dfbd"),
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "9f8b435f0a284f7ea0c51eaec325c1e53da73a16"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
+        "79577ac326bf881077e3ba8ba5f6ca34fb7ea727"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "6471b899e74573cfd47650a5c0b97cfe40d0c873"
+    ),
+}
+DEPLOYMENT_CANDIDATE_SOURCE_PINS: Final = {
+    "src/trading_bot/supervised_release/deployment_candidate.py": (
+        "3bfe6666fe2b0ba151938c191289659eacd5a52b"
+    ),
+    (
+        "docs/architecture/134-fresh-successor-deployment-candidate-admission-source.md"
+    ): ("e4c3ef44c19ee51a2789e1d121235f2a8fe41da9"),
+    (
+        "docs/validation/"
+        "arch134-fresh-successor-deployment-candidate-admission-source.md"
+    ): ("977ed7e3ec024b4ceae71fe1cd6f5be0e4ed47d4"),
+}
+DEPLOYMENT_CANDIDATE_AST_PINS: Final = {
+    "_deployment_candidate_maps": (
+        "39178ae601e1fd9ccebb23929bee4af638da5f26124d14ac0d1bb403a6996c7e"
+    ),
+    "_deployment_candidate_pin": (
+        "8224904e3c0b7c21680559bc4a9b8b1e78956816172a68063ddf535794d91f29"
+    ),
+    "_deployment_candidate_shared_blob_pin": (
+        "71832ce0114e50a2eeb64e79dd0ca05b2b3e2c2cd6dfd6dbf398d1ba3e2504b8"
+    ),
+    "_deployment_candidate_graph_check": (
+        "49d0db9292b919d7df4c17dc30954941d58b07e3e8c2a87e88e25fff39f2187f"
+    ),
+    "_deployment_candidate_predecessor_authority_check": (
+        "9c7cbed62e8b268252d6605ad343bc9d871fd103ff8b2861b32be8d9e1aab982"
+    ),
+    "_deployment_candidate_146a_authority_check": (
+        "1b919e87cd4b84b9df3d4dc76457f95e1e5ae7ae94e1b070d635e211a3d165a5"
+    ),
+    "_deployment_candidate_authority_check": (
+        "c55ae6d72f6c1c43b69b85d177bcd72d7115ce66b94b9bc1857916267d591e95"
+    ),
+}
+DEPLOYMENT_CANDIDATE_MAPS_SHA256: Final = (
+    "221887f0a79d61b2da48a121f9c4d511abf0041c951487f44876c8f3bb76bfeb"
+)
+
+_PRE_DEPLOYMENT_CANDIDATE_PIN = _arch132_r3n_c4_pin
+_PRE_DEPLOYMENT_CANDIDATE_SHARED_PIN = _arch146a_shared_blob_pin
+
+
+def _deployment_candidate_maps() -> None:
+    maps = (
+        DEPLOYMENT_CANDIDATE_BLOB_PREDECESSORS,
+        DEPLOYMENT_CANDIDATE_BLOB_PINS,
+        DEPLOYMENT_CANDIDATE_SOURCE_PINS,
+        DEPLOYMENT_CANDIDATE_AST_PINS,
+    )
+    if hashlib.sha256(
+        json.dumps(maps, sort_keys=True).encode()
+    ).hexdigest() != DEPLOYMENT_CANDIDATE_MAPS_SHA256 or set(
+        DEPLOYMENT_CANDIDATE_BLOB_PREDECESSORS
+    ) != set(DEPLOYMENT_CANDIDATE_BLOB_PINS):
+        raise ValueError("Deployment candidate exact successor maps drift")
+
+
+def _deployment_candidate_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _deployment_candidate_maps()
+    before = DEPLOYMENT_CANDIDATE_BLOB_PREDECESSORS
+    after = DEPLOYMENT_CANDIDATE_BLOB_PINS
+    if not ast_pin and key in after and predecessor == after[key]:
+        return predecessor
+    resolved = _PRE_DEPLOYMENT_CANDIDATE_PIN(key, predecessor, ast_pin=ast_pin)
+    if not ast_pin and key in before:
+        if resolved != before[key]:
+            raise ValueError("Deployment candidate wrong exact predecessor")
+        return after[key]
+    return resolved
+
+
+def _deployment_candidate_shared_blob_pin(relative: str, predecessor: str) -> str:
+    """Accept an exact terminal successor without feeding it back into old maps."""
+    _deployment_candidate_maps()
+    if relative in DEPLOYMENT_CANDIDATE_BLOB_PINS and predecessor in (
+        DEPLOYMENT_CANDIDATE_BLOB_PREDECESSORS[relative],
+        DEPLOYMENT_CANDIDATE_BLOB_PINS[relative],
+    ):
+        return DEPLOYMENT_CANDIDATE_BLOB_PINS[relative]
+    return _PRE_DEPLOYMENT_CANDIDATE_SHARED_PIN(relative, predecessor)
+
+
+def _deployment_candidate_graph_check(repo_root: Path) -> tuple[str, ...]:
+    """Keep this pure descriptor closed to host, native and retired dispatch."""
+    try:
+        source = ast.parse(
+            (
+                repo_root
+                / ("src/trading_bot/supervised_release/deployment_candidate.py")
+            ).read_text(encoding="utf-8")
+        )
+        imports = {
+            "__future__": {"annotations"},
+            "json": {None},
+            "re": {None},
+            "dataclasses": {"dataclass"},
+            "uuid": {"UUID", "uuid5"},
+            "trading_bot.supervised_release.bundle": {"canonical_json"},
+            "trading_bot.supervised_release.model": {"RELEASES_BASE", "release_root"},
+        }
+        forbidden = {
+            "open",
+            "mkdir",
+            "write_bytes",
+            "write_text",
+            "stat",
+            "lstat",
+            "resolve",
+            "rename",
+            "replace",
+            "move",
+            "unlink",
+            "remove",
+            "rmdir",
+            "link",
+            "symlink",
+            "materialize_release",
+            "execute_once",
+            "preflight",
+            "SetFileInformationByHandle",
+            "FileRenameInfo",
+            "SetSecurityInfo",
+            "SetNamedSecurityInfo",
+            "CreateFileW",
+            "CreateDirectoryW",
+            "WriteFile",
+            "__import__",
+            "__builtins__",
+            "exec",
+            "eval",
+            "compile",
+            "getattr",
+            "setattr",
+            "globals",
+            "locals",
+            "vars",
+        }
+        for node in ast.walk(source):
+            if isinstance(node, ast.Import):
+                if any(None not in imports.get(row.name, set()) for row in node.names):
+                    return ("Deployment candidate effect import reachable",)
+            if isinstance(node, ast.ImportFrom):
+                if node.level or any(
+                    row.name not in imports.get(node.module, set())
+                    for row in node.names
+                ):
+                    return ("Deployment candidate non-pure import reachable",)
+            name = (
+                node.id
+                if isinstance(node, ast.Name)
+                else node.attr
+                if isinstance(node, ast.Attribute)
+                else ""
+            )
+            if name in forbidden or name.startswith("MoveFile"):
+                return ("Deployment candidate effect primitive reachable: " + name,)
+    except (OSError, ValueError, SyntaxError):
+        return ("Deployment candidate source graph unavailable",)
+    return ()
+
+
+def _deployment_candidate_predecessor_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3n_c1_maps()
+        _arch132_r3n_c2_maps()
+        _arch132_r3n_c3_maps()
+        _arch132_r3n_c4_maps()
+        source = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(source)
+        for key, pin in {
+            **ARCH132_R3N_C1_AST_PINS,
+            **ARCH132_R3N_C1_NEW_AST_PINS,
+            **ARCH132_R3N_C2_AST_PINS,
+            **ARCH132_R3N_C2_NEW_AST_PINS,
+            **ARCH132_R3N_C3_AST_PINS,
+            **ARCH132_R3N_C3_NEW_AST_PINS,
+            **ARCH132_R3N_C4_NEW_AST_PINS,
+        }.items():
+            actual = hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest()
+            if actual != _arch132_r3n_c4_pin(key, pin, ast_pin=True):
+                failures.append("R3N C4 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
+            # Mutable coordination docs are not executable source authority.
+            # Preserve their historical map entries without reading current bytes.
+            if relative in {"docs/PROJECT_STATUS.md", "docs/AI_TRADING_BOT_HANDOFF.md"}:
+                continue
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3N C4 source drift: " + relative)
+
+        # The predecessor map remains a required integrity check. Only the
+        # exact C1 successor surfaces are replaced by this overlay.
+        _arch132_r3m_c3_maps()
+        skipped_ast = set(ARCH132_R3N_C1_AST_PREDECESSORS)
+        for key, pin in ARCH132_R3M_C3_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C4 predecessor AST drift: " + key)
+        for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C4 predecessor new AST drift: " + key)
+        skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
+        for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
+            if relative in skipped_blobs:
+                continue
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3N C4 predecessor source drift: " + relative)
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if (
+            not _batch_workflow_is_reviewed(workflow)
+            or workflow.count(f"    name: {REVIEWED_SKIPPED_CERTIFICATION_JOB}\n") != 1
+        ):
+            failures.append("R3N C4 workflow topology drift")
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C4 authority unavailable")
+    return tuple(failures)
+
+
+def _deployment_candidate_146a_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch146a_maps()
+        _arch146a_predecessor_active_inventory()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
+                failures.append("R3N C1 146-A runner AST drift: " + key)
+        for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
+            if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
+                continue
+            if _git_blob_sha1(repo_root / relative) != _deployment_candidate_pin(
+                relative, _arch146a_c1_pin(relative, pin, ast_pin=False), ast_pin=False
+            ):
+                failures.append("R3N C1 146-A source drift: " + relative)
+        failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+        failures.extend(_arch145a_authority_check(repo_root))
+        spec = _checkpoint_specs()[ARCH146A_NAME]
+        if (
+            spec.tests != ARCH146A_TESTS
+            or spec.ruff_paths != ARCH146A_RUFF_PATHS
+            or spec.remote_branch != ARCH146A_BRANCH
+            or spec.preflight is not None
+            or spec.execute is not None
+            or spec.remote_head_env is not None
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "full"
+            or resolve_ci_checkpoint(_checkpoint_specs(), ARCH146A_BRANCH, "push")
+            != ARCH146A_NAME
+        ):
+            failures.append("R3N C1 146-A source-only registration drift")
+    except (ValueError, KeyError, TypeError, OSError, SyntaxError):
+        failures.append("R3N C1 146-A authority unavailable")
+    return tuple(failures)
+
+
+def _deployment_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_deployment_candidate_predecessor_authority_check(repo_root))
+    try:
+        _deployment_candidate_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for name, pin in DEPLOYMENT_CANDIDATE_AST_PINS.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("Deployment candidate runner AST drift: " + name)
+        for relative, pin in {
+            **DEPLOYMENT_CANDIDATE_BLOB_PINS,
+            **DEPLOYMENT_CANDIDATE_SOURCE_PINS,
+        }.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("Deployment candidate source drift: " + relative)
+        if (
+            _arch132_r3n_c4_pin is not _deployment_candidate_pin
+            or _arch146a_shared_blob_pin is not _deployment_candidate_shared_blob_pin
+            or _arch146a_authority_check
+            is not _deployment_candidate_146a_authority_check
+            or _arch132_r3n_c4_authority_check
+            is not _deployment_candidate_authority_check
+            or _arch132_r3n_c1_authority_check
+            is not _deployment_candidate_authority_check
+            or _arch132_r3m_c3_authority_check
+            is not _deployment_candidate_authority_check
+        ):
+            failures.append("Deployment candidate current authority dispatch drift")
+        failures.extend(_deployment_candidate_graph_check(repo_root))
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("Deployment candidate authority unavailable")
+    return tuple(failures)
+
+
+_arch146a_shared_blob_pin = _deployment_candidate_shared_blob_pin
+_arch146a_authority_check = _deployment_candidate_146a_authority_check
+_arch132_r3n_c4_pin = _deployment_candidate_pin
+_arch132_r3n_c4_authority_check = _deployment_candidate_authority_check
+_arch132_r3n_c1_authority_check = _deployment_candidate_authority_check
+_arch132_r3m_c3_authority_check = _deployment_candidate_authority_check
+
+
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:
     parent_tests = (
         *RETAINED_TESTS,

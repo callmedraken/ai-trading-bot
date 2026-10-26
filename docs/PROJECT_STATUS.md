@@ -2,73 +2,60 @@
 
 ## Current integrated checkpoint
 
-Architecture 132-R3M — exact develop certification reuse is **SOURCE ACCEPTED /
-INTEGRATED**.
+Architecture 132-R3N — workflow throughput and current-contract consolidation
+is **SOURCE ACCEPTED / INTEGRATED**.
 
-    HEAD 029d72e81a1589e8bd3b3134531682f500087810
-    TREE ea120b292a9252e3234ab4db8b64ff2c89851fea
+    HEAD 61836d6adadf25907c0347d42012bc4200a179ff
+    TREE eabbf166db2d14ce7fed603df3f8b6762394e3c7
+    Feature #733 / 40271136792 / attempt 1: SUCCESS
+    Develop #734 / 40271802280 / attempt 1: SUCCESS
 
-Feature chronology is preserved as #722 failure, #723 success, #724 failure,
-#725 failure, #726 failure and #727 terminal success. Develop integration #728 /
-40233946706 / attempt 1: SUCCESS. Primary local develop was reconciled to the
-same exact HEAD/tree before R3N began. The final #728 broad execution was a
-bootstrap duplication because R3M recognized only mapped canonical feature
-evidence; R3N extends reuse to exact successful broad feature source gates.
+#734 proved DEVELOP_CERTIFICATION_REUSE=True with reason
+`exact_feature_broad_source_gate` and skipped active-tests, certification-tests
+and broad full-tests. No duplicate broad execution occurred. Primary local
+develop was reconciled to this exact HEAD/tree before the production-candidate
+checkpoint. Preserved #722–#732 chronology remains in the workflow/architecture
+records; no historical run or failed evidence is rewritten.
 
-The accepted R3M source preserves exact repository/workflow/SHA/tree and
-first-attempt-only mapped certification reuse, with fail-closed fallback for
-missing, malformed, ambiguous or unavailable evidence. Architecture 146-A
-remains historical context; Architecture 146-B is not started here.
+## Current source checkpoint
 
-## Current workflow checkpoint
+Architecture 134 fresh-successor deployment candidate / admission source is
+**SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
+REVIEW**. Its frozen production source selection is the exact R3N develop
+HEAD/tree above, not an installed production image. Its own final implementation
+HEAD/tree and CI are post-publication handoff facts, separately reviewed.
 
-Architecture 132-R3N corrective C4 is **SOURCE IMPLEMENTED /
-PENDING CHATGPT EXACT-SOURCE REVIEW**. Publication and terminal CI must bind
-the exact C4 successor commit before acceptance. C4 follows exact C3
-HEAD `711c45f46efdba9b490d8e7e138879e432cfd9b7` / tree
-`bc517481d0cd1ca0a149402ec9080a8f392ee48e` on the existing R3N feature branch.
-Preserved attempt-1 CI: #729 / 40238669278 SUCCESS; #730 / 40265181160
-FAILURE; #731 / 40265822617 FAILURE; #732 / 40266767289 SUCCESS.
+The pure contract freezes repository/develop identity, accepted fresh-successor
+lineage, permanently CONSUMED R1, forbidden incident roots, fresh-only rename-free
+policy, zero effect eligibility, and the next separately reviewed read-only
+admission design. It has no host observer or preflight/execute dispatch.
+See [the candidate/admission contract](architecture/134-fresh-successor-deployment-candidate-admission-source.md).
 
-C4 aligns both broad-route proofs and synthetic fixtures with the real #732
-skipped certification display name, retains exact topology and first-attempt
-checks, and adds exact successor authority with all predecessor literals frozen.
-See the [current R3N contract](AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).
-
-The cheap `ops.ps1 admit` gate is a GENERAL ordinary-feature prepublication
-gate, not an R3N-only gate. It performs a read-only check of the exact current
-remote develop identity, clean strict-descendant feature ancestry, cleanliness,
-path classification, diff/Ruff/current authority/workflow checks,
-inventory/profile reconciliation, nonempty six/four lane construction and the
-small current contract tests. It does not run protected effects, canonical
-FULL/ROBINHOOD or the broad checkpoint union. Current inventory remains
-`203 / 112 / 222 / 425`; current profile counts and lane topology are owned by
-the current certification/profile/lane/CI tests. Historical Architecture-133/
-134 chronology and predecessor/incident assertions remain preserved.
-See [Architecture 132](architecture/132-tiered-certification-profiles.md).
+`ops.ps1 admit` remains the general PRE-PUBLICATION gate on the clean committed
+feature candidate. Exact-base/branch/origin/cleanliness checks precede edits.
+The source-only branch uses the existing unregistered four-shard broad CI route;
+no local canonical FULL/ROBINHOOD or broad suite is part of implementation.
+Current inventory remains `203 / 112 / 222 / 425`; required baselines and lane
+construction are unchanged.
 
 ## Production boundary
 
 Architecture 134-F1R1-D1S4 Fresh Successor Source remains accepted/integrated at
 b18c6e32606828beeebc540a93c9f05e3e024323 /
 b082c15bc697bf289fc7997b3d7bf87050082dc3. R1 is reconciled and permanently
-CONSUMED; preserved incident releases remain inert evidence.
+CONSUMED. Preserved incident roots/latches remain inert immutable evidence.
+Source selection cannot create, install, bind, repair or reuse a generation.
 
-No production deployment generation is frozen for the weekend. Sunday night,
-select the then-current exact terminal-green develop HEAD/tree for the separately
-reviewed deployment-admission sequence. Live remains NO-GO.
-
-Architecture 146-B is **NOT STARTED**. No acquisition, holdout access, ACL
-mutation, promotion, deployment, production/runtime/scheduler or paper/broker/live
-authority follows from 146-A acceptance or R3M. Architecture 145-B remains
-separate and deferred until the fresh F1 successor soak; Research Results GUI
-follows 145-B, then large strategy campaigns.
+Live remains NO-GO. No real-host admission, root creation, materialization, ACL,
+scheduler, credentials/provider, runtime, paper/broker or F1 execution is
+performed or authorized by this checkpoint. Architecture 146-B is NOT STARTED.
 
 ## Next step
 
-ChatGPT reviews the exact published R3N C4 source, terminal CI, additive
-authority overlay, general pre-publication admission, all three reuse shapes
-and fallback tests, centralized current-contract assertions, and preserved
-#722–#732 evidence. No production candidate is frozen and no protected or
-external effect is authorized. Accept/integrate only after that exact-source
-re-review is complete. Do not begin 146-B here.
+ChatGPT reviews the exact published admission-source commit/diff and terminal CI.
+After acceptance: develop integration + terminal gate, local-main reconciliation,
+then separately reviewed real-host READ-ONLY deployment admission. Root write
+and ACL authority review follows that admission; protected fresh materialization
+and manual-start F1 successor soak require their later reviewed bounds. Fresh
+F1 evidence precedes Architecture 145-B, Research Results GUI and large strategy
+campaigns. No later step is authorized by the source freeze.

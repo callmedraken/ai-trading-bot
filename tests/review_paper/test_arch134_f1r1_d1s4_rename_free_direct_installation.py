@@ -17,6 +17,7 @@ import pytest
 from scripts import checkpoint_runner as runner
 from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID
 from trading_bot.strategies import MovingAverageCrossoverConfig
+from trading_bot.supervised_release import deployment_candidate as candidate
 from trading_bot.supervised_release import successor_direct_installation as d
 from trading_bot.supervised_release import successor_native_direct_write as native
 from trading_bot.supervised_release import successor_source as fresh
@@ -1505,3 +1506,315 @@ def test_fresh_current_docs_do_not_grant_executable_authority(monkeypatch):
 
     monkeypatch.setattr(runner, "_git_blob_sha1", blob)
     assert runner._arch134_fresh_authority_check(ROOT) == ()
+
+
+# Current source-selection contract; predecessor incident/host tests above stay exact.
+def test_candidate_exact_freeze_and_successor_lineage():
+    freeze = candidate.CandidateFreeze()
+    assert freeze.candidate.to_dict() == {
+        "repository": "callmedraken/ai-trading-bot",
+        "reference": "develop",
+        "head": "61836d6adadf25907c0347d42012bc4200a179ff",
+        "tree": "eabbf166db2d14ce7fed603df3f8b6762394e3c7",
+    }
+    assert freeze.accepted_successor.head == "b18c6e32606828beeebc540a93c9f05e3e024323"
+    assert freeze.accepted_successor.tree == "b082c15bc697bf289fc7997b3d7bf87050082dc3"
+    assert freeze.accepted_successor.reference == fresh.BRANCH
+    assert freeze.r1_state == "CONSUMED"
+    assert candidate.INCIDENT_ROOTS == fresh.INCIDENT_ROOTS
+    assert candidate.INCIDENT_RELEASE_IDS == fresh.INCIDENT_RELEASE_IDS
+    assert freeze.to_bytes() == candidate.CandidateFreeze().to_bytes()
+    assert (
+        candidate.verify_candidate(
+            freeze.to_bytes(), observed_develop=candidate.CANDIDATE
+        )
+        == freeze
+    )
+    from uuid import UUID
+
+    assert UUID(freeze.candidate_id).version == 5
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("head", "a" * 40),
+        ("tree", "b" * 40),
+        ("head", candidate.SUCCESSOR_HEAD),
+        ("tree", candidate.SUCCESSOR_TREE),
+        ("repository", "other/ai-trading-bot"),
+        ("reference", "main"),
+        ("reference", candidate.SUCCESSOR_REF),
+    ],
+)
+def test_candidate_rejects_stale_wrong_source_and_repository(field, value):
+    wrong = replace(candidate.CANDIDATE, **{field: value})
+    with pytest.raises(ValueError, match="exact candidate"):
+        candidate.CandidateFreeze(candidate=wrong)
+    with pytest.raises(ValueError, match="stale or mismatched"):
+        candidate.verify_candidate(
+            candidate.CandidateFreeze().to_bytes(), observed_develop=wrong
+        )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"accepted_successor": candidate.CANDIDATE},
+        {"accepted_successor": replace(candidate.SUCCESSOR, tree="f" * 40)},
+        {"r1_state": "AVAILABLE"},
+        {"r1_state": "RECONCILED"},
+        {"candidate": candidate.CANDIDATE.to_dict()},
+    ],
+)
+def test_candidate_rejects_lineage_and_consumed_state_substitution(change):
+    with pytest.raises(ValueError, match="exact candidate"):
+        candidate.CandidateFreeze(**change)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"",
+        b"{",
+        b"null",
+        b"[]",
+        b"true",
+        b"\xff",
+        b"{}",
+        b"x" * 16385,
+        b"[" * 2000,
+        candidate.CandidateFreeze().to_bytes().decode(),
+        bytearray(candidate.CandidateFreeze().to_bytes()),
+        candidate.CandidateFreeze().to_bytes() + b"\n",
+        b"\xef\xbb\xbf" + candidate.CandidateFreeze().to_bytes(),
+        json.dumps(candidate.CandidateFreeze().to_dict(), indent=2).encode(),
+        candidate.CandidateFreeze()
+        .to_bytes()
+        .replace(b"{", b'{"schema":"duplicate",', 1),
+    ],
+)
+def test_candidate_rejects_malformed_or_noncanonical_evidence(payload):
+    with pytest.raises(ValueError):
+        candidate.verify_candidate(payload, observed_develop=candidate.CANDIDATE)
+
+
+@pytest.mark.parametrize("field", list(candidate.CandidateFreeze().to_dict()))
+def test_candidate_evidence_cannot_change_any_frozen_policy_or_identity(field):
+    from trading_bot.supervised_release.bundle import canonical_json
+
+    evidence = candidate.CandidateFreeze().to_dict()
+    evidence[field] = "SUBSTITUTED"
+    with pytest.raises(ValueError):
+        candidate.verify_candidate(
+            canonical_json(evidence).encode(), observed_develop=candidate.CANDIDATE
+        )
+
+
+@pytest.mark.parametrize("release_id", candidate.INCIDENT_RELEASE_IDS)
+@pytest.mark.parametrize("suffix", ["", ".installing", "\\child", "\\..\\fresh"])
+def test_candidate_rejects_incident_identity_even_with_destination_alias(
+    release_id, suffix
+):
+    with pytest.raises(ValueError):
+        candidate.validate_destination(release_id, release_root(release_id) + suffix)
+
+
+@pytest.mark.parametrize(
+    "destination",
+    [
+        *candidate.INCIDENT_ROOTS,
+        RELEASES_BASE,
+        RELEASES_BASE + "\\..\\releases\\fresh",
+        "F:/AITradingBot/releases/fresh",
+        "\\\\?\\F:\\AITradingBot\\releases\\fresh",
+    ],
+)
+def test_candidate_rejects_incident_or_noncanonical_destination(destination):
+    with pytest.raises(ValueError):
+        candidate.validate_destination(accepted().manifest.release_id, destination)
+
+
+def test_candidate_destination_is_only_lexical_and_requires_later_host_review():
+    release_id = accepted().manifest.release_id
+    assert candidate.validate_destination(release_id, release_root(release_id)) is None
+    design = candidate.readonly_admission_design(candidate.CandidateFreeze())
+    assert design["production_namespace"] == RELEASES_BASE
+    assert design["observer_implemented"] is False
+    assert design["host_admission_pass"] is False
+    assert design["write_authority"] is False
+    assert design["materialization_eligible"] is False
+    assert design["live_eligible"] is False
+    assert design["later_review"] == "SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW"
+    with pytest.raises(ValueError):
+        candidate.readonly_admission_design({})
+
+
+def test_candidate_future_sequence_and_no_effect_eligibility():
+    data = candidate.CandidateFreeze().to_dict()
+    assert data["selection"] == "SOURCE_ONLY_NOT_AN_INSTALLED_IMAGE"
+    assert data["deployment_mode"] == "FRESH_SUCCESSOR_ONLY"
+    assert data["future_sequence"] == [
+        "terminal-green develop production candidate",
+        "exact fresh-successor deployment-admission source",
+        "ChatGPT exact-source acceptance",
+        "develop integration + terminal gate",
+        "local-main reconciliation",
+        "real-host READ-ONLY deployment admission",
+        "successor-root write-authority / ACL review",
+        "separately reviewed protected fresh materialization",
+        "manual-start fresh F1 successor soak",
+        "fresh F1 evidence",
+        "Architecture 145-B",
+        "Research Results GUI",
+        "large strategy campaigns",
+    ]
+    for key in (
+        "incident_roots_authoritative",
+        "consumed_generation_reuse",
+        "historical_d1s4_r1_execute_substitution",
+        "directory_namespace_promotion",
+        "host_admission_executed",
+        "materialization_eligible",
+        "runtime_binding_eligible",
+        "successor_soak_eligible",
+        "scheduler_effects",
+        "provider_effects",
+        "broker_effects",
+        "live_eligible",
+        "later_steps_authorized",
+    ):
+        assert data[key] is False
+    for name in (
+        "preflight",
+        "execute",
+        "execute_once",
+        "source_report",
+        "admit_source",
+    ):
+        assert not hasattr(candidate, name)
+
+
+def test_candidate_import_parse_verify_and_design_have_no_effects(monkeypatch):
+    import socket
+    import subprocess
+    import sys
+    from types import ModuleType
+
+    source = Path(candidate.__file__).read_text(encoding="utf-8")
+    payload = candidate.CandidateFreeze().to_bytes()
+    isolated = ModuleType("candidate_no_effect_test")
+    monkeypatch.setitem(sys.modules, isolated.__name__, isolated)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("pure deployment candidate attempted a host or external effect")
+
+    with monkeypatch.context() as effects:
+        effects.setattr(builtins, "open", forbidden)
+        for method in (
+            "open",
+            "read_bytes",
+            "read_text",
+            "write_bytes",
+            "write_text",
+            "mkdir",
+            "stat",
+            "lstat",
+            "resolve",
+            "rename",
+            "replace",
+        ):
+            effects.setattr(Path, method, forbidden)
+        effects.setattr(subprocess, "run", forbidden)
+        effects.setattr(socket, "socket", forbidden)
+        effects.setattr(ctypes, "CDLL", forbidden)
+        effects.setattr(d, "preflight", forbidden)
+        effects.setattr(d, "execute_once", forbidden)
+        effects.setattr(native, "materialize_release", forbidden)
+        exec(compile(source, "<pure-candidate>", "exec"), isolated.__dict__)
+        frozen = isolated.verify_candidate(payload, observed_develop=isolated.CANDIDATE)
+        assert (
+            isolated.readonly_admission_design(frozen)["host_admission_pass"] is False
+        )
+        release_id = "release-aaaaaaaaaaaa5aaa8aaaaaaaaaaaaaaa"
+        isolated.validate_destination(release_id, release_root(release_id))
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "import os",
+        "import socket",
+        "import subprocess",
+        "import ctypes",
+        "from pathlib import Path",
+        "from trading_bot.supervised_release import successor_source",
+        "from trading_bot.supervised_release import successor_direct_installation",
+        "from trading_bot.supervised_release import successor_publication_recovery",
+        "from trading_bot.shared_namespace_acl_recovery import execute_once",
+        "from trading_bot.runtime import scheduler",
+        "__import__('os')",
+        "open('host', 'w')",
+        "Path.mkdir()",
+        "os.rename()",
+        "os.replace()",
+        "SetFileInformationByHandle()",
+        "FileRenameInfo()",
+        "MoveFileExW()",
+    ],
+)
+def test_candidate_source_guard_rejects_host_and_retired_dispatch(monkeypatch, payload):
+    original = Path.read_text
+
+    def read(path, *args, **kwargs):
+        text = original(path, *args, **kwargs)
+        return text + "\n" + payload if path.name == "deployment_candidate.py" else text
+
+    monkeypatch.setattr(Path, "read_text", read)
+    assert runner._deployment_candidate_graph_check(ROOT)
+
+
+def test_candidate_exact_overlay_and_source_guard_preserve_frozen_predecessors():
+    assert runner._deployment_candidate_graph_check(ROOT) == ()
+    assert runner._deployment_candidate_authority_check(ROOT) == ()
+    assert runner._arch134_fresh_authority_check(ROOT) == ()
+    assert runner._arch134_acl_authority_check(ROOT) == ()
+    assert runner._arch134_d1s4_authority_check(ROOT) == ()
+    assert runner._checkpoint_specs()[fresh.CHECKPOINT].preflight is None
+    assert runner._checkpoint_specs()[fresh.CHECKPOINT].execute is None
+    # This new source-only branch deliberately retains the reviewed broad route.
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(),
+            "feature/robinhood-production-paper-fresh-successor-deployment-admission-current",
+            "push",
+        )
+        is None
+    )
+
+
+@pytest.mark.parametrize(
+    "mapping", ["BLOB_PREDECESSORS", "BLOB_PINS", "SOURCE_PINS", "AST_PINS"]
+)
+def test_candidate_overlay_map_mutation_fails_closed(monkeypatch, mapping):
+    monkeypatch.setattr(runner, "DEPLOYMENT_CANDIDATE_" + mapping, {})
+    assert runner._deployment_candidate_authority_check(ROOT)
+
+
+def test_candidate_overlay_rejects_wrong_predecessor():
+    with pytest.raises(ValueError, match="wrong exact predecessor"):
+        runner._deployment_candidate_pin(
+            "docs/AI_DEVELOPMENT_WORKFLOW.md", "0" * 40, ast_pin=False
+        )
+
+
+def test_candidate_current_docs_are_never_executable_blob_authority(monkeypatch):
+    original = runner._git_blob_sha1
+
+    def blob(path):
+        if path.name in {"PROJECT_STATUS.md", "AI_TRADING_BOT_HANDOFF.md"}:
+            pytest.fail("mutable current documents must not be blob-pinned")
+        return original(path)
+
+    monkeypatch.setattr(runner, "_git_blob_sha1", blob)
+    assert runner._deployment_candidate_authority_check(ROOT) == ()

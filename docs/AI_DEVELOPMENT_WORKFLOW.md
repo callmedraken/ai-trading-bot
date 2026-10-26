@@ -97,6 +97,15 @@ lane construction, and the small current contract tests. It does not reset,
 rebase, merge, repair or rewrite source history, and it does not execute
 protected effects or canonical FULL/ROBINHOOD certification.
 
+Pre-edit admission checks the exact base, branch, origin, remote identity and
+clean worktree/index. `ops.ps1 admit` is PRE-PUBLICATION admission: run it on
+the clean committed candidate after implementation/focused checks and before
+the first push. A new branch exactly at develop is intentionally ineligible;
+do not weaken the strict-descendant/nonempty-diff gate or run it before edits.
+If this unpublished admission fails, preserve its report and classify it before
+any push. Replacing an unpublished candidate commit requires explicit task
+authorization; the standing prohibition on rewriting published history remains.
+
 One logical checkpoint still receives one prepared atomic commit/push and one
 CI admission. A red attempt is preserved; a bounded mechanical correction is a
 separately named checkpoint with fresh focused verification and a fresh
@@ -809,8 +818,10 @@ documentation, status/handoff, formatting, diff-check and cleanup edits
 **before** the ordinary push. The normal and required path is:
 
 ```text
-focused/local verification
--> one atomic commit
+pre-edit exact base/branch/origin/cleanliness checks
+-> implementation and focused/local verification
+-> one atomic unpublished commit
+-> PRE-PUBLICATION ops.ps1 admit on the clean committed candidate
 -> one ordinary push/ref advance
 -> one push-triggered source-gate CI admission run
 -> terminal PASS or terminal failed checkpoint attempt

@@ -69,7 +69,11 @@ Corrective chronology remains immutable: #729 / `40238669278` SUCCESS,
 C1 #730 / `40265181160` FAILURE, C2 #731 / `40265822617` FAILURE, and
 C3 #732 / `40266767289` SUCCESS (all original attempt 1). C4 follows C3
 source `711c45f46efdba9b490d8e7e138879e432cfd9b7`, tree
-`bc517481d0cd1ca0a149402ec9080a8f392ee48e`, and remains pending exact-source review.
+`bc517481d0cd1ca0a149402ec9080a8f392ee48e`, and is SOURCE ACCEPTED / INTEGRATED at
+`61836d6adadf25907c0347d42012bc4200a179ff`, tree
+`eabbf166db2d14ce7fed603df3f8b6762394e3c7`. Feature #733 / `40271136792`
+and develop #734 / `40271802280` both succeeded on attempt 1. #734 reused
+`exact_feature_broad_source_gate`; no duplicate broad execution occurred.
 
 C4's exact skipped-job identity and rejection rules are defined once in the
 [current R3N workflow contract](../AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).

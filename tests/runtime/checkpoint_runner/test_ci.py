@@ -2041,7 +2041,12 @@ def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
         ),
     ):
         for key, pin in before.items():
-            assert runner._arch132_r3n_c4_pin(key, pin, ast_pin=ast_pin) == after[key]
+            expected = (
+                after[key]
+                if ast_pin
+                else runner.DEPLOYMENT_CANDIDATE_BLOB_PINS.get(key, after[key])
+            )
+            assert runner._arch132_r3n_c4_pin(key, pin, ast_pin=ast_pin) == expected
             with pytest.raises(ValueError, match="C4 wrong exact predecessor"):
                 runner._arch132_r3n_c4_pin(key, "0" * len(pin), ast_pin=ast_pin)
     monkeypatch.setattr(runner, "ARCH132_R3N_C4_AST_PINS", {})
@@ -2066,7 +2071,7 @@ def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
     relative = "tests/runtime/checkpoint_runner/test_ci.py"
     assert (
         runner._arch134_d1s3_shared_successor_pin(relative)
-        == runner.ARCH132_R3N_C4_BLOB_PINS[relative]
+        == runner.DEPLOYMENT_CANDIDATE_BLOB_PINS[relative]
     )
     monkeypatch.setattr(
         runner, "_ARCH134_D1S3_SHARED_SUCCESSOR_PIN_PRE_C1", lambda _: None

@@ -21,6 +21,9 @@ from tests.review_paper.test_armed_production_paper_session import (  # noqa: F4
     run,
 )
 from tests.review_paper.test_store import _intent, _review
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from trading_bot.review_paper import alpaca_windows_credentials as creds
 from trading_bot.review_paper import armed_session_host as host
@@ -924,10 +927,11 @@ def test_credential_failure_sanitized_evidence_with_unknown_counts(
     )
 
 
-def test_registration_source_only_and_authority():
+def test_registration_source_only_and_authority(monkeypatch):
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch134_production_paper_runtime_authority_check(root) == ()
     spec = runner._checkpoint_specs()[runner.ARCH134_PRODUCTION_PAPER_RUNTIME_NAME]
     assert spec.preflight is spec.execute is None

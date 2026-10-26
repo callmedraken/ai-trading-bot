@@ -11,6 +11,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID
@@ -648,7 +651,8 @@ def test_native_writer_exact_no_replace_record(monkeypatch):
     )
 
 
-def test_runner_registration_and_historical_boundary():
+def test_runner_registration_and_historical_boundary(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[r.CHECKPOINT]
     assert spec.preflight is runner._arch134_r5_preflight
     assert spec.execute is runner._arch134_r5_execute

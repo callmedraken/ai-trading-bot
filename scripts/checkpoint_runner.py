@@ -26046,6 +26046,42 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS: Final = {
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
         "2353a5191e9f39593ab365c0b1855ad6a1509425"
     ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "e3259ba082f5d702c507fa194bd739a627053baf"
+    ),
+    "tests/review_paper/test_pre_market_wake_qualification.py": (
+        "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "0c3bc741f8f6dd0bb4a402126862898ed0838812"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "60110e41b86f1e96734bc4a0da526755ecc97ab6"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py": (
+        "6dc196faf07d9a70601718f3d194a85db70713c8"
+    ),
+    "tests/review_paper/test_successor_publication_recovery.py": (
+        "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
+    ),
+    "tests/review_paper/test_production_paper_runtime_acl.py": (
+        "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
+        "9e83157c7d92073dc72123decf1b41250656d9ea"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+        "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
+    ),
     "tests/scripts/certification_runner/helpers.py": (
         "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
     ),
@@ -26062,19 +26098,55 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
         "0fb317747114b403b728437a22496a8786212488"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "5dd6c2d65ac7b3f30190935ee13ea2572b264794"
+        "6d24ac807bc0b4051e6eb6decf4796272088b67a"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "8aa93300138bbaab428f2738b1cadb64d5b801b1"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
-        "b125dedcc1664bd1e90b0e0adec62967222c2121"
+        "1fbc344e6651eda575076db5cdcbb6a7637c2f73"
     ),
     "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
         "d38c6a82ee64c800b8970f62f7b033b51badfbc7"
     ),
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
-        "e260aaa4344afd2124596b43dc93be9ed3bf07fc"
+        "2946fd6de45745c1f86e4964620d41c04143c702"
+    ),
+    "tests/review_paper/test_d1_session_execution.py": (
+        "50ff822096191db196251a9f245e6db24711188a"
+    ),
+    "tests/review_paper/test_pre_market_wake_qualification.py": (
+        "5bdcee0612fb196be5bfb4af19d1ef3a865b353c"
+    ),
+    "tests/review_paper/test_five_session_soak.py": (
+        "661190cdffcc5f8ef59a0cd63cc07d022125716a"
+    ),
+    "tests/review_paper/test_pre_market_wake_overnight.py": (
+        "57e313b821e02f2111b175d740d3398100b9478c"
+    ),
+    "tests/review_paper/test_d1_session_authorization.py": (
+        "bcadbd6a1e0f935bc2a234e71351cebdee446b7f"
+    ),
+    "tests/review_paper/test_production_paper_runtime.py": (
+        "530e987b80c61c38a7abc680c00d20d85e1936f8"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py": (
+        "dfd92914520d82c11782014c1556d2ed104d54fe"
+    ),
+    "tests/review_paper/test_successor_publication_recovery.py": (
+        "6338e118adb5749ec76094b4a169ae778535dc27"
+    ),
+    "tests/review_paper/test_production_paper_runtime_acl.py": (
+        "0420c658f1fc9411261f4470af95d2cde5c27fb1"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py": (
+        "aca88ec9043c59b7ec28e8518a62675eeecd523c"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+        "556801225742433e551b542dd30504f811fbfa66"
+    ),
+    "tests/review_paper/test_alpaca_authentication_qualification.py": (
+        "996942a55114c674ed9fb9e3276e63f61b9cbd44"
     ),
     "tests/scripts/certification_runner/helpers.py": (
         "86abd4cb1bb932f064038281ec60c9591dd7939b"
@@ -26180,7 +26252,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "f9741491520bae2e87163af70eb7f5c851a4c63d28bc22d1b57d3ca67a098033"
+    "e4595c6d44c14d9820905990a6bb5dd7d2a1fe72f4ad16c71810f2a0301d503f"
 )
 
 

@@ -10,6 +10,9 @@ from types import SimpleNamespace
 import pytest
 import test_supervised_runtime_host_admission as production_fixtures
 from test_supervised_release_installation import accepted
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.review_paper import successor_readiness
@@ -530,6 +533,7 @@ def test_current_document_exception_is_exact_and_predecessor_maps_are_unchanged(
 
 
 def test_current_document_wording_can_change_without_blob_authority(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch, ROOT)
     original = runner._git_blob_sha1
 
     def changed_current_doc(path):

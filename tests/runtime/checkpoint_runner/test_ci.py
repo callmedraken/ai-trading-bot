@@ -39,6 +39,12 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
     )
     historical_d1s1 = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
     historical_c1 = "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    historical_d1s4_r1 = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
+    )
+    historical_d1s3 = (
+        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    )
     historical_blobs = {
         root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
             "docs/AI_DEVELOPMENT_WORKFLOW.md"
@@ -63,6 +69,38 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         ),
         root / "tests/scripts/certification_runner/test_lanes.py": (
             "6ef03c56497055a8edf7d2378c87c44d55800b53"
+        ),
+        root / "tests/review_paper/test_d1_session_execution.py": (
+            "e3259ba082f5d702c507fa194bd739a627053baf"
+        ),
+        root / "tests/review_paper/test_pre_market_wake_qualification.py": (
+            "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
+        ),
+        root / "tests/review_paper/test_five_session_soak.py": (
+            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
+        ),
+        root / "tests/review_paper/test_pre_market_wake_overnight.py": (
+            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
+        ),
+        root / "tests/review_paper/test_d1_session_authorization.py": (
+            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
+        ),
+        root / "tests/review_paper/test_production_paper_runtime.py": (
+            "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
+        ),
+        root / historical_d1s4_r1: ("6dc196faf07d9a70601718f3d194a85db70713c8"),
+        root / "tests/review_paper/test_successor_publication_recovery.py": (
+            "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
+        ),
+        root / "tests/review_paper/test_production_paper_runtime_acl.py": (
+            "a77edf7dfdaa2e6932594ae77601203f975bbff2"
+        ),
+        root / historical_d1s3: ("9e83157c7d92073dc72123decf1b41250656d9ea"),
+        root / "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+            "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
+        ),
+        root / "tests/review_paper/test_alpaca_authentication_qualification.py": (
+            "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
         ),
     }
     monkeypatch.setattr(

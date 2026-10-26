@@ -11,6 +11,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from trading_bot.review_paper import pre_market_wake_qualification as q
 from trading_bot.review_paper import pre_market_wake_qualification_host as host
@@ -613,10 +616,11 @@ def test_exact_source_admission_fails_closed(monkeypatch, boundary: str) -> None
         host.admit_wake_source(HEAD, TREE)
 
 
-def test_d1r5_registration_and_authority() -> None:
+def test_d1r5_registration_and_authority(monkeypatch) -> None:
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_D1R5_NAME]
     assert spec.remote_branch == host.BRANCH
     assert spec.preflight is None and spec.execute is None

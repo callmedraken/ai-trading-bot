@@ -70,6 +70,12 @@ def _use_historical_predecessor_authority(monkeypatch: pytest.MonkeyPatch) -> No
     historical_d1s4 = (
         "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
     )
+    historical_d1s3 = (
+        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    )
+    historical_d1s4_r1 = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
+    )
     historical_blobs = {
         ROOT / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
             "docs/AI_DEVELOPMENT_WORKFLOW.md"
@@ -82,6 +88,36 @@ def _use_historical_predecessor_authority(monkeypatch: pytest.MonkeyPatch) -> No
             "tests/runtime/checkpoint_runner/test_core.py"
         ],
         ROOT / historical_d1s4: runner.READONLY_BLOB_AFTER[historical_d1s4],
+        ROOT / "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+            runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
+                "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+            ]
+        ),
+        ROOT / "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
+            runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
+                "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+            ]
+        ),
+        ROOT / "tests/review_paper/test_d1_session_execution.py": (
+            "e3259ba082f5d702c507fa194bd739a627053baf"
+        ),
+        ROOT / "tests/review_paper/test_d1_session_authorization.py": (
+            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
+        ),
+        ROOT / "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+            "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
+        ),
+        ROOT / "tests/review_paper/test_pre_market_wake_overnight.py": (
+            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
+        ),
+        ROOT / "tests/review_paper/test_five_session_soak.py": (
+            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
+        ),
+        ROOT / historical_d1s3: ("9e83157c7d92073dc72123decf1b41250656d9ea"),
+        ROOT / "tests/review_paper/test_successor_publication_recovery.py": (
+            "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
+        ),
+        ROOT / historical_d1s4_r1: ("6dc196faf07d9a70601718f3d194a85db70713c8"),
         ROOT / "tests/scripts/certification_runner/helpers.py": (
             "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
         ),

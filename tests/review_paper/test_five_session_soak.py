@@ -10,6 +10,9 @@ from pathlib import Path
 
 import pytest
 from tests.review_paper.test_five_session_soak_child import SOURCE, Crash, Fake, instant
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from trading_bot.review_paper import five_session_soak as c
 from trading_bot.review_paper import five_session_soak_child as child
@@ -413,10 +416,11 @@ def test_previous_evidence_drift_blocks_later_effects(fake, mutation):
         assert fake.children == before
 
 
-def test_f1_checkpoint_is_source_only_and_robinhood_owned():
+def test_f1_checkpoint_is_source_only_and_robinhood_owned(monkeypatch):
     from scripts import checkpoint_runner as runner
 
     root = Path(__file__).resolve().parents[2]
+    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_F1_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == s.BRANCH

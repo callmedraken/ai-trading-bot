@@ -11,6 +11,9 @@ from uuid import UUID
 
 import pytest
 import test_supervised_runtime_host_admission as production_fixtures
+from tests.runtime.checkpoint_runner.test_ci import (
+    _use_historical_predecessor_authority,
+)
 
 from trading_bot.review_paper import successor_soak as controller
 from trading_bot.review_paper import successor_soak_admission as admission
@@ -617,9 +620,10 @@ def test_removing_overlay_restores_c1_and_wrong_predecessor_rejected(monkeypatch
     assert runner._arch134_d1s1_current_source_pin("unrelated", "b" * 40) == "b" * 40
 
 
-def test_checkpoint_profile_and_exact_authority_consumers():
+def test_checkpoint_profile_and_exact_authority_consumers(monkeypatch):
     from scripts import checkpoint_runner as runner
 
+    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[runner.ARCH134_D1S1_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert (

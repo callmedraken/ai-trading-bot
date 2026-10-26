@@ -26164,7 +26164,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
     ),
     "_arch134_r3n_prepublication_authority_check": (
-        "4ace08fab6b14c49746bce188a7334b3344883abe1d9a21ea9decc641064dae4"
+        "c6d9248b560c00cf9426b7607f2d4ae0e750e7bbf28f1d154ff11c4c685e5b7e"
     ),
     "_arch134_readonly_diagnostic_shared_successor_pin": (
         "ac1decd8b7e367c0739e35c8d47949808e630339cf221226507faa34ba5b1fe2"
@@ -26177,7 +26177,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "0c49675421357565b852fdc53b87fa463fe54f10995178340349a1b6c3c6c08d"
+    "080d1a0c0bae3a3e0c7d93885c59ecefb9258b5f7309e7178dc2f09d7fe2ff30"
 )
 
 
@@ -26540,6 +26540,10 @@ def _arch134_r3n_prepublication_authority_check(
         "tests/scripts/certification_runner/test_lanes.py",
         "R3N C4 predecessor source drift: "
         "tests/scripts/certification_runner/test_profiles.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
         "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
         "Read-only admission predecessor blob drift: "
         "tests/runtime/checkpoint_runner/test_ci.py",
@@ -26548,6 +26552,8 @@ def _arch134_r3n_prepublication_authority_check(
         "tests/runtime/checkpoint_runner/test_ci.py",
         "Read-only admission shared source drift: "
         "tests/runtime/checkpoint_runner/test_core.py",
+        "Read-only admission shared source drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
         "Read-only admission predecessor blob drift: "
         "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
         "Read-only admission shared source drift: "

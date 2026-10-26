@@ -26137,7 +26137,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
     ),
     "_arch134_readonly_diagnostic_authority_check": (
-        "52b022cde8bbd4a5dd4c63bd525f4e83e3875b55372b51a0dffe54e5085806c4"
+        "fd9c873d517294905428f704b9a82110e8dec8647f9bc57c17d1f6458470be3d"
     ),
     "_arch134_readonly_diagnostic_preflight": (
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
@@ -26153,7 +26153,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "67e801a9921bb5c594a5a1b0fd75ed49533f89cab31c0a0f180a2520b265cf0e"
+    "d0744471b065e7e46fc027537a5b0e4c16e6c172abe3dd6b1ac60b00d7641442"
 )
 
 
@@ -26212,9 +26212,6 @@ def _arch134_readonly_diagnostic_shared_successor_pin(relative: str) -> str | No
     if predecessor != expected:
         raise ValueError("Architecture 134 diagnostic wrong shared predecessor")
     return ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS[relative]
-
-
-_arch134_d1s3_shared_successor_pin = _arch134_readonly_diagnostic_shared_successor_pin
 
 
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
@@ -26444,6 +26441,9 @@ def _arch134_readonly_diagnostic_authority_check(
         for relative, pin in ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.items():
             if _git_blob_sha1(repo_root / relative) != pin:
                 failures.append("Diagnostic successor source drift: " + relative)
+        for relative, pin in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS.items():
+            if _arch134_readonly_diagnostic_shared_successor_pin(relative) != pin:
+                failures.append("Diagnostic shared successor drift: " + relative)
         functions = _top_level_functions(
             ast.parse(
                 (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")

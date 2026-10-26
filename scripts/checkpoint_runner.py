@@ -26074,6 +26074,27 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
         "3c206d0bf730a97ee78e47af372da38b5ea80dbb"
     ),
 }
+ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS: Final = {
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "3737babdb35cb5992edcf87616da93d457af47b5"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "57651c926b8e4cba9924aebb55424778f201f1d8"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "6ef03c56497055a8edf7d2378c87c44d55800b53"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS: Final = {
+    relative: ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS[relative]
+    for relative in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS
+}
 ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS: Final = {
     "_readonly_checkpoint_specs": (
         "b90b18eab176c2f859c2b3c68010652acd67661b68ec48a4b465dca3c5ea1d9a"
@@ -26098,13 +26119,16 @@ ARCH134_READONLY_DIAGNOSTIC_AST_PINS: Final = {
 }
 ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     "_arch134_readonly_diagnostic_maps": (
-        "56beb76818271621868607fe825b2a9ba9357f56171628423511bd77c339f47d"
+        "f3745ca0ec9cb1a6d4544b8a0706388bcc4a8577593cf8077adbcc38f0a30ba9"
     ),
     "_arch134_readonly_diagnostic_pin": (
         "c380c29b44c3ba682e32ee2ad35aa6fd7fcbc5dab98a1dbcf8864060cade5019"
     ),
     "_arch134_current_batch_workflow_is_reviewed": (
         "b981e651d28ef9ddebe38e59c129131985e276764c6aa5988e48070fde6344f1"
+    ),
+    "_arch134_readonly_diagnostic_batch_workflow_successor": (
+        "0840eaef8617bf6f949860b9b586eb62fbf71adba20652b72baacb2e1bc88848"
     ),
     "_arch134_readonly_diagnostic_predecessor_authority_check": (
         "9c4783c5624832c72a1fe9280bed8e0e95aa93c1afbbf3774cbf1326e8280e0a"
@@ -26121,12 +26145,15 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     "_arch134_r3n_prepublication_authority_check": (
         "4ace08fab6b14c49746bce188a7334b3344883abe1d9a21ea9decc641064dae4"
     ),
+    "_arch134_readonly_diagnostic_shared_successor_pin": (
+        "f8c99f034d5ea78493c0e45fbfa437b37a9cb64bac229af355fdeda9f5c0ce0d"
+    ),
     "prepublication_admission": (
         "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "8afd2bd837599fdfa4cd9d7d816bb124aaacd31336be9a9333fe3a95d81f3811"
+    "67e801a9921bb5c594a5a1b0fd75ed49533f89cab31c0a0f180a2520b265cf0e"
 )
 
 
@@ -26137,6 +26164,8 @@ def _arch134_readonly_diagnostic_maps() -> None:
         ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS,
         ARCH134_READONLY_DIAGNOSTIC_AST_PINS,
         ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS,
+        ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS,
+        ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS,
     )
     if (
         hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
@@ -26170,6 +26199,24 @@ def _arch134_readonly_diagnostic_pin(
     return predecessor
 
 
+_ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN = (
+    _arch134_d1s3_shared_successor_pin
+)
+
+
+def _arch134_readonly_diagnostic_shared_successor_pin(relative: str) -> str | None:
+    predecessor = _ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN(relative)
+    if relative not in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS:
+        return predecessor
+    expected = ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PREDECESSORS[relative]
+    if predecessor != expected:
+        raise ValueError("Architecture 134 diagnostic wrong shared predecessor")
+    return ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS[relative]
+
+
+_arch134_d1s3_shared_successor_pin = _arch134_readonly_diagnostic_shared_successor_pin
+
+
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     active = tuple(
         name
@@ -26196,6 +26243,43 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         ARCH134_READONLY_DIAGNOSTIC_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
     )
     return _batch_workflow_is_reviewed(translated)
+
+
+# Keep the frozen R3M predecessor predicate reachable by identity while the
+# current route uses the exact diagnostic successor topology below.  The
+# predecessor function body and its AST pin remain unchanged.
+_ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED: Final = _batch_workflow_is_reviewed
+
+
+def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool:
+    active = tuple(
+        name
+        for name in CURRENT_ACTIVE_CI_CHECKPOINTS
+        if name
+        not in {
+            ARCH134_D1R6_NAME,
+            ARCH134_D1R7_NAME,
+            ARCH134_D1R8_NAME,
+            ARCH134_F1_NAME,
+            ARCH144C_NAME,
+        }
+    )
+    block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(f"              {name} `\n" for name in active[:-1])
+        + f"              {active[-1]}\n"
+    )
+    if workflow.count(block) != 1 or workflow.count(
+        "              " + ACTIVE_CI_CHECKPOINTS[0] + " `\n"
+    ):
+        return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
+    translated = workflow.replace(
+        ARCH134_READONLY_DIAGNOSTIC_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
+    )
+    return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(translated)
+
+
+_batch_workflow_is_reviewed = _arch134_readonly_diagnostic_batch_workflow_successor
 
 
 _ARCH134_PREVIOUS_PREDECESSOR_AUTHORITY = (

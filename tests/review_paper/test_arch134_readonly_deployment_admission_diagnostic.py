@@ -331,7 +331,20 @@ def test_diagnostic_overlay_bypass_and_unrelated_workflow_drift_fail_closed(
 
 def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
     root = runner.Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
     assert runner._arch134_readonly_diagnostic_authority_check(root) == ()
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert not runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
+    historical_workflow = workflow.replace(
+        runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
+        runner.ACTIVE_CI_CHECKPOINTS[0],
+        1,
+    )
+    assert runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(
+        historical_workflow
+    )
     assert runner._arch132_r3m_authority_check(root)
     assert runner._arch132_r3n_c4_authority_check(root)
     assert runner._readonly_candidate_authority_check(root)

@@ -26037,6 +26037,15 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS: Final = {
     "tests/runtime/checkpoint_runner/test_core.py": (
         "57651c926b8e4cba9924aebb55424778f201f1d8"
     ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "6ef03c56497055a8edf7d2378c87c44d55800b53"
+    ),
 }
 ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("6082aba5392e64195b7fed3b05a5fdb6888b3f9e"),
@@ -26048,6 +26057,15 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "27e2f372c1946b660d85afbbe23abea7389d50c6"
+    ),
+    "tests/scripts/certification_runner/helpers.py": (
+        "86abd4cb1bb932f064038281ec60c9591dd7939b"
+    ),
+    "tests/scripts/certification_runner/test_profiles.py": (
+        "51c892e0e6c0853ae41eed75735ecfdb56cf61b5"
+    ),
+    "tests/scripts/certification_runner/test_lanes.py": (
+        "3c206d0bf730a97ee78e47af372da38b5ea80dbb"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS: Final = {
@@ -26083,7 +26101,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "b981e651d28ef9ddebe38e59c129131985e276764c6aa5988e48070fde6344f1"
     ),
     "_arch134_readonly_diagnostic_predecessor_authority_check": (
-        "96e2b083a14c009e2d50076186a056b2b0373d037d18c03d1a59f2e627702f9b"
+        "9c4783c5624832c72a1fe9280bed8e0e95aa93c1afbbf3774cbf1326e8280e0a"
     ),
     "_arch134_readonly_diagnostic_graph_check": (
         "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
@@ -26102,7 +26120,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "b6f424ddbffc26bc863964fcad4dd37bb28d8266a63eacc536d2372b18099f6f"
+    "4081e7691a3f5140b85387b40c0c73ede7be9b5e56b233ef23de6d215bb18d06"
 )
 
 
@@ -26216,22 +26234,16 @@ def _arch134_readonly_diagnostic_predecessor_authority_check(
             for failure in failures
             if failure != "R3N C4 source drift: " + test_ci
         ]
-    test_core = "tests/runtime/checkpoint_runner/test_core.py"
-    test_core_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(test_core)
-    if (
-        test_core_pin is not None
-        and _git_blob_sha1(repo_root / test_core) == test_core_pin
-    ):
-        failures = [
-            failure
-            for failure in failures
-            if failure
-            not in {
-                "R3N C1 R3M source drift: " + test_core,
-                "Read-only admission predecessor blob drift: " + test_core,
-                "Read-only admission shared source drift: " + test_core,
-            }
-        ]
+    for relative, current_pin in ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.items():
+        if _git_blob_sha1(repo_root / relative) != current_pin:
+            continue
+        accepted = {
+            "R3N C1 R3M source drift: " + relative,
+            "R3N C4 predecessor source drift: " + relative,
+            "Read-only admission predecessor blob drift: " + relative,
+            "Read-only admission shared source drift: " + relative,
+        }
+        failures = [failure for failure in failures if failure not in accepted]
     return tuple(failures)
 
 

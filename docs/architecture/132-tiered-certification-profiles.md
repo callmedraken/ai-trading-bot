@@ -65,6 +65,18 @@ qualifying run. Missing, malformed, truncated, ambiguous or unavailable
 evidence, unexpected active/certification routing, and all attempt-2-or-later
 runs fall back to the normal broad develop route. Artifact names are not proof.
 
+Corrective chronology remains immutable: #729 / `40238669278` SUCCESS,
+C1 #730 / `40265181160` FAILURE, C2 #731 / `40265822617` FAILURE, and
+C3 #732 / `40266767289` SUCCESS (all original attempt 1). C4 follows C3
+source `711c45f46efdba9b490d8e7e138879e432cfd9b7`, tree
+`bc517481d0cd1ca0a149402ec9080a8f392ee48e`, and remains pending exact-source review.
+
+C4's exact skipped-job identity and rejection rules are defined once in the
+[current R3N workflow contract](../AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).
+The current proof binds that source-owned name to the reviewed workflow and
+retains exact job-set equality, route-specific conclusions and attempt-1 checks.
+Its additive authority layer preserves all R3M/R3N/C1/C2/C3 literals.
+
 The current non-effectful pre-publication admission is the GENERAL ordinary-
 feature gate `ops.ps1 admit`, not an R3N-only gate. It performs a read-only
 remote identity check against the exact current `origin/develop` commit/tree,

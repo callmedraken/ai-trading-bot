@@ -19,9 +19,14 @@ Architecture 146-A remains historical context; 146-B is not started here.
 ## Active source-only checkpoint
 
 Architecture 132-R3N — workflow throughput and current-contract consolidation
-remains pending ChatGPT exact-source review. Preserved terminal R3N CI is #729 /
-40238669278 / attempt 1: SUCCESS. Corrective C1 is the separately named
-prepublication/source correction for the general-throughput findings:
+remains pending ChatGPT exact-source review. C4 is SOURCE IMPLEMENTED /
+PENDING CHATGPT EXACT-SOURCE REVIEW. Publication and terminal CI must be
+verified against the exact C4 successor commit before acceptance. Exact C3 predecessor HEAD is
+`711c45f46efdba9b490d8e7e138879e432cfd9b7` / tree
+`bc517481d0cd1ca0a149402ec9080a8f392ee48e` / parent
+`748937705ad5d3885a4ccb9c26a0ea5247166242`. Preserve original attempt-1
+#729 / 40238669278 SUCCESS, #730 / 40265181160 FAILURE,
+#731 / 40265822617 FAILURE, and #732 / 40266767289 SUCCESS unchanged.
 
     branch feature/test-suite-arch132-r3n-workflow-throughput-current
     worktree F:\AI\worktrees\ai-trading-bot-test-suite-arch132-r3n-workflow-throughput-current
@@ -36,6 +41,11 @@ or shard execution and hygiene success, source-gates success, and one unique
 qualifying run. Missing, malformed, truncated, ambiguous or unavailable
 evidence, attempt 2 or later, and any job/step mismatch fall back to normal
 develop broad testing. Artifact names are never provenance.
+
+C4 aligns both broad-route proofs and synthetic fixtures with the real #732
+skipped certification display name, retains exact topology and first-attempt
+checks, and adds exact successor authority with all predecessor literals frozen.
+See the [current R3N contract](AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).
 
 Before publication, `ops.ps1 admit` is the GENERAL ordinary-feature
 prepublication gate, not an R3N-only gate. It checks the exact current remote
@@ -65,12 +75,12 @@ attempts remain untouched. No production generation is frozen for the weekend.
 
 ## Next owner / next step
 
-ChatGPT performs exact GitHub source/CI review of the final R3N C1 commit and
+ChatGPT performs exact GitHub source/CI review of the final R3N C4 commit and
 reviews its fail-closed mapped/registered-broad/unregistered-broad metadata
 proof, workflow aggregation,
 additive authority overlay, pre-publication admission, focused evidence,
-centralized current-contract assertions and preserved #722–#728 chronology.
-Stop this delegated task at ARCHITECTURE 132-R3N C1 IMPLEMENTED / PUBLISHED /
+centralized current-contract assertions and preserved #722–#732 chronology.
+Stop this delegated task at ARCHITECTURE 132-R3N C4 IMPLEMENTED / PUBLISHED /
 TERMINAL GREEN / PENDING CHATGPT EXACT-SOURCE RE-REVIEW. Do not begin 146-B.
 
 Sunday night: separately freeze then-current terminal-green develop for reviewed

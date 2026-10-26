@@ -22,15 +22,18 @@ remains historical context; Architecture 146-B is not started here.
 
 ## Current workflow checkpoint
 
-Architecture 132-R3N corrective C1 is **IMPLEMENTED / PENDING PUBLICATION**;
-the initial R3N publication remains **PENDING CHATGPT EXACT-SOURCE REVIEW**.
-R3N terminal CI #729 / 40238669278 / attempt 1 remains preserved unchanged.
-C1 preserves mapped FULL/ROBINHOOD reuse and exact unregistered broad reuse,
-and adds exact registered ACTIVE plus four-shard broad reuse. Broad reuse
-requires original attempt 1, exact repository/workflow/SHA/tree and branch
-family, exact route-specific job topology, required source-static/active or
-shard execution and hygiene success, source-gates success and one unique run;
-anything incomplete or ambiguous falls back to ordinary broad testing.
+Architecture 132-R3N corrective C4 is **SOURCE IMPLEMENTED /
+PENDING CHATGPT EXACT-SOURCE REVIEW**. Publication and terminal CI must bind
+the exact C4 successor commit before acceptance. C4 follows exact C3
+HEAD `711c45f46efdba9b490d8e7e138879e432cfd9b7` / tree
+`bc517481d0cd1ca0a149402ec9080a8f392ee48e` on the existing R3N feature branch.
+Preserved attempt-1 CI: #729 / 40238669278 SUCCESS; #730 / 40265181160
+FAILURE; #731 / 40265822617 FAILURE; #732 / 40266767289 SUCCESS.
+
+C4 aligns both broad-route proofs and synthetic fixtures with the real #732
+skipped certification display name, retains exact topology and first-attempt
+checks, and adds exact successor authority with all predecessor literals frozen.
+See the [current R3N contract](AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).
 
 The cheap `ops.ps1 admit` gate is a GENERAL ordinary-feature prepublication
 gate, not an R3N-only gate. It performs a read-only check of the exact current
@@ -63,9 +66,9 @@ follows 145-B, then large strategy campaigns.
 
 ## Next step
 
-ChatGPT reviews the exact published R3N C1 source, terminal CI, additive
+ChatGPT reviews the exact published R3N C4 source, terminal CI, additive
 authority overlay, general pre-publication admission, all three reuse shapes
 and fallback tests, centralized current-contract assertions, and preserved
-#722–#729 evidence. No production candidate is frozen and no protected or
+#722–#732 evidence. No production candidate is frozen and no protected or
 external effect is authorized. Accept/integrate only after that exact-source
 re-review is complete. Do not begin 146-B here.

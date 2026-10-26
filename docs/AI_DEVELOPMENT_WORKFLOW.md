@@ -76,6 +76,16 @@ metadata, missing jobs or steps, unexpected active/certification routing, and
 any mismatch fall back to the normal four-shard develop run. Artifact names are
 never provenance.
 
+C4 corrects the broad-route skipped certification identity to GitHub's literal
+workflow display-name expression:
+`certification-tests (${{ needs.source-static.outputs.checkpoint }} / ${{ needs.source-static.outputs.certification_profile }})`.
+Both broad routes require that exact job, completed/skipped; registered ACTIVE
+also requires active-tests success, while unregistered FULL requires it skipped.
+The evaluated-empty name `certification-tests ( / )`, missing/duplicate jobs,
+unexpected certification execution and all later attempts remain ineligible.
+The fixture models the actual #732 job topology; exact set equality remains.
+C4 adds successor authority without rewriting R3M/R3N/C1/C2/C3 literals.
+
 `ops.ps1 admit` is the GENERAL ordinary-feature prepublication gate, not an
 R3N-only gate. It performs a read-only remote identity check against the exact
 current `origin/develop` commit/tree and admits only clean descendants in the

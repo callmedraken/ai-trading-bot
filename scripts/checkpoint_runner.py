@@ -335,6 +335,11 @@ SOURCE_ORIGIN_URLS: Final = frozenset(
         f"https://github.com/{SOURCE_REPOSITORY}.git",
     }
 )
+# GitHub preserves this literal display-name expression when the job is skipped.
+REVIEWED_SKIPPED_CERTIFICATION_JOB: Final = (
+    "certification-tests (${{ needs.source-static.outputs.checkpoint }} / "
+    "${{ needs.source-static.outputs.certification_profile }})"
+)
 ARCH132_R3N_ADMISSION_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/scripts/certification_runner/test_profiles.py",
@@ -581,14 +586,14 @@ def find_reusable_ci_certification(
                         )
                         for index in range(4)
                     },
-                    "certification-tests ( / )": (),
+                    REVIEWED_SKIPPED_CERTIFICATION_JOB: (),
                     "source-gates": ("Require source gate success",),
                 }
                 require(set(by_name) == set(broad_jobs))
                 eligible = all(
                     completed_success(by_name, name, steps, run_id, attempt)
                     for name, steps in broad_jobs.items()
-                    if name != "certification-tests ( / )"
+                    if name != REVIEWED_SKIPPED_CERTIFICATION_JOB
                     and (registered_broad or name != "active-tests")
                 )
                 if registered_broad:
@@ -606,16 +611,19 @@ def find_reusable_ci_certification(
                         and by_name[name].get("run_id") == run_id
                         and by_name[name].get("run_attempt") == attempt
                         and by_name[name].get("head_sha") == head
-                        for name in ("active-tests", "certification-tests ( / )")
+                        for name in ("active-tests", REVIEWED_SKIPPED_CERTIFICATION_JOB)
                     )
                 eligible = eligible and (
-                    by_name["certification-tests ( / )"].get("status") == "completed"
-                    and by_name["certification-tests ( / )"].get("conclusion")
+                    by_name[REVIEWED_SKIPPED_CERTIFICATION_JOB].get("status")
+                    == "completed"
+                    and by_name[REVIEWED_SKIPPED_CERTIFICATION_JOB].get("conclusion")
                     == "skipped"
-                    and by_name["certification-tests ( / )"].get("run_id") == run_id
-                    and by_name["certification-tests ( / )"].get("run_attempt")
+                    and by_name[REVIEWED_SKIPPED_CERTIFICATION_JOB].get("run_id")
+                    == run_id
+                    and by_name[REVIEWED_SKIPPED_CERTIFICATION_JOB].get("run_attempt")
                     == attempt
-                    and by_name["certification-tests ( / )"].get("head_sha") == head
+                    and by_name[REVIEWED_SKIPPED_CERTIFICATION_JOB].get("head_sha")
+                    == head
                 )
             if eligible:
                 evidence = {
@@ -21993,16 +22001,264 @@ def _arch132_r3n_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# C4 models #732's literal skipped-job identity. All predecessor maps stay frozen.
+ARCH132_R3N_C4_AST_PREDECESSORS: Final = {
+    "find_reusable_ci_certification": (
+        "fb81742d566b2fb68301873a4783aa100598bd259438a614a423178091cd3b78"
+    ),
+}
+ARCH132_R3N_C4_AST_PINS: Final = {
+    "find_reusable_ci_certification": (
+        "9839121da30528c2eb3e9d6f3ab6d4e688f3435c009357f884d7679c743b9125"
+    ),
+}
+ARCH132_R3N_C4_BLOB_PREDECESSORS: Final = {
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "aba57505c1006e37b662c3301e3bc5ba52910825"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("735857b25b7f1721431467ff0d60f3ae2a5f0d52"),
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "0497f135c9244cdf0d67d9434aab3729a7d7aebb"
+    ),
+    "docs/PROJECT_STATUS.md": ("fc06128110b61838231ffe51c8af41980147aaf7"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("985cef46cc34de964355fd5b752865bd07916d61"),
+}
+ARCH132_R3N_C4_BLOB_PINS: Final = {
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "74bfdb7a33180fb8bee549a39c8a90837dc0b4bc"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("d6d700f9756efdb26df99761ac7bf525f73840f9"),
+    "docs/architecture/132-tiered-certification-profiles.md": (
+        "5840477c906789f43ee5a6a0810e93c009f5ce8f"
+    ),
+    "docs/PROJECT_STATUS.md": ("2f95da696218ffc6faed9ad10455d646aeb31498"),
+    "docs/AI_TRADING_BOT_HANDOFF.md": ("7c97a48a4416f69b0b234d9bfb3a6c839a54ce87"),
+}
+ARCH132_R3N_C4_NEW_AST_PINS: Final = {
+    "_arch132_r3n_c4_maps": (
+        "6d8ce36b86e4d4b83a9d8fd65c8a251bb7a58552d4a069d75be48e8c7a08e9a3"
+    ),
+    "_arch132_r3n_c4_pin": (
+        "638a00e773e11d33cceec3929a4538fb42cf89c08e69bb1de3121a064281a6db"
+    ),
+    "_arch132_r3n_c4_shared_blob_pin": (
+        "e8b550b587157d67532f8b35deec14bd3ac968c0849cb21b99caae3b4f3dfc87"
+    ),
+    "_arch132_r3n_c4_d1s3_shared_successor_pin": (
+        "a561caeccf54b5793ce853f1ad1ae6a78f9413a34854b923046520bdc489e1da"
+    ),
+    "_arch132_r3n_c4_current_pin": (
+        "9620e8fc6582634db41285ea76f35f59a1d4d2cf5a679598d13f3a2c86e408c9"
+    ),
+    "_arch132_r3n_c4_shared_overlay": (
+        "463e251d74bd6c8b92a39cedcf32fa6b30d612cc7ec86e2eb32828a32592dbe4"
+    ),
+    "_arch132_r3n_c4_r3m_c2_authority_check": (
+        "950da9c761bf97dcf2d63637075ff8e581bb8101f41f1494b8cb4fff98ccc4e6"
+    ),
+    "_arch132_r3n_c4_authority_check": (
+        "b6d03445154ae326027cb6175c6f996b2e1a9e20eb86e99faba51aa01d9f26e9"
+    ),
+}
+ARCH132_R3N_C4_MAPS_SHA256: Final = (
+    "54af67f73d64bb4934f2dbe11eaf31567279e69dcde10a0ad485ee4d3f9f50ff"
+)
+
+
+def _arch132_r3n_c4_maps() -> None:
+    maps = (
+        ARCH132_R3N_C4_AST_PREDECESSORS,
+        ARCH132_R3N_C4_AST_PINS,
+        ARCH132_R3N_C4_BLOB_PREDECESSORS,
+        ARCH132_R3N_C4_BLOB_PINS,
+        ARCH132_R3N_C4_NEW_AST_PINS,
+        REVIEWED_SKIPPED_CERTIFICATION_JOB,
+    )
+    if (
+        hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
+        != ARCH132_R3N_C4_MAPS_SHA256
+        or set(ARCH132_R3N_C4_AST_PREDECESSORS) != set(ARCH132_R3N_C4_AST_PINS)
+        or set(ARCH132_R3N_C4_BLOB_PREDECESSORS) != set(ARCH132_R3N_C4_BLOB_PINS)
+    ):
+        raise ValueError("R3N C4 exact successor maps drift")
+
+
+def _arch132_r3n_c4_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _arch132_r3n_c4_maps()
+    before = (
+        ARCH132_R3N_C4_AST_PREDECESSORS if ast_pin else ARCH132_R3N_C4_BLOB_PREDECESSORS
+    )
+    after = ARCH132_R3N_C4_AST_PINS if ast_pin else ARCH132_R3N_C4_BLOB_PINS
+    if key in before:
+        if predecessor not in (before[key], after[key]):
+            raise ValueError("R3N C4 wrong exact predecessor")
+        return after[key]
+    return predecessor
+
+
+def _arch132_r3n_c4_shared_blob_pin(relative: str, predecessor: str) -> str:
+    if predecessor == ARCH132_R3N_C4_BLOB_PINS.get(relative):
+        return _arch132_r3n_c4_pin(relative, predecessor, ast_pin=False)
+    resolved = _arch132_r3n_c1_shared_blob_pin(relative, predecessor)
+    return _arch132_r3n_c4_pin(relative, resolved, ast_pin=False)
+
+
+def _arch132_r3n_c4_d1s3_shared_successor_pin(relative: str) -> str | None:
+    predecessor = _arch132_r3n_c3_d1s3_shared_successor_pin(relative)
+    if predecessor is None:
+        return None
+    return _arch132_r3n_c4_pin(relative, predecessor, ast_pin=False)
+
+
+_ARCH132_R3N_C1_PIN_PRE_C4 = _arch132_r3n_c1_pin
+
+
+def _arch132_r3n_c4_current_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    after = ARCH132_R3N_C4_AST_PINS if ast_pin else ARCH132_R3N_C4_BLOB_PINS
+    if predecessor == after.get(key):
+        return _arch132_r3n_c4_pin(key, predecessor, ast_pin=ast_pin)
+    resolved = _ARCH132_R3N_C1_PIN_PRE_C4(key, predecessor, ast_pin=ast_pin)
+    return _arch132_r3n_c4_pin(key, resolved, ast_pin=ast_pin)
+
+
+def _arch132_r3n_c4_shared_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    resolved = _arch132_r3n_c2_shared_overlay(key, predecessor, ast_pin=ast_pin)
+    return _arch132_r3n_c4_pin(key, resolved, ast_pin=ast_pin)
+
+
+def _arch132_r3n_c4_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = []
+    try:
+        _arch132_r3m_c2_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3M_C2_AST_PINS,
+            **ARCH132_R3M_C2_NEW_AST_PINS,
+        }.items():
+            if hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest() != _arch132_r3n_c4_pin(
+                key,
+                _arch132_r3n_c1_pin(
+                    key, _arch132_r3m_c3_pin(key, pin, ast_pin=True), ast_pin=True
+                ),
+                ast_pin=True,
+            ):
+                failures.append("R3M C2 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3M_C2_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
+                relative,
+                _arch132_r3n_c1_pin(
+                    relative,
+                    _arch132_r3m_c3_pin(relative, pin, ast_pin=False),
+                    ast_pin=False,
+                ),
+                ast_pin=False,
+            ):
+                failures.append("R3M C2 source drift: " + relative)
+        for relative, pin in ARCH132_R3M_C2_NEW_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3M C2 new source drift: " + relative)
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3M C2 authority unavailable")
+    failures.extend(_arch132_r3m_c3_authority_check(repo_root))
+    return tuple(failures)
+
+
+def _arch132_r3n_c4_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3n_c1_maps()
+        _arch132_r3n_c2_maps()
+        _arch132_r3n_c3_maps()
+        _arch132_r3n_c4_maps()
+        source = ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+        functions = _top_level_functions(source)
+        for key, pin in {
+            **ARCH132_R3N_C1_AST_PINS,
+            **ARCH132_R3N_C1_NEW_AST_PINS,
+            **ARCH132_R3N_C2_AST_PINS,
+            **ARCH132_R3N_C2_NEW_AST_PINS,
+            **ARCH132_R3N_C3_AST_PINS,
+            **ARCH132_R3N_C3_NEW_AST_PINS,
+            **ARCH132_R3N_C4_NEW_AST_PINS,
+        }.items():
+            actual = hashlib.sha256(
+                ast.dump(functions[key], include_attributes=False).encode()
+            ).hexdigest()
+            if actual != _arch132_r3n_c4_pin(key, pin, ast_pin=True):
+                failures.append("R3N C4 runner AST drift: " + key)
+        for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append("R3N C4 source drift: " + relative)
+
+        # The predecessor map remains a required integrity check. Only the
+        # exact C1 successor surfaces are replaced by this overlay.
+        _arch132_r3m_c3_maps()
+        skipped_ast = set(ARCH132_R3N_C1_AST_PREDECESSORS)
+        for key, pin in ARCH132_R3M_C3_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C4 predecessor AST drift: " + key)
+        for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
+            if key in skipped_ast:
+                continue
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C4 predecessor new AST drift: " + key)
+        skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
+        for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
+            if relative in skipped_blobs:
+                continue
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("R3N C4 predecessor source drift: " + relative)
+        workflow = (
+            repo_root / ".github/workflows/checkpoint-source-gates.yml"
+        ).read_text(encoding="utf-8")
+        if (
+            not _batch_workflow_is_reviewed(workflow)
+            or workflow.count(f"    name: {REVIEWED_SKIPPED_CERTIFICATION_JOB}\n") != 1
+        ):
+            failures.append("R3N C4 workflow topology drift")
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C4 authority unavailable")
+    return tuple(failures)
+
+
+# Current dispatch includes C4 without replacing any predecessor implementation.
+_arch132_r3n_c1_authority_check = _arch132_r3n_c4_authority_check
+_arch132_r3n_c1_pin = _arch132_r3n_c4_current_pin
+
+
 # Historical authority maps remain frozen; current shared authority dispatch
 # uses additive R3N-C1 successors while preserving predecessor failure shapes.
-_arch132_r3m_c3_authority_check = _arch132_r3n_c1_authority_check
+_arch132_r3m_c3_authority_check = _arch132_r3n_c4_authority_check
 _arch132_r3m_c1_authority_check = _arch132_r3n_c1_r3m_c1_authority_check
 _arch132_r3m_authority_check = _arch132_r3n_c1_r3m_authority_check
-_arch146a_shared_blob_pin = _arch132_r3n_c1_shared_blob_pin
-_arch134_d1s3_shared_successor_pin = _arch132_r3n_c3_d1s3_shared_successor_pin
+_arch146a_shared_blob_pin = _arch132_r3n_c4_shared_blob_pin
+_arch134_d1s3_shared_successor_pin = _arch132_r3n_c4_d1s3_shared_successor_pin
 _arch146a_c2_authority_check = _arch132_r3n_c1_arch146a_c2_authority_check
 _arch146a_authority_check = _arch132_r3n_c1_arch146a_authority_check
-_arch146a_overlay = _arch132_r3n_c2_shared_overlay
+_arch146a_overlay = _arch132_r3n_c4_shared_overlay
+_arch132_r3m_c2_authority_check = _arch132_r3n_c4_r3m_c2_authority_check
 
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:

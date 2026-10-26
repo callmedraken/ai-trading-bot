@@ -1007,7 +1007,7 @@ def _broad_reuse_fixture(*, registered=False):
             )
             for index in range(4)
         },
-        "certification-tests ( / )": (),
+        runner.REVIEWED_SKIPPED_CERTIFICATION_JOB: (),
         "source-gates": ("Require source gate success",),
     }
     jobs[:] = [
@@ -1019,19 +1019,105 @@ def _broad_reuse_fixture(*, registered=False):
             "status": "completed",
             "conclusion": (
                 "skipped"
-                if name == "certification-tests ( / )"
+                if name == runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
                 or (name == "active-tests" and not registered)
                 else "success"
             ),
-            "steps": [
-                {"name": step, "status": "completed", "conclusion": "success"}
-                for step in step_names
-            ],
+            "steps": (
+                [
+                    {"name": step, "status": "completed", "conclusion": "success"}
+                    for step in step_names
+                ]
+                if step_names
+                else None
+            ),
         }
         for name, step_names in broad_steps.items()
     ]
     responses[jobs_path]["total_count"] = len(jobs)
     return args, responses, run, jobs, runs_path, jobs_path
+
+
+@pytest.mark.parametrize("registered", [False, True])
+def test_r3n_c4_broad_jobs_match_reviewed_732_topology(registered):
+    args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=registered)
+    # Independent literal from #732, not a name copied from the implementation.
+    certification = (
+        "certification-tests (${{ needs.source-static.outputs.checkpoint }} / "
+        "${{ needs.source-static.outputs.certification_profile }})"
+    )
+    expected = {
+        "source-static": "success",
+        **{f"full-tests ({index})": "success" for index in range(4)},
+        certification: "skipped",
+        "active-tests": "success" if registered else "skipped",
+        "source-gates": "success",
+    }
+    assert {job["name"]: job["conclusion"] for job in jobs} == expected
+    assert all(job["status"] == "completed" for job in jobs)
+    assert runner.REVIEWED_SKIPPED_CERTIFICATION_JOB == certification
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    assert runner._batch_workflow_is_reviewed(workflow)
+    assert workflow.count(f"    name: {certification}\n") == 1
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is True
+    )
+
+
+@pytest.mark.parametrize("registered", [False, True])
+@pytest.mark.parametrize(
+    "mutation", ["empty_name", "missing", "duplicate", "running", "success", "failure"]
+)
+def test_r3n_c4_skipped_certification_identity_is_exact(registered, mutation):
+    from copy import deepcopy
+
+    args, responses, _, jobs, _, jobs_path = _broad_reuse_fixture(registered=registered)
+    certification = next(
+        job for job in jobs if job["name"] == runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
+    )
+    if mutation == "empty_name":
+        certification["name"] = "certification-tests ( / )"
+    elif mutation == "missing":
+        jobs.remove(certification)
+    elif mutation == "duplicate":
+        jobs.append(deepcopy(certification))
+    elif mutation == "running":
+        certification.update(status="in_progress", conclusion=None)
+    else:
+        certification["conclusion"] = mutation
+    responses[jobs_path]["total_count"] = len(jobs)
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is False
+    )
+
+
+@pytest.mark.parametrize("registered", [False, True])
+def test_r3n_c4_coherent_broad_attempt_two_is_not_reusable(registered):
+    args, responses, run, jobs, _, jobs_path = _broad_reuse_fixture(
+        registered=registered
+    )
+    run["run_attempt"] = 2
+    responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["run_attempt"] = 2
+    for job in jobs:
+        job["run_attempt"] = 2
+    responses[jobs_path.replace("/attempts/1/", "/attempts/2/")] = responses.pop(
+        jobs_path
+    )
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is False
+    )
 
 
 def test_r3n_prepublication_admission_contract():
@@ -1295,9 +1381,9 @@ def test_r3n_unregistered_active_run_is_not_reusable():
 @pytest.mark.parametrize("route", ["registered", "unregistered"])
 def test_r3n_broad_certification_run_is_not_reusable(route):
     args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=route == "registered")
-    next(job for job in jobs if job["name"] == "certification-tests ( / )")[
-        "conclusion"
-    ] = "success"
+    next(
+        job for job in jobs if job["name"] == runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
+    )["conclusion"] = "success"
     result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
@@ -1939,3 +2025,50 @@ def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch)
                 runner._arch132_r3m_c1_pin(key, "0" * len(pin), ast_pin=ast_pin)
     monkeypatch.setattr(runner, "ARCH132_R3M_C1_AST_PINS", {})
     assert runner._arch132_r3m_c1_authority_check(root)
+
+
+def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._arch132_r3n_c4_authority_check(root) == ()
+    assert runner._arch132_r3n_c3_authority_check(root) == ()
+    assert runner._arch132_r3m_authority_check(root) == ()
+    for ast_pin, before, after in (
+        (True, runner.ARCH132_R3N_C4_AST_PREDECESSORS, runner.ARCH132_R3N_C4_AST_PINS),
+        (
+            False,
+            runner.ARCH132_R3N_C4_BLOB_PREDECESSORS,
+            runner.ARCH132_R3N_C4_BLOB_PINS,
+        ),
+    ):
+        for key, pin in before.items():
+            assert runner._arch132_r3n_c4_pin(key, pin, ast_pin=ast_pin) == after[key]
+            with pytest.raises(ValueError, match="C4 wrong exact predecessor"):
+                runner._arch132_r3n_c4_pin(key, "0" * len(pin), ast_pin=ast_pin)
+    monkeypatch.setattr(runner, "ARCH132_R3N_C4_AST_PINS", {})
+    assert runner._arch132_r3m_authority_check(root)
+
+
+def test_r3n_c4_skipped_name_drift_fails_authority(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    monkeypatch.setattr(
+        runner, "REVIEWED_SKIPPED_CERTIFICATION_JOB", "certification-tests ( / )"
+    )
+    assert runner._arch132_r3m_authority_check(root)
+
+
+def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
+    relative = "docs/AI_TRADING_BOT_HANDOFF.md"
+    predecessor = runner.ARCH132_R3N_C4_BLOB_PREDECESSORS[relative]
+    expected = runner.ARCH132_R3N_C4_BLOB_PINS[relative]
+    assert runner._arch146a_shared_blob_pin(relative, predecessor) == expected
+    # Mutable current documents deliberately have no historical D1S3 pin.
+    assert runner._arch134_d1s3_shared_successor_pin(relative) is None
+    relative = "tests/runtime/checkpoint_runner/test_ci.py"
+    assert (
+        runner._arch134_d1s3_shared_successor_pin(relative)
+        == runner.ARCH132_R3N_C4_BLOB_PINS[relative]
+    )
+    monkeypatch.setattr(
+        runner, "_ARCH134_D1S3_SHARED_SUCCESSOR_PIN_PRE_C1", lambda _: None
+    )
+    assert runner._arch134_d1s3_shared_successor_pin(relative) is None

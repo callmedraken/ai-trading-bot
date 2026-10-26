@@ -252,6 +252,32 @@ def test_r3n_prepublication_admission_dispatches_current_successor_authority(
     }
 
 
+def test_r3n_successor_filters_only_exact_current_topology_drift(monkeypatch, tmp_path):
+    current_topology = (
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/helpers.py",
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_lanes.py",
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_profiles.py",
+        "R3N C4 predecessor source drift: "
+        "tests/scripts/certification_runner/test_lanes.py",
+        "R3N C4 predecessor source drift: "
+        "tests/scripts/certification_runner/test_profiles.py",
+    )
+    monkeypatch.setattr(
+        runner,
+        "_arch134_readonly_diagnostic_authority_check",
+        lambda root: (),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_arch132_r3n_admission_authority_check",
+        lambda root: (*current_topology, "unrelated source drift"),
+    )
+
+    assert runner._arch134_r3n_prepublication_authority_check(tmp_path) == (
+        "unrelated source drift",
+    )
+
+
 def test_diagnostic_overlay_preserves_frozen_r3m_and_reconstructs_exact_successor():
     assert runner.ARCH132_R3M_AST_PINS["_batch_workflow_is_reviewed"] == (
         "3f910a44262aa76ee52b25158492a3b4061b1d0274414d8c2fb850725091c87d"

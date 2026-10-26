@@ -26113,14 +26113,14 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
     ),
     "_arch134_r3n_prepublication_authority_check": (
-        "2ddb721c1efac09361b115f710452afc600a026b6667a3e1d4a1175c211f4be2"
+        "f5549b3af80f5ca1f35fd0fa10a266f711afca6ef7b46665be7406dd694d3d99"
     ),
     "prepublication_admission": (
         "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "4081e7691a3f5140b85387b40c0c73ede7be9b5e56b233ef23de6d215bb18d06"
+    "2e8bf01f9cf9cb4e6517eb937f157faab1fcf60be366dbc88ff3d74f7c2ec2a4"
 )
 
 
@@ -26386,10 +26386,17 @@ def _arch134_r3n_prepublication_authority_check(
         return tuple(sorted(set((*predecessor, *current))))
     successor_drift = {
         "R3N C1 R3M source drift: tests/runtime/checkpoint_runner/test_core.py",
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/helpers.py",
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_lanes.py",
+        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_profiles.py",
         "R3N C1 R3M workflow topology drift",
         "R3N C4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
         "R3N C4 source drift: tests/runtime/checkpoint_runner/test_ci.py",
         "R3N C4 workflow topology drift",
+        "R3N C4 predecessor source drift: "
+        "tests/scripts/certification_runner/test_lanes.py",
+        "R3N C4 predecessor source drift: "
+        "tests/scripts/certification_runner/test_profiles.py",
         "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
         "Read-only admission predecessor blob drift: "
         "tests/runtime/checkpoint_runner/test_ci.py",

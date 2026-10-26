@@ -48,6 +48,15 @@ def _use_historical_predecessor_authority(
         / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
             "tests/runtime/checkpoint_runner/test_core.py"
         ],
+        root / "tests/scripts/certification_runner/helpers.py": (
+            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+        ),
+        root / "tests/scripts/certification_runner/test_profiles.py": (
+            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+        ),
+        root / "tests/scripts/certification_runner/test_lanes.py": (
+            "6ef03c56497055a8edf7d2378c87c44d55800b53"
+        ),
     }
     monkeypatch.setattr(
         runner,

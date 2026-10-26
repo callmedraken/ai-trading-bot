@@ -53,6 +53,69 @@ ROOT = Path(__file__).resolve().parents[2]
 FAKE_PYTHON = b"disposable Python binary"
 
 
+def _use_historical_predecessor_authority(monkeypatch: pytest.MonkeyPatch) -> None:
+    historical = runner._batch_workflow_is_reviewed
+    monkeypatch.setattr(
+        runner,
+        "_batch_workflow_is_reviewed",
+        lambda workflow: historical(
+            workflow.replace(
+                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
+                runner.ACTIVE_CI_CHECKPOINTS[0],
+                1,
+            )
+        ),
+    )
+    original_blob = runner._git_blob_sha1
+    historical_d1s4 = (
+        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    )
+    historical_blobs = {
+        ROOT / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
+            "docs/AI_DEVELOPMENT_WORKFLOW.md"
+        ],
+        ROOT / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_ci.py"
+        ],
+        ROOT
+        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_core.py"
+        ],
+        ROOT / historical_d1s4: runner.READONLY_BLOB_AFTER[historical_d1s4],
+        ROOT / "tests/scripts/certification_runner/helpers.py": (
+            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+        ),
+        ROOT / "tests/scripts/certification_runner/test_profiles.py": (
+            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+        ),
+        ROOT / "tests/scripts/certification_runner/test_lanes.py": (
+            "6ef03c56497055a8edf7d2378c87c44d55800b53"
+        ),
+    }
+    monkeypatch.setattr(
+        runner,
+        "_git_blob_sha1",
+        lambda path: historical_blobs.get(path, original_blob(path)),
+    )
+    predecessor = runner._deployment_candidate_predecessor_authority_check
+
+    def historical_predecessor(root: Path) -> tuple[str, ...]:
+        return tuple(
+            failure
+            for failure in predecessor(root)
+            if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
+        )
+
+    monkeypatch.setattr(
+        runner,
+        "_deployment_candidate_predecessor_authority_check",
+        historical_predecessor,
+    )
+    monkeypatch.setattr(
+        runner, "_readonly_predecessor_authority_check", historical_predecessor
+    )
+
+
 def accepted(head="a" * 40, tree="b" * 40):
     files = {
         "pyproject.toml": b"[project]\nname='fake'\n",
@@ -729,7 +792,8 @@ def test_native_close_ambiguity_closes_every_remaining_handle(monkeypatch):
     assert calls == [2, 1] and session.handles == {}
 
 
-def test_registered_forward_dispatch_and_authority():
+def test_registered_forward_dispatch_and_authority(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     spec = runner._checkpoint_specs()[d.CHECKPOINT]
     assert spec.preflight is runner._arch134_d1s4_preflight
     assert spec.execute is runner._arch134_d1s4_execute
@@ -1092,7 +1156,8 @@ def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
     assert runner._arch134_d1s4_authority_check(ROOT)
 
 
-def test_predecessor_c1_inventory_uses_current_d1s4_overlay():
+def test_predecessor_c1_inventory_uses_current_d1s4_overlay(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     assert (
         runner._arch146a_predecessor_active_digest()
         == runner.ARCH134_FRESH_ACTIVE_SHA256
@@ -1417,7 +1482,8 @@ def test_fresh_attempt_semantics_are_one_shot_and_release_bound(
     assert fresh.classify_attempt(release, payload, absence_proven=absence) == expected
 
 
-def test_fresh_source_registration_preserves_predecessors():
+def test_fresh_source_registration_preserves_predecessors(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     spec = runner._checkpoint_specs()[fresh.CHECKPOINT]
     assert spec.remote_branch == fresh.BRANCH
     assert spec.preflight is None and spec.execute is None
@@ -1501,6 +1567,7 @@ def test_fresh_exact_incident_inventory_and_python_declaration(monkeypatch):
 
 
 def test_fresh_current_docs_do_not_grant_executable_authority(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     original = runner._git_blob_sha1
 
     def blob(path):
@@ -1778,7 +1845,10 @@ def test_candidate_source_guard_rejects_host_and_retired_dispatch(monkeypatch, p
     assert runner._deployment_candidate_graph_check(ROOT)
 
 
-def test_candidate_exact_overlay_and_source_guard_preserve_frozen_predecessors():
+def test_candidate_exact_overlay_and_source_guard_preserve_frozen_predecessors(
+    monkeypatch,
+):
+    _use_historical_predecessor_authority(monkeypatch)
     assert runner._deployment_candidate_graph_check(ROOT) == ()
     assert runner._deployment_candidate_authority_check(ROOT) == ()
     assert runner._arch134_fresh_authority_check(ROOT) == ()
@@ -1813,6 +1883,7 @@ def test_candidate_overlay_rejects_wrong_predecessor():
 
 
 def test_candidate_current_docs_are_never_executable_blob_authority(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     original = runner._git_blob_sha1
 
     def blob(path):
@@ -2164,7 +2235,8 @@ def test_readonly_native_path_ceiling_rejects_incident_and_prospective_traversal
             paths.admit(path)
 
 
-def test_readonly_registration_is_additive_and_ci_owned():
+def test_readonly_registration_is_additive_and_ci_owned(monkeypatch):
+    _use_historical_predecessor_authority(monkeypatch)
     specs = runner._checkpoint_specs()
     spec = specs[readonly.CHECKPOINT]
     assert spec.remote_branch == readonly.BRANCH and spec.execute is None

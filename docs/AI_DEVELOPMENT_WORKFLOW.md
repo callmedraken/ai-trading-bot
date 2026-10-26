@@ -1455,10 +1455,15 @@ non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
 .\ops.ps1 preflight arch128-r7
 ```
 
-The current post-R1 successor is SOURCE ONLY and has no preflight/execute
-dispatch. Historical D1S4/R1 host registrations retain predecessor meaning;
-they are not fresh-successor deployment authority. ChatGPT must review the new
-exact source and later deployment-admission boundary before real-host work.
+The current fresh-successor observer checkpoint is
+`arch134-fresh-successor-readonly-deployment-admission`. It registers read-only
+preflight and no execute dispatch, with GitHub-owned ROBINHOOD certification.
+The inert predecessor successor-source checkpoint still has no host dispatch.
+Historical D1S4/R1 registrations retain predecessor meaning. Real-host observer
+invocation requires exact ChatGPT-accepted observer HEAD/tree and reviewed token
+policy after publication/integration; implementation tests do not invoke it.
+Bounded local Git/PowerShell diagnostic children are permitted, counted separately
+from forbidden runtime process starts/stops. No source PASS grants mutation.
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
 combined Ruff diagnostics, evidence capture, and checkpoint authority checks

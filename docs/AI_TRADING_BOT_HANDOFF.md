@@ -2,49 +2,51 @@
 
 ## Verified integrated source
 
-Architecture 132-R3N is **SOURCE ACCEPTED / INTEGRATED**:
+Architecture 134 candidate/admission-design source is **SOURCE ACCEPTED / INTEGRATED**:
 
-    HEAD 61836d6adadf25907c0347d42012bc4200a179ff
-    TREE eabbf166db2d14ce7fed603df3f8b6762394e3c7
-    Feature #733 / 40271136792 / attempt 1: SUCCESS
-    Develop #734 / 40271802280 / attempt 1: SUCCESS
+    HEAD 745b027abfd5cf75ba113b5bb78880af5f55fcce
+    TREE 5f3b784d65d3052e3525fef7a7ed1bad93fa144a
+    Feature #735 / 40275506498 / attempt 1: SUCCESS
+    Develop #736 / 40276839124 / attempt 1: SUCCESS
 
 Primary local develop was reconciled to this exact HEAD/tree before the new
-production-candidate checkpoint. #734 proved DEVELOP_CERTIFICATION_REUSE=True,
+observer checkpoint. #736 proved DEVELOP_CERTIFICATION_REUSE=True,
 reason `exact_feature_broad_source_gate`. Active-tests, certification-tests and
 broad full-tests were skipped; no duplicate broad execution occurred. Earlier
 R3M/R3N attempt chronology remains preserved in its architecture/workflow records.
 
 ## Active source-only checkpoint
 
-Architecture 134 fresh-successor deployment candidate / admission source is
+Architecture 134 fresh-successor READ-ONLY deployment admission observer is
 SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
 REVIEW.
 
-    branch feature/robinhood-production-paper-fresh-successor-deployment-admission-current
-    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-deployment-admission-current
-    base HEAD/TREE: 61836d6adadf25907c0347d42012bc4200a179ff /
-        eabbf166db2d14ce7fed603df3f8b6762394e3c7
+    branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-current
+    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-current
+    base HEAD/TREE: 745b027abfd5cf75ba113b5bb78880af5f55fcce /
+        5f3b784d65d3052e3525fef7a7ed1bad93fa144a
 
-This is the exact frozen SOURCE SELECTION. It does not claim an installed image
+The production candidate stays frozen at 61836d6adadf25907c0347d42012bc4200a179ff /
+eabbf166db2d14ce7fed603df3f8b6762394e3c7. This does not claim an installed image
 or predict the admission implementation's own commit/release identity. The
 accepted inert successor source remains b18c6e32606828beeebc540a93c9f05e3e024323 /
 b082c15bc697bf289fc7997b3d7bf87050082dc3. R1 remains reconciled and permanently
 CONSUMED. Incident roots and consumed generations cannot be selected or reused.
 
-The pure candidate verifier consumes canonical bytes and caller-supplied source
-identity only. Future read-only admission is a design, not an implemented host
-observer, PASS or effect authority. No historical D1S4/R1 dispatch substitutes
-for it. See [the contract](architecture/134-fresh-successor-deployment-candidate-admission-source.md)
-and [validation plan](validation/arch134-fresh-successor-deployment-candidate-admission-source.md).
+The read-only observer implements repeated source/inventory, namespace, security,
+Python and scheduler/runtime quiescence collection. No host preflight is run in
+this checkpoint. PASS grants only root write-authority/ACL review. Historical
+D1S4/R1 dispatch cannot substitute. See [the observer contract](architecture/134-fresh-successor-readonly-deployment-admission.md)
+and [validation](validation/arch134-fresh-successor-readonly-deployment-admission.md).
 
 Pre-edit checks establish exact base/branch/origin/cleanliness. PRE-PUBLICATION
 `ops.ps1 admit` runs after the one clean committed candidate and before push.
 The preserved pre-edit failure proved only that the unchanged gate rejects a
 branch exactly at develop; no source defect or published correction resulted.
-No changes to the admission algorithm, required baselines, profiles, lanes or
-workflow routing are made. Existing unregistered four-shard broad CI owns the
-terminal source gate; do not duplicate it or canonical FULL/ROBINHOOD locally.
+Required baselines, profile ownership and lane construction are unchanged.
+The new registered checkpoint maps to GitHub-owned canonical ROBINHOOD; do not
+duplicate it locally. Bounded read-only diagnostic child processes are explicitly
+permitted; runtime/process-control and production mutation counters stay zero.
 
 ## Protected boundary
 
@@ -56,7 +58,7 @@ untouched. Live remains NO-GO; Architecture 146-B is NOT STARTED.
 ## Next owner / next step
 
 ChatGPT performs exact GitHub source/diff/terminal-CI review. Stop implementation
-at FRESH-SUCCESSOR DEPLOYMENT CANDIDATE / ADMISSION SOURCE IMPLEMENTED /
+at FRESH-SUCCESSOR READ-ONLY DEPLOYMENT ADMISSION SOURCE IMPLEMENTED /
 PUBLISHED / TERMINAL GREEN / PENDING CHATGPT EXACT-SOURCE REVIEW.
 
 The frozen sequence is candidate -> exact admission source -> ChatGPT acceptance

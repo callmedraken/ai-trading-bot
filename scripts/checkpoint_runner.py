@@ -136,11 +136,12 @@ RETAINED_CHECKPOINTS: Final = (
 
 # Reviewed pin of the complete active tuple AST; refresh only with topology review.
 REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256: Final = (
-    "f06def62c93bbbfe2941006d300b028aad60ae1cc8c42f4b80b8ad530d231ba7"
+    "55366007032d67f5083e30812283a817e4fb12e19092353448b4597913b1697e"
 )
 
 # Registered historical recovery remains closed; it is excluded from active CI.
 ACTIVE_CI_CHECKPOINTS: Final = (
+    "arch134-fresh-successor-readonly-deployment-admission",
     "arch146-a-historical-research-dataset-enforcement",
     "arch134-f1r1-d1s3-successor-release-installation-operator",
     "arch133-robinhood-supervised-release-installation-operator",
@@ -226,6 +227,7 @@ ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
     "arch146-a-historical-research-dataset-enforcement": "full",
     "arch134-f1r1-d1s4-fresh-successor-source": "robinhood",
     "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery": "robinhood",
@@ -25140,6 +25142,722 @@ def preflight_checkpoint(
     print(f"EVIDENCE={report_path if report_path is not None else 'STDOUT'}")
     print(f"OVERALL={'PASS' if passed else 'BLOCKED'}")
     return passed, report_path
+
+
+# Additive observer successor: predecessor functions/maps remain in place.
+READONLY_ADMISSION_NAME: Final = "arch134-fresh-successor-readonly-deployment-admission"
+READONLY_ADMISSION_BRANCH: Final = (
+    "feature/robinhood-production-paper-fresh-successor-"
+    "readonly-deployment-admission-current"
+)
+READONLY_ADMISSION_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+READONLY_BLOB_BEFORE: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "7a1d0280b5675d6d30bb2014699e31454eedc91a"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("710a0f266bb5d5d6d86764c988974c1394c6dfbd"),
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
+        "79577ac326bf881077e3ba8ba5f6ca34fb7ea727"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "2a3922c9dd73c00672e6db26550bd11c35510666"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "6471b899e74573cfd47650a5c0b97cfe40d0c873"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "d2606ab9462b8462c654129b2368f016a300c250"
+    ),
+}
+READONLY_BLOB_AFTER: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
+    ),
+    "docs/AI_DEVELOPMENT_WORKFLOW.md": ("69b80e568efbfbeadaa004cccae2c12f849a6c17"),
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
+        "34a27005e43b5d67c76061784e3cdfa393f94f0d"
+    ),
+    "tests/runtime/checkpoint_runner/helpers.py": (
+        "ed93c46ccb929193b1779a8f6f16a686730d8c59"
+    ),
+    "tests/runtime/checkpoint_runner/test_ci.py": (
+        "a6c4a8e358849a6d90843461edba6268500b5b21"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "57651c926b8e4cba9924aebb55424778f201f1d8"
+    ),
+}
+READONLY_SOURCE_PINS: Final = {
+    ".github/workflows/checkpoint-source-gates.yml": (
+        "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
+    ),
+    "docs/architecture/134-fresh-successor-readonly-deployment-admission.md": (
+        "09a86522881879627370534a84fc4550d79fff69"
+    ),
+    "docs/validation/arch134-fresh-successor-readonly-deployment-admission.md": (
+        "6448418592a3598695176d47d171bf81d5d1b8e6"
+    ),
+    "scripts/arch134_deployment_admission_observe.ps1": (
+        "fe3bbeeb28b63806d80f06d550ff3d0305abec1d"
+    ),
+    "src/trading_bot/__init__.py": ("844df369681914646c4bb522bfc2c3fda615cf87"),
+    "src/trading_bot/arch133_acl/__init__.py": (
+        "283d2294fd588ed498f366608d6ca0bbca6f0876"
+    ),
+    "src/trading_bot/arch133_acl/read_only.py": (
+        "09bdfb69953b155a1a75a9f2235456815f179b31"
+    ),
+    "src/trading_bot/arch133_verifier/__init__.py": (
+        "342a7a7b7345e6c9d226d068827ad2727638a767"
+    ),
+    "src/trading_bot/arch133_verifier/token.py": (
+        "d28516899857288b8349e4659676bc4fcb88b676"
+    ),
+    "src/trading_bot/backtesting/__init__.py": (
+        "8dee77f6ba26af8ee3ef06bf63981fcf3547882c"
+    ),
+    "src/trading_bot/backtesting/engine.py": (
+        "f20a8fa25701f192ee6922c825281c1233f1d722"
+    ),
+    "src/trading_bot/backtesting/exceptions.py": (
+        "439824b66042a5b48e9b6843409dbac8de03716f"
+    ),
+    "src/trading_bot/backtesting/models.py": (
+        "78c5df9ee7d4181974516209962f8655695af26b"
+    ),
+    "src/trading_bot/backtesting/strategy.py": (
+        "686ffe9b0eb0898cf49f0a8e471e2cfba9b85af5"
+    ),
+    "src/trading_bot/config.py": ("2e20646923701f402cd42d71e2b64aeef804f800"),
+    "src/trading_bot/domain/__init__.py": ("646cc3901b3c83af2fbe528ca9b71d9582ad9592"),
+    "src/trading_bot/domain/_validation.py": (
+        "e6949f366e64f8c859b9bb75334f5534adf28aa3"
+    ),
+    "src/trading_bot/domain/enums.py": ("fd15367ec77cb9ac080ee1f40f9397e000b93f7b"),
+    "src/trading_bot/domain/market.py": ("d5e059b78a5a876cf36dd2e9501a1f0321bcc35d"),
+    "src/trading_bot/domain/orders.py": ("4029e1c8d2180b3a35673648339bed84aa2386f7"),
+    "src/trading_bot/domain/positions.py": ("eb992456bfb6da38fd9026ce5d74f9f366397421"),
+    "src/trading_bot/domain/proposals.py": ("4c221e2a9d4f887107cfa15e44fe1b3470eca64a"),
+    "src/trading_bot/execution/__init__.py": (
+        "143f8b481ff01e91f21f242a798ffed19a502183"
+    ),
+    "src/trading_bot/execution/engine.py": ("5c7a916901a4d2e2a35d6b9605995542b6fe004a"),
+    "src/trading_bot/execution/exceptions.py": (
+        "3f3d2836074589da6a6c66af087e9d4e1a35d2e4"
+    ),
+    "src/trading_bot/execution/models.py": ("388895fa3c193f8f7353f4ffa569b4e584f28e27"),
+    "src/trading_bot/execution/paper_fill_application.py": (
+        "1ad41675a1390a6b188620f3ad501a1134d0f47e"
+    ),
+    "src/trading_bot/execution/paper_fills.py": (
+        "f55f1a401411bb35f866e6bdaeed282bc07b642d"
+    ),
+    "src/trading_bot/execution/paper_submission.py": (
+        "f742fa1ccced5eb3a854e8a4566576eacfac16db"
+    ),
+    "src/trading_bot/execution/portfolio_orders.py": (
+        "9ceb187ff61ee902ed4c9f86deed3b96e23eb7bb"
+    ),
+    "src/trading_bot/execution/state_fingerprints.py": (
+        "1570e92c63c14e1c3c1ca7f11283a61720e45af3"
+    ),
+    "src/trading_bot/ledger/__init__.py": ("493bca4924ff88887997b8181042217c28231302"),
+    "src/trading_bot/ledger/checkpoint_state.py": (
+        "ada513596a1d30f68e45be56e2bf47b6bf8ca3c5"
+    ),
+    "src/trading_bot/ledger/exceptions.py": (
+        "5f3d2e439747a6abf22eae473b38173f15fa9dc6"
+    ),
+    "src/trading_bot/ledger/initialization.py": (
+        "e16d146e47a2c3bb7c80311aa0522259a986b50b"
+    ),
+    "src/trading_bot/ledger/ledger.py": ("ba2062cfcc87da65d90a4085bb0597eddfabd145"),
+    "src/trading_bot/ledger/models.py": ("69ee12ba4c73698c5fe6f62f17cc97261941122d"),
+    "src/trading_bot/market_calendar/__init__.py": (
+        "be7457147506cf3bb7cf3719b97546c1f5c3e9b0"
+    ),
+    "src/trading_bot/market_calendar/calendar.py": (
+        "0a9fbf47448eb3e7ae985b35f99f2c3f7568220b"
+    ),
+    "src/trading_bot/market_calendar/exceptions.py": (
+        "7d8950c729ce6bf886bd4aad115d704dc83fa4a9"
+    ),
+    "src/trading_bot/market_calendar/models.py": (
+        "1f09e0015d25651a09c8bc89dcd83d6ad0138d05"
+    ),
+    "src/trading_bot/market_calendar/nyse.py": (
+        "b93a54bb2bb7ecac36cf5a116886c7fdfb2a2038"
+    ),
+    "src/trading_bot/market_data/__init__.py": (
+        "3b5237e5f7a6bbfa34213f48db9aa8dc3f52fe66"
+    ),
+    "src/trading_bot/market_data/alpaca_daily_snapshot.py": (
+        "82e30b6b486915acadb85c95faf538ee9d828451"
+    ),
+    "src/trading_bot/market_data/alpaca_http.py": (
+        "a45037d821460d5fa0bab937f7085250890225d7"
+    ),
+    "src/trading_bot/market_data/csv_provider.py": (
+        "b636804c53a631c2e308b89b15c5dbb51090aa57"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_acceptance.py": (
+        "0c8cbc498a84c90776ccc0bac19877f721921399"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_identity.py": (
+        "80618f77b5ce8e54b817ae8ccc665d717f199425"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_models.py": (
+        "5a194695a558668baef4cc8d4c4b0062d088c580"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_provider.py": (
+        "397de9c14be6297754e49703df117a07222d2f84"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_serialization.py": (
+        "16a707c515179a1c83a6e264912ea25066a41ecf"
+    ),
+    "src/trading_bot/market_data/daily_snapshot_verification.py": (
+        "a913ab3c2fd35a2d111f691b571f28d4d37550cd"
+    ),
+    "src/trading_bot/market_data/exceptions.py": (
+        "ce264675c48e5259cefdd58a319a0858dcef8d4d"
+    ),
+    "src/trading_bot/market_data/fingerprints.py": (
+        "677f8a46910ff8c1892ba0929b0d8fab02b0698d"
+    ),
+    "src/trading_bot/market_data/models.py": (
+        "b7eb7559eed7215e0cc3d917fc0857777093e273"
+    ),
+    "src/trading_bot/market_data/multi_provider.py": (
+        "4357ac2742791e5893a682d77bbcb453e45938bc"
+    ),
+    "src/trading_bot/market_data/provider.py": (
+        "3437be6a4a12e4641b9e75f983bd5e50385767a2"
+    ),
+    "src/trading_bot/portfolio/__init__.py": (
+        "8d0b391158b7837f0d1d4b0f4f1211d5bd11e52d"
+    ),
+    "src/trading_bot/portfolio/exceptions.py": (
+        "ca6743753b2dd7943f15953516068632fe5a7f38"
+    ),
+    "src/trading_bot/portfolio/historical_scenarios.py": (
+        "3a1120f0c0647104a0515dbb85122ada9259039a"
+    ),
+    "src/trading_bot/portfolio/mean_cvar.py": (
+        "4b97df92574797f49a454ee5196ddae29fab1d9d"
+    ),
+    "src/trading_bot/portfolio/models.py": ("3fcf379824ae4b727452aab5966da4363d463a12"),
+    "src/trading_bot/portfolio/optimized_targets.py": (
+        "4c8d617ba8d673ae04d0be70877f7e2d216e0a81"
+    ),
+    "src/trading_bot/portfolio/optimizer.py": (
+        "936ed13a8f42581b46b84ecb252e9e67a6368ad5"
+    ),
+    "src/trading_bot/portfolio/scenarios.py": (
+        "f29c94d5b2714379bca3a3765535d9a7360f03f6"
+    ),
+    "src/trading_bot/risk/__init__.py": ("2b38b6c92b0b7e2604340d56e63f91656da10f5a"),
+    "src/trading_bot/risk/exceptions.py": ("e96140eb7c16c5164d36ee35efab600ef07db68e"),
+    "src/trading_bot/risk/manager.py": ("0a13fcd15de2d46b7f76172f0f2ab541c2aa1e06"),
+    "src/trading_bot/risk/models.py": ("29f3a0294e3d29029d62d8722db18fb315be64cc"),
+    "src/trading_bot/risk/orchestration.py": (
+        "f8aefdfbcbce09c50b687d0fcd7757fd51e5258c"
+    ),
+    "src/trading_bot/strategies/__init__.py": (
+        "ce050824fd1e7dfb86a08f4ad15a607016d1afe2"
+    ),
+    "src/trading_bot/strategies/exceptions.py": (
+        "180194bf44df19563f9586e314c437f60206241c"
+    ),
+    "src/trading_bot/strategies/moving_average.py": (
+        "2ce246a1305bf4514ee26bcb5113207e56f95cf8"
+    ),
+    "src/trading_bot/supervised_release/__init__.py": (
+        "ce9c00935d3383ab97b642fe010423b62f685776"
+    ),
+    "src/trading_bot/supervised_release/binding.py": (
+        "acdd2dfa17398afc822e770dd18166b747514cc1"
+    ),
+    "src/trading_bot/supervised_release/bundle.py": (
+        "1a3edc3186da17851106810c7f34c43c17b56b7c"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission.py": (
+        "a6d09d8fac8bed7a53d3bafce102d0001009243f"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_host.py": (
+        "794253b0e35fa8ecb25085e2fc702a52164f71c4"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_native.py": (
+        "9bbb749268cd2f2949b3d4a69b8348f5c93ef298"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_source.py": (
+        "3284e20bdb04696095041c54e3f542c24214ba05"
+    ),
+    "src/trading_bot/supervised_release/deployment_candidate.py": (
+        "3bfe6666fe2b0ba151938c191289659eacd5a52b"
+    ),
+    "src/trading_bot/supervised_release/installation_contract.py": (
+        "ffff404ed16c7a476a0a3ecb622b8bdfbd701ef1"
+    ),
+    "src/trading_bot/supervised_release/model.py": (
+        "1619bf29a3c0c8b262912dfaf517ae44e4b77708"
+    ),
+    "src/trading_bot/supervised_release/native_read.py": (
+        "bcbfd75043d6c31cad725425278dd7c80baff642"
+    ),
+    "src/trading_bot/supervised_release/observer.py": (
+        "7b08981a06b5df123355abef678c6d17a54339ec"
+    ),
+}
+READONLY_AST_PINS: Final = {
+    "_readonly_admission_graph_check": (
+        "70bcfccdab5fd4e3bddb680d113361a0f67e7093487ac0679d26ff2befad7f24"
+    ),
+    "_readonly_admission_preflight": (
+        "68a6353b11e27445acc0561b7230f7e2117bb39b16c6b86b99ed5bbb4a81e728"
+    ),
+    "_readonly_candidate_authority_check": (
+        "bd2aa09280a6834ea1d303de7dce68d4ca36e2d4ecadcd74999b2503520f963b"
+    ),
+    "_readonly_checkpoint_specs": (
+        "b90b18eab176c2f859c2b3c68010652acd67661b68ec48a4b465dca3c5ea1d9a"
+    ),
+    "_readonly_maps": (
+        "f3d5b0ef72591110591bf248583dd8559e08d0cb5842696a99a1b73e302162ab"
+    ),
+    "_readonly_pin": (
+        "380e204d9509bc13e6cf41406262463aab43b852c41a5fc40289598fc5ce93e8"
+    ),
+    "_readonly_predecessor_active_inventory": (
+        "d6176df041f4074327066a0d7474048f4038bd8bded586817e96b15721db9c42"
+    ),
+    "_readonly_preflight_checkpoint": (
+        "5e6e1c314805e4d2a51da27d769d74580f617af2c3ebc065dab4e85aa8d3785f"
+    ),
+    "_readonly_r3m_pin": (
+        "df52faa37584cf46472ea6db78d12606209079b5fa63ed22c19dbdef6e1d38bd"
+    ),
+    "_readonly_shared_blob_pin": (
+        "74dafcd53f46984b1945fe902bd794095409c58862278c593dfa6c12e3146207"
+    ),
+}
+READONLY_MAPS_SHA256: Final = (
+    "6bb47c9ae27c57b661a5d72967b44aba10802f018e44c0614b45482dea6d4bd5"
+)
+READONLY_PREDECESSOR_ACTIVE: Final = (
+    "arch146-a-historical-research-dataset-enforcement",
+    "arch134-f1r1-d1s3-successor-release-installation-operator",
+    "arch133-robinhood-supervised-release-installation-operator",
+    "arch133-robinhood-supervised-deployment-qualification",
+    "arch133-robinhood-supervised-runtime-host-admission",
+    "arch133-robinhood-supervised-maintenance-rebind",
+    "arch133-robinhood-supervised-release-installation",
+    "arch133-robinhood-supervised-release-build-verification",
+    "arch133-robinhood-supervised-release-foundation",
+    "arch131-robinhood-review-paper",
+    "arch131-robinhood-mcp-schema",
+    "arch131-robinhood-paper-cycle",
+    "arch131-robinhood-performance",
+    "arch131-robinhood-direct-mcp",
+    "arch131-robinhood-oauth-windows",
+    "arch131-robinhood-agentic-account",
+    "arch131-robinhood-paper-operator",
+    "arch131-robinhood-paper-intent-bridge",
+    "arch131-robinhood-deterministic-paper-pipeline",
+    "arch131-robinhood-virtual-risk-context",
+    "arch131-robinhood-forward-paper-cycle",
+    "arch131-robinhood-live-qualification-verifier",
+    "arch131-robinhood-session-admission",
+    "arch131-robinhood-risk-price-snapshot",
+    "arch131-robinhood-forward-paper-preview",
+    "arch131-robinhood-risk-price-acquisition",
+    "arch131-robinhood-supervised-forward-paper",
+    "arch131-robinhood-supervised-prepare-qualification",
+    "arch131-robinhood-supervised-prepare-verifier",
+    "arch131-nyse-published-regular-session-authority",
+    "arch131-robinhood-published-session-prepare",
+    "arch131-robinhood-published-prepare-operator",
+    "arch131-robinhood-supervised-qualification",
+    "arch133-robinhood-unattended-activation-core",
+    "arch133-robinhood-unattended-state-store",
+    "arch133-robinhood-unattended-one-wake-composition",
+    "arch133-robinhood-unattended-review-paper-execution",
+    "arch133-robinhood-unattended-host-scheduler-surface",
+    "arch133-robinhood-unattended-host-bootstrap",
+    "arch133-robinhood-unattended-host-publication",
+    "arch133-robinhood-scratch-root-acl-qualification",
+    "arch133-robinhood-retained-root-diagnostic",
+    "arch133-robinhood-retained-root-acl-recovery",
+    "arch133-robinhood-post-publication-verifier",
+    "arch133-robinhood-post-publication-stage-diagnostic",
+    "arch133-robinhood-publication-state-paper-diagnostic",
+    "arch133-robinhood-publication-state-paper-corrected",
+    "arch133-robinhood-single-session-scheduler-installation",
+    "arch133-robinhood-fresh-activation-reprovision",
+    "arch133-robinhood-reprovision-admission-diagnostic",
+    "arch133-robinhood-reprovision-parent-security-diagnostic",
+    "arch133-robinhood-reprovision-parent-policy-diagnostic",
+    "arch133-robinhood-fresh-activation-reprovision-corrected",
+    "arch133-robinhood-reprovision-indeterminate-reconciliation",
+    "arch133-robinhood-reprovision-sealed-predecessor-recovery",
+    "arch133-robinhood-reprovision-recovery-reconciliation",
+    "arch133-robinhood-windows-rename-qualification",
+    "arch133-robinhood-closed-descendant-rename-qualification",
+    "arch144-c-f1-paper-evidence-admission",
+    "arch134-f1r1-d1s4-fresh-successor-source",
+    "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+    "arch134-f1r1-d1s4-rename-free-direct-installation",
+    "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+    "arch134-f1r1-d1s2-successor-installed-readiness",
+    "arch134-f1r1-d1s1-successor-soak-source",
+    "arch134-f1r1-c1-qualification-operator",
+    "arch134-f1r1-b-host-qualification",
+    "arch134-f1-five-session-soak",
+    "arch134-d1r8-d1-session-execution-consumer",
+    "arch134-d1r7-d1-session-authorization",
+    "arch134-d1r6-overnight-wake-arming",
+    "arch134-d1r5-pre-market-wake-qualification",
+    "arch134-alpaca-authentication-qualification",
+    "arch134-armed-paper-mvp",
+    "arch134-production-strategy-contract",
+    "arch134-production-strategy-decision",
+    "arch134-production-strategy-live-paper",
+    "arch134-production-paper-runtime",
+    "arch134-production-paper-runtime-acl",
+)
+
+_PRE_READONLY_PIN = _deployment_candidate_pin
+_PRE_READONLY_R3M_PIN = _arch132_r3m_pin
+_PRE_READONLY_SHARED_PIN = _arch146a_shared_blob_pin
+_PRE_READONLY_SPECS = _checkpoint_specs
+_PRE_READONLY_PREFLIGHT = preflight_checkpoint
+
+
+def _readonly_maps() -> None:
+    material = (
+        READONLY_BLOB_BEFORE,
+        READONLY_BLOB_AFTER,
+        READONLY_SOURCE_PINS,
+        READONLY_AST_PINS,
+        READONLY_PREDECESSOR_ACTIVE,
+        READONLY_ADMISSION_NAME,
+        READONLY_ADMISSION_BRANCH,
+        READONLY_ADMISSION_TESTS,
+        READONLY_ADMISSION_RUFF,
+        CI_CERTIFICATION_PROFILES,
+        ACTIVE_CI_CHECKPOINTS,
+    )
+    if hashlib.sha256(
+        json.dumps(material, sort_keys=True).encode()
+    ).hexdigest() != READONLY_MAPS_SHA256 or set(READONLY_BLOB_BEFORE) != set(
+        READONLY_BLOB_AFTER
+    ):
+        raise ValueError("Read-only admission successor maps drift")
+
+
+def _readonly_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    _readonly_maps()
+    if (
+        not ast_pin
+        and key in READONLY_BLOB_AFTER
+        and predecessor == READONLY_BLOB_AFTER[key]
+    ):
+        return predecessor
+    resolved = _PRE_READONLY_PIN(key, predecessor, ast_pin=ast_pin)
+    if not ast_pin and key in READONLY_BLOB_BEFORE:
+        if resolved != READONLY_BLOB_BEFORE[key]:
+            raise ValueError("Read-only admission wrong exact predecessor")
+        return READONLY_BLOB_AFTER[key]
+    return resolved
+
+
+def _readonly_shared_blob_pin(relative: str, predecessor: str) -> str:
+    _readonly_maps()
+    if relative in READONLY_BLOB_AFTER and predecessor in (
+        READONLY_BLOB_BEFORE[relative],
+        READONLY_BLOB_AFTER[relative],
+    ):
+        return READONLY_BLOB_AFTER[relative]
+    return _PRE_READONLY_SHARED_PIN(relative, predecessor)
+
+
+def _readonly_r3m_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    resolved = _PRE_READONLY_R3M_PIN(key, predecessor, ast_pin=ast_pin)
+    _readonly_maps()
+    if (
+        not ast_pin
+        and key in READONLY_BLOB_BEFORE
+        and resolved in (READONLY_BLOB_BEFORE[key], READONLY_BLOB_AFTER[key])
+    ):
+        return READONLY_BLOB_AFTER[key]
+    return resolved
+
+
+def _readonly_predecessor_active_inventory() -> tuple[str, ...]:
+    _readonly_maps()
+    _arch146a_maps()
+    current = tuple(ACTIVE_CI_CHECKPOINTS)
+    if (
+        current != (READONLY_ADMISSION_NAME, *READONLY_PREDECESSOR_ACTIVE)
+        or READONLY_PREDECESSOR_ACTIVE[0] != ARCH146A_NAME
+    ):
+        raise ValueError("Read-only admission active inventory drift")
+    return READONLY_PREDECESSOR_ACTIVE[1:]
+
+
+def _readonly_admission_graph_check(repo_root: Path) -> tuple[str, ...]:
+    """Exact closed dependency graph, plus mutation primitive non-regression."""
+    forbidden = {
+        "rename",
+        "replace",
+        "move",
+        "mkdir",
+        "makedirs",
+        "unlink",
+        "rmdir",
+        "write_bytes",
+        "write_text",
+        "SetSecurityInfo",
+        "SetNamedSecurityInfoW",
+        "SetFileInformationByHandle",
+        "FileRenameInfo",
+        "CreateDirectoryW",
+        "WriteFile",
+        "AdjustTokenPrivileges",
+        "TerminateProcess",
+        "CreateProcessW",
+        "execute_once",
+        "materialize_release",
+        "consume_attempt",
+        "__import__",
+        "eval",
+        "exec",
+        "compile",
+        "getattr",
+        "setattr",
+        "globals",
+    }
+    try:
+        for relative, expected in READONLY_SOURCE_PINS.items():
+            if _git_blob_sha1(repo_root / relative) != expected:
+                return ("Read-only admission dependency drift: " + relative,)
+            if not relative.endswith(".py") or "/deployment_admission" not in relative:
+                continue
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                name = (
+                    node.id
+                    if isinstance(node, ast.Name)
+                    else node.attr
+                    if isinstance(node, ast.Attribute)
+                    else node.value
+                    if isinstance(node, ast.Constant) and isinstance(node.value, str)
+                    else ""
+                )
+                if name in forbidden or name.startswith("MoveFile"):
+                    return ("Read-only admission effect primitive: " + name,)
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    modules = (
+                        [item.name for item in node.names]
+                        if isinstance(node, ast.Import)
+                        else [node.module or ""]
+                    )
+                    for module in modules:
+                        if module.startswith("trading_bot"):
+                            path = "src/" + module.replace(".", "/")
+                            if (
+                                path + ".py" not in READONLY_SOURCE_PINS
+                                and path + "/__init__.py" not in READONLY_SOURCE_PINS
+                            ):
+                                return ("Read-only admission import outside graph",)
+                        elif module not in {
+                            "__future__",
+                            "hashlib",
+                            "json",
+                            "re",
+                            "dataclasses",
+                            "typing",
+                            "os",
+                            "stat",
+                            "subprocess",
+                            "decimal",
+                            "pathlib",
+                            "ctypes",
+                            "collections.abc",
+                            "contextlib",
+                        }:
+                            return ("Read-only admission effect import",)
+        return ()
+    except (OSError, ValueError, SyntaxError):
+        return ("Read-only admission graph unavailable",)
+
+
+def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures = list(_deployment_candidate_predecessor_authority_check(repo_root))
+    try:
+        _readonly_maps()
+        _deployment_candidate_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for name, pin in {**DEPLOYMENT_CANDIDATE_AST_PINS, **READONLY_AST_PINS}.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("Read-only admission runner AST drift: " + name)
+        for relative, pin in {
+            **DEPLOYMENT_CANDIDATE_BLOB_PINS,
+            **DEPLOYMENT_CANDIDATE_SOURCE_PINS,
+        }.items():
+            if _git_blob_sha1(repo_root / relative) != _readonly_pin(
+                relative, pin, ast_pin=False
+            ):
+                failures.append(
+                    "Read-only admission predecessor blob drift: " + relative
+                )
+        for relative, pin in READONLY_BLOB_AFTER.items():
+            if _git_blob_sha1(repo_root / relative) != pin:
+                failures.append("Read-only admission shared source drift: " + relative)
+        if (
+            _deployment_candidate_authority_check
+            is not _readonly_candidate_authority_check
+            or _arch132_r3n_c4_authority_check
+            is not _readonly_candidate_authority_check
+            or _arch132_r3n_c1_authority_check
+            is not _readonly_candidate_authority_check
+            or _arch132_r3m_c3_authority_check
+            is not _readonly_candidate_authority_check
+            or _arch132_r3n_c4_pin is not _readonly_pin
+            or _deployment_candidate_pin is not _readonly_pin
+            or _arch146a_shared_blob_pin is not _readonly_shared_blob_pin
+            or _checkpoint_specs is not _readonly_checkpoint_specs
+            or preflight_checkpoint is not _readonly_preflight_checkpoint
+            or _arch146a_predecessor_active_inventory
+            is not _readonly_predecessor_active_inventory
+        ):
+            failures.append("Read-only admission current dispatch drift")
+        _readonly_predecessor_active_inventory()
+        spec = _checkpoint_specs()[READONLY_ADMISSION_NAME]
+        if (
+            spec
+            != CheckpointSpec(
+                READONLY_ADMISSION_NAME,
+                "Read-only fresh-successor host admission; next authority review only",
+                READONLY_ADMISSION_TESTS,
+                READONLY_ADMISSION_RUFF,
+                _readonly_candidate_authority_check,
+                _readonly_admission_preflight,
+                None,
+                READONLY_ADMISSION_BRANCH,
+                "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
+            )
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+        ):
+            failures.append("Read-only admission registration drift")
+        failures.extend(_deployment_candidate_graph_check(repo_root))
+        failures.extend(_readonly_admission_graph_check(repo_root))
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("Read-only admission authority unavailable")
+    return tuple(failures)
+
+
+def _readonly_admission_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release.deployment_admission_host import preflight
+
+    return preflight()
+
+
+READONLY_ADMISSION_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "src/trading_bot/supervised_release/deployment_admission.py",
+    "src/trading_bot/supervised_release/deployment_admission_source.py",
+    "src/trading_bot/supervised_release/deployment_admission_native.py",
+    "src/trading_bot/supervised_release/deployment_admission_host.py",
+    *READONLY_ADMISSION_TESTS[2:],
+)
+
+
+def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
+    specs = _PRE_READONLY_SPECS()
+    if READONLY_ADMISSION_NAME in specs:
+        raise ValueError("Read-only admission duplicate registration")
+    return {
+        READONLY_ADMISSION_NAME: CheckpointSpec(
+            READONLY_ADMISSION_NAME,
+            "Read-only fresh-successor host admission; next authority review only",
+            READONLY_ADMISSION_TESTS,
+            READONLY_ADMISSION_RUFF,
+            _readonly_candidate_authority_check,
+            _readonly_admission_preflight,
+            None,
+            READONLY_ADMISSION_BRANCH,
+            "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
+        ),
+        **specs,
+    }
+
+
+def _readonly_preflight_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    if spec.name == READONLY_ADMISSION_NAME:
+        from trading_bot.supervised_release.deployment_admission_source import (
+            require_checkout_path,
+        )
+
+        if spec != _checkpoint_specs()[
+            spec.name
+        ] or _readonly_candidate_authority_check(repo_root):
+            raise RuntimeError("Read-only admission exact source/registration rejected")
+        # Evidence is deliberately limited to a unique operator-selected external
+        # development evidence path. Reject aliases before resolving/traversing.
+        if (
+            not evidence_root.is_absolute()
+            or ".." in evidence_root.parts
+            or any(part.casefold() == "aitradingbot" for part in evidence_root.parts)
+            or repo_root == evidence_root
+            or repo_root in evidence_root.parents
+        ):
+            raise RuntimeError("Read-only admission external evidence root required")
+        for ancestor in (*reversed(evidence_root.parents), evidence_root):
+            try:
+                fact = ancestor.lstat()
+            except FileNotFoundError:
+                break
+            if (
+                stat.S_ISLNK(fact.st_mode)
+                or getattr(fact, "st_file_attributes", 0)
+                & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            ):
+                raise RuntimeError("Read-only admission evidence alias rejected")
+            require_checkout_path(ancestor)
+            if ancestor == evidence_root:
+                raise RuntimeError("Read-only admission fresh evidence root required")
+    return _PRE_READONLY_PREFLIGHT(
+        spec, repo_root=repo_root, evidence_root=evidence_root
+    )
+
+
+_deployment_candidate_pin = _readonly_pin
+_arch132_r3n_c4_pin = _readonly_pin
+_arch132_r3m_pin = _readonly_r3m_pin
+_arch146a_shared_blob_pin = _readonly_shared_blob_pin
+_deployment_candidate_authority_check = _readonly_candidate_authority_check
+_arch132_r3n_c4_authority_check = _readonly_candidate_authority_check
+_arch132_r3n_c1_authority_check = _readonly_candidate_authority_check
+_arch132_r3m_c3_authority_check = _readonly_candidate_authority_check
+_arch146a_predecessor_active_inventory = _readonly_predecessor_active_inventory
+_checkpoint_specs = _readonly_checkpoint_specs
+preflight_checkpoint = _readonly_preflight_checkpoint
 
 
 def execute_checkpoint(

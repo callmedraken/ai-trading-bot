@@ -2,39 +2,43 @@
 
 ## Current integrated checkpoint
 
-Architecture 132-R3N — workflow throughput and current-contract consolidation
+Architecture 134 fresh-successor candidate/admission-design source
 is **SOURCE ACCEPTED / INTEGRATED**.
 
-    HEAD 61836d6adadf25907c0347d42012bc4200a179ff
-    TREE eabbf166db2d14ce7fed603df3f8b6762394e3c7
-    Feature #733 / 40271136792 / attempt 1: SUCCESS
-    Develop #734 / 40271802280 / attempt 1: SUCCESS
+    HEAD 745b027abfd5cf75ba113b5bb78880af5f55fcce
+    TREE 5f3b784d65d3052e3525fef7a7ed1bad93fa144a
+    Feature #735 / 40275506498 / attempt 1: SUCCESS
+    Develop #736 / 40276839124 / attempt 1: SUCCESS
 
-#734 proved DEVELOP_CERTIFICATION_REUSE=True with reason
+#736 proved DEVELOP_CERTIFICATION_REUSE=True with reason
 `exact_feature_broad_source_gate` and skipped active-tests, certification-tests
 and broad full-tests. No duplicate broad execution occurred. Primary local
-develop was reconciled to this exact HEAD/tree before the production-candidate
-checkpoint. Preserved #722–#732 chronology remains in the workflow/architecture
+develop was reconciled to this exact HEAD/tree before this observer
+checkpoint. Preserved R3N chronology remains in the workflow/architecture
 records; no historical run or failed evidence is rewritten.
 
 ## Current source checkpoint
 
-Architecture 134 fresh-successor deployment candidate / admission source is
+Architecture 134 fresh-successor READ-ONLY deployment admission observer is
 **SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
-REVIEW**. Its frozen production source selection is the exact R3N develop
-HEAD/tree above, not an installed production image. Its own final implementation
+REVIEW**. Its frozen production source selection remains
+61836d6adadf25907c0347d42012bc4200a179ff /
+eabbf166db2d14ce7fed603df3f8b6762394e3c7, not newer develop or an installed image.
+Its own final implementation
 HEAD/tree and CI are post-publication handoff facts, separately reviewed.
 
-The pure contract freezes repository/develop identity, accepted fresh-successor
-lineage, permanently CONSUMED R1, forbidden incident roots, fresh-only rename-free
-policy, zero effect eligibility, and the next separately reviewed read-only
-admission design. It has no host observer or preflight/execute dispatch.
-See [the candidate/admission contract](architecture/134-fresh-successor-deployment-candidate-admission-source.md).
+The observer binds reviewed source, frozen inventory/manifest, consumed R1 closure,
+fixed no-follow namespace, principal/security, Python and quiescence observations.
+Stable read-only PASS grants only the next root write-authority/ACL review.
+There is no execute dispatch. Bounded local diagnostic children are permitted;
+runtime starts, production writes and provider/broker effects remain forbidden.
+See [the observer contract](architecture/134-fresh-successor-readonly-deployment-admission.md).
 
 `ops.ps1 admit` remains the general PRE-PUBLICATION gate on the clean committed
 feature candidate. Exact-base/branch/origin/cleanliness checks precede edits.
-The source-only branch uses the existing unregistered four-shard broad CI route;
-no local canonical FULL/ROBINHOOD or broad suite is part of implementation.
+The registered observer branch maps to canonical ROBINHOOD in GitHub CI;
+do not duplicate that certification locally. Develop may later reuse exact feature
+certification under existing first-attempt rules.
 Current inventory remains `203 / 112 / 222 / 425`; required baselines and lane
 construction are unchanged.
 

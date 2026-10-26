@@ -17,6 +17,10 @@ import pytest
 from scripts import checkpoint_runner as runner
 from trading_bot.arch133_acl.read_only import ADMINISTRATORS_SID
 from trading_bot.strategies import MovingAverageCrossoverConfig
+from trading_bot.supervised_release import deployment_admission as readonly
+from trading_bot.supervised_release import (
+    deployment_admission_source as readonly_source,
+)
 from trading_bot.supervised_release import deployment_candidate as candidate
 from trading_bot.supervised_release import successor_direct_installation as d
 from trading_bot.supervised_release import successor_native_direct_write as native
@@ -1818,3 +1822,857 @@ def test_candidate_current_docs_are_never_executable_blob_authority(monkeypatch)
 
     monkeypatch.setattr(runner, "_git_blob_sha1", blob)
     assert runner._deployment_candidate_authority_check(ROOT) == ()
+
+
+# Current fresh-successor observer. All host observations below are disposable
+# fakes; the native production preflight is never invoked by source tests.
+class ReadonlyFake(FakeHost):
+    def __init__(self):
+        from trading_bot.arch133_acl.read_only import TRADING_SID
+        from trading_bot.arch133_verifier.token import TradingTokenObservation
+
+        super().__init__(accepted())
+        self.invocation = readonly.ReviewedInvocation(
+            candidate.SourceIdentity(
+                candidate.REPOSITORY, readonly.BRANCH, "c" * 40, "d" * 40
+            ),
+            TRADING_SID,
+            False,
+        )
+        self.source_value = readonly.SourceObservation(
+            self.invocation.observer,
+            candidate.CANDIDATE,
+            readonly.DESIGN,
+            candidate.SUCCESSOR,
+            readonly_source.manifest_for(self.release.manifest.source_inventory),
+            "CONSUMED",
+            readonly_source.CLOSURE_BLOB,
+        )
+        self.security_value = readonly.SecurityObservation(
+            TradingTokenObservation(TRADING_SID, 1, False, False, ()),
+            (("SeChangeNotifyPrivilege", 3),),
+            "ACCESS_DENIED",
+            None,
+            0x1200A9,
+            "e" * 64,
+            (7, 13),
+            (7, 14),
+        )
+        self.quiet_value = readonly.QuiescenceObservation((), "f" * 64, 0, True)
+        self.namespace = ()
+        self.source_count = 0
+        self.drift = False
+
+    @contextmanager
+    def read_session(self, release_id):
+        assert release_id == self.source_value.manifest.release_id
+        self.events.append("read_scope")
+        yield self
+
+    def object(self, path, *, directory):
+        assert path in ANCESTORS, "observer attempted a destination/incident open"
+        self.events.append(("metadata", path))
+        return self.nodes.get(path)
+
+    def names(self, path):
+        assert path == RELEASES_BASE
+        self.events.append("parent_names")
+        return self.namespace
+
+    def namespace_metadata(self):
+        return tuple(
+            (name, index + 100, 0x10, "")
+            for index, name in enumerate(self.names(RELEASES_BASE))
+        )
+
+    def source(self, invocation):
+        assert invocation == self.invocation
+        self.source_count += 1
+        return self.source_value
+
+    def security(self, parent):
+        if self.drift and self.source_count > 1:
+            return replace(self.security_value, parent_descriptor_sha256="a" * 64)
+        return self.security_value
+
+    def quiescence(self):
+        return self.quiet_value
+
+    def run(self):
+        return readonly.admission(self.invocation, self, self)
+
+
+def test_readonly_exact_lineage_pass_and_only_next_review_authority():
+    fake = ReadonlyFake()
+    result = fake.run()
+    assert result["status"] == "PASS", result
+    assert result["reason"] == readonly.READY
+    assert result["manifest"]["source_head"] == candidate.CANDIDATE_HEAD
+    assert result["manifest"]["source_tree"] == candidate.CANDIDATE_TREE
+    assert result["source"]["design"]["head"] == readonly.DESIGN.head
+    assert fake.source_count == 2 and fake.events.count("parent_names") == 2
+    assert result["effects"] == dict.fromkeys(readonly.ZERO_EFFECTS, 0)
+    assert result["authority"] == dict.fromkeys(readonly.NO_AUTHORITY, False)
+    assert result["observations"]["security"]["sacl_status"] == "ACCESS_DENIED"
+    readonly.verify_evidence(readonly.encode_evidence(result), expected=result)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("candidate", readonly.DESIGN),
+        ("candidate", replace(candidate.CANDIDATE, head="f" * 40)),
+        ("candidate", replace(candidate.CANDIDATE, tree="f" * 40)),
+        ("candidate", replace(candidate.CANDIDATE, repository="wrong/repository")),
+        ("observer", candidate.CANDIDATE),
+        ("observer", replace(ReadonlyFake().invocation.observer, tree="a" * 40)),
+        ("design", candidate.CANDIDATE),
+        ("successor", candidate.CANDIDATE),
+        ("r1_state", "AVAILABLE"),
+        ("r1_state", "RECONCILED"),
+        ("r1_state", "consumed"),
+        ("closure_blob", "a" * 40),
+    ],
+)
+def test_readonly_wrong_source_and_consumed_closure_block_before_host(field, value):
+    fake = ReadonlyFake()
+    fake.source_value = replace(fake.source_value, **{field: value})
+    assert fake.run()["status"] == "BLOCKED"
+    assert fake.events == []
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("production_python_version", "3.12.0"),
+        ("production_python_sha256", "f" * 64),
+        ("risk_policy_id", "other"),
+        ("risk_policy_sha256", "f" * 64),
+        ("strategy_config", MovingAverageCrossoverConfig(6, 20, Decimal("1"))),
+        ("strategy_version", "2.0.0"),
+        ("risk_policy_version", "2.0.0"),
+    ],
+)
+def test_readonly_wrong_python_launcher_config_risk_identity(field, value):
+    fake = ReadonlyFake()
+    manifest = replace(fake.source_value.manifest, **{field: value})
+    fake.source_value = replace(fake.source_value, manifest=manifest)
+    assert fake.run()["status"] == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        *candidate.INCIDENT_RELEASE_IDS,
+        *(item + ".installing" for item in candidate.INCIDENT_RELEASE_IDS),
+        "RELEAS~1",
+        "junction\\child",
+        "alias.",
+        "..",
+        "alternate:stream",
+    ],
+)
+def test_readonly_incident_alias_and_partial_names_never_traversed(name):
+    fake = ReadonlyFake()
+    fake.namespace = (name,)
+    assert fake.run()["status"] == "BLOCKED"
+    assert all(
+        not isinstance(event, tuple) or event[1] in ANCESTORS for event in fake.events
+    )
+
+
+@pytest.mark.parametrize("suffix", ["", ".installing", ".partial", ".failed"])
+def test_readonly_existing_final_or_partial_blocks_without_opening(suffix):
+    fake = ReadonlyFake()
+    fake.namespace = (fake.source_value.manifest.release_id + suffix,)
+    assert fake.run()["status"] == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"reparse": True},
+        {"links": 2},
+        {"filesystem": "ReFS"},
+        {"local": False},
+        {"persistent_acls": False},
+        {"identity": (8, 55)},
+        {"owner": "S-1-5-18"},
+        {"protected": False},
+        {"aces": ()},
+    ],
+)
+def test_readonly_namespace_volume_owner_dacl_policy(changes):
+    fake = ReadonlyFake()
+    fake.nodes[RELEASES_BASE] = replace(fake.nodes[RELEASES_BASE], **changes)
+    assert fake.run()["status"] == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"elevated": True},
+        {"thread_token_present": True},
+        {"token_type": 2},
+        {"user_sid": "S-1-5-21-999"},
+        {"groups": ((ADMINISTRATORS_SID, 4),)},
+    ],
+)
+def test_readonly_unreviewed_elevated_wrong_or_impersonating_token(changes):
+    fake = ReadonlyFake()
+    fake.security_value = replace(
+        fake.security_value, token=replace(fake.security_value.token, **changes)
+    )
+    assert fake.run()["status"] == "BLOCKED"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"privileges": (("SeDebugPrivilege", 2),)},
+        {"sacl_status": "UNAVAILABLE"},
+        {"sacl_status": "AVAILABLE", "sacl_sha256": None},
+        {"sacl_sha256": "a" * 64},
+        {"effective_parent_access": True},
+        {"parent_descriptor_sha256": "raw descriptor or secret"},
+    ],
+)
+def test_readonly_security_missing_or_unexpected_facts_block(changes):
+    fake = ReadonlyFake()
+    fake.security_value = replace(fake.security_value, **changes)
+    assert fake.run()["status"] == "BLOCKED"
+
+
+@pytest.mark.parametrize("status", ["ACCESS_DENIED", "PRIVILEGE_NOT_HELD", "AVAILABLE"])
+def test_readonly_sacl_availability_explicit_without_enabling_privilege(status):
+    fake = ReadonlyFake()
+    fake.security_value = replace(
+        fake.security_value,
+        sacl_status=status,
+        sacl_sha256="a" * 64 if status == "AVAILABLE" else None,
+    )
+    result = fake.run()
+    assert result["status"] == "PASS"
+    assert result["effects"]["privilege_enables"] == 0
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"relevant_process_count": 1},
+        {"reboot_manual_start": False},
+        {"process_inventory_sha256": ""},
+        {"tasks": (("raw command secret", "a" * 64),)},
+    ],
+)
+def test_readonly_scheduler_runtime_and_resume_policy_fail_closed(changes):
+    fake = ReadonlyFake()
+    fake.quiet_value = replace(fake.quiet_value, **changes)
+    assert fake.run()["status"] == "BLOCKED"
+
+
+def test_readonly_security_drift_blocks_without_retry():
+    fake = ReadonlyFake()
+    fake.drift = True
+    result = fake.run()
+    assert result["status"] == "BLOCKED" and result["reason"] == "STABILITY"
+    assert fake.source_count == 2
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"",
+        b"{}",
+        b"null",
+        b"[" * 2000,
+        b"\xff",
+        b"x" * (readonly.MAX_EVIDENCE_BYTES + 1),
+    ],
+    ids=("empty", "object", "null", "deep", "utf8", "oversize"),
+)
+def test_readonly_malformed_oversize_evidence_rejected(payload):
+    with pytest.raises(ValueError):
+        readonly.verify_evidence(payload, expected=ReadonlyFake().run())
+
+
+def test_readonly_evidence_sanitization_and_noncanonical_rejection():
+    fake = ReadonlyFake()
+
+    def fail(invocation):
+        raise RuntimeError("secret=never-emit-provider-response")
+
+    fake.source = fail
+    result = fake.run()
+    payload = readonly.encode_evidence(result)
+    assert b"secret" not in payload and b"provider-response" not in payload
+    for wrong in (
+        payload + b"\n",
+        b"\xef\xbb\xbf" + payload,
+        json.dumps(result, indent=2).encode(),
+        payload.replace(b"{", b'{"schema":"duplicate",', 1),
+    ):
+        with pytest.raises(ValueError):
+            readonly.verify_evidence(wrong, expected=result)
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    ["release-aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa", "release-unknown", "../alias"],
+)
+def test_readonly_release_identity_requires_uuid5(identifier):
+    with pytest.raises(ValueError):
+        readonly.safe_namespace_names((), identifier)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("config", "--add", "key", "value"),
+        ("fetch",),
+        ("checkout", "develop"),
+        ("remote", "set-url", "origin", "url"),
+        ("cat-file", "--batch-command"),
+        ("status", "--exec=bad"),
+        ("rev-parse", "--resolve-git-dir=bad"),
+    ],
+)
+def test_readonly_git_vocabulary_rejects_mutations_and_network_before_launch(
+    monkeypatch, args
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("forbidden Git vocabulary reached a process")
+
+    monkeypatch.setattr(readonly_source.subprocess, "run", forbidden)
+    with pytest.raises(ValueError, match="GIT_VOCABULARY"):
+        readonly_source.LocalGitReader(Path("disposable")).query(*args)
+
+
+def test_readonly_native_path_ceiling_rejects_incident_and_prospective_traversal():
+    from trading_bot.supervised_release.deployment_admission_native import (
+        ObservationPaths,
+    )
+
+    paths = ObservationPaths()
+    for path in (
+        *candidate.INCIDENT_ROOTS,
+        release_root(ReadonlyFake().source_value.manifest.release_id),
+        RELEASES_BASE + r"\alias",
+        "F:/AITradingBot/releases",
+    ):
+        with pytest.raises(ValueError, match="READ_NAMESPACE_CEILING"):
+            paths.admit(path)
+
+
+def test_readonly_registration_is_additive_and_ci_owned():
+    specs = runner._checkpoint_specs()
+    spec = specs[readonly.CHECKPOINT]
+    assert spec.remote_branch == readonly.BRANCH and spec.execute is None
+    assert spec.preflight is runner._readonly_admission_preflight
+    assert (
+        runner.resolve_ci_checkpoint(specs, readonly.BRANCH, "push")
+        == readonly.CHECKPOINT
+    )
+    assert runner.CI_CERTIFICATION_PROFILES[readonly.CHECKPOINT] == "robinhood"
+    assert runner._readonly_candidate_authority_check(ROOT) == ()
+    assert (
+        specs[fresh.CHECKPOINT].preflight is None
+        and specs[fresh.CHECKPOINT].execute is None
+    )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "import socket",
+        "from trading_bot.supervised_release.successor_direct_installation "
+        "import execute_once",
+        "Path.mkdir()",
+        "os.rename()",
+        "SetSecurityInfo()",
+        "AdjustTokenPrivileges()",
+        "bind(x, 'MoveFileExW', [], None)",
+    ],
+)
+def test_readonly_source_graph_rejects_effects_and_historical_substitution(
+    monkeypatch, payload
+):
+    original = Path.read_text
+
+    def read(path, *args, **kwargs):
+        data = original(path, *args, **kwargs)
+        return data + "\n" + payload if path.name == "deployment_admission.py" else data
+
+    monkeypatch.setattr(Path, "read_text", read)
+    assert runner._readonly_admission_graph_check(ROOT)
+
+
+@pytest.fixture
+def readonly_git(monkeypatch, tmp_path):
+    def git_hash(kind, content):
+        return hashlib.sha1(
+            kind + b" " + str(len(content)).encode() + b"\0" + content
+        ).hexdigest()
+
+    def tree(entries):
+        return git_hash(
+            b"tree",
+            b"".join(
+                mode.encode() + b" " + name.encode() + b"\0" + bytes.fromhex(oid)
+                for mode, name, oid in entries
+            ),
+        )
+
+    contents = {
+        "pyproject.toml": b"project",
+        LAUNCHER_RELATIVE_PATH: b"launcher",
+        "src/trading_bot/__init__.py": b"",
+    }
+    objects = {name: git_hash(b"blob", content) for name, content in contents.items()}
+    scripts_tree = tree(
+        [
+            (
+                "100644",
+                LAUNCHER_RELATIVE_PATH.split("/")[-1],
+                objects[LAUNCHER_RELATIVE_PATH],
+            )
+        ]
+    )
+    package_tree = tree(
+        [("100644", "__init__.py", objects["src/trading_bot/__init__.py"])]
+    )
+    source_tree = tree([("40000", "trading_bot", package_tree)])
+    root_tree = tree(
+        [
+            ("100644", "pyproject.toml", objects["pyproject.toml"]),
+            ("40000", "scripts", scripts_tree),
+            ("40000", "src", source_tree),
+        ]
+    )
+    selection = replace(candidate.CANDIDATE, tree=root_tree)
+    monkeypatch.setattr(readonly_source, "CANDIDATE", selection)
+    invocation = ReadonlyFake().invocation
+    responses = {
+        ("rev-parse", "--show-toplevel"): str(tmp_path).encode(),
+        ("rev-parse", "--git-path", "info/grafts"): str(
+            tmp_path / "missing-grafts"
+        ).encode(),
+        ("rev-parse", "HEAD"): invocation.observer.head.encode(),
+        ("rev-parse", "HEAD^{tree}"): invocation.observer.tree.encode(),
+        ("branch", "--show-current"): readonly.BRANCH.encode(),
+        ("remote", "get-url", "origin"): readonly_source.ORIGIN.encode(),
+        ("status", "--porcelain=v1", "--untracked-files=all"): b"",
+        ("diff", "--cached", "--name-only"): b"",
+        ("rev-parse", "--is-shallow-repository"): b"false",
+        (
+            "rev-parse",
+            "refs/remotes/origin/" + readonly.BRANCH,
+        ): invocation.observer.head.encode(),
+        ("ls-files", "-v", "-z"): b"H file\0",
+        (
+            "config",
+            "--local",
+            "--get-regexp",
+            r"^(extensions\.partialclone|remote\..*\.promisor|core\.worktree)$",
+        ): b"",
+        (
+            "cat-file",
+            "blob",
+            readonly.DESIGN.head + ":" + readonly_source.CLOSURE_PATH,
+        ): Path(candidate.__file__).read_bytes().replace(b"\r\n", b"\n"),
+    }
+    for identity in (selection, candidate.SUCCESSOR, readonly.DESIGN):
+        responses[("rev-parse", identity.head + "^{tree}")] = identity.tree.encode()
+        responses[("merge-base", identity.head, invocation.observer.head)] = (
+            identity.head.encode()
+        )
+    responses[("merge-base", candidate.SUCCESSOR.head, selection.head)] = (
+        candidate.SUCCESSOR.head.encode()
+    )
+    responses[("merge-base", selection.head, readonly.DESIGN.head)] = (
+        selection.head.encode()
+    )
+    responses[("ls-tree", "-r", "-z", selection.head)] = b"".join(
+        b"100644 blob " + objects[name].encode() + b"\t" + name.encode() + b"\0"
+        for name in sorted(contents)
+    )
+    batch = b"".join(
+        objects[name].encode()
+        + b" blob "
+        + str(len(contents[name])).encode()
+        + b"\n"
+        + contents[name]
+        + b"\n"
+        for name in sorted(contents)
+    )
+
+    class GitFake:
+        root = tmp_path
+
+        def query(self, *args, input_bytes=None):
+            if args == ("cat-file", "--batch"):
+                assert input_bytes == b"".join(
+                    objects[name].encode() + b"\n" for name in sorted(contents)
+                )
+                return self.batch
+            return self.responses[args]
+
+    fake = GitFake()
+    fake.responses, fake.batch, fake.invocation = responses, batch, invocation
+    return fake
+
+
+def test_readonly_git_exact_lineage_and_complete_candidate_inventory(readonly_git):
+    value = readonly_source.observe_source(readonly_git, readonly_git.invocation)
+    assert value.candidate.head == candidate.CANDIDATE_HEAD
+    assert value.observer == readonly_git.invocation.observer
+    assert len(value.manifest.source_inventory) == 3
+    assert value.r1_state == "CONSUMED"
+
+
+@pytest.mark.parametrize(
+    "args,value",
+    [
+        (("rev-parse", "HEAD"), b"a" * 40),
+        (("rev-parse", "HEAD^{tree}"), b"a" * 40),
+        (("remote", "get-url", "origin"), b"wrong/repository"),
+        (("status", "--porcelain=v1", "--untracked-files=all"), b" M changed"),
+        (("ls-files", "-v", "-z"), b"h hidden\0"),
+        (("rev-parse", "--is-shallow-repository"), b"true"),
+    ],
+)
+def test_readonly_git_stale_wrong_dirty_and_hidden_index_rejected(
+    readonly_git, args, value
+):
+    readonly_git.responses[args] = value
+    with pytest.raises(ValueError):
+        readonly_source.observe_source(readonly_git, readonly_git.invocation)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "blob", "extra", "closure"])
+def test_readonly_complete_tree_and_blob_inventory_tampering(readonly_git, mutation):
+    key = ("ls-tree", "-r", "-z", candidate.CANDIDATE_HEAD)
+    if mutation == "missing":
+        readonly_git.responses[key] = b"\0".join(
+            readonly_git.responses[key].split(b"\0")[1:]
+        )
+    elif mutation == "blob":
+        readonly_git.batch = readonly_git.batch.replace(b"launcher", b"mutated!")
+    elif mutation == "extra":
+        readonly_git.batch += b"unexpected"
+    else:
+        readonly_git.responses[
+            (
+                "cat-file",
+                "blob",
+                readonly.DESIGN.head + ":" + readonly_source.CLOSURE_PATH,
+            )
+        ] = b"not accepted closure"
+    with pytest.raises(ValueError):
+        readonly_source.observe_source(readonly_git, readonly_git.invocation)
+
+
+def test_readonly_zero_mutation_and_external_effects(monkeypatch):
+    import socket
+    import subprocess
+
+    from trading_bot.supervised_release.deployment_admission_native import (
+        ObservationPaths,
+    )
+
+    fake = ReadonlyFake()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("read-only admission attempted an unauthorized effect")
+
+    with monkeypatch.context() as effects:
+        for name in (
+            "mkdir",
+            "write_bytes",
+            "write_text",
+            "rename",
+            "replace",
+            "unlink",
+            "open",
+        ):
+            effects.setattr(Path, name, forbidden)
+        effects.setattr(socket, "socket", forbidden)
+        effects.setattr(subprocess, "run", forbidden)
+        effects.setattr(d, "execute_once", forbidden)
+        effects.setattr(native, "materialize_release", forbidden)
+        assert fake.run()["status"] == "PASS"
+        with pytest.raises(ValueError):
+            ObservationPaths().admit(candidate.INCIDENT_ROOTS[0])
+
+
+@pytest.mark.parametrize(
+    "where", ["top", "source", "observations", "security", "token", "quiet", "ancestor"]
+)
+def test_readonly_evidence_schema_rejects_unrestricted_nested_fields(where):
+    result = ReadonlyFake().run()
+    targets = {
+        "top": result,
+        "source": result["source"],
+        "observations": result["observations"],
+        "security": result["observations"]["security"],
+        "token": result["observations"]["security"]["token"],
+        "quiet": result["observations"]["quiescence"],
+        "ancestor": result["observations"]["ancestors"][0],
+    }
+    targets[where]["raw_secret_descriptor"] = "must not be emitted"
+    with pytest.raises(ValueError):
+        readonly.encode_evidence(result)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [("production_writes", 1), ("directory_creations", False), ("provider_calls", "0")],
+)
+def test_readonly_evidence_cannot_claim_effectful_pass(field, value):
+    result = ReadonlyFake().run()
+    result["effects"][field] = value
+    with pytest.raises(ValueError):
+        readonly.encode_evidence(result)
+
+
+@pytest.mark.parametrize("mutation", ["bytes", "version", "writable", "alias", "drift"])
+def test_readonly_native_python_collector_failures_use_only_disposable_facts(
+    monkeypatch, mutation
+):
+    from trading_bot.supervised_release import deployment_admission_native as n
+
+    fake = FakeHost(accepted())
+    monkeypatch.setattr(n, "PYTHON_SHA256", hashlib.sha256(FAKE_PYTHON).hexdigest())
+    if mutation == "bytes":
+        fake.data[PRODUCTION_PYTHON] = b"wrong binary"
+    elif mutation == "version":
+        fake.python_version = lambda: "3.12.0"
+    elif mutation == "writable":
+        fake.nodes[PRODUCTION_PYTHON] = replace(
+            fake.nodes[PRODUCTION_PYTHON], owner="S-1-5-21-999"
+        )
+    elif mutation == "alias":
+        fake.nodes[PRODUCTION_PYTHON] = replace(fake.nodes[PRODUCTION_PYTHON], links=2)
+    else:
+        original = fake.object
+        count = 0
+
+        def drift(path, **kwargs):
+            nonlocal count
+            count += 1
+            row = original(path, **kwargs)
+            return replace(row, identity=(7, 999)) if count > 2 else row
+
+        fake.object = drift
+    with pytest.raises(ValueError):
+        n.observe_python(fake, 7)
+
+
+def test_readonly_native_binary_read_rewinds_only_held_read_handle(monkeypatch):
+    from trading_bot.supervised_release import deployment_admission_native as n
+    from trading_bot.supervised_release import native_read
+
+    session = object.__new__(n.AdmissionReadSession)
+    session.kernel = object()
+    session.handles = {PRODUCTION_PYTHON: 77}
+    calls = []
+
+    def binder(library, name, args, result):
+        assert library is session.kernel and name == "SetFilePointerEx"
+
+        def rewind(handle, offset, output, origin):
+            calls.append((handle, offset, output, origin))
+            return True
+
+        return rewind
+
+    monkeypatch.setattr(n, "bind", binder)
+    monkeypatch.setattr(
+        native_read.WindowsReadSession, "read", lambda *args: FAKE_PYTHON
+    )
+    assert session.read(PRODUCTION_PYTHON, n.MAX_FILE_BYTES) == FAKE_PYTHON
+    assert session.read(PRODUCTION_PYTHON, n.MAX_FILE_BYTES) == FAKE_PYTHON
+    assert calls == [(77, 0, None, 0)] * 2
+    with pytest.raises(ValueError):
+        session.read(candidate.INCIDENT_ROOTS[0], n.MAX_FILE_BYTES)
+
+
+def test_readonly_diagnostic_transport_is_fixed_bounded_and_sanitized(monkeypatch):
+    from trading_bot.supervised_release import deployment_admission_native as n
+
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        assert argv[:6] == (
+            n.POWERSHELL,
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+        )
+        assert str(argv[6]).endswith("arch134_deployment_admission_observe.ps1")
+        assert kwargs == {"capture_output": True, "check": False, "timeout": 60}
+        return SimpleNamespace(
+            returncode=0,
+            stderr=b"",
+            stdout=b'{"schema":"arch134-deployment-quiescence/v1","tasks":[],"process_inventory_sha256":"'
+            + b"f" * 64
+            + b'","relevant_process_count":0,"reboot_manual_start":true}',
+        )
+
+    monkeypatch.setattr(n.subprocess, "run", run)
+    result = n.observe_quiescence(Path("disposable-source"))
+    readonly.require_quiescence(result)
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        "READONLY_BLOB_BEFORE",
+        "READONLY_BLOB_AFTER",
+        "READONLY_SOURCE_PINS",
+        "READONLY_AST_PINS",
+        "READONLY_ADMISSION_TESTS",
+    ],
+)
+def test_readonly_additive_maps_and_registration_fail_closed(monkeypatch, mapping):
+    monkeypatch.setattr(runner, mapping, {})
+    assert runner._readonly_candidate_authority_check(ROOT)
+
+
+def test_readonly_historical_execute_substitution_rejected(monkeypatch):
+    old = runner._checkpoint_specs
+
+    def specs():
+        values = old()
+        values[readonly.CHECKPOINT] = replace(
+            values[readonly.CHECKPOINT], execute=d.execute_once
+        )
+        return values
+
+    monkeypatch.setattr(runner, "_checkpoint_specs", specs)
+    assert runner._readonly_candidate_authority_check(ROOT)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["reparse", "short_alias", "duplicate_id", "not_directory", "changed_id"],
+)
+def test_readonly_parent_metadata_rejects_aliases_and_identity_drift(mutation):
+    fake = ReadonlyFake()
+    sibling = "release-aaaaaaaaaaaa5aaa8aaaaaaaaaaaaaaa"
+    rows = ((sibling, 500, 0x10, ""),)
+    if mutation == "reparse":
+        rows = ((sibling, 500, 0x410, ""),)
+    elif mutation == "short_alias":
+        rows = ((sibling, 500, 0x10, "RELEAS~1"),)
+    elif mutation == "duplicate_id":
+        rows += (("release-bbbbbbbbbbbb5bbb8bbbbbbbbbbbbbbb", 500, 0x10, ""),)
+    elif mutation == "not_directory":
+        rows = ((sibling, 500, 0, ""),)
+
+    def metadata():
+        if mutation == "changed_id" and fake.source_count > 1:
+            return ((sibling, 501, 0x10, ""),)
+        return rows
+
+    fake.namespace_metadata = metadata
+    assert fake.run()["status"] == "BLOCKED"
+    assert fake.source_count <= 2
+
+
+def test_readonly_parent_metadata_parser_never_opens_a_child():
+    from trading_bot.supervised_release.deployment_admission_native import (
+        parse_namespace_page,
+    )
+
+    name = candidate.INCIDENT_RELEASE_IDS[0]
+    encoded = name.encode("utf-16-le")
+    raw = bytearray(65536)
+    raw[56:60] = (0x410).to_bytes(4, "little")
+    raw[60:64] = len(encoded).to_bytes(4, "little")
+    raw[96:104] = (77).to_bytes(8, "little")
+    raw[104 : 104 + len(encoded)] = encoded
+    assert parse_namespace_page(bytes(raw)) == ((name, 77, 0x410, ""),)
+    raw[68] = 25
+    with pytest.raises(ValueError):
+        parse_namespace_page(bytes(raw))
+
+
+def test_readonly_existing_canonical_sibling_is_observed_without_traversal():
+    fake = ReadonlyFake()
+    fake.namespace = ("release-aaaaaaaaaaaa5aaa8aaaaaaaaaaaaaaa",)
+    assert fake.run()["status"] == "PASS"
+
+
+@pytest.mark.parametrize("changed", ["source", "python", "scheduler", "token"])
+def test_readonly_every_repeated_observation_blocks_on_drift(changed):
+    fake = ReadonlyFake()
+    if changed == "source":
+        original = fake.source
+
+        def source(invocation):
+            result = original(invocation)
+            return (
+                replace(result, observer=replace(result.observer, tree="e" * 40))
+                if fake.source_count == 2
+                else result
+            )
+
+        fake.source = source
+    elif changed == "scheduler":
+        fake.quiescence = lambda: (
+            replace(fake.quiet_value, process_inventory_sha256="a" * 64)
+            if fake.source_count == 2
+            else fake.quiet_value
+        )
+    else:
+
+        def security(parent):
+            result = fake.security_value
+            if fake.source_count == 2:
+                if changed == "python":
+                    result = replace(result, python_identity=(7, 999))
+                else:
+                    result = replace(
+                        result, token=replace(result.token, groups=(("S-1-5-18", 4),))
+                    )
+            return result
+
+        fake.security = security
+    result = fake.run()
+    assert result["status"] == "BLOCKED" and result["reason"] == "STABILITY"
+    assert fake.source_count == 2
+
+
+def test_readonly_evidence_root_rejects_production_before_metadata_or_dispatch(
+    monkeypatch,
+):
+    spec = runner._checkpoint_specs()[readonly.CHECKPOINT]
+    monkeypatch.setattr(
+        runner, "_readonly_candidate_authority_check", spec.authority_check
+    )
+    original_specs = runner._checkpoint_specs
+    monkeypatch.setattr(runner, "_readonly_candidate_authority_check", lambda root: ())
+    # Keep the exact admitted registration while making the authority observation
+    # a fake. The real preflight callback must never be reached by this test.
+    monkeypatch.setattr(
+        runner,
+        "_checkpoint_specs",
+        lambda: {**original_specs(), readonly.CHECKPOINT: spec},
+    )
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("production metadata/host dispatch reached")
+
+    monkeypatch.setattr(runner, "_PRE_READONLY_PREFLIGHT", forbidden)
+    monkeypatch.setattr(Path, "lstat", forbidden)
+    with pytest.raises(RuntimeError, match="external evidence"):
+        runner._readonly_preflight_checkpoint(
+            spec,
+            repo_root=ROOT,
+            evidence_root=Path(RELEASES_BASE) / "forbidden-evidence",
+        )

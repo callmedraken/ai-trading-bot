@@ -132,6 +132,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.READONLY_ADMISSION_NAME,
         runner.ARCH146A_NAME,
         runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
@@ -409,6 +410,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             )
         if spec.name == runner.ARCH146A_NAME:
             expected_branch = runner.ARCH146A_BRANCH
+        if spec.name == runner.READONLY_ADMISSION_NAME:
+            expected_branch = runner.READONLY_ADMISSION_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -920,6 +923,7 @@ def test_batch_first_seen_requirements_and_all_current_coverage():
         for name in runner.ACTIVE_CI_CHECKPOINTS
         if name
         not in {
+            runner.READONLY_ADMISSION_NAME,
             runner.ARCH146A_NAME,
             runner.ARCH134_AUTH_NAME,
             runner.ARCH134_D1R5_NAME,
@@ -1377,6 +1381,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             runner.COMMON_TESTS
             if name
             in {
+                runner.READONLY_ADMISSION_NAME,
                 "arch133-robinhood-supervised-release-installation-operator",
                 "arch133-robinhood-supervised-release-publication-recovery",
                 "arch133-robinhood-supervised-release-installation-reconciliation",
@@ -1741,7 +1746,7 @@ def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers():
     )
     assert (
         runner._arch145a_predecessor_active_checkpoint_inventory()
-        == (runner.ACTIVE_CI_CHECKPOINTS[1:])
+        == (runner.ACTIVE_CI_CHECKPOINTS[2:])
     )
     assert runner._arch144c_authority_check(root) == ()
     assert runner._arch134_f1_authority_check(root) == ()
@@ -1831,7 +1836,7 @@ def test_arch134_f1r1_b_registration_and_active_successor_are_source_only():
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH134_F1R1_B_NAME] == ("robinhood")
     assert (
         runner._arch145a_predecessor_active_checkpoint_inventory()
-        == (runner.ACTIVE_CI_CHECKPOINTS[1:])
+        == (runner.ACTIVE_CI_CHECKPOINTS[2:])
     )
 
 

@@ -2073,6 +2073,7 @@ def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
     assert runner._arch146a_shared_blob_pin(relative, predecessor) == expected
     # Mutable current documents deliberately have no historical D1S3 pin.
     assert runner._arch134_d1s3_shared_successor_pin(relative) is None
+
     relative = "tests/runtime/checkpoint_runner/test_ci.py"
     assert (
         runner._arch134_d1s3_shared_successor_pin(relative)
@@ -2082,3 +2083,23 @@ def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
         runner, "_ARCH134_D1S3_SHARED_SUCCESSOR_PIN_PRE_C1", lambda _: None
     )
     assert runner._arch134_d1s3_shared_successor_pin(relative) is None
+
+
+def test_readonly_c1_exact_test_successors_do_not_hide_source_drift(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    assert runner._readonly_candidate_authority_check(root) == ()
+    relative = "tests/strategies/test_production_strategy_contract.py"
+    assert (
+        runner.ARCH132_R3M_C3_BLOB_PINS[relative]
+        == runner.READONLY_BLOB_BEFORE[relative]
+    )
+    original = runner._git_blob_sha1
+
+    def blob(path):
+        return "0" * 40 if path == root / relative else original(path)
+
+    monkeypatch.setattr(runner, "_git_blob_sha1", blob)
+    assert (
+        "R3N C4 predecessor source drift: " + relative
+        in runner._readonly_predecessor_authority_check(root)
+    )

@@ -1161,11 +1161,25 @@ def test_133p_registration_workflow_drift_fails_closed(
     previous = (
         f'    "{prior}",\n' if target == "runner" else f"              {prior} `\n"
     )
-    assert text.count(line) == (2 if target == "runner" else 1)
+    # Mutate the canonical active declaration only. Historical and additive
+    # predecessor tuples may legitimately repeat the same checkpoint literal.
+    start = (
+        text.index("ACTIVE_CI_CHECKPOINTS: Final = (\n")
+        if target == "runner"
+        else text.index("  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n")
+    )
+    end = (
+        text.index("\n)\n", start) + 3
+        if target == "runner"
+        else text.index("\njobs:\n", start)
+    )
+    active = text[start:end]
+    assert active.count(line) == active.count(previous) == 1
     if mutation == "order":
-        text = text.replace(previous + line, line + previous, 1)
+        active = active.replace(previous + line, line + previous, 1)
     else:
-        text = text.replace(line, "" if mutation == "missing" else line * 2, 1)
+        active = active.replace(line, "" if mutation == "missing" else line * 2, 1)
+    text = text[:start] + active + text[end:]
     path.write_text(text, encoding="utf-8")
     assert runner._arch133_scheduler_installation_authority_check(
         workflow_authority_copy

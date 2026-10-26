@@ -25161,8 +25161,29 @@ READONLY_BLOB_BEFORE: Final = {
         "7a1d0280b5675d6d30bb2014699e31454eedc91a"
     ),
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("710a0f266bb5d5d6d86764c988974c1394c6dfbd"),
+    "tests/review_paper/test_arch133_scheduler_installation.py": (
+        "f1baa1a903955a76b8b72d57f11cfb5c96e3a031"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "9249dd7820c933e66e11ff5de0eb522e94198e04"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+        "b540070803200a8cc961d29a8db9f3ba3886a6f6"
+    ),
     "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
         "79577ac326bf881077e3ba8ba5f6ca34fb7ea727"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "8af8ee7bdcfd5413fbcc1592538034128beba676"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "0e4b2a80c79a3a776e585e0aa10471549127c946"
+    ),
+    "tests/review_paper/test_supervised_release_installation_operator.py": (
+        "d632eeeb008f8e6ba2767338ea504724c25c04df"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "b7d6163f2f7f22255fe04d89cda60031a6a42308"
     ),
     "tests/runtime/checkpoint_runner/helpers.py": (
         "2a3922c9dd73c00672e6db26550bd11c35510666"
@@ -25173,23 +25194,56 @@ READONLY_BLOB_BEFORE: Final = {
     "tests/runtime/checkpoint_runner/test_core.py": (
         "d2606ab9462b8462c654129b2368f016a300c250"
     ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "3c1b9f8bef5ccf3e23a38f3adbacbdbd2d69425c"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "c34094da4ab11769b59a93c5c2f511e9af3496c1"
+    ),
 }
 READONLY_BLOB_AFTER: Final = {
     ".github/workflows/checkpoint-source-gates.yml": (
         "4b0e067eda4d4dea40ee4f6d758fb81c2e90c60c"
     ),
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("69b80e568efbfbeadaa004cccae2c12f849a6c17"),
+    "tests/review_paper/test_arch133_scheduler_installation.py": (
+        "8dbf68ad57996f68a373e8a4101ccb7387d53b14"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
+        "2353a5191e9f39593ab365c0b1855ad6a1509425"
+    ),
+    "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
+        "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
+    ),
     "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py": (
         "34a27005e43b5d67c76061784e3cdfa393f94f0d"
+    ),
+    "tests/review_paper/test_supervised_deployment_qualification.py": (
+        "1dd2d55e60939763a34b47c4e633a54d47e92300"
+    ),
+    "tests/review_paper/test_supervised_maintenance_rebind.py": (
+        "76ceb46582c073f8605debe25802df4f3113ea78"
+    ),
+    "tests/review_paper/test_supervised_release_installation_operator.py": (
+        "05f44d677c92451f01c3ea359f26ac0bad38a6be"
+    ),
+    "tests/review_paper/test_supervised_runtime_host_admission.py": (
+        "34611197e598ce8f298bde92780d576604c6b9e3"
     ),
     "tests/runtime/checkpoint_runner/helpers.py": (
         "ed93c46ccb929193b1779a8f6f16a686730d8c59"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "a6c4a8e358849a6d90843461edba6268500b5b21"
+        "b7be985d19d535f0dd6837cc5cfb99615e24f5f0"
     ),
     "tests/runtime/checkpoint_runner/test_core.py": (
         "57651c926b8e4cba9924aebb55424778f201f1d8"
+    ),
+    "tests/strategies/test_production_strategy_contract.py": (
+        "f8fa38041aaa54c69b8f3692fb13b98d14baf6e5"
+    ),
+    "tests/strategies/test_production_strategy_decision.py": (
+        "026170f86055fa500fd9e73c0ef84804196d2ce5"
     ),
 }
 READONLY_SOURCE_PINS: Final = {
@@ -25200,7 +25254,7 @@ READONLY_SOURCE_PINS: Final = {
         "09a86522881879627370534a84fc4550d79fff69"
     ),
     "docs/validation/arch134-fresh-successor-readonly-deployment-admission.md": (
-        "6448418592a3598695176d47d171bf81d5d1b8e6"
+        "7aa04755e28a4c5b75423efbd583a0b2182aec1c"
     ),
     "scripts/arch134_deployment_admission_observe.ps1": (
         "fe3bbeeb28b63806d80f06d550ff3d0305abec1d"
@@ -25421,7 +25475,7 @@ READONLY_AST_PINS: Final = {
         "68a6353b11e27445acc0561b7230f7e2117bb39b16c6b86b99ed5bbb4a81e728"
     ),
     "_readonly_candidate_authority_check": (
-        "bd2aa09280a6834ea1d303de7dce68d4ca36e2d4ecadcd74999b2503520f963b"
+        "0ebc772994af0b181575ee5e1750f934430c4e8d225a48d81c669ec4dc2dd94d"
     ),
     "_readonly_checkpoint_specs": (
         "b90b18eab176c2f859c2b3c68010652acd67661b68ec48a4b465dca3c5ea1d9a"
@@ -25435,6 +25489,9 @@ READONLY_AST_PINS: Final = {
     "_readonly_predecessor_active_inventory": (
         "d6176df041f4074327066a0d7474048f4038bd8bded586817e96b15721db9c42"
     ),
+    "_readonly_predecessor_authority_check": (
+        "e7f006a1e1f976c1a3be531300176632a21e1094ad75aa8d8ab7ddb2b96131ff"
+    ),
     "_readonly_preflight_checkpoint": (
         "5e6e1c314805e4d2a51da27d769d74580f617af2c3ebc065dab4e85aa8d3785f"
     ),
@@ -25446,7 +25503,7 @@ READONLY_AST_PINS: Final = {
     ),
 }
 READONLY_MAPS_SHA256: Final = (
-    "6bb47c9ae27c57b661a5d72967b44aba10802f018e44c0614b45482dea6d4bd5"
+    "884c802521ed964402e5595b79f87170294535eebc4858c2855b751b8fe680ae"
 )
 READONLY_PREDECESSOR_ACTIVE: Final = (
     "arch146-a-historical-research-dataset-enforcement",
@@ -25535,6 +25592,7 @@ _PRE_READONLY_R3M_PIN = _arch132_r3m_pin
 _PRE_READONLY_SHARED_PIN = _arch146a_shared_blob_pin
 _PRE_READONLY_SPECS = _checkpoint_specs
 _PRE_READONLY_PREFLIGHT = preflight_checkpoint
+_PRE_READONLY_PREDECESSOR_CHECK = _deployment_candidate_predecessor_authority_check
 
 
 def _readonly_maps() -> None:
@@ -25696,6 +25754,31 @@ def _readonly_admission_graph_check(repo_root: Path) -> tuple[str, ...]:
         return ("Read-only admission graph unavailable",)
 
 
+def _readonly_predecessor_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Reconcile only exact reviewed test successors in the frozen M3 surface."""
+    failures = _PRE_READONLY_PREDECESSOR_CHECK(repo_root)
+    try:
+        _readonly_maps()
+        prefix = "R3N C4 predecessor source drift: "
+        remaining = []
+        for failure in failures:
+            relative = failure[len(prefix) :] if failure.startswith(prefix) else ""
+            if (
+                relative in READONLY_BLOB_BEFORE
+                and relative in ARCH132_R3M_C3_BLOB_PINS
+            ):
+                if (
+                    ARCH132_R3M_C3_BLOB_PINS[relative] == READONLY_BLOB_BEFORE[relative]
+                    and _git_blob_sha1(repo_root / relative)
+                    == READONLY_BLOB_AFTER[relative]
+                ):
+                    continue
+            remaining.append(failure)
+        return tuple(remaining)
+    except (OSError, ValueError, KeyError, TypeError):
+        return (*failures, "Read-only admission predecessor reconciliation unavailable")
+
+
 def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = list(_deployment_candidate_predecessor_authority_check(repo_root))
     try:
@@ -25743,6 +25826,8 @@ def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
             or preflight_checkpoint is not _readonly_preflight_checkpoint
             or _arch146a_predecessor_active_inventory
             is not _readonly_predecessor_active_inventory
+            or _deployment_candidate_predecessor_authority_check
+            is not _readonly_predecessor_authority_check
         ):
             failures.append("Read-only admission current dispatch drift")
         _readonly_predecessor_active_inventory()
@@ -25852,6 +25937,9 @@ _arch132_r3n_c4_pin = _readonly_pin
 _arch132_r3m_pin = _readonly_r3m_pin
 _arch146a_shared_blob_pin = _readonly_shared_blob_pin
 _deployment_candidate_authority_check = _readonly_candidate_authority_check
+_deployment_candidate_predecessor_authority_check = (
+    _readonly_predecessor_authority_check
+)
 _arch132_r3n_c4_authority_check = _readonly_candidate_authority_check
 _arch132_r3n_c1_authority_check = _readonly_candidate_authority_check
 _arch132_r3m_c3_authority_check = _readonly_candidate_authority_check

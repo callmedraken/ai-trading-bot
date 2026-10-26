@@ -21,6 +21,13 @@ Architecture 134 fresh-successor READ-ONLY deployment admission observer is
 SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
 REVIEW.
 
+C1 — registry contract reconciliation follows preserved initial observer source
+b6797eba6e1ee47ccfa914a36d3a229d74661f48 /
+31b45de23822711acc0924ffe3f3590d5c5064c2. Feature #737 / 40286185979 / attempt 1
+is terminal FAILURE: source-static/active tests passed; ROBINHOOD reported nine
+stale registry-consumer assertions. All nine reproduced locally. C1 updates
+current test topology assertions and exact test pins without observer changes.
+
     branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-current
     worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-current
     base HEAD/TREE: 745b027abfd5cf75ba113b5bb78880af5f55fcce /

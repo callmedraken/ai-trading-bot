@@ -431,7 +431,7 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         NAME,
         "arch134-production-strategy-decision",
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 79
+    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 80
 
     root = Path(certification.__file__).resolve().parents[1]
     inventory = certification.discover_inventory(root)

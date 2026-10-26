@@ -27,6 +27,12 @@ eabbf166db2d14ce7fed603df3f8b6762394e3c7, not newer develop or an installed imag
 Its own final implementation
 HEAD/tree and CI are post-publication handoff facts, separately reviewed.
 
+Initial observer source b6797eba6e1ee47ccfa914a36d3a229d74661f48 /
+31b45de23822711acc0924ffe3f3590d5c5064c2 reached terminal-red feature
+#737 / 40286185979 / attempt 1. Source-static and active tests passed; canonical
+ROBINHOOD exposed nine stale registry-consumer assertions. C1 reconciles current
+registry tests and exact test authority only; observer behavior is unchanged.
+
 The observer binds reviewed source, frozen inventory/manifest, consumed R1 closure,
 fixed no-follow namespace, principal/security, Python and quiescence observations.
 Stable read-only PASS grants only the next root write-authority/ACL review.

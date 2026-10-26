@@ -29,6 +29,34 @@ any red attempt and follow the separately named corrective-checkpoint rules.
 
 ## Completed focused evidence
 
+### C1 — registry contract reconciliation
+
+Preserve feature #737 / 40286185979 / attempt 1 terminal FAILURE on initial
+observer source b6797eba6e1ee47ccfa914a36d3a229d74661f48 /
+31b45de23822711acc0924ffe3f3590d5c5064c2. Source-static and active tests passed.
+Canonical ROBINHOOD recorded 11,597 passed / 6 skipped / 9 failed / 0 errors in
+272.925 seconds, within its unchanged 300-second hygiene budget. Failed evidence
+is preserved at `F:\AI\temp\ra-red-0c3820389a2a4fd99f0d3ebfe7c4fcc1`.
+
+All nine failures reproduced with 3 passing companion mutation cases at
+`F:\AI\temp\ra-c1-repro-641438f65e844abb89b65316dfc2a810\j.xml`.
+The bounded cause is stale absolute registry positions/predecessor slicing and
+a copied-runner whole-file text count. C1 updates those consumers, scopes the
+mutation test to the canonical active declaration, and reconciles two analogous
+FULL-only strategy count assertions. Historical projected fixtures retain their
+reviewed predecessor contracts. Exact additive test pins are refreshed; observer
+implementation and every accepted predecessor map/function stay unchanged.
+
+Run affected tests and the complete prepublication gate before one new atomic
+commit/push. Preserve #737; never rerun unchanged CI or amend published source.
+
+C1 focused verification passed 273 cases in 71.27 seconds at
+`F:\AI\temp\ra-c1-test-9a4953bc7c37447d985ee2cf75be7ed1\j.xml`. This includes
+the reproduced failures, analogous FULL-only assertions, current CI contracts,
+map-substitution rejection and a regression proving that exact predecessor-test
+pin reconciliation cannot hide an unreviewed source change. The observer's four
+modules and fixed host diagnostic remain byte-identical to the initial source.
+
 Latest passing coverage spans 1,245 unique cases across the affected successor,
 current runner, CI, profile and lane surfaces. Initial evidence is preserved at
 `F:\AI\temp\ra-focused-d7d9da0bd00148cfa97c09c50d83cada\j.xml`;

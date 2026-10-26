@@ -261,6 +261,15 @@ def test_r3n_successor_filters_only_exact_current_topology_drift(monkeypatch, tm
         "tests/scripts/certification_runner/test_lanes.py",
         "R3N C4 predecessor source drift: "
         "tests/scripts/certification_runner/test_profiles.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_d1_session_execution.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_d1_session_authorization.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_pre_market_wake_overnight.py",
+        "R3N C4 predecessor source drift: tests/review_paper/test_five_session_soak.py",
+        "Read-only admission shared source drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
     )
     monkeypatch.setattr(
         runner,

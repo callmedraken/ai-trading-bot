@@ -26236,7 +26236,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
     ),
     "_arch134_r3n_prepublication_authority_check": (
-        "c6d9248b560c00cf9426b7607f2d4ae0e750e7bbf28f1d154ff11c4c685e5b7e"
+        "a5586fc96af4685977c5aa011a944c5897c7e71a1a10dfd6729c0e8a5cf9344f"
     ),
     "_arch134_readonly_diagnostic_shared_successor_pin": (
         "ac1decd8b7e367c0739e35c8d47949808e630339cf221226507faa34ba5b1fe2"
@@ -26252,7 +26252,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "e4595c6d44c14d9820905990a6bb5dd7d2a1fe72f4ad16c71810f2a0301d503f"
+    "b1e755209286f8ec4758a23f11a8c471521982cccef86cc9c3e2cf51c0b35432"
 )
 
 
@@ -26632,6 +26632,13 @@ def _arch134_r3n_prepublication_authority_check(
         "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
         "R3N C4 predecessor source drift: "
         "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_d1_session_execution.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_d1_session_authorization.py",
+        "R3N C4 predecessor source drift: "
+        "tests/review_paper/test_pre_market_wake_overnight.py",
+        "R3N C4 predecessor source drift: tests/review_paper/test_five_session_soak.py",
         "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
         "Read-only admission predecessor blob drift: "
         "tests/runtime/checkpoint_runner/test_ci.py",
@@ -26646,6 +26653,8 @@ def _arch134_r3n_prepublication_authority_check(
         "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
         "Read-only admission shared source drift: "
         "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+        "Read-only admission shared source drift: "
+        "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
         "R3N C4 predecessor new AST drift: prepublication_admission",
         "R3N workflow topology drift",
     }

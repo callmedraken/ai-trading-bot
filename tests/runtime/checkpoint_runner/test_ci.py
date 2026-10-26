@@ -45,6 +45,15 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
             "tests/runtime/checkpoint_runner/test_core.py"
         ],
+        root / "tests/scripts/certification_runner/helpers.py": (
+            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+        ),
+        root / "tests/scripts/certification_runner/test_profiles.py": (
+            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+        ),
+        root / "tests/scripts/certification_runner/test_lanes.py": (
+            "6ef03c56497055a8edf7d2378c87c44d55800b53"
+        ),
     }
     monkeypatch.setattr(
         runner,
@@ -57,7 +66,30 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         return tuple(
             failure
             for failure in predecessor(repo_root)
-            if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
+            if failure
+            not in {
+                (
+                    "R3N C1 R3M source drift: "
+                    "tests/scripts/certification_runner/helpers.py"
+                ),
+                (
+                    "R3N C1 R3M source drift: "
+                    "tests/scripts/certification_runner/test_lanes.py"
+                ),
+                (
+                    "R3N C1 R3M source drift: "
+                    "tests/scripts/certification_runner/test_profiles.py"
+                ),
+                (
+                    "R3N C4 predecessor source drift: "
+                    "tests/scripts/certification_runner/test_lanes.py"
+                ),
+                (
+                    "R3N C4 predecessor source drift: "
+                    "tests/scripts/certification_runner/test_profiles.py"
+                ),
+                "R3N C4 predecessor new AST drift: prepublication_admission",
+            }
         )
 
     monkeypatch.setattr(
@@ -726,6 +758,9 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
     original_blob = runner._git_blob_sha1
     historical_test_ci = "tests/runtime/checkpoint_runner/test_ci.py"
     historical_test_core = "tests/runtime/checkpoint_runner/test_core.py"
+    historical_test_helpers = "tests/scripts/certification_runner/helpers.py"
+    historical_test_profiles = "tests/scripts/certification_runner/test_profiles.py"
+    historical_test_lanes = "tests/scripts/certification_runner/test_lanes.py"
     monkeypatch.setattr(
         runner,
         "_git_blob_sha1",
@@ -734,6 +769,12 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
             if path == root / historical_test_ci
             else runner.READONLY_BLOB_AFTER[historical_test_core]
             if path == root / historical_test_core
+            else "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
+            if path == root / historical_test_helpers
+            else "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
+            if path == root / historical_test_profiles
+            else "6ef03c56497055a8edf7d2378c87c44d55800b53"
+            if path == root / historical_test_lanes
             else original_blob(path)
         ),
     )

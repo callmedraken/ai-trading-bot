@@ -21842,6 +21842,82 @@ def _arch132_r3n_c1_r5_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+# R3N corrective C2 adds the current R3N successor after the preserved shared
+# overlay chain. C1 and all predecessor maps remain immutable.
+ARCH132_R3N_C2_AST_PREDECESSORS: Final = {
+    "_arch146a_overlay": (
+        "9967ab52cfbe3a3ffc97811c428d468eb65532a91f49429a427f21a2c0c9f1c7"
+    ),
+}
+ARCH132_R3N_C2_AST_PINS: Final = {
+    "_arch146a_overlay": (
+        "9967ab52cfbe3a3ffc97811c428d468eb65532a91f49429a427f21a2c0c9f1c7"
+    ),
+}
+ARCH132_R3N_C2_NEW_AST_PINS: Final = {
+    "_arch132_r3n_c2_maps": (
+        "4855bf3bb735ef80545449abb83a15f7489bf63d8e82e7890c6c2ae9c931460a"
+    ),
+    "_arch132_r3n_c2_shared_overlay": (
+        "b46e4dce4248409ca1814e8fc44d0356a52896714f4552d47241dee2e0067cf1"
+    ),
+    "_arch132_r3n_c2_authority_check": (
+        "ba2850b6ae1046e935c7d077dff97f1a90d7625e4af561a7c4185e4614084065"
+    ),
+}
+ARCH132_R3N_C2_MAPS_SHA256: Final = (
+    "481fdeb6764a44f5baeacec706bd401a6f11d06b48b4ee915c92e944c3f149c1"
+)
+
+
+def _arch132_r3n_c2_maps() -> None:
+    maps = (
+        ARCH132_R3N_C2_AST_PREDECESSORS,
+        ARCH132_R3N_C2_AST_PINS,
+        ARCH132_R3N_C2_NEW_AST_PINS,
+    )
+    if hashlib.sha256(
+        json.dumps(maps, sort_keys=True).encode()
+    ).hexdigest() != ARCH132_R3N_C2_MAPS_SHA256 or set(
+        ARCH132_R3N_C2_AST_PREDECESSORS
+    ) != set(ARCH132_R3N_C2_AST_PINS):
+        raise ValueError("R3N C2 exact successor maps drift")
+
+
+_ARCH146A_OVERLAY_PRE_R3N_C2 = _arch146a_overlay
+
+
+def _arch132_r3n_c2_shared_overlay(key: str, predecessor: str, *, ast_pin: bool) -> str:
+    resolved = _ARCH146A_OVERLAY_PRE_R3N_C2(key, predecessor, ast_pin=ast_pin)
+    return _arch132_r3n_c1_pin(key, resolved, ast_pin=ast_pin)
+
+
+def _arch132_r3n_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        _arch132_r3n_c2_maps()
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for key, pin in {
+            **ARCH132_R3N_C2_AST_PINS,
+            **ARCH132_R3N_C2_NEW_AST_PINS,
+        }.items():
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[key], include_attributes=False).encode()
+                ).hexdigest()
+                != pin
+            ):
+                failures.append("R3N C2 runner AST drift: " + key)
+        failures.extend(_arch132_r3n_c1_authority_check(repo_root))
+    except (OSError, ValueError, KeyError, TypeError, SyntaxError):
+        failures.append("R3N C2 authority unavailable")
+    return tuple(failures)
+
+
 # The frozen R3M entry points remain in the source for predecessor review, but
 # current runtime pin and authority dispatch follow the reviewed C1 overlay.
 _arch132_r3m_c3_authority_check = _arch132_r3n_c1_authority_check
@@ -21852,6 +21928,7 @@ _arch134_d1s3_shared_successor_pin = _arch132_r3n_c1_d1s3_shared_successor_pin
 _arch146a_c2_authority_check = _arch132_r3n_c1_arch146a_c2_authority_check
 _arch146a_authority_check = _arch132_r3n_c1_arch146a_authority_check
 _arch134_r5_authority_check = _arch132_r3n_c1_r5_authority_check
+_arch146a_overlay = _arch132_r3n_c2_shared_overlay
 
 
 def _checkpoint_specs() -> dict[str, CheckpointSpec]:

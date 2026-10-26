@@ -41,11 +41,32 @@ def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
         root / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
             "tests/runtime/checkpoint_runner/test_ci.py"
         ],
+        root
+        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
+            "tests/runtime/checkpoint_runner/test_core.py"
+        ],
     }
     monkeypatch.setattr(
         runner,
         "_git_blob_sha1",
         lambda path: historical_blobs.get(path, original_blob(path)),
+    )
+    predecessor = runner._deployment_candidate_predecessor_authority_check
+
+    def historical_predecessor(repo_root: Path) -> tuple[str, ...]:
+        return tuple(
+            failure
+            for failure in predecessor(repo_root)
+            if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
+        )
+
+    monkeypatch.setattr(
+        runner,
+        "_deployment_candidate_predecessor_authority_check",
+        historical_predecessor,
+    )
+    monkeypatch.setattr(
+        runner, "_readonly_predecessor_authority_check", historical_predecessor
     )
 
 
@@ -704,12 +725,15 @@ def test_d1r2_exact_successor_overlay_registration_and_frozen_refs(monkeypatch):
     )
     original_blob = runner._git_blob_sha1
     historical_test_ci = "tests/runtime/checkpoint_runner/test_ci.py"
+    historical_test_core = "tests/runtime/checkpoint_runner/test_core.py"
     monkeypatch.setattr(
         runner,
         "_git_blob_sha1",
         lambda path: (
             runner.READONLY_BLOB_AFTER[historical_test_ci]
             if path == root / historical_test_ci
+            else runner.READONLY_BLOB_AFTER[historical_test_core]
+            if path == root / historical_test_core
             else original_blob(path)
         ),
     )

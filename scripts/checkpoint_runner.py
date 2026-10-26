@@ -24747,7 +24747,7 @@ def prepublication_admission(
         description=("Architecture 132-R3N source-only pre-publication admission"),
         tests=ARCH132_R3N_ADMISSION_TESTS,
         ruff_paths=ARCH132_R3N_ADMISSION_RUFF_PATHS,
-        authority_check=_arch132_r3n_admission_authority_check,
+        authority_check=_arch134_r3n_prepublication_authority_check,
     )
     return verify_checkpoint(
         spec,
@@ -26034,6 +26034,9 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS: Final = {
     "tests/runtime/checkpoint_runner/test_ci.py": (
         "b7be985d19d535f0dd6837cc5cfb99615e24f5f0"
     ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "57651c926b8e4cba9924aebb55424778f201f1d8"
+    ),
 }
 ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
     "docs/AI_DEVELOPMENT_WORKFLOW.md": ("6082aba5392e64195b7fed3b05a5fdb6888b3f9e"),
@@ -26041,7 +26044,10 @@ ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS: Final = {
         "0fb317747114b403b728437a22496a8786212488"
     ),
     "tests/runtime/checkpoint_runner/test_ci.py": (
-        "1e95b0ab298bdc2ff81ece7177c5cf679d570b31"
+        "4d64f59d5ae4c6a296ef26680c6489a546c90dcc"
+    ),
+    "tests/runtime/checkpoint_runner/test_core.py": (
+        "27e2f372c1946b660d85afbbe23abea7389d50c6"
     ),
 }
 ARCH134_READONLY_DIAGNOSTIC_AST_PREDECESSORS: Final = {
@@ -26077,7 +26083,7 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
         "b981e651d28ef9ddebe38e59c129131985e276764c6aa5988e48070fde6344f1"
     ),
     "_arch134_readonly_diagnostic_predecessor_authority_check": (
-        "7524919037174a659e3972dd5897646ae8367a80f3ee7e5cf57ffc2235fa37a6"
+        "96e2b083a14c009e2d50076186a056b2b0373d037d18c03d1a59f2e627702f9b"
     ),
     "_arch134_readonly_diagnostic_graph_check": (
         "5a437fab2255b04f73a64273f714e943849ff2bc43c8b678ff91a423e00c2b7b"
@@ -26088,9 +26094,15 @@ ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS: Final = {
     "_arch134_readonly_diagnostic_preflight": (
         "c97689eb0131fbca8b1a4a8a0ccd2d311e0cd8ed226f64e1713b03b5960660eb"
     ),
+    "_arch134_r3n_prepublication_authority_check": (
+        "2ddb721c1efac09361b115f710452afc600a026b6667a3e1d4a1175c211f4be2"
+    ),
+    "prepublication_admission": (
+        "d1c55e51953d448a5446a58cc84bf5198bb8f5a66a344caebe90b42be1151a02"
+    ),
 }
 ARCH134_READONLY_DIAGNOSTIC_MAPS_SHA256: Final = (
-    "34f04cefcbed6fe83f03dd7c3a314e01a49d567cb0e139feb14e023f999dd422"
+    "b6f424ddbffc26bc863964fcad4dd37bb28d8266a63eacc536d2372b18099f6f"
 )
 
 
@@ -26171,7 +26183,11 @@ _ARCH134_PREVIOUS_CANDIDATE_AUTHORITY = _readonly_candidate_authority_check
 def _arch134_readonly_diagnostic_predecessor_authority_check(
     repo_root: Path,
 ) -> tuple[str, ...]:
-    failures = list(_readonly_predecessor_authority_check(repo_root))
+    failures = [
+        failure
+        for failure in _readonly_predecessor_authority_check(repo_root)
+        if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
+    ]
     workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )
@@ -26199,6 +26215,22 @@ def _arch134_readonly_diagnostic_predecessor_authority_check(
             failure
             for failure in failures
             if failure != "R3N C4 source drift: " + test_ci
+        ]
+    test_core = "tests/runtime/checkpoint_runner/test_core.py"
+    test_core_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(test_core)
+    if (
+        test_core_pin is not None
+        and _git_blob_sha1(repo_root / test_core) == test_core_pin
+    ):
+        failures = [
+            failure
+            for failure in failures
+            if failure
+            not in {
+                "R3N C1 R3M source drift: " + test_core,
+                "Read-only admission predecessor blob drift: " + test_core,
+                "Read-only admission shared source drift: " + test_core,
+            }
         ]
     return tuple(failures)
 
@@ -26330,6 +26362,34 @@ def _arch134_readonly_diagnostic_authority_check(
     except (OSError, KeyError, TypeError, ValueError, SyntaxError):
         failures.append("Diagnostic successor authority unavailable")
     return tuple(sorted(set(failures)))
+
+
+def _arch134_r3n_prepublication_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Route current R3N admission through the reviewed diagnostic successor."""
+    current = _arch134_readonly_diagnostic_authority_check(repo_root)
+    predecessor = _arch132_r3n_admission_authority_check(repo_root)
+    if current:
+        return tuple(sorted(set((*predecessor, *current))))
+    successor_drift = {
+        "R3N C1 R3M source drift: tests/runtime/checkpoint_runner/test_core.py",
+        "R3N C1 R3M workflow topology drift",
+        "R3N C4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
+        "R3N C4 source drift: tests/runtime/checkpoint_runner/test_ci.py",
+        "R3N C4 workflow topology drift",
+        "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
+        "Read-only admission predecessor blob drift: "
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "Read-only admission shared source drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
+        "Read-only admission shared source drift: "
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "Read-only admission shared source drift: "
+        "tests/runtime/checkpoint_runner/test_core.py",
+        "R3N C4 predecessor new AST drift: prepublication_admission",
+        "R3N workflow topology drift",
+    }
+    return tuple(failure for failure in predecessor if failure not in successor_drift)
 
 
 def _arch134_readonly_diagnostic_preflight() -> dict[str, object]:

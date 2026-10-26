@@ -227,6 +227,31 @@ def test_successor_registration_is_current_without_execute_or_host_invocation(
     )
 
 
+def test_r3n_prepublication_admission_dispatches_current_successor_authority(
+    monkeypatch, tmp_path
+):
+    captured: dict[str, object] = {}
+
+    def verify(spec, **kwargs):
+        captured["spec"] = spec
+        captured["kwargs"] = kwargs
+        return True, tmp_path / "report.json"
+
+    monkeypatch.setattr(runner, "verify_checkpoint", verify)
+    result = runner.prepublication_admission(
+        repo_root=tmp_path,
+        evidence_root=tmp_path / "evidence",
+    )
+
+    assert result == (True, tmp_path / "report.json")
+    spec = captured["spec"]
+    assert spec.authority_check is runner._arch134_r3n_prepublication_authority_check
+    assert captured["kwargs"] == {
+        "repo_root": tmp_path,
+        "evidence_root": tmp_path / "evidence",
+    }
+
+
 def test_diagnostic_overlay_preserves_frozen_r3m_and_reconstructs_exact_successor():
     assert runner.ARCH132_R3M_AST_PINS["_batch_workflow_is_reviewed"] == (
         "3f910a44262aa76ee52b25158492a3b4061b1d0274414d8c2fb850725091c87d"

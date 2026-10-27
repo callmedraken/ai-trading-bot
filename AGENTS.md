@@ -685,13 +685,14 @@ protected-dispatch inventory from prose or examples; `_checkpoint_specs()` and
 Administrator/source/host admission and evidence capture; do not insert an
 external pre-screen that can abort before the runner records the attempt.
 
-The current diagnostic R1 implementation checkpoint is SOURCE ONLY:
-`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1` registers
+The current diagnostic R2 implementation checkpoint is SOURCE ONLY:
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2` registers
 read-only preflight and `execute = None`; no host attempt runs during source
-implementation. Historical D1S4/R1 recovery and consumed v1/diagnostic host
-registrations retain predecessor meaning. ChatGPT must review the exact new
-source before any new host attempt. The complete future invocation contract is
-in `docs/architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r1.md`.
+implementation. R1 is SOURCE ACCEPTED/integrated and its real-host attempt is
+permanently consumed. Historical R1/v1/diagnostic registrations retain their
+meaning and must not be rerun. ChatGPT must review exact R2 source before any
+later host boundary. The current namespace contract is in
+`docs/architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r2.md`.
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a
 source/preflight PASS. It may be invoked only after authorization within the

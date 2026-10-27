@@ -59,6 +59,7 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
             "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
             "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
         }
     )
     weights = runner.robinhood_module_weights(selected)
@@ -248,6 +249,7 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
             "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
             "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
         }
     )
     weights = runner.full_module_weights(inventory)
@@ -337,6 +339,7 @@ def test_full_fixture_matches_frozen_timing_membership() -> None:
     assert set(_fixture_profiles()["full"]) - {
         diagnostic,
         "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
     } == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
 
 

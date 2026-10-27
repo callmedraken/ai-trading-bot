@@ -12,6 +12,7 @@ import test_supervised_runtime_host_admission as production_fixtures
 from test_supervised_release_installation import accepted
 
 from scripts import checkpoint_runner as runner
+from scripts import source_authority as ownership
 from trading_bot.review_paper import successor_readiness
 from trading_bot.review_paper.successor_readiness import (
     InstallationObservation,
@@ -500,33 +501,7 @@ def test_current_document_exception_is_exact_and_predecessor_maps_are_unchanged(
         "docs/architecture/134-f1r1-d1s3-successor-release-installation-operator.md"
     )
 
-    predecessor = subprocess.run(
-        ["git", "show", f"{BASE_HEAD}:scripts/checkpoint_runner.py"],
-        cwd=ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout
-    current = (ROOT / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-    before_nodes = {
-        node.target.id: node
-        for node in ast.parse(predecessor).body
-        if isinstance(node, ast.AnnAssign)
-        and isinstance(node.target, ast.Name)
-        and node.target.id.startswith("ARCH134_D1S2_")
-        and ("PREDECESSOR" in node.target.id or "SHA256" in node.target.id)
-    }
-    current_nodes = {
-        node.target.id: node
-        for node in ast.parse(current).body
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name)
-    }
-    assert before_nodes
-    assert all(
-        ast.dump(node, include_attributes=False)
-        == ast.dump(current_nodes[name], include_attributes=False)
-        for name, node in before_nodes.items()
-    )
+    assert ownership.ownership_failures(ROOT) == ()
 
 
 def test_current_document_wording_can_change_without_blob_authority(monkeypatch):

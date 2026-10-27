@@ -50,6 +50,14 @@ complete admission, one push and one terminal CI result. Mapped canonical
 ROBINHOOD/FULL remains GitHub-owned. The bounded corrective ownership rule above
 has no C1/C2/C3 ceiling; published failed evidence is immutable.
 
+If mapped canonical CI finds a deterministic, locally reproducible
+stale-current, pin, fixture or ownership failure that the required
+prepublication gate did not exercise, classify it as
+`PREPUBLICATION_COVERAGE_DEFECT`, preserve the terminal evidence, and stop for
+ChatGPT review. Do not silently continue through C1/C2/C3 corrective patches.
+The no-arbitrary-correction-count rule otherwise remains in force for failures
+that the required prepublication gate did exercise.
+
 ## Project purpose
 
 Build a conservative algorithmic trading platform that progresses through

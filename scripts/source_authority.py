@@ -297,6 +297,339 @@ def _mutable_pin_literals(tree: ast.AST) -> list[str]:
     return result
 
 
+_HASH_METHODS = frozenset(
+    {
+        "blake2b",
+        "blake2s",
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha512",
+    }
+)
+_SOURCE_READ_METHODS = frozenset({"read_bytes", "read_text"})
+_SOURCE_AUTHORITY_APIS = frozenset({"ast_matches", "blob_matches"})
+
+
+def _assignment_targets(node: ast.AST) -> tuple[str, ...]:
+    targets: list[ast.AST] = []
+    if isinstance(node, ast.Assign):
+        targets.extend(node.targets)
+    elif isinstance(node, (ast.AnnAssign, ast.NamedExpr)):
+        targets.append(node.target)
+    return tuple(target.id for target in targets if isinstance(target, ast.Name))
+
+
+def _module_aliases(tree: ast.Module) -> dict[str, str]:
+    aliases: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                if node.module == "scripts" and alias.name in {
+                    "checkpoint_runner",
+                    "current_source_authority",
+                    "run_test_certification",
+                    "source_authority",
+                }:
+                    aliases[alias.asname or alias.name] = f"scripts/{alias.name}.py"
+        elif isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name in {
+                    "scripts.checkpoint_runner",
+                    "scripts.current_source_authority",
+                    "scripts.run_test_certification",
+                    "scripts.source_authority",
+                }:
+                    aliases[alias.asname or alias.name.split(".")[-1]] = (
+                        alias.name.replace(".", "/") + ".py"
+                    )
+    return aliases
+
+
+def _current_module_file(node: ast.AST, aliases: dict[str, str]) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "__file__"
+        and isinstance(node.value, ast.Name)
+        and classify_path(aliases.get(node.value.id, "")) is PinClass.CURRENT_MUTABLE
+    )
+
+
+def _current_symbol(node: ast.AST, aliases: dict[str, str]) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and isinstance(node.value, ast.Name)
+        and classify_path(aliases.get(node.value.id, "")) is PinClass.CURRENT_MUTABLE
+        and current_owner(node.attr) is not None
+    )
+
+
+def _literal_current_path(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and classify_path(node.value.replace("\\", "/")) is PinClass.CURRENT_MUTABLE
+    )
+
+
+def _path_is_current_mutable(
+    node: ast.AST, path_names: set[str], aliases: dict[str, str]
+) -> bool:
+    if _literal_current_path(node) or _current_module_file(node, aliases):
+        return True
+    if isinstance(node, ast.Name):
+        return node.id in path_names
+    if isinstance(node, ast.Attribute) and node.attr in {"parent", "parents"}:
+        # Path(runner.__file__).parents[1] is the repository root, not the
+        # current-mutable runner file itself.
+        return False
+    if (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.value, ast.Attribute)
+        and node.value.attr in {"parent", "parents"}
+    ):
+        return False
+    if isinstance(node, (ast.BinOp, ast.JoinedStr, ast.Subscript)):
+        return any(
+            _path_is_current_mutable(child, path_names, aliases)
+            for child in ast.iter_child_nodes(node)
+        )
+    if isinstance(node, ast.Call):
+        return any(
+            _path_is_current_mutable(child, path_names, aliases)
+            for child in ast.iter_child_nodes(node)
+        )
+    if isinstance(node, ast.Attribute):
+        return _path_is_current_mutable(node.value, path_names, aliases)
+    return False
+
+
+def _source_is_current_mutable(
+    node: ast.AST,
+    path_names: set[str],
+    source_names: set[str],
+    aliases: dict[str, str],
+) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in source_names
+    if isinstance(node, ast.Call):
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr in _SOURCE_READ_METHODS
+            and _path_is_current_mutable(node.func.value, path_names, aliases)
+        ):
+            return True
+        if (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "getsource"
+            and any(_current_symbol(arg, aliases) for arg in node.args)
+        ):
+            return True
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {
+            "decode",
+            "encode",
+            "strip",
+            "splitlines",
+        }:
+            return _source_is_current_mutable(
+                node.func.value, path_names, source_names, aliases
+            )
+        return False
+    if isinstance(node, ast.Attribute):
+        return False
+    if isinstance(node, ast.Subscript):
+        return _source_is_current_mutable(node.value, path_names, source_names, aliases)
+    return False
+
+
+def _ast_is_current_mutable(
+    node: ast.AST,
+    path_names: set[str],
+    source_names: set[str],
+    ast_names: set[str],
+    aliases: dict[str, str],
+) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in ast_names
+    if isinstance(node, ast.Subscript):
+        return _ast_is_current_mutable(
+            node.value, path_names, source_names, ast_names, aliases
+        )
+    if isinstance(node, ast.Attribute):
+        return _ast_is_current_mutable(
+            node.value, path_names, source_names, ast_names, aliases
+        )
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Attribute) and node.func.attr == "parse":
+            return any(
+                _source_is_current_mutable(arg, path_names, source_names, aliases)
+                for arg in node.args
+            )
+        return False
+    if isinstance(node, (ast.DictComp, ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+        return any(
+            _ast_is_current_mutable(child, path_names, source_names, ast_names, aliases)
+            for child in ast.iter_child_nodes(node)
+        )
+    return any(
+        _ast_is_current_mutable(child, path_names, source_names, ast_names, aliases)
+        for child in ast.iter_child_nodes(node)
+    )
+
+
+def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
+    review_root = repo_root / "tests/review_paper"
+    if not review_root.is_dir():
+        return ()
+    failures: list[str] = []
+    for path in sorted(review_root.rglob("*.py")):
+        relative = path.relative_to(repo_root).as_posix()
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        except (OSError, UnicodeError, SyntaxError) as exc:
+            failures.append(
+                "historical test authority unavailable: "
+                f"{relative} ({type(exc).__name__})"
+            )
+            continue
+
+        aliases = _module_aliases(tree)
+
+        def analyze(scope: ast.AST, *, aliases=aliases, relative=relative) -> None:
+            path_names: set[str] = set()
+            source_names: set[str] = set()
+            ast_names: set[str] = set()
+            changed = True
+            while changed:
+                changed = False
+                for item in ast.walk(scope):
+                    value = (
+                        item.value
+                        if isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
+                        else None
+                    )
+                    if value is None:
+                        continue
+                    targets = _assignment_targets(item)
+                    if not targets:
+                        continue
+                    if _path_is_current_mutable(value, path_names, aliases):
+                        for target in targets:
+                            if target not in path_names:
+                                path_names.add(target)
+                                changed = True
+                    if _source_is_current_mutable(
+                        value, path_names, source_names, aliases
+                    ):
+                        for target in targets:
+                            if target not in source_names:
+                                source_names.add(target)
+                                changed = True
+                    if _ast_is_current_mutable(
+                        value, path_names, source_names, ast_names, aliases
+                    ):
+                        for target in targets:
+                            if target not in ast_names:
+                                ast_names.add(target)
+                                changed = True
+
+            def authority_api(node: ast.Call) -> bool:
+                return (
+                    isinstance(node.func, ast.Attribute)
+                    and node.func.attr in _SOURCE_AUTHORITY_APIS
+                    and isinstance(node.func.value, ast.Name)
+                    and aliases.get(node.func.value.id) == "scripts/source_authority.py"
+                )
+
+            def exact_current_use(node: ast.AST) -> bool:
+                if isinstance(node, ast.Call):
+                    if authority_api(node):
+                        return False
+                    if isinstance(node.func, ast.Attribute):
+                        if node.func.attr == "_git_blob_sha1" and any(
+                            _path_is_current_mutable(arg, path_names, aliases)
+                            for arg in node.args
+                        ):
+                            return True
+                        if node.func.attr == "dump" and node.args:
+                            if _ast_is_current_mutable(
+                                node.args[0],
+                                path_names,
+                                source_names,
+                                ast_names,
+                                aliases,
+                            ):
+                                return True
+                        if node.func.attr in _HASH_METHODS and any(
+                            _current_symbol(arg, aliases)
+                            or _source_is_current_mutable(
+                                arg, path_names, source_names, aliases
+                            )
+                            or _ast_is_current_mutable(
+                                arg,
+                                path_names,
+                                source_names,
+                                ast_names,
+                                aliases,
+                            )
+                            for arg in node.args
+                        ):
+                            return True
+                    return any(
+                        exact_current_use(child)
+                        for child in ast.iter_child_nodes(node)
+                        if isinstance(child, (ast.Call, ast.Compare))
+                    )
+                if isinstance(node, ast.Compare):
+                    exact_call = any(
+                        exact_current_use(child) for child in ast.iter_child_nodes(node)
+                    )
+                    if exact_call:
+                        return True
+                    if not any(
+                        isinstance(operator, (ast.Eq, ast.NotEq))
+                        for operator in node.ops
+                    ):
+                        return False
+                    return any(
+                        _source_is_current_mutable(
+                            child, path_names, source_names, aliases
+                        )
+                        for child in ast.iter_child_nodes(node)
+                    )
+                return False
+
+            for node in ast.walk(scope):
+                if isinstance(node, ast.Call) and authority_api(node):
+                    continue
+                if isinstance(node, (ast.Call, ast.Compare)) and exact_current_use(
+                    node
+                ):
+                    failures.append(
+                        "historical test directly compares CURRENT_MUTABLE source: "
+                        f"{relative}:{node.lineno}"
+                    )
+
+        module_scope = ast.Module(
+            body=[
+                node
+                for node in tree.body
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            ],
+            type_ignores=[],
+        )
+        scopes = [module_scope] + [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        ]
+        for scope in scopes:
+            analyze(scope)
+    return tuple(sorted(set(failures)))
+
+
 def ownership_failures(repo_root: Path) -> tuple[str, ...]:
     """Frozen historical records cannot grow new current-path exact claims.
 
@@ -367,6 +700,7 @@ def ownership_failures(repo_root: Path) -> tuple[str, ...]:
             failures.append(
                 "historical exact dependency on CURRENT_MUTABLE: " + relative
             )
+    failures.extend(_historical_test_ownership_failures(repo_root))
     return tuple(failures)
 
 

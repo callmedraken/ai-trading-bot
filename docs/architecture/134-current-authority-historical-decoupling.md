@@ -69,8 +69,10 @@ accepted. `historical_authority_objects.json` indexes immutable ancestor runner
 objects by symbol/AST digest. Shared workflow/reuse/registry AST versions are reconstructed independently as well.
 The two historical digest builders read frozen profile, harness and CI-caption
 material from the checksummed record rather than live current globals. A structural
-regression rejects new historical digest builders using those mutable globals.
-Protected execution/preflight implementations stay
+regression rejects new historical/review-paper exact-byte or AST comparisons
+against those mutable globals; such historical exactness must route through the
+classification-aware authority API. SECURITY_SEMANTIC source remains eligible
+for exact-current checks. Protected execution/preflight implementations stay
 SECURITY_SEMANTIC and compare today's source directly.
 
 One retired planned harness declaration, test_ci blob

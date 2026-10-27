@@ -156,6 +156,14 @@ If this unpublished admission fails, preserve its report and classify it before
 any push. Replacing an unpublished candidate commit requires explicit task
 authorization; the standing prohibition on rewriting published history remains.
 
+If mapped canonical CI finds a deterministic, locally reproducible
+stale-current, pin, fixture or ownership failure that the required
+prepublication gate did not exercise, classify it as
+`PREPUBLICATION_COVERAGE_DEFECT`, preserve the terminal evidence, and stop for
+ChatGPT review. Do not silently continue through C1/C2/C3 corrective patches.
+The no-arbitrary-correction-count rule otherwise remains in force for failures
+that the required prepublication gate did exercise.
+
 One logical checkpoint still receives one prepared atomic commit/push and one
 CI admission. A red attempt is preserved; a bounded mechanical correction is a
 separately named checkpoint with fresh focused verification and a fresh

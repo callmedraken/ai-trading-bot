@@ -133,6 +133,38 @@ def test_historical_map_declarations_and_catalog_preserve_accepted_source():
         assert ownership.ast_matches(ROOT, name, ast.Pass(), digest)
 
 
+def test_historical_test_cannot_hash_current_mutable_runner_symbol(tmp_path):
+    for file in (
+        "scripts/checkpoint_runner.py",
+        "scripts/source_authority.py",
+        "scripts/current_source_authority.py",
+    ):
+        path = tmp_path / file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text((ROOT / file).read_text(encoding="utf-8"), encoding="utf-8")
+    bad = tmp_path / "tests/review_paper/test_stale_current.py"
+    bad.parent.mkdir(parents=True)
+    bad.write_text(
+        "import ast\n"
+        "import hashlib\n"
+        "from pathlib import Path\n"
+        "from scripts import checkpoint_runner as runner\n"
+        "ROOT = Path(__file__).resolve().parents[2]\n"
+        "def test_stale():\n"
+        "    tree = ast.parse((ROOT / 'scripts/checkpoint_runner.py').read_text())\n"
+        "    functions = {n.name: n for n in tree.body "
+        "if isinstance(n, ast.FunctionDef)}\n"
+        "    hashlib.sha256("
+        "ast.dump(functions['_checkpoint_specs']).encode()).hexdigest()\n",
+        encoding="utf-8",
+    )
+    failures = ownership.ownership_failures(tmp_path)
+    assert any(
+        "historical test directly compares CURRENT_MUTABLE source" in failure
+        for failure in failures
+    )
+
+
 def _contexts(monkeypatch, *, develop_red=False):
     state = {
         "head": "a" * 40,

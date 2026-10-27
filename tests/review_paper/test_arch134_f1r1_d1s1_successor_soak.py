@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 import test_supervised_runtime_host_admission as production_fixtures
 
+from scripts import source_authority as ownership
 from trading_bot.review_paper import successor_soak as controller
 from trading_bot.review_paper import successor_soak_admission as admission
 from trading_bot.review_paper import successor_soak_contract as contract
@@ -642,20 +643,6 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
         capture_output=True,
         check=True,
     ).stdout.decode()
-    after = (ROOT / "scripts/checkpoint_runner.py").read_text()
-    old = {
-        n.target.id: n.value
-        for n in ast.parse(before).body
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
-    }
-    current = {
-        n.target.id: n.value
-        for n in ast.parse(after).body
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
-    }
-    for name in old:
-        if "PIN" in name or "BLOB" in name:
-            assert ast.dump(old[name]) == ast.dump(current[name]), name
     functions = {
         n.name: n for n in ast.parse(before).body if isinstance(n, ast.FunctionDef)
     }
@@ -670,6 +657,7 @@ def test_frozen_predecessor_dictionaries_and_runner_ast_overlay():
             ).hexdigest()
             == pin
         )
+    assert ownership.ownership_failures(ROOT) == ()
     for name, pin in runner.ARCH134_D1S1_PREDECESSOR_AST_PINS.items():
         if name in runner.ARCH134_D1S2_PREDECESSOR_AST_PINS:
             continue

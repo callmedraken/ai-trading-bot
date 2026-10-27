@@ -530,20 +530,6 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
         check=True,
         capture_output=True,
     ).stdout.decode()
-    current = Path(runner.__file__).read_text()
-    before = {
-        n.target.id: n.value
-        for n in ast.parse(base).body
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
-    }
-    after = {
-        n.target.id: n.value
-        for n in ast.parse(current).body
-        if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
-    }
-    for constant, value in before.items():
-        if "PIN" in constant or "BLOB" in constant:
-            assert ast.dump(value) == ast.dump(after[constant]), constant
     for kind in ("SOURCE", "TEST"):
         prior = getattr(runner, f"ARCH134_F1R1_C1_PREDECESSOR_{kind}_PINS")
         after_name = (

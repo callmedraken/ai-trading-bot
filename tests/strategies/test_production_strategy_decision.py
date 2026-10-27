@@ -17,7 +17,6 @@ from tests.runtime.test_manual_paper_strategy_plan import (
 )
 
 from scripts import checkpoint_runner
-from scripts import run_test_certification as certification
 from trading_bot.runtime import ManualPaperStrategySignalStatus
 from trading_bot.runtime.manual_paper_strategy_plan import (
     build_manual_paper_strategy_decision,
@@ -324,22 +323,4 @@ def test_checkpoint_registration_and_inventory_are_exact() -> None:
         "arch134-production-strategy-contract",
         NAME,
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 80
-
-    root = Path(certification.__file__).resolve().parents[1]
-    inventory = certification.discover_inventory(root)
-    profiles = {
-        name: certification.select_inventory(inventory, name)
-        for name in ("full", "robinhood", "legacy", "exhaustive")
-    }
-    assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 203,
-        "robinhood": 112,
-        "legacy": 222,
-        "exhaustive": 425,
-    }
-    assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]
-    assert (
-        "tests/strategies/test_production_strategy_decision.py"
-        not in profiles["robinhood"]
-    )
+    assert "tests/strategies/test_production_strategy_decision.py" in spec.tests

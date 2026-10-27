@@ -28,6 +28,21 @@ The diagnostic branch is:
 Its accepted executable source is c2755c6. A later docs-only develop descendant
 does not require advancing that remote diagnostic ref again.
 
+## Preserved red compatibility correction
+
+Feature #752 / run 40478607410 / attempt 1 is preserved terminal-red evidence
+and is classified as `PREPUBLICATION_COVERAGE_DEFECT`; it was not rerun. The
+ordinary four-shard broad fallback exposed four deterministic stale-current
+strategy assertions: two historical D1R5 successor pin checks compared against
+today's mutable test bytes, and two strategy registration checks owned mutable
+global certification/profile totals. C1 is a separate corrective checkpoint on
+preserved red `bf2345b80f6b5c4c2933e9f1cff9007dbe63c20d` / tree
+`f0fc4f14e2b7426532805d100af953759e09b98e`. It routes historical assertions
+through immutable source-authority reconstruction, removes global count
+ownership from strategy tests, and extends the existing structural guard to
+reject the exposed strategy pattern before publication. No historical pin map
+or current certification/profile total is repinned.
+
 ## Session chronology — do not conflate F1 and F1R1
 
 Original F1 reserved five targets:
@@ -64,9 +79,9 @@ credential/provider, broker/paper or live effect is authorized. Live is NO-GO.
 
 ## Automatic next step
 
-Complete this docs-only status/handoff closeout through one ordinary terminal
-source gate and ChatGPT exact review/integration. Do not start another source
-architecture task and do not run local canonical ROBINHOOD/FULL.
+Complete this C1 correction through focused verification, exact clean candidate
+admission, one ordinary terminal source gate and ChatGPT exact review. Do not
+run local canonical ROBINHOOD/FULL.
 
 After the closeout is accepted/integrated, automatically:
 

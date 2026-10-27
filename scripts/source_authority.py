@@ -52,6 +52,8 @@ def current_owner(relative: str) -> str | None:
     """Assign each current mutable concept to exactly one semantic owner."""
     if relative in CURRENT_MUTABLE_CONSTANTS:
         return "checkpoint_runner"
+    if relative in {"discover_inventory", "select_inventory"}:
+        return "certification"
     if "/" not in relative and (
         relative in historical_catalog(_ARCHIVE_ROOT)["mutable_symbols"]
         or relative
@@ -66,6 +68,7 @@ def current_owner(relative: str) -> str | None:
             "ast_matches",
             "runner_tree",
             "_source_pytest_basetemp",
+            "ACTIVE_CI_CHECKPOINTS",
         }
     ):
         return "checkpoint_runner"
@@ -322,6 +325,16 @@ def _assignment_targets(node: ast.AST) -> tuple[str, ...]:
     return tuple(target.id for target in targets if isinstance(target, ast.Name))
 
 
+def _target_names(node: ast.AST) -> tuple[str, ...]:
+    if isinstance(node, ast.Name):
+        return (node.id,)
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return tuple(name for element in node.elts for name in _target_names(element))
+    if isinstance(node, ast.Starred):
+        return _target_names(node.value)
+    return ()
+
+
 def _module_aliases(tree: ast.Module) -> dict[str, str]:
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
@@ -444,6 +457,24 @@ def _source_is_current_mutable(
     return False
 
 
+def _current_inventory_value(
+    node: ast.AST, aliases: dict[str, str], source_names: set[str]
+) -> bool:
+    if isinstance(node, ast.Name):
+        return node.id in source_names
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+        if node.func.attr in {"discover_inventory", "select_inventory"}:
+            return _current_symbol(node.func, aliases)
+        if node.func.attr == "items":
+            return _current_inventory_value(node.func.value, aliases, source_names)
+    if isinstance(node, (ast.DictComp, ast.ListComp, ast.GeneratorExp, ast.SetComp)):
+        return any(
+            _current_inventory_value(child, aliases, source_names)
+            for child in ast.iter_child_nodes(node)
+        )
+    return False
+
+
 def _ast_is_current_mutable(
     node: ast.AST,
     path_names: set[str],
@@ -479,12 +510,32 @@ def _ast_is_current_mutable(
     )
 
 
+def _current_mutable_pin_map(node: ast.AST, aliases: dict[str, str]) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "items"
+        and isinstance(node.func.value, ast.Attribute)
+        and isinstance(node.func.value.value, ast.Name)
+        and classify_path(aliases.get(node.func.value.value.id, ""))
+        is PinClass.CURRENT_MUTABLE
+        and "PIN" in node.func.value.attr.upper()
+    )
+
+
 def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
-    review_root = repo_root / "tests/review_paper"
-    if not review_root.is_dir():
-        return ()
     failures: list[str] = []
-    for path in sorted(review_root.rglob("*.py")):
+    historical_roots = (
+        repo_root / "tests/review_paper",
+        repo_root / "tests/strategies",
+    )
+    paths = [
+        path
+        for historical_root in historical_roots
+        if historical_root.is_dir()
+        for path in sorted(historical_root.rglob("*.py"))
+    ]
+    for path in paths:
         relative = path.relative_to(repo_root).as_posix()
         try:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
@@ -498,6 +549,7 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
         aliases = _module_aliases(tree)
 
         def analyze(scope: ast.AST, *, aliases=aliases, relative=relative) -> None:
+            strategy_scope = relative.startswith("tests/strategies/")
             path_names: set[str] = set()
             source_names: set[str] = set()
             ast_names: set[str] = set()
@@ -505,6 +557,22 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
             while changed:
                 changed = False
                 for item in ast.walk(scope):
+                    if strategy_scope and isinstance(
+                        item, (ast.For, ast.comprehension)
+                    ):
+                        targets = _target_names(item.target)
+                        if _current_mutable_pin_map(item.iter, aliases):
+                            for target in targets:
+                                if target not in path_names:
+                                    path_names.add(target)
+                                    changed = True
+                        if _source_is_current_mutable(
+                            item.iter, path_names, source_names, aliases
+                        ) or _current_inventory_value(item.iter, aliases, source_names):
+                            for target in targets:
+                                if target not in source_names:
+                                    source_names.add(target)
+                                    changed = True
                     value = (
                         item.value
                         if isinstance(item, (ast.Assign, ast.AnnAssign, ast.NamedExpr))
@@ -515,6 +583,13 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
                     targets = _assignment_targets(item)
                     if not targets:
                         continue
+                    if strategy_scope and _current_inventory_value(
+                        value, aliases, source_names
+                    ):
+                        for target in targets:
+                            if target not in source_names:
+                                source_names.add(target)
+                                changed = True
                     if _path_is_current_mutable(value, path_names, aliases):
                         for target in targets:
                             if target not in path_names:
@@ -547,6 +622,18 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
                 if isinstance(node, ast.Call):
                     if authority_api(node):
                         return False
+                    if (
+                        strategy_scope
+                        and isinstance(node.func, ast.Name)
+                        and node.func.id == "len"
+                    ):
+                        return any(
+                            _current_symbol(arg, aliases)
+                            or _source_is_current_mutable(
+                                arg, path_names, source_names, aliases
+                            )
+                            for arg in node.args
+                        )
                     if isinstance(node.func, ast.Attribute):
                         if node.func.attr == "_git_blob_sha1" and any(
                             _path_is_current_mutable(arg, path_names, aliases)

@@ -165,6 +165,40 @@ def test_historical_test_cannot_hash_current_mutable_runner_symbol(tmp_path):
     )
 
 
+def test_historical_strategy_cannot_own_current_pins_or_profile_totals(tmp_path):
+    for file in (
+        "scripts/checkpoint_runner.py",
+        "scripts/source_authority.py",
+        "scripts/current_source_authority.py",
+    ):
+        path = tmp_path / file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text((ROOT / file).read_text(encoding="utf-8"), encoding="utf-8")
+    bad = tmp_path / "tests/strategies/test_stale_current.py"
+    bad.parent.mkdir(parents=True)
+    bad.write_text(
+        "from pathlib import Path\n"
+        "from scripts import checkpoint_runner as runner\n"
+        "from scripts import run_test_certification as certification\n"
+        "ROOT = Path(runner.__file__).resolve().parents[1]\n"
+        "def test_stale_strategy():\n"
+        "    for relative, pin in runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():\n"
+        "        assert runner._git_blob_sha1(ROOT / relative) == pin\n"
+        "    assert len(runner.ACTIVE_CI_CHECKPOINTS) == 80\n"
+        "    inventory = certification.discover_inventory(ROOT)\n"
+        "    profiles = {name: certification.select_inventory(inventory, name) "
+        "for name in ('full',)}\n"
+        "    assert {name: len(value) for name, value in profiles.items()} == "
+        "{'full': 203}\n",
+        encoding="utf-8",
+    )
+    failures = ownership.ownership_failures(tmp_path)
+    assert any(
+        "tests/strategies/test_stale_current.py" in failure for failure in failures
+    )
+    assert len(failures) >= 3
+
+
 def _contexts(monkeypatch, *, develop_red=False):
     state = {
         "head": "a" * 40,

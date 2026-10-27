@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from scripts import checkpoint_runner as checkpoint_runner
-from scripts import run_test_certification as certification
+from scripts import source_authority
 from trading_bot.domain import Symbol
 from trading_bot.strategies import (
     MovingAverageCrossoverConfig,
@@ -103,7 +103,7 @@ def test_arch138_successor_preserves_unmodified_d1r5_pins() -> None:
             expected = checkpoint_runner._arch144_current_inventory_test_pin(
                 relative, expected
             )
-            assert checkpoint_runner._git_blob_sha1(root / relative) == expected
+            assert source_authority.blob_matches(root, root / relative, expected)
     assert checkpoint_runner._arch134_d1r5_authority_check(root) == ()
 
 
@@ -158,7 +158,7 @@ def test_arch140a18_successor_pins_match_and_preserve_unmodified_d1r5_pins():
         current = checkpoint_runner._arch144_current_inventory_test_pin(
             relative, current
         )
-        assert checkpoint_runner._git_blob_sha1(root / relative) == current
+        assert source_authority.blob_matches(root, root / relative, current)
     for relative, pin in checkpoint_runner.ARCH134_D1R5_TEST_PIN_OVERRIDES.items():
         if relative not in predecessor:
             expected = checkpoint_runner._arch134_d1r7_test_pin(
@@ -170,7 +170,7 @@ def test_arch140a18_successor_pins_match_and_preserve_unmodified_d1r5_pins():
             expected = checkpoint_runner._arch144_current_inventory_test_pin(
                 relative, expected
             )
-            assert checkpoint_runner._git_blob_sha1(root / relative) == expected
+            assert source_authority.blob_matches(root, root / relative, expected)
     for check in (
         checkpoint_runner._arch134_production_paper_runtime_authority_check,
         checkpoint_runner._arch134_authentication_authority_check,
@@ -431,26 +431,7 @@ def test_checkpoint_is_source_only_and_profile_inventory_is_exact() -> None:
         NAME,
         "arch134-production-strategy-decision",
     )
-    assert len(checkpoint_runner.ACTIVE_CI_CHECKPOINTS) == 80
-
-    root = Path(certification.__file__).resolve().parents[1]
-    inventory = certification.discover_inventory(root)
-    profiles = {
-        name: certification.select_inventory(inventory, name)
-        for name in ("full", "robinhood", "legacy", "exhaustive")
-    }
-    assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 203,
-        "robinhood": 112,
-        "legacy": 222,
-        "exhaustive": 425,
-    }
-    assert "tests/strategies/test_production_strategy_contract.py" in profiles["full"]
-    assert "tests/strategies/test_production_strategy_decision.py" in profiles["full"]
-    assert (
-        "tests/strategies/test_production_strategy_contract.py"
-        not in profiles["robinhood"]
-    )
+    assert "tests/strategies/test_production_strategy_contract.py" in spec.tests
 
 
 def test_contract_cannot_be_reconfigured_with_dataclass_replace_constants() -> None:

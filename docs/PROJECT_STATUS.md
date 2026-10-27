@@ -33,6 +33,19 @@ certification/test-harness ownership. General `ops.ps1 admit` owns FEATURE +
 PROSPECTIVE_DEVELOP prepublication authority. Canonical mapped certification
 remains GitHub-owned.
 
+Preserved red feature #752 / run 40478607410 / attempt 1 is classified as a
+`PREPUBLICATION_COVERAGE_DEFECT`; it was not rerun. Its ordinary four-shard
+broad fallback exposed four deterministic stale-current strategy assertions:
+two historical D1R5 successor pin checks exact-pinned today's mutable test
+bytes, and two strategy registration checks owned mutable global inventory and
+profile totals. C1 is a separate corrective checkpoint on preserved red
+`bf2345b80f6b5c4c2933e9f1cff9007dbe63c20d` / tree
+`f0fc4f14e2b7426532805d100af953759e09b98e`. It routes historical checks
+through immutable source-authority reconstruction, removes global count
+ownership from strategy tests, and extends the existing structural guard to
+reject the exposed strategy pattern before publication. Historical pin maps
+and current certification/profile totals are not repinned.
+
 ## F1 and F1R1 session chronology
 
 The original Architecture 134 F1 five-session soak reserved the targets:
@@ -78,8 +91,9 @@ source or certification PASS. Live remains NO-GO.
 
 ## Next safe step
 
-This status/handoff closeout is docs-only and must complete its own ordinary
-review/publication/integration cycle before local operator work resumes.
+This C1 correction must complete its own focused verification, exact clean
+candidate admission, one ordinary feature push and terminal source gate before
+local operator work resumes. Do not run local canonical ROBINHOOD or FULL.
 
 After that closeout is accepted and integrated:
 

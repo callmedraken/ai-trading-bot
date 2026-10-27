@@ -105,3 +105,33 @@ The HOST taxonomy, v1 BLOCKED/HOST predecessor, consumed report SHA256
 `execute = None`, zero effects, false authority and rename-free immutable
 release destination identity remain unchanged. The first host attempt is never
 retried. Product `src/` files were not changed.
+
+## Corrective checkpoint C1 — historical AJ test ownership
+
+Published #747 / run 40452306244 / attempt 1 is preserved terminal FAILURE at
+`abac76fe9709c8e260896a7d2efc13083aba53d2`. Source-static and active-tests passed;
+canonical ROBINHOOD recorded 11,693 cases: 11,686 passed, six skipped, one failed,
+zero errors (268.8 s). The checksummed artifact
+`12711021823` / SHA256
+`42cdda96f439b9367ae67cf36da5bd74aca6533bd87a955a0e96004cb4af8e5a`
+and single-test local reproduction show one stale test in
+`test_supervised_release_publication_recovery.py` hashing today's entire mutable
+AJ authority helper/registry directly. It expected an obsolete exact drift set.
+
+C1 changes only that test contract and current evidence/status documentation.
+Historical AJ pins remain unchanged. Mutable registry and authority-helper ASTs
+reconstruct their immutable historical objects, with explicit future-change
+regressions; protected `execute_checkpoint` remains an exact-source rejection.
+The retired AJ registration gate still rejects, and its protected effect dispatch
+is never invoked. No security semantics or product source change is needed.
+The complete focused prepublication infrastructure plus AJ module and fresh
+exact-candidate admission must pass before one C1 commit/push. #747 is not rerun,
+amended, rebased or hidden. No protected effect is authorized.
+
+C1's complete affected focused gate passed 979 tests (80.03 s), including the
+entire AJ recovery module, current runner/core/CI, ownership/fan-out, profile/lane,
+reuse and diagnostic-preservation tests. JUnit:
+`F:\AI\temp\pytest\authority-c1-focused-d7c0bd7955b842c8948415307a59730e.xml`.
+Whole-repository Ruff check and format-check passed (1,086 files), and worktree
+diff check passed. The single failed #747 assertion was reproduced before its
+correction; no canonical profile was run locally.

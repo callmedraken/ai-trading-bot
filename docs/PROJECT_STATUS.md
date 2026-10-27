@@ -10,6 +10,14 @@ The diagnostic successor is NOT SOURCE ACCEPTED. Feature #745 was green;
 develop #746 / run 40421315451 / attempt 1 is preserved terminal-red evidence.
 Do not rerun #746 or reconcile the primary local checkout to red develop.
 
+Correction attempt #747 / run 40452306244 / attempt 1 at
+`abac76fe9709c8e260896a7d2efc13083aba53d2` is also preserved terminal-red
+evidence: source-static/active-tests passed; ROBINHOOD found one stale AJ
+historical test assertion. Corrective checkpoint C1 replaces that mutable-current
+AST assertion with immutable reconstruction while preserving exact protected
+execution and the retired gate's closed semantics. C1 requires fresh complete
+admission and one new ordinary push; no unchanged CI rerun.
+
     starting develop HEAD 29e9487b7a4e831dc6f306de66184cb6f8bb2723
     starting tree fc3649f3a86f42503402ac20bad595a5d62570a5
     branch feature/test-suite-current-authority-historical-decoupling-current

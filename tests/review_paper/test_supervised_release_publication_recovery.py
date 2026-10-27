@@ -12,6 +12,7 @@ from types import SimpleNamespace
 import pytest
 
 from scripts import checkpoint_runner as runner
+from scripts import source_authority as ownership
 from trading_bot.supervised_release import native_publication as native
 from trading_bot.supervised_release import publication_recovery as subject
 from trading_bot.supervised_release.installation_contract import ReleasePaths
@@ -557,9 +558,9 @@ def test_aj_remains_registered_historical_and_closed_outside_active_ci():
     ].split("\njobs:", 1)[0]
     assert NAME not in active_batch.split()
     assert runner._batch_workflow_is_reviewed(workflow)
-    # AJ pins the complete historical registry. Later checkpoint additions must
-    # keep that protected recovery gate closed without changing any other pin.
-    # Retirement also violates its frozen active-registration requirement.
+    # Mutable registry/reconstruction helpers belong to their current owners.
+    # Reconstruct AJ evidence independently; protected execution stays exact and
+    # retirement keeps the historical recovery gate closed.
     functions = {
         node.name: node
         for node in ast.parse(
@@ -570,16 +571,30 @@ def test_aj_remains_registered_historical_and_closed_outside_active_ci():
     drifted = {
         name
         for name, pin in runner.SUPERVISED_PUBLICATION_RUNNER_PINS.items()
-        if hashlib.sha256(
-            ast.dump(functions[name], include_attributes=False).encode()
-        ).hexdigest()
-        != pin
+        if not ownership.ast_matches(root, name, functions[name], pin)
     }
-    assert drifted == {"_checkpoint_specs", "execute_checkpoint"}
+    assert drifted == {"execute_checkpoint"}
     assert runner._supervised_publication_recovery_authority_check(root) == (
         "publication recovery registration drift",
         "publication recovery runner authority drift",
-        "publication recovery runner authority drift",
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["_checkpoint_specs", "_supervised_publication_recovery_authority_check"],
+)
+def test_historical_aj_reconstruction_is_independent_of_current_infrastructure(name):
+    root = Path(runner.__file__).resolve().parents[1]
+    future = ast.parse(f"def {name}():\n    return False\n").body[0]
+    pin = runner.SUPERVISED_PUBLICATION_RUNNER_PINS[name]
+    assert ownership.current_owner(name) == "checkpoint_runner"
+    assert ownership.ast_matches(root, name, future, pin)
+    assert not ownership.ast_matches(
+        root,
+        "execute_checkpoint",
+        future,
+        runner.SUPERVISED_PUBLICATION_RUNNER_PINS["execute_checkpoint"],
     )
 
 

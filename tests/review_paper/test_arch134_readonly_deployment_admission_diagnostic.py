@@ -237,6 +237,13 @@ def test_r3n_prepublication_admission_dispatches_current_successor_authority(
         captured["kwargs"] = kwargs
         return True, tmp_path / "report.json"
 
+    monkeypatch.setattr(
+        runner,
+        "_prepublication_source",
+        lambda _: runner.PrepublicationSource(
+            {}, "b" * 40, "c" * 40, ("scripts/checkpoint_runner.py",), "FULL", ()
+        ),
+    )
     monkeypatch.setattr(runner, "verify_checkpoint", verify)
     result = runner.prepublication_admission(
         repo_root=tmp_path,

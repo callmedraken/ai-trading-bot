@@ -26,6 +26,7 @@ from typing import Final
 from uuid import uuid4
 
 from scripts.current_source_authority import (
+    AuthorityResult,
     PublicationContext,
     evaluate_source_authority,
 )
@@ -21433,13 +21434,26 @@ def _arch132_r3m_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
-def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
-    """Check cheap, source-only admission before an ordinary feature publication."""
+@dataclass(frozen=True, slots=True)
+class PrepublicationSource:
+    candidate: dict[str, object]
+    base_head: str | None
+    base_tree: str | None
+    changed_paths: tuple[str, ...]
+    mode: str | None
+    failures: tuple[str, ...]
+
+
+def _prepublication_source(repo_root: Path) -> PrepublicationSource:
+    """Bind local admission to one exact live develop range, never CI events."""
     failures: list[str] = []
+    state: dict[str, object] = {}
+    base_head = base_tree = mode = None
+    changed: tuple[str, ...] = ()
     try:
+        state = _git_state(repo_root)
         if repo_root.resolve() != _REPOSITORY_ROOT.resolve():
             failures.append("R3N repository root identity drift")
-        state = _git_state(repo_root)
         branch = state["branch"]
         if (
             type(branch) is not str
@@ -21452,53 +21466,73 @@ def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
         origin = _git_output(repo_root, "remote", "get-url", "origin")
         if origin not in SOURCE_ORIGIN_URLS:
             failures.append("R3N origin identity drift")
-        reviewed_develop_head = _remote_branch_head(repo_root, "develop")
-        if not re.fullmatch("[0-9a-f]{40}", reviewed_develop_head):
+        base_head = _remote_branch_head(repo_root, "develop")
+        if not re.fullmatch("[0-9a-f]{40}", base_head):
             failures.append("R3N reviewed develop identity unavailable")
         else:
-            reviewed_develop_commit = _git_output(
-                repo_root, "rev-parse", f"{reviewed_develop_head}^{{commit}}"
-            )
-            reviewed_develop_tree = _git_output(
-                repo_root, "rev-parse", f"{reviewed_develop_head}^{{tree}}"
-            )
-            if reviewed_develop_commit != reviewed_develop_head or not re.fullmatch(
-                "[0-9a-f]{40}", reviewed_develop_tree
-            ):
+            commit = _git_output(repo_root, "rev-parse", f"{base_head}^{{commit}}")
+            base_tree = _git_output(repo_root, "rev-parse", f"{base_head}^{{tree}}")
+            if commit != base_head or not re.fullmatch("[0-9a-f]{40}", base_tree):
                 failures.append("R3N reviewed develop commit/tree unavailable")
             else:
                 head = state["head"]
                 if type(head) is not str or not re.fullmatch("[0-9a-f]{40}", head):
                     failures.append("R3N current HEAD identity unavailable")
-                elif head == reviewed_develop_head:
+                elif head == base_head:
                     failures.append("R3N feature HEAD is not a strict descendant")
                 else:
                     _git_output(
-                        repo_root,
-                        "merge-base",
-                        "--is-ancestor",
-                        reviewed_develop_head,
-                        head,
+                        repo_root, "merge-base", "--is-ancestor", base_head, head
                     )
                     if (
-                        _git_output(
-                            repo_root, "merge-base", head, reviewed_develop_head
-                        )
-                        != reviewed_develop_head
+                        _git_output(repo_root, "merge-base", head, base_head)
+                        != base_head
                     ):
                         failures.append("R3N develop ancestry drift")
-                    changed = tuple(
-                        path
-                        for path in _git_output(
-                            repo_root,
+                    # NUL paths and disabled renames retain source deletions and
+                    # unusual filenames exactly; text stripping is unsafe here.
+                    result = subprocess.run(
+                        (
+                            "git",
                             "diff",
                             "--name-only",
-                            f"{reviewed_develop_head}..{head}",
-                        ).splitlines()
-                        if path
+                            "--no-renames",
+                            "-z",
+                            base_head,
+                            head,
+                            "--",
+                        ),
+                        cwd=repo_root,
+                        capture_output=True,
+                        check=False,
+                        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
                     )
-                    if not changed or classify_changed_paths(changed) != "FULL":
+                    raw = result.stdout.decode("utf-8")
+                    if result.returncode or (raw and not raw.endswith("\x00")):
+                        raise ValueError("changed paths unavailable")
+                    changed = (
+                        tuple(raw.removesuffix("\x00").split("\x00")) if raw else ()
+                    )
+                    classification = classify_changed_paths(changed)
+                    if (
+                        not changed
+                        or type(classification) is not str
+                        or classification not in ("FULL", "DOCS_ONLY")
+                    ):
                         failures.append("R3N changed-path classification drift")
+                    else:
+                        mode = classification
+    except (OSError, RuntimeError, ValueError, KeyError, TypeError, SyntaxError) as exc:
+        failures.append(f"R3N admission unavailable: {type(exc).__name__}")
+    return PrepublicationSource(
+        state, base_head, base_tree, changed, mode, tuple(failures)
+    )
+
+
+def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Check cheap, source-only admission before an ordinary feature publication."""
+    failures = list(_prepublication_source(repo_root).failures)
+    try:
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
         ).read_text(encoding="utf-8")
@@ -24654,6 +24688,7 @@ def verify_checkpoint(
         "schema": SCHEMA,
         "kind": "source_gate",
         "checkpoint": spec.name,
+        **({"mode": "FULL"} if spec.name == ARCH132_R3N_ADMISSION_NAME else {}),
         "description": spec.description,
         "status": "PASS" if passed else "FAIL",
         "phase": phase,
@@ -24706,6 +24741,15 @@ def prepublication_admission(
     """Run complete general admission; CI phase/shard controls cannot bypass it."""
     if _source_gate_phase() != "all" or _source_gate_shard() is not None:
         raise RuntimeError("general admission requires the all/unsharded source gate")
+    source = _prepublication_source(repo_root)
+    if source.mode == "DOCS_ONLY":
+        return _docs_only_prepublication_admission(
+            repo_root=repo_root, evidence_root=evidence_root, source=source
+        )
+    if source.mode != "FULL" or source.failures:
+        raise RuntimeError(
+            "general admission source rejected: " + "; ".join(source.failures)
+        )
     spec = CheckpointSpec(
         name=ARCH132_R3N_ADMISSION_NAME,
         description=("Architecture 132-R3N source-only pre-publication admission"),
@@ -24718,6 +24762,98 @@ def prepublication_admission(
         repo_root=repo_root,
         evidence_root=evidence_root,
     )
+
+
+def _docs_only_prepublication_admission(
+    *, repo_root: Path, evidence_root: Path, source: PrepublicationSource
+) -> tuple[bool, Path]:
+    """Admit docs with both authorities and no test, Ruff or profile commands."""
+    if evidence_root.resolve().is_relative_to(repo_root.resolve()):
+        raise RuntimeError("admission evidence root must be external")
+    evidence_dir = (
+        evidence_root / ARCH132_R3N_ADMISSION_NAME / f"source-gate-{_stamp()}"
+    )
+    command_dir = evidence_dir / "commands"
+    command_dir.mkdir(parents=True, exist_ok=False)
+    failures = list(source.failures)
+    failures.extend(_arch132_r3n_admission_authority_check(repo_root))
+    outcomes: tuple[CommandOutcome, ...] = ()
+    contexts = {context.value: {"status": "NOT_RUN"} for context in PublicationContext}
+    if not failures:
+        step = Step(
+            "git_range_diff_check",
+            (
+                "git",
+                "diff",
+                "--check",
+                str(source.base_head),
+                str(source.candidate["head"]),
+                "--",
+            ),
+        )
+        outcomes = (
+            _execute_step(step, repo_root=repo_root, command_dir=command_dir, index=1),
+        )
+        if outcomes[0].exit_code:
+            failures.append("R3N docs-only range diff check failed")
+        else:
+            for result in _prepublication_authority_results(repo_root):
+                contexts[result.context.value] = {
+                    "status": "PASS" if result.passed else "FAIL",
+                    "head": result.head,
+                    "tree": result.tree,
+                }
+                failures.extend(
+                    result.context.value + ": " + failure for failure in result.failures
+                )
+                if (result.head, result.tree) != (
+                    source.candidate["head"],
+                    source.candidate["tree"],
+                ):
+                    failures.append(
+                        result.context.value + ": admission source identity drift"
+                    )
+    final = _prepublication_source(repo_root)
+    stable = source == final and not final.candidate["porcelain"]
+    passed = (
+        not failures
+        and stable
+        and all(context["status"] == "PASS" for context in contexts.values())
+    )
+    report_path = evidence_dir / "report.json"
+    _write_json(
+        report_path,
+        {
+            "schema": SCHEMA,
+            "kind": "source_gate",
+            "checkpoint": ARCH132_R3N_ADMISSION_NAME,
+            "mode": "DOCS_ONLY",
+            "base": {"head": source.base_head, "tree": source.base_tree},
+            "changed_paths": list(source.changed_paths),
+            "started_from": source.candidate,
+            "finished_at": final.candidate,
+            "identity_stable": stable,
+            "authority_contexts": contexts,
+            "authority_failures": failures,
+            "executed_tests": [],
+            "ruff_check": "NOT_RUN",
+            "ruff_format": "NOT_RUN",
+            "canonical_certification": "NOT_RUN",
+            "host_diagnostics": "NOT_RUN",
+            "commands": [asdict(outcome) for outcome in outcomes],
+            "production_effects": "NOT_RUN",
+            "protected_effects": "NOT_RUN",
+            "scheduler_mutation": "NOT_RUN",
+            "provider_effects": "NOT_RUN",
+            "broker_live_effects": "NOT_RUN",
+            "status": "PASS" if passed else "FAIL",
+        },
+    )
+    print(f"CHECKPOINT={ARCH132_R3N_ADMISSION_NAME} MODE=DOCS_ONLY")
+    print(f"IDENTITY_STABLE={stable}")
+    print(f"EVIDENCE={report_path}")
+    print(f"OVERALL={'PASS' if passed else 'FAIL'}")
+    return passed, report_path
 
 
 def batch_requirements(
@@ -26570,15 +26706,25 @@ def _arch134_r3n_prepublication_authority_check(repo_root: Path) -> tuple[str, .
     failures = list(_arch132_r3n_admission_authority_check(repo_root))
     if failures:
         return tuple(failures)
-    for context in PublicationContext:
-        result = evaluate_source_authority(repo_root, publication_context=context)
+    for result in _prepublication_authority_results(repo_root):
+        failures.extend(
+            result.context.value + ": " + failure for failure in result.failures
+        )
+    return tuple(failures)
+
+
+def _prepublication_authority_results(repo_root: Path) -> tuple[AuthorityResult, ...]:
+    results = tuple(
+        evaluate_source_authority(repo_root, publication_context=context)
+        for context in PublicationContext
+    )
+    for result in results:
         print(
-            f"{context.value}_AUTHORITY={'PASS' if result.passed else 'FAIL'} "
+            f"{result.context.value}_AUTHORITY={'PASS' if result.passed else 'FAIL'} "
             f"HEAD={result.head} TREE={result.tree} "
             f"CHECKPOINTS={len(result.checkpoints)}"
         )
-        failures.extend(context.value + ": " + failure for failure in result.failures)
-    return tuple(failures)
+    return results
 
 
 def _arch134_readonly_diagnostic_preflight() -> dict[str, object]:

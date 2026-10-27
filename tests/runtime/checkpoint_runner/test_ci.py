@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -29,6 +30,7 @@ def _historical_workflow_view(workflow: str) -> str:
 @pytest.mark.parametrize(
     "paths,expected",
     [
+        (["docs/example.md"], "DOCS_ONLY"),
         (["docs/foo.md"], "DOCS_ONLY"),
         (["docs/foo.md", "docs/nested/bar.md"], "DOCS_ONLY"),
         (["docs/foo.md", "src/foo.py"], "FULL"),
@@ -41,6 +43,10 @@ def _historical_workflow_view(workflow: str) -> str:
         ([""], "FULL"),
         (["docs/../src/foo.py"], "FULL"),
         (["docs/"], "FULL"),
+        (["docs//foo.md"], "FULL"),
+        (["docs/./foo.md"], "FULL"),
+        (["/docs/foo.md"], "FULL"),
+        (["docs/foo\x00.md"], "FULL"),
         ([" docs/foo.md"], "FULL"),
         (["docs\\foo.md"], "FULL"),
     ],
@@ -1346,6 +1352,13 @@ def test_r3n_c4_coherent_broad_attempt_two_is_not_reusable(registered):
     )
 
 
+def test_docs_only_general_admission_regression(monkeypatch):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["changed"] = ("docs/example.md",)
+    assert runner.classify_changed_paths(["docs/example.md"]) == "DOCS_ONLY"
+    assert runner._arch132_r3n_admission_authority_check(root) == ()
+
+
 def test_r3n_prepublication_admission_contract():
     parser = runner._parser(runner._checkpoint_specs())
     args = parser.parse_args(["admit"])
@@ -1374,7 +1387,7 @@ def _r3n_admission_fixture(monkeypatch):
         "object_available": True,
         "is_ancestor": True,
         "merge_base": "b" * 40,
-        "changed": "scripts/checkpoint_runner.py\n",
+        "changed": ("scripts/checkpoint_runner.py",),
         "authority": (),
     }
     state = {
@@ -1414,6 +1427,19 @@ def _r3n_admission_fixture(monkeypatch):
             return context["changed"]
         return original_git_output(_, *arguments)
 
+    original_run = runner.subprocess.run
+
+    def run(argv, **kwargs):
+        if argv[:5] == ("git", "diff", "--name-only", "--no-renames", "-z"):
+            assert argv[5:] == (context["remote_head"], state["head"], "--")
+            raw = b"".join(path.encode("utf-8") + b"\0" for path in context["changed"])
+            return subprocess.CompletedProcess(
+                argv, 0, context.get("raw_changed", raw), b""
+            )
+        assert argv[0] == "git", "unexpected Python/host command"
+        return original_run(argv, **kwargs)
+
+    monkeypatch.setattr(runner.subprocess, "run", run)
     monkeypatch.setattr(runner, "_git_state", git_state)
     monkeypatch.setattr(runner, "_remote_branch_head", remote_branch_head)
     monkeypatch.setattr(runner, "_git_output", git_output)
@@ -1457,7 +1483,7 @@ def test_r3n_general_prepublication_admission_accepts_reviewed_feature_families(
         "empty_diff",
         "malformed_identity",
         "unavailable_identity",
-        "invalid_classification",
+        "unknown_classification",
         "invalid_topology",
     ],
 )
@@ -1480,7 +1506,7 @@ def test_r3n_general_prepublication_admission_rejects_invalid_state(
     elif mutation == "not_ancestor":
         context["is_ancestor"] = False
     elif mutation == "empty_diff":
-        context["changed"] = ""
+        context["changed"] = ()
     elif mutation == "malformed_identity":
         context["remote_head"] = "malformed"
     elif mutation == "unavailable_identity":
@@ -1490,8 +1516,8 @@ def test_r3n_general_prepublication_admission_rejects_invalid_state(
             raise RuntimeError("remote unavailable")
 
         monkeypatch.setattr(runner, "_remote_branch_head", unavailable)
-    elif mutation == "invalid_classification":
-        context["changed"] = "docs/example.md\n"
+    elif mutation == "unknown_classification":
+        monkeypatch.setattr(runner, "classify_changed_paths", lambda _: "UNKNOWN")
     else:
         monkeypatch.setattr(runner, "_batch_workflow_is_reviewed", lambda _: False)
     assert runner._arch132_r3n_admission_authority_check(
@@ -2322,3 +2348,379 @@ def test_historical_test_successors_do_not_claim_current_harness_bytes(monkeypat
         is source_authority.PinClass.CURRENT_MUTABLE
     )
     assert source_authority.blob_matches(root, root / relative, pin)
+
+
+@pytest.mark.parametrize(
+    "paths,expected",
+    [
+        (("docs/example.md", "docs/a file.md"), "DOCS_ONLY"),
+        (("docs/example.md", "src/example.py"), "FULL"),
+        (("src/example.py",), "FULL"),
+        ((" docs/example.md",), "FULL"),
+        (("docs/../src/example.py",), "FULL"),
+        (("docs/example.md", "src/deleted.py"), "FULL"),
+    ],
+)
+def test_local_admission_uses_exact_live_range_and_closed_classifier(
+    monkeypatch, paths, expected
+):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["changed"] = paths
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("GITHUB_EVENT_PATH", "must-not-be-read")
+    source = runner._prepublication_source(root)
+    assert source.failures == ()
+    assert source.mode == expected
+    assert source.changed_paths == paths
+    assert source.base_head == "b" * 40 and source.base_tree == "c" * 40
+    assert source.candidate["head"] == "a" * 40
+
+
+@pytest.mark.parametrize("unknown", ["UNKNOWN", "", None, [], {"mode": "DOCS_ONLY"}])
+def test_general_admission_rejects_unknown_classifier_values(monkeypatch, unknown):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["changed"] = ("docs/example.md",)
+    monkeypatch.setattr(runner, "classify_changed_paths", lambda _: unknown)
+    assert (
+        "R3N changed-path classification drift"
+        in runner._arch132_r3n_admission_authority_check(root)
+    )
+
+
+@pytest.mark.parametrize("raw", [b"docs/example.md", b"docs/\xff.md\0"])
+def test_local_admission_rejects_incomplete_or_invalid_path_bytes(monkeypatch, raw):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["raw_changed"] = raw
+    source = runner._prepublication_source(root)
+    assert source.mode is None and source.failures
+
+
+def _docs_admission_execution_fixture(monkeypatch):
+    from scripts.current_source_authority import AuthorityResult
+
+    from scripts import run_test_certification as certification
+
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["changed"] = ("docs/example.md", "docs/nested/a file.md")
+    contexts = []
+    steps = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail(
+            "docs-only invoked tests/static checks, canonical or host/effect dispatch"
+        )
+
+    for name in (
+        "verify_checkpoint",
+        "build_verification_steps",
+        "_source_pytest_basetemp",
+        "preflight_checkpoint",
+        "execute_checkpoint",
+    ):
+        monkeypatch.setattr(runner, name, forbidden)
+    monkeypatch.setattr(certification, "main", forbidden)
+
+    def execute(step, **kwargs):
+        assert step.name == "git_range_diff_check"
+        assert step.argv == ("git", "diff", "--check", "b" * 40, "a" * 40, "--")
+        steps.append(step)
+        return replace(
+            _outcome(step.name, context.get("range_exit", 0)), argv=step.argv
+        )
+
+    def evaluate(repo, *, publication_context):
+        assert repo == root
+        contexts.append(publication_context)
+        return AuthorityResult(
+            publication_context,
+            "a" * 40,
+            "c" * 40,
+            ("current",),
+            ("bounded authority rejection",)
+            if context.get("red") == publication_context
+            else (),
+        )
+
+    monkeypatch.setattr(runner, "_execute_step", execute)
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+    return root, context, contexts, steps
+
+
+@pytest.mark.parametrize("red", [None, *runner.PublicationContext])
+def test_docs_only_public_admission_requires_both_authorities_without_python_work(
+    monkeypatch, tmp_path, capsys, red
+):
+    root, context, contexts, steps = _docs_admission_execution_fixture(monkeypatch)
+    context["red"] = red
+    passed, path = runner.prepublication_admission(
+        repo_root=root, evidence_root=tmp_path / "evidence"
+    )
+    assert passed is (red is None)
+    assert contexts == list(runner.PublicationContext)
+    assert len(steps) == 1
+    report = json.loads(path.read_text())
+    assert report["mode"] == "DOCS_ONLY"
+    assert report["base"] == {"head": "b" * 40, "tree": "c" * 40}
+    assert report["changed_paths"] == list(context["changed"])
+    assert report["started_from"] == report["finished_at"]
+    assert report["started_from"]["head"] == "a" * 40
+    assert report["identity_stable"] is True
+    assert report["executed_tests"] == []
+    assert [command["argv"] for command in report["commands"]] == [list(steps[0].argv)]
+    for name in (
+        "ruff_check",
+        "ruff_format",
+        "canonical_certification",
+        "host_diagnostics",
+        "production_effects",
+        "protected_effects",
+        "scheduler_mutation",
+        "provider_effects",
+        "broker_live_effects",
+    ):
+        assert report[name] == "NOT_RUN"
+    for publication_context in runner.PublicationContext:
+        status = "FAIL" if red == publication_context else "PASS"
+        assert (
+            report["authority_contexts"][publication_context.value]["status"] == status
+        )
+    output = capsys.readouterr().out
+    assert "FEATURE_AUTHORITY=" in output and "PROSPECTIVE_DEVELOP_AUTHORITY=" in output
+    assert report["status"] == ("PASS" if red is None else "FAIL")
+
+
+@pytest.mark.parametrize(
+    "failure", ["range", "branch", "tree", "dirty", "live_base", "authority_source"]
+)
+def test_docs_only_admission_rejects_range_and_identity_drift(
+    monkeypatch, tmp_path, failure
+):
+    root, context, contexts, steps = _docs_admission_execution_fixture(monkeypatch)
+    execute = runner._execute_step
+
+    def changed(step, **kwargs):
+        result = execute(step, **kwargs)
+        if failure == "range":
+            return replace(result, exit_code=1)
+        if failure == "branch":
+            context["branch"] = "feature/test-suite-another"
+        elif failure == "dirty":
+            context["porcelain"] = " M docs/example.md"
+        elif failure == "live_base":
+            context["remote_head"] = "d" * 40
+        elif failure == "tree":
+            before = runner._git_state(root)
+            monkeypatch.setattr(
+                runner, "_git_state", lambda _: {**before, "tree": "d" * 40}
+            )
+        elif failure == "authority_source":
+            evaluate = runner.evaluate_source_authority
+            monkeypatch.setattr(
+                runner,
+                "evaluate_source_authority",
+                lambda *a, **k: replace(evaluate(*a, **k), head="d" * 40),
+            )
+        return result
+
+    monkeypatch.setattr(runner, "_execute_step", changed)
+    passed, path = runner.prepublication_admission(
+        repo_root=root, evidence_root=tmp_path / "evidence"
+    )
+    report = json.loads(path.read_text())
+    assert not passed and report["status"] == "FAIL"
+    if failure == "range":
+        assert contexts == []
+    elif failure != "authority_source":
+        assert report["identity_stable"] is False
+    assert len(steps) == 1 and report["executed_tests"] == []
+
+
+@pytest.mark.parametrize(
+    "paths", [("src/example.py",), ("docs/example.md", "src/example.py")]
+)
+def test_full_public_admission_retains_ordinary_complete_verifier(
+    monkeypatch, tmp_path, paths
+):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    context["changed"] = paths
+    captured = []
+
+    def verify(spec, **kwargs):
+        captured.append(spec)
+        assert kwargs == {"repo_root": root, "evidence_root": tmp_path}
+        assert spec.tests == runner.ARCH132_R3N_ADMISSION_TESTS
+        assert spec.ruff_paths == (".",)
+        assert (
+            spec.authority_check is runner._arch134_r3n_prepublication_authority_check
+        )
+        return True, tmp_path / "report.json"
+
+    monkeypatch.setattr(runner, "verify_checkpoint", verify)
+    monkeypatch.setattr(
+        runner,
+        "_docs_only_prepublication_admission",
+        lambda **_: pytest.fail("FULL took docs-only route"),
+    )
+    assert runner.prepublication_admission(repo_root=root, evidence_root=tmp_path) == (
+        True,
+        tmp_path / "report.json",
+    )
+    assert len(captured) == 1
+
+
+def test_full_admission_executes_combined_checks_both_authorities_and_test_bundle(
+    monkeypatch, tmp_path
+):
+    from scripts.current_source_authority import AuthorityResult
+
+    root, _ = _r3n_admission_fixture(monkeypatch)
+    contexts = []
+    commands = []
+
+    def evaluate(repo, *, publication_context, checkpoints=None):
+        if checkpoints is not None:
+            assert len(checkpoints) == 1
+            failures = checkpoints[0].authority_check(repo)
+        else:
+            contexts.append(publication_context)
+            failures = ()
+        return AuthorityResult(
+            publication_context, "a" * 40, "c" * 40, ("current",), failures
+        )
+
+    def execute(step, **kwargs):
+        commands.append(step)
+        return replace(_outcome(step.name, 0), argv=step.argv)
+
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+    monkeypatch.setattr(runner, "_execute_step", execute)
+    monkeypatch.setattr(runner, "_source_pytest_basetemp", lambda: tmp_path / "pytest")
+    passed, path = runner.prepublication_admission(
+        repo_root=root, evidence_root=tmp_path / "evidence"
+    )
+    assert passed
+    assert [step.name for step in commands] == [
+        "git_diff_check",
+        "ruff_check",
+        "ruff_format",
+        "pytest",
+    ]
+    assert contexts == list(runner.PublicationContext)
+    report = json.loads(path.read_text())
+    assert report["mode"] == "FULL"
+    assert report["executed_tests"] == list(runner.ARCH132_R3N_ADMISSION_TESTS)
+    assert report["authority_checked"] and report["identity_stable"]
+
+
+def test_docs_only_admission_real_git_range_never_launches_python(
+    monkeypatch, tmp_path
+):
+    from scripts.current_source_authority import AuthorityResult
+
+    from scripts import run_test_certification as certification
+
+    root = tmp_path / "source"
+    root.mkdir()
+
+    def git(*args):
+        return subprocess.run(
+            ("git", *args), cwd=root, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    git("init")
+    git("config", "user.name", "Admission Test")
+    git("config", "user.email", "admission@example.invalid")
+    git("remote", "add", "origin", "https://github.com/callmedraken/ai-trading-bot.git")
+    (root / "docs").mkdir()
+    doc = root / "docs/example.md"
+    doc.write_text("base\n")
+    git("add", "--", "docs/example.md")
+    git("commit", "-m", "base")
+    base = git("rev-parse", "HEAD")
+    base_tree = git("rev-parse", "HEAD^{tree}")
+    git("checkout", "-b", "feature/test-suite-docs-regression")
+    doc.write_text("candidate\n")
+    git("add", "--", "docs/example.md")
+    git("commit", "-m", "docs")
+    head, tree = git("rev-parse", "HEAD"), git("rev-parse", "HEAD^{tree}")
+    monkeypatch.setattr(runner, "_REPOSITORY_ROOT", root)
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda repo, branch: base)
+    monkeypatch.setattr(
+        runner,
+        "_arch132_r3n_admission_authority_check",
+        lambda repo: runner._prepublication_source(repo).failures,
+    )
+    contexts = []
+
+    def evaluate(repo, *, publication_context):
+        contexts.append(publication_context)
+        return AuthorityResult(publication_context, head, tree, ("current",), ())
+
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+
+    def forbidden(*a, **k):
+        pytest.fail("docs-only attempted Python verification or protected dispatch")
+
+    for name in (
+        "verify_checkpoint",
+        "build_verification_steps",
+        "_source_pytest_basetemp",
+        "preflight_checkpoint",
+        "execute_checkpoint",
+    ):
+        monkeypatch.setattr(runner, name, forbidden)
+    monkeypatch.setattr(certification, "main", forbidden)
+    original_run = runner.subprocess.run
+    calls = []
+
+    def read_only(argv, **kwargs):
+        assert argv[0] == "git" and argv[1] in {
+            "rev-parse",
+            "status",
+            "remote",
+            "merge-base",
+            "diff",
+        }
+        if argv[1] == "remote":
+            assert tuple(argv[2:]) == ("get-url", "origin")
+        calls.append(tuple(argv))
+        return original_run(argv, **kwargs)
+
+    monkeypatch.setattr(runner.subprocess, "run", read_only)
+    passed, path = runner.prepublication_admission(
+        repo_root=root, evidence_root=tmp_path / "evidence"
+    )
+    report = json.loads(path.read_text())
+    assert passed and report["identity_stable"]
+    assert report["base"] == {"head": base, "tree": base_tree}
+    assert (
+        report["started_from"]["head"] == head
+        and report["started_from"]["tree"] == tree
+    )
+    assert report["changed_paths"] == ["docs/example.md"]
+    assert report["executed_tests"] == [] and contexts == list(
+        runner.PublicationContext
+    )
+    assert ("git", "diff", "--check", base, head, "--") in calls
+
+
+@pytest.mark.parametrize("failure", ["empty", "unknown", "origin"])
+def test_public_admission_does_not_retry_rejected_source_as_full(
+    monkeypatch, tmp_path, failure
+):
+    root, context = _r3n_admission_fixture(monkeypatch)
+    if failure == "empty":
+        context["changed"] = ()
+    elif failure == "unknown":
+        monkeypatch.setattr(runner, "classify_changed_paths", lambda _: "UNKNOWN")
+    else:
+        context["origin"] = "https://github.com/other/repository.git"
+    monkeypatch.setattr(
+        runner,
+        "verify_checkpoint",
+        lambda *a, **k: pytest.fail("rejected source retried as FULL"),
+    )
+    with pytest.raises(RuntimeError, match="general admission source rejected"):
+        runner.prepublication_admission(
+            repo_root=root, evidence_root=tmp_path / "evidence"
+        )

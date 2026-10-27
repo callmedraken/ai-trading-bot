@@ -298,10 +298,15 @@ def test_actual_develop_static_routing_and_local_prospective_authority_are_ident
         }
     )
     tree = ast.parse((ROOT / "scripts/checkpoint_runner.py").read_text())
-    for name in (
-        "verify_checkpoint",
-        "verify_batch",
-        "_arch134_r3n_prepublication_authority_check",
+    for name, callee in (
+        ("verify_checkpoint", "evaluate_source_authority"),
+        ("verify_batch", "evaluate_source_authority"),
+        ("_prepublication_authority_results", "evaluate_source_authority"),
+        (
+            "_arch134_r3n_prepublication_authority_check",
+            "_prepublication_authority_results",
+        ),
+        ("_docs_only_prepublication_admission", "_prepublication_authority_results"),
     ):
         node = next(
             n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == name
@@ -309,7 +314,7 @@ def test_actual_develop_static_routing_and_local_prospective_authority_are_ident
         assert any(
             isinstance(n, ast.Call)
             and isinstance(n.func, ast.Name)
-            and n.func.id == "evaluate_source_authority"
+            and n.func.id == callee
             for n in ast.walk(node)
         )
 
@@ -577,6 +582,11 @@ def test_general_admission_cannot_bypass_both_contexts_with_ci_controls(
         runner,
         "verify_checkpoint",
         lambda *a, **k: pytest.fail("partial admission ran"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_prepublication_source",
+        lambda *a, **k: pytest.fail("partial admission collected source"),
     )
     with pytest.raises(RuntimeError):
         runner.prepublication_admission(

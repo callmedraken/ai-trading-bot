@@ -244,8 +244,15 @@ ARCH134_READONLY_DIAGNOSTIC_BRANCH: Final = (
     "feature/robinhood-production-paper-fresh-successor-"
     "readonly-deployment-admission-diagnostic-current"
 )
+ARCH134_READONLY_DIAGNOSTIC_R1_NAME: Final = (
+    "arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1"
+)
+ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH: Final = (
+    "feature/robinhood-production-paper-fresh-successor-"
+    "readonly-deployment-admission-diagnostic-r1-current"
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
-    ARCH134_READONLY_DIAGNOSTIC_NAME,
+    ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
 )
 
@@ -255,6 +262,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 CI_CERTIFICATION_PROFILES: Final = {
     "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
+    ARCH134_READONLY_DIAGNOSTIC_R1_NAME: "robinhood",
     "arch146-a-historical-research-dataset-enforcement": "full",
     "arch134-f1r1-d1s4-fresh-successor-source": "robinhood",
     "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery": "robinhood",
@@ -393,6 +401,7 @@ def resolve_ci_checkpoint(
     if len(matches) != 1 or matches[0] not in (
         *CURRENT_ACTIVE_CI_CHECKPOINTS,
         ACTIVE_CI_CHECKPOINTS[0],
+        ARCH134_READONLY_DIAGNOSTIC_NAME,
     ):
         return None
     return matches[0]
@@ -12362,13 +12371,14 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = _arch144_current_inventory_test_pin(relative, expected)
             if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("134-D1R6 successor drift: " + relative)
-        workflow_candidate = _git_blob_sha1(repo_root / ARCH145A_D1R6_WORKFLOW_PATH)
-        try:
-            _arch145a_d1r6_workflow_successor(
-                ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1,
-                workflow_candidate,
-            )
-        except ValueError:
+        # Reconstruct the immutable historical workflow declaration separately
+        # from today's canonical workflow topology; never repin a historical map.
+        workflow_path = repo_root / ARCH145A_D1R6_WORKFLOW_PATH
+        if not _authority_blob_matches(
+            repo_root, workflow_path, ARCH145A_D1R6_WORKFLOW_SUCCESSOR_BLOB_SHA1
+        ) or not _arch134_current_batch_workflow_is_reviewed(
+            workflow_path.read_text(encoding="utf-8")
+        ):
             failures.append("134-D1R6 workflow drift")
         spec = _checkpoint_specs()[ARCH134_D1R6_NAME]
         if (
@@ -25906,6 +25916,20 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
             ),
             **values,
         }
+        values = {
+            ARCH134_READONLY_DIAGNOSTIC_R1_NAME: CheckpointSpec(
+                ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+                "R1 exact source binding and closed source diagnostics; read-only",
+                ARCH134_READONLY_DIAGNOSTIC_R1_TESTS,
+                ARCH134_READONLY_DIAGNOSTIC_R1_RUFF,
+                _arch134_readonly_diagnostic_r1_authority_check,
+                _arch134_readonly_diagnostic_r1_preflight,
+                None,
+                ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH,
+                "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
+            ),
+            **values,
+        }
     return values
 
 
@@ -25915,6 +25939,7 @@ def _readonly_preflight_checkpoint(
     if spec.name in {
         READONLY_ADMISSION_NAME,
         ARCH134_READONLY_DIAGNOSTIC_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     }:
         from trading_bot.supervised_release.deployment_admission_source import (
             require_checkout_path,
@@ -25923,6 +25948,8 @@ def _readonly_preflight_checkpoint(
         authority = (
             _readonly_candidate_authority_check
             if spec.name == READONLY_ADMISSION_NAME
+            else _arch134_readonly_diagnostic_r1_authority_check
+            if spec.name == ARCH134_READONLY_DIAGNOSTIC_R1_NAME
             else _arch134_readonly_diagnostic_authority_check
         )
         if spec != _checkpoint_specs()[spec.name] or authority(repo_root):
@@ -26302,6 +26329,20 @@ def _arch134_readonly_diagnostic_overlay(
 
 
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
+    triggers = (
+        "name: Checkpoint Source Gates\n\n"
+        "on:\n  push:\n    branches:\n"
+        "      - develop\n"
+        "      - feature/d10c-durable-wake-evidence\n"
+        "      - feature/d10c-r8-terminal-halt\n"
+        "      - feature/d10c-r8-incident-reconciliation\n"
+        '      - "feature/robinhood-*"\n'
+        '      - "feature/research-*"\n'
+        '      - "feature/test-suite-*"\n'
+        "  pull_request:\n  workflow_dispatch:\n\n"
+    )
+    if not workflow.startswith(triggers):
+        return False
     active = tuple(
         name
         for name in CURRENT_ACTIVE_CI_CHECKPOINTS
@@ -26324,7 +26365,7 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = workflow.replace(
-        ARCH134_READONLY_DIAGNOSTIC_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
+        ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
     )
     return _batch_workflow_is_reviewed(translated)
 
@@ -26358,7 +26399,7 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = workflow.replace(
-        ARCH134_READONLY_DIAGNOSTIC_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
+        ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1
     )
     return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(translated)
 
@@ -26477,7 +26518,9 @@ def _arch134_readonly_diagnostic_authority_body(
         else:
             failures.append("Diagnostic workflow topology drift")
         if (
-            workflow.count("              " + ARCH134_READONLY_DIAGNOSTIC_NAME + " `\n")
+            workflow.count(
+                "              " + ARCH134_READONLY_DIAGNOSTIC_R1_NAME + " `\n"
+            )
             != 1
             or workflow.count(
                 "              arch134-fresh-successor-readonly-"
@@ -26540,6 +26583,105 @@ def _arch134_r3n_prepublication_authority_check(repo_root: Path) -> tuple[str, .
 
 def _arch134_readonly_diagnostic_preflight() -> dict[str, object]:
     from trading_bot.supervised_release.deployment_admission_diagnostic_host import (
+        preflight,
+    )
+
+    return preflight()
+
+
+ARCH134_READONLY_DIAGNOSTIC_R1_TESTS: Final = tuple(
+    dict.fromkeys(
+        (
+            *ARCH134_READONLY_DIAGNOSTIC_TESTS,
+            *ARCH132_R3N_ADMISSION_TESTS,
+            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+        )
+    )
+)
+ARCH134_READONLY_DIAGNOSTIC_R1_RUFF: Final = (
+    *ARCH134_READONLY_DIAGNOSTIC_RUFF,
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r1.py",
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r1_host.py",
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+)
+# Only the shared security source and protected preflight AST change. Historical
+# declarations remain intact; source_authority applies this reviewed R1 overlay.
+ARCH134_READONLY_DIAGNOSTIC_R1_BLOB_PREDECESSORS: Final = {
+    "src/trading_bot/supervised_release/deployment_admission_source.py": (
+        "3284e20bdb04696095041c54e3f542c24214ba05"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_R1_SOURCE_PINS: Final = {
+    "src/trading_bot/supervised_release/deployment_admission_source.py": (
+        "9624ac12f317bc0121ad6c79502130d3e8d2b0f2"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r1.py": (
+        "735dabc28e4ea30dff338875f811a9531215a884"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r1_host.py": (
+        "42c06c4988a31d03f73e07a4470d33b74f6a0479"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_PREDECESSOR: Final = (
+    "ea45620778e4b1f155b05d5d7abb333bd0f42873166cd89e7d63a714921471d4"
+)
+ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_AST: Final = (
+    "ffd152c65e7dc1c5e54fa537212ce2ec19059751e3a87fb351677ad0e83e7160"
+)
+ARCH134_READONLY_DIAGNOSTIC_R1_DISPATCH_AST: Final = (
+    "d14b9a4fd1de2680566ec698e3570cb85bc13342cec817f4b5934d6775d354e6"
+)
+
+
+def _arch134_readonly_diagnostic_r1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Compose R1 security identities with existing classified authority."""
+    failures = list(_arch134_readonly_diagnostic_authority_check(repo_root))
+    try:
+        spec = _checkpoint_specs()[ARCH134_READONLY_DIAGNOSTIC_R1_NAME]
+        if (
+            spec.remote_branch != ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH
+            or spec.preflight is not _arch134_readonly_diagnostic_r1_preflight
+            or spec.execute is not None
+            or spec.tests != ARCH134_READONLY_DIAGNOSTIC_R1_TESTS
+            or spec.ruff_paths != ARCH134_READONLY_DIAGNOSTIC_R1_RUFF
+            or spec.remote_head_env != "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD"
+            or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
+            != spec.name
+            or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+        ):
+            failures.append("Diagnostic R1 registration drift")
+        for relative, pin in ARCH134_READONLY_DIAGNOSTIC_R1_SOURCE_PINS.items():
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
+                failures.append("Diagnostic R1 security source drift: " + relative)
+        functions = _top_level_functions(
+            ast.parse(
+                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+            )
+        )
+        for name, expected in (
+            (
+                "_readonly_preflight_checkpoint",
+                ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_AST,
+            ),
+            (
+                "_arch134_readonly_diagnostic_r1_preflight",
+                ARCH134_READONLY_DIAGNOSTIC_R1_DISPATCH_AST,
+            ),
+        ):
+            if (
+                hashlib.sha256(
+                    ast.dump(functions[name], include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                failures.append("Diagnostic R1 preflight dispatch drift")
+    except (OSError, KeyError, TypeError, ValueError, SyntaxError):
+        failures.append("Diagnostic R1 authority unavailable")
+    return tuple(sorted(set(failures)))
+
+
+def _arch134_readonly_diagnostic_r1_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release.deployment_admission_diagnostic_r1_host import (
         preflight,
     )
 

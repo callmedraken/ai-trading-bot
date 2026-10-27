@@ -2,8 +2,13 @@
 
 ## Current accepted integration state
 
+The accepted develop starting integration for diagnostic R1 is HEAD
+`91d6d3191736471d38c8542cd4bcfded35e51867`, tree
+`94101fc079f4730415a632b82adcd1349e5d2b47`. R1 is a new source-only candidate
+pending its own terminal CI and ChatGPT exact-source review.
+
 Architecture 134 historical/current authority decoupling through corrective
-checkpoint C2 is SOURCE ACCEPTED. The accepted executable/source identity is:
+checkpoint C2 remains SOURCE ACCEPTED predecessor evidence. Its identity is:
 
     HEAD c2755c682a544bb4c24bb87889de819751715952
     TREE a2f0dfc86431dcc8e8ed5a89476df63bcab807cd
@@ -77,41 +82,60 @@ backfilled or dynamically extended. The earlier weekend instruction to
 deployment/admission path; treating 10/26 as an F1R1 successor trading session
 was a planning regression.
 
-## Protected boundary
+## Current source-only diagnostic R1 boundary
 
-The first real-host v1 deployment-admission observer attempt remains consumed
-BLOCKED / HOST and non-retryable, report SHA256
-`3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`.
+The accepted starting integration for this successor is develop HEAD
+`91d6d3191736471d38c8542cd4bcfded35e51867`, tree
+`94101fc079f4730415a632b82adcd1349e5d2b47`. The historical C1 preparation text
+above is provenance; this R1 starts from that completed integration.
 
-The accepted diagnostic successor remains read-only with `execute = None`,
-zero effect counters and false authority flags. No new real-host diagnostic has
-yet run on the accepted diagnostic successor. No root/ACL/materialization,
-scheduler, credential/provider, broker/paper/live effect is authorized by
-source or certification PASS. Live remains NO-GO.
+The diagnostic at source HEAD `c2755c682a544bb4c24bb87889de819751715952`,
+tree `a2f0dfc86431dcc8e8ed5a89476df63bcab807cd`, was consumed with report SHA256
+`640e0d61e9122ef40fd3716b80316a12d78cb1b19c70f651e7c3e576765ca26b`:
+`BLOCKED / HOST / HOST_UNKNOWN / diagnostic_process_starts=9`, identity stable,
+zero effects and false authority; protected execution NOT_AUTHORIZED.
+Source tracking-ref binding failed before Windows host-state qualification.
+This is not an ACL, namespace, token, scheduler, runtime or quiescence diagnosis.
+Do not rerun, repoint, amend or overwrite that attempt or its branch/evidence.
+The earlier non-fresh default evidence root and missing trusted remote-head
+handoff were pre-dispatch non-host failures; neither consumed a host attempt.
+The separate v1 report `3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`
+also remains immutable and non-retryable.
+
+The new source-only candidate is
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1` on
+`feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r1-current`.
+It adds exact explicit R1 source binding and closed source collection, checkout
+policy, lineage and inventory diagnostics. Predecessor v1 defaults remain intact.
+Its registered `execute = None`, effect counters zero and authority flags false.
+R1 real-host preflight is NOT_RUN. No production inspection, root/ACL write,
+materialization, scheduler/runtime, provider/OAuth/broker, F1 or live activity
+belongs to this source checkpoint. Live remains NO-GO.
 
 ## Next safe step
 
-This C1 correction must complete its own focused verification, exact clean
-candidate admission, one ordinary feature push and terminal source gate before
-local operator work resumes. Do not run local canonical ROBINHOOD or FULL.
+Finish focused verification, combined Ruff/diff, exact clean candidate admission
+in FEATURE and PROSPECTIVE_DEVELOP, one ordinary feature push and terminal
+GitHub-owned canonical ROBINHOOD. Do not run local canonical ROBINHOOD/FULL.
+Then ChatGPT owns exact-source review of the published HEAD/tree, admission and
+terminal CI before any new host attempt. Do not merge to develop here.
 
-After that closeout is accepted and integrated:
+The previous bare preflight command was incomplete and is retired as operator
+instructions. Future R1 invocation requires a fresh nonexistent external
+`--evidence-root` plus exact reviewed `AI_TRADING_BOT_ARCH134_ADMISSION_HEAD`,
+`AI_TRADING_BOT_ARCH134_ADMISSION_TREE`,
+`AI_TRADING_BOT_ARCH134_ADMISSION_REFERENCE`, and truthful current-process
+`AI_TRADING_BOT_ARCH134_ADMISSION_PRINCIPAL_SID` and
+`AI_TRADING_BOT_ARCH134_ADMISSION_ELEVATED`.
+Use the short guarded scriptblock in the
+[R1 operator contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r1.md#complete-future-operator-contract--not_run)
+only after source review supplies the exact literal R1 HEAD/tree. It derives
+SID/elevation from the invoking token, creates only a GUID path string, and
+leaves actual host/token admission and evidence capture to the registered
+preflight. No external Administrator or production-state pre-screen is added.
 
-1. reconcile the primary local `F:\AI\ai-trading-bot` checkout only under the
-   exact-known-behind fast-forward rule to the final accepted `develop` docs
-   closeout identity;
-2. independently reconcile the existing diagnostic operator worktree only to
-   its exact live diagnostic branch HEAD, currently the accepted executable
-   c2755c6 identity. Do not move that remote diagnostic branch again merely to
-   match a docs-only develop descendant;
-3. run exactly one registered read-only preflight:
-   `.\ops.ps1 preflight arch134-fresh-successor-readonly-deployment-admission-diagnostic`.
-   The registered preflight owns its own source/Administrator/host admission and
-   evidence capture; do not add a custom PowerShell wrapper or external
-   pre-screen;
-4. on PASS, stop for ChatGPT review of the exact evidence before any
-   successor-root write-authority/ACL action;
-5. on BLOCKED or HOST_UNKNOWN, stop with no retry or repair.
-
-The operational objective is readiness for the fixed 2026-11-02 / 2026-11-03
-manual-start successor sessions, not the retired 2026-10-26 F1 target.
+Return the complete sanitized report and SHA256, source HEAD/tree, process count
+and identity stability for ChatGPT review. PASS means only
+`READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`; BLOCKED/unknown means
+STOP with no retry/repair. The fixed F1R1 manual-start session dates remain
+2026-11-02 and 2026-11-03; dates grant no authority.

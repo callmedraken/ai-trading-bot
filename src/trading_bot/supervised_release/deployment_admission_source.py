@@ -43,6 +43,10 @@ from trading_bot.supervised_release.model import (
 ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 CLOSURE_PATH = "src/trading_bot/supervised_release/deployment_candidate.py"
 CLOSURE_BLOB = "3bfe6666fe2b0ba151938c191289659eacd5a52b"
+R1_TRACKING_BRANCH = (
+    "feature/robinhood-production-paper-fresh-successor-"
+    "readonly-deployment-admission-diagnostic-r1-current"
+)
 # Exact accepted successor_source.RISK_MATERIAL declaration, independently pinned
 # by source authority. No import of its historical host/source dispatch occurs.
 RISK_MATERIAL = (
@@ -79,8 +83,15 @@ def manifest_for(inventory: tuple[ReleaseInventoryEntry, ...]) -> ReleaseManifes
 class LocalGitReader:
     """Fixed read-only Git vocabulary. Diagnostic children are separately counted."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, tracking_branch: str | None = None) -> None:
+        branch = invocation_branch() if tracking_branch is None else tracking_branch
+        if type(branch) is not str or branch not in {
+            invocation_branch(),
+            R1_TRACKING_BRANCH,
+        }:
+            raise ValueError("GIT_VOCABULARY")
         self.root = root
+        self._tracking_branch = branch
         self.diagnostic_process_starts = 0
 
     def query(self, *args: str, input_bytes: bytes | None = None) -> bytes:
@@ -111,7 +122,7 @@ class LocalGitReader:
                     "HEAD",
                     "HEAD^{tree}",
                     "refs/remotes/origin/develop",
-                    "refs/remotes/origin/" + invocation_branch(),
+                    "refs/remotes/origin/" + self._tracking_branch,
                 }
                 or re.fullmatch(r"[0-9a-f]{40}\^\{tree\}", args[1]) is not None
             )

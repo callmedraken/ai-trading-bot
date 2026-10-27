@@ -1,6 +1,6 @@
 # AI Development and Review Workflow
 
-## Standing authorization for reviewed next steps — current normative rule
+## Standing authorization for reviewed next steps â€” current normative rule
 
 Reviewed next-step actions are implicitly authorized by default within their
 exact described scope. ChatGPT must not insert an authorization-only turn to
@@ -27,7 +27,7 @@ reviewed safe step within scope. A separate new authorization message is not
 universally required for reviewed bounded operator actions. Historical accounts
 of separate authorization remain historical and do not override this current rule.
 
-## Current historical/current authority rule — Architecture 134
+## Current historical/current authority rule â€” Architecture 134
 
 Historical evidence and current infrastructure are independent authority domains.
 The enforceable classification, ownership map, complete #746 failure audit and
@@ -75,7 +75,7 @@ Canonical mapped ROBINHOOD/FULL stays GitHub-owned and is not a local debug loop
 The R3M/R3N narrative below preserves predecessor chronology; its exact overlays
 are immutable records, superseded as owners of current mutable infrastructure.
 
-## Architecture 132-R3M — predecessor exact develop certification reuse
+## Architecture 132-R3M â€” predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local
 HEAD/tree/branch and origin admission, fast-forward ancestry proof, full-batch
@@ -109,7 +109,7 @@ CI; no new feature certification mapping or local canonical run is introduced.
 ChatGPT owns exact-source review and any selected certification before integration.
 No provider, holdout, ACL, scheduler, runtime, broker or live authority follows.
 
-## Architecture 132-R3N — workflow throughput and current-contract consolidation
+## Architecture 132-R3N â€” workflow throughput and current-contract consolidation
 
 R3N preserves R3M's exact develop-push admission and extends the reusable
 feature evidence set. A develop push may reuse one exact first-attempt mapped
@@ -175,7 +175,7 @@ lane topology, and workflow-contract assertions are owned by the current
 certification/profile/lane/CI test surfaces; historical review-paper tests
 retain predecessor and incident evidence only.
 
-## CI-owned selected certification — normative expedited path
+## CI-owned selected certification â€” normative expedited path
 
 For reviewed coherent integration checkpoints, the source gate may own the
 selected Architecture-132 certification profile directly. The mapping from exact
@@ -201,7 +201,7 @@ that profile obligation. Do not ask the human operator to rerun the same profile
 locally. Local certification is reserved for an unmapped selected gate, invalid
 or incomplete CI evidence, or materially different host/runtime evidence.
 
-### Terminal selected-certification ownership — normative
+### Terminal selected-certification ownership â€” normative
 
 When a milestone is known before implementation to require terminal
 Architecture-132 `FULL` or `ROBINHOOD` certification, that certification is part
@@ -252,7 +252,7 @@ in 45/47-module lanes and recorded 8,416 passed / 1 skipped / 0 failed/errors in
 and terminal source-gates passed. This exact result is the reference proof that
 mapped CI certification replaces a duplicate human rerun.
 
-## Canonical source-gate topology non-regression notary — normative
+## Canonical source-gate topology non-regression notary â€” normative
 
 This rule is **normative**, not merely historical. The accepted source-gate
 topology is the audited split/sharded workflow. A return to the older monolithic
@@ -395,7 +395,7 @@ from code deployment.
   mutated, cleaned or reused without a separately reviewed housekeeping or
   diagnostic boundary.
 
-### Rename-free immutable-release publication — normative non-regression
+### Rename-free immutable-release publication â€” normative non-regression
 
 This is a **current normative architecture rule**, adopted after the repeated
 Architecture-133 Windows rename incidents and the 2026-10-24
@@ -578,7 +578,7 @@ Git operations and reports the local changes.
 Use the smallest model class that fits the *uncertainty and safety profile* of
 the task, not simply the number of files changed.
 
-### Luna Extra High — known contract, known surface
+### Luna Extra High â€” known contract, known surface
 
 Use **Luna Extra High** by default when:
 
@@ -593,7 +593,7 @@ Typical Luna work includes known-file feature implementation, focused test
 additions, narrow bug fixes with an established root cause, small refactors
 under a frozen contract, and routine docs/help updates.
 
-### Astra — discovery-aware bounded implementation
+### Astra â€” discovery-aware bounded implementation
 
 Use **Astra** by default when the task is still bounded but useful implementation
 requires broader repository understanding first, including when:
@@ -611,7 +611,7 @@ Astra's broader exploration allowance is not permission to redesign settled
 architecture or broaden the authorized checkpoint. If discovery reveals that
 the contract itself must change, stop and return the issue to ChatGPT.
 
-### Sol High — safety/authority escalation
+### Sol High â€” safety/authority escalation
 
 Use **Sol High** for native Windows/security, production authority, ordering,
 crash/recovery, credential/reference-version changes, external-effect
@@ -838,7 +838,7 @@ pull/repair mechanism.
 
 ## Testing and certification
 
-### Normative verification and certification rules — 2026-10-11
+### Normative verification and certification rules â€” 2026-10-11
 
 Verification is fail-fast before longer pytest/certification execution.
 These rules are normative and preserve Architecture 132's reviewed profile
@@ -1514,15 +1514,23 @@ non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
 .\ops.ps1 preflight arch128-r7
 ```
 
-The current fresh-successor diagnostic checkpoint is
-`arch134-fresh-successor-readonly-deployment-admission-diagnostic`. It registers
-read-only diagnostic preflight, `execute = None`, an exact feature branch and
-GitHub-owned canonical ROBINHOOD certification. The v1 predecessor remains
-coarse `BLOCKED / HOST`; only the successor emits a closed diagnostic code.
-The first real-host v1 attempt is preserved as immutable evidence and is not
-rerun. Implementation tests use fakes only and never invoke the real host
-observer, production namespace, scheduler/security state or protected runtime.
-No source PASS grants mutation.
+The current source-only fresh-successor diagnostic is
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1`. It has
+read-only preflight registration, `execute = None`, exact explicit R1 branch
+binding and GitHub-owned canonical ROBINHOOD. Implementation runs no host
+observer. The consumed predecessor diagnostic report
+`640e0d61e9122ef40fd3716b80316a12d78cb1b19c70f651e7c3e576765ca26b`
+is immutable; source binding failed at nine Git children before Windows host
+qualification. Do not rerun it. The earlier v1 coarse BLOCKED/HOST report also
+remains immutable. Source PASS grants no mutation.
+
+Before any new R1 host attempt ChatGPT must review exact published HEAD/tree,
+admission and terminal CI. The complete future invocation requires a fresh
+nonexistent external evidence root, reviewed HEAD/TREE/REFERENCE and truthful
+invoking-process SID/elevation, using the short guarded scriptblock in the
+[R1 operator contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r1.md).
+The runner owns actual token/host admission; no giant wrapper or external
+production/Administrator pre-screen is required.
 
 The exact #738 mapped ROBINHOOD run (`40288823461`, attempt 1) is reusable only
 when repository, workflow, event, SHA/tree, branch, profile, attempt, exact job

@@ -1,6 +1,6 @@
 # AI Trading Bot Development Rules
 
-## Standing authorization for reviewed next steps — current normative rule
+## Standing authorization for reviewed next steps â€” current normative rule
 
 Reviewed next-step actions are implicitly authorized by default within their
 exact described scope. ChatGPT must not insert an authorization-only turn to
@@ -123,7 +123,7 @@ from code deployment.
   mutated, cleaned or reused without a separately reviewed housekeeping or
   diagnostic boundary.
 
-### Rename-free immutable-release publication — normative non-regression
+### Rename-free immutable-release publication â€” normative non-regression
 
 This is a **current normative architecture rule**, adopted after the repeated
 Architecture-133 Windows rename incidents and the 2026-10-24
@@ -685,10 +685,13 @@ protected-dispatch inventory from prose or examples; `_checkpoint_specs()` and
 Administrator/source/host admission and evidence capture; do not insert an
 external pre-screen that can abort before the runner records the attempt.
 
-The current post-R1 successor is SOURCE ONLY and has no preflight/execute
-dispatch. Historical D1S4/R1 host registrations retain predecessor meaning;
-they are not fresh-successor deployment authority. ChatGPT must review the new
-exact source and later deployment-admission boundary before real-host work.
+The current diagnostic R1 implementation checkpoint is SOURCE ONLY:
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1` registers
+read-only preflight and `execute = None`; no host attempt runs during source
+implementation. Historical D1S4/R1 recovery and consumed v1/diagnostic host
+registrations retain predecessor meaning. ChatGPT must review the exact new
+source before any new host attempt. The complete future invocation contract is
+in `docs/architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r1.md`.
 
 The `execute` surface is protected, checkpoint-specific, and never implied by a
 source/preflight PASS. It may be invoked only after authorization within the

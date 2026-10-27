@@ -328,6 +328,29 @@ def test_correction_source_route_keeps_diagnostic_effect_and_profile_bounds():
     assert runner._arch134_readonly_diagnostic_graph_check(ROOT) == ()
 
 
+def test_d1r6_reconstructs_historical_workflow_and_checks_current_topology(monkeypatch):
+    original_hash = runner._git_blob_sha1
+
+    def hash_security_source(path):
+        assert path.name != "checkpoint-source-gates.yml", (
+            "historical current-byte claim"
+        )
+        return original_hash(path)
+
+    monkeypatch.setattr(runner, "_git_blob_sha1", hash_security_source)
+    assert runner._arch134_d1r6_authority_check(ROOT) == ()
+    original_read = Path.read_text
+
+    def read(path, *args, **kwargs):
+        text = original_read(path, *args, **kwargs)
+        if path.name == "checkpoint-source-gates.yml":
+            return text.replace('      - "feature/research-*"\n', "")
+        return text
+
+    monkeypatch.setattr(Path, "read_text", read)
+    assert "134-D1R6 workflow drift" in runner._arch134_d1r6_authority_check(ROOT)
+
+
 def test_complete_746_failure_families_are_rechecked():
     evidence = json.loads(
         (

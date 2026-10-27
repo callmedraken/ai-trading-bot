@@ -200,6 +200,15 @@ def blob_matches(repo_root: Path, path: Path, expected: str | None) -> bool:
     # security source hash owner.
     from scripts import checkpoint_runner
 
+    if (
+        relative in checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_BLOB_PREDECESSORS
+        and expected
+        == checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_BLOB_PREDECESSORS[relative]
+    ):
+        historical_blob(_ARCHIVE_ROOT, expected)
+        expected = checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_SOURCE_PINS[
+            relative
+        ]
     return checkpoint_runner._git_blob_sha1(path) == expected
 
 
@@ -264,6 +273,26 @@ def ast_matches(repo_root: Path, name: str, node: ast.AST, expected: str) -> boo
         return _historical_ast_match(_ARCHIVE_ROOT, blob, name, expected)
     # Exact implementation remains authoritative for protected dispatch and
     # other security-sensitive symbols. No mutable-symbol fallback is allowed.
+    if name == "_readonly_preflight_checkpoint":
+        from scripts import checkpoint_runner
+
+        if (
+            expected
+            == checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_PREDECESSOR
+        ):
+            predecessor = next(
+                item
+                for item in historical_tree(_ARCHIVE_ROOT).body
+                if isinstance(item, ast.FunctionDef) and item.name == name
+            )
+            if (
+                hashlib.sha256(
+                    ast.dump(predecessor, include_attributes=False).encode()
+                ).hexdigest()
+                != expected
+            ):
+                return False
+            expected = checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_AST
     return (
         hashlib.sha256(ast.dump(node, include_attributes=False).encode()).hexdigest()
         == expected

@@ -22,7 +22,7 @@ permissions:
 
 env:
   AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
-              arch134-fresh-successor-readonly-deployment-admission-diagnostic `
+              arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1 `
               arch146-a-historical-research-dataset-enforcement `
               arch134-f1r1-d1s3-successor-release-installation-operator `
               arch133-robinhood-supervised-release-installation-operator `

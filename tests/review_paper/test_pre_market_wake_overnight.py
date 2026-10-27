@@ -10,9 +10,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.review_paper import pre_market_wake_overnight as q
@@ -880,7 +877,6 @@ def test_static_capability_closure_and_fixed_transport():
 
 
 def test_checkpoint_inventory_and_frozen_predecessors(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[runner.ARCH134_D1R6_NAME]
     assert spec.remote_branch == host.BRANCH and spec.preflight is spec.execute is None
     assert (

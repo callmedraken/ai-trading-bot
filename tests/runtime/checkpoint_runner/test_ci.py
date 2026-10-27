@@ -26,130 +26,6 @@ def _historical_workflow_view(workflow: str) -> str:
     )
 
 
-def _use_historical_predecessor_authority(monkeypatch, root: Path) -> None:
-    historical = runner._batch_workflow_is_reviewed
-    monkeypatch.setattr(
-        runner,
-        "_batch_workflow_is_reviewed",
-        lambda workflow: historical(_historical_workflow_view(workflow)),
-    )
-    original_blob = runner._git_blob_sha1
-    historical_d1s4 = (
-        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
-    )
-    historical_d1s1 = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
-    historical_c1 = "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
-    historical_d1s4_r1 = (
-        "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
-    )
-    historical_d1s3 = (
-        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
-    )
-    historical_blobs = {
-        root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
-            "docs/AI_DEVELOPMENT_WORKFLOW.md"
-        ],
-        root / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_ci.py"
-        ],
-        root
-        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_core.py"
-        ],
-        root / historical_d1s4: runner.READONLY_BLOB_AFTER[historical_d1s4],
-        root / historical_d1s1: runner.READONLY_BLOB_AFTER[historical_d1s1],
-        root / historical_c1: runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
-            historical_c1
-        ],
-        root / "tests/scripts/certification_runner/helpers.py": (
-            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
-        ),
-        root / "tests/scripts/certification_runner/test_profiles.py": (
-            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
-        ),
-        root / "tests/scripts/certification_runner/test_lanes.py": (
-            "6ef03c56497055a8edf7d2378c87c44d55800b53"
-        ),
-        root / "tests/review_paper/test_d1_session_execution.py": (
-            "e3259ba082f5d702c507fa194bd739a627053baf"
-        ),
-        root / "tests/review_paper/test_pre_market_wake_qualification.py": (
-            "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
-        ),
-        root / "tests/review_paper/test_five_session_soak.py": (
-            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
-        ),
-        root / "tests/review_paper/test_pre_market_wake_overnight.py": (
-            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
-        ),
-        root / "tests/review_paper/test_d1_session_authorization.py": (
-            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
-        ),
-        root / "tests/review_paper/test_production_paper_runtime.py": (
-            "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
-        ),
-        root / historical_d1s4_r1: ("6dc196faf07d9a70601718f3d194a85db70713c8"),
-        root / "tests/review_paper/test_successor_publication_recovery.py": (
-            "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
-        ),
-        root / "tests/review_paper/test_production_paper_runtime_acl.py": (
-            "a77edf7dfdaa2e6932594ae77601203f975bbff2"
-        ),
-        root / historical_d1s3: ("9e83157c7d92073dc72123decf1b41250656d9ea"),
-        root / "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
-            "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
-        ),
-        root / "tests/review_paper/test_alpaca_authentication_qualification.py": (
-            "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
-        ),
-    }
-    monkeypatch.setattr(
-        runner,
-        "_git_blob_sha1",
-        lambda path: historical_blobs.get(path, original_blob(path)),
-    )
-    predecessor = runner._deployment_candidate_predecessor_authority_check
-
-    def historical_predecessor(repo_root: Path) -> tuple[str, ...]:
-        return tuple(
-            failure
-            for failure in predecessor(repo_root)
-            if failure
-            not in {
-                (
-                    "R3N C1 R3M source drift: "
-                    "tests/scripts/certification_runner/helpers.py"
-                ),
-                (
-                    "R3N C1 R3M source drift: "
-                    "tests/scripts/certification_runner/test_lanes.py"
-                ),
-                (
-                    "R3N C1 R3M source drift: "
-                    "tests/scripts/certification_runner/test_profiles.py"
-                ),
-                (
-                    "R3N C4 predecessor source drift: "
-                    "tests/scripts/certification_runner/test_lanes.py"
-                ),
-                (
-                    "R3N C4 predecessor source drift: "
-                    "tests/scripts/certification_runner/test_profiles.py"
-                ),
-                "R3N C4 predecessor new AST drift: prepublication_admission",
-            }
-        )
-
-    monkeypatch.setattr(
-        runner,
-        "_deployment_candidate_predecessor_authority_check",
-        historical_predecessor,
-    )
-    monkeypatch.setattr(
-        runner, "_readonly_predecessor_authority_check", historical_predecessor
-    )
-
-
 @pytest.mark.parametrize(
     "paths,expected",
     [
@@ -918,7 +794,6 @@ def test_d1r2_successor_authority_drift_fails_closed(monkeypatch, which):
 
 def test_arch146a_registration_and_additive_successor_authority(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH146A_NAME]
     assert spec.remote_branch == runner.ARCH146A_BRANCH
     assert spec.preflight is spec.execute is spec.remote_head_env is None
@@ -999,7 +874,6 @@ def test_arch146a_c1_full_dependency_is_declared_conditional_and_fail_closed():
 
 def test_arch146a_c1_exact_successors_and_frozen_failed_maps(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     runner._arch146a_maps()
     runner._arch146a_c1_maps()
     assert runner._arch132_r3n_c1_arch146a_c2_authority_check(root) == ()
@@ -1044,7 +918,6 @@ def test_arch146a_c2_solver_pin_matches_accepted_fixture_provenance():
 
 def test_arch146a_c2_maps_and_wrong_predecessors_fail_closed(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch146a_c2_authority_check(root) == ()
     assert runner._arch146a_authority_check(root) == ()
     for ast_pin, before, after in (
@@ -1483,6 +1356,7 @@ def test_r3n_prepublication_admission_contract():
     )
     assert runner.SOURCE_REPOSITORY == "callmedraken/ai-trading-bot"
     assert runner.ARCH132_R3N_ADMISSION_TESTS == (
+        "tests/runtime/checkpoint_runner/test_source_authority.py",
         "tests/runtime/checkpoint_runner/test_ci.py",
         "tests/scripts/certification_runner/test_profiles.py",
         "tests/scripts/certification_runner/test_lanes.py",
@@ -1545,7 +1419,6 @@ def _r3n_admission_fixture(monkeypatch):
     monkeypatch.setattr(
         runner, "_arch132_r3m_authority_check", lambda _: context["authority"]
     )
-    _use_historical_predecessor_authority(monkeypatch, root)
     return root, context
 
 
@@ -1619,7 +1492,7 @@ def test_r3n_general_prepublication_admission_rejects_invalid_state(
     elif mutation == "invalid_classification":
         context["changed"] = "docs/example.md\n"
     else:
-        context["authority"] = ("invalid current topology",)
+        monkeypatch.setattr(runner, "_batch_workflow_is_reviewed", lambda _: False)
     assert runner._arch132_r3n_admission_authority_check(
         Path(runner.__file__).resolve().parents[1]
     )
@@ -2098,7 +1971,6 @@ def test_r3m_reuse_workflow_mutations_fail_authority(old, new):
 
 def test_r3m_exact_successor_authority_and_frozen_certification_source(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3m_authority_check(root) == ()
     for ast_pin, before, after in (
         (True, runner.ARCH132_R3M_AST_PREDECESSORS, runner.ARCH132_R3M_AST_PINS),
@@ -2365,7 +2237,6 @@ def test_r3m_metadata_client_is_read_only_and_lookup_failures_fall_back(monkeypa
 
 def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3m_c1_authority_check(root) == ()
     assert runner._arch132_r3m_authority_check(root) == ()
     for ast_pin, before, after in (
@@ -2386,7 +2257,6 @@ def test_r3m_c1_preserves_initial_maps_and_rejects_wrong_successors(monkeypatch)
 
 def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch132_r3n_c4_authority_check(root) == ()
     assert runner._arch132_r3n_c3_authority_check(root) == ()
     assert runner._arch132_r3m_authority_check(root) == ()
@@ -2415,7 +2285,6 @@ def test_r3n_c4_additive_authority_and_exact_predecessors(monkeypatch):
 
 def test_r3n_c4_skipped_name_drift_fails_authority(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     monkeypatch.setattr(
         runner, "REVIEWED_SKIPPED_CERTIFICATION_JOB", "certification-tests ( / )"
     )
@@ -2441,22 +2310,14 @@ def test_r3n_c4_shared_blob_routes_preserve_predecessor_semantics(monkeypatch):
     assert runner._arch134_d1s3_shared_successor_pin(relative) is None
 
 
-def test_readonly_c1_exact_test_successors_do_not_hide_source_drift(monkeypatch):
+def test_historical_test_successors_do_not_claim_current_harness_bytes(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
-    assert runner._readonly_candidate_authority_check(root) == ()
+    from scripts import source_authority
+
     relative = "tests/strategies/test_production_strategy_contract.py"
+    pin = runner.ARCH132_R3M_C3_BLOB_PINS[relative]
     assert (
-        runner.ARCH132_R3M_C3_BLOB_PINS[relative]
-        == runner.READONLY_BLOB_BEFORE[relative]
+        source_authority.classify_path(relative)
+        is source_authority.PinClass.CURRENT_MUTABLE
     )
-    original = runner._git_blob_sha1
-
-    def blob(path):
-        return "0" * 40 if path == root / relative else original(path)
-
-    monkeypatch.setattr(runner, "_git_blob_sha1", blob)
-    assert (
-        "R3N C4 predecessor source drift: " + relative
-        in runner._readonly_predecessor_authority_check(root)
-    )
+    assert source_authority.blob_matches(root, root / relative, pin)

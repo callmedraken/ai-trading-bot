@@ -11,9 +11,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from trading_bot.market_data.alpaca_http import (
     MAX_ALPACA_RESPONSE_BYTES,
@@ -581,7 +578,6 @@ def test_d1r4_source_only_registration_and_frozen_predecessors(monkeypatch):
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_AUTH_NAME]
     assert (
         runner.resolve_ci_checkpoint(runner._checkpoint_specs(), host.BRANCH, "push")

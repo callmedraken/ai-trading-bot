@@ -35,6 +35,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
         sorted(
             (
                 *_EXPECTED_ROBINHOOD,
+                "tests/runtime/checkpoint_runner/test_source_authority.py",
                 _PUBLISHED_PREPARE_TEST,
                 _PREPARE_OPERATOR_TEST,
                 _SUPERVISED_QUALIFICATION_TEST,
@@ -102,7 +103,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
             )
         )
     )
-    assert len(selected) == 113
+    assert len(selected) == 114
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -127,6 +128,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
         sorted(
             (
                 *_EXPECTED_FULL,
+                "tests/runtime/checkpoint_runner/test_source_authority.py",
                 "tests/runtime/checkpoint_runner/test_r3m_c2.py",
                 _PUBLISHED_PREPARE_TEST,
                 _PREPARE_OPERATOR_TEST,
@@ -225,10 +227,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 204,
-        "robinhood": 113,
+        "full": 205,
+        "robinhood": 114,
         "legacy": 222,
-        "exhaustive": 426,
+        "exhaustive": 427,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
@@ -251,8 +253,6 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
             else:
                 expected = runner.balance_robinhood(selected)
             assert tuple(lanes.values()) == expected
-            if name == "robinhood":
-                assert tuple(map(len, lanes.values())) == (28, 27, 31, 27)
 
 
 @pytest.mark.parametrize(

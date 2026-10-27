@@ -421,6 +421,7 @@ ROBINHOOD_INFRASTRUCTURE_MODULES = (
     "tests/scripts/certification_runner/test_profiles.py",
     "tests/scripts/certification_runner/test_results.py",
     "tests/scripts/certification_runner/test_source.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
 )
 # Frozen Architecture 132 baseline at accepted HEAD:
 # 69327a7d5fbea7499329902ff96fd98e77a62591.
@@ -543,6 +544,7 @@ FULL_EXACT_MODULES = (
     "tests/scripts/test_run_rolling_historical_simulation.py",
     "tests/scripts/test_run_walk_forward_experiment.py",
     "tests/test_config.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
 )
 # Frozen supported baseline at Architecture 132-R1 startup HEAD:
 # 2577225dafcff2d616fcbf018d7045aebaab1ff5.

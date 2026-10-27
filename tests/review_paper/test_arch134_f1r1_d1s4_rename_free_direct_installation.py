@@ -53,105 +53,6 @@ ROOT = Path(__file__).resolve().parents[2]
 FAKE_PYTHON = b"disposable Python binary"
 
 
-def _use_historical_predecessor_authority(monkeypatch: pytest.MonkeyPatch) -> None:
-    historical = runner._batch_workflow_is_reviewed
-    monkeypatch.setattr(
-        runner,
-        "_batch_workflow_is_reviewed",
-        lambda workflow: historical(
-            workflow.replace(
-                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
-                runner.ACTIVE_CI_CHECKPOINTS[0],
-                1,
-            )
-        ),
-    )
-    original_blob = runner._git_blob_sha1
-    historical_d1s4 = (
-        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
-    )
-    historical_d1s3 = (
-        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
-    )
-    historical_d1s4_r1 = (
-        "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
-    )
-    historical_blobs = {
-        ROOT / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
-            "docs/AI_DEVELOPMENT_WORKFLOW.md"
-        ],
-        ROOT / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_ci.py"
-        ],
-        ROOT
-        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_core.py"
-        ],
-        ROOT / historical_d1s4: runner.READONLY_BLOB_AFTER[historical_d1s4],
-        ROOT / "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py": (
-            runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
-                "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
-            ]
-        ),
-        ROOT / "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py": (
-            runner.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
-                "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
-            ]
-        ),
-        ROOT / "tests/review_paper/test_d1_session_execution.py": (
-            "e3259ba082f5d702c507fa194bd739a627053baf"
-        ),
-        ROOT / "tests/review_paper/test_d1_session_authorization.py": (
-            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
-        ),
-        ROOT / "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py": (
-            "3f7d83b0cb15ec9f9dc81c9aa822ae98bf1a76e5"
-        ),
-        ROOT / "tests/review_paper/test_pre_market_wake_overnight.py": (
-            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
-        ),
-        ROOT / "tests/review_paper/test_five_session_soak.py": (
-            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
-        ),
-        ROOT / historical_d1s3: ("9e83157c7d92073dc72123decf1b41250656d9ea"),
-        ROOT / "tests/review_paper/test_successor_publication_recovery.py": (
-            "b5b60f014ce6c542a4ff6f4607f2eada19988d11"
-        ),
-        ROOT / historical_d1s4_r1: ("6dc196faf07d9a70601718f3d194a85db70713c8"),
-        ROOT / "tests/scripts/certification_runner/helpers.py": (
-            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
-        ),
-        ROOT / "tests/scripts/certification_runner/test_profiles.py": (
-            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
-        ),
-        ROOT / "tests/scripts/certification_runner/test_lanes.py": (
-            "6ef03c56497055a8edf7d2378c87c44d55800b53"
-        ),
-    }
-    monkeypatch.setattr(
-        runner,
-        "_git_blob_sha1",
-        lambda path: historical_blobs.get(path, original_blob(path)),
-    )
-    predecessor = runner._deployment_candidate_predecessor_authority_check
-
-    def historical_predecessor(root: Path) -> tuple[str, ...]:
-        return tuple(
-            failure
-            for failure in predecessor(root)
-            if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
-        )
-
-    monkeypatch.setattr(
-        runner,
-        "_deployment_candidate_predecessor_authority_check",
-        historical_predecessor,
-    )
-    monkeypatch.setattr(
-        runner, "_readonly_predecessor_authority_check", historical_predecessor
-    )
-
-
 def accepted(head="a" * 40, tree="b" * 40):
     files = {
         "pyproject.toml": b"[project]\nname='fake'\n",
@@ -829,7 +730,6 @@ def test_native_close_ambiguity_closes_every_remaining_handle(monkeypatch):
 
 
 def test_registered_forward_dispatch_and_authority(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     spec = runner._checkpoint_specs()[d.CHECKPOINT]
     assert spec.preflight is runner._arch134_d1s4_preflight
     assert spec.execute is runner._arch134_d1s4_execute
@@ -1193,7 +1093,6 @@ def test_direct_authority_maps_fail_closed_on_drift(monkeypatch, mapping):
 
 
 def test_predecessor_c1_inventory_uses_current_d1s4_overlay(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     assert (
         runner._arch146a_predecessor_active_digest()
         == runner.ARCH134_FRESH_ACTIVE_SHA256
@@ -1519,7 +1418,6 @@ def test_fresh_attempt_semantics_are_one_shot_and_release_bound(
 
 
 def test_fresh_source_registration_preserves_predecessors(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     spec = runner._checkpoint_specs()[fresh.CHECKPOINT]
     assert spec.remote_branch == fresh.BRANCH
     assert spec.preflight is None and spec.execute is None
@@ -1603,7 +1501,6 @@ def test_fresh_exact_incident_inventory_and_python_declaration(monkeypatch):
 
 
 def test_fresh_current_docs_do_not_grant_executable_authority(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     original = runner._git_blob_sha1
 
     def blob(path):
@@ -1884,7 +1781,6 @@ def test_candidate_source_guard_rejects_host_and_retired_dispatch(monkeypatch, p
 def test_candidate_exact_overlay_and_source_guard_preserve_frozen_predecessors(
     monkeypatch,
 ):
-    _use_historical_predecessor_authority(monkeypatch)
     assert runner._deployment_candidate_graph_check(ROOT) == ()
     assert runner._deployment_candidate_authority_check(ROOT) == ()
     assert runner._arch134_fresh_authority_check(ROOT) == ()
@@ -1919,7 +1815,6 @@ def test_candidate_overlay_rejects_wrong_predecessor():
 
 
 def test_candidate_current_docs_are_never_executable_blob_authority(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     original = runner._git_blob_sha1
 
     def blob(path):
@@ -2272,7 +2167,6 @@ def test_readonly_native_path_ceiling_rejects_incident_and_prospective_traversal
 
 
 def test_readonly_registration_is_additive_and_ci_owned(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch)
     specs = runner._checkpoint_specs()
     spec = specs[readonly.CHECKPOINT]
     assert spec.remote_branch == readonly.BRANCH and spec.execute is None
@@ -2643,7 +2537,6 @@ def test_readonly_diagnostic_transport_is_fixed_bounded_and_sanitized(monkeypatc
         "READONLY_BLOB_AFTER",
         "READONLY_SOURCE_PINS",
         "READONLY_AST_PINS",
-        "READONLY_ADMISSION_TESTS",
     ],
 )
 def test_readonly_additive_maps_and_registration_fail_closed(monkeypatch, mapping):

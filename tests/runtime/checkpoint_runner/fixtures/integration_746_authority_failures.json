@@ -1,0 +1,1194 @@
+{
+  "run_id": 40421315451,
+  "attempt": 1,
+  "head": "29e9487b7a4e831dc6f306de66184cb6f8bb2723",
+  "tree": "fc3649f3a86f42503402ac20bad595a5d62570a5",
+  "source_static_job": 121916173516,
+  "failures": [
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C1 146-A source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor new AST drift: prepublication_admission"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "R3N C4 predecessor source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission predecessor blob drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission predecessor blob drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch146-a-historical-research-dataset-enforcement",
+      "failure": "Read-only admission shared source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-successor-release-installation-operator",
+      "failure": "D1S3 source drift: tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S3 source drift: tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R5 source drift: tests/review_paper/test_successor_publication_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "D1S4 source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-fresh-successor-source",
+      "failure": "Fresh successor source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S3 source drift: tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_successor_publication_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "D1S4 source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery",
+      "failure": "R1 source drift: tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S3 source drift: tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "R5 source drift: tests/review_paper/test_successor_publication_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s4-rename-free-direct-installation",
+      "failure": "D1S4 source drift: tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 shared successor drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "D1S3 source drift: tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s3-r5-successor-release-publication-recovery",
+      "failure": "R5 source drift: tests/review_paper/test_successor_publication_recovery.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 source drift: tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s2-successor-installed-readiness",
+      "failure": "D1S2 D1S1 test overlay drift"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 source drift: tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-d1s1-successor-soak-source",
+      "failure": "D1S1 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 source drift: tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/review_paper/test_d1_session_authorization.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/review_paper/test_d1_session_execution.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/review_paper/test_five_session_soak.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/review_paper/test_pre_market_wake_overnight.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/scripts/certification_runner/helpers.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-f1r1-c1-qualification-operator",
+      "failure": "134-F1R1-C1 shared successor drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1Q source drift: tests/review_paper/test_production_paper_runtime.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1Q source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R4R source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R4 source drift: tests/review_paper/test_alpaca_authentication_qualification.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R4 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R3 source drift: tests/review_paper/test_alpaca_authentication_qualification.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R3 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R3 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R3 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R5 source drift: tests/review_paper/test_pre_market_wake_qualification.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R5 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R5 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R5 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-d1r5-pre-market-wake-qualification",
+      "failure": "134-D1R5 source drift: tests/scripts/certification_runner/test_lanes.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1Q source drift: tests/review_paper/test_production_paper_runtime.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1Q source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R4R source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R4 source drift: tests/review_paper/test_alpaca_authentication_qualification.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R4 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R3 source drift: tests/review_paper/test_alpaca_authentication_qualification.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R3 source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R3 source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-alpaca-authentication-qualification",
+      "failure": "134-D1R3 source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime",
+      "failure": "134-D1Q source drift: tests/review_paper/test_production_paper_runtime.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime",
+      "failure": "134-D1Q source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_core.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime-acl",
+      "failure": "134-D1Q-R2 source drift: tests/review_paper/test_production_paper_runtime_acl.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime-acl",
+      "failure": "134-D1Q source drift: tests/review_paper/test_production_paper_runtime.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime-acl",
+      "failure": "134-D1Q source drift: tests/scripts/certification_runner/test_profiles.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime-acl",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_ci.py"
+    },
+    {
+      "checkpoint": "arch134-production-paper-runtime-acl",
+      "failure": "134-D1Q source drift: tests/runtime/checkpoint_runner/test_core.py"
+    }
+  ],
+  "failure_graph_sha256": "e4a522bc7d6c110a99dd3d108d97ca3f048cc79b0a8197b838feaa5a2770eb86"
+}

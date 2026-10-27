@@ -27,6 +27,54 @@ reviewed safe step within scope. A separate new authorization message is not
 universally required for reviewed bounded operator actions. Historical accounts
 of separate authorization remain historical and do not override this current rule.
 
+## Current historical/current authority rule — Architecture 134
+
+Historical evidence and current infrastructure are independent authority domains.
+The enforceable classification, ownership map, complete #746 failure audit and
+shared evaluator are specified in
+[Architecture 134 authority separation](architecture/134-current-authority-historical-decoupling.md).
+Historical exact pins reconstruct immutable source/evidence, never today's
+mutable runner, registry, CI topology, profile/lane implementation, test harness,
+workflow prose or current status/handoff. Current semantic owners validate those
+concepts once; historical milestones must not introduce new current-path exact
+claims or successor repin chains.
+
+The required preparation/publication order is:
+
+```text
+cheap deterministic/static checks
+-> current authority
+-> historical semantic/source reconstruction
+-> FEATURE + PROSPECTIVE_DEVELOP authority using the same evaluator
+-> complete affected focused tests
+-> combined Ruff/diff checks
+-> exact clean unpublished candidate
+-> general ops.ps1 admit PASS in both contexts on that HEAD/tree
+-> one ordinary push
+-> terminal GitHub active tests + selected mapped canonical certification
+```
+
+Prospective-develop authority is read-only deterministic evaluation of the exact
+candidate, with the expected fast-forward relationship. It performs no merge,
+ref move, branch switch, Git mutation, canonical ROBINHOOD/FULL execution, host
+observer or protected effect. Actual develop source-static uses the same
+source-owned evaluator and routing. A deterministic repository-authority failure
+on the same source after prospective PASS is a workflow infrastructure defect.
+
+A logical publication attempt is one fully prepared atomic unpublished candidate,
+complete admission, one push and one terminal CI result. Preserve every published
+red attempt. Never rerun unchanged CI, amend/overwrite/rebase published failed
+evidence or force-push it away. A fully reproduced/classified bounded mechanical
+failure within scope, with no authority/security ambiguity or protected effect,
+permits a separately named corrective checkpoint after the full prepublication
+gate. Codex retains corrective ownership until terminal green or a documented
+uncertainty/protected/unexpected-state/scope STOP. There is no C1/C2/C3 ceiling.
+An explicitly authorized unpublished replacement workflow ends at first push.
+Canonical mapped ROBINHOOD/FULL stays GitHub-owned and is not a local debug loop.
+
+The R3M/R3N narrative below preserves predecessor chronology; its exact overlays
+are immutable records, superseded as owners of current mutable infrastructure.
+
 ## Architecture 132-R3M — predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local
@@ -93,7 +141,9 @@ reviewed `feature/robinhood-*`, `feature/research-*`, or `feature/test-suite-*`
 families with a nonempty feature diff. It then checks path classification,
 Ruff/diff checks, current authority and workflow topology,
 inventory/profile reconciliation, nonempty FULL/ROBINHOOD/LEGACY/EXHAUSTIVE
-lane construction, and the small current contract tests. It does not reset,
+lane construction, FEATURE and PROSPECTIVE_DEVELOP authority through the shared
+evaluator, and the small current contract tests. CI partial-phase/shard controls
+cannot bypass general admission. It does not reset,
 rebase, merge, repair or rewrite source history, and it does not execute
 protected effects or canonical FULL/ROBINHOOD certification.
 
@@ -599,8 +649,9 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
 -> index is proven initially clean when a commit is planned
 -> exact intended paths only are staged
 -> staged filename set and git diff --cached --check are verified
--> normal checkpoint commit is created when authorized
--> isolated feature branch is ordinary-pushed when authorized
+-> one atomic unpublished checkpoint commit is created when authorized
+-> general ops.ps1 admit proves FEATURE + PROSPECTIVE_DEVELOP authority
+-> isolated feature branch is ordinary-pushed once after admission PASS
 -> exact remote branch HEAD/tree are verified
 -> relevant push-triggered CI/source gate is polled to terminal
 -> ChatGPT reviews the exact GitHub commit/diff
@@ -1470,7 +1521,9 @@ when repository, workflow, event, SHA/tree, branch, profile, attempt, exact job
 topology, required steps and uniqueness all match. The mapped route requires the
 `full-tests` job to be completed with `skipped` conclusion and no steps. The
 later #739 `provenance_not_proven` broad fallback is preserved as a throughput
-defect, not weakened admission; its correction is batched in this checkpoint.
+defect, not weakened admission. That diagnostic-successor correction is historical;
+current feature #745 / develop #746 consequences and the authority correction
+are recorded in the bounded status/handoff and Architecture 134 authority rule.
 
 `ops.ps1` is intentionally a thin launcher. Source-gate orchestration,
 combined Ruff diagnostics, evidence capture, and checkpoint authority checks

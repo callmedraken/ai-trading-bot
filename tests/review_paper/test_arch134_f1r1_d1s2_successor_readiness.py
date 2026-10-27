@@ -7,9 +7,6 @@ from pathlib import Path
 
 import pytest
 import test_supervised_runtime_host_admission as production_fixtures
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.review_paper import successor_readiness as subject
@@ -556,7 +553,6 @@ def test_manual_start_policy_has_no_scheduler_or_resume_surface():
 
 
 def test_d1s2_checkpoint_registration_and_predecessor_overlay(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[runner.ARCH134_D1S2_NAME]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert spec.remote_branch == runner.ARCH134_D1S2_BRANCH

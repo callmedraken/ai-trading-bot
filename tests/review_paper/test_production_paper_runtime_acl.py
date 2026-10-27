@@ -9,9 +9,6 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from trading_bot.review_paper import production_paper_runtime_acl as acl
 from trading_bot.runtime import windows_authority_security as security
@@ -482,7 +479,6 @@ def test_registered_source_only_authority_and_canonical_mapping(monkeypatch):
     from scripts import checkpoint_runner as runner
 
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     assert runner._arch134_runtime_acl_authority_check(root) == ()
     spec = runner._checkpoint_specs()[runner.ARCH134_RUNTIME_ACL_NAME]
     assert spec.preflight is spec.execute is None

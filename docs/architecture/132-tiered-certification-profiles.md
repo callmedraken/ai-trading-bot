@@ -1,5 +1,12 @@
 # Architecture 132 — Tiered certification profiles
 
+Current infrastructure ownership and prepublication admission are governed by
+[Architecture 134 authority separation](134-current-authority-historical-decoupling.md).
+R3M/R3N exact overlays below preserve historical evidence; they do not own current
+mutable test/workflow bytes. General admit uses the shared FEATURE and
+PROSPECTIVE_DEVELOP evaluator before publication. Canonical mapped profiles
+remain GitHub-owned. Required baselines and profile/lane semantics are unchanged.
+
 ## Architecture 132-R3M — predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local

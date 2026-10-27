@@ -10,9 +10,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from scripts import checkpoint_runner as runner
 from trading_bot import shared_namespace_acl_native as native
@@ -746,7 +743,6 @@ def test_source_admin_and_repeat_admission_fail_closed(host, monkeypatch):
 
 
 def test_registered_route_graph_and_exact_authority(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[r.CHECKPOINT]
     assert spec.preflight is runner._arch134_acl_preflight
     assert spec.execute is runner._arch134_acl_execute

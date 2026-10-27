@@ -13,115 +13,6 @@ from .helpers import (
 )
 
 
-def _use_historical_d1s3_authority(
-    monkeypatch: pytest.MonkeyPatch, checkpoint, root: Path
-) -> None:
-    historical = checkpoint._batch_workflow_is_reviewed
-    monkeypatch.setattr(
-        checkpoint,
-        "_batch_workflow_is_reviewed",
-        lambda workflow: historical(
-            workflow.replace(
-                checkpoint.ARCH134_READONLY_DIAGNOSTIC_NAME,
-                checkpoint.ACTIVE_CI_CHECKPOINTS[0],
-                1,
-            )
-        ),
-    )
-    original_blob = checkpoint._git_blob_sha1
-    historical_d1s1 = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
-    historical_c1 = "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py"
-    historical_d1s2 = "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py"
-    historical_d1s3 = (
-        "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py"
-    )
-    historical_d1_session_execution = "tests/review_paper/test_d1_session_execution.py"
-    historical_d1_session_authorization = (
-        "tests/review_paper/test_d1_session_authorization.py"
-    )
-    historical_pre_market_wake_overnight = (
-        "tests/review_paper/test_pre_market_wake_overnight.py"
-    )
-    historical_five_session_soak = "tests/review_paper/test_five_session_soak.py"
-    historical_production_paper_runtime = (
-        "tests/review_paper/test_production_paper_runtime.py"
-    )
-    historical_production_paper_runtime_acl = (
-        "tests/review_paper/test_production_paper_runtime_acl.py"
-    )
-    historical_pre_market_wake_qualification = (
-        "tests/review_paper/test_pre_market_wake_qualification.py"
-    )
-    historical_alpaca_authentication_qualification = (
-        "tests/review_paper/test_alpaca_authentication_qualification.py"
-    )
-    diagnostic_predecessors = checkpoint.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS
-    historical_blobs = {
-        root / "tests/scripts/certification_runner/helpers.py": (
-            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
-        ),
-        root / "tests/scripts/certification_runner/test_profiles.py": (
-            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
-        ),
-        root / "tests/scripts/certification_runner/test_lanes.py": (
-            "6ef03c56497055a8edf7d2378c87c44d55800b53"
-        ),
-        root / "tests/runtime/checkpoint_runner/test_core.py": (
-            checkpoint.READONLY_BLOB_AFTER[
-                "tests/runtime/checkpoint_runner/test_core.py"
-            ]
-        ),
-        root / "tests/runtime/checkpoint_runner/test_ci.py": (
-            checkpoint.READONLY_BLOB_AFTER["tests/runtime/checkpoint_runner/test_ci.py"]
-        ),
-        root / historical_d1s1: checkpoint.READONLY_BLOB_AFTER[historical_d1s1],
-        root / historical_c1: checkpoint.ARCH134_READONLY_DIAGNOSTIC_BLOB_PREDECESSORS[
-            historical_c1
-        ],
-        root / historical_d1s2: diagnostic_predecessors[historical_d1s2],
-        root / historical_d1s3: diagnostic_predecessors[historical_d1s3],
-        root / historical_d1_session_execution: diagnostic_predecessors[
-            historical_d1_session_execution
-        ],
-        root / historical_d1_session_authorization: diagnostic_predecessors[
-            historical_d1_session_authorization
-        ],
-        root / historical_pre_market_wake_overnight: diagnostic_predecessors[
-            historical_pre_market_wake_overnight
-        ],
-        root / historical_five_session_soak: diagnostic_predecessors[
-            historical_five_session_soak
-        ],
-        root / historical_production_paper_runtime: diagnostic_predecessors[
-            historical_production_paper_runtime
-        ],
-        root / historical_production_paper_runtime_acl: diagnostic_predecessors[
-            historical_production_paper_runtime_acl
-        ],
-        root / historical_pre_market_wake_qualification: diagnostic_predecessors[
-            historical_pre_market_wake_qualification
-        ],
-        root / historical_alpaca_authentication_qualification: diagnostic_predecessors[
-            historical_alpaca_authentication_qualification
-        ],
-    }
-    monkeypatch.setattr(
-        checkpoint,
-        "_git_blob_sha1",
-        lambda path: historical_blobs.get(path, original_blob(path)),
-    )
-    current_specs = checkpoint._checkpoint_specs
-    monkeypatch.setattr(
-        checkpoint,
-        "_checkpoint_specs",
-        lambda: {
-            name: spec
-            for name, spec in current_specs().items()
-            if name != checkpoint.ARCH134_READONLY_DIAGNOSTIC_NAME
-        },
-    )
-
-
 def test_inventory_partition_is_complete_disjoint_and_deterministic(
     tmp_path: Path,
 ) -> None:
@@ -162,6 +53,7 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
         for m in selected
         if m
         not in {
+            "tests/runtime/checkpoint_runner/test_source_authority.py",
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
@@ -348,6 +240,7 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         for m in inventory
         if m
         not in {
+            "tests/runtime/checkpoint_runner/test_source_authority.py",
             "tests/experiments/test_historical_research_dataset.py",
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
@@ -585,7 +478,6 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests(monkeypatch
     from scripts import checkpoint_runner as checkpoint
 
     root = Path(checkpoint.__file__).resolve().parents[1]
-    _use_historical_d1s3_authority(monkeypatch, checkpoint, root)
     pins = checkpoint.ARCH132_R3I_CURRENT_TEST_PIN_OVERRIDES
     assert set(pins) == {
         "tests/scripts/certification_runner/test_lanes.py",
@@ -620,9 +512,13 @@ def test_r3i_successor_is_limited_to_changed_previously_pinned_tests(monkeypatch
         expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
             module, expected_current
         )
-        assert checkpoint._git_blob_sha1(
-            root / module
-        ) == checkpoint._arch134_r5_blob_pin(module, expected_current)
+        from scripts import source_authority
+
+        assert source_authority.blob_matches(
+            root,
+            root / module,
+            checkpoint._arch134_r5_blob_pin(module, expected_current),
+        )
     assert (
         checkpoint._arch132_r3i_current_inventory_test_pin("other", "unchanged")
         == "unchanged"
@@ -645,7 +541,6 @@ def test_arch144_current_inventory_successor_is_exact_and_current(monkeypatch):
     from scripts import checkpoint_runner as checkpoint
 
     root = Path(checkpoint.__file__).resolve().parents[1]
-    _use_historical_d1s3_authority(monkeypatch, checkpoint, root)
     pins = checkpoint.ARCH144_CURRENT_INVENTORY_TEST_PIN_OVERRIDES
     assert set(pins) == {
         *checkpoint.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES,
@@ -681,9 +576,13 @@ def test_arch144_current_inventory_successor_is_exact_and_current(monkeypatch):
         expected_current = checkpoint._arch132_r3l_current_shared_successor_pin(
             module, expected_current
         )
-        assert checkpoint._git_blob_sha1(
-            root / module
-        ) == checkpoint._arch134_r5_blob_pin(module, expected_current)
+        from scripts import source_authority
+
+        assert source_authority.blob_matches(
+            root,
+            root / module,
+            checkpoint._arch134_r5_blob_pin(module, expected_current),
+        )
     assert checkpoint._arch144_current_inventory_test_pin("other", "unchanged") == (
         "unchanged"
     )
@@ -723,7 +622,6 @@ def test_r3j_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch) 
     from scripts import checkpoint_runner as checkpoint
 
     root = Path(checkpoint.__file__).resolve().parents[1]
-    _use_historical_d1s3_authority(monkeypatch, checkpoint, root)
     expected = {
         "scripts/run_test_certification.py": "7cff6bb635c0faf0eb30edfb298170490d8f523e",
         "tests/scripts/certification_runner/test_lanes.py": (
@@ -767,7 +665,6 @@ def test_r3k_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch) 
     from scripts import checkpoint_runner as checkpoint
 
     root = Path(checkpoint.__file__).resolve().parents[1]
-    _use_historical_d1s3_authority(monkeypatch, checkpoint, root)
     expected = {
         "scripts/run_test_certification.py": (
             "a6b3857f832af47fccaf3c13203ecae1c813a22e"
@@ -859,7 +756,6 @@ def test_r3l_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch):
     from scripts import checkpoint_runner as checkpoint
 
     root = Path(checkpoint.__file__).resolve().parents[1]
-    _use_historical_d1s3_authority(monkeypatch, checkpoint, root)
     pins = checkpoint.ARCH132_R3L_CURRENT_SHARED_SUCCESSOR_PINS
     assert set(pins) == {
         "scripts/run_test_certification.py",
@@ -872,9 +768,11 @@ def test_r3l_successor_overlay_is_exact_and_intentionally_unmapped(monkeypatch):
     )
     for relative, successor in pins.items():
         predecessor = checkpoint.ARCH132_R3K_CURRENT_SHARED_SUCCESSOR_PINS[relative]
-        assert checkpoint._git_blob_sha1(
-            root / relative
-        ) == checkpoint._arch134_r5_blob_pin(relative, successor)
+        from scripts import source_authority
+
+        assert source_authority.blob_matches(
+            root, root / relative, checkpoint._arch134_r5_blob_pin(relative, successor)
+        )
         assert (
             checkpoint._arch132_r3l_current_shared_successor_pin(relative, predecessor)
             == successor

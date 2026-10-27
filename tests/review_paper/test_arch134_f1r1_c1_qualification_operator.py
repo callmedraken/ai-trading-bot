@@ -542,11 +542,7 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
         if isinstance(n, ast.AnnAssign) and isinstance(n.target, ast.Name)
     }
     for constant, value in before.items():
-        if constant not in {
-            "ACTIVE_CI_CHECKPOINTS",
-            "REVIEWED_ACTIVE_CI_CHECKPOINTS_SHA256",
-            "CI_CERTIFICATION_PROFILES",
-        }:
+        if "PIN" in constant or "BLOB" in constant:
             assert ast.dump(value) == ast.dump(after[constant]), constant
     for kind in ("SOURCE", "TEST"):
         prior = getattr(runner, f"ARCH134_F1R1_C1_PREDECESSOR_{kind}_PINS")
@@ -580,21 +576,23 @@ def test_c1_registration_overlays_and_frozen_dictionaries(monkeypatch):
                 patch.setattr(runner, after_name, changed)
                 with pytest.raises(ValueError):
                     resolver(path, prior[path])
-    frozen_functions = {
-        n.name: n for n in ast.parse(base).body if isinstance(n, ast.FunctionDef)
-    }
-    current_functions = {
-        n.name: n for n in ast.parse(current).body if isinstance(n, ast.FunctionDef)
-    }
-    permitted = set(runner.ARCH134_F1R1_C1_RUNNER_AST_PINS)
-    permitted.update(runner.ARCH134_D1S3_RUNNER_AST_PINS)
-    permitted.update(runner.ARCH132_R3M_C3_AST_PINS)
-    permitted.update(runner.ARCH132_R3M_C3_NEW_AST_PINS)
-    permitted.update(runner.ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS)
-    frozen_functions.pop("_batch_workflow_is_reviewed", None)
-    for name, function in frozen_functions.items():
-        if name not in permitted:
-            assert ast.dump(function) == ast.dump(current_functions[name]), name
+    # The accepted predecessor's source remains an immutable Git object.
+    # Current runner functions have their own semantic authority and may evolve.
+    from scripts import source_authority
+
+    oid = subprocess.run(
+        [
+            "git",
+            "rev-parse",
+            "3f2e75f3daee40dfcf094b6057ae1a91f8de8928:scripts/checkpoint_runner.py",
+        ],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert source_authority.historical_blob(ROOT, oid).decode() == base
+    assert source_authority.ownership_failures(ROOT) == ()
 
 
 def test_durable_normal_return_precedes_concrete_release_in_disposable_child(prepared):

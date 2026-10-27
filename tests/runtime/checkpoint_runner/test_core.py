@@ -10,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from scripts import checkpoint_runner as runner
+from scripts import current_source_authority
 
 from .helpers import (
     _EXPECTED_ACTIVE_CI_CHECKPOINTS,
@@ -19,74 +20,6 @@ from .helpers import (
     _parent_preflight_result,
     _spec,
 )
-
-
-def _use_historical_predecessor_authority(
-    monkeypatch: pytest.MonkeyPatch, root: Path
-) -> None:
-    historical = runner._batch_workflow_is_reviewed
-    monkeypatch.setattr(
-        runner,
-        "_batch_workflow_is_reviewed",
-        lambda workflow: historical(
-            workflow.replace(
-                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
-                runner.ACTIVE_CI_CHECKPOINTS[0],
-                1,
-            )
-        ),
-    )
-    original_blob = runner._git_blob_sha1
-    historical_blobs = {
-        root / "docs/AI_DEVELOPMENT_WORKFLOW.md": runner.READONLY_BLOB_AFTER[
-            "docs/AI_DEVELOPMENT_WORKFLOW.md"
-        ],
-        root / "tests/runtime/checkpoint_runner/test_ci.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_ci.py"
-        ],
-        root
-        / "tests/runtime/checkpoint_runner/test_core.py": runner.READONLY_BLOB_AFTER[
-            "tests/runtime/checkpoint_runner/test_core.py"
-        ],
-        root / "tests/review_paper/test_d1_session_authorization.py": (
-            "60110e41b86f1e96734bc4a0da526755ecc97ab6"
-        ),
-        root / "tests/review_paper/test_d1_session_execution.py": (
-            "e3259ba082f5d702c507fa194bd739a627053baf"
-        ),
-        root / "tests/review_paper/test_five_session_soak.py": (
-            "0c3bc741f8f6dd0bb4a402126862898ed0838812"
-        ),
-        root / "tests/review_paper/test_pre_market_wake_overnight.py": (
-            "810f065f7b63b1ff5aa8fcfe78de782182c9d5e3"
-        ),
-        root / "tests/review_paper/test_production_paper_runtime.py": (
-            "a48f763db9c6b7a8fd64d787a16c378cc5cbc6c4"
-        ),
-        root / "tests/review_paper/test_production_paper_runtime_acl.py": (
-            "a77edf7dfdaa2e6932594ae77601203f975bbff2"
-        ),
-        root / "tests/review_paper/test_alpaca_authentication_qualification.py": (
-            "25f1bfa4e5c6f1e1ff3912b3cd163a86761a9d5f"
-        ),
-        root / "tests/review_paper/test_pre_market_wake_qualification.py": (
-            "f6f4dfaf3b13e9d2d643ebf085b6ddacfbd168cd"
-        ),
-        root / "tests/scripts/certification_runner/helpers.py": (
-            "5370ea55565b5981d8fe85d7247c795f72ca3ff5"
-        ),
-        root / "tests/scripts/certification_runner/test_profiles.py": (
-            "d22e2f9fbf0c03c1e6be8aa157d4575e9a517ede"
-        ),
-        root / "tests/scripts/certification_runner/test_lanes.py": (
-            "6ef03c56497055a8edf7d2378c87c44d55800b53"
-        ),
-    }
-    monkeypatch.setattr(
-        runner,
-        "_git_blob_sha1",
-        lambda path: historical_blobs.get(path, original_blob(path)),
-    )
 
 
 def test_build_verification_steps_runs_both_nonmutating_ruff_gates(
@@ -1073,6 +1006,9 @@ def test_single_source_gate_phase_separates_static_authority_and_tests(
     expected_steps,
     authority_calls,
 ):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     calls = []
     authorities = []
 
@@ -1105,6 +1041,9 @@ def test_single_source_gate_phase_separates_static_authority_and_tests(
 
 
 def test_batch_tests_phase_shards_and_skips_authority(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     authorities = []
     specs = _batch_specs(authorities)
     monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
@@ -1140,6 +1079,9 @@ def test_batch_shares_commands_preserves_order_and_collects_authorities(
     monkeypatch,
     failure,
 ):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     authorities = []
     specs = _batch_specs(authorities)
     monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
@@ -1214,6 +1156,9 @@ def test_batch_shares_commands_preserves_order_and_collects_authorities(
 def test_batch_authority_failure_attribution_and_continuation(
     tmp_path, monkeypatch, exception
 ):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     calls = []
     specs = _batch_specs(calls, authority_failure=True, authority_exception=exception)
     monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
@@ -1239,7 +1184,17 @@ def test_batch_authority_failure_attribution_and_continuation(
     "drift", [{"head": "c" * 40}, {"tree": "d" * 40}, {"porcelain": " M changed.py"}]
 )
 def test_batch_source_drift_fails(tmp_path, monkeypatch, drift):
-    states = iter([_clean_source(), {**_clean_source(), **drift}])
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
+    states = iter(
+        [
+            _clean_source(),
+            _clean_source(),
+            _clean_source(),
+            {**_clean_source(), **drift},
+        ]
+    )
     monkeypatch.setattr(runner, "_git_state", lambda repo: next(states))
     monkeypatch.setattr(
         runner, "_execute_step", lambda step, **kw: _outcome(step.name, 0)
@@ -1256,6 +1211,9 @@ def test_batch_source_drift_fails(tmp_path, monkeypatch, drift):
 def test_batch_dirty_source_rejected_before_commands_or_authority(
     tmp_path, monkeypatch
 ):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     calls = []
     monkeypatch.setattr(
         runner,
@@ -1305,6 +1263,9 @@ def test_batch_cli_preserves_order_and_single_verify_dispatch(monkeypatch, tmp_p
 
 
 def test_single_verify_report_and_command_selection_unchanged(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
     calls = []
 
@@ -1381,6 +1342,9 @@ def test_r2a_command_elapsed_uses_monotonic_and_preserves_stdout(
 def test_r2a_elapsed_is_additive_report_evidence_without_status_threshold(
     tmp_path, monkeypatch, batch, elapsed, exit_code
 ):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
     monkeypatch.setattr(runner, "_git_state", lambda repo: _clean_source())
     monkeypatch.setattr(
         runner,
@@ -1505,6 +1469,11 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 )
             )
         )
+        if name == runner.ARCH134_READONLY_DIAGNOSTIC_NAME:
+            expected = (
+                "tests/runtime/checkpoint_runner/test_source_authority.py",
+                *expected,
+            )
         assert selected == expected
         assert set(selected) <= set(spec.ruff_paths)
         certification = tuple(
@@ -1556,7 +1525,6 @@ def test_arch144c_source_only_route_authority_and_frozen_v1(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH144C_NAME]
     assert spec.preflight is None and spec.execute is None
     assert spec.remote_branch == runner.ARCH144C_BRANCH
@@ -1604,7 +1572,6 @@ def test_arch145a_source_only_route_is_registered_and_inert(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH145A_NAME]
     assert spec.preflight is None and spec.execute is None
     assert spec.remote_branch == runner.ARCH145A_BRANCH
@@ -1624,7 +1591,6 @@ def test_arch134_f1r1_a_source_only_route_is_registered_and_inert(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_A_NAME]
 
     assert runner._arch134_f1r1_a_authority_check(root) == ()
@@ -1689,7 +1655,6 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     path = root / runner.ARCH145A_D1R6_WORKFLOW_PATH
     # Retain the historical 145 proof against its exact accepted C2 successor.
     # R3M's current workflow is independently pinned and verified below.
@@ -1776,10 +1741,12 @@ def test_arch145a_d1r6_workflow_successor_is_exact_and_fail_closed(
     assert current.count("  source-gates:\n") == 1
     assert "feature/robinhood-*" in current
     assert "feature/test-suite-*" in current
-    candidate = runner._git_blob_sha1(path)
-    assert candidate == runner._arch134_d1s3_shared_successor_pin(
+    from scripts import source_authority
+
+    candidate = runner._arch134_d1s3_shared_successor_pin(
         runner.ARCH145A_D1R6_WORKFLOW_PATH
     )
+    assert source_authority.blob_matches(root, path, candidate)
     assert (
         runner._arch145a_d1r6_workflow_successor(
             runner.ARCH145A_D1R6_WORKFLOW_PREDECESSOR_BLOB_SHA1,
@@ -1817,7 +1784,6 @@ def test_arch145a_successors_preserve_predecessors_and_resolve_all_consumers(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     digest = lambda value: hashlib.sha256(  # noqa: E731
         json.dumps(value, sort_keys=True).encode()
     ).hexdigest()
@@ -1913,7 +1879,6 @@ def test_arch134_f1r1_b_registration_and_active_successor_are_source_only(
     monkeypatch: pytest.MonkeyPatch,
 ):
     root = Path(runner.__file__).resolve().parents[1]
-    _use_historical_predecessor_authority(monkeypatch, root)
     spec = runner._checkpoint_specs()[runner.ARCH134_F1R1_B_NAME]
 
     assert runner._arch134_f1r1_b_authority_check(root) == ()
@@ -2000,3 +1965,74 @@ def test_h_p_compact_fixtures_preserve_exact_source_ast_and_tuple_anchors(tmp_pa
     assert ast.dump(before) == ast.dump(after)
     assert compact.count('    "arch133-robinhood-unattended-host-publication",\n') == 2
     assert len(compact) < len(original) // 3
+
+
+def test_source_pytest_scratch_is_short_unique_and_external(tmp_path):
+    first = runner._source_pytest_basetemp(tmp_path / "short")
+    second = runner._source_pytest_basetemp(tmp_path / "short")
+    assert first != second
+    assert first.parent == second.parent == tmp_path / "short"
+    assert first.name.startswith("source-") and len(first.name) == 39
+    assert not first.exists() and not second.exists()
+    with pytest.raises(RuntimeError, match="external"):
+        runner._source_pytest_basetemp(Path(runner.__file__).resolve().parents[1])
+
+
+def test_source_junit_evidence_is_separate_from_short_scratch(tmp_path):
+    scratch = runner._source_pytest_basetemp(tmp_path / "short")
+    evidence = tmp_path / ("evidence-" + "x" * 100) / "pytest-results.xml"
+    step = next(
+        s
+        for s in runner.build_verification_steps(
+            _spec(), python_executable="python", basetemp=scratch, junitxml=evidence
+        )
+        if s.name == "pytest"
+    )
+    assert f"--basetemp={scratch}" in step.argv
+    assert f"--junitxml={evidence}" in step.argv
+    assert scratch.parent != evidence.parent
+
+
+@pytest.mark.parametrize("batch", [False, True])
+def test_both_source_gate_paths_use_short_scratch_with_deep_evidence(
+    tmp_path, monkeypatch, batch
+):
+    monkeypatch.setattr(
+        current_source_authority, "current_authority_check", lambda _: ()
+    )
+    monkeypatch.setattr(runner, "_git_state", lambda _: _clean_source())
+    monkeypatch.setenv(runner.SOURCE_GATE_PHASE_ENV, "tests")
+    scratch = tmp_path / "short" / "fresh-guid"
+    monkeypatch.setattr(runner, "_source_pytest_basetemp", lambda: scratch)
+    steps = []
+    monkeypatch.setattr(
+        runner,
+        "_execute_step",
+        lambda step, **kw: steps.append(step) or _outcome(step.name, 0),
+    )
+    root = tmp_path / ("evidence-" + "x" * 100)
+    if batch:
+        passed, report = runner.verify_batch(
+            [_spec()], repo_root=tmp_path, evidence_root=root
+        )
+    else:
+        passed, report = runner.verify_checkpoint(
+            _spec(), repo_root=tmp_path, evidence_root=root
+        )
+    assert passed
+    step = next(s for s in steps if s.name == "pytest")
+    assert f"--basetemp={scratch}" in step.argv
+    assert f"--junitxml={report.parent / 'pytest-results.xml'}" in step.argv
+
+
+def test_source_scratch_collision_preserves_existing_directory(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(runner, "uuid4", lambda: SimpleNamespace(hex="0" * 32))
+    existing = tmp_path / ("source-" + "0" * 32)
+    existing.mkdir()
+    marker = existing / "preserved.txt"
+    marker.write_text("preserve", encoding="utf-8")
+    with pytest.raises(RuntimeError, match="already exists"):
+        runner._source_pytest_basetemp(tmp_path)
+    assert marker.read_text(encoding="utf-8") == "preserve"

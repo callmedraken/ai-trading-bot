@@ -1,51 +1,43 @@
 # AI Trading Bot — Current Handoff
 
-## Active source-only checkpoint
+## Current correction state
 
-Architecture 134 fresh-successor READ-ONLY deployment-admission diagnostic is
-SOURCE IMPLEMENTED / PENDING PUBLICATION, TERMINAL CI AND CHATGPT EXACT-SOURCE
-REVIEW.
+Architecture 134 historical/current authority decoupling is SOURCE IMPLEMENTED /
+PENDING CHATGPT EXACT-SOURCE REVIEW. Exact candidate admission, publication and
+terminal CI evidence must be checked against the isolated feature HEAD; this
+document grants no source acceptance or integration authority.
+The diagnostic successor is NOT SOURCE ACCEPTED. Feature #745 was green;
+develop #746 / run 40421315451 / attempt 1 is preserved terminal-red evidence.
+Do not rerun #746 or reconcile the primary local checkout to red develop.
 
-C1 predecessor evidence is retained but this checkpoint advances to the
-diagnostic successor from exact base HEAD/TREE
-`8a6791ba036a60f978d700bba0a2f1bc65a631bc /
-80ebe3d10cdbb63828f08fe0909079c5aaefb8d6`.
+    starting develop HEAD 29e9487b7a4e831dc6f306de66184cb6f8bb2723
+    starting tree fc3649f3a86f42503402ac20bad595a5d62570a5
+    branch feature/test-suite-current-authority-historical-decoupling-current
+    worktree F:\AI\worktrees\ai-trading-bot-test-suite-current-authority-historical-decoupling-current
 
-    checkpoint arch134-fresh-successor-readonly-deployment-admission-diagnostic
-    branch feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
-    worktree F:\AI\worktrees\ai-trading-bot-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
-
-The first real-host v1 attempt is preserved and not rerun. Its report SHA256 is
-`3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`;
-it is BLOCKED/HOST with `diagnostic_process_starts = 23`, zero production
-effects and no protected authority. The host subreason remains unknown.
-See [the diagnostic contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic.md)
-and [validation](validation/arch134-fresh-successor-readonly-deployment-admission-diagnostic.md).
-
-Pre-edit checks establish exact base/branch/origin/cleanliness. PRE-PUBLICATION
-`ops.ps1 admit` runs after the one clean committed candidate and before push.
-The exact #738 mapped ROBINHOOD run is `40288823461`, attempt 1. The later #739
-develop result reported `provenance_not_proven` and safely used the broad
-fallback. This is a throughput defect, not weakened admission; its correction
-is batched into this runner-touch checkpoint. Do not run canonical ROBINHOOD or
-FULL locally.
+The [authority correction](architecture/134-current-authority-historical-decoupling.md)
+separates immutable historical reconstruction/security/incident evidence from
+current runner/workflow/profile/lane/test-harness authority. General
+`ops.ps1 admit` must prove FEATURE and PROSPECTIVE_DEVELOP authority for the
+same exact clean candidate. The existing diagnostic route owns mapped canonical
+ROBINHOOD in GitHub; do not run that profile or FULL locally.
 
 ## Protected boundary
 
-No real-host admission, successor-root creation, ACL mutation, materialization,
-scheduler mutation, credentials/provider access, runtime start, paper/broker
-operation or F1 execution occurs here. Preserved incident evidence remains
-untouched. Live remains NO-GO; Architecture 146-B is NOT STARTED.
+The diagnostic successor and rename-free release contract are preserved.
+The first real-host v1 BLOCKED/HOST attempt remains consumed/non-retryable,
+report SHA256 `3f412affd0fd89b850d4f2de4b7e27680b01780c9e1f6fdd3957a51821e23a36`.
+Zero protected effects and false authority remain; `execute = None`.
+No real-host diagnostic, production namespace inspection, root/ACL/materialization,
+scheduler, credential/provider, broker/paper/live operation is authorized here.
+Live remains NO-GO. Architecture 146-B is NOT STARTED. Preserved incident roots,
+latches and reports remain untouched.
 
-## Next owner / next step
+## Next safe step
 
-ChatGPT performs exact GitHub source/diff/terminal-CI review. Stop implementation
-at FRESH-SUCCESSOR READ-ONLY DEPLOYMENT ADMISSION SOURCE IMPLEMENTED /
-PUBLISHED / TERMINAL GREEN / PENDING CHATGPT EXACT-SOURCE REVIEW.
-
-The frozen sequence is candidate -> exact admission source -> ChatGPT acceptance
--> develop integration + terminal gate -> local-main reconciliation -> real-host
-READ-ONLY admission -> successor-root write-authority / ACL review -> separately
-reviewed protected fresh materialization -> manual-start fresh F1 successor soak
--> fresh F1 evidence -> Architecture 145-B -> Research Results GUI -> large
-strategy campaigns. No later step is authorized merely by this source checkpoint.
+The publication sequence is complete affected focused checks -> exact clean
+candidate -> general admission in both contexts -> one ordinary feature push
+-> terminal GitHub gate. Terminal green stops for ChatGPT exact source/diff and
+certification review. No develop update or real-host diagnostic is authorized.
+A terminal-red publication remains evidence and follows the bounded separately
+named corrective-checkpoint rule. Source acceptance belongs to ChatGPT.

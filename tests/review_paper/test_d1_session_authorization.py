@@ -15,9 +15,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.review_paper import d1_session_authorization as q
@@ -762,7 +759,6 @@ def test_import_and_reachable_call_containment():
 
 
 def test_checkpoint_profile_inventory_and_frozen_authority(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     spec = runner._checkpoint_specs()[q.CHECKPOINT]
     assert spec.remote_branch == q.BRANCH and spec.preflight is spec.execute is None
     assert (
@@ -1042,7 +1038,6 @@ def test_exact_zero_effect_surface():
 
 
 def test_d1r6_resolution_runs_once_before_d1r7_successor(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     path = "tests/runtime/checkpoint_runner/test_core.py"
     predecessor = runner.ARCH134_D1R5_TEST_PIN_OVERRIDES[path]
     resolved = runner._arch134_d1r6_test_pin(path, predecessor)
@@ -1051,5 +1046,7 @@ def test_d1r6_resolution_runs_once_before_d1r7_successor(monkeypatch):
     current = runner._arch134_f1_current_inventory_test_pin(
         path, runner._arch134_d1r7_test_pin(path, resolved)
     )
-    assert current == runner._git_blob_sha1(ROOT / path)
+    from scripts import source_authority
+
+    assert source_authority.blob_matches(ROOT, ROOT / path, current)
     assert runner._arch134_d1r6_authority_check(ROOT) == ()

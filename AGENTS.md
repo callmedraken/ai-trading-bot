@@ -27,6 +27,29 @@ reviewed safe step within scope. A separate new authorization message is not
 universally required for reviewed bounded operator actions. Historical accounts
 of separate authorization remain historical and do not override this current rule.
 
+## Historical and current authority - current normative rule
+
+Historical source/evidence and current infrastructure are independent authority
+domains. Follow `docs/architecture/134-current-authority-historical-decoupling.md`.
+Historical checkpoints reconstruct immutable Git objects and preserve security,
+authorization, incident, consumed-state and effect-ceiling semantics; they must
+not exact-pin today's mutable runner, registry, workflow, certification,
+test harness or coordination documents. Current concepts have one canonical
+semantic owner. New historical current-path exact claims fail the structural
+ownership/fan-out gate; no successor repin ladder is permitted.
+
+Before publication, general `ops.ps1 admit` must prove FEATURE and
+PROSPECTIVE_DEVELOP authority for the exact clean candidate through the same
+source-owned evaluator used by CI. Prospective evaluation performs no merge,
+ref move, branch switch, Git mutation, canonical certification or protected
+effect. A deterministic develop authority failure on that exact source after
+prospective PASS is a workflow infrastructure defect. Complete cheap static,
+current authority, historical reconstruction, both contexts, affected focused
+tests and combined Ruff/diff checks before the one unpublished candidate,
+complete admission, one push and one terminal CI result. Mapped canonical
+ROBINHOOD/FULL remains GitHub-owned. The bounded corrective ownership rule above
+has no C1/C2/C3 ceiling; published failed evidence is immutable.
+
 ## Project purpose
 
 Build a conservative algorithmic trading platform that progresses through

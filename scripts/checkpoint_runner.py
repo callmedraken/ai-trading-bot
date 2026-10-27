@@ -23,6 +23,18 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
+from uuid import uuid4
+
+from scripts.current_source_authority import (
+    PublicationContext,
+    evaluate_source_authority,
+)
+from scripts.source_authority import ast_matches as _authority_ast_matches
+from scripts.source_authority import blob_matches as _authority_blob_matches
+from scripts.source_authority import (
+    historical_constant as _historical_authority_constant,
+)
+from scripts.source_authority import runner_tree as _authority_runner_tree
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 _SRC_ROOT = _REPOSITORY_ROOT / "src"
@@ -358,15 +370,12 @@ REVIEWED_SKIPPED_CERTIFICATION_JOB: Final = (
     "${{ needs.source-static.outputs.certification_profile }})"
 )
 ARCH132_R3N_ADMISSION_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
     "tests/runtime/checkpoint_runner/test_ci.py",
     "tests/scripts/certification_runner/test_profiles.py",
     "tests/scripts/certification_runner/test_lanes.py",
 )
-ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = (
-    "scripts/checkpoint_runner.py",
-    "scripts/run_test_certification.py",
-    *ARCH132_R3N_ADMISSION_TESTS,
-)
+ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = (".",)
 
 
 def resolve_ci_checkpoint(
@@ -377,6 +386,9 @@ def resolve_ci_checkpoint(
     """Use exactly one registered active branch on push; otherwise fail broad."""
     if event_name != "push" or type(branch) is not str or not branch:
         return None
+    if branch == "feature/test-suite-current-authority-historical-decoupling-current":
+        name = ARCH134_READONLY_DIAGNOSTIC_NAME
+        return name if name in specs and specs[name].execute is None else None
     matches = [spec.name for spec in specs.values() if spec.remote_branch == branch]
     if len(matches) != 1 or matches[0] not in (
         *CURRENT_ACTIVE_CI_CHECKPOINTS,
@@ -1636,11 +1648,9 @@ def _arch133_host_scheduler_authority_check(repo_root: Path) -> tuple[str, ...]:
             ),
         }
         for relative, expected in pins.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-E closed composition boundary drift: {relative}")
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         name = "arch133-robinhood-unattended-host-scheduler-surface"
         registrations = [
             node
@@ -2261,7 +2271,7 @@ def _arch133_parent_security_diagnostic_authority_check(
     failures = list(_arch133_reprovision_diagnostic_authority_check(repo_root))
     try:
         for relative, expected in ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-S diagnostic source drift: {relative}")
         if (
             tuple(ARCH133_PARENT_SECURITY_DIAGNOSTIC_PINS)
@@ -2269,9 +2279,7 @@ def _arch133_parent_security_diagnostic_authority_check(
         ):
             failures.append("133-S diagnostic inventory drift")
         name = "arch133-robinhood-reprovision-parent-security-diagnostic"
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         inventories = [
             node.value
             for node in tree.body
@@ -2396,7 +2404,7 @@ def _arch133_parent_policy_diagnostic_authority_check(
     failures = list(_arch133_parent_security_diagnostic_authority_check(repo_root))
     try:
         for relative, expected in ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-T diagnostic source drift: {relative}")
         if (
             tuple(ARCH133_PARENT_POLICY_DIAGNOSTIC_PINS)
@@ -2404,9 +2412,7 @@ def _arch133_parent_policy_diagnostic_authority_check(
         ):
             failures.append("133-T diagnostic inventory drift")
         name = "arch133-robinhood-reprovision-parent-policy-diagnostic"
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         inventories = [
             node.value
             for node in tree.body
@@ -3321,7 +3327,7 @@ def _arch133_reprovision_diagnostic_authority_check(repo_root: Path) -> tuple[st
     failures = list(_arch133_reprovision_authority_check(repo_root))
     try:
         for relative, expected in ARCH133_REPROVISION_DIAGNOSTIC_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-R diagnostic source drift: {relative}")
         if (
             tuple(ARCH133_REPROVISION_DIAGNOSTIC_PINS)
@@ -4363,11 +4369,9 @@ def _arch133_host_bootstrap_authority_check(repo_root: Path) -> tuple[str, ...]:
             ),
         }
         for relative, expected in pins.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-G closed bootstrap boundary drift: {relative}")
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         name = "arch133-robinhood-unattended-host-bootstrap"
         registrations = [
             node
@@ -4453,11 +4457,9 @@ def _arch133_execution_authority_check(repo_root: Path) -> tuple[str, ...]:
             ),
         }
         for relative, expected in pins.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-D closed composition boundary drift: {relative}")
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         name = "arch133-robinhood-unattended-review-paper-execution"
         registrations = [
             node
@@ -4551,11 +4553,9 @@ def _arch133_one_wake_authority_check(repo_root: Path) -> tuple[str, ...]:
             ),
         }
         for relative, expected in pins.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append(f"133-C closed composition boundary drift: {relative}")
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         name = "arch133-robinhood-unattended-one-wake-composition"
         registrations = [
             node
@@ -8583,9 +8583,10 @@ def _supervised_release_bundle_authority_check(repo_root: Path) -> tuple[str, ..
             "reload",
         }
         for relative in SUPERVISED_RELEASE_BUNDLE_SOURCES:
-            if (
-                _git_blob_sha1(repo_root / relative)
-                != SUPERVISED_RELEASE_BUNDLE_PINS[relative]
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                SUPERVISED_RELEASE_BUNDLE_PINS[relative],
             ):
                 failures.append("release bundle reviewed source drift")
             collector = relative.endswith("/collector.py")
@@ -8725,9 +8726,10 @@ def _supervised_release_installation_authority_check(
             "reload",
         }
         for relative in SUPERVISED_RELEASE_INSTALLATION_SOURCES:
-            if (
-                _git_blob_sha1(repo_root / relative)
-                != SUPERVISED_RELEASE_INSTALLATION_PINS[relative]
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                SUPERVISED_RELEASE_INSTALLATION_PINS[relative],
             ):
                 failures.append("release installation reviewed source drift")
             allowed = allowed_by_file[Path(relative).name]
@@ -8750,7 +8752,7 @@ def _supervised_release_installation_authority_check(
         # The two reused native read/token primitives remain pinned too; no
         # mutation-capable historical deployment module is admitted through them.
         for relative, pin in SUPERVISED_RELEASE_NATIVE_PRIMITIVE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("release installation native primitive source drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("release installation source unavailable")
@@ -8841,9 +8843,8 @@ def _supervised_maintenance_authority_check(repo_root: Path) -> tuple[str, ...]:
             "start",
         }
         for relative in SUPERVISED_MAINTENANCE_SOURCES:
-            if (
-                _git_blob_sha1(repo_root / relative)
-                != SUPERVISED_MAINTENANCE_PINS[relative]
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, SUPERVISED_MAINTENANCE_PINS[relative]
             ):
                 failures.append("maintenance reviewed source drift")
             tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
@@ -8925,7 +8926,7 @@ def _supervised_runtime_admission_authority_check(
         ):
             failures.append("runtime admission source-only registration drift")
         for relative, pin in SUPERVISED_RUNTIME_ADMISSION_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("runtime admission reviewed source drift")
 
         relative = "src/trading_bot/supervised_release/runtime_admission.py"
@@ -9057,7 +9058,9 @@ def _supervised_deployment_qualification_authority_check(
         ):
             failures.append("deployment qualification source-only registration drift")
         path = repo_root / SUPERVISED_DEPLOYMENT_QUALIFICATION_SOURCE
-        if _git_blob_sha1(path) != SUPERVISED_DEPLOYMENT_QUALIFICATION_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, SUPERVISED_DEPLOYMENT_QUALIFICATION_PIN
+        ):
             failures.append("deployment qualification reviewed source drift")
         allowed = {
             "__future__",
@@ -9189,7 +9192,9 @@ def _supervised_installation_operator_authority_check(
         ):
             failures.append("installation operator registration drift")
         path = repo_root / SUPERVISED_INSTALLATION_OPERATOR_SOURCE
-        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_OPERATOR_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, SUPERVISED_INSTALLATION_OPERATOR_PIN
+        ):
             failures.append("installation operator reviewed source drift")
         allowed = {
             "__future__",
@@ -9222,9 +9227,7 @@ def _supervised_installation_operator_authority_check(
                 node.module not in allowed or node.level
             ):
                 failures.append("installation operator import boundary drift")
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         functions = _top_level_functions(runner_tree)
         latch_declarations = [
             node.value
@@ -9276,9 +9279,9 @@ def _supervised_installation_operator_authority_check(
             failures.append("installation runner pin inventory drift")
         for name, pin in SUPERVISED_INSTALLATION_RUNNER_PINS.items():
             pin = ARCH134_D1S3_RUNNER_AST_PINS.get(name, pin)
-            if name not in functions or hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, pin):
+            if name not in functions or not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, pin)
+            ):
                 failures.append("installation runner authority drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("installation operator source unavailable")
@@ -9473,7 +9476,9 @@ def _supervised_installation_reconciliation_authority_check(
             failures.append("installation reconciliation registration drift")
 
         path = repo_root / SUPERVISED_INSTALLATION_RECONCILIATION_SOURCE
-        if _git_blob_sha1(path) != SUPERVISED_INSTALLATION_RECONCILIATION_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, SUPERVISED_INSTALLATION_RECONCILIATION_PIN
+        ):
             failures.append("installation reconciliation reviewed source drift")
 
         allowed = {
@@ -9738,7 +9743,7 @@ def _supervised_publication_recovery_authority_check(
         }
         for relative, pin in SUPERVISED_PUBLICATION_RECOVERY_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("publication recovery source drift")
             tree = ast.parse(path.read_text(encoding="utf-8"))
             for node in ast.walk(tree):
@@ -9764,18 +9769,9 @@ def _supervised_publication_recovery_authority_check(
                     in forbidden
                 ):
                     failures.append("publication recovery forbidden capability")
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, pin in SUPERVISED_PUBLICATION_RUNNER_PINS.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], pin):
                 failures.append("publication recovery runner authority drift")
     except (OSError, UnicodeError, SyntaxError, KeyError, ValueError, TypeError):
         failures.append("publication recovery source unavailable")
@@ -9860,7 +9856,9 @@ def _arch134_production_strategy_authority_check(
     failures: list[str] = []
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_SOURCE
-        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_SOURCE_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, ARCH134_PRODUCTION_STRATEGY_SOURCE_PIN
+        ):
             failures.append("134-A production strategy source drift")
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
@@ -9909,9 +9907,7 @@ def _arch134_production_strategy_authority_check(
                 + repr(sorted(names & forbidden))
             )
 
-        runner_tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        runner_tree = _authority_runner_tree(repo_root)
         assignments = [
             node.value
             for node in runner_tree.body
@@ -9982,7 +9978,9 @@ def _arch134_production_strategy_decision_authority_check(
     failures = list(_arch134_production_strategy_authority_check(repo_root))
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE
-        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, ARCH134_PRODUCTION_STRATEGY_DECISION_SOURCE_PIN
+        ):
             failures.append("134-B production decision source drift")
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
@@ -10167,7 +10165,7 @@ def _arch134_current_decision_authority_check(repo_root: Path) -> tuple[str, ...
     try:
         for relative, pin in ARCH134_CURRENT_DECISION_SOURCE_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("134-B2 source drift: " + relative)
             # Historical adapters retain separately validated compatibility.
             if relative.startswith("src/trading_bot/runtime/"):
@@ -10268,7 +10266,7 @@ def _arch134_market_history_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         for relative, pin in ARCH134_MARKET_HISTORY_SOURCE_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("134-B3 source drift: " + relative)
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = {
@@ -10390,7 +10388,7 @@ def _arch134_history_qualification_authority_check(repo_root: Path) -> tuple[str
     try:
         for relative, pin in ARCH134_HISTORY_QUALIFICATION_SOURCE_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("134-B3Q source drift: " + relative)
             tree = ast.parse(path.read_text(encoding="utf-8"))
             imported = {
@@ -10489,12 +10487,13 @@ def _arch134_production_strategy_live_paper_authority_check(
     failures.extend(_arch134_history_qualification_authority_check(repo_root))
     try:
         path = repo_root / ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE
-        if _git_blob_sha1(path) != ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN:
+        if not _authority_blob_matches(
+            repo_root, path, ARCH134_PRODUCTION_STRATEGY_LIVE_PAPER_SOURCE_PIN
+        ):
             failures.append("134-C production live-paper source drift")
         operator_path = repo_root / ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_SOURCE
-        if (
-            _git_blob_sha1(operator_path)
-            != ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN
+        if not _authority_blob_matches(
+            repo_root, operator_path, ARCH134_PRODUCTION_STRATEGY_PREPARE_OPERATOR_PIN
         ):
             failures.append("134-C production shadow PREPARE operator drift")
         source = path.read_text(encoding="utf-8")
@@ -10898,7 +10897,7 @@ def _arch134_armed_paper_authority_check(repo_root: Path) -> tuple[str, ...]:
         }
         for relative, pin in pins.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("134-D1 source drift: " + relative)
             if relative not in imports:
                 continue  # unchanged reviewed concrete provider/HTTPS pins
@@ -11333,7 +11332,7 @@ def _arch134_production_paper_runtime_authority_check(
             successor_pin = _arch134_d1s3_shared_successor_pin(relative)
             if successor_pin is not None:
                 expected_pin = successor_pin
-            if _git_blob_sha1(path) != expected_pin:
+            if not _authority_blob_matches(repo_root, path, expected_pin):
                 failures.append("134-D1Q source drift: " + relative)
             if relative not in ARCH134_PRODUCTION_PAPER_RUNTIME_RECOVERY_IMPORTS:
                 continue
@@ -12341,7 +12340,7 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch143_current_inventory_test_pin(relative, pin)
             pin = _arch132_r3i_current_inventory_test_pin(relative, pin)
             pin = _arch144_current_inventory_test_pin(relative, pin)
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("134-D1R6 source drift: " + relative)
         for relative in ARCH134_D1R6_TEST_PIN_OVERRIDES:
             expected = _arch134_d1r6_test_pin(
@@ -12361,7 +12360,7 @@ def _arch134_d1r6_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = _arch143_current_inventory_test_pin(relative, expected)
             expected = _arch132_r3i_current_inventory_test_pin(relative, expected)
             expected = _arch144_current_inventory_test_pin(relative, expected)
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("134-D1R6 successor drift: " + relative)
         workflow_candidate = _git_blob_sha1(repo_root / ARCH145A_D1R6_WORKFLOW_PATH)
         try:
@@ -12872,7 +12871,9 @@ def _arch134_d1r5_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _arch144_current_inventory_test_pin(relative, expected_pin)
-            if _git_blob_sha1(repo_root / relative) != expected_pin:
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, expected_pin
+            ):
                 failures.append("134-D1R5 source drift: " + relative)
         for relative, allowed in ARCH134_D1R5_IMPORTS.items():
             tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
@@ -12997,7 +12998,9 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _arch144_current_inventory_test_pin(relative, expected_pin)
-            if _git_blob_sha1(repo_root / relative) != expected_pin:
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, expected_pin
+            ):
                 failures.append("134-D1R4R source drift: " + relative)
         for relative, pin in ARCH134_D1R4_SOURCE_PINS.items():
             expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(relative, pin)
@@ -13020,14 +13023,16 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _arch144_current_inventory_test_pin(relative, expected_pin)
-            if _git_blob_sha1(repo_root / relative) != expected_pin:
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, expected_pin
+            ):
                 failures.append("134-D1R4 source drift: " + relative)
         if set(ARCH134_AUTH_CORRECTION_TEST_PINS) != {
             "tests/review_paper/test_armed_production_paper_session.py"
         }:
             failures.append("134-D1R3 unreviewed correction test override")
         for relative, pin in ARCH134_AUTH_CORRECTION_TEST_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("134-D1R3 correction test drift: " + relative)
         for relative, pin in ARCH134_AUTH_SOURCE_PINS.items():
             expected_pin = ARCH134_D1R4R_SOURCE_PINS.get(
@@ -13052,7 +13057,9 @@ def _arch134_authentication_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative, expected_pin
             )
             expected_pin = _arch144_current_inventory_test_pin(relative, expected_pin)
-            if _git_blob_sha1(repo_root / relative) != expected_pin:
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, expected_pin
+            ):
                 failures.append("134-D1R3 source drift: " + relative)
         for relative, allowed in {
             **ARCH134_AUTH_IMPORTS,
@@ -13523,7 +13530,7 @@ def _arch134_runtime_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         for relative, pin in ARCH134_RUNTIME_ACL_SOURCE_PINS.items():
             path = repo_root / relative
-            if _git_blob_sha1(path) != pin:
+            if not _authority_blob_matches(repo_root, path, pin):
                 failures.append("134-D1Q-R2 source drift: " + relative)
             if relative not in ARCH134_RUNTIME_ACL_IMPORTS:
                 continue
@@ -13823,7 +13830,7 @@ def _arch134_d1r7_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch143_current_inventory_test_pin(relative, pin)
             pin = _arch132_r3i_current_inventory_test_pin(relative, pin)
             pin = _arch144_current_inventory_test_pin(relative, pin)
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("D1R7 source drift: " + relative)
         for relative, predecessor in ARCH134_D1R7_PREDECESSOR_TEST_PINS.items():
             expected = _arch134_d1r7_test_pin(relative, predecessor)
@@ -13832,7 +13839,7 @@ def _arch134_d1r7_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = _arch143_current_inventory_test_pin(relative, expected)
             expected = _arch132_r3i_current_inventory_test_pin(relative, expected)
             expected = _arch144_current_inventory_test_pin(relative, expected)
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("D1R7 successor drift: " + relative)
         if not _batch_workflow_is_reviewed(
             (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
@@ -14094,7 +14101,7 @@ def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch143_current_inventory_test_pin(relative, pin)
             pin = _arch132_r3i_current_inventory_test_pin(relative, pin)
             pin = _arch144_current_inventory_test_pin(relative, pin)
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("D1R8 source drift: " + relative)
         for relative, predecessor in ARCH134_D1R8_PREDECESSOR_TEST_PINS.items():
             expected = _arch134_d1r8_test_pin(relative, predecessor)
@@ -14103,7 +14110,7 @@ def _arch134_d1r8_authority_check(repo_root: Path) -> tuple[str, ...]:
             expected = _arch143_current_inventory_test_pin(relative, expected)
             expected = _arch132_r3i_current_inventory_test_pin(relative, expected)
             expected = _arch144_current_inventory_test_pin(relative, expected)
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("D1R8 successor drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_D1R8_NAME]
         if (
@@ -14526,14 +14533,18 @@ def _arch134_f1_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH134_F1_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch144c_current_source_pin(
-                relative, pin
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch144c_current_source_pin(relative, pin),
             ):
                 failures.append("F1 source drift: " + relative)
         for relative, pin in ARCH134_F1_PREDECESSOR_TEST_PINS.items():
-            if _git_blob_sha1(
-                repo_root / relative
-            ) != _arch134_f1_current_inventory_test_pin(relative, pin):
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch134_f1_current_inventory_test_pin(relative, pin),
+            ):
                 failures.append("F1 current-inventory drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_F1_NAME]
         if (
@@ -15047,7 +15058,7 @@ def _arch134_f1r1_a_authority_check(repo_root: Path) -> tuple[str, ...]:
         if set(ARCH134_F1R1_A_SOURCE_PINS) != set(ARCH134_F1R1_A_PATHS):
             failures.append("134-F1R1-A source pin set drift")
         for relative, pin in ARCH134_F1R1_A_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("134-F1R1-A source drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_F1R1_A_NAME]
         if (
@@ -15412,7 +15423,7 @@ def _arch134_f1r1_b_authority_check(repo_root: Path) -> tuple[str, ...]:
                 expected = _arch134_d1s1_current_source_pin(
                     relative, _arch134_f1r1_c1_current_source_pin(relative, pin)
                 )
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("134-F1R1-B source drift: " + relative)
         spec = _checkpoint_specs()[ARCH134_F1R1_B_NAME]
         if (
@@ -15606,7 +15617,7 @@ def _arch145a_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         for relative, pin in ARCH145A_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("145-A source drift: " + relative)
         spec = _checkpoint_specs()[ARCH145A_NAME]
         if (
@@ -15931,16 +15942,20 @@ def _arch144c_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH144C_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch145a_current_source_pin(
-                relative, pin
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch145a_current_source_pin(relative, pin),
             ):
                 failures.append("144-C source drift: " + relative)
         if not ARCH144C_SOURCE_PINS or set(ARCH144C_SOURCE_PINS) != set(ARCH144C_PATHS):
             failures.append("144-C missing source pins")
         for relative, pin in ARCH144C_PREDECESSOR_TEST_PINS.items():
-            if _git_blob_sha1(
-                repo_root / relative
-            ) != _arch144c_current_inventory_test_pin(relative, pin):
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch144c_current_inventory_test_pin(relative, pin),
+            ):
                 failures.append("144-C current-inventory drift: " + relative)
         spec = _checkpoint_specs()[ARCH144C_NAME]
         if (
@@ -16452,7 +16467,7 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
             successor_pin = _arch134_d1s3_shared_successor_pin(relative)
             if successor_pin is not None:
                 expected = successor_pin
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("134-F1R1-C1 source drift: " + relative)
         for relative, before in ARCH134_F1R1_C1_PREDECESSOR_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
@@ -16467,11 +16482,9 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
             successor_pin = _arch134_d1s3_shared_successor_pin(relative)
             if successor_pin is not None:
                 expected = successor_pin
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("134-F1R1-C1 shared successor drift: " + relative)
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_F1R1_C1_RUNNER_AST_PINS.items():
             if name in ARCH134_D1S3_RUNNER_AST_PINS:
@@ -16482,9 +16495,9 @@ def _arch134_f1r1_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
                 )
             else:
                 expected = _arch134_d1s1_runner_ast_pin(name, expected)
-            if hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, expected):
+            if not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, expected)
+            ):
                 failures.append("134-F1R1-C1 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_F1R1_C1_NAME]
         if (
@@ -16964,27 +16977,27 @@ def _arch134_d1s1_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, pin in ARCH134_D1S1_SOURCE_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch134_d1s2_source_pin(
-                relative, pin
+            if not _authority_blob_matches(
+                repo_root, repo_root / relative, _arch134_d1s2_source_pin(relative, pin)
             ):
                 failures.append("D1S1 source drift: " + relative)
         for relative, _pin in ARCH134_D1S1_PREDECESSOR_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
             d1s2_predecessor = ARCH134_D1S2_PREDECESSOR_PINS[relative]
-            if _git_blob_sha1(repo_root / relative) != _arch134_d1s2_current_source_pin(
-                relative, d1s2_predecessor
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch134_d1s2_current_source_pin(relative, d1s2_predecessor),
             ):
                 failures.append("D1S1 shared successor drift: " + relative)
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_D1S2_RUNNER_AST_PINS.items():
             expected = ARCH134_D1S3_RUNNER_AST_PINS.get(name, expected)
-            if hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, expected):
+            if not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, expected)
+            ):
                 failures.append("D1S1 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_D1S1_NAME]
         if (
@@ -17926,35 +17939,39 @@ def _arch134_d1s2_authority_check(repo_root: Path) -> tuple[str, ...]:
                 if predecessor is not None
                 else (_arch134_d1s3_shared_successor_pin(relative) or pin)
             )
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("D1S2 source drift: " + relative)
         for relative, pin in ARCH134_D1S2_PREDECESSOR_PINS.items():
             if _arch134_d1s3_mutable_current_doc(relative):
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch134_d1s2_current_source_pin(
-                relative, pin
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch134_d1s2_current_source_pin(relative, pin),
             ):
                 failures.append("D1S2 shared successor drift: " + relative)
         old_test = "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py"
-        if _git_blob_sha1(repo_root / old_test) != _arch134_d1s2_source_pin(
-            old_test, ARCH134_D1S2_SOURCE_PREDECESSOR_PINS[old_test]
+        if not _authority_blob_matches(
+            repo_root,
+            repo_root / old_test,
+            _arch134_d1s2_source_pin(
+                old_test, ARCH134_D1S2_SOURCE_PREDECESSOR_PINS[old_test]
+            ),
         ):
             failures.append("D1S2 D1S1 test overlay drift")
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_D1S2_RUNNER_AST_PINS.items():
             expected = ARCH134_D1S3_RUNNER_AST_PINS.get(name, expected)
-            if hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, expected):
+            if not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, expected)
+            ):
                 failures.append("D1S2 runner AST drift: " + name)
         for name, expected in ARCH134_D1S2_NEW_RUNNER_AST_PINS.items():
             expected = ARCH134_D1S3_RUNNER_AST_PINS.get(name, expected)
-            if hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, expected):
+            if not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, expected)
+            ):
                 failures.append("D1S2 new runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_D1S2_NAME]
         if (
@@ -18022,14 +18039,16 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
         for relative, _pin in ARCH134_D1S3_SHARED_SUCCESSOR_PINS.items():
             if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS:
                 failures.append("D1S3 current-doc pin reintroduced: " + relative)
-            elif _git_blob_sha1(repo_root / relative) != (
-                _arch134_d1s3_shared_successor_pin(relative)
+            elif not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch134_d1s3_shared_successor_pin(relative),
             ):
                 failures.append("D1S3 shared successor drift: " + relative)
         for relative, pin in ARCH134_D1S3_SOURCE_PINS.items():
             if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS:
                 failures.append("D1S3 current-doc source pin reintroduced: " + relative)
-            elif _git_blob_sha1(repo_root / relative) != pin:
+            elif not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("D1S3 source drift: " + relative)
         if (
             hashlib.sha256(
@@ -18100,9 +18119,7 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
                     resolver(relative, predecessor)
             else:
                 resolver(probe, "")
-        tree = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        tree = _authority_runner_tree(repo_root)
         functions = _top_level_functions(tree)
         for name, expected in ARCH134_D1S3_RUNNER_AST_PINS.items():
             expected = ARCH132_R3L_RUNNER_AST_PINS.get(
@@ -18111,9 +18128,9 @@ def _arch134_d1s3_authority_check(repo_root: Path) -> tuple[str, ...]:
                     name, ARCH132_R3J_RUNNER_AST_PINS.get(name, expected)
                 ),
             )
-            if name not in functions or hashlib.sha256(
-                ast.dump(functions[name], include_attributes=False).encode()
-            ).hexdigest() != _arch134_r5_ast_pin(name, expected):
+            if name not in functions or not _authority_ast_matches(
+                repo_root, name, functions[name], _arch134_r5_ast_pin(name, expected)
+            ):
                 failures.append("D1S3 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_D1S3_NAME]
         if (
@@ -18497,21 +18514,12 @@ def _arch134_r5_authority_check(repo_root: Path) -> tuple[str, ...]:
         )
         for relative, expected in ARCH134_R5_BLOB_PINS.items():
             expected = _arch134_d1s4_overlay(relative, expected, ast_pin=False)
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("R5 source drift: " + relative)
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, expected in ARCH134_R5_AST_PINS.items():
             expected = _arch134_d1s4_overlay(name, expected, ast_pin=True)
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != expected
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], expected):
                 failures.append("R5 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_R5_NAME]
         if (
@@ -19007,22 +19015,13 @@ def _arch134_d1s4_authority_check(repo_root: Path) -> tuple[str, ...]:
             pin = _arch134_acl_overlay(relative, pin, ast_pin=False)
             if (
                 relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS
-                or _git_blob_sha1(repo_root / relative) != pin
+                or not _authority_blob_matches(repo_root, repo_root / relative, pin)
             ):
                 failures.append("D1S4 source drift: " + relative)
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, pin in {**ARCH134_D1S4_AST_PINS, **ARCH134_D1S4_NEW_AST_PINS}.items():
             pin = _arch134_acl_overlay(name, pin, ast_pin=True)
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], pin):
                 failures.append("D1S4 runner AST drift: " + name)
         failures.extend(_arch134_d1s4_graph_check(repo_root))
         spec = _checkpoint_specs()[ARCH134_D1S4_NAME]
@@ -19530,15 +19529,14 @@ def _arch134_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _arch134_acl_overlay("", "", ast_pin=False)
         _arch134_f1r1_c1_active_inventory()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {**ARCH134_ACL_AST_PINS, **ARCH134_ACL_NEW_AST_PINS}.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch134_fresh_overlay(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch134_fresh_overlay(key, pin, ast_pin=True),
+            ):
                 failures.append("R1 runner AST drift: " + key)
         for relative, pin in {
             **ARCH134_ACL_BLOB_PINS,
@@ -19546,8 +19544,10 @@ def _arch134_acl_authority_check(repo_root: Path) -> tuple[str, ...]:
         }.items():
             if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch134_fresh_overlay(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch134_fresh_overlay(relative, pin, ast_pin=False),
             ):
                 failures.append("R1 source drift: " + relative)
         failures.extend(_arch134_acl_graph_check(repo_root))
@@ -20003,26 +20003,30 @@ def _arch134_fresh_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _arch134_fresh_overlay("", "", ast_pin=False)
         _arch134_f1r1_c1_active_inventory()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH134_FRESH_AST_PINS,
             **ARCH134_FRESH_NEW_AST_PINS,
         }.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch146a_overlay(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch146a_overlay(key, pin, ast_pin=True),
+            ):
                 failures.append("Fresh successor runner AST drift: " + key)
         for relative, pin in {
             **ARCH134_FRESH_BLOB_PINS,
             **ARCH134_FRESH_SOURCE_PINS,
         }.items():
-            if relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS or _git_blob_sha1(
-                repo_root / relative
-            ) != _arch146a_overlay(relative, pin, ast_pin=False):
+            if (
+                relative in ARCH134_D1S3_MUTABLE_CURRENT_DOCS
+                or not _authority_blob_matches(
+                    repo_root,
+                    repo_root / relative,
+                    _arch146a_overlay(relative, pin, ast_pin=False),
+                )
+            ):
                 failures.append("Fresh successor source drift: " + relative)
         failures.extend(_arch134_fresh_graph_check(repo_root))
         spec = _checkpoint_specs()[ARCH134_FRESH_NAME]
@@ -20421,19 +20425,17 @@ def _arch146a_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _arch146a_maps()
         _arch146a_predecessor_active_inventory()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root, key, functions[key], _arch146a_c1_pin(key, pin, ast_pin=True)
+            ):
                 failures.append("146-A runner AST drift: " + key)
         for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
-            if _git_blob_sha1(repo_root / relative) != _arch146a_c1_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch146a_c1_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("146-A source drift: " + relative)
         failures.extend(_arch146a_c1_authority_check(repo_root))
@@ -20579,19 +20581,17 @@ def _arch146a_c1_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
 def _arch146a_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
     _arch146a_c1_maps()
     failures = []
-    functions = _top_level_functions(
-        ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
-    )
+    functions = _top_level_functions(_authority_runner_tree(repo_root))
     for key, pin in {**ARCH146A_C1_AST_PINS, **ARCH146A_C1_NEW_AST_PINS}.items():
-        if hashlib.sha256(
-            ast.dump(functions[key], include_attributes=False).encode()
-        ).hexdigest() != _arch146a_c2_pin(key, pin, ast_pin=True):
+        if not _authority_ast_matches(
+            repo_root, key, functions[key], _arch146a_c2_pin(key, pin, ast_pin=True)
+        ):
             failures.append("146-A C1 runner AST drift: " + key)
     for relative, pin in ARCH146A_C1_BLOB_PINS.items():
-        if _git_blob_sha1(repo_root / relative) != _arch146a_c2_pin(
-            relative, pin, ast_pin=False
+        if not _authority_blob_matches(
+            repo_root,
+            repo_root / relative,
+            _arch146a_c2_pin(relative, pin, ast_pin=False),
         ):
             failures.append("146-A C1 source drift: " + relative)
     failures.extend(_arch146a_c2_authority_check(repo_root))
@@ -20691,19 +20691,17 @@ def _arch146a_c2_pin(key: str, predecessor: str, *, ast_pin: bool) -> str:
 def _arch146a_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
     _arch146a_c2_maps()
     failures = []
-    functions = _top_level_functions(
-        ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
-    )
+    functions = _top_level_functions(_authority_runner_tree(repo_root))
     for key, pin in {**ARCH146A_C2_AST_PINS, **ARCH146A_C2_NEW_AST_PINS}.items():
-        if hashlib.sha256(
-            ast.dump(functions[key], include_attributes=False).encode()
-        ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
+        if not _authority_ast_matches(
+            repo_root, key, functions[key], _arch132_r3m_pin(key, pin, ast_pin=True)
+        ):
             failures.append("146-A C2 runner AST drift: " + key)
     for relative, pin in ARCH146A_C2_BLOB_PINS.items():
-        if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
-            relative, pin, ast_pin=False
+        if not _authority_blob_matches(
+            repo_root,
+            repo_root / relative,
+            _arch132_r3m_pin(relative, pin, ast_pin=False),
         ):
             failures.append("146-A C2 source drift: " + relative)
     failures.extend(_arch132_r3m_authority_check(repo_root))
@@ -20836,25 +20834,29 @@ def _arch132_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         _arch132_r3m_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {**ARCH132_R3M_AST_PINS, **ARCH132_R3M_NEW_AST_PINS}.items():
-            actual = hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest()
-            if actual != _arch132_r3m_c3_pin(
-                key, _arch132_r3m_pin(key, pin, ast_pin=True), ast_pin=True
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch132_r3m_c3_pin(
+                    key, _arch132_r3m_pin(key, pin, ast_pin=True), ast_pin=True
+                ),
             ):
                 failures.append("R3M runner AST drift: " + key)
         for relative, pin in {
             **ARCH132_R3M_BLOB_PINS,
             **ARCH132_R3M_FROZEN_SOURCE_PINS,
         }.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
-                relative, _arch132_r3m_pin(relative, pin, ast_pin=False), ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3m_c3_pin(
+                    relative,
+                    _arch132_r3m_pin(relative, pin, ast_pin=False),
+                    ast_pin=False,
+                ),
             ):
                 failures.append("R3M source drift: " + relative)
         if not _batch_workflow_is_reviewed(
@@ -20964,26 +20966,29 @@ def _arch132_r3m_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         _arch132_r3m_c1_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3M_C1_AST_PINS,
             **ARCH132_R3M_C1_NEW_AST_PINS,
         }.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3m_c3_pin(
-                key, _arch132_r3m_c2_pin(key, pin, ast_pin=True), ast_pin=True
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch132_r3m_c3_pin(
+                    key, _arch132_r3m_c2_pin(key, pin, ast_pin=True), ast_pin=True
+                ),
             ):
                 failures.append("R3M C1 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C1_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
-                relative,
-                _arch132_r3m_c2_pin(relative, pin, ast_pin=False),
-                ast_pin=False,
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3m_c3_pin(
+                    relative,
+                    _arch132_r3m_c2_pin(relative, pin, ast_pin=False),
+                    ast_pin=False,
+                ),
             ):
                 failures.append("R3M C1 source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
@@ -21115,26 +21120,27 @@ def _arch132_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         _arch132_r3m_c2_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3M_C2_AST_PINS,
             **ARCH132_R3M_C2_NEW_AST_PINS,
         }.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3m_c3_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch132_r3m_c3_pin(key, pin, ast_pin=True),
+            ):
                 failures.append("R3M C2 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C2_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_c3_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3m_c3_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3M C2 source drift: " + relative)
         for relative, pin in ARCH132_R3M_C2_NEW_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3M C2 new source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M C2 authority unavailable")
@@ -21402,24 +21408,15 @@ def _arch132_r3m_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         _arch132_r3m_c3_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3M_C3_AST_PINS,
             **ARCH132_R3M_C3_NEW_AST_PINS,
         }.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3M C3 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3M C3 source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M C3 authority unavailable")
@@ -21492,7 +21489,6 @@ def _arch132_r3n_admission_authority_check(repo_root: Path) -> tuple[str, ...]:
                     )
                     if not changed or classify_changed_paths(changed) != "FULL":
                         failures.append("R3N changed-path classification drift")
-        failures.extend(_arch132_r3m_authority_check(repo_root))
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
         ).read_text(encoding="utf-8")
@@ -21634,21 +21630,16 @@ def _arch132_r3n_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     try:
         _arch132_r3n_c1_maps()
-        source = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        source = _authority_runner_tree(repo_root)
         functions = _top_level_functions(source)
         for key, pin in {
             **ARCH132_R3N_C1_AST_PINS,
             **ARCH132_R3N_C1_NEW_AST_PINS,
         }.items():
-            actual = hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest()
-            if actual != pin:
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C1 runner AST drift: " + key)
         for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3N C1 source drift: " + relative)
 
         # The predecessor map remains a required integrity check. Only the
@@ -21658,28 +21649,18 @@ def _arch132_r3n_c1_authority_check(repo_root: Path) -> tuple[str, ...]:
         for key, pin in ARCH132_R3M_C3_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C1 predecessor AST drift: " + key)
         for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C1 predecessor new AST drift: " + key)
         skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
         for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
             if relative in skipped_blobs:
                 continue
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3N C1 predecessor source drift: " + relative)
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
@@ -21718,24 +21699,22 @@ def _arch132_r3n_c1_arch146a_c2_authority_check(
     failures: list[str] = []
     try:
         _arch146a_c2_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH146A_C2_AST_PINS,
             **ARCH146A_C2_NEW_AST_PINS,
         }.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root, key, functions[key], _arch132_r3m_pin(key, pin, ast_pin=True)
+            ):
                 failures.append("R3N C1 146-A C2 runner AST drift: " + key)
         for relative, pin in ARCH146A_C2_BLOB_PINS.items():
             if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3m_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3N C1 146-A C2 source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
@@ -21751,21 +21730,19 @@ def _arch132_r3n_c1_arch146a_authority_check(
     try:
         _arch146a_maps()
         _arch146a_predecessor_active_inventory()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root, key, functions[key], _arch146a_c1_pin(key, pin, ast_pin=True)
+            ):
                 failures.append("R3N C1 146-A runner AST drift: " + key)
         for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
             if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch146a_c1_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch146a_c1_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3N C1 146-A source drift: " + relative)
         failures.extend(_arch132_r3n_c1_authority_check(repo_root))
@@ -21792,20 +21769,16 @@ def _arch132_r3n_c1_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     try:
         _arch132_r3m_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3M_AST_PINS,
             **ARCH132_R3M_NEW_AST_PINS,
         }.items():
             if key in ARCH132_R3N_C1_AST_PREDECESSORS:
                 continue
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3m_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root, key, functions[key], _arch132_r3m_pin(key, pin, ast_pin=True)
+            ):
                 failures.append("R3N C1 R3M runner AST drift: " + key)
         for relative, pin in {
             **ARCH132_R3M_BLOB_PINS,
@@ -21813,8 +21786,10 @@ def _arch132_r3n_c1_r3m_authority_check(repo_root: Path) -> tuple[str, ...]:
         }.items():
             if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3m_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3m_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3N C1 R3M source drift: " + relative)
         if not _batch_workflow_is_reviewed(
@@ -21847,25 +21822,16 @@ def _arch132_r3n_c1_r5_authority_check(repo_root: Path) -> tuple[str, ...]:
         _arch134_r5_active_inventory(
             (ARCH134_D1S3_NAME, *ARCH134_D1S2_SUCCESSOR_ACTIVE_CI_CHECKPOINTS)
         )
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for relative, expected in ARCH134_R5_BLOB_PINS.items():
             if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
                 continue
             expected = _arch134_d1s4_overlay(relative, expected, ast_pin=False)
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 failures.append("R3N C1 R5 source drift: " + relative)
         for name, expected in ARCH134_R5_AST_PINS.items():
             expected = _arch134_d1s4_overlay(name, expected, ast_pin=True)
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != expected
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], expected):
                 failures.append("R3N C1 R5 runner AST drift: " + name)
         spec = _checkpoint_specs()[ARCH134_R5_NAME]
         if (
@@ -21939,21 +21905,12 @@ def _arch132_r3n_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     try:
         _arch132_r3n_c2_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3N_C2_AST_PINS,
             **ARCH132_R3N_C2_NEW_AST_PINS,
         }.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C2 runner AST drift: " + key)
         failures.extend(_arch132_r3n_c1_authority_check(repo_root))
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
@@ -22014,21 +21971,12 @@ def _arch132_r3n_c3_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures: list[str] = []
     try:
         _arch132_r3n_c3_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3N_C3_AST_PINS,
             **ARCH132_R3N_C3_NEW_AST_PINS,
         }.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C3 runner AST drift: " + key)
         failures.extend(_arch132_r3n_c2_authority_check(repo_root))
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
@@ -22107,7 +22055,7 @@ def _arch132_r3n_c4_maps() -> None:
         ARCH132_R3N_C4_BLOB_PREDECESSORS,
         ARCH132_R3N_C4_BLOB_PINS,
         ARCH132_R3N_C4_NEW_AST_PINS,
-        REVIEWED_SKIPPED_CERTIFICATION_JOB,
+        _historical_authority_constant("REVIEWED_SKIPPED_CERTIFICATION_JOB"),
     )
     if (
         hashlib.sha256(json.dumps(maps, sort_keys=True).encode()).hexdigest()
@@ -22165,38 +22113,41 @@ def _arch132_r3n_c4_r3m_c2_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = []
     try:
         _arch132_r3m_c2_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {
             **ARCH132_R3M_C2_AST_PINS,
             **ARCH132_R3M_C2_NEW_AST_PINS,
         }.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch132_r3n_c4_pin(
+            if not _authority_ast_matches(
+                repo_root,
                 key,
-                _arch132_r3n_c1_pin(
-                    key, _arch132_r3m_c3_pin(key, pin, ast_pin=True), ast_pin=True
+                functions[key],
+                _arch132_r3n_c4_pin(
+                    key,
+                    _arch132_r3n_c1_pin(
+                        key, _arch132_r3m_c3_pin(key, pin, ast_pin=True), ast_pin=True
+                    ),
+                    ast_pin=True,
                 ),
-                ast_pin=True,
             ):
                 failures.append("R3M C2 runner AST drift: " + key)
         for relative, pin in ARCH132_R3M_C2_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
-                relative,
-                _arch132_r3n_c1_pin(
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3n_c4_pin(
                     relative,
-                    _arch132_r3m_c3_pin(relative, pin, ast_pin=False),
+                    _arch132_r3n_c1_pin(
+                        relative,
+                        _arch132_r3m_c3_pin(relative, pin, ast_pin=False),
+                        ast_pin=False,
+                    ),
                     ast_pin=False,
                 ),
-                ast_pin=False,
             ):
                 failures.append("R3M C2 source drift: " + relative)
         for relative, pin in ARCH132_R3M_C2_NEW_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3M C2 new source drift: " + relative)
     except (OSError, ValueError, KeyError, TypeError, SyntaxError):
         failures.append("R3M C2 authority unavailable")
@@ -22211,9 +22162,7 @@ def _arch132_r3n_c4_authority_check(repo_root: Path) -> tuple[str, ...]:
         _arch132_r3n_c2_maps()
         _arch132_r3n_c3_maps()
         _arch132_r3n_c4_maps()
-        source = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        source = _authority_runner_tree(repo_root)
         functions = _top_level_functions(source)
         for key, pin in {
             **ARCH132_R3N_C1_AST_PINS,
@@ -22224,14 +22173,18 @@ def _arch132_r3n_c4_authority_check(repo_root: Path) -> tuple[str, ...]:
             **ARCH132_R3N_C3_NEW_AST_PINS,
             **ARCH132_R3N_C4_NEW_AST_PINS,
         }.items():
-            actual = hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest()
-            if actual != _arch132_r3n_c4_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch132_r3n_c4_pin(key, pin, ast_pin=True),
+            ):
                 failures.append("R3N C4 runner AST drift: " + key)
         for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3n_c4_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3N C4 source drift: " + relative)
 
@@ -22242,28 +22195,18 @@ def _arch132_r3n_c4_authority_check(repo_root: Path) -> tuple[str, ...]:
         for key, pin in ARCH132_R3M_C3_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C4 predecessor AST drift: " + key)
         for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C4 predecessor new AST drift: " + key)
         skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
         for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
             if relative in skipped_blobs:
                 continue
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3N C4 predecessor source drift: " + relative)
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
@@ -22493,9 +22436,7 @@ def _deployment_candidate_predecessor_authority_check(
         _arch132_r3n_c2_maps()
         _arch132_r3n_c3_maps()
         _arch132_r3n_c4_maps()
-        source = ast.parse(
-            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-        )
+        source = _authority_runner_tree(repo_root)
         functions = _top_level_functions(source)
         for key, pin in {
             **ARCH132_R3N_C1_AST_PINS,
@@ -22506,18 +22447,22 @@ def _deployment_candidate_predecessor_authority_check(
             **ARCH132_R3N_C3_NEW_AST_PINS,
             **ARCH132_R3N_C4_NEW_AST_PINS,
         }.items():
-            actual = hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest()
-            if actual != _arch132_r3n_c4_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root,
+                key,
+                functions[key],
+                _arch132_r3n_c4_pin(key, pin, ast_pin=True),
+            ):
                 failures.append("R3N C4 runner AST drift: " + key)
         for relative, pin in ARCH132_R3N_C1_BLOB_PINS.items():
             # Mutable coordination docs are not executable source authority.
             # Preserve their historical map entries without reading current bytes.
             if relative in {"docs/PROJECT_STATUS.md", "docs/AI_TRADING_BOT_HANDOFF.md"}:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _arch132_r3n_c4_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _arch132_r3n_c4_pin(relative, pin, ast_pin=False),
             ):
                 failures.append("R3N C4 source drift: " + relative)
 
@@ -22528,28 +22473,18 @@ def _deployment_candidate_predecessor_authority_check(
         for key, pin in ARCH132_R3M_C3_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C4 predecessor AST drift: " + key)
         for key, pin in ARCH132_R3M_C3_NEW_AST_PINS.items():
             if key in skipped_ast:
                 continue
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[key], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, key, functions[key], pin):
                 failures.append("R3N C4 predecessor new AST drift: " + key)
         skipped_blobs = set(ARCH132_R3N_C1_BLOB_PREDECESSORS)
         for relative, pin in ARCH132_R3M_C3_BLOB_PINS.items():
             if relative in skipped_blobs:
                 continue
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("R3N C4 predecessor source drift: " + relative)
         workflow = (
             repo_root / ".github/workflows/checkpoint-source-gates.yml"
@@ -22571,21 +22506,23 @@ def _deployment_candidate_146a_authority_check(
     try:
         _arch146a_maps()
         _arch146a_predecessor_active_inventory()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for key, pin in {**ARCH146A_AST_PINS, **ARCH146A_NEW_AST_PINS}.items():
-            if hashlib.sha256(
-                ast.dump(functions[key], include_attributes=False).encode()
-            ).hexdigest() != _arch146a_c1_pin(key, pin, ast_pin=True):
+            if not _authority_ast_matches(
+                repo_root, key, functions[key], _arch146a_c1_pin(key, pin, ast_pin=True)
+            ):
                 failures.append("R3N C1 146-A runner AST drift: " + key)
         for relative, pin in {**ARCH146A_BLOB_PINS, **ARCH146A_SOURCE_PINS}.items():
             if relative in ARCH132_R3N_C1_BLOB_PREDECESSORS:
                 continue
-            if _git_blob_sha1(repo_root / relative) != _deployment_candidate_pin(
-                relative, _arch146a_c1_pin(relative, pin, ast_pin=False), ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _deployment_candidate_pin(
+                    relative,
+                    _arch146a_c1_pin(relative, pin, ast_pin=False),
+                    ast_pin=False,
+                ),
             ):
                 failures.append("R3N C1 146-A source drift: " + relative)
         failures.extend(_arch132_r3n_c1_authority_check(repo_root))
@@ -22612,24 +22549,15 @@ def _deployment_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
     failures = list(_deployment_candidate_predecessor_authority_check(repo_root))
     try:
         _deployment_candidate_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, pin in DEPLOYMENT_CANDIDATE_AST_PINS.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], pin):
                 failures.append("Deployment candidate runner AST drift: " + name)
         for relative, pin in {
             **DEPLOYMENT_CANDIDATE_BLOB_PINS,
             **DEPLOYMENT_CANDIDATE_SOURCE_PINS,
         }.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("Deployment candidate source drift: " + relative)
         if (
             _arch132_r3n_c4_pin is not _deployment_candidate_pin
@@ -24309,6 +24237,7 @@ def _git_output(repo_root: Path, *arguments: str) -> str:
         capture_output=True,
         text=True,
         check=False,
+        env={**os.environ, "GIT_OPTIONAL_LOCKS": "0"},
     )
     if completed.returncode != 0:
         raise RuntimeError(
@@ -24380,12 +24309,30 @@ def _git_state(repo_root: Path) -> dict[str, object]:
     }
 
 
+def _source_pytest_basetemp(root: Path | None = None) -> Path:
+    """Allocate short external verification scratch; never a domain identity."""
+    if root is None:
+        root = (
+            Path(r"F:\AI\temp\pytest")
+            if os.name == "nt" and Path(r"F:\AI\temp").is_dir()
+            else Path(tempfile.gettempdir()) / "atb-pytest"
+        )
+    if root.resolve().is_relative_to(_REPOSITORY_ROOT.resolve()):
+        raise RuntimeError("source pytest basetemp must be external")
+    root.mkdir(parents=True, exist_ok=True)
+    candidate = root / ("source-" + uuid4().hex)
+    if candidate.exists():
+        raise RuntimeError("fresh source pytest basetemp already exists")
+    return candidate
+
+
 def build_verification_steps(
     spec: CheckpointSpec,
     *,
     python_executable: str,
     basetemp: Path,
     tests: Sequence[str] | None = None,
+    junitxml: Path | None = None,
 ) -> tuple[Step, ...]:
     test_paths = spec.tests if tests is None else tuple(tests)
     return (
@@ -24443,7 +24390,7 @@ def build_verification_steps(
                 "no:cacheprovider",
                 "--durations=100",
                 "--durations-min=0.0",
-                f"--junitxml={basetemp.parent / 'pytest-results.xml'}",
+                f"--junitxml={junitxml or basetemp.parent / 'pytest-results.xml'}",
             ),
         ),
     )
@@ -24612,7 +24559,7 @@ def verify_checkpoint(
     evidence_dir = evidence_root / spec.name / f"source-gate-{_stamp()}"
     command_dir = evidence_dir / "commands"
     command_dir.mkdir(parents=True, exist_ok=False)
-    basetemp = evidence_dir / "pytest"
+    basetemp = _source_pytest_basetemp()
     phase = _source_gate_phase()
     shard = _source_gate_shard()
     if phase != "tests" and shard is not None:
@@ -24625,6 +24572,7 @@ def verify_checkpoint(
         spec,
         python_executable=sys.executable,
         basetemp=basetemp,
+        junitxml=evidence_dir / "pytest-results.xml",
         tests=selected_tests,
     )
     static_steps, test_steps = _source_gate_steps(steps, phase)
@@ -24654,7 +24602,11 @@ def verify_checkpoint(
     )
     if authority_requested and static_pass:
         authority_checked = True
-        authority_failures = spec.authority_check(repo_root)
+        authority_failures = evaluate_source_authority(
+            repo_root,
+            publication_context=PublicationContext.FEATURE,
+            checkpoints=(spec,),
+        ).failures
     if test_steps and (phase == "tests" or (static_pass and not authority_failures)):
         outcomes.extend(run_verification_steps(test_steps, execute))
     state_after = _git_state(repo_root)
@@ -24741,7 +24693,9 @@ def verify_checkpoint(
 def prepublication_admission(
     *, repo_root: Path, evidence_root: Path
 ) -> tuple[bool, Path]:
-    """Run the cheap, non-effectful R3N admission gate."""
+    """Run complete general admission; CI phase/shard controls cannot bypass it."""
+    if _source_gate_phase() != "all" or _source_gate_shard() is not None:
+        raise RuntimeError("general admission requires the all/unsharded source gate")
     spec = CheckpointSpec(
         name=ARCH132_R3N_ADMISSION_NAME,
         description=("Architecture 132-R3N source-only pre-publication admission"),
@@ -24799,7 +24753,8 @@ def verify_batch(
     steps = build_verification_steps(
         shared,
         python_executable=sys.executable,
-        basetemp=evidence_dir / "pytest",
+        basetemp=_source_pytest_basetemp(),
+        junitxml=evidence_dir / "pytest-results.xml",
         tests=selected_tests,
     )
     static_steps, test_steps = _source_gate_steps(steps, phase)
@@ -24829,11 +24784,25 @@ def verify_batch(
     )
     if authority_requested and static_pass:
         authority_checked = True
+        result = evaluate_source_authority(
+            repo_root,
+            publication_context=PublicationContext.PROSPECTIVE_DEVELOP,
+            checkpoints=specs,
+        )
         for spec in specs:
-            try:
-                authority_failures[spec.name] = spec.authority_check(repo_root)
-            except Exception as exc:
-                authority_failures[spec.name] = (f"{type(exc).__name__}: {exc}",)
+            prefix = spec.name + ": "
+            authority_failures[spec.name] = tuple(
+                failure.removeprefix(prefix)
+                for failure in result.failures
+                if failure.startswith(prefix)
+            )
+        shared_failures = tuple(
+            failure
+            for failure in result.failures
+            if not any(failure.startswith(spec.name + ": ") for spec in specs)
+        )
+        if shared_failures:
+            authority_failures[specs[0].name] += shared_failures
     if test_steps and (
         phase == "tests" or (static_pass and not any(authority_failures.values()))
     ):
@@ -25637,9 +25606,9 @@ def _readonly_maps() -> None:
         READONLY_PREDECESSOR_ACTIVE,
         READONLY_ADMISSION_NAME,
         READONLY_ADMISSION_BRANCH,
-        READONLY_ADMISSION_TESTS,
-        READONLY_ADMISSION_RUFF,
-        CI_CERTIFICATION_PROFILES,
+        _historical_authority_constant("READONLY_ADMISSION_TESTS"),
+        _historical_authority_constant("READONLY_ADMISSION_RUFF"),
+        _historical_authority_constant("CI_CERTIFICATION_PROFILES"),
         ACTIVE_CI_CHECKPOINTS,
     )
     if hashlib.sha256(
@@ -25734,7 +25703,7 @@ def _readonly_admission_graph_check(repo_root: Path) -> tuple[str, ...]:
     }
     try:
         for relative, expected in READONLY_SOURCE_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != expected:
+            if not _authority_blob_matches(repo_root, repo_root / relative, expected):
                 return ("Read-only admission dependency drift: " + relative,)
             if not relative.endswith(".py") or "/deployment_admission" not in relative:
                 continue
@@ -25800,10 +25769,10 @@ def _readonly_predecessor_authority_check(repo_root: Path) -> tuple[str, ...]:
                 relative in READONLY_BLOB_BEFORE
                 and relative in ARCH132_R3M_C3_BLOB_PINS
             ):
-                if (
-                    ARCH132_R3M_C3_BLOB_PINS[relative] == READONLY_BLOB_BEFORE[relative]
-                    and _git_blob_sha1(repo_root / relative)
-                    == READONLY_BLOB_AFTER[relative]
+                if ARCH132_R3M_C3_BLOB_PINS[relative] == READONLY_BLOB_BEFORE[
+                    relative
+                ] and _authority_blob_matches(
+                    repo_root, repo_root / relative, READONLY_BLOB_AFTER[relative]
                 ):
                     continue
             remaining.append(failure)
@@ -25817,31 +25786,24 @@ def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         _readonly_maps()
         _deployment_candidate_maps()
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, pin in {**DEPLOYMENT_CANDIDATE_AST_PINS, **READONLY_AST_PINS}.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], pin):
                 failures.append("Read-only admission runner AST drift: " + name)
         for relative, pin in {
             **DEPLOYMENT_CANDIDATE_BLOB_PINS,
             **DEPLOYMENT_CANDIDATE_SOURCE_PINS,
         }.items():
-            if _git_blob_sha1(repo_root / relative) != _readonly_pin(
-                relative, pin, ast_pin=False
+            if not _authority_blob_matches(
+                repo_root,
+                repo_root / relative,
+                _readonly_pin(relative, pin, ast_pin=False),
             ):
                 failures.append(
                     "Read-only admission predecessor blob drift: " + relative
                 )
         for relative, pin in READONLY_BLOB_AFTER.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("Read-only admission shared source drift: " + relative)
         if (
             _deployment_candidate_authority_check
@@ -26013,10 +25975,14 @@ preflight_checkpoint = _readonly_preflight_checkpoint
 # Architecture 134 diagnostic successor.  The v1 observer registration and
 # authority chain above remain intact; this layer is the only current route.
 ARCH134_READONLY_DIAGNOSTIC_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
     *READONLY_ADMISSION_TESTS,
     "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
 )
 ARCH134_READONLY_DIAGNOSTIC_RUFF: Final = (
+    "scripts/source_authority.py",
+    "scripts/current_source_authority.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
     *READONLY_ADMISSION_RUFF,
     "src/trading_bot/supervised_release/deployment_admission_diagnostic.py",
     "src/trading_bot/supervised_release/deployment_admission_diagnostic_host.py",
@@ -26409,50 +26375,8 @@ _ARCH134_PREVIOUS_CANDIDATE_AUTHORITY = _readonly_candidate_authority_check
 def _arch134_readonly_diagnostic_predecessor_authority_check(
     repo_root: Path,
 ) -> tuple[str, ...]:
-    failures = [
-        failure
-        for failure in _readonly_predecessor_authority_check(repo_root)
-        if failure != "R3N C4 predecessor new AST drift: prepublication_admission"
-    ]
-    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
-        encoding="utf-8"
-    )
-    if _arch134_current_batch_workflow_is_reviewed(workflow):
-        failures = [
-            failure
-            for failure in failures
-            if failure != "R3N C4 workflow topology drift"
-        ]
-    workflow_doc = "docs/AI_DEVELOPMENT_WORKFLOW.md"
-    workflow_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(workflow_doc)
-    if (
-        workflow_pin is not None
-        and _git_blob_sha1(repo_root / workflow_doc) == workflow_pin
-    ):
-        failures = [
-            failure
-            for failure in failures
-            if failure != "R3N C4 source drift: " + workflow_doc
-        ]
-    test_ci = "tests/runtime/checkpoint_runner/test_ci.py"
-    test_ci_pin = ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.get(test_ci)
-    if test_ci_pin is not None and _git_blob_sha1(repo_root / test_ci) == test_ci_pin:
-        failures = [
-            failure
-            for failure in failures
-            if failure != "R3N C4 source drift: " + test_ci
-        ]
-    for relative, current_pin in ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.items():
-        if _git_blob_sha1(repo_root / relative) != current_pin:
-            continue
-        accepted = {
-            "R3N C1 R3M source drift: " + relative,
-            "R3N C4 predecessor source drift: " + relative,
-            "Read-only admission predecessor blob drift: " + relative,
-            "Read-only admission shared source drift: " + relative,
-        }
-        failures = [failure for failure in failures if failure not in accepted]
-    return tuple(failures)
+    """Compose historical reconstruction without current-drift exception lists."""
+    return _readonly_predecessor_authority_check(repo_root)
 
 
 def _arch134_readonly_diagnostic_graph_check(repo_root: Path) -> tuple[str, ...]:
@@ -26563,26 +26487,17 @@ def _arch134_readonly_diagnostic_authority_body(
         ):
             failures.append("Diagnostic active inventory drift")
         for relative, pin in ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS.items():
-            if _git_blob_sha1(repo_root / relative) != pin:
+            if not _authority_blob_matches(repo_root, repo_root / relative, pin):
                 failures.append("Diagnostic successor source drift: " + relative)
         for relative, pin in ARCH134_READONLY_DIAGNOSTIC_SHARED_BLOB_PINS.items():
             if _arch134_readonly_diagnostic_shared_successor_pin(relative) != pin:
                 failures.append("Diagnostic shared successor drift: " + relative)
-        functions = _top_level_functions(
-            ast.parse(
-                (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
-            )
-        )
+        functions = _top_level_functions(_authority_runner_tree(repo_root))
         for name, pin in {
             **ARCH134_READONLY_DIAGNOSTIC_AST_PINS,
             **ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS,
         }.items():
-            if (
-                hashlib.sha256(
-                    ast.dump(functions[name], include_attributes=False).encode()
-                ).hexdigest()
-                != pin
-            ):
+            if not _authority_ast_matches(repo_root, name, functions[name], pin):
                 failures.append("Diagnostic successor runner AST drift: " + name)
         failures.extend(_arch134_readonly_diagnostic_graph_check(repo_root))
     except (OSError, KeyError, TypeError, ValueError, SyntaxError):
@@ -26607,58 +26522,20 @@ def _arch134_readonly_diagnostic_authority_check(
         _arch146a_overlay = previous_overlay
 
 
-def _arch134_r3n_prepublication_authority_check(
-    repo_root: Path,
-) -> tuple[str, ...]:
-    """Route current R3N admission through the reviewed diagnostic successor."""
-    current = _arch134_readonly_diagnostic_authority_check(repo_root)
-    predecessor = _arch132_r3n_admission_authority_check(repo_root)
-    if current:
-        return tuple(sorted(set((*predecessor, *current))))
-    successor_drift = {
-        "R3N C1 R3M source drift: tests/runtime/checkpoint_runner/test_core.py",
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/helpers.py",
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_lanes.py",
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_profiles.py",
-        "R3N C1 R3M workflow topology drift",
-        "R3N C4 source drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
-        "R3N C4 source drift: tests/runtime/checkpoint_runner/test_ci.py",
-        "R3N C4 workflow topology drift",
-        "R3N C4 predecessor source drift: "
-        "tests/scripts/certification_runner/test_lanes.py",
-        "R3N C4 predecessor source drift: "
-        "tests/scripts/certification_runner/test_profiles.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_d1_session_execution.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_d1_session_authorization.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_pre_market_wake_overnight.py",
-        "R3N C4 predecessor source drift: tests/review_paper/test_five_session_soak.py",
-        "Read-only admission predecessor blob drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
-        "Read-only admission predecessor blob drift: "
-        "tests/runtime/checkpoint_runner/test_ci.py",
-        "Read-only admission shared source drift: docs/AI_DEVELOPMENT_WORKFLOW.md",
-        "Read-only admission shared source drift: "
-        "tests/runtime/checkpoint_runner/test_ci.py",
-        "Read-only admission shared source drift: "
-        "tests/runtime/checkpoint_runner/test_core.py",
-        "Read-only admission shared source drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
-        "Read-only admission predecessor blob drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-        "Read-only admission shared source drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-        "Read-only admission shared source drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
-        "R3N C4 predecessor new AST drift: prepublication_admission",
-        "R3N workflow topology drift",
-    }
-    return tuple(failure for failure in predecessor if failure not in successor_drift)
+def _arch134_r3n_prepublication_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Require identity admission and both publication contexts before push."""
+    failures = list(_arch132_r3n_admission_authority_check(repo_root))
+    if failures:
+        return tuple(failures)
+    for context in PublicationContext:
+        result = evaluate_source_authority(repo_root, publication_context=context)
+        print(
+            f"{context.value}_AUTHORITY={'PASS' if result.passed else 'FAIL'} "
+            f"HEAD={result.head} TREE={result.tree} "
+            f"CHECKPOINTS={len(result.checkpoints)}"
+        )
+        failures.extend(context.value + ": " + failure for failure in result.failures)
+    return tuple(failures)
 
 
 def _arch134_readonly_diagnostic_preflight() -> dict[str, object]:

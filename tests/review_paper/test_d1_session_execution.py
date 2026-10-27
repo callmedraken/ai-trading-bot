@@ -16,9 +16,6 @@ from types import SimpleNamespace
 import pytest
 from tests.review_paper.test_armed_production_paper_session import AlpacaTransport
 from tests.review_paper.test_risk_price_acquisition import _quote
-from tests.runtime.checkpoint_runner.test_ci import (
-    _use_historical_predecessor_authority,
-)
 
 from scripts import checkpoint_runner as runner
 from trading_bot.review_paper import d1_session_authorization as q
@@ -958,7 +955,6 @@ def test_persisted_auth_has_single_yield_and_no_refresh_or_storage():
 
 
 def test_checkpoint_inventory_and_explicit_successor(monkeypatch):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     name = "arch134-d1r8-d1-session-execution-consumer"
     spec = runner._checkpoint_specs()[name]
     assert spec.preflight is spec.execute is spec.remote_head_env is None
@@ -978,7 +974,6 @@ def test_checkpoint_inventory_and_explicit_successor(monkeypatch):
     ],
 )
 def test_every_successor_layer_executes_once(monkeypatch, path):
-    _use_historical_predecessor_authority(monkeypatch, ROOT)
     calls = []
     for name in (
         "_arch134_d1r6_test_pin",
@@ -1016,7 +1011,9 @@ def test_every_successor_layer_executes_once(monkeypatch, path):
         pin = runner._arch144_current_inventory_test_pin(path, pin)
     else:
         pin = runner._arch134_f1_current_inventory_test_pin(path, pin)
-    assert pin == runner._git_blob_sha1(ROOT / path)
+    from scripts import source_authority
+
+    assert source_authority.blob_matches(ROOT, ROOT / path, pin)
     first = ["_arch134_d1r6_test_pin", "_canonical_current_inventory_test_pin"]
     if path not in runner.CANONICAL_CURRENT_INVENTORY_TEST_PIN_OVERRIDES:
         first.reverse()

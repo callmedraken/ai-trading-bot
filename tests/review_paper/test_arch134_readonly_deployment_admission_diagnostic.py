@@ -252,39 +252,40 @@ def test_r3n_prepublication_admission_dispatches_current_successor_authority(
     }
 
 
-def test_r3n_successor_filters_only_exact_current_topology_drift(monkeypatch, tmp_path):
-    current_topology = (
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/helpers.py",
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_lanes.py",
-        "R3N C1 R3M source drift: tests/scripts/certification_runner/test_profiles.py",
-        "R3N C4 predecessor source drift: "
-        "tests/scripts/certification_runner/test_lanes.py",
-        "R3N C4 predecessor source drift: "
-        "tests/scripts/certification_runner/test_profiles.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_d1_session_execution.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_d1_session_authorization.py",
-        "R3N C4 predecessor source drift: "
-        "tests/review_paper/test_pre_market_wake_overnight.py",
-        "R3N C4 predecessor source drift: tests/review_paper/test_five_session_soak.py",
-        "Read-only admission shared source drift: "
-        "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
-    )
-    monkeypatch.setattr(
-        runner,
-        "_arch134_readonly_diagnostic_authority_check",
-        lambda root: (),
-    )
+@pytest.mark.parametrize("identity_bad", [True, False])
+def test_general_admission_preserves_identity_and_both_context_failures(
+    monkeypatch, tmp_path, identity_bad
+):
+    from scripts.current_source_authority import AuthorityResult, PublicationContext
+
     monkeypatch.setattr(
         runner,
         "_arch132_r3n_admission_authority_check",
-        lambda root: (*current_topology, "unrelated source drift"),
+        lambda _: ("identity rejected",) if identity_bad else (),
     )
+    calls = []
 
-    assert runner._arch134_r3n_prepublication_authority_check(tmp_path) == (
-        "unrelated source drift",
-    )
+    def evaluate(root, *, publication_context):
+        calls.append(publication_context)
+        return AuthorityResult(
+            publication_context,
+            "a" * 40,
+            "b" * 40,
+            ("example",),
+            ("semantic rejected",),
+        )
+
+    monkeypatch.setattr(runner, "evaluate_source_authority", evaluate)
+    failures = runner._arch134_r3n_prepublication_authority_check(tmp_path)
+    if identity_bad:
+        assert failures == ("identity rejected",)
+        assert calls == []
+    else:
+        assert failures == (
+            "FEATURE: semantic rejected",
+            "PROSPECTIVE_DEVELOP: semantic rejected",
+        )
+        assert calls == list(PublicationContext)
 
 
 def test_diagnostic_overlay_preserves_frozen_r3m_and_reconstructs_exact_successor():
@@ -326,15 +327,11 @@ def test_diagnostic_overlay_bypass_and_unrelated_workflow_drift_fail_closed(
     monkeypatch.setattr(runner, "ARCH134_READONLY_DIAGNOSTIC_BLOB_PINS", {})
     assert runner._arch134_readonly_diagnostic_authority_check(root)
 
+    # Current workflow drift is owned by the current semantic predicate.
     monkeypatch.undo()
-    original = runner._git_blob_sha1
-
-    def unrelated(path):
-        if path == root / ".github/workflows/checkpoint-source-gates.yml":
-            return "0" * 40
-        return original(path)
-
-    monkeypatch.setattr(runner, "_git_blob_sha1", unrelated)
+    monkeypatch.setattr(
+        runner, "_arch134_current_batch_workflow_is_reviewed", lambda _: False
+    )
     assert runner._arch134_readonly_diagnostic_authority_check(root)
 
 
@@ -418,9 +415,9 @@ def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
         runner._ARCH134_READONLY_DIAGNOSTIC_PREVIOUS_SHARED_SUCCESSOR_PIN
         is not runner._arch134_readonly_diagnostic_shared_successor_pin
     )
-    assert runner._arch132_r3m_authority_check(root)
-    assert runner._arch132_r3n_c4_authority_check(root)
-    assert runner._readonly_candidate_authority_check(root)
+    assert runner._arch132_r3m_authority_check(root) == ()
+    assert runner._arch132_r3n_c4_authority_check(root) == ()
+    assert runner._readonly_candidate_authority_check(root) == ()
     assert (
         runner._arch134_d1s3_shared_successor_pin(
             "tests/runtime/checkpoint_runner/test_ci.py"

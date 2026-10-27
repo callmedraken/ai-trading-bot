@@ -136,6 +136,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         runner.READONLY_ADMISSION_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+        runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
         runner.ARCH146A_NAME,
         runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
@@ -419,6 +420,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_BRANCH
         if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH
+        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME:
+            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1422,6 +1425,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 runner.READONLY_ADMISSION_NAME,
                 runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
                 runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+                runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
                 "arch133-robinhood-supervised-release-installation-operator",
                 "arch133-robinhood-supervised-release-publication-recovery",
                 "arch133-robinhood-supervised-release-installation-reconciliation",
@@ -1476,6 +1480,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
         if name in {
             runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
             runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+            runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
         }:
             expected = (
                 "tests/runtime/checkpoint_runner/test_source_authority.py",

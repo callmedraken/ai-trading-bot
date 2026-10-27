@@ -265,6 +265,7 @@ _CURRENT_FULL_ADDITIONS = (
     "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
     "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
     "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
     "tests/review_paper/test_armed_production_paper_session.py",
     "tests/review_paper/test_current_production_strategy_decision.py",
     "tests/review_paper/test_d1_session_authorization.py",

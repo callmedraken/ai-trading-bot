@@ -1514,23 +1514,18 @@ non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
 .\ops.ps1 preflight arch128-r7
 ```
 
-The current source-only fresh-successor diagnostic is
-`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1`. It has
-read-only preflight registration, `execute = None`, exact explicit R1 branch
-binding and GitHub-owned canonical ROBINHOOD. Implementation runs no host
-observer. The consumed predecessor diagnostic report
-`640e0d61e9122ef40fd3716b80316a12d78cb1b19c70f651e7c3e576765ca26b`
-is immutable; source binding failed at nine Git children before Windows host
-qualification. Do not rerun it. The earlier v1 coarse BLOCKED/HOST report also
-remains immutable. Source PASS grants no mutation.
-
-Before any new R1 host attempt ChatGPT must review exact published HEAD/tree,
-admission and terminal CI. The complete future invocation requires a fresh
-nonexistent external evidence root, reviewed HEAD/TREE/REFERENCE and truthful
-invoking-process SID/elevation, using the short guarded scriptblock in the
-[R1 operator contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r1.md).
-The runner owns actual token/host admission; no giant wrapper or external
-production/Administrator pre-screen is required.
+The current fresh-successor diagnostic checkpoint is
+`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2`. It registers
+read-only preflight, `execute = None`, an exact R2 feature branch and GitHub-owned
+canonical ROBINHOOD. R1 is SOURCE ACCEPTED/integrated; its real-host attempt is
+consumed BLOCKED/HOST/HOST_FORBIDDEN_IDENTITY. Never rerun or repoint it. R2 permits
+only frozen preserved incident basenames as opaque parent metadata and rejects
+incident aliases and all prospective destination/partial prefixes. Tests use
+fakes only and never invoke the real host observer, production namespace,
+scheduler/security state or protected runtime. The
+[R2 contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r2.md)
+and bounded current status/handoff own the next review boundary. No source PASS
+grants mutation. Historical R1 invocation templates confer no retry authority.
 
 The exact #738 mapped ROBINHOOD run (`40288823461`, attempt 1) is reusable only
 when repository, workflow, event, SHA/tree, branch, profile, attempt, exact job

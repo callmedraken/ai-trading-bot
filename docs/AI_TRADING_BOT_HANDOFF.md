@@ -2,6 +2,29 @@
 
 ## Accepted checkpoint
 
+Architecture 134 diagnostic R2 is SOURCE ACCEPTED and integrated through the
+ordinary GitHub PR #32 merge path.
+
+Accepted R2 feature source:
+
+    HEAD b70ca1ade95f122a014c45c9a2f64de900b685f5
+    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+
+Feature CI #765 / run 40593570365 / attempt 1 is terminal SUCCESS:
+source-static, active-tests, mapped ROBINHOOD and source-gates passed; FULL was
+skipped. Canonical ROBINHOOD recorded 11,881 cases: 11,875 passed, 6 skipped,
+0 failed/errors in 218.335 seconds.
+
+PR #32 develop integration:
+
+    HEAD d55466edece45c93bc8eef3c5cda6687eed9cf6c
+    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+
+Develop CI #767 / run 40595839765 / attempt 1 is terminal SUCCESS:
+source-static, all four broad develop shards and source-gates passed; active-tests
+and mapped certification were skipped/reused. No R2 host preflight has run, no
+protected effect occurred, and LIVE remains NO-GO.
+
 Architecture 134 diagnostic R1 is SOURCE ACCEPTED and integrated through the
 ordinary GitHub PR #29 merge path.
 
@@ -92,7 +115,7 @@ prior plan to "prepare for Monday 2026-10-26 market open" should have meant
 preparing/reviewing the deployment-admission chain; treating 10/26 as an F1R1
 trading session was a workflow/planning regression.
 
-## Consumed diagnostic R1 and additive R2 boundary
+## Consumed diagnostic R1 and integrated R2 boundary
 
 R1 remains SOURCE ACCEPTED and integrated at feature HEAD
 `cb78f005626a9678cd0d792aed2689e567796a6a`, tree
@@ -111,13 +134,21 @@ never rerun, repoint, modify or rewrite R1 to PASS. Incident evidence remains
 immutable, opaque and non-authoritative; it must not be deleted to make admission
 pass. No child inspection, repair, rename, promotion or reuse is authorized.
 
-R2 is the additive SOURCE ONLY correction:
-`arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2`, branch
+R2 is SOURCE ACCEPTED and integrated through PR #32. Its source identity is
+HEAD `b70ca1ade95f122a014c45c9a2f64de900b685f5`, tree
+`1c836cf17ea5887b669db1867d0b116ac02559da`, on branch
 `feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r2-current`.
-Only exact frozen INCIDENT_ROOT basenames may coexist as parent metadata.
-Incident aliases/case variants and every prospective destination/partial prefix
-remain rejected. Source/security/quiescence policy and all effect/authority
-ceilings remain unchanged. R2 host preflight is NOT_RUN; `execute = None`.
+The correction changed only the over-broad preserved-incident namespace policy:
+
+- exact three frozen incident basenames may coexist only as opaque parent
+  metadata;
+- their existence grants no authority;
+- they are never opened or traversed as children;
+- incident aliases and variants remain rejected;
+- every prospective destination and partial prefix remains rejected.
+
+Security, token, SACL, runtime-Python and quiescence policy remains unchanged.
+R2 remains read-only with `execute = None`; its host preflight is NOT_RUN.
 See the [R2 contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r2.md).
 
 ## Preserved predecessor diagnostic evidence
@@ -137,13 +168,22 @@ also remains immutable and non-retryable.
 
 ## Next safe step
 
-ChatGPT owns exact published R2 commit/diff, FEATURE + PROSPECTIVE_DEVELOP
-admission and terminal GitHub source-gate/mapped ROBINHOOD review. This checkpoint
-does not merge or run R2 on the host. No local duplicate canonical certification
-is required. Review the final implementation handoff and R2 contract, confirm
-R1 source/evidence unchanged, closed namespace taxonomy and parent-only fake
-coverage, then decide the separately reviewed integration and later host boundary.
-Do not use the historical R1 invocation template as a new operator instruction.
+Run exactly one registered R2 real-host read-only preflight from the exact clean
+R2 feature/operator source:
+
+    HEAD b70ca1ade95f122a014c45c9a2f64de900b685f5
+    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+    REFERENCE feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r2-current
+
+The invocation must use a fresh nonexistent external evidence root, the exact
+reviewed HEAD/TREE/REFERENCE, truthful current-process SID and elevation, no
+manual production namespace inspection, no Administrator/source/ACL pre-screen
+outside the registered preflight, and no R1 fallback. PASS stops at
+`READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`.
+
+BLOCKED or unknown stops with preserved evidence and no retry, repair, cleanup,
+namespace mutation or alternate command. This docs closeout does not run the
+host preflight.
 
 PASS can mean only `READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`;
 no root/ACL/materialization/runtime/scheduler/F1/provider/broker/live effect is

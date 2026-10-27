@@ -1,4 +1,4 @@
-# Architecture 134 â€” Read-only diagnostic R1 source binding
+# Architecture 134 — Read-only diagnostic R1 source binding
 
 ## Source-only successor
 
@@ -82,7 +82,7 @@ only `READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`. No release root,
 ACL/materialization, scheduler/runtime, provider/OAuth/broker, F1 or live authority
 follows. Rename-free immutable-release requirements remain mandatory.
 
-## Complete future operator contract â€” NOT_RUN
+## Complete future operator contract — NOT_RUN
 
 ChatGPT must first review the exact published R1 HEAD/tree, admission and terminal
 CI. Only that review may supply the two literal identities below. The placeholders

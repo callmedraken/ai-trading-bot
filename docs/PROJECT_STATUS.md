@@ -1,4 +1,4 @@
-# AI Trading Bot â€” Project Status
+# AI Trading Bot — Project Status
 
 ## Current accepted integration state
 

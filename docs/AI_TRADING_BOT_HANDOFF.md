@@ -1,4 +1,4 @@
-# AI Trading Bot â€” Current Handoff
+# AI Trading Bot — Current Handoff
 
 ## Accepted checkpoint
 
@@ -48,7 +48,7 @@ ownership from strategy tests, and extends the existing structural guard to
 reject the exposed strategy pattern before publication. No historical pin map
 or current certification/profile total is repinned.
 
-## Session chronology â€” do not conflate F1 and F1R1
+## Session chronology — do not conflate F1 and F1R1
 
 Original F1 reserved five targets:
 

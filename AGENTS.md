@@ -1,6 +1,6 @@
 # AI Trading Bot Development Rules
 
-## Standing authorization for reviewed next steps â€” current normative rule
+## Standing authorization for reviewed next steps — current normative rule
 
 Reviewed next-step actions are implicitly authorized by default within their
 exact described scope. ChatGPT must not insert an authorization-only turn to
@@ -123,7 +123,7 @@ from code deployment.
   mutated, cleaned or reused without a separately reviewed housekeeping or
   diagnostic boundary.
 
-### Rename-free immutable-release publication â€” normative non-regression
+### Rename-free immutable-release publication — normative non-regression
 
 This is a **current normative architecture rule**, adopted after the repeated
 Architecture-133 Windows rename incidents and the 2026-10-24

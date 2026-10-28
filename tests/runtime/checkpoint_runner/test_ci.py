@@ -3,6 +3,8 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
+import shutil
 import subprocess
 from dataclasses import replace
 from pathlib import Path
@@ -1661,6 +1663,7 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
         "scripts/run_test_certification.py",
         "scripts/source_authority.py",
         "scripts/current_source_authority.py",
+        "scripts/distributed_full.py",
         "tests/runtime/checkpoint_runner/test_source_authority.py",
         "tests/runtime/checkpoint_runner/test_ci.py",
         "tests/scripts/certification_runner/test_profiles.py",
@@ -1670,7 +1673,11 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
         "docs/AI_DEVELOPMENT_WORKFLOW.md",
     )
     for path in required_paths:
-        assert runner._prepublication_admission_tests((path,)) == expected
+        selected = runner._prepublication_admission_tests((path,))
+        assert selected == expected
+        # The real Windows native regression below belongs to this required
+        # module, so workflow/generator edits cannot omit it from admission.
+        assert "tests/runtime/checkpoint_runner/test_ci.py" in selected
 
     source = runner.PrepublicationSource(
         candidate={"head": "a" * 40, "tree": "b" * 40},
@@ -3212,7 +3219,10 @@ def test_current_full_reuse_accepts_exact_literal_skipped_job_name():
 
 
 def test_current_distributed_full_workflow_is_exact_and_isolated():
-    from scripts.distributed_full import predecessor_workflow
+    from scripts.distributed_full import (
+        FULL_DETACHED_BRANCH_BOOTSTRAP,
+        predecessor_workflow,
+    )
 
     root = Path(runner.__file__).resolve().parents[1]
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
@@ -3225,6 +3235,14 @@ def test_current_distributed_full_workflow_is_exact_and_isolated():
     assert "      fail-fast: false\n" in matrix
     assert "        lane: [1, 2, 3, 4, 5, 6, 7]\n" in matrix
     assert "          ref: ${{ github.sha }}" in matrix
+    assert (
+        "".join(
+            "          " + line + "\n"
+            for line in FULL_DETACHED_BRANCH_BOOTSTRAP.splitlines()
+        )
+        in matrix
+    )
+    assert "([string](git branch --show-current)).Trim()" not in matrix
     assert "              --lane $env:FULL_LANE `" in matrix
     artifact = "canonical-certification-full-broad-${{ matrix.lane }}"
     assert matrix.count("name: " + artifact) == 1
@@ -3243,6 +3261,22 @@ def test_current_distributed_full_workflow_is_exact_and_isolated():
         ("fail-fast: false", "fail-fast: true"),
         ("--lane $env:FULL_LANE", "--lane 1"),
         ("--ci-source-static", "--plan"),
+        ("ref: ${{ github.sha }}", "ref: ${{ github.ref_name }}"),
+        (
+            "$CurrentBranchLines = @(git branch --show-current)",
+            "$CurrentBranchLines = git branch --show-current",
+        ),
+        (
+            "if ($CurrentBranchLines.Count -eq 0)",
+            "if ($CurrentBranchLines.Count -eq 1)",
+        ),
+        (
+            "elseif ($CurrentBranchLines.Count -eq 1)",
+            "elseif ($CurrentBranchLines.Count -ge 1)",
+        ),
+        ("throw 'Ambiguous certification checkout branch output'", "# accept"),
+        ("throw 'Failed to inspect certification checkout branch'", "# accept"),
+        ("if ($CurrentBranch -ne '')", "if ($false)"),
         (
             "name: canonical-certification-full-broad-${{ matrix.lane }}",
             "name: canonical-certification-full",
@@ -3306,3 +3340,99 @@ def test_actual_full_aggregate_requires_every_matrix_lane(matrix_result, passed)
         (bash, "-c", script), env=env, capture_output=True, text=True
     )
     assert (result.returncode == 0) == passed, result.stderr
+
+
+@pytest.mark.skipif(os.name != "nt", reason="requires real Windows PowerShell 5.1")
+def test_full_detached_bootstrap_native_empty_stdout(tmp_path):
+    from scripts.distributed_full import FULL_DETACHED_BRANCH_BOOTSTRAP
+
+    powershell = shutil.which("powershell.exe")
+    assert powershell is not None, "Windows admission requires powershell.exe"
+    git = shutil.which("git")
+    assert git is not None, "Windows admission requires real Git"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    # Discard ambient repository selectors so both the real temporary repository
+    # and the intentional non-repository failure exercise their own cwd.
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith("GIT_")
+    }
+    env.update(GIT_CONFIG_NOSYSTEM="1", GIT_CONFIG_GLOBAL=os.devnull)
+
+    def run_git(*args):
+        return subprocess.run(
+            (git, *args),
+            cwd=repo,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=30,
+        ).stdout.strip()
+
+    run_git("init")
+    run_git("config", "user.name", "Native bootstrap regression")
+    run_git("config", "user.email", "native-bootstrap@example.invalid")
+    run_git("config", "commit.gpgsign", "false")
+    (repo / "tracked.txt").write_text("native regression\n", encoding="utf-8")
+    run_git("add", "--", "tracked.txt")
+    run_git("commit", "-m", "native regression")
+    head = run_git("rev-parse", "HEAD")
+    branch = run_git("branch", "--show-current")
+    assert branch
+
+    script = tmp_path / "bootstrap.ps1"
+    script.write_text(
+        "Set-StrictMode -Version Latest\n$ErrorActionPreference = 'Stop'\n"
+        "if ($PSVersionTable.PSVersion.Major -ne 5) {\n"
+        "    throw 'Expected Windows PowerShell 5.1'\n}\n"
+        + FULL_DETACHED_BRANCH_BOOTSTRAP
+        + "if ($CurrentBranch -cne '') { throw 'Expected exact empty identity' }\n"
+        + "if ($CurrentBranchLines.Count -ne 0) {\n"
+        + "    throw 'Expected zero native lines'\n}\n"
+        + "Write-Output 'DETACHED_NATIVE_EMPTY_PASS'\n",
+        encoding="utf-8",
+    )
+
+    def run_ps(cwd, path=script):
+        return subprocess.run(
+            (powershell, "-NoProfile", "-NonInteractive", "-File", str(path)),
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    attached = run_ps(repo)
+    assert attached.returncode != 0
+    assert f"Certification branch mismatch: {branch}" in attached.stderr
+    assert "DETACHED_NATIVE_EMPTY_PASS" not in attached.stdout
+
+    run_git("checkout", "--detach", head)
+    assert run_git("rev-parse", "HEAD") == head
+    assert run_git("branch", "--show-current") == ""
+    legacy = tmp_path / "legacy.ps1"
+    legacy.write_text(
+        "$ErrorActionPreference = 'Stop'\n"
+        "$CurrentBranch = ([string](git branch --show-current)).Trim()\n",
+        encoding="utf-8",
+    )
+    failed_legacy = run_ps(repo, legacy)
+    assert failed_legacy.returncode != 0
+    assert "null-valued expression" in failed_legacy.stderr
+
+    detached = run_ps(repo)
+    assert detached.returncode == 0, detached.stderr
+    assert detached.stdout.strip() == "DETACHED_NATIVE_EMPTY_PASS"
+
+    # Real native Git failure: the cwd is outside any repository, not a fake
+    # executable, a supplied $null, or a substituted native command.
+    outside = tmp_path / "not-a-repository"
+    outside.mkdir()
+    failed = run_ps(outside)
+    assert failed.returncode != 0
+    assert "Failed to inspect certification checkout branch" in failed.stderr
+    assert "DETACHED_NATIVE_EMPTY_PASS" not in failed.stdout

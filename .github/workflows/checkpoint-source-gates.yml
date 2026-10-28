@@ -563,7 +563,6 @@ jobs:
           $BaseHead = (git rev-parse origin/develop).Trim()
           $FeatureRef = "origin/$env:EXPECTED_BRANCH"
           $FeatureHead = (git rev-parse $FeatureRef).Trim()
-          $CurrentBranch = ([string](git branch --show-current)).Trim()
 
           if ($Head -ne $env:EXPECTED_HEAD) {
             throw "Certification checkout HEAD mismatch: $Head"
@@ -571,8 +570,21 @@ jobs:
           if ($FeatureHead -ne $Head) {
             throw "Certification feature ref mismatch: $FeatureHead"
           }
-          if ($CurrentBranch -ne "") {
-            throw "Certification branch mismatch: $CurrentBranch"
+          $CurrentBranchLines = @(git branch --show-current)
+          if ($LASTEXITCODE -ne 0) {
+              throw 'Failed to inspect certification checkout branch'
+          }
+          if ($CurrentBranchLines.Count -eq 0) {
+              $CurrentBranch = ''
+          }
+          elseif ($CurrentBranchLines.Count -eq 1) {
+              $CurrentBranch = ([string]$CurrentBranchLines[0]).Trim()
+          }
+          else {
+              throw 'Ambiguous certification checkout branch output'
+          }
+          if ($CurrentBranch -ne '') {
+              throw "Certification branch mismatch: $CurrentBranch"
           }
 
           $TempRoot = Join-Path $env:RUNNER_TEMP 'canonical-certification-pytest'

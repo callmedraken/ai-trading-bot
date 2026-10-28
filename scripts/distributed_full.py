@@ -7,6 +7,26 @@ from typing import Any
 FULL_JOB_NAMES = tuple(f"certification-full (broad-{index})" for index in range(1, 8))
 SKIPPED_FULL_JOB = "certification-full (broad-${{ matrix.lane }})"
 
+# Windows PowerShell 5.1 represents zero native stdout lines as $null. Capture
+# the line vector explicitly and keep the detached-only condition in this owner.
+FULL_DETACHED_BRANCH_BOOTSTRAP = """$CurrentBranchLines = @(git branch --show-current)
+if ($LASTEXITCODE -ne 0) {
+    throw 'Failed to inspect certification checkout branch'
+}
+if ($CurrentBranchLines.Count -eq 0) {
+    $CurrentBranch = ''
+}
+elseif ($CurrentBranchLines.Count -eq 1) {
+    $CurrentBranch = ([string]$CurrentBranchLines[0]).Trim()
+}
+else {
+    throw 'Ambiguous certification checkout branch output'
+}
+if ($CurrentBranch -ne '') {
+    throw "Certification branch mismatch: $CurrentBranch"
+}
+"""
+
 
 def full_matrix_job(predecessor: str) -> str:
     "Derive isolated FULL execution from the shared canonical toolchain/steps."
@@ -55,12 +75,18 @@ def full_matrix_job(predecessor: str) -> str:
         ),
     )
     job = job.replace(
-        "          if ($CurrentBranch -ne $env:EXPECTED_BRANCH) {",
-        '          if ($CurrentBranch -ne "") {',
+        "          $CurrentBranch = (git branch --show-current).Trim()\n", ""
     )
     job = job.replace(
-        "$CurrentBranch = (git branch --show-current).Trim()",
-        "$CurrentBranch = ([string](git branch --show-current)).Trim()",
+        (
+            "          if ($CurrentBranch -ne $env:EXPECTED_BRANCH) {\n"
+            '            throw "Certification branch mismatch: $CurrentBranch"\n'
+            "          }\n"
+        ),
+        "".join(
+            "          " + line + "\n"
+            for line in FULL_DETACHED_BRANCH_BOOTSTRAP.splitlines()
+        ),
     )
     job = job.replace(
         (

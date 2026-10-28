@@ -22,16 +22,21 @@ Worktree non-regression is now explicit: no Trading Bot auxiliary worktree may
 be created outside `F:\\AI\\worktrees\\...`. A tool-managed C:-drive
 worktree is a workflow regression even if it is clean and unused.
 
-## Pending feature checkpoint — Architecture 146-B1-C5
+## Pending feature checkpoint — Architecture 146-B1-C6
 
-B1-C4 passed all functional/static checks but #785 failed the unchanged
-300-second hygiene ceiling. C5 addresses shared-runner oversubscription by
-executing C4's unchanged seven FULL lanes in seven isolated Windows jobs.
-The #784 timing map remains placement authority. C5 requires terminal mapped CI,
-every isolated lane below 300 seconds, then ChatGPT exact-source acceptance.
-B-E remain gated on terminal-green B1 and exact acceptance/integration. The
-[C5 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution)
-owns preserved failure evidence and STOP conditions. Acquisition/custody is unchanged.
+C5's immutable #786 / run `40766415660` / attempt 1 passed source-static and
+active-tests and created seven isolated Windows FULL jobs. All seven stopped
+before Python/pytest at the same native-empty-output bootstrap defect.
+Classification: `PREPUBLICATION_COVERAGE_DEFECT / FULL_POWERSHELL_NATIVE_EMPTY_STDOUT`.
+C6 corrects only FULL's source-owned detached-branch capture and adds a real
+Git/Windows PowerShell 5.1 regression to the required admission/source-gate
+module. Exact-SHA checkout, C4 timing/placement and C5 topology/reuse stay intact.
+The [C6 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c6--full-detached-bootstrap-native-output-correction)
+owns the failure evidence, correction and STOP conditions. C6 still requires
+clean-candidate admission and terminal mapped CI: all seven functional results
+must pass, each wall must be <300s, and every unique lane artifact must exist.
+B-E remain gated on terminal-green B1 and exact acceptance/integration.
+No protected effect occurred; acquisition/custody is unchanged.
 
 ## Architecture 134 host track — parked, fail closed
 
@@ -78,8 +83,8 @@ and custody. Published B1-C1 source is on
 #782 / run `40649744489` / attempt 1 completed FAILURE and was classified
 `PREPUBLICATION_COVERAGE_DEFECT`; the exact failures and C2 correction are
 recorded once in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
-C2/C3/C4 corrections and preserved #783/#784/#785 failures are recorded in the
-validation plan. C5 above is the current publication boundary; earlier functional
+C2/C3/C4/C5 corrections and preserved #783/#784/#785/#786 failures are recorded in the
+validation plan. C6 above is the current publication boundary; earlier functional
 passes confer no source acceptance or integration.
 
 Both real custody and historical-session admission registries remain empty.

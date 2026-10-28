@@ -418,3 +418,73 @@ No provider/credential/custody/holdout/ACL/campaign/GUI/paper/broker/live effect
 are authorized. Architecture 134 R3 remains parked and LIVE remains NO-GO.
 The native-MAC applicability contract is unchanged: optimizer-only metrics are
 explicitly N/A, never fabricated numeric placeholders, and cannot rank/compare.
+
+
+## 146-B1-C6 — FULL detached-bootstrap native-output correction
+
+C5 source HEAD `d6bc4f75179c3561b83a8910ae2b2f83aa51e496`, TREE
+`2130bc00217fecb0e9d090e447199ab61bf28cff`, parent
+`9088e0d7b8e128a3c79873ba741d52506c848436` produced immutable Checkpoint
+Source Gates #786 / run `40766415660` / attempt 1 / FAILURE. Preserve it and
+#782 / `40649744489`, #783 / `40658848795`, #784 / `40689830781` and
+#785 / `40759967556` unchanged. No unchanged CI rerun is authorized.
+
+Source-static and active-tests passed. Seven isolated FULL Windows jobs were
+created, but every job stopped before Python/pytest at:
+
+    $CurrentBranch = ([string](git branch --show-current)).Trim()
+    You cannot call a method on a null-valued expression.
+
+Exact-SHA checkout is intentionally detached. Under Windows PowerShell 5.1,
+zero native stdout lines reach this expression as null; the cast does not make
+that method call safe. Missing results.json, hygiene failure and no-files
+artifact failure are downstream consequences of that primary defect.
+Classification: `PREPUBLICATION_COVERAGE_DEFECT / FULL_POWERSHELL_NATIVE_EMPTY_STDOUT`.
+
+C6 gives FULL one named source-owned PowerShell fragment in
+`scripts/distributed_full.py`, used verbatim by the generated workflow and real
+native regression. It captures an array of native stdout lines, checks native
+exit status explicitly, maps zero lines to the exact empty detached identity,
+casts/trims exactly one line, rejects multiple lines, and rejects a nonempty
+attached branch. It uses no Out-String normalization. The predecessor owner
+still reconstructs the historical workflow unchanged; ROBINHOOD retains its
+attached-branch bootstrap. Python verify_source and its complete independent
+HEAD/TREE/tracking/live-ref/clean-source/GitHub-context proofs are unchanged.
+
+The required `tests/runtime/checkpoint_runner/test_ci.py` admission/source-gate
+module executes real powershell.exe -NoProfile against an actual disposable Git
+repository. It proves attached rejection, exact-commit detachment and actual
+native empty stdout, reproduces the unsafe predecessor failure, verifies the
+corrected fragment resolves exactly CurrentBranch == '', and rejects actual
+native Git failure outside a repository. Only non-Windows hosts may skip;
+missing powershell.exe on Windows is a failure. Workflow/generator mutation
+checks reject weakened exit/cardinality/detached conditions. Infrastructure
+admission selection explicitly covers the distributed-FULL generator and
+workflow and includes this required native regression module; it executes no
+canonical FULL locally.
+
+C4 remains unchanged: seven broad-1 through broad-7 lanes, #784 timing authority,
+1,749,660 raw/canonical ms, timing digest
+`a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710`,
+deterministic placement with no pins or runtime adaptation. C5 retains seven
+isolated exact-SHA jobs, fail-fast false, source-static dependency, unique lane
+artifacts, all-seven aggregate and exact original-attempt-1 feature-to-develop
+reuse. ROBINHOOD, LEGACY and EXHAUSTIVE are unchanged; no broad-8 is authorized.
+
+Require real native/focused C2/C3/C4/C5/B1 regressions, exact Ruff 0.17.3
+whole-root check/format and diff checks before the one ordinary atomic candidate
+commit. Run fresh exact clean-candidate FEATURE and PROSPECTIVE_DEVELOP admission
+on that committed source before one ordinary push. Both contexts must PASS;
+canonical FULL remains GitHub-owned. Terminal acceptance requires source-static,
+active-tests, source-gates, all seven Python/pytest functional results, each
+lane wall strictly <300s and every uniquely named artifact, original attempt 1,
+on the unchanged final HEAD/TREE. Any red functional lane or wall >=300s is STOP
+for ChatGPT review; preserve fresh evidence without a rerun or topology change.
+
+No provider call, credential access, custody/holdout operation, ACL mutation,
+scheduler/host operation, Architecture 145 campaign, GUI mutation, paper/broker
+or live effect occurred. Architecture 134 R3 remains parked; LIVE remains NO-GO.
+B-E remain gated until terminal-green B1 exact-source acceptance/integration.
+The native-MAC applicability contract remains: optimizer-only metrics are N/A,
+never fabricated numeric placeholders, and unavailable metrics cannot rank or
+compare.

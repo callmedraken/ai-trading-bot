@@ -22,6 +22,16 @@ Worktree non-regression is now explicit: no Trading Bot auxiliary worktree may
 be created outside `F:\\AI\\worktrees\\...`. A tool-managed C:-drive
 worktree is a workflow regression even if it is clean and unused.
 
+## Pending feature checkpoint — Architecture 146-B1-C4
+
+B1-C3 is functionally green but certification/source acceptance remains blocked
+by #784's FULL timing ceiling. The authorized C4 candidate refreshes the current
+FULL timing authority from #784 and uses seven deterministic lanes under the
+unchanged 300-second ceiling. It awaits terminal mapped CI and ChatGPT exact-
+source review. B-E implementation remains gated on terminal-green B1; publication
+also requires base acceptance/integration. The [C4 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction)
+owns the evidence and STOP boundary. Acquisition/custody behavior is unchanged.
+
 ## Architecture 134 host track — parked, fail closed
 
 R3's single real-host read-only observation is consumed:

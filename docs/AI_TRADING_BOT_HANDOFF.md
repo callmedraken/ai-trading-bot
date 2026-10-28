@@ -44,6 +44,23 @@ first and run the tool against it. Existing noncanonical worktrees are preserved
 for a separate reviewed reconciliation step and are never adopted for current
 work.
 
+## Pending B1-C4 continuation
+
+Work only in `F:\AI\worktrees\ai-trading-bot-146b1-source`, branch
+`feature/research-arch146-b-acquisition-custody-current`. C4's reviewed parent is
+HEAD `100d1cd0f759a7df1d31632c2f237621731017bd`, TREE
+`060899aad7c9d68d2e992b139657af384a5405d4`. #782 / `40649744489`, #783 /
+`40658848795` and #784 / `40689830781` are immutable failed evidence.
+
+C4 is a source-only timing/topology correction pending one clean-candidate
+FEATURE/PROSPECTIVE_DEVELOP admission, ordinary atomic commit/push and terminal
+mapped canonical FULL. Do not run FULL locally. Functionally green wall <300s
+permits ChatGPT exact-source acceptance review; wall >=300s is STOP, with no
+unchanged rerun or automatic eight-lane change. The [C4 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction)
+owns timing provenance and exact review bounds. B-E implementation remains gated
+on terminal-green B1; publication additionally requires base acceptance/integration.
+R3 remains parked; all protected effects remain unavailable and LIVE is NO-GO.
+
 ## Consumed Architecture 134 diagnostics
 
 R1, R2 and R3 are independent consumed historical observations. Never rerun,

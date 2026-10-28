@@ -1,6 +1,6 @@
 # Architecture 146-B — Acquisition/Custody Validation Plan
 
-Status: **B1-C1/C2 PUBLISHED / CI FAILED; B1-C3 STATIC PARITY CORRECTION PENDING.**
+Status: **B1-C3 FUNCTIONALLY GREEN / HYGIENE FAILED; B1-C4 TIMING CORRECTION PENDING.**
 
 ## B1 required source verification
 
@@ -235,7 +235,7 @@ by the required prepublication gate, not PREPUBLICATION_COVERAGE_DEFECT.
 C1 adds the new supported acquisition test module to the exact current FULL
 inventory/count expectation (209 FULL / 431 EXHAUSTIVE, with ROBINHOOD 117 and
 LEGACY 222 unchanged), preserves the historical timing sample, and proves the
-new module appears exactly once in current six-lane FULL using fallback weight.
+new module appeared exactly once in then-current six-lane FULL using fallback weight.
 The required 122/49 baselines, certification implementation and lane policy do
 not change. Preserve the original unpublished commit and report; require a new
 normal corrective commit, complete admission on its exact clean source, and
@@ -308,3 +308,50 @@ rerun or automatic topology correction. Terminal-green C3 is required before
 B-E implementation; publication additionally requires base acceptance/integration.
 No source acceptance, integration or B2 credential/network/custody/ACL authority
 is granted here. R3 remains parked and LIVE remains NO-GO.
+
+## 146-B1-C4 — current FULL timing-capacity correction
+
+C3 source HEAD `100d1cd0f759a7df1d31632c2f237621731017bd`, TREE
+`060899aad7c9d68d2e992b139657af384a5405d4` is functionally green but not
+certification/source accepted. #784 / run `40689830781` / attempt 1 failed solely
+on the unchanged 300-second FULL hygiene ceiling. Preserve #782 / `40649744489`,
+#783 / `40658848795` and #784 unchanged; never rerun them.
+
+Classification: `CERTIFICATION_TOPOLOGY_CAPACITY_DEFECT / STALE_FULL_TIMING_AUTHORITY`.
+The sole new current FULL timing authority is #784's immutable canonical JUnit:
+209 selected modules, 14,722 cases, 14,716 passed, six skipped, zero failed/errors,
+1,749,660 raw/canonical testcase milliseconds, no zero-duration modules. The
+sorted compact JSON timing-map SHA256 is
+`a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710`.
+
+C4 freezes those 209 positive integer weights in source and changes only current
+FULL placement to seven nonempty whole-module lanes, `broad-1` through `broad-7`.
+The unchanged deterministic greedy algorithm models 29/29/30/30/30/31/30 modules
+and 249953/249953/249950/249952/249952/249951/249949 ms. Six lanes would average
+291.610 seconds and peak near 291.612 seconds before collection/process overhead.
+The historical R3L 1,231,440-ms map remains immutable historical evidence only.
+No runtime JUnit reads, adaptive history or lane pins are introduced.
+The exact counts/order differ from the planning approximation; they follow
+from the frozen map and existing algorithm, with the reviewed 249.953-second maximum.
+
+ROBINHOOD stays four lanes and LEGACY/EXHAUSTIVE remain unchanged. C3 retains
+exact Ruff 0.17.3 local/CI parity, shared whole-root `.` non-mutating commands,
+static-before-pytest ordering and fail-closed toolchain/static behavior. The
+hygiene threshold remains exactly 300 seconds; B1 acquisition/custody source is
+unchanged. The native-MAC report applicability contract remains: optimizer-only
+metrics are explicitly N/A, never fabricated numbers, and unavailable metrics
+cannot participate in ranking/comparison.
+
+Required local evidence: affected lane/profile/result/child/source and checkpoint
+runner/current-authority tests, C2 coherence, C3 static-order/toolchain and B1
+synthetic regressions; exact whole-root Ruff check/format and diff checks; then
+fresh clean-candidate `ops.ps1 admit` in FEATURE and PROSPECTIVE_DEVELOP. Do not
+run canonical FULL locally. Publish one normal atomic commit and ordinary push,
+then wait for its mapped canonical CI. Terminal functionally green FULL with
+wall <300 seconds permits ChatGPT exact-source acceptance review. Wall >=300
+seconds is STOP for ChatGPT review; no automatic eight-lane correction or rerun.
+
+B-E implementation stays gated on terminal-green B1; later publication requires
+base acceptance/integration. No provider/credential/custody/holdout/ACL/campaign/
+GUI/paper/broker/live effect is authorized. Architecture 134 R3 stays parked and
+LIVE remains NO-GO.

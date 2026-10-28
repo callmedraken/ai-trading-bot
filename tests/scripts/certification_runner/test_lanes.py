@@ -232,94 +232,113 @@ def test_empty_lane_never_launches_pytest(
         runner.run_children(SimpleNamespace(), lanes, tmp_path)
 
 
-def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
+def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
-    assert "tests/review_paper/test_successor_publication_recovery.py" in inventory
-    current = inventory
-    assert "tests/experiments/test_historical_research_dataset.py" in current
-    acquisition_module = (
-        "tests/experiments/test_historical_research_acquisition_custody.py"
-    )
-    assert acquisition_module in current
-    inventory = tuple(
-        m
-        for m in inventory
-        if m
-        not in {
-            "tests/runtime/checkpoint_runner/test_source_authority.py",
-            "tests/experiments/test_historical_research_dataset.py",
-            acquisition_module,
-            "tests/review_paper/test_successor_publication_recovery.py",
-            "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-            "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
-        }
-    )
+    table = runner.FULL_MODULE_TIMINGS_MS
+    paths = tuple(module for module, _ in table)
+    assert len(paths) == len(set(paths)) == len(inventory) == 209
+    assert set(paths) == set(inventory)
+    assert all(type(ms) is int and ms > 0 for _, ms in table)
     weights = runner.full_module_weights(inventory)
-    assert len(inventory) == 199
-    assert set(weights) == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS} | {
-        "tests/runtime/checkpoint_runner/test_r3m_c2.py"
-    }
+    assert weights == dict(table)
     assert runner.FULL_FALLBACK_MS == 1000
-    assert sum(weights.values()) == 1232440
+    assert sum(weights.values()) == 1749660
     assert (
         hashlib.sha256(
             json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
-        == "c736db12c1762b220c8493b182d1b6a0a7592a57658fc8eddbb20f8aafc19b2d"
+        == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
     )
     lanes = runner.build_lanes(root, inventory, "full")
-    assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 7))
+    assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
     assert all(lanes.values()) and "serial" not in lanes
-    assert lanes == runner.build_lanes(root, tuple(reversed(inventory)), "full")
+    repeated = runner.build_lanes(root, tuple(reversed(inventory)), "full")
+    assert tuple(lanes.items()) == tuple(repeated.items())
+    assert json.dumps(lanes).encode() == json.dumps(repeated).encode()
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (32, 32, 33, 34, 34, 34)
+    assert tuple(map(len, lanes.values())) == (29, 29, 30, 30, 30, 31, 30)
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
-    assert totals == (205407, 205407, 205407, 205407, 205406, 205406)
-    assert tuple(_ordered_lane_hash(lane) for lane in lanes.values()) == (
-        "4370c172de1ed35b513bfe0601686f6a37687a1c8e71410677a437f333b0c652",
-        "44fbd5262637ce9aaafe064c5a084136b51720a8f481f6df8bd957ab17bc00a7",
-        "b9114c371658362d7725838357d91b7d829e1432a3be89ffe9feb8a222c64605",
-        "d16bcf154b0d51989ac7429f84e7f8a15606ab9e63334158974f900248081c53",
-        "dcd467076a0069d80279aa2df4e3490ddc1f28f190135f169fc6d6ddaa434bf2",
-        "7c0122c95d1f0961f95aaa84d5966b39c893d5d0a4de62f6bcf9f575ec6cd89b",
-    )
-    assert max(totals) + 81674 == 287081 < 300000
-    # Only this module measured zero in the preserved R4 FULL XML.
-    assert weights["tests/domain/test_proposals.py"] == 1
-    raw = dict(weights, **{"tests/domain/test_proposals.py": 0})
-    assert sum(raw.values()) == 1232439
-    assert [module for module, ms in raw.items() if ms == 0] == [
-        "tests/domain/test_proposals.py"
-    ]
-    assert {module: max(1, ms) for module, ms in raw.items()} == weights
-
-    assert (
-        runner.full_module_weights(current)[
-            "tests/experiments/test_historical_research_dataset.py"
-        ]
-        == runner.FULL_FALLBACK_MS
-    )
-    assert (
-        runner.full_module_weights(current)[acquisition_module]
-        == runner.FULL_FALLBACK_MS
-    )
-    current_lanes = runner.build_lanes(root, current, "full")
-    assert sum(lane.count(acquisition_module) for lane in current_lanes.values()) == 1
-    runner.validate_partitions(current, tuple(current_lanes.values()))
-    assert (
-        runner.full_module_weights(current)[
-            "tests/review_paper/test_successor_publication_recovery.py"
-        ]
-        == runner.FULL_FALLBACK_MS
-    )
+    assert totals == (249953, 249953, 249950, 249952, 249952, 249951, 249949)
+    assert max(totals) == 249953 < 300000
 
 
-def test_full_fixture_byte_size_cannot_change_six_lane_placement(tmp_path) -> None:
+def test_c4_preserves_robinhood_legacy_and_exhaustive_placement(monkeypatch) -> None:
+    import subprocess
+
+    root = Path(runner.__file__).resolve().parents[1]
+    parent = subprocess.run(
+        [
+            "git",
+            "show",
+            "100d1cd0f759a7df1d31632c2f237621731017bd:scripts/run_test_certification.py",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+
+    import sys
+    from types import ModuleType
+
+    frozen = ModuleType("frozen_c3_certification")
+    frozen.__file__ = runner.__file__
+    monkeypatch.setitem(sys.modules, frozen.__name__, frozen)
+    namespace = frozen.__dict__
+    exec(compile(parent, "frozen_c3_certification", "exec"), namespace)
+    for profile in ("robinhood", "legacy", "exhaustive"):
+        inventory = runner.select_inventory(runner.discover_inventory(root), profile)
+        assert runner.build_lanes(root, inventory, profile) == namespace["build_lanes"](
+            root, inventory, profile
+        )
+    assert (
+        len(
+            runner.build_lanes(
+                root,
+                runner.select_inventory(runner.discover_inventory(root), "robinhood"),
+                "robinhood",
+            )
+        )
+        == 4
+    )
+
+
+def test_r3l_full_timing_evidence_remains_historical_and_frozen() -> None:
+    import ast
+    import subprocess
+
+    root = Path(runner.__file__).resolve().parents[1]
+    source = subprocess.run(
+        [
+            "git",
+            "show",
+            "a6b6791db9237e4df6b0768ba1013d30052d00a7:scripts/run_test_certification.py",
+        ],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    table = next(
+        ast.literal_eval(node.value)
+        for node in ast.parse(source).body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(t, ast.Name) and t.id == "FULL_MODULE_TIMINGS_MS"
+            for t in node.targets
+        )
+    )
+    assert len(table) == 198 and sum(dict(table).values()) == 1231440
+    assert (
+        hashlib.sha256(
+            json.dumps(dict(table), sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        == "65e9c1cc30d09d33db08f70c93be354ef5d3746ea45ef460467848f9f42998f9"
+    )
+
+
+def test_full_fixture_byte_size_cannot_change_seven_lane_placement(tmp_path) -> None:
     root = Path(runner.__file__).resolve().parents[1]
     selected = runner.select_inventory(runner.discover_inventory(root), "full")
     fixture = tmp_path / selected[0]
@@ -345,15 +364,9 @@ def test_full_duplicate_inventory_is_rejected(monkeypatch) -> None:
 
 
 def test_full_fixture_matches_frozen_timing_membership() -> None:
-    diagnostic = (
-        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py"
-    )
-    assert set(_fixture_profiles()["full"]) - {
-        diagnostic,
-        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
-        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
-        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
-    } == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
+    assert set(_fixture_profiles()["full"]) == {
+        module for module, _ in runner.FULL_MODULE_TIMINGS_MS
+    }
 
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
@@ -362,12 +375,13 @@ def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> N
     monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ((modules[1], 1000),))
     assert runner.full_module_weights(modules) == dict.fromkeys(modules, 1000)
     expected = (
-        (modules[0], modules[6]),
-        (modules[1], modules[7]),
+        (modules[0], modules[7]),
+        (modules[1],),
         (modules[2],),
         (modules[3],),
         (modules[4],),
         (modules[5],),
+        (modules[6],),
     )
     assert runner.balance_full(tuple(reversed(modules))) == expected
     monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", original)

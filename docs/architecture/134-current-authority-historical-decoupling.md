@@ -36,7 +36,7 @@ through shared predecessor reconstruction, rather than 296 independent defects.
 | D1S1/D1S2/D1S3/D1S4/R1/R5 and predecessor evidence | immutable historical declarations, Git objects and checkpoint-specific security semantics |
 
 Current profile baselines remain 122 FULL / 49 ROBINHOOD required modules.
-FULL has six lanes and ROBINHOOD four. The additional current authority regression
+FULL has seven lanes under 146-B1-C4 and ROBINHOOD four. The additional current authority regression
 module is explicitly owned by both supported profiles. No certification is weakened.
 
 ## Complete failure audit and preserved safety properties

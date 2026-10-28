@@ -261,8 +261,8 @@ baselines.
   Missing/renamed baseline modules fail closed; new owned tests enter
   automatically.
 - **FULL:** the default `--profile full` certifies all CURRENTLY SUPPORTED
-  functionality in exactly six deterministic nonempty whole-module timing-aware
-  lanes (`broad-1` through `broad-6`), with no historical Windows serial lane.
+  functionality in exactly seven deterministic nonempty whole-module timing-aware
+  lanes (`broad-1` through `broad-7`), with no historical Windows serial lane.
   Use after certification-topology changes, at coherent
   current-product boundaries, before major develop/release integration or
   consequential production/live-readiness transitions, after sufficiently broad

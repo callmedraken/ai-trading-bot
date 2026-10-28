@@ -230,6 +230,13 @@ _FIXTURE_LEGACY = tuple(
 
 
 _CURRENT_FULL_ADDITIONS = (
+    "tests/experiments/test_historical_research_acquisition_custody.py",
+    "tests/experiments/test_historical_research_dataset.py",
+    "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
+    "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
+    "tests/review_paper/test_successor_publication_recovery.py",
+    "tests/runtime/checkpoint_runner/test_r3m_c2.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
     "tests/experiments/test_research_candidate.py",
     "tests/experiments/test_research_candidate_shadow_binding.py",
     "tests/experiments/test_research_candidate_shadow_observation.py",
@@ -326,6 +333,11 @@ def _fixture_profiles() -> dict[str, tuple[str, ...]]:
                         if (
                             Path(module).parent.as_posix().removeprefix("tests/")
                             in _BASELINE_FAMILIES
+                            or module
+                            == (
+                                "tests/runtime/checkpoint_runner/"
+                                "test_source_authority.py"
+                            )
                             or (
                                 Path(module).parent.as_posix() == "tests"
                                 and Path(module).name.startswith("test_robinhood_")
@@ -344,7 +356,7 @@ def _fixture_profiles() -> dict[str, tuple[str, ...]]:
 
 def _lane_names(profile: str) -> tuple[str, ...]:
     return {
-        "full": tuple(f"broad-{index}" for index in range(1, 7)),
+        "full": tuple(f"broad-{index}" for index in range(1, 8)),
         "robinhood": (
             "robinhood-1",
             "robinhood-2",

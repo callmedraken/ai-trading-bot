@@ -78,12 +78,12 @@ def test_subprocess_failure_propagates(
 @pytest.mark.parametrize(
     "outcome", ["pass", "nonzero", "timeout", "missing", "malformed", "cases"]
 )
-def test_six_children_start_before_wait_and_retain_exact_evidence(
+def test_seven_children_start_before_wait_and_retain_exact_evidence(
     tmp_path, monkeypatch, outcome
 ):
     started = []
     killed = []
-    lanes = {f"broad-{i}": (f"tests/domain/test_module_{i}.py",) for i in range(1, 7)}
+    lanes = {f"broad-{i}": (f"tests/domain/test_module_{i}.py",) for i in range(1, 8)}
 
     class Process:
         returncode = 0
@@ -92,7 +92,7 @@ def test_six_children_start_before_wait_and_retain_exact_evidence(
             self.index = index
 
         def wait(self, timeout=None):
-            assert len(started) == 6
+            assert len(started) == 7
             if self.index == 2 and outcome == "timeout" and timeout is not None:
                 raise runner.subprocess.TimeoutExpired("pytest", timeout)
             self.returncode = 7 if self.index == 2 and outcome == "nonzero" else 0
@@ -134,7 +134,7 @@ def test_six_children_start_before_wait_and_retain_exact_evidence(
     )
     results = runner.run_children(args, lanes, tmp_path)
     assert tuple(results) == tuple(lanes)
-    assert len({child["basetemp"] for child in results.values()}) == 6
+    assert len({child["basetemp"] for child in results.values()}) == 7
     for name, child in results.items():
         if name == "broad-2" and outcome != "pass":
             assert "error" in child

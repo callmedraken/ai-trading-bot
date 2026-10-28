@@ -1192,12 +1192,12 @@ current-product testing. That topology predates the Architecture-132 current/
 legacy ownership split.
 
 The latest reviewed current-product certification contract is the
-Architecture-132-R3L FULL / R3K ROBINHOOD selected-profile topology implemented by
+Architecture-146-B1-C4 FULL / R3K ROBINHOOD selected-profile topology implemented by
 `scripts/run_test_certification.py`:
 
 - `--profile full` selects all CURRENTLY SUPPORTED modules and runs exactly
-  six deterministic nonempty whole-module timing-aware lanes,
-  `broad-1` through `broad-6`, with **no serial lane**;
+  seven deterministic nonempty whole-module timing-aware lanes,
+  `broad-1` through `broad-7`, with **no serial lane**;
 - `--profile robinhood` selects the reviewed Robinhood/current-product subset
   and runs exactly four deterministic timing-aware lanes,
   `robinhood-1` through `robinhood-4`, with the accepted R3K model
@@ -1368,8 +1368,8 @@ tests/acceptance/test_windows_authority_provisioning_acceptance.py
 ```
 
 Architecture-77 remains serial; unrestricted parallel safety has not been
-established. Current FULL has six deterministic nonempty whole-module
-timing-aware lanes under R3L; Robinhood retains four deterministic timing-aware
+established. Current FULL has seven deterministic nonempty whole-module
+timing-aware lanes under 146-B1-C4; Robinhood retains four deterministic timing-aware
 lanes under accepted R3K. Both have no serial lane. LEGACY/EXHAUSTIVE retain their
 historical two-broad-plus-serial topology. Never launch pytest with an empty
 module list.

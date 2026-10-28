@@ -5,7 +5,37 @@ Current infrastructure ownership and prepublication admission are governed by
 R3M/R3N exact overlays below preserve historical evidence; they do not own current
 mutable test/workflow bytes. General admit uses the shared FEATURE and
 PROSPECTIVE_DEVELOP evaluator before publication. Canonical mapped profiles
-remain GitHub-owned. Required baselines and profile/lane semantics are unchanged.
+remain GitHub-owned. Required baselines are unchanged; current FULL placement
+is corrected by 146-B1-C4 below.
+
+## Current FULL correction — Architecture 146-B1-C4
+
+Current FULL uses exactly seven deterministic nonempty whole-module lanes,
+`broad-1` through `broad-7`, with no serial lane. Its sole current frozen timing
+map comes from canonical FULL #784 / run `40689830781`, attempt 1: 209 modules,
+14,722 cases, 14,716 passed, six skipped and zero failed/errors. Every raw module
+total is positive; raw and canonical totals both equal 1,749,660 ms. Sorted
+compact JSON timing-map SHA256:
+`a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710`.
+
+The existing descending-time / ascending-path / lowest-total / lowest-index
+greedy algorithm yields module counts 29/29/30/30/30/31/30 and lane totals
+249953/249953/249950/249952/249952/249951/249949 ms. Six lanes modeled about
+291.612 seconds before collection/process overhead, leaving inadequate room
+under the unchanged 300-second ceiling. Runtime acceptance still requires
+canonical FULL wall strictly below 300 seconds. There are no lane pins, runtime
+JUnit reads or adaptive history. Future owned modules retain the 1000-ms fallback.
+The exact counts/order differ from the planning approximation; they follow
+from the frozen map and existing algorithm, with the reviewed 249.953-second maximum.
+
+ROBINHOOD remains four lanes; LEGACY/EXHAUSTIVE and required baselines are unchanged.
+
+Classification: `CERTIFICATION_TOPOLOGY_CAPACITY_DEFECT / STALE_FULL_TIMING_AUTHORITY`.
+R3L's older six-lane map and 1,231,440-ms total below are frozen historical
+Architecture 132 evidence, superseded as current FULL authority. #782, #783 and
+#784 remain immutable. This candidate is pending terminal CI and ChatGPT exact-
+source acceptance; no integration or protected effect follows. See the
+[C4 validation boundary](../validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction).
 
 ## Architecture 132-R3M — predecessor exact develop certification reuse
 
@@ -632,10 +662,10 @@ The older two-broad-plus-one-serial all-repository FULL layout is historical
 provenance. It predates the current/legacy ownership split and must not be
 reintroduced for routine current-product verification.
 
-The latest reviewed current topology is R3L FULL and R3K ROBINHOOD:
+The latest reviewed current topology is 146-B1-C4 FULL and R3K ROBINHOOD:
 
-- FULL runs six deterministic nonempty whole-module timing-aware lanes,
-  `broad-1` through `broad-6`, with no serial lane;
+- FULL runs seven deterministic nonempty whole-module timing-aware lanes,
+  `broad-1` through `broad-7`, with no serial lane;
 - ROBINHOOD runs exactly four deterministic nonempty timing-aware lanes,
   `robinhood-1` through `robinhood-4`, with accepted R3K and no serial lane;
 - LEGACY and EXHAUSTIVE alone retain the exact five-module serial safety lane.
@@ -2391,8 +2421,8 @@ full union legacy == exhaustive
 exhaustive == complete discovered repository inventory
 ```
 
-FULL uses six deterministic nonempty whole-module timing-aware lanes as
-specified by R3L above. Robinhood retains four deterministic timing-aware lanes
+FULL uses seven deterministic nonempty whole-module timing-aware lanes as
+specified by 146-B1-C4 above. Robinhood retains four deterministic timing-aware lanes
 under accepted R3K. Both have no serial lane. Only the historical
 LEGACY/EXHAUSTIVE broad lanes retain descending-file-size balancing
 with stable path/lane ties and whole-file allocation. LEGACY and EXHAUSTIVE

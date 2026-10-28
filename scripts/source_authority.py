@@ -43,6 +43,9 @@ CURRENT_MUTABLE_CONSTANTS = frozenset(
         "COMMON_RUFF_PATHS",
         "READONLY_ADMISSION_TESTS",
         "READONLY_ADMISSION_RUFF",
+        "PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS",
+        "PREPUBLICATION_INFRASTRUCTURE_PATHS",
+        "PREPUBLICATION_INFRASTRUCTURE_TEST_PREFIXES",
         "REVIEWED_SKIPPED_CERTIFICATION_JOB",
     }
 )
@@ -68,6 +71,8 @@ def current_owner(relative: str) -> str | None:
             "ast_matches",
             "runner_tree",
             "_source_pytest_basetemp",
+            "_prepublication_admission_tests",
+            "_prepublication_requires_infrastructure_coherence",
             "ACTIVE_CI_CHECKPOINTS",
         }
     ):
@@ -557,6 +562,7 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
     historical_roots = (
         repo_root / "tests/review_paper",
         repo_root / "tests/strategies",
+        repo_root / "tests/experiments",
     )
     paths = [
         path
@@ -578,7 +584,9 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
         aliases = _module_aliases(tree)
 
         def analyze(scope: ast.AST, *, aliases=aliases, relative=relative) -> None:
-            strategy_scope = relative.startswith("tests/strategies/")
+            inventory_scope = relative.startswith(
+                ("tests/strategies/", "tests/experiments/")
+            )
             path_names: set[str] = set()
             source_names: set[str] = set()
             ast_names: set[str] = set()
@@ -586,7 +594,7 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
             while changed:
                 changed = False
                 for item in ast.walk(scope):
-                    if strategy_scope and isinstance(
+                    if inventory_scope and isinstance(
                         item, (ast.For, ast.comprehension)
                     ):
                         targets = _target_names(item.target)
@@ -612,7 +620,7 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
                     targets = _assignment_targets(item)
                     if not targets:
                         continue
-                    if strategy_scope and _current_inventory_value(
+                    if inventory_scope and _current_inventory_value(
                         value, aliases, source_names
                     ):
                         for target in targets:
@@ -652,7 +660,7 @@ def _historical_test_ownership_failures(repo_root: Path) -> tuple[str, ...]:
                     if authority_api(node):
                         return False
                     if (
-                        strategy_scope
+                        inventory_scope
                         and isinstance(node.func, ast.Name)
                         and node.func.id == "len"
                     ):

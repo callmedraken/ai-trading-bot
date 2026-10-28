@@ -142,13 +142,14 @@ closeout or from B1 source acceptance.
 
 ## Product roadmap after 146-B
 
-    real SPY v1 open + sealed holdout snapshot
-      -> Architecture 145-B results/campaign bundle
-      -> Research Results GUI
-      -> large strategy/optimizer campaigns
-      -> candidate selection / walk-forward / sensitivity / stress qualification
-      -> separately reviewed tiny live-canary eligibility decision
-      -> production-host remediation only when deployment is again required
+    admitted OPEN SPY data
+      -> DEVELOPMENT + WALK_FORWARD research with deterministic execution stress
+      -> existing compact experiment report
+      -> existing Research Results GUI
+
+This is the working prototype path. FINAL_HOLDOUT evaluation, production-host
+remediation, paper soak, broker execution and live money are not prerequisites.
+They remain separate later decisions; LIVE remains NO-GO.
 
 Paper trading remains useful for integration/operational evidence, but research
 quality is driven by deterministic historical robustness evidence. No final
@@ -180,11 +181,13 @@ registries and successor OPEN-only verifier. No existing 145-A/146-A source
 changes. The original untracked implementation-review proposal is preserved as
 local discovery evidence and is not part of the intended source checkpoint.
 
-The source checkpoint is not accepted or integrated. No commit/push is implied
-by this pending-source record. After authorized publication, require complete
-clean-candidate FEATURE and PROSPECTIVE_DEVELOP admission, one ordinary push and
-terminal GitHub-owned FULL before ChatGPT exact-source acceptance. Do not run
-canonical FULL locally.
+B1-C1 was published but is not accepted or integrated. Its exact source
+identity and immutable push-triggered Checkpoint Source Gates #782 / run
+`40649744489` / attempt 1 evidence are recorded in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
+B1-C2 is a bounded corrective candidate; require focused verification and
+complete clean-candidate FEATURE and PROSPECTIVE_DEVELOP admission before its
+single ordinary push. Wait for terminal mapped GitHub CI, then ChatGPT exact-source
+review. Do not run canonical FULL locally or treat C2 as accepted/integrated.
 
 B2 has no native bindings or registered host dispatcher here. Before any real
 attempt, separately review its native source/host binding and exact published
@@ -193,13 +196,15 @@ its immutable evidence and freeze the source-owned custody admission before
 normal OPEN research. The current raw-material OPEN verifier must not receive
 mixed acquired pages. R3 remains consumed/parked; LIVE remains NO-GO.
 
-### Pending 146-B1-C1 publication
+### Pending 146-B1-C2 correction
 
-The initial unpublished B1 candidate a0d7050 failed two stale certification
-inventory/lane-test expectations in required local admission, with 867 tests
-passing, both authority contexts PASS and no push. That commit/evidence is
-preserved; the bounded C1 correction changes only current certification tests
-and this evidence record. The exact report/hash and inventory consequences
-are recorded once in the 146-B validation plan. Require complete admission on
-the new normal corrective commit before the first branch push and mapped FULL.
-No real acquisition/holdout/native effect has occurred.
+B1-C1's published canonical FULL failure is preserved as #782. The bounded C2
+candidate repairs the historical workflow reconstruction and separates frozen
+Architecture-143 pin/object checks from current mutable test bytes. The local
+admission path now adds a focused current/historical coherence bundle for the
+mutable workflow, runner, certification, source-authority and related test
+surfaces. Require full focused verification and general `ops.ps1 admit` before
+one ordinary corrective push; then wait for one terminal mapped CI result.
+The candidate grants no source acceptance or integration. No real B2 acquisition,
+credentials, holdout/custody, ACL, provider, host, paper, broker or live effect
+has occurred.

@@ -56,6 +56,14 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
         ownership.current_owner("scripts/current_source_authority.py")
         == "checkpoint_runner"
     )
+    for symbol in (
+        "PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS",
+        "PREPUBLICATION_INFRASTRUCTURE_PATHS",
+        "PREPUBLICATION_INFRASTRUCTURE_TEST_PREFIXES",
+        "_prepublication_admission_tests",
+        "_prepublication_requires_infrastructure_coherence",
+    ):
+        assert ownership.current_owner(symbol) == "checkpoint_runner"
     assert ownership.current_owner("AGENTS.md") == "workflow_coordination"
 
 
@@ -133,7 +141,10 @@ def test_historical_map_declarations_and_catalog_preserve_accepted_source():
         assert ownership.ast_matches(ROOT, name, ast.Pass(), digest)
 
 
-def test_historical_test_cannot_hash_current_mutable_runner_symbol(tmp_path):
+@pytest.mark.parametrize("relative_dir", ["tests/review_paper", "tests/experiments"])
+def test_historical_test_cannot_hash_current_mutable_runner_symbol(
+    tmp_path, relative_dir
+):
     for file in (
         "scripts/checkpoint_runner.py",
         "scripts/source_authority.py",
@@ -142,7 +153,7 @@ def test_historical_test_cannot_hash_current_mutable_runner_symbol(tmp_path):
         path = tmp_path / file
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text((ROOT / file).read_text(encoding="utf-8"), encoding="utf-8")
-    bad = tmp_path / "tests/review_paper/test_stale_current.py"
+    bad = tmp_path / relative_dir / "test_stale_current.py"
     bad.parent.mkdir(parents=True)
     bad.write_text(
         "import ast\n"
@@ -161,6 +172,38 @@ def test_historical_test_cannot_hash_current_mutable_runner_symbol(tmp_path):
     failures = ownership.ownership_failures(tmp_path)
     assert any(
         "historical test directly compares CURRENT_MUTABLE source" in failure
+        for failure in failures
+    )
+
+
+def test_historical_experiment_cannot_hash_current_inventory_pin_targets(tmp_path):
+    for file in (
+        "scripts/checkpoint_runner.py",
+        "scripts/source_authority.py",
+        "scripts/current_source_authority.py",
+    ):
+        path = tmp_path / file
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text((ROOT / file).read_text(encoding="utf-8"), encoding="utf-8")
+    bad = tmp_path / "tests/experiments/test_stale_current_inventory.py"
+    bad.parent.mkdir(parents=True)
+    bad.write_text(
+        "from pathlib import Path\n"
+        "from scripts import checkpoint_runner as runner\n"
+        "ROOT = Path(runner.__file__).resolve().parents[1]\n"
+        "def test_stale_inventory():\n"
+        "    for path, pin in "
+        "runner.ARCH143_CURRENT_INVENTORY_TEST_PIN_OVERRIDES.items():\n"
+        "        current = runner._arch143_current_inventory_test_pin(path, pin)\n"
+        "        current = runner._arch132_r3i_current_inventory_test_pin("
+        "path, current)\n"
+        "        assert runner._git_blob_sha1(ROOT / path) == current\n",
+        encoding="utf-8",
+    )
+    failures = ownership.ownership_failures(tmp_path)
+    assert any(
+        "historical test directly compares CURRENT_MUTABLE source" in failure
+        and "tests/experiments/test_stale_current_inventory.py" in failure
         for failure in failures
     )
 

@@ -420,6 +420,50 @@ ARCH132_R3N_ADMISSION_TESTS: Final = (
 )
 ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = (".",)
 
+# Current mutable infrastructure changes add the two bounded cross-era regressions
+# to the ordinary local admission bundle. Canonical FULL remains GitHub-owned.
+PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS: Final = (
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+    "tests/experiments/test_research_strategy_production_compatibility.py",
+)
+PREPUBLICATION_INFRASTRUCTURE_PATHS: Final = frozenset(
+    {
+        ".github/workflows/checkpoint-source-gates.yml",
+        "scripts/checkpoint_runner.py",
+        "scripts/run_test_certification.py",
+        "scripts/source_authority.py",
+        "scripts/current_source_authority.py",
+        "docs/AI_DEVELOPMENT_WORKFLOW.md",
+        *PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS,
+    }
+)
+PREPUBLICATION_INFRASTRUCTURE_TEST_PREFIXES: Final = (
+    "tests/runtime/checkpoint_runner/",
+    "tests/scripts/certification_runner/",
+)
+
+
+def _prepublication_requires_infrastructure_coherence(
+    changed_paths: Sequence[str],
+) -> bool:
+    return any(
+        path in PREPUBLICATION_INFRASTRUCTURE_PATHS
+        or any(
+            path.startswith(prefix)
+            for prefix in PREPUBLICATION_INFRASTRUCTURE_TEST_PREFIXES
+        )
+        for path in changed_paths
+    )
+
+
+def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, ...]:
+    if _prepublication_requires_infrastructure_coherence(changed_paths):
+        return (
+            *ARCH132_R3N_ADMISSION_TESTS,
+            *PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS,
+        )
+    return ARCH132_R3N_ADMISSION_TESTS
+
 
 def resolve_ci_checkpoint(
     specs: Mapping[str, CheckpointSpec],
@@ -24787,7 +24831,7 @@ def prepublication_admission(
     spec = CheckpointSpec(
         name=ARCH132_R3N_ADMISSION_NAME,
         description=("Architecture 132-R3N source-only pre-publication admission"),
-        tests=ARCH132_R3N_ADMISSION_TESTS,
+        tests=_prepublication_admission_tests(source.changed_paths),
         ruff_paths=ARCH132_R3N_ADMISSION_RUFF_PATHS,
         authority_check=_arch134_r3n_prepublication_authority_check,
     )

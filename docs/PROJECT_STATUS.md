@@ -60,16 +60,30 @@ Architecture 146-A is already in current develop ancestry. Its final C2 source i
 republish it; verify current mutable develop separately.
 
 The active milestone is Architecture 146-B: bounded historical-data acquisition
-and custody. B1 additive source is implemented on
-`feature/research-arch146-b-acquisition-custody-current`, pending exact-source
-review, publication and GitHub-owned FULL certification. Both real custody and
-historical-session admission registries remain empty. The source-only kernel
-has no native B2 bindings or preflight/execute dispatcher. B2 remains blocked on
-source acceptance, reviewed native bindings and independently frozen published
-historical-session authority. The accepted design boundary remains in force. This checkpoint reads no real
-credentials, call Alpaca, create the holdout root, mutate ACLs, acquire data,
-open holdout bytes, run Architecture 145-B, or touch production/paper/broker/live
-state.
+and custody. Published B1-C1 source is on
+`feature/research-arch146-b-acquisition-custody-current` at HEAD
+`2208b7e637671001b02deb56751dc7687a3cf36d`, TREE
+`0b37449859b0bad78704f5324cdb19a2aa3d3475`. GitHub Checkpoint Source Gates
+#782 / run `40649744489` / attempt 1 completed FAILURE and was classified
+`PREPUBLICATION_COVERAGE_DEFECT`; the exact failures and C2 correction are
+recorded once in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
+B1-C2 is the bounded corrective candidate. It requires complete local focused
+verification, clean-candidate admission and terminal mapped GitHub CI before
+ChatGPT exact-source acceptance; it is not accepted or integrated.
+
+Both real custody and historical-session admission registries remain empty.
+The source-only kernel has no native B2 bindings or preflight/execute dispatcher.
+B2 remains blocked on source acceptance, reviewed native bindings and an
+independently frozen published historical-session authority. The accepted
+146-B design boundary remains in force. No real credentials/provider call,
+holdout read, custody write, ACL mutation, host effect, paper/broker/live effect
+or Architecture-145 evaluation has occurred.
+
+The working research-prototype target is admitted OPEN SPY data through
+DEVELOPMENT and WALK_FORWARD research with deterministic execution stress, the
+existing compact report and existing Research Results GUI. FINAL_HOLDOUT,
+host remediation, paper soak, broker execution and live trading are not
+prototype prerequisites.
 
 ## Foreseen roadmap
 

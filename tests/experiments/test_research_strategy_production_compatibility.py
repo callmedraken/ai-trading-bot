@@ -8,6 +8,7 @@ from dataclasses import FrozenInstanceError, fields, replace
 from datetime import UTC, datetime
 from decimal import Decimal, localcontext
 from hashlib import sha256
+from pathlib import Path
 from uuid import UUID, uuid5
 
 import pytest
@@ -16,6 +17,7 @@ import trading_bot.experiments as exports
 import trading_bot.experiments.research_strategy_production_compatibility as subject
 import trading_bot.experiments.research_strategy_walk_forward as walk_forward
 from scripts import checkpoint_runner
+from scripts import source_authority as ownership
 from trading_bot.domain import Bar, Symbol
 from trading_bot.experiments.research_strategy_definition import (
     ResearchStrategyDefinition,
@@ -614,30 +616,19 @@ def test_arch143_inventory_overlay_exact_predecessor_and_blobs():
         sha256(json.dumps(pins, sort_keys=True).encode()).hexdigest()
         == checkpoint_runner.ARCH143_CURRENT_INVENTORY_TEST_PINS_SHA256
     )
-    from pathlib import Path
-
     root = Path(checkpoint_runner.__file__).resolve().parents[1]
+    historical_pins = ownership.historical_path_pins(root)
     for path, pin in pins.items():
+        assert (path, pin) in historical_pins
+        assert ownership.blob_matches(root, root / path, pin)
         assert (
             checkpoint_runner._arch143_current_inventory_test_pin(
                 path, predecessor[path]
             )
             == pin
         )
-        expected_current = checkpoint_runner._arch132_r3i_current_inventory_test_pin(
-            path, pin
-        )
-        expected_current = checkpoint_runner._arch144_current_inventory_test_pin(
-            path, expected_current
-        )
-        assert (
-            checkpoint_runner._arch144_current_inventory_test_pin(
-                path,
-                checkpoint_runner._arch132_r3i_current_inventory_test_pin(path, pin),
-            )
-            == expected_current
-        )
-        assert checkpoint_runner._git_blob_sha1(root / path) == expected_current
+        assert ownership.classify_path(path) is ownership.PinClass.CURRENT_MUTABLE
+        assert ownership.current_owner(path) is not None
     assert (
         checkpoint_runner._arch143_current_inventory_test_pin(
             "tests/unrelated.py", "a" * 40

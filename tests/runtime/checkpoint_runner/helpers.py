@@ -7,6 +7,29 @@ from pathlib import Path
 
 from scripts import checkpoint_runner as runner
 
+_ARCH132_R3M_FIRST_ACTIVE_CHECKPOINT = (
+    "arch134-fresh-successor-readonly-deployment-admission"
+)
+
+
+def _historical_workflow_view(workflow: str) -> str:
+    """Reconstruct the frozen R3M batch before current successor registrations."""
+    for name in (
+        runner.ARCH146B1_NAME,
+        runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
+        runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+    ):
+        registration = f"              {name} `\n"
+        if workflow.count(registration) != 1:
+            raise AssertionError(f"expected one current workflow registration: {name}")
+        workflow = workflow.replace(registration, "", 1)
+
+    current_first = f"              {runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME} `\n"
+    historical_first = f"              {_ARCH132_R3M_FIRST_ACTIVE_CHECKPOINT} `\n"
+    if workflow.count(current_first) != 1:
+        raise AssertionError("expected one R1 successor workflow registration")
+    return workflow.replace(current_first, historical_first, 1)
+
 
 def _spec() -> runner.CheckpointSpec:
     return runner.CheckpointSpec(

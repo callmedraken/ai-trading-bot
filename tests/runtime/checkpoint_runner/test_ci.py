@@ -15,29 +15,9 @@ from .helpers import (
     _EXPECTED_RETAINED_CHECKPOINTS,
     _clean_source,
     _event,
+    _historical_workflow_view,
     _outcome,
 )
-
-
-def _historical_workflow_view(workflow: str) -> str:
-    return (
-        workflow.replace("              " + runner.ARCH146B1_NAME + " `\n", "", 1)
-        .replace(
-            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n",
-            "",
-            1,
-        )
-        .replace(
-            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n",
-            "",
-            1,
-        )
-        .replace(
-            runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-            runner.ACTIVE_CI_CHECKPOINTS[0],
-            1,
-        )
-    )
 
 
 @pytest.mark.parametrize(
@@ -1655,6 +1635,60 @@ def test_r3n_prepublication_admission_contract():
     )
 
 
+def test_prepublication_admission_selects_infrastructure_coherence_tests(
+    monkeypatch, tmp_path
+):
+    base_tests = runner.ARCH132_R3N_ADMISSION_TESTS
+    coherence_tests = runner.PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS
+    expected = (*base_tests, *coherence_tests)
+    assert runner._prepublication_admission_tests(("src/example.py",)) == base_tests
+    assert (
+        runner._prepublication_admission_tests(("docs/PROJECT_STATUS.md",))
+        == base_tests
+    )
+
+    required_paths = (
+        ".github/workflows/checkpoint-source-gates.yml",
+        "scripts/checkpoint_runner.py",
+        "scripts/run_test_certification.py",
+        "scripts/source_authority.py",
+        "scripts/current_source_authority.py",
+        "tests/runtime/checkpoint_runner/test_source_authority.py",
+        "tests/runtime/checkpoint_runner/test_ci.py",
+        "tests/scripts/certification_runner/test_profiles.py",
+        "tests/scripts/certification_runner/test_lanes.py",
+        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+        "tests/experiments/test_research_strategy_production_compatibility.py",
+        "docs/AI_DEVELOPMENT_WORKFLOW.md",
+    )
+    for path in required_paths:
+        assert runner._prepublication_admission_tests((path,)) == expected
+
+    source = runner.PrepublicationSource(
+        candidate={"head": "a" * 40, "tree": "b" * 40},
+        base_head="c" * 40,
+        base_tree="d" * 40,
+        changed_paths=("scripts/checkpoint_runner.py",),
+        mode="FULL",
+        failures=(),
+    )
+    monkeypatch.setattr(runner, "_source_gate_phase", lambda: "all")
+    monkeypatch.setattr(runner, "_source_gate_shard", lambda: None)
+    monkeypatch.setattr(runner, "_prepublication_source", lambda _: source)
+    captured = {}
+
+    def capture(spec, **_kwargs):
+        captured["tests"] = spec.tests
+        return True, tmp_path / "admission.json"
+
+    monkeypatch.setattr(runner, "verify_checkpoint", capture)
+    passed, _ = runner.prepublication_admission(
+        repo_root=tmp_path, evidence_root=tmp_path / "evidence"
+    )
+    assert passed
+    assert captured["tests"] == expected
+
+
 def _r3n_admission_fixture(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
     context = {
@@ -2886,7 +2920,9 @@ def test_full_admission_executes_combined_checks_both_authorities_and_test_bundl
     assert contexts == list(runner.PublicationContext)
     report = json.loads(path.read_text())
     assert report["mode"] == "FULL"
-    assert report["executed_tests"] == list(runner.ARCH132_R3N_ADMISSION_TESTS)
+    assert report["executed_tests"] == list(
+        runner._prepublication_admission_tests(("scripts/checkpoint_runner.py",))
+    )
     assert report["authority_checked"] and report["identity_stable"]
 
 

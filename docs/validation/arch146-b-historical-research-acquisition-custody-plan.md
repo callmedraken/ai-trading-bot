@@ -1,6 +1,6 @@
 # Architecture 146-B — Acquisition/Custody Validation Plan
 
-Status: **B1 SOURCE IMPLEMENTED / FOCUSED VERIFICATION; REVIEW AND CI PENDING.**
+Status: **B1-C1 PUBLISHED / CI FAILED; B1-C2 CORRECTIVE REVIEW PENDING.**
 
 ## B1 required source verification
 
@@ -240,3 +240,34 @@ The required 122/49 baselines, certification implementation and lane policy do
 not change. Preserve the original unpublished commit and report; require a new
 normal corrective commit, complete admission on its exact clean source, and
 one first publication only after PASS. No amend/rebase/force or CI rerun.
+
+## 146-B1-C2 - prepublication coverage correction
+
+Published B1-C1 source was HEAD
+`2208b7e637671001b02deb56751dc7687a3cf36d`, TREE
+`0b37449859b0bad78704f5324cdb19a2aa3d3475`. Its push-triggered Checkpoint
+Source Gates #782 / run `40649744489` / attempt 1 is terminal FAILURE. Canonical
+FULL reported 14,697 cases: 14,689 passed, 6 skipped, 2 failed and 0 errors.
+The exact failures were:
+
+1. `tests.review_paper.test_arch134_readonly_deployment_admission_diagnostic::test_diagnostic_current_authority_does_not_rebind_historical_entrypoints`
+2. `tests.experiments.test_research_strategy_production_compatibility::test_arch143_inventory_overlay_exact_predecessor_and_blobs`
+
+Classification: `PREPUBLICATION_COVERAGE_DEFECT`. Preserve #782 unchanged; do
+not rerun or overwrite its evidence.
+
+The bounded C2 correction reconstructs the historical R3M workflow input after
+removing later current checkpoint registrations, including B1, while preserving
+the predecessor predicate. Architecture-143 pin semantics are verified against
+the immutable historical object catalog; current test bytes remain owned by the
+current test/authority path. A path-triggered local admission bundle runs both
+regression modules when the workflow, runner, certification, current-authority,
+or affected test surfaces change. Ordinary source-only changes retain the
+smaller existing bundle. C2 does not run canonical FULL locally and does not
+change frozen historical pin values.
+
+This corrective candidate requires focused tests, Ruff/diff checks, clean-candidate
+FEATURE and PROSPECTIVE_DEVELOP admission, then one ordinary push and terminal
+mapped GitHub CI before exact-source review. It grants no source acceptance or
+integration. No B2 credential, network, filesystem, custody, ACL, holdout, host,
+paper, broker or live effect occurred.

@@ -73,6 +73,32 @@ uncertainty/protected/unexpected-state/scope STOP. There is no C1/C2/C3 ceiling.
 An explicitly authorized unpublished replacement workflow ends at first push.
 Canonical mapped ROBINHOOD/FULL stays GitHub-owned and is not a local debug loop.
 
+For candidates that change the source-gate workflow, checkpoint runner,
+certification runner, current source-authority owner, their current-owner tests,
+or the two historical/current regression modules below, `ops.ps1 admit` adds a
+bounded coherence bundle before publication:
+
+- `tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py`
+- `tests/experiments/test_research_strategy_production_compatibility.py`
+
+The bundle checks that historical workflow reconstruction removes later current
+checkpoint registrations before applying the frozen predecessor predicate, and
+that frozen Architecture-143 pins are checked against historical authority while
+current test files remain under their current semantic owners. Ordinary
+source-only changes keep the smaller admission bundle. This path-triggered gate
+does not run canonical FULL or ROBINHOOD locally.
+
+Reserve an architecture number for a new authority, external-effect, security
+boundary, or immutable external contract. Adapters, CLIs, report writers, GUI
+views, prototype orchestration, and test maintenance stay under the already
+reviewed boundary they implement or validate.
+
+While GitHub CI or ChatGPT source review is pending, effect-free unpublished
+descendant work may be prepared locally from its exact recorded parent. Keep it
+unpublished until its base is accepted and integrated; preparation grants no
+source acceptance, merge, or protected-effect authority. Do not perform
+protected effects speculatively.
+
 The R3M/R3N narrative below preserves predecessor chronology; its exact overlays
 are immutable records, superseded as owners of current mutable infrastructure.
 

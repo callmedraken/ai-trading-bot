@@ -137,6 +137,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
         runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+        runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
         runner.ARCH146A_NAME,
         runner.ARCH134_FRESH_NAME,
         runner.ARCH134_ACL_NAME,
@@ -422,6 +423,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH
         if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH
+        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME:
+            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1426,6 +1429,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
                 runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
                 runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+                runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
                 "arch133-robinhood-supervised-release-installation-operator",
                 "arch133-robinhood-supervised-release-publication-recovery",
                 "arch133-robinhood-supervised-release-installation-reconciliation",
@@ -1481,6 +1485,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
             runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
             runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+            runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
         }:
             expected = (
                 "tests/runtime/checkpoint_runner/test_source_authority.py",
@@ -2048,3 +2053,19 @@ def test_source_scratch_collision_preserves_existing_directory(tmp_path, monkeyp
     with pytest.raises(RuntimeError, match="already exists"):
         runner._source_pytest_basetemp(tmp_path)
     assert marker.read_text(encoding="utf-8") == "preserve"
+
+
+def test_r3_dispatch_preserves_r2_fresh_evidence_gate_structurally():
+    tree = ast.parse(runner.Path(runner.__file__).read_text())
+    nodes = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+    old = ast.dump(nodes["_arch134_readonly_diagnostic_r2_preflight_checkpoint"])
+    new = ast.dump(nodes["_arch134_readonly_diagnostic_r3_preflight_checkpoint"])
+    expected = (
+        old.replace("diagnostic_r2", "diagnostic_r3")
+        .replace("DIAGNOSTIC_R2", "DIAGNOSTIC_R3")
+        .replace(
+            "Name(id='_readonly_preflight_checkpoint'",
+            "Name(id='_arch134_readonly_diagnostic_r2_preflight_checkpoint'",
+        )
+    )
+    assert new == expected

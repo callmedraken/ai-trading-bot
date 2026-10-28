@@ -406,12 +406,22 @@ def test_diagnostic_current_authority_does_not_rebind_historical_entrypoints():
     assert runner._arch134_readonly_diagnostic_authority_check(root) == ()
     assert runner._batch_workflow_is_reviewed(workflow)
     assert not runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
-    historical_workflow = workflow.replace(
-        "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1
-    ).replace(
-        runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-        runner.ACTIVE_CI_CHECKPOINTS[0],
-        1,
+    historical_workflow = (
+        workflow.replace(
+            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n",
+            "",
+            1,
+        )
+        .replace(
+            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n",
+            "",
+            1,
+        )
+        .replace(
+            runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+            runner.ACTIVE_CI_CHECKPOINTS[0],
+            1,
+        )
     )
     assert runner._ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(
         historical_workflow

@@ -74,6 +74,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
+                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
                 "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
                 "tests/review_paper/test_supervised_release_foundation.py",
                 "tests/review_paper/test_supervised_release_bundle.py",
@@ -105,7 +106,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
             )
         )
     )
-    assert len(selected) == 116
+    assert len(selected) == 117
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -170,6 +171,7 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
                 "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
+                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
                 "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
                 "tests/review_paper/test_supervised_release_foundation.py",
                 "tests/review_paper/test_supervised_release_bundle.py",
@@ -231,10 +233,10 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
     assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 207,
-        "robinhood": 116,
+        "full": 208,
+        "robinhood": 117,
         "legacy": 222,
-        "exhaustive": 429,
+        "exhaustive": 430,
     }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])

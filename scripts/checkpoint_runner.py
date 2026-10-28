@@ -259,7 +259,15 @@ ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH: Final = (
     "feature/robinhood-production-paper-fresh-successor-"
     "readonly-deployment-admission-diagnostic-r2-current"
 )
+ARCH134_READONLY_DIAGNOSTIC_R3_NAME: Final = (
+    "arch134-fresh-successor-readonly-deployment-admission-diagnostic-r3"
+)
+ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH: Final = (
+    "feature/robinhood-production-paper-fresh-successor-"
+    "readonly-deployment-admission-diagnostic-r3-current"
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
     *ACTIVE_CI_CHECKPOINTS[1:],
@@ -273,6 +281,7 @@ CI_CERTIFICATION_PROFILES: Final = {
     ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME: "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME: "robinhood",
+    ARCH134_READONLY_DIAGNOSTIC_R3_NAME: "robinhood",
     "arch146-a-historical-research-dataset-enforcement": "full",
     "arch134-f1r1-d1s4-fresh-successor-source": "robinhood",
     "arch134-f1r1-d1s4-r1-shared-namespace-acl-recovery": "robinhood",
@@ -26014,7 +26023,7 @@ def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
             or _arch146a_shared_blob_pin is not _readonly_shared_blob_pin
             or _checkpoint_specs is not _readonly_checkpoint_specs
             or preflight_checkpoint
-            is not _arch134_readonly_diagnostic_r2_preflight_checkpoint
+            is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
             or _arch146a_predecessor_active_inventory
             is not _readonly_predecessor_active_inventory
             or _deployment_candidate_predecessor_authority_check
@@ -26126,6 +26135,20 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
             _arch134_readonly_diagnostic_r2_preflight,
             None,
             ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH,
+            "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
+        ),
+        **values,
+    }
+    values = {
+        ARCH134_READONLY_DIAGNOSTIC_R3_NAME: CheckpointSpec(
+            ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
+            "R3 closed token-policy diagnostic discrimination; read-only",
+            ARCH134_READONLY_DIAGNOSTIC_R3_TESTS,
+            ARCH134_READONLY_DIAGNOSTIC_R3_RUFF,
+            _arch134_readonly_diagnostic_r3_authority_check,
+            _arch134_readonly_diagnostic_r3_preflight,
+            None,
+            ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH,
             "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD",
         ),
         **values,
@@ -26564,9 +26587,13 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         "              " + ACTIVE_CI_CHECKPOINTS[0] + " `\n"
     ):
         return False
-    translated = workflow.replace(
-        "              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1
-    ).replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
+    translated = (
+        workflow.replace(
+            "              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1
+        )
+        .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
+        .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
+    )
     return _batch_workflow_is_reviewed(translated)
 
 
@@ -26598,9 +26625,13 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
         "              " + ACTIVE_CI_CHECKPOINTS[0] + " `\n"
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
-    translated = workflow.replace(
-        "              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1
-    ).replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
+    translated = (
+        workflow.replace(
+            "              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1
+        )
+        .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
+        .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
+    )
     return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(translated)
 
 
@@ -26945,7 +26976,7 @@ def _arch134_readonly_diagnostic_r2_authority_check(repo_root: Path) -> tuple[st
         != spec.name
         or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
         or preflight_checkpoint
-        is not _arch134_readonly_diagnostic_r2_preflight_checkpoint
+        is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
     ):
         failures.append("Diagnostic R2 registration drift")
     for relative, pin in ARCH134_READONLY_DIAGNOSTIC_R2_SOURCE_PINS.items():
@@ -27015,6 +27046,125 @@ def _arch134_readonly_diagnostic_r2_preflight_checkpoint(
 
 
 preflight_checkpoint = _arch134_readonly_diagnostic_r2_preflight_checkpoint
+
+
+ARCH134_READONLY_DIAGNOSTIC_R3_TESTS: Final = tuple(
+    dict.fromkeys(
+        (
+            *ARCH134_READONLY_DIAGNOSTIC_R2_TESTS,
+            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
+        )
+    )
+)
+ARCH134_READONLY_DIAGNOSTIC_R3_RUFF: Final = (
+    *ARCH134_READONLY_DIAGNOSTIC_R2_RUFF,
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r3.py",
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r3_host.py",
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
+)
+ARCH134_READONLY_DIAGNOSTIC_R3_SOURCE_PINS: Final = {
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r3.py": (
+        "fa8fdf6a15c976ce0e8537e2fe07c1c3d0d36399"
+    ),
+    "src/trading_bot/supervised_release/deployment_admission_diagnostic_r3_host.py": (
+        "4d269ec124a0da2995c8e57842bbf6d10a35ac81"
+    ),
+}
+ARCH134_READONLY_DIAGNOSTIC_R3_DISPATCH_PINS: Final = {
+    "_arch134_readonly_diagnostic_r3_preflight": (
+        "a831c8f6159650ba85d9765f04a4734de7cb54422f3176c7c9eafc6f6c67cbcf"
+    ),
+    "_arch134_readonly_diagnostic_r3_preflight_checkpoint": (
+        "cec72cb311a9ad5ac1a05cefcebb16161e41c0da89fb3c3669113a7d5de315c9"
+    ),
+}
+
+
+def _arch134_readonly_diagnostic_r3_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Compose unchanged R2 authority with exact R3 security source and dispatch."""
+    failures = list(_arch134_readonly_diagnostic_r2_authority_check(repo_root))
+    spec = _checkpoint_specs()[ARCH134_READONLY_DIAGNOSTIC_R3_NAME]
+    if (
+        spec.remote_branch != ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH
+        or spec.preflight is not _arch134_readonly_diagnostic_r3_preflight
+        or spec.execute is not None
+        or spec.tests != ARCH134_READONLY_DIAGNOSTIC_R3_TESTS
+        or spec.ruff_paths != ARCH134_READONLY_DIAGNOSTIC_R3_RUFF
+        or spec.remote_head_env != "AI_TRADING_BOT_ARCH134_ADMISSION_HEAD"
+        or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
+        != spec.name
+        or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
+        or preflight_checkpoint
+        is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
+    ):
+        failures.append("Diagnostic R3 registration drift")
+    for relative, pin in ARCH134_READONLY_DIAGNOSTIC_R3_SOURCE_PINS.items():
+        if not _authority_blob_matches(repo_root, repo_root / relative, pin):
+            failures.append("Diagnostic R3 security source drift: " + relative)
+    functions = _top_level_functions(
+        ast.parse(
+            (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+        )
+    )
+    for name, pin in ARCH134_READONLY_DIAGNOSTIC_R3_DISPATCH_PINS.items():
+        if not _authority_ast_matches(repo_root, name, functions[name], pin):
+            failures.append("Diagnostic R3 dispatch drift: " + name)
+    return tuple(sorted(set(failures)))
+
+
+def _arch134_readonly_diagnostic_r3_preflight() -> dict[str, object]:
+    from trading_bot.supervised_release.deployment_admission_diagnostic_r3_host import (
+        preflight,
+    )
+
+    return preflight()
+
+
+def _arch134_readonly_diagnostic_r3_preflight_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    if spec.name != ARCH134_READONLY_DIAGNOSTIC_R3_NAME:
+        return _arch134_readonly_diagnostic_r2_preflight_checkpoint(
+            spec, repo_root=repo_root, evidence_root=evidence_root
+        )
+    if spec.name == ARCH134_READONLY_DIAGNOSTIC_R3_NAME:
+        from trading_bot.supervised_release.deployment_admission_source import (
+            require_checkout_path,
+        )
+
+        authority = _arch134_readonly_diagnostic_r3_authority_check
+        if spec != _checkpoint_specs()[spec.name] or authority(repo_root):
+            raise RuntimeError("Read-only admission exact source/registration rejected")
+        # Evidence is deliberately limited to a unique operator-selected external
+        # development evidence path. Reject aliases before resolving/traversing.
+        if (
+            not evidence_root.is_absolute()
+            or ".." in evidence_root.parts
+            or any(part.casefold() == "aitradingbot" for part in evidence_root.parts)
+            or repo_root == evidence_root
+            or repo_root in evidence_root.parents
+        ):
+            raise RuntimeError("Read-only admission external evidence root required")
+        for ancestor in (*reversed(evidence_root.parents), evidence_root):
+            try:
+                fact = ancestor.lstat()
+            except FileNotFoundError:
+                break
+            if (
+                stat.S_ISLNK(fact.st_mode)
+                or getattr(fact, "st_file_attributes", 0)
+                & stat.FILE_ATTRIBUTE_REPARSE_POINT
+            ):
+                raise RuntimeError("Read-only admission evidence alias rejected")
+            require_checkout_path(ancestor)
+            if ancestor == evidence_root:
+                raise RuntimeError("Read-only admission fresh evidence root required")
+    return _PRE_READONLY_PREFLIGHT(
+        spec, repo_root=repo_root, evidence_root=evidence_root
+    )
+
+
+preflight_checkpoint = _arch134_readonly_diagnostic_r3_preflight_checkpoint
 
 
 def execute_checkpoint(

@@ -20,12 +20,22 @@ from .helpers import (
 
 
 def _historical_workflow_view(workflow: str) -> str:
-    return workflow.replace(
-        "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1
-    ).replace(
-        runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-        runner.ACTIVE_CI_CHECKPOINTS[0],
-        1,
+    return (
+        workflow.replace(
+            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n",
+            "",
+            1,
+        )
+        .replace(
+            "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n",
+            "",
+            1,
+        )
+        .replace(
+            runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+            runner.ACTIVE_CI_CHECKPOINTS[0],
+            1,
+        )
     )
 
 
@@ -741,6 +751,7 @@ def test_ci_certification_profile_mapping_is_explicit_and_bounded():
         runner.ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
         runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME: "robinhood",
         runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME: "robinhood",
+        runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME: "robinhood",
         runner.ARCH146A_NAME: "full",
         runner.ARCH134_FRESH_NAME: "robinhood",
         runner.ARCH134_ACL_NAME: "robinhood",

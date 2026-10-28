@@ -92,6 +92,7 @@ def current_owner(relative: str) -> str | None:
         "scripts/checkpoint_runner.py",
         "scripts/source_authority.py",
         "scripts/current_source_authority.py",
+        "scripts/distributed_full.py",
     }:
         return "checkpoint_runner"
     if relative in {"scripts/run_test_certification.py", "pyproject.toml"}:

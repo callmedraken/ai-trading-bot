@@ -1,0 +1,284 @@
+"Current distributed FULL workflow and exact integration-reuse adapter."
+
+from collections.abc import Callable
+from copy import deepcopy
+from typing import Any
+
+FULL_JOB_NAMES = tuple(f"certification-full (broad-{index})" for index in range(1, 8))
+SKIPPED_FULL_JOB = "certification-full (broad-${{ matrix.lane }})"
+
+
+def full_matrix_job(predecessor: str) -> str:
+    "Derive isolated FULL execution from the shared canonical toolchain/steps."
+    job = predecessor.replace(
+        (
+            "    name: certification-tests (${{ needs.source-static."
+            "outputs.checkpoint }} / ${{ needs.source-static.outputs"
+            ".certification_profile }})"
+        ),
+        "    name: certification-full (broad-${{ matrix.lane }})",
+    ).replace(
+        "needs.source-static.outputs.certification_profile != ''",
+        "needs.source-static.outputs.certification_profile == 'full'",
+    )
+    job = job.replace(
+        "    steps:\n",
+        (
+            "    strategy:\n      fail-fast: false\n      matrix:\n    "
+            "    lane: [1, 2, 3, 4, 5, 6, 7]\n\n    steps:\n"
+        ),
+        1,
+    )
+    job = job.replace(
+        "          fetch-depth: 0",
+        "          fetch-depth: 0\n          ref: ${{ github.sha }}",
+        1,
+    )
+    job = job.replace(
+        (
+            "          CERT_PROFILE: ${{ needs.source-static.outputs"
+            ".certification_profile }}"
+        ),
+        (
+            "          CERT_PROFILE: full\n          FULL_LANE: ${{ m"
+            "atrix.lane }}\n          SOURCE_STATIC_RESULT: ${{ needs"
+            ".source-static.result }}\n          SOURCE_STATIC_HEAD: "
+            "${{ github.sha }}"
+        ),
+    )
+    job = job.replace(
+        "              --profile $env:CERT_PROFILE `",
+        (
+            "              --profile $env:CERT_PROFILE `\n           "
+            "   --lane $env:FULL_LANE `\n              --ci-source-st"
+            "atic `"
+        ),
+    )
+    job = job.replace(
+        "          if ($CurrentBranch -ne $env:EXPECTED_BRANCH) {",
+        '          if ($CurrentBranch -ne "") {',
+    )
+    job = job.replace(
+        "$CurrentBranch = (git branch --show-current).Trim()",
+        "$CurrentBranch = ([string](git branch --show-current)).Trim()",
+    )
+    job = job.replace(
+        (
+            "canonical-certification-${{ needs.source-static.outputs"
+            ".certification_profile }}"
+        ),
+        "canonical-certification-full-broad-${{ matrix.lane }}",
+    )
+    # Missing/partial evidence is never a successful hygiene assertion.
+    job = job.replace("            exit 0\n", "            exit 86\n")
+    job = job.replace("if-no-files-found: ignore", "if-no-files-found: error")
+    job = job.replace(
+        "          $Wall = [double]$Summary.wall_seconds",
+        (
+            "          if ($Summary.status -ne 'passed' -or $Summary"
+            ".executed_lanes.Count -ne 1 -or $Summary.executed_lanes"
+            "[0] -ne 'broad-${{ matrix.lane }}') { exit 86 }\n       "
+            "   $Wall = [double]$Summary.wall_seconds"
+        ),
+    )
+    return "  certification-full:\n" + job
+
+
+def full_aggregate(predecessor: str) -> str:
+    "Require the selected canonical route and skip the irrelevant route."
+    result = predecessor.replace(
+        "full-tests, certification-tests]",
+        "full-tests, certification-tests, certification-full]",
+    )
+    result = result.replace(
+        "          REUSE:",
+        (
+            "          FULL_CERT_RESULT: ${{ needs.certification-ful"
+            "l.result }}\n          REUSE:"
+        ),
+    )
+    result = result.replace(
+        '            test "$CERT_RESULT" = "skipped"',
+        (
+            '            test "$CERT_RESULT" = "skipped"\n           '
+            ' test "$FULL_CERT_RESULT" = "skipped"'
+        ),
+    )
+    result = result.replace(
+        '            test "$CERT_RESULT" = "success"',
+        (
+            '            if [ "$CERT_PROFILE" = "full" ]; then\n     '
+            '         test "$CERT_RESULT" = "skipped"\n              '
+            'test "$FULL_CERT_RESULT" = "success"\n            elif ['
+            ' "$CERT_PROFILE" = "robinhood" ]; then\n              te'
+            'st "$CERT_RESULT" = "success"\n              test "$FULL'
+            '_CERT_RESULT" = "skipped"\n            else\n            '
+            "  exit 1\n            fi"
+        ),
+    )
+    return result
+
+
+def predecessor_workflow(workflow: str) -> str:
+    "Validate the additive matrix then reconstruct input to the older owner."
+    if "  certification-full:\n" not in workflow:
+        return workflow
+    before, _, rest = workflow.partition("  certification-tests:\n")
+    robinhood, _, rest = rest.partition("  certification-full:\n")
+    matrix, _, aggregate = rest.partition("  source-gates:\n")
+    old = robinhood.replace(
+        "needs.source-static.outputs.certification_profile == 'robinhood'",
+        "needs.source-static.outputs.certification_profile != ''",
+    )
+    # Reconstruct the aggregate by reversing only the exact additive changes.
+    original = "  source-gates:\n" + aggregate
+    original = original.replace(
+        "full-tests, certification-tests, certification-full]",
+        "full-tests, certification-tests]",
+    )
+    original = original.replace(
+        ("          FULL_CERT_RESULT: ${{ needs.certification-full.result }}\n"), ""
+    )
+    original = original.replace(
+        (
+            '            test "$CERT_RESULT" = "skipped"\n           '
+            ' test "$FULL_CERT_RESULT" = "skipped"'
+        ),
+        '            test "$CERT_RESULT" = "skipped"',
+    )
+    start = original.find('            if [ "$CERT_PROFILE" = "full" ]; then\n')
+    if start >= 0:
+        end = original.find("            fi\n", start)
+        original = (
+            original[:start]
+            + '            test "$CERT_RESULT" = "success"\n'
+            + original[end + len("            fi\n") :]
+        )
+    if "  certification-full:\n" + matrix != full_matrix_job(
+        old
+    ) or "  source-gates:\n" + aggregate != full_aggregate(original):
+        raise ValueError("Distributed FULL topology drift")
+    return before + "  certification-tests:\n" + old + original
+
+
+def find_reusable(predecessor: Callable, specs: Any, **kwargs: Any) -> dict:
+    "Prove all seven jobs before applying the unchanged run/repository proof."
+    lookup = kwargs["lookup"]
+    originals = {}
+    runs = {}
+
+    def adapted(path: str) -> object:
+        value = lookup(path)
+        if not path.endswith("/jobs?per_page=100"):
+            if type(value) is dict and "head_branch" in value and "id" in value:
+                runs[value["id"]] = value
+            return value
+        if type(value) is not dict or type(value.get("jobs")) is not list:
+            raise ValueError("Malformed job page")
+        jobs = value["jobs"]
+        if value.get("total_count") != len(jobs) or len(jobs) > 100:
+            raise ValueError("Incomplete job page")
+        names = [job["name"] for job in jobs]
+        if len(set(names)) != len(names):
+            raise ValueError("Duplicate job identity")
+        canonical = [
+            job for job in jobs if job["name"].startswith("certification-full")
+        ]
+        if not canonical:
+            # Historical ROBINHOOD/broad evidence remains valid; old FULL cannot
+            # prove current distributed FULL execution.
+            if any(
+                name.startswith("certification-tests (") and name.endswith(" / full)")
+                for name in names
+            ):
+                raise ValueError("Missing distributed FULL jobs")
+            return value
+        normalized = [deepcopy(job) for job in jobs if job not in canonical]
+        if set(job["name"] for job in canonical) == set(FULL_JOB_NAMES):
+            skipped = [
+                job
+                for job in normalized
+                if job["name"].startswith("certification-tests (")
+            ]
+            if (
+                len(skipped) != 1
+                or skipped[0]["conclusion"] != "skipped"
+                or skipped[0]["status"] != "completed"
+                or skipped[0].get("steps") != []
+            ):
+                raise ValueError("Irrelevant canonical route was not skipped")
+            binding = skipped[0]
+            from scripts.checkpoint_runner import (
+                REVIEWED_SKIPPED_CERTIFICATION_JOB,
+                resolve_ci_certification_profile,
+                resolve_ci_checkpoint,
+            )
+
+            run = runs[binding["run_id"]]
+            checkpoint = resolve_ci_checkpoint(specs, run["head_branch"], "push")
+            expected = f"certification-tests ({checkpoint} / full)"
+            if resolve_ci_certification_profile(checkpoint) != "full" or binding[
+                "name"
+            ] not in {expected, REVIEWED_SKIPPED_CERTIFICATION_JOB}:
+                raise ValueError("Wrong canonical profile")
+            ids = [job.get("id") for job in canonical]
+            if len(set(ids)) != 7 or any(type(value) is not int for value in ids):
+                raise ValueError("FULL lanes require seven distinct job IDs")
+            for job in canonical:
+                if not (
+                    job["status"] == "completed"
+                    and job["conclusion"] == "success"
+                    and job["run_attempt"] == 1
+                    and all(
+                        job[key] == binding[key]
+                        for key in ("run_id", "run_attempt", "head_sha")
+                    )
+                ):
+                    raise ValueError("Incomplete FULL lane success")
+                steps = job["steps"]
+                step_map = {step["name"]: step for step in steps}
+                if len(step_map) != len(steps) or not all(
+                    step_map.get(name, {}).get("status") == "completed"
+                    and step_map[name].get("conclusion") == "success"
+                    for name in (
+                        "Run canonical certification profile",
+                        "Enforce canonical certification hygiene budget",
+                    )
+                ):
+                    raise ValueError("Missing FULL functional/hygiene success")
+            combined = deepcopy(canonical[0])
+            combined["name"] = expected
+            normalized.remove(binding)
+            normalized.append(combined)
+        elif len(canonical) == 1 and canonical[0]["name"] == SKIPPED_FULL_JOB:
+            job = canonical[0]
+            if (
+                job["status"] != "completed"
+                or job["conclusion"] != "skipped"
+                or job.get("steps") not in (None, [])
+            ):
+                raise ValueError("Unexpected distributed FULL execution")
+            if any(name.endswith(" / full)") for name in names):
+                raise ValueError("Skipped required FULL lanes")
+            # Bind the skipped matrix to the same original run as every other job.
+            if not all(
+                job[key] == normalized[0][key]
+                for key in ("run_id", "run_attempt", "head_sha")
+            ):
+                raise ValueError("Skipped matrix provenance drift")
+        else:
+            raise ValueError("Missing, malformed or extra FULL lane identity")
+        originals[path] = jobs
+        return {**value, "jobs": normalized, "total_count": len(normalized)}
+
+    result = predecessor(specs, **{**kwargs, "lookup": adapted})
+    if result.get("reuse"):
+        path = (
+            f"repos/{result['repository']}/actions/runs/{result['run_id']}"
+            "/attempts/1/jobs?per_page=100"
+        )
+        if path in originals:
+            result["jobs"] = originals[path]
+            if result.get("profile") == "full":
+                result["full_lane_jobs"] = list(FULL_JOB_NAMES)
+    return result

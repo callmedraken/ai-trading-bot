@@ -22,15 +22,16 @@ Worktree non-regression is now explicit: no Trading Bot auxiliary worktree may
 be created outside `F:\\AI\\worktrees\\...`. A tool-managed C:-drive
 worktree is a workflow regression even if it is clean and unused.
 
-## Pending feature checkpoint — Architecture 146-B1-C4
+## Pending feature checkpoint — Architecture 146-B1-C5
 
-B1-C3 is functionally green but certification/source acceptance remains blocked
-by #784's FULL timing ceiling. The authorized C4 candidate refreshes the current
-FULL timing authority from #784 and uses seven deterministic lanes under the
-unchanged 300-second ceiling. It awaits terminal mapped CI and ChatGPT exact-
-source review. B-E implementation remains gated on terminal-green B1; publication
-also requires base acceptance/integration. The [C4 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction)
-owns the evidence and STOP boundary. Acquisition/custody behavior is unchanged.
+B1-C4 passed all functional/static checks but #785 failed the unchanged
+300-second hygiene ceiling. C5 addresses shared-runner oversubscription by
+executing C4's unchanged seven FULL lanes in seven isolated Windows jobs.
+The #784 timing map remains placement authority. C5 requires terminal mapped CI,
+every isolated lane below 300 seconds, then ChatGPT exact-source acceptance.
+B-E remain gated on terminal-green B1 and exact acceptance/integration. The
+[C5 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution)
+owns preserved failure evidence and STOP conditions. Acquisition/custody is unchanged.
 
 ## Architecture 134 host track — parked, fail closed
 
@@ -77,13 +78,9 @@ and custody. Published B1-C1 source is on
 #782 / run `40649744489` / attempt 1 completed FAILURE and was classified
 `PREPUBLICATION_COVERAGE_DEFECT`; the exact failures and C2 correction are
 recorded once in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
-B1-C2's canonical tests passed, but #783 failed static-format/toolchain parity
-and exceeded the unchanged timing ceiling. B1-C3 is the bounded static parity
-correction, recorded in the validation plan. It requires complete local focused
-verification, clean-candidate admission and terminal mapped GitHub CI before
-ChatGPT exact-source acceptance; it is not accepted or integrated. A fresh wall
-at or above 300 seconds is STOP for timing review; B-E implementation stays gated
-on terminal-green C3 and publication on base acceptance/integration.
+C2/C3/C4 corrections and preserved #783/#784/#785 failures are recorded in the
+validation plan. C5 above is the current publication boundary; earlier functional
+passes confer no source acceptance or integration.
 
 Both real custody and historical-session admission registries remain empty.
 The source-only kernel has no native B2 bindings or preflight/execute dispatcher.

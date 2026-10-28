@@ -14,6 +14,9 @@ _ARCH132_R3M_FIRST_ACTIVE_CHECKPOINT = (
 
 def _historical_workflow_view(workflow: str) -> str:
     """Reconstruct the frozen R3M batch before current successor registrations."""
+    from scripts.distributed_full import predecessor_workflow
+
+    workflow = predecessor_workflow(workflow)
     for name in (
         runner.ARCH146B1_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,

@@ -461,7 +461,8 @@ def test_ci_workflow_fast_route_full_fallback_and_slim_artifacts():
     assert "resolve_ci_checkpoint(" in workflow
     assert (
         "  source-gates:\n"
-        "    needs: [source-static, active-tests, full-tests, certification-tests]\n"
+        "    needs: [source-static, active-tests, full-tests, certification-tests, "
+        "certification-full]\n"
         "    if: always()\n" in workflow
     )
     assert "resolve_ci_certification_profile(" in workflow
@@ -495,8 +496,11 @@ def test_ci_workflow_fast_route_full_fallback_and_slim_artifacts():
     ],
 )
 def test_batch_workflow_authority_rejects_incomplete_or_ambiguous_invocation(mutation):
+    from scripts.distributed_full import predecessor_workflow
+
     repo = Path(runner.__file__).resolve().parent.parent
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    workflow = predecessor_workflow(workflow)
     if mutation == "duplicate":
         workflow += "\nverify-batch @Checkpoints\n"
     elif mutation == "comment":
@@ -720,8 +724,11 @@ def test_installation_checkpoint_is_in_exact_ci_batch_and_has_no_effect_dispatch
     ],
 )
 def test_broad_push_policy_mutations_fail_closed(old, new):
+    from scripts.distributed_full import predecessor_workflow
+
     repo = Path(runner.__file__).resolve().parents[1]
     workflow = (repo / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    workflow = predecessor_workflow(workflow)
     assert workflow.count(old) == 1
     assert not runner._batch_workflow_is_reviewed(workflow.replace(old, new, 1))
 
@@ -1326,7 +1333,7 @@ def _real_738_reuse_fixture():
 
 def test_r3n_real_738_mapped_robinhood_metadata_is_reusable():
     args, _, _, jobs, _, _ = _real_738_reuse_fixture()
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is True
     assert result["reason"] == "exact_feature_certification"
     assert result["profile"] == "robinhood"
@@ -1433,7 +1440,7 @@ def test_r3n_real_738_mapped_metadata_mutations_fallback(mutation):
         responses[runs_path]["total_count"] = 2
     else:
         responses[runs_path] = {"workflow_runs": "truncated"}
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1529,7 +1536,7 @@ def test_r3n_c4_broad_jobs_match_reviewed_732_topology(registered):
     assert runner._batch_workflow_is_reviewed(_historical_workflow_view(workflow))
     assert workflow.count(f"    name: {certification}\n") == 1
     assert (
-        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+        runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)[
             "reuse"
         ]
         is True
@@ -1559,7 +1566,7 @@ def test_r3n_c4_skipped_certification_identity_is_exact(registered, mutation):
         certification["conclusion"] = mutation
     responses[jobs_path]["total_count"] = len(jobs)
     assert (
-        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+        runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)[
             "reuse"
         ]
         is False
@@ -1579,7 +1586,7 @@ def test_r3n_c4_coherent_broad_attempt_two_is_not_reusable(registered):
         jobs_path
     )
     assert (
-        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+        runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)[
             "reuse"
         ]
         is False
@@ -1658,8 +1665,8 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
         "tests/runtime/checkpoint_runner/test_ci.py",
         "tests/scripts/certification_runner/test_profiles.py",
         "tests/scripts/certification_runner/test_lanes.py",
-        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
-        "tests/experiments/test_research_strategy_production_compatibility.py",
+        ("tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py"),
+        ("tests/experiments/test_research_strategy_production_compatibility.py"),
         "docs/AI_DEVELOPMENT_WORKFLOW.md",
     )
     for path in required_paths:
@@ -1843,7 +1850,7 @@ def test_r3n_general_prepublication_admission_rejects_invalid_state(
 @pytest.mark.parametrize("profile", ["full", "robinhood"])
 def test_r3m_exact_feature_certification_reused(profile):
     args, _, _, _, _, _ = _reuse_fixture(profile)
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is True
     assert result["head"] == args["head"] and result["tree"] == args["tree"]
     assert result["run_id"] == 100 and result["run_attempt"] == 1
@@ -1852,7 +1859,7 @@ def test_r3m_exact_feature_certification_reused(profile):
 
 def test_r3n_exact_feature_broad_source_gate_reused():
     args, _, _, _, _, _ = _broad_reuse_fixture()
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is True
     assert result["reason"] == "exact_feature_broad_source_gate"
     assert result["reuse_kind"] == "broad_source_gate"
@@ -1863,7 +1870,7 @@ def test_r3n_exact_feature_broad_source_gate_reused():
 
 def test_r3n_registered_active_broad_source_gate_reused():
     args, _, _, _, _, _ = _broad_reuse_fixture(registered=True)
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is True
     assert result["reason"] == "exact_feature_broad_source_gate"
     assert result["reuse_kind"] == "broad_source_gate"
@@ -1883,7 +1890,7 @@ def test_r3n_attempt_two_is_never_reusable(route):
     args, responses, run, _, _, _ = _r3n_route_fixture(route)
     run["run_attempt"] = 2
     responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["run_attempt"] = 2
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1901,7 +1908,7 @@ def test_r3n_broad_shard_cardinality_is_exact(route, mutation):
     else:
         jobs.append(deepcopy(shard))
     responses[jobs_path]["total_count"] = len(jobs)
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1911,7 +1918,7 @@ def test_r3n_broad_failed_shard_is_not_reusable(route):
     next(job for job in jobs if job["name"] == "full-tests (2)")["conclusion"] = (
         "failure"
     )
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1921,28 +1928,28 @@ def test_r3n_broad_failed_hygiene_is_not_reusable(route):
     next(job for job in jobs if job["name"] == "full-tests (1)")["steps"][-1][
         "conclusion"
     ] = "failure"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
 def test_r3n_registered_active_failure_is_not_reusable():
     args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=True)
     next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "failure"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
 def test_r3n_registered_active_skip_is_not_reusable():
     args, _, _, jobs, _, _ = _broad_reuse_fixture(registered=True)
     next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "skipped"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
 def test_r3n_unregistered_active_run_is_not_reusable():
     args, _, _, jobs, _, _ = _broad_reuse_fixture()
     next(job for job in jobs if job["name"] == "active-tests")["conclusion"] = "success"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1952,7 +1959,7 @@ def test_r3n_broad_certification_run_is_not_reusable(route):
     next(
         job for job in jobs if job["name"] == runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
     )["conclusion"] = "success"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1974,7 +1981,7 @@ def test_r3n_broad_source_gate_topology_is_exact(mutation):
     else:
         jobs.append(deepcopy(jobs[2]))
         responses[jobs_path]["total_count"] = len(jobs)
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -1989,7 +1996,7 @@ def test_r3n_broad_source_gate_execution_contract_is_exact(mutation):
         jobs[1]["conclusion"] = "success"
     else:
         jobs[6]["conclusion"] = "success"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -2007,7 +2014,7 @@ def test_r3n_broad_source_gate_metadata_fail_closed(mutation):
         responses[runs_path] = {"workflow_runs": "bad"}
     else:
         responses[runs_path] = None
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -2157,9 +2164,12 @@ def test_r3m_ineligible_provenance_falls_back(mutation):
         ] = "c" * 40
     else:
         responses[
-            "repos/callmedraken/ai-trading-bot/actions/workflows/checkpoint-source-gates.yml"
+            (
+                "repos/callmedraken/ai-trading-bot/actions/workflows/che"
+                "ckpoint-source-gates.yml"
+            )
         ]["name"] = "Other workflow"
-    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    result = runner._PRE_DISTRIBUTED_FIND_REUSABLE(runner._checkpoint_specs(), **args)
     assert result["reuse"] is False
 
 
@@ -2184,7 +2194,7 @@ def test_r3m_other_routes_never_lookup_provenance(
 
 
 def _develop_reuse_context(tmp_path, monkeypatch):
-    args, responses, *_ = _reuse_fixture()
+    args, responses, *_ = _distributed_reuse_fixture()
     repo = "callmedraken/ai-trading-bot"
     env = {
         "GITHUB_EVENT_NAME": "push",
@@ -2552,7 +2562,8 @@ def test_r3m_terminal_aggregator_executes_exact_route_policy(
         "REUSE": reuse,
         "ACTIVE_RESULT": active,
         "FULL_RESULT": broad,
-        "CERT_RESULT": canonical,
+        "CERT_RESULT": "skipped" if profile == "full" else canonical,
+        "FULL_CERT_RESULT": canonical if profile == "full" else "skipped",
         "EVENT": event,
         "REF": ref,
     }
@@ -3063,3 +3074,235 @@ def test_full_admission_rejects_ruff_mismatch_before_verification(
     )
     with pytest.raises(RuntimeError, match=f"expected ruff 0.17.3; current {actual}"):
         runner.prepublication_admission(repo_root=root, evidence_root=tmp_path)
+
+
+def _distributed_reuse_fixture():
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, jobs_path = _reuse_fixture()
+    canonical = jobs[2]
+    lanes = []
+    for index in range(1, 8):
+        job = deepcopy(canonical)
+        job["id"] = 1000 + index
+        job["name"] = f"certification-full (broad-{index})"
+        lanes.append(job)
+    canonical["conclusion"] = "skipped"
+    canonical["steps"] = []
+    jobs.extend(lanes)
+    responses[jobs_path]["total_count"] = len(jobs)
+    return args, responses, run, jobs, runs_path, jobs_path
+
+
+def test_current_full_reuse_retains_all_seven_original_jobs():
+    args, _, _, jobs, _, _ = _distributed_reuse_fixture()
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["jobs"] == jobs
+    assert result["full_lane_jobs"] == [
+        f"certification-full (broad-{i})" for i in range(1, 8)
+    ]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing",
+        "duplicate",
+        "malformed",
+        "extra",
+        "failure",
+        "timeout",
+        "over_budget",
+        "missing_hygiene",
+        "missing_functional",
+        "attempt_two",
+        "job_attempt",
+        "job_sha",
+        "job_run",
+        "route_executed",
+        "wrong_profile",
+        "duplicate_id",
+        "missing_id",
+        "static_failed",
+        "active_failed",
+        "gate_failed",
+        "truncated",
+        "tree",
+        "branch",
+        "event",
+    ],
+)
+def test_current_full_reuse_rejects_incomplete_or_ambiguous_evidence(mutation):
+    from copy import deepcopy
+
+    args, responses, run, jobs, runs_path, jobs_path = _distributed_reuse_fixture()
+    lane = jobs[-1]
+    if mutation == "missing":
+        jobs.pop()
+    elif mutation == "duplicate":
+        jobs.append(deepcopy(lane))
+    elif mutation == "malformed":
+        lane["name"] = "certification-full (broad-07)"
+    elif mutation == "extra":
+        extra = deepcopy(lane)
+        extra["name"] = "certification-full (broad-8)"
+        jobs.append(extra)
+    elif mutation in ("failure", "timeout"):
+        lane["conclusion"] = "failure" if mutation == "failure" else "timed_out"
+    elif mutation == "over_budget":
+        lane["steps"][-1]["conclusion"] = "failure"
+    elif mutation in ("missing_hygiene", "missing_functional"):
+        lane["steps"].pop(-1 if mutation == "missing_hygiene" else 0)
+    elif mutation == "attempt_two":
+        run["run_attempt"] = responses[
+            "repos/callmedraken/ai-trading-bot/actions/runs/100"
+        ]["run_attempt"] = 2
+    elif mutation in ("job_attempt", "job_sha", "job_run"):
+        lane[
+            {"job_attempt": "run_attempt", "job_sha": "head_sha", "job_run": "run_id"}[
+                mutation
+            ]
+        ] = 2
+    elif mutation == "route_executed":
+        jobs[2]["conclusion"] = "success"
+    elif mutation == "wrong_profile":
+        jobs[2]["name"] = jobs[2]["name"].replace(" / full)", " / robinhood)")
+    elif mutation in ("static_failed", "active_failed", "gate_failed"):
+        jobs[{"static_failed": 0, "active_failed": 1, "gate_failed": 4}[mutation]][
+            "conclusion"
+        ] = "failure"
+    elif mutation == "tree":
+        responses[f"repos/callmedraken/ai-trading-bot/git/commits/{args['head']}"][
+            "tree"
+        ]["sha"] = "c" * 40
+    elif mutation == "branch":
+        run["head_branch"] = "feature/research-unknown"
+    elif mutation == "event":
+        run["event"] = "workflow_dispatch"
+    elif mutation == "duplicate_id":
+        lane["id"] = jobs[-2]["id"]
+    elif mutation == "missing_id":
+        del lane["id"]
+    responses[jobs_path]["total_count"] = 101 if mutation == "truncated" else len(jobs)
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is False
+    )
+
+
+def test_current_full_reuse_rejects_old_shared_runner_topology():
+    args, *_ = _reuse_fixture()
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is False
+    )
+
+
+def test_current_full_reuse_accepts_exact_literal_skipped_job_name():
+    args, _, _, jobs, _, _ = _distributed_reuse_fixture()
+    jobs[2]["name"] = runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["jobs"] == jobs
+
+
+def test_current_distributed_full_workflow_is_exact_and_isolated():
+    from scripts.distributed_full import predecessor_workflow
+
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert runner._arch134_current_batch_workflow_is_reviewed(workflow)
+    matrix = workflow.split("  certification-full:\n", 1)[1].split(
+        "  source-gates:\n", 1
+    )[0]
+    assert "    needs: source-static\n" in matrix
+    assert "    runs-on: windows-latest\n" in matrix
+    assert "      fail-fast: false\n" in matrix
+    assert "        lane: [1, 2, 3, 4, 5, 6, 7]\n" in matrix
+    assert "          ref: ${{ github.sha }}" in matrix
+    assert "              --lane $env:FULL_LANE `" in matrix
+    artifact = "canonical-certification-full-broad-${{ matrix.lane }}"
+    assert matrix.count("name: " + artifact) == 1
+    assert (
+        len({artifact.replace("${{ matrix.lane }}", str(i)) for i in range(1, 8)}) == 7
+    )
+    predecessor = predecessor_workflow(workflow)
+    assert "certification-full" not in predecessor
+    assert not runner._arch134_current_batch_workflow_is_reviewed(predecessor)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("lane: [1, 2, 3, 4, 5, 6, 7]", "lane: [1, 2, 3, 4, 5, 6, 6]"),
+        ("fail-fast: false", "fail-fast: true"),
+        ("--lane $env:FULL_LANE", "--lane 1"),
+        ("--ci-source-static", "--plan"),
+        (
+            "name: canonical-certification-full-broad-${{ matrix.lane }}",
+            "name: canonical-certification-full",
+        ),
+        (
+            "SOURCE_STATIC_RESULT: ${{ needs.source-static.result }}",
+            "SOURCE_STATIC_RESULT: success",
+        ),
+        ('test "$FULL_CERT_RESULT" = "success"', "true"),
+    ],
+)
+def test_current_distributed_workflow_mutations_fail_closed(old, new):
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert old in workflow
+    assert not runner._arch134_current_batch_workflow_is_reviewed(
+        workflow.replace(old, new)
+    )
+
+
+@pytest.mark.parametrize(
+    "matrix_result,passed",
+    [
+        ("success", True),
+        ("failure", False),
+        ("cancelled", False),
+        ("timed_out", False),
+        ("skipped", False),
+    ],
+)
+def test_actual_full_aggregate_requires_every_matrix_lane(matrix_result, passed):
+    import os
+    import shutil
+    import textwrap
+
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    script = textwrap.dedent(
+        workflow.split("  source-gates:\n", 1)[1].split("        run: |\n", 1)[1]
+    )
+    bash = (
+        str(Path(shutil.which("git")).resolve().parents[1] / "bin/bash.exe")
+        if os.name == "nt"
+        else shutil.which("bash")
+    )
+    env = {
+        **os.environ,
+        "STATIC_RESULT": "success",
+        "MODE": "FULL",
+        "ROUTE": "ACTIVE",
+        "CERT_PROFILE": "full",
+        "REUSE": "false",
+        "ACTIVE_RESULT": "success",
+        "FULL_RESULT": "skipped",
+        "CERT_RESULT": "skipped",
+        "FULL_CERT_RESULT": matrix_result,
+        "EVENT": "push",
+        "REF": "refs/heads/feature/research-example",
+    }
+    result = subprocess.run(
+        (bash, "-c", script), env=env, capture_output=True, text=True
+    )
+    assert (result.returncode == 0) == passed, result.stderr

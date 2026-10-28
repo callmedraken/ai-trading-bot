@@ -900,3 +900,65 @@ def test_r3l_preserves_r4_product_and_predecessor_topology_contracts() -> None:
             and name not in intentionally_updated
         ):
             assert after_nodes[name] == node
+
+
+def test_distributed_selectors_cover_the_exact_c4_plan_once():
+    root = Path(runner.__file__).resolve().parents[1]
+    inventory = runner.select_inventory(runner.discover_inventory(root), "full")
+    lanes = runner.build_lanes(root, inventory, "full")
+    selections = [
+        runner.select_full_lane(inventory, lanes, "full", [str(i)]) for i in range(1, 8)
+    ]
+    assert [tuple(selected) for selected in selections] == [
+        (f"broad-{i}",) for i in range(1, 8)
+    ]
+    modules = [
+        module
+        for selected in selections
+        for lane in selected.values()
+        for module in lane
+    ]
+    assert sorted(modules) == sorted(inventory)
+    assert len(modules) == len(set(modules)) == 209
+
+
+@pytest.mark.parametrize(
+    "selection",
+    [
+        [],
+        [""],
+        ["0"],
+        ["8"],
+        ["01"],
+        ["-1"],
+        ["1.0"],
+        ["broad-1"],
+        ["1", "1"],
+        ["1", "2"],
+    ],
+)
+def test_distributed_selector_rejects_invalid_or_multiple_selection(selection):
+    with pytest.raises(runner.CertificationError, match="exactly one FULL"):
+        runner.select_full_lane((), {}, "full", selection)
+
+
+@pytest.mark.parametrize("mutation", ["missing", "duplicate", "empty", "extra"])
+def test_distributed_selector_rejects_incomplete_plan(mutation):
+    inventory = tuple(f"tests/a/test_{i}.py" for i in range(1, 8))
+    lanes = {f"broad-{i}": (inventory[i - 1],) for i in range(1, 8)}
+    if mutation == "missing":
+        lanes.pop("broad-7")
+    elif mutation == "duplicate":
+        lanes["broad-7"] = lanes["broad-1"]
+    elif mutation == "empty":
+        lanes["broad-7"] = ()
+    else:
+        lanes["broad-8"] = ("tests/a/test_8.py",)
+    with pytest.raises(runner.CertificationError):
+        runner.select_full_lane(inventory, lanes, "full", ["1"])
+
+
+@pytest.mark.parametrize("profile", ["robinhood", "legacy", "exhaustive"])
+def test_single_lane_is_full_only(profile):
+    with pytest.raises(runner.CertificationError):
+        runner.select_full_lane((), {}, profile, ["1"])

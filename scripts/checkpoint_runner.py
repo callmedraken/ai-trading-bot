@@ -441,6 +441,7 @@ PREPUBLICATION_INFRASTRUCTURE_PATHS: Final = frozenset(
         "scripts/run_test_certification.py",
         "scripts/source_authority.py",
         "scripts/current_source_authority.py",
+        "scripts/distributed_full.py",
         "docs/AI_DEVELOPMENT_WORKFLOW.md",
         *PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS,
     }
@@ -26646,6 +26647,14 @@ def _arch134_readonly_diagnostic_overlay(
 
 
 def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
+    from scripts.distributed_full import predecessor_workflow
+
+    if workflow.count("  certification-full:\n") != 1:
+        return False
+    try:
+        workflow = predecessor_workflow(workflow)
+    except ValueError:
+        return False
     triggers = (
         "name: Checkpoint Source Gates\n\n"
         "on:\n  push:\n    branches:\n"
@@ -26697,6 +26706,12 @@ _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED: Final = _batch_workflow_is_
 
 
 def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool:
+    from scripts.distributed_full import predecessor_workflow
+
+    try:
+        workflow = predecessor_workflow(workflow)
+    except ValueError:
+        return False
     active = tuple(
         name
         for name in CURRENT_ACTIVE_CI_CHECKPOINTS
@@ -27769,6 +27784,18 @@ def _arch146b1_authority_check(repo_root: Path) -> tuple[str, ...]:
                         "146-B1 cannot self-admit real custody/calendar authority"
                     )
     return tuple(failures)
+
+
+_PRE_DISTRIBUTED_FIND_REUSABLE = find_reusable_ci_certification
+
+
+def _distributed_find_reusable_ci_certification(specs, **kwargs):
+    from scripts.distributed_full import find_reusable
+
+    return find_reusable(_PRE_DISTRIBUTED_FIND_REUSABLE, specs, **kwargs)
+
+
+find_reusable_ci_certification = _distributed_find_reusable_ci_certification
 
 
 if __name__ == "__main__":

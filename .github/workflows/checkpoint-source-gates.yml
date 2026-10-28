@@ -370,7 +370,7 @@ jobs:
   certification-tests:
     name: certification-tests (${{ needs.source-static.outputs.checkpoint }} / ${{ needs.source-static.outputs.certification_profile }})
     needs: source-static
-    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile != ''
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile == 'robinhood'
     runs-on: windows-latest
     timeout-minutes: 20
 
@@ -491,8 +491,144 @@ jobs:
             ${{ runner.temp }}/canonical-certification-evidence/**
           if-no-files-found: ignore
 
+  certification-full:
+    name: certification-full (broad-${{ matrix.lane }})
+    needs: source-static
+    if: needs.source-static.outputs.mode != 'DOCS_ONLY' && needs.source-static.outputs.certification_profile == 'full'
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [1, 2, 3, 4, 5, 6, 7]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install certification dependencies
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check `
+            "pytest>=8.0,<9.0" `
+            "ruff==0.17.3" `
+            "tzdata>=2024.1,<2027.0"
+
+      - name: Install FULL optimizer dependency
+        if: needs.source-static.outputs.certification_profile == 'full'
+        shell: powershell
+        run: |
+          python -m pip install --disable-pip-version-check "numpy==2.5.1" "scipy==1.18.0"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          python -m pip check
+          exit $LASTEXITCODE
+
+      - name: Run canonical certification profile
+        env:
+          CERT_PROFILE: full
+          FULL_LANE: ${{ matrix.lane }}
+          SOURCE_STATIC_RESULT: ${{ needs.source-static.result }}
+          SOURCE_STATIC_HEAD: ${{ github.sha }}
+          EXPECTED_HEAD: ${{ github.sha }}
+          EXPECTED_BRANCH: ${{ github.ref_name }}
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          if ($env:CERT_PROFILE -notin @('robinhood', 'full')) {
+            throw "Unsupported canonical certification profile: $env:CERT_PROFILE"
+          }
+
+          $FeatureSpec = "+refs/heads/$($env:EXPECTED_BRANCH):refs/remotes/origin/$($env:EXPECTED_BRANCH)"
+          git fetch --no-tags origin `
+            "+refs/heads/develop:refs/remotes/origin/develop" `
+            $FeatureSpec
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Failed to refresh exact certification refs'
+          }
+
+          $Head = (git rev-parse HEAD).Trim()
+          $Tree = (git show -s --format=%T HEAD).Trim()
+          $BaseHead = (git rev-parse origin/develop).Trim()
+          $FeatureRef = "origin/$env:EXPECTED_BRANCH"
+          $FeatureHead = (git rev-parse $FeatureRef).Trim()
+          $CurrentBranch = ([string](git branch --show-current)).Trim()
+
+          if ($Head -ne $env:EXPECTED_HEAD) {
+            throw "Certification checkout HEAD mismatch: $Head"
+          }
+          if ($FeatureHead -ne $Head) {
+            throw "Certification feature ref mismatch: $FeatureHead"
+          }
+          if ($CurrentBranch -ne "") {
+            throw "Certification branch mismatch: $CurrentBranch"
+          }
+
+          $TempRoot = Join-Path $env:RUNNER_TEMP 'canonical-certification-pytest'
+          $Evidence = Join-Path $env:RUNNER_TEMP 'canonical-certification-evidence'
+          if (Test-Path -LiteralPath $Evidence) {
+            throw "Certification evidence path already exists: $Evidence"
+          }
+
+          "AI_TRADING_BOT_CERTIFICATION_EVIDENCE=$Evidence" |
+            Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          & python -B .\scripts\run_test_certification.py `
+              --profile $env:CERT_PROFILE `
+              --lane $env:FULL_LANE `
+              --ci-source-static `
+              --root . `
+              --python (Get-Command python).Source `
+              --expected-head $Head `
+              --expected-tree $Tree `
+              --expected-base-head $BaseHead `
+              --expected-branch $env:EXPECTED_BRANCH `
+              --expected-feature-ref $FeatureRef `
+              --expected-feature-head $Head `
+              --temp-root $TempRoot `
+              --evidence-dir $Evidence
+          exit $LASTEXITCODE
+
+      - name: Enforce canonical certification hygiene budget
+        if: always()
+        shell: powershell
+        run: |
+          $Results = Join-Path $env:RUNNER_TEMP 'canonical-certification-evidence\results.json'
+          if (-not (Test-Path -LiteralPath $Results -PathType Leaf)) {
+            Write-Host 'Canonical certification results are absent; preserve the primary failure.'
+            exit 86
+          }
+          $Summary = Get-Content -LiteralPath $Results -Raw | ConvertFrom-Json
+          if ($Summary.status -ne 'passed' -or $Summary.executed_lanes.Count -ne 1 -or $Summary.executed_lanes[0] -ne 'broad-${{ matrix.lane }}') { exit 86 }
+          $Wall = [double]$Summary.wall_seconds
+          Write-Host "CANONICAL_CERTIFICATION_WALL_SECONDS=$Wall"
+          if ($Wall -ge 300) {
+            Write-Host "::error::Canonical certification exceeded the 300-second hygiene threshold ($Wall s). Run a test topology/hygiene audit before accepting this source."
+            exit 86
+          }
+
+      - name: Upload canonical certification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-certification-full-broad-${{ matrix.lane }}
+          path: |
+            ${{ runner.temp }}/canonical-certification-evidence/**
+          if-no-files-found: error
+
   source-gates:
-    needs: [source-static, active-tests, full-tests, certification-tests]
+    needs: [source-static, active-tests, full-tests, certification-tests, certification-full]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -505,6 +641,7 @@ jobs:
           ACTIVE_RESULT: ${{ needs.active-tests.result }}
           FULL_RESULT: ${{ needs.full-tests.result }}
           CERT_RESULT: ${{ needs.certification-tests.result }}
+          FULL_CERT_RESULT: ${{ needs.certification-full.result }}
           REUSE: ${{ needs.source-static.outputs.reuse_certification }}
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
@@ -519,6 +656,7 @@ jobs:
             test "$ACTIVE_RESULT" = "skipped"
             test "$FULL_RESULT" = "skipped"
             test "$CERT_RESULT" = "skipped"
+            test "$FULL_CERT_RESULT" = "skipped"
           elif [ "$REUSE" = "true" ]; then
             test "$EVENT" = "push"
             test "$REF" = "refs/heads/develop"
@@ -527,16 +665,27 @@ jobs:
             test "$ACTIVE_RESULT" = "skipped"
             test "$FULL_RESULT" = "skipped"
             test "$CERT_RESULT" = "skipped"
+            test "$FULL_CERT_RESULT" = "skipped"
           elif [ "$ROUTE" = "ACTIVE" ] && [ -n "$CERT_PROFILE" ]; then
             test "$ACTIVE_RESULT" = "success"
             test "$FULL_RESULT" = "skipped"
-            test "$CERT_RESULT" = "success"
+            if [ "$CERT_PROFILE" = "full" ]; then
+              test "$CERT_RESULT" = "skipped"
+              test "$FULL_CERT_RESULT" = "success"
+            elif [ "$CERT_PROFILE" = "robinhood" ]; then
+              test "$CERT_RESULT" = "success"
+              test "$FULL_CERT_RESULT" = "skipped"
+            else
+              exit 1
+            fi
           elif [ "$ROUTE" = "ACTIVE" ]; then
             test "$ACTIVE_RESULT" = "success"
             test "$FULL_RESULT" = "success"
             test "$CERT_RESULT" = "skipped"
+            test "$FULL_CERT_RESULT" = "skipped"
           else
             test "$ACTIVE_RESULT" = "skipped"
             test "$FULL_RESULT" = "success"
             test "$CERT_RESULT" = "skipped"
+            test "$FULL_CERT_RESULT" = "skipped"
           fi

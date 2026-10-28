@@ -67,6 +67,37 @@ def test_live_develop_matching_expected_head_is_accepted(
     assert queried == ["refs/heads/develop"]
 
 
+@pytest.mark.parametrize("mutation", [None, "local", "wrong_ref", "wrong_job"])
+def test_detached_full_checkout_requires_exact_ci_branch_binding(
+    tmp_path, monkeypatch, mutation
+):
+    args = _source_args(tmp_path)
+    args.lane = ["1"]
+    args.profile = "full"
+    _install_source_git_state(monkeypatch, tmp_path, args)
+    git = runner._git
+    monkeypatch.setattr(
+        runner,
+        "_git",
+        lambda root, *argv: (
+            "" if argv == ("branch", "--show-current") else git(root, *argv)
+        ),
+    )
+    monkeypatch.setattr(runner, "_resolve_live_origin_branch_sha", lambda *a: _BASE_SHA)
+    monkeypatch.setenv("GITHUB_ACTIONS", "false" if mutation == "local" else "true")
+    monkeypatch.setenv(
+        "GITHUB_JOB", "other" if mutation == "wrong_job" else "certification-full"
+    )
+    monkeypatch.setenv(
+        "GITHUB_REF_NAME", "other" if mutation == "wrong_ref" else args.expected_branch
+    )
+    if mutation:
+        with pytest.raises(runner.CertificationError, match="branch"):
+            runner.verify_source(args)
+    else:
+        assert runner.verify_source(args)["branch"] == ""
+
+
 def test_live_develop_move_is_rejected_when_local_tracking_ref_is_stale(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

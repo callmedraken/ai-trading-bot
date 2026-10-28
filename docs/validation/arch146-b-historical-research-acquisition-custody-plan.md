@@ -355,3 +355,66 @@ B-E implementation stays gated on terminal-green B1; later publication requires
 base acceptance/integration. No provider/credential/custody/holdout/ACL/campaign/
 GUI/paper/broker/live effect is authorized. Architecture 134 R3 stays parked and
 LIVE remains NO-GO.
+
+## 146-B1-C5 — distributed canonical FULL execution
+
+C5 starts from exact C4 HEAD `9088e0d7b8e128a3c79873ba741d52506c848436`,
+TREE `6a653e9af267e4bd9e5fc745c27ac8655da2b12f`, direct parent
+`100d1cd0f759a7df1d31632c2f237621731017bd`, in
+`F:\AI\worktrees\ai-trading-bot-146b1-source` on
+`feature/research-arch146-b-acquisition-custody-current`.
+
+Preserve #782 / `40649744489`, #783 / `40658848795`, #784 / `40689830781`
+and #785 / `40759967556` unchanged. #785 was the original push-triggered
+attempt 1 on exact C4. Canonical FULL passed 14,724 cases: 14,718 passed,
+six skipped, zero failures/errors; Ruff/static/source checks passed. Its only
+failure was the unchanged 300-second hygiene ceiling: 372.412 seconds.
+
+Classification:
+`CERTIFICATION_EXECUTION_TOPOLOGY_CONTENTION_DEFECT / SHARED_RUNNER_OVERSUBSCRIPTION`.
+#784's six shared-runner children summed to 1,749.660 testcase seconds over
+364.084 wall seconds. #785's seven children summed to 2,272.331 testcase seconds
+over 372.412 wall seconds, an approximately 29.87% aggregate increase with only
+two additional cases. The observed #785 lane sums were 354.804/320.923/293.450/
+342.906/305.131/308.133/346.984 seconds. These measure contention and do not
+replace C4's #784 placement authority.
+
+C5 retains all seven C4 lanes, the 1,749,660-ms map and digest
+`a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710`,
+counts 29/29/30/30/30/31/30, modeled totals
+249953/249953/249950/249952/249952/249951/249949 ms, deterministic greedy
+placement, no pins/adaptation and the 1000-ms fallback. It changes canonical
+execution to seven isolated hosted Windows matrix jobs. Each exact-SHA job
+reconstructs the complete current inventory/plan, executes exactly its assigned
+one-based lane, verifies source before/after and records JUnit/counts/wall plus
+unique artifact `canonical-certification-full-broad-N`.
+
+The shared successful same-SHA source-static dependency proves whole-root Ruff
+0.17.3 check/format and diff checks before any expensive lane. Each lane records
+bounded inherited static evidence and independently checks the exact Ruff version.
+Every lane must be functionally green and strictly below 300 seconds. Matrix
+fail-fast is false and source-gates requires the correct canonical route.
+ROBINHOOD's four-child topology, LEGACY/EXHAUSTIVE, inventories, required
+baselines, dependencies and acquisition/custody behavior are unchanged.
+
+Current reuse validates all seven unique lane job identities and IDs, every
+functional/hygiene step, same original attempt-1 run and exact source identity,
+plus source-static, active-tests and source-gates. Original job metadata is
+retained; the frozen predecessor repository/workflow/SHA/tree/feature-branch
+proof remains in force. No missing, duplicate, extra, malformed, failed,
+timed-out, over-budget or attempt-2+ evidence permits reuse. Frozen R3M/R3N
+literals and R3L history are not repinned.
+
+Required local checks are focused runner/current-authority and C2/C3/C4/B1
+regressions, whole-root Ruff 0.17.3 check/format, diff checks and fresh exact
+clean-candidate FEATURE/PROSPECTIVE_DEVELOP admission. Canonical FULL is GitHub-
+owned and must not run locally. Publish one normal atomic commit and ordinary
+push, then wait for terminal CI. Any functional lane failure, isolated wall
+>=300 seconds, incomplete/duplicated coverage or ambiguous source/reuse evidence
+is STOP for ChatGPT review. Never rerun unchanged CI or add an eighth lane.
+
+B-E remain gated on terminal-green B1 and exact ChatGPT acceptance/integration.
+No provider/credential/custody/holdout/ACL/campaign/GUI/paper/broker/live effects
+are authorized. Architecture 134 R3 remains parked and LIVE remains NO-GO.
+The native-MAC applicability contract is unchanged: optimizer-only metrics are
+explicitly N/A, never fabricated numeric placeholders, and cannot rank/compare.

@@ -451,7 +451,7 @@ def test_local_and_canonical_static_contract_is_identical(tmp_path):
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )
-    assert re.findall(r'"(ruff[^"]+)"', workflow) == ["ruff==0.17.3"] * 4
+    assert re.findall(r'"(ruff[^"]+)"', workflow) == ["ruff==0.17.3"] * 5
     assert runner.RUFF_VERSION == "0.17.3"
     assert checkpoint.check_ruff_version is runner.check_ruff_version
     assert checkpoint.CANONICAL_RUFF_ROOTS == runner.CANONICAL_RUFF_ROOTS == (".",)
@@ -577,3 +577,148 @@ def test_current_toolchain_owner_rejects_version_drift(tmp_path, path):
         destination.write_text(text, encoding="utf-8")
     assert runner.static_toolchain_contract_failures(root) == ()
     assert runner.static_toolchain_contract_failures(tmp_path)
+
+
+@pytest.mark.parametrize("selection", range(1, 8))
+@pytest.mark.parametrize("outcome", ["pass", "failed", "over_budget", "missing_child"])
+def test_single_lane_execution_keeps_complete_inventory_and_plan(
+    tmp_path, monkeypatch, selection, outcome
+):
+    from types import SimpleNamespace
+
+    inventory = _profile_inventory(tmp_path, "full")
+    monkeypatch.setattr(runner, "verify_source", lambda _: {"head": "h", "tree": "t"})
+    monkeypatch.setattr(runner, "_validate_pytest_temp_root", lambda _: None)
+    monkeypatch.setattr(
+        runner,
+        "run_static_checks",
+        lambda *a: {
+            name: {"exit_code": 0}
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
+        },
+    )
+    executed = []
+
+    def children(args, lanes, evidence):
+        executed.append(lanes)
+        return (
+            {}
+            if outcome == "missing_child"
+            else {
+                name: {
+                    "exit_code": 1 if outcome == "failed" else 0,
+                    "counts": {
+                        "cases": 1,
+                        "passed": 1,
+                        "skipped": 0,
+                        "failed": 0,
+                        "errors": 0,
+                    },
+                }
+                for name in lanes
+            }
+        )
+
+    monkeypatch.setattr(runner, "run_children", children)
+    ticks = iter([0, 300 if outcome == "over_budget" else 10])
+    monkeypatch.setattr(runner.time, "monotonic", lambda: next(ticks))
+    args = SimpleNamespace(
+        root=tmp_path,
+        python=Path("python"),
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        profile="full",
+        lane=[str(selection)],
+        plan=False,
+        temp_root=tmp_path.parent / (tmp_path.name + "-temp"),
+        evidence_dir=tmp_path.parent / (tmp_path.name + "-evidence"),
+    )
+    summary = runner.run(args)
+    assert summary["status"] == ("passed" if outcome == "pass" else "failed")
+    assert len(summary["lanes"]) == 7
+    assert summary["executed_lanes"] == [f"broad-{selection}"]
+    assert executed == [
+        {f"broad-{selection}": tuple(summary["lanes"][f"broad-{selection}"]["modules"])}
+    ]
+    assert sorted(summary["selected_inventory"]) == sorted(inventory)
+    assert summary["inventory_sha256"]
+    assert summary["final_source"] == summary["post_test_source"] == summary["source"]
+    assert json.loads((args.evidence_dir / "inventory.json").read_text())[
+        "selected"
+    ] == list(inventory)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        None,
+        "local",
+        "wrong_job",
+        "failed_static",
+        "wrong_sha",
+        "attempt_two",
+        "no_selection",
+        "wrong_profile",
+        "version",
+    ],
+)
+def test_distributed_static_inheritance_is_exact_and_bounded(
+    tmp_path, monkeypatch, mutation
+):
+    from types import SimpleNamespace
+
+    values = {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_JOB": "certification-full",
+        "SOURCE_STATIC_RESULT": "success",
+        "SOURCE_STATIC_HEAD": "h",
+        "GITHUB_SHA": "h",
+        "GITHUB_RUN_ATTEMPT": "1",
+        "GITHUB_RUN_ID": "123",
+    }
+    changes = {
+        "local": ("GITHUB_ACTIONS", "false"),
+        "wrong_job": ("GITHUB_JOB", "other"),
+        "failed_static": ("SOURCE_STATIC_RESULT", "failure"),
+        "wrong_sha": ("SOURCE_STATIC_HEAD", "different"),
+        "attempt_two": ("GITHUB_RUN_ATTEMPT", "2"),
+    }
+    if mutation in changes:
+        key, value = changes[mutation]
+        values[key] = value
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(
+        runner,
+        "check_ruff_version",
+        lambda *a: {"exit_code": 1 if mutation == "version" else 0},
+    )
+    args = SimpleNamespace(
+        lane=None if mutation == "no_selection" else ["1"],
+        profile="robinhood" if mutation == "wrong_profile" else "full",
+        python="python",
+        root=tmp_path,
+        expected_head="h",
+    )
+    if mutation not in (None, "version"):
+        with pytest.raises(runner.CertificationError, match="source-static"):
+            runner.inherited_ci_static_checks(
+                args, {"head": "h", "tree": "t"}, tmp_path
+            )
+    else:
+        checks = runner.inherited_ci_static_checks(
+            args, {"head": "h", "tree": "t"}, tmp_path
+        )
+        assert checks["ruff_version"]["exit_code"] == (
+            1 if mutation == "version" else 0
+        )
+        assert checks["ruff_check"]["command"] == [
+            "python",
+            "-m",
+            "ruff",
+            "check",
+            "--no-cache",
+            ".",
+        ]
+        assert checks["ruff_check"]["inherited_from"] == "source-static"

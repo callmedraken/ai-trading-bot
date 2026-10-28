@@ -1,6 +1,7 @@
 """Certify supported, Robinhood, legacy, or exhaustive source test profiles."""
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -51,7 +52,7 @@ def static_toolchain_contract_failures(root: Path) -> tuple[str, ...]:
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )
-    if re.findall(r'"(ruff[^"]+)"', workflow) != [f"ruff=={RUFF_VERSION}"] * 4:
+    if re.findall(r'"(ruff[^"]+)"', workflow) != [f"ruff=={RUFF_VERSION}"] * 5:
         failures.append("current CI Ruff version drift")
     return tuple(failures)
 
@@ -1124,6 +1125,68 @@ def build_lanes(
     return lanes
 
 
+def select_full_lane(
+    inventory: tuple[str, ...],
+    lanes: dict[str, tuple[str, ...]],
+    profile: str,
+    selection: list[str] | None,
+) -> dict[str, tuple[str, ...]]:
+    "Select one stable one-based FULL identity from a verified complete plan."
+    if selection is None:
+        return lanes
+    if (
+        profile != "full"
+        or len(selection) != 1
+        or selection[0] not in {str(index) for index in range(1, 8)}
+    ):
+        raise CertificationError(
+            "Single-lane selection requires exactly one FULL lane 1..7"
+        )
+    if tuple(lanes) != tuple(f"broad-{index}" for index in range(1, 8)):
+        raise CertificationError("Incomplete FULL lane plan")
+    validate_partitions(inventory, tuple(lanes.values()))
+    if any(not modules for modules in lanes.values()):
+        raise CertificationError("Empty FULL lane")
+    name = f"broad-{selection[0]}"
+    return {name: lanes[name]}
+
+
+def inherited_ci_static_checks(
+    args: argparse.Namespace, identity: dict[str, str], evidence_dir: Path
+) -> dict[str, dict[str, Any]]:
+    "Accept only the exact workflow's successful same-SHA static dependency."
+    if not (
+        getattr(args, "lane", None)
+        and args.profile == "full"
+        and os.environ.get("GITHUB_ACTIONS") == "true"
+        and os.environ.get("GITHUB_JOB") == "certification-full"
+        and os.environ.get("SOURCE_STATIC_RESULT") == "success"
+        and os.environ.get("SOURCE_STATIC_HEAD") == identity["head"]
+        and identity["head"] == args.expected_head
+        and os.environ.get("GITHUB_SHA") == identity["head"]
+        and os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
+    ):
+        raise CertificationError(
+            "Exact successful CI source-static dependency required"
+        )
+    version = check_ruff_version(str(args.python), args.root)
+    checks = {"ruff_version": version}
+    for name, command in {
+        **canonical_ruff_commands(str(args.python)),
+        "git_diff_check": ["git", "diff", "--check"],
+    }.items():
+        checks[name] = {
+            "command": command,
+            "exit_code": 0,
+            "inherited_from": "source-static",
+            "head": identity["head"],
+            "tree": identity["tree"],
+            "run_id": os.environ.get("GITHUB_RUN_ID"),
+        }
+    _save(evidence_dir / "inherited-static.json", checks)
+    return checks
+
+
 def _git(root: Path, *arguments: str) -> str:
     result = subprocess.run(
         ["git", *arguments], cwd=root, text=True, capture_output=True, check=False
@@ -1211,7 +1274,15 @@ def verify_source(args: argparse.Namespace) -> dict[str, str]:
         "base_head": args.expected_base_head,
     }
     if args.expected_branch:
-        expected["branch"] = args.expected_branch
+        detached_full = (
+            getattr(args, "lane", None)
+            and getattr(args, "profile", None) == "full"
+            and os.environ.get("GITHUB_ACTIONS") == "true"
+            and os.environ.get("GITHUB_JOB") == "certification-full"
+            and os.environ.get("GITHUB_REF_NAME") == args.expected_branch
+            and actual["branch"] == ""
+        )
+        expected["branch"] = "" if detached_full else args.expected_branch
     if args.expected_feature_ref:
         actual["feature_ref"] = args.expected_feature_ref
         actual["feature_head"] = _git(root, "rev-parse", args.expected_feature_ref)
@@ -1435,6 +1506,14 @@ def run_static_checks(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", choices=PROFILES, default="full")
+    parser.add_argument(
+        "--lane", action="append", help="Execute exactly one FULL lane (1..7)"
+    )
+    parser.add_argument(
+        "--ci-source-static",
+        action="store_true",
+        help="Use the exact CI static dependency in distributed FULL mode",
+    )
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--expected-head", required=True)
@@ -1496,6 +1575,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     inventory = profiles[profile]
     _validate_legacy_required(inventory, profile)
     lanes = build_lanes(args.root, inventory, profile)
+    execution_lanes = select_full_lane(
+        inventory, lanes, profile, getattr(args, "lane", None)
+    )
+    if getattr(args, "ci_source_static", False) and not getattr(args, "lane", None):
+        raise CertificationError("CI static dependency requires single-lane FULL mode")
     serial = lanes.get("serial", ())
     broad = tuple(module for module in inventory if module not in set(serial))
     excluded = tuple(
@@ -1534,6 +1618,13 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         profile=profile,
         repository_inventory=list(repository_inventory),
         selected_inventory=list(inventory),
+        inventory_sha256=hashlib.sha256(
+            json.dumps(sorted(inventory), separators=(",", ":")).encode()
+        ).hexdigest(),
+        executed_lanes=list(execution_lanes),
+        executed_modules=[
+            module for modules in execution_lanes.values() for module in modules
+        ],
         excluded_inventory=list(excluded),
     )
     _save(
@@ -1555,7 +1646,11 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         return summary
     start = time.monotonic()
     try:
-        summary["static_checks"] = run_static_checks(args, evidence_dir)
+        summary["static_checks"] = (
+            inherited_ci_static_checks(args, identity, evidence_dir)
+            if getattr(args, "ci_source_static", False)
+            else run_static_checks(args, evidence_dir)
+        )
         static_passed = set(summary["static_checks"]) == {
             "ruff_version",
             "ruff_check",
@@ -1566,12 +1661,12 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
         summary["children"] = {}
         if static_passed:
-            summary["children"] = run_children(args, lanes, evidence_dir)
+            summary["children"] = run_children(args, execution_lanes, evidence_dir)
             try:
                 summary["post_test_source"] = verify_source(args)
             except CertificationError as error:
                 summary["source_error"] = str(error)
-        children_passed = set(summary["children"]) == set(lanes) and all(
+        children_passed = set(summary["children"]) == set(execution_lanes) and all(
             "error" not in child and child.get("exit_code") == 0
             for child in summary["children"].values()
         )
@@ -1591,6 +1686,10 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         )
     finally:
         summary["wall_seconds"] = round(time.monotonic() - start, 3)
+        if getattr(args, "lane", None):
+            summary["hygiene_passed"] = summary["wall_seconds"] < 300
+            if not summary["hygiene_passed"]:
+                summary["status"] = "failed"
         _save(evidence_dir / "results.json", summary)
     return summary
 

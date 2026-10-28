@@ -44,21 +44,24 @@ first and run the tool against it. Existing noncanonical worktrees are preserved
 for a separate reviewed reconciliation step and are never adopted for current
 work.
 
-## Pending B1-C4 continuation
+## Pending B1-C5 continuation
 
 Work only in `F:\AI\worktrees\ai-trading-bot-146b1-source`, branch
-`feature/research-arch146-b-acquisition-custody-current`. C4's reviewed parent is
-HEAD `100d1cd0f759a7df1d31632c2f237621731017bd`, TREE
-`060899aad7c9d68d2e992b139657af384a5405d4`. #782 / `40649744489`, #783 /
-`40658848795` and #784 / `40689830781` are immutable failed evidence.
+`feature/research-arch146-b-acquisition-custody-current`. C5's exact parent is
+HEAD `9088e0d7b8e128a3c79873ba741d52506c848436`, TREE
+`6a653e9af267e4bd9e5fc745c27ac8655da2b12f`, direct parent
+`100d1cd0f759a7df1d31632c2f237621731017bd`. Preserve #782 / `40649744489`,
+#783 / `40658848795`, #784 / `40689830781` and #785 / `40759967556` unchanged.
 
-C4 is a source-only timing/topology correction pending one clean-candidate
+C5 is a source-only execution-topology correction pending one clean-candidate
 FEATURE/PROSPECTIVE_DEVELOP admission, ordinary atomic commit/push and terminal
-mapped canonical FULL. Do not run FULL locally. Functionally green wall <300s
-permits ChatGPT exact-source acceptance review; wall >=300s is STOP, with no
-unchanged rerun or automatic eight-lane change. The [C4 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction)
-owns timing provenance and exact review bounds. B-E implementation remains gated
-on terminal-green B1; publication additionally requires base acceptance/integration.
+mapped canonical FULL. Do not run FULL locally. All seven isolated lanes must
+pass functionally and each wall must be <300s before ChatGPT exact-source review.
+Any lane failure, wall >=300s, incomplete/duplicated matrix coverage or ambiguous
+source/reuse evidence is STOP; never rerun unchanged CI or add an eighth lane.
+The [C5 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution)
+owns contention evidence and exact review bounds. B-E remain gated on terminal-
+green B1 and exact acceptance/integration.
 R3 remains parked; all protected effects remain unavailable and LIVE is NO-GO.
 
 ## Consumed Architecture 134 diagnostics
@@ -203,12 +206,10 @@ identity and immutable push-triggered Checkpoint Source Gates #782 / run
 `40649744489` / attempt 1 evidence are recorded in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
 B1-C2 was published at HEAD `2ec59d6a8f409d469485815106c5087125b977be`,
 TREE `17c2985af56076d9aef8ec4c1b5abe2d623a7e69`. Preserve failed #783 /
-`40658848795` / attempt 1 and #782 unchanged. B1-C3 corrects static-toolchain/
-file-universe parity; require focused verification and complete clean-candidate
-FEATURE and PROSPECTIVE_DEVELOP admission before its one ordinary push. Wait for
-terminal mapped GitHub CI and STOP for ChatGPT timing review if canonical wall
-remains >=300 seconds. Do not run canonical FULL locally or treat C3 as accepted
-or integrated. The validation plan owns the failure details and exact C3 scope.
+`40658848795` / attempt 1 and #782 unchanged. C3 corrected static parity; C4
+refreshed placement from #784. Their terminal timing failures remain immutable.
+C5 above is the current publication boundary, with no local canonical FULL.
+The validation plan owns the chronology; no B1 source is accepted or integrated.
 
 B2 has no native bindings or registered host dispatcher here. Before any real
 attempt, separately review its native source/host binding and exact published
@@ -221,7 +222,7 @@ mixed acquired pages. R3 remains consumed/parked; LIVE remains NO-GO.
 
 Published C2 repaired historical workflow reconstruction and separated frozen
 Architecture-143 pin/object checks from current mutable test bytes. Its local
-coherence bundle remains in force and C3 adds the affected result/source tests.
-The next publication boundary is C3 above; C2 is not accepted or integrated.
+coherence bundle remains in force and C3 added the affected result/source tests.
+The next publication boundary is C5 above; C2 is not accepted or integrated.
 No real B2 acquisition, credentials, holdout/custody, ACL, provider, host, paper,
 broker or live effect has occurred.

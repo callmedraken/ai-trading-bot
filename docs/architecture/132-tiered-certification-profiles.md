@@ -6,7 +6,38 @@ R3M/R3N exact overlays below preserve historical evidence; they do not own curre
 mutable test/workflow bytes. General admit uses the shared FEATURE and
 PROSPECTIVE_DEVELOP evaluator before publication. Canonical mapped profiles
 remain GitHub-owned. Required baselines are unchanged; current FULL placement
-is corrected by 146-B1-C4 below.
+is owned by 146-B1-C4, with distributed canonical execution under C5 below.
+
+## Current canonical FULL execution — Architecture 146-B1-C5
+
+Canonical FULL executes the seven existing lanes on seven independent hosted
+Windows jobs, with exact matrix identities 1 through 7 and fail-fast disabled.
+Each exact-SHA job reconstructs the full inventory and C4 plan, then selects one
+lane with `--profile full --lane N --ci-source-static`. Duplicate, empty,
+malformed and out-of-range selectors fail closed; other profiles reject selection.
+`results.json` retains the complete plan/inventory plus its SHA256 identity,
+`executed_lanes`, `executed_modules`, source before/after, JUnit counts and wall.
+The selected lane must pass functionally and finish strictly below 300 seconds.
+Artifacts are unique: `canonical-certification-full-broad-1` through `broad-7`.
+
+Every lane has a hard dependency on successful same-SHA whole-root source-static.
+The bounded CI-only static inheritance records that dependency and still checks
+exact Ruff 0.17.3 locally in each job. Ordinary/local certification retains all
+whole-root static checks. No sevenfold redundant Ruff pass is required.
+Source-gates requires the FULL matrix aggregate success for FULL and the existing
+canonical job for ROBINHOOD, with the irrelevant route skipped. ROBINHOOD retains
+its existing four-child execution; LEGACY/EXHAUSTIVE are unchanged.
+
+The current reuse adapter requires all seven uniquely named successful jobs,
+each functional/hygiene step, source-static, active-tests and source-gates in the
+same exact original attempt-1 push run. It retains original job metadata in reuse
+evidence and delegates repository/workflow/SHA/tree/branch proof to the unchanged
+predecessor evaluator. Old shared-runner FULL, missing/duplicate/extra/malformed
+lane names, attempt 2+, partial or ambiguous evidence cannot authorize reuse.
+Frozen R3M/R3N evidence remains historical. C4's map, digest, placement algorithm,
+module counts and 1000-ms fallback are unchanged. #785 measures contention,
+not replacement timing authority. See the
+[C5 validation boundary](../validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution).
 
 ## Current FULL correction — Architecture 146-B1-C4
 
@@ -23,7 +54,8 @@ greedy algorithm yields module counts 29/29/30/30/30/31/30 and lane totals
 249953/249953/249950/249952/249952/249951/249949 ms. Six lanes modeled about
 291.612 seconds before collection/process overhead, leaving inadequate room
 under the unchanged 300-second ceiling. Runtime acceptance still requires
-canonical FULL wall strictly below 300 seconds. There are no lane pins, runtime
+each isolated canonical FULL lane wall strictly below 300 seconds under C5.
+There are no lane pins, runtime
 JUnit reads or adaptive history. Future owned modules retain the 1000-ms fallback.
 The exact counts/order differ from the planning approximation; they follow
 from the frozen map and existing algorithm, with the reviewed 249.953-second maximum.
@@ -33,8 +65,8 @@ ROBINHOOD remains four lanes; LEGACY/EXHAUSTIVE and required baselines are uncha
 Classification: `CERTIFICATION_TOPOLOGY_CAPACITY_DEFECT / STALE_FULL_TIMING_AUTHORITY`.
 R3L's older six-lane map and 1,231,440-ms total below are frozen historical
 Architecture 132 evidence, superseded as current FULL authority. #782, #783 and
-#784 remain immutable. This candidate is pending terminal CI and ChatGPT exact-
-source acceptance; no integration or protected effect follows. See the
+#784 remain immutable. C4's #785 failed hygiene with all functional/static checks
+passing; C5 owns the pending execution correction. No integration or protected effect follows. See the
 [C4 validation boundary](../validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c4--current-full-timing-capacity-correction).
 
 ## Architecture 132-R3M — predecessor exact develop certification reuse

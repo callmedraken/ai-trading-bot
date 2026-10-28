@@ -213,3 +213,30 @@ calendar becomes published authority without a source-owned accepted entry.
 Exact clean FEATURE/PROSPECTIVE_DEVELOP admission and canonical FULL follow only
 after an explicitly authorized atomic candidate commit and publication. Neither
 local synthetic verification nor this document reports source acceptance.
+
+## 146-B1-C1 — prepublication certification-inventory correction
+
+Initial unpublished candidate a0d7050c52957abab292ce98d4d3a7265d9f4d63,
+tree f6145307daec6c1765443bd819a69e6f046f2861, failed its local required
+prepublication test gate: 867 passed, two failed. Both FEATURE and
+PROSPECTIVE_DEVELOP authority passed, as did Ruff/diff checks; source identity
+remained stable. No push or GitHub run occurred for that failed candidate.
+
+Preserved report:
+
+    F:\AI\temp\ai-trading-bot-checkpoints\arch146-b1-admission-d9448ee44a22443ebf77ebfb5493470f\arch132-r3n-prepublication-admission\source-gate-20261028T071014.640864Z\report.json
+
+SHA256:
+
+    41149073dcd83011e6e99aa194a192ebb9ad8c45b64dbda8d95be21ab3844d1c
+
+Classification: bounded stale test-inventory expectations exercised and caught
+by the required prepublication gate, not PREPUBLICATION_COVERAGE_DEFECT.
+C1 adds the new supported acquisition test module to the exact current FULL
+inventory/count expectation (209 FULL / 431 EXHAUSTIVE, with ROBINHOOD 117 and
+LEGACY 222 unchanged), preserves the historical timing sample, and proves the
+new module appears exactly once in current six-lane FULL using fallback weight.
+The required 122/49 baselines, certification implementation and lane policy do
+not change. Preserve the original unpublished commit and report; require a new
+normal corrective commit, complete admission on its exact clean source, and
+one first publication only after PASS. No amend/rebase/force or CI rerun.

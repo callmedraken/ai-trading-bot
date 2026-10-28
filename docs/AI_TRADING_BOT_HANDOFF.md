@@ -192,3 +192,14 @@ historical-session authority. After B2 materialization, independently accept
 its immutable evidence and freeze the source-owned custody admission before
 normal OPEN research. The current raw-material OPEN verifier must not receive
 mixed acquired pages. R3 remains consumed/parked; LIVE remains NO-GO.
+
+### Pending 146-B1-C1 publication
+
+The initial unpublished B1 candidate a0d7050 failed two stale certification
+inventory/lane-test expectations in required local admission, with 867 tests
+passing, both authority contexts PASS and no push. That commit/evidence is
+preserved; the bounded C1 correction changes only current certification tests
+and this evidence record. The exact report/hash and inventory consequences
+are recorded once in the 146-B validation plan. Require complete admission on
+the new normal corrective commit before the first branch push and mapped FULL.
+No real acquisition/holdout/native effect has occurred.

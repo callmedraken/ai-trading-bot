@@ -238,6 +238,10 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
     assert "tests/review_paper/test_successor_publication_recovery.py" in inventory
     current = inventory
     assert "tests/experiments/test_historical_research_dataset.py" in current
+    acquisition_module = (
+        "tests/experiments/test_historical_research_acquisition_custody.py"
+    )
+    assert acquisition_module in current
     inventory = tuple(
         m
         for m in inventory
@@ -245,6 +249,7 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         not in {
             "tests/runtime/checkpoint_runner/test_source_authority.py",
             "tests/experiments/test_historical_research_dataset.py",
+            acquisition_module,
             "tests/review_paper/test_successor_publication_recovery.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
             "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
@@ -299,7 +304,12 @@ def test_full_six_lane_current_local_model_is_exact_and_repeatable() -> None:
         ]
         == runner.FULL_FALLBACK_MS
     )
+    assert (
+        runner.full_module_weights(current)[acquisition_module]
+        == runner.FULL_FALLBACK_MS
+    )
     current_lanes = runner.build_lanes(root, current, "full")
+    assert sum(lane.count(acquisition_module) for lane in current_lanes.values()) == 1
     runner.validate_partitions(current, tuple(current_lanes.values()))
     assert (
         runner.full_module_weights(current)[

@@ -1466,6 +1466,8 @@ Trading Bot Git worktree must be created under:
 F:\\AI\\worktrees\\<explicit-project-worktree-name>
 ```
 
+### Hard pre-creation invariant
+
 Do not create or adopt Trading Bot worktrees under the user profile, including
 Codex-managed defaults such as:
 
@@ -1473,16 +1475,46 @@ Codex-managed defaults such as:
 C:\\Users\\John\\.codex\\worktrees\\...
 ```
 
-Every task that creates or selects a worktree must name the exact
-`F:\\AI\\worktrees\\...` path in its startup gate. If a tool proposes or
-creates a worktree outside that root, stop before edits and recreate/select the
-worktree at the canonical F: location. Do not silently treat a noncanonical
-path as equivalent.
+This is a **pre-creation prohibition**, not merely a post-creation admission
+check. A new Trading Bot worktree appearing anywhere outside
+`F:\\AI\\worktrees\\...` is itself a workflow regression and STOP even when
+it is clean and no source edit has occurred. In particular, no Codex/tool
+default may first create a C:-drive worktree and then rely on repository
+instructions to reject or relocate it afterward.
 
-A noncanonical worktree that already contains generated/untracked artifacts is
-not force-removed or cleaned merely to satisfy this convention. Preserve the
-artifacts, classify the worktree state, and use a separate reviewed
-reconciliation/removal step. A dirty-worktree STOP remains a STOP.
+Before invoking Codex, another agent, or any tool/session mode capable of
+automatically provisioning a worktree, the caller must already provide or
+configure the exact canonical destination:
+
+```text
+F:\\AI\\worktrees\\<explicit-project-worktree-name>
+```
+
+If that tool/session cannot guarantee this exact root **before filesystem
+creation**, do not use its automatic worktree mode. Instead, create or select
+the exact canonical F: worktree first with the reviewed Git workflow and run
+the tool against that existing checkout. Never accept a tool-managed
+`C:\\Users\\John\\.codex\\worktrees\\...` checkout as a transient,
+disposable or equivalent starting point.
+
+Every task that creates or selects a worktree must name the exact canonical F:
+path in its prompt and startup gate. Phrases such as "create a worktree",
+"make a fresh checkout", or "use a Codex worktree" without the exact F: path
+are insufficient and must be corrected before the task starts.
+
+The first repository action in the selected checkout must resolve and verify
+the worktree root. It must be either the explicitly scoped main checkout
+`F:\\AI\\ai-trading-bot` or the exact task-owned child of
+`F:\\AI\\worktrees`. A different resolved root is STOP **before edits,
+tests, branch creation/switching, staging, commit, push, certification or
+operator execution**. Do not self-correct by moving or recreating the
+noncanonical checkout inside the same task.
+
+A noncanonical worktree that already exists is incident/reconciliation state
+only. Never adopt it for current work. Do not force-remove, clean, reset,
+delete or migrate it merely to satisfy this invariant. Preserve any generated
+or untracked artifacts, classify the worktree state, and use a separate
+reviewed reconciliation/removal step. A dirty-worktree STOP remains a STOP.
 
 When an interactive PowerShell block throws a STOP, commands appearing later in
 the pasted block are not authorized to continue just because PowerShell accepts

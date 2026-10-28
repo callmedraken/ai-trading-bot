@@ -2,16 +2,25 @@
 
 ## Current checkpoint
 
-Remote `develop` is at:
+Do not freeze the mutable `develop` tip in this status file across a
+documentation-only correction. Verify `origin/develop` live at every new task
+startup.
 
-    HEAD 99654f3547140dc8fd005ee1525ac9a77987b946
-    TREE 5b04b8d4baf70b3a936d10a5972ffcd26c03dd3c
+The most recent integrated product/design checkpoint immediately before this
+workflow-only correction is:
 
-Architecture 134 R3 is SOURCE ACCEPTED and integrated by exact-SHA ordinary
-fast-forward. Feature Checkpoint Source Gates #775 / run 40633699956 / attempt 1
-completed SUCCESS. Develop run #776 / 40635656630 / attempt 1 completed SUCCESS
-with exact feature certification reuse; no duplicate canonical certification was
-run on develop.
+    HEAD 6f07e0fdaf20d335c22bc77c8cfb09a0ee47260c
+    TREE b8cb3b62033a8f7f096a02a353d3dfa81d72b130
+
+Architecture 134 R3 remains SOURCE ACCEPTED and parked. The Architecture 146-B
+design/closeout fast-forward landed at the identity above. Develop Checkpoint
+Source Gates #779 / run 40642547780 / attempt 1 completed SUCCESS in
+`DOCS_ONLY` mode: source-static and source-gates passed; active-tests,
+full-tests and certification-tests were correctly skipped.
+
+Worktree non-regression is now explicit: no Trading Bot auxiliary worktree may
+be created outside `F:\\AI\\worktrees\\...`. A tool-managed C:-drive
+worktree is a workflow regression even if it is clean and unused.
 
 ## Architecture 134 host track — parked, fail closed
 

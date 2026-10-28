@@ -2,26 +2,47 @@
 
 ## Current source identity
 
-Remote `develop`:
+The mutable `develop` tip must be read live at the start of each new task; do
+not infer it from a previously written handoff SHA.
 
-    HEAD 99654f3547140dc8fd005ee1525ac9a77987b946
-    TREE 5b04b8d4baf70b3a936d10a5972ffcd26c03dd3c
+The most recent integrated product/design checkpoint immediately before the
+current workflow-only correction is:
 
-Architecture 134 R3 is SOURCE ACCEPTED and integrated by exact-SHA ordinary
-fast-forward.
+    HEAD 6f07e0fdaf20d335c22bc77c8cfb09a0ee47260c
+    TREE b8cb3b62033a8f7f096a02a353d3dfa81d72b130
 
-Feature certification:
+That checkpoint closed Architecture 134 R3, froze the Architecture 146-B design,
+and was integrated by exact-SHA ordinary fast-forward. Develop Checkpoint Source
+Gates #779 / run 40642547780 / attempt 1 completed SUCCESS in `DOCS_ONLY`
+mode; source-static and source-gates passed and broad/certification jobs were
+correctly skipped.
+
+The earlier Architecture 134 R3 feature certification remains historical and
+must not be rerun:
 
     Checkpoint Source Gates #775
     run     40633699956
     attempt 1
     result  SUCCESS
-    HEAD    99654f3547140dc8fd005ee1525ac9a77987b946
-    TREE    5b04b8d4baf70b3a936d10a5972ffcd26c03dd3c
+    R3 HEAD 99654f3547140dc8fd005ee1525ac9a77987b946
+    R3 TREE 5b04b8d4baf70b3a936d10a5972ffcd26c03dd3c
 
-The canonical ROBINHOOD run completed 12,063 cases: 12,057 passed, 6 skipped,
-0 failed/errors. Develop run #776 / 40635656630 / attempt 1 then completed
+The canonical R3 ROBINHOOD run completed 12,063 cases: 12,057 passed, 6 skipped,
+0 failed/errors. Historical develop run #776 / 40635656630 / attempt 1 completed
 SUCCESS using exact feature-certification reuse. Do not rerun either run.
+
+### Worktree-root non-regression
+
+Every Trading Bot auxiliary worktree must be created under
+`F:\\AI\\worktrees\\...`. Creation under
+`C:\\Users\\John\\.codex\\worktrees\\...`, any other C: location, or
+any other noncanonical root is itself a workflow regression and STOP. Codex or
+another tool must be given the exact F: destination before it can create a
+worktree. If its automatic worktree mode cannot guarantee that destination
+before creation, do not use that mode; create/select the canonical F: worktree
+first and run the tool against it. Existing noncanonical worktrees are preserved
+for a separate reviewed reconciliation step and are never adopted for current
+work.
 
 ## Consumed Architecture 134 diagnostics
 

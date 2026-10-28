@@ -106,6 +106,116 @@ reviewed.
 A change to endpoint semantics, entitlement, authentication method, feed access
 or permitted use before B2 execution is a STOP/review condition.
 
+## Architecture review correction — mixed-page provenance and OPEN publication
+
+Architecture review base:
+
+    develop HEAD b4e9fb173bcfe0edee473dd12640e4305012f4a5
+    develop TREE 15bded7d020fee60d399b1914f68b1b6a6bc86fb
+    Checkpoint Source Gates #780 / 40643221998 / attempt 1 / SUCCESS
+
+Reviewed B1 source worktree:
+
+    F:\AI\worktrees\ai-trading-bot-146b1-source
+    feature/research-arch146-b-acquisition-custody-current
+
+The frozen full-range request plan is retained. The architecture does **not**
+switch to partition-scoped vendor requests merely to make raw-page custody easier.
+
+A returned bars page may contain rows from both sides of the
+2024-01-01T00:00:00Z OPEN/FINAL_HOLDOUT boundary. Likewise, the complete
+corporate-action response stream is dataset-level provenance and may describe
+events on either side of that boundary. Vendor page boundaries are therefore
+not custody boundaries.
+
+Architecture 146-A intentionally treats raw vendor pages and the corporate-action
+sidecar as opaque integrity provenance. Its
+`verify_historical_research_partition` requires the exact supplied raw-page
+tuple and sidecar bytes to match the partition manifest, and
+`verify_historical_research_open_commitment` delegates to that verifier. That
+existing interface remains valid for synthetic/privileged verification, but it
+is **not** the normal-research verification interface for a real 146-B
+acquisition whose protected provenance bytes may contain FINAL_HOLDOUT material.
+
+The following successor rules are frozen:
+
+1. Every original bars response page and every original corporate-action
+   response page is persisted byte-for-byte under protected custody before
+   normalization. No redaction, partition reserialization or OPEN projection is
+   labeled as an original vendor page.
+2. For the v1 full-range acquisition, both 146-A partition manifests may bind the
+   same complete ordered bars-page digest vector when mixed pages contribute to
+   both partitions. Both may bind the same complete corporate-action sidecar
+   digest. This is dataset-level acquisition provenance, not a claim that the
+   protected raw bytes are partition-local.
+3. Custodian-side complete verification supplies the exact protected provenance
+   bytes to the unchanged 146-A verifier. Normal research supplies **none** of
+   those protected bytes.
+4. The real OPEN publication contains normalized OPEN CSV plus non-price
+   manifests/commitments and accepted non-price custody evidence only. It does
+   not contain original full-range raw pages, the complete corporate-action
+   body, or any other byte object capable of disclosing FINAL_HOLDOUT prices.
+5. Normal research must not call
+   `verify_historical_research_open_commitment` on real acquired v1 material.
+   B1 adds an additive successor interface,
+   `verify_historical_research_open_publication`, without changing 146-A
+   schemas, IDs, serializers or existing verifier behavior.
+6. The successor verifier directly validates the complete OPEN normalized CSV:
+   canonical parsing, exact OPEN bounds, SHA256/byte size, row count,
+   first/last timestamp, physical historical-data fingerprint and session
+   coverage. It reconciles snapshot/manifest membership using public 146-A
+   contract fields but never opens raw vendor pages or the corporate-action
+   sidecar.
+7. Raw-page truth, normalization truth, complete snapshot truth and custody truth
+   are not inferred from a self-consistent manifest. They are established by
+   the separately reviewed B2 custodian execution and then bound into normal
+   research by an **externally accepted immutable non-price evidence artifact**.
+8. The serialized B2 evidence schema is additive:
+   `historical-research-custody-evidence/v1`. At minimum it binds exact B2
+   source HEAD/TREE, checkpoint and attempt identity, terminal success state,
+   canonical request descriptors, ordered raw-page SHA256 vectors/counts for
+   both endpoint families, normalized OPEN/HOLDOUT digests/sizes/counts and
+   first/last timestamps, corporate-action sidecar digest, both partition
+   manifest IDs, dataset snapshot ID, physical fingerprints, full logical
+   fingerprint, historical-session-authority identity/result, custody/open-root
+   classifications and zero production/paper/broker/live effects. It contains
+   no raw response body, OHLCV value, credential or secret-derived value.
+9. B2 evidence is **not self-authenticating**. After the real attempt, ChatGPT
+   must independently review the exact accepted B2 source and immutable evidence
+   bytes and freeze at least: evidence SHA256, B2 source HEAD/TREE, checkpoint,
+   attempt identity, snapshot ID and historical-session-authority identity. The
+   resulting external acceptance binding uses additive schema
+   `historical-research-custody-admission/v1`.
+10. `verify_historical_research_open_publication` may accept custody evidence
+    only when its canonical bytes hash to that independently frozen evidence
+    SHA256 and every frozen source/attempt/snapshot/calendar field matches. A
+    caller-supplied receipt, arbitrary expected hash, self-consistent admission
+    object or report path is not custody authority.
+11. Successful B2 execution may materialize OPEN bytes only after complete
+    custodian-side 146-A verification, but normal research consumption remains
+    blocked until the separate B2 evidence/admission review above is accepted.
+    The successor verifier is the required real-data OPEN admission surface.
+
+This decision supersedes any earlier design-era implication that
+`vendor-raw\open\...` or the complete corporate-action sidecar belongs in the
+normal development OPEN root for real 146-B v1 acquisition. Those protected
+bytes remain under custody.
+
+### Historical-session authority remains an independent B2 prerequisite
+
+The accepted 146-A `NYSEMarketCalendar` check remains a repository consistency
+check; Architecture 146 explicitly did not certify it as published historical
+session authority or grant exceptional-closure authority. B1 therefore uses an
+injected historical-session-authority boundary in synthetic tests and must not
+claim that 146-A calendar success alone makes B2 ready.
+
+Before any real B2 network/ACL effect, a separate reviewed decision must freeze
+the exact published historical-session authority, coverage interval,
+timezone/session-date semantics and immutable identity/digest used for v1. B2
+must reconcile normalized bars against both the unchanged 146-A check and that
+accepted external authority. Any disagreement is STOP before OPEN publication.
+No real attempt is consumed merely to discover this predictable prerequisite.
+
 ## Two-step authority boundary
 
 ### 146-B1 — source checkpoint
@@ -121,6 +231,12 @@ B1 may add:
 - corporate-action sidecar preservation;
 - OPEN/FINAL_HOLDOUT split planning;
 - snapshot/manifest construction through 146-A public contracts;
+- the additive `historical-research-custody-evidence/v1` non-price evidence
+  model and externally pinned `historical-research-custody-admission/v1`
+  consistency boundary;
+- the additive `verify_historical_research_open_publication` real-data OPEN
+  verification interface, which consumes no protected raw page or sidecar bytes;
+- an injected historical-session-authority boundary for synthetic B1 testing;
 - bounded evidence/report models;
 - crash/reconciliation state classification;
 - Windows custody ACL code that is unreachable from tests without an injected
@@ -162,11 +278,21 @@ B2 may perform exactly one manually initiated attempt that:
 4. fetches every bars page and every corporate-action page by GET only;
 5. persists raw response bytes before normalization;
 6. normalizes and validates the complete dataset;
-7. writes FINAL_HOLDOUT material only under protected custody;
-8. reconstructs and verifies the full 146-A snapshot/manifest chain;
-9. publishes OPEN material to the development root only after full verification;
-10. emits a non-price evidence report containing identities, digests, counts,
-    request metadata and final state, never holdout OHLCV or credential values.
+7. writes FINAL_HOLDOUT material and all original full-range vendor/corporate-
+   action provenance only under protected custody;
+8. reconstructs and verifies the full 146-A snapshot/manifest chain inside the
+   protected custodian boundary using the exact original provenance bytes;
+9. reconciles session coverage against the separately accepted historical-
+   session authority as well as the unchanged 146-A repository calendar check;
+10. materializes only normalized OPEN CSV plus non-price manifests/commitments to
+    the development root after complete custodian verification;
+11. emits canonical `historical-research-custody-evidence/v1` containing only
+    identities, digests, counts, request metadata, calendar-authority binding and
+    final state, never raw bodies, holdout OHLCV or credential values;
+12. leaves normal research consumption blocked until ChatGPT independently
+    accepts the exact B2 evidence bytes/source binding and freezes
+    `historical-research-custody-admission/v1` material for the successor OPEN
+    verifier.
 
 A network error, authentication/entitlement rejection, ambiguous persistence,
 ACL mismatch, unexpected pre-existing destination, malformed vendor response,
@@ -185,9 +311,16 @@ Protected custody root remains:
     F:\AI\research-holdout\arch146-v1
 
 Normal development/research processes must not be able to enumerate or open
-FINAL_HOLDOUT content. Holdout vendor bytes, normalized CSV and temporary
-persistence never enter the repository, worktrees, ordinary
-`F:\AI\temp`, GUI/report directories or test fixtures.
+FINAL_HOLDOUT content. All original full-range bars pages, all original
+corporate-action pages/complete sidecar bytes, holdout normalized CSV and
+protected temporary persistence remain under custody and never enter the
+repository, worktrees, ordinary `F:\AI\temp`, GUI/report directories or test
+fixtures.
+
+The development OPEN root may contain only normalized OPEN CSV, the non-price
+146-A manifests/snapshot commitments, canonical non-price custody evidence and
+the separately accepted non-price custody-admission binding. It contains no
+`vendor-raw\open` publication for real v1 acquisition.
 
 The protected root DACL remains the Architecture 146 design:
 
@@ -202,12 +335,17 @@ non-price metadata only.
 
 ## Publication rule
 
-OPEN material is the only dataset content available to normal research. It is
-published only after the protected holdout material, both partition manifests
-and full snapshot all verify.
+OPEN material is the only dataset content available to normal research.
+Materialization to the development root is allowed only after protected
+custodian verification of the complete dataset. **Research admission is a
+separate step:** the exact B2 evidence must then receive independent external
+acceptance, and real-data consumers must use
+`verify_historical_research_open_publication` with that frozen evidence/source
+binding. Presence of files in the OPEN root alone is not admission.
 
-No B2 result authorizes opening FINAL_HOLDOUT for model/parameter selection.
-Architecture 145's later explicit final-holdout admission remains separate.
+No B2 result or custody-admission record authorizes opening FINAL_HOLDOUT for
+model/parameter selection. Architecture 145's later explicit final-holdout
+admission remains separate.
 
 ## Explicit non-scope
 

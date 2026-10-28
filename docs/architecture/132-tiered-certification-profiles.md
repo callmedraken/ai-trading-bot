@@ -2424,9 +2424,13 @@ JUnit validation, and evidence outside the worktree. Actual runs require
 `F:\AI\temp\pytest`. `--plan` verifies admission and records topology without
 launching pytest or static checks.
 
-Every profile retains whole-repository final/post-test static checks. Applicable
-cheap gates must also pass before longer pytest/certification execution under
-the normative ordering above; required final checks are preserved:
+Every executing profile requires exact Ruff 0.17.3 and whole-repository static
+checks after source admission and inventory/topology construction, before any
+pytest child starts. Static failure persists canonical evidence with no children.
+Post-test/final source identity checks and result accounting remain required.
+Local FULL-mode prepublication admission shares the exact version and Ruff roots;
+a version mismatch stops before static checks or pytest without installing tools.
+Plan-only operation remains non-executing. The canonical non-mutating checks are:
 
 ```text
 ruff check --no-cache .

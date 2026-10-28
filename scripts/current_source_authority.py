@@ -63,6 +63,7 @@ def current_authority_check(repo_root: Path) -> tuple[str, ...]:
     from scripts import run_test_certification as certification
 
     failures = list(ownership.ownership_failures(repo_root))
+    failures.extend(certification.static_toolchain_contract_failures(repo_root))
     specs = runner._checkpoint_specs()
     if any(name != spec.name for name, spec in specs.items()):
         failures.append("current checkpoint registry identity drift")

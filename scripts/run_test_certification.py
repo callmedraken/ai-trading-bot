@@ -7,10 +7,78 @@ import re
 import subprocess
 import sys
 import time
+import tomllib
 import uuid
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
+
+# One current static-toolchain contract shared by local admission and certification.
+RUFF_VERSION = "0.17.3"
+CANONICAL_RUFF_ROOTS = (".",)
+
+
+def canonical_ruff_commands(python: str) -> dict[str, list[str]]:
+    """Return the complete non-mutating canonical Ruff file universe."""
+    return {
+        "ruff_check": [
+            python,
+            "-m",
+            "ruff",
+            "check",
+            "--no-cache",
+            *CANONICAL_RUFF_ROOTS,
+        ],
+        "ruff_format": [
+            python,
+            "-m",
+            "ruff",
+            "format",
+            "--check",
+            "--no-cache",
+            *CANONICAL_RUFF_ROOTS,
+        ],
+    }
+
+
+def static_toolchain_contract_failures(root: Path) -> tuple[str, ...]:
+    """Own current Ruff dependency/install parity independently of historical pins."""
+    failures = []
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    dev = project["project"]["optional-dependencies"]["dev"]
+    if [item for item in dev if item.startswith("ruff")] != [f"ruff=={RUFF_VERSION}"]:
+        failures.append("current development Ruff version drift")
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if re.findall(r'"(ruff[^"]+)"', workflow) != [f"ruff=={RUFF_VERSION}"] * 4:
+        failures.append("current CI Ruff version drift")
+    return tuple(failures)
+
+
+def check_ruff_version(python: str, root: Path) -> dict[str, Any]:
+    """Fail closed on unavailable, malformed or mismatched Ruff, without installing."""
+    command = [python, "-m", "ruff", "--version"]
+    result: dict[str, Any] = {"command": command, "expected": f"ruff {RUFF_VERSION}"}
+    try:
+        completed = subprocess.run(
+            command, cwd=root, text=True, capture_output=True, check=False, timeout=30
+        )
+        result.update(
+            actual=completed.stdout.strip(),
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+            exit_code=(
+                0
+                if completed.returncode == 0
+                and completed.stdout.strip() == result["expected"]
+                else 1
+            ),
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        result.update(actual="unavailable", error=str(error), exit_code=1)
+    return result
+
 
 SERIAL_MODULES = (
     "tests/runtime/test_windows_transactional_capture_authority.py",
@@ -1305,20 +1373,18 @@ def run_static_checks(
     args: argparse.Namespace, evidence_dir: Path
 ) -> dict[str, dict[str, Any]]:
     """Run the accepted source checks without Ruff caches."""
+    version = check_ruff_version(str(args.python), args.root)
+    results = {"ruff_version": version}
+    for stream in ("stdout", "stderr"):
+        (evidence_dir / f"ruff_version.{stream}.log").write_text(
+            version.get(stream, version.get("error", "")), encoding="utf-8"
+        )
+    if version["exit_code"]:
+        return results
     commands = {
-        "ruff_check": [str(args.python), "-m", "ruff", "check", "--no-cache", "."],
-        "ruff_format": [
-            str(args.python),
-            "-m",
-            "ruff",
-            "format",
-            "--check",
-            "--no-cache",
-            ".",
-        ],
+        **canonical_ruff_commands(str(args.python)),
         "git_diff_check": ["git", "diff", "--check"],
     }
-    results = {}
     for name, command in commands.items():
         try:
             completed = subprocess.run(
@@ -1460,19 +1526,26 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         return summary
     start = time.monotonic()
     try:
-        summary["children"] = run_children(args, lanes, evidence_dir)
-        try:
-            summary["post_test_source"] = verify_source(args)
-        except CertificationError as error:
-            summary["source_error"] = str(error)
+        summary["static_checks"] = run_static_checks(args, evidence_dir)
+        static_passed = set(summary["static_checks"]) == {
+            "ruff_version",
+            "ruff_check",
+            "ruff_format",
+            "git_diff_check",
+        } and all(
+            check.get("exit_code") == 0 for check in summary["static_checks"].values()
+        )
+        summary["children"] = {}
+        if static_passed:
+            summary["children"] = run_children(args, lanes, evidence_dir)
+            try:
+                summary["post_test_source"] = verify_source(args)
+            except CertificationError as error:
+                summary["source_error"] = str(error)
         children_passed = set(summary["children"]) == set(lanes) and all(
             "error" not in child and child.get("exit_code") == 0
             for child in summary["children"].values()
         )
-        if not summary.get("source_error") and children_passed:
-            summary["static_checks"] = run_static_checks(args, evidence_dir)
-        else:
-            summary["static_checks"] = {}
         try:
             summary["final_source"] = verify_source(args)
         except CertificationError as error:
@@ -1484,15 +1557,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         summary["totals"] = counts
         summary["status"] = (
             "passed"
-            if (
-                not summary.get("source_error")
-                and children_passed
-                and len(summary["static_checks"]) == 3
-                and all(
-                    check.get("exit_code") == 0
-                    for check in summary["static_checks"].values()
-                )
-            )
+            if (not summary.get("source_error") and children_passed and static_passed)
             else "failed"
         )
     finally:

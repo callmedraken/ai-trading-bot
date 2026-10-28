@@ -1377,7 +1377,13 @@ module list.
 All profiles retain exact clean source/local-tracking/live-origin admission,
 post-test/final verification, protected-opt-in rejection, external temp-root and
 JUnit/evidence validation, and whole-repository `ruff check --no-cache .`,
-`ruff format --check --no-cache .`, and `git diff --check`. Evidence records the
+`ruff format --check --no-cache .`, and `git diff --check`. Ruff is frozen at
+0.17.3 in development and CI. FULL-mode local admission rejects any other version
+before static checks or pytest and never installs tools. Canonical certification
+uses the same Ruff commands/root (`.`), including Markdown; static checks must pass
+after inventory/topology construction and before pytest children start. Static
+failure preserves canonical evidence; final source identity checks still run.
+Evidence records the
 profile, repository/selected/excluded inventories, support classification and
 exact lanes. `inventory.json` retains `all` as the complete repository inventory;
 only EXHAUSTIVE selects all of it. `--plan` saves topology/evidence without

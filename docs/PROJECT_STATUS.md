@@ -67,9 +67,13 @@ and custody. Published B1-C1 source is on
 #782 / run `40649744489` / attempt 1 completed FAILURE and was classified
 `PREPUBLICATION_COVERAGE_DEFECT`; the exact failures and C2 correction are
 recorded once in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
-B1-C2 is the bounded corrective candidate. It requires complete local focused
+B1-C2's canonical tests passed, but #783 failed static-format/toolchain parity
+and exceeded the unchanged timing ceiling. B1-C3 is the bounded static parity
+correction, recorded in the validation plan. It requires complete local focused
 verification, clean-candidate admission and terminal mapped GitHub CI before
-ChatGPT exact-source acceptance; it is not accepted or integrated.
+ChatGPT exact-source acceptance; it is not accepted or integrated. A fresh wall
+at or above 300 seconds is STOP for timing review; B-E implementation stays gated
+on terminal-green C3 and publication on base acceptance/integration.
 
 Both real custody and historical-session admission registries remain empty.
 The source-only kernel has no native B2 bindings or preflight/execute dispatcher.

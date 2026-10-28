@@ -1,6 +1,6 @@
 # Architecture 146-B — Acquisition/Custody Validation Plan
 
-Status: **B1-C1 PUBLISHED / CI FAILED; B1-C2 CORRECTIVE REVIEW PENDING.**
+Status: **B1-C1/C2 PUBLISHED / CI FAILED; B1-C3 STATIC PARITY CORRECTION PENDING.**
 
 ## B1 required source verification
 
@@ -214,7 +214,7 @@ Exact clean FEATURE/PROSPECTIVE_DEVELOP admission and canonical FULL follow only
 after an explicitly authorized atomic candidate commit and publication. Neither
 local synthetic verification nor this document reports source acceptance.
 
-## 146-B1-C1 � prepublication certification-inventory correction
+## 146-B1-C1 — prepublication certification-inventory correction
 
 Initial unpublished candidate a0d7050c52957abab292ce98d4d3a7265d9f4d63,
 tree f6145307daec6c1765443bd819a69e6f046f2861, failed its local required
@@ -271,3 +271,40 @@ FEATURE and PROSPECTIVE_DEVELOP admission, then one ordinary push and terminal
 mapped GitHub CI before exact-source review. It grants no source acceptance or
 integration. No B2 credential, network, filesystem, custody, ACL, holdout, host,
 paper, broker or live effect occurred.
+
+## 146-B1-C3 - static-toolchain/file-universe parity correction
+
+Preserve #782 and #783 / run `40658848795` / attempt 1 unchanged. C2 source
+HEAD `2ec59d6a8f409d469485815106c5087125b977be`, TREE
+`17c2985af56076d9aef8ec4c1b5abe2d623a7e69` passed all canonical test cases:
+14,700 total, 14,694 passed, 6 skipped, 0 failed/errors. Canonical Ruff check
+passed; Ruff format failed on this document's preexisting non-UTF-8 byte.
+The canonical FULL wall was 354.487 seconds, above the unchanged 300-second
+hygiene ceiling. This remains an immutable timing observation, not authority
+to change topology, timing maps, pins, weights, dependencies or test inventory.
+
+Classification:
+`PREPUBLICATION_COVERAGE_DEFECT / STATIC_TOOLCHAIN_FILE_UNIVERSE_PARITY`.
+Local Ruff 0.15.21 and CI Ruff 0.17.3 came from the prior open dependency range;
+their formatter file universes differed. C3 normalizes the single Windows-1252
+0x97 heading byte to UTF-8 U+2014, preserving the prose, and freezes Ruff 0.17.3
+for development, admission and every relevant workflow install. The current
+certification owner validates dependency/install parity; the old pyproject pin
+reconstructs its immutable historical object instead of pinning today's tools.
+Local admission and canonical certification share exact version expectations and whole-root
+non-mutating commands. Markdown remains in the canonical formatter universe.
+
+Canonical static checks now precede certification children; version/static
+failure persists evidence without launching pytest. Source identity, lane
+topology, inventory, timeouts and result accounting remain in force. Admission
+adds the affected certification result/source regressions to the C2 coherence
+bundle. No canonical FULL runs locally.
+
+C3 requires complete focused verification, combined static checks, exact clean
+candidate FEATURE/PROSPECTIVE_DEVELOP admission, one atomic normal commit/push
+and one terminal mapped CI result. If fresh canonical wall remains at or above
+300 seconds, preserve it and STOP for ChatGPT timing review without an unchanged
+rerun or automatic topology correction. Terminal-green C3 is required before
+B-E implementation; publication additionally requires base acceptance/integration.
+No source acceptance, integration or B2 credential/network/custody/ACL authority
+is granted here. R3 remains parked and LIVE remains NO-GO.

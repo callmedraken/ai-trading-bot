@@ -202,7 +202,7 @@ def test_final_source_verification_repeats_live_origin_proof(
         "run_static_checks",
         lambda *args: {
             name: {"exit_code": 0}
-            for name in ("ruff_check", "ruff_format", "git_diff_check")
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
         },
     )
     args.python = Path("python")

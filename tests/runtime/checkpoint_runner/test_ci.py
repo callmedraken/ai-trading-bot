@@ -1649,6 +1649,7 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
 
     required_paths = (
         ".github/workflows/checkpoint-source-gates.yml",
+        "pyproject.toml",
         "scripts/checkpoint_runner.py",
         "scripts/run_test_certification.py",
         "scripts/source_authority.py",
@@ -1748,6 +1749,8 @@ def _r3n_admission_fixture(monkeypatch):
             return subprocess.CompletedProcess(
                 argv, 0, context.get("raw_changed", raw), b""
             )
+        if list(argv) == [runner.sys.executable, "-m", "ruff", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "ruff 0.17.3\n", "")
         assert argv[0] == "git", "unexpected Python/host command"
         return original_run(argv, **kwargs)
 
@@ -2859,6 +2862,9 @@ def test_full_public_admission_retains_ordinary_complete_verifier(
 
     def verify(spec, **kwargs):
         captured.append(spec)
+        version = kwargs.pop("ruff_version")
+        assert version["expected"] == version["actual"] == "ruff 0.17.3"
+        assert version["exit_code"] == 0
         assert kwargs == {"repo_root": root, "evidence_root": tmp_path}
         assert spec.tests == runner.ARCH132_R3N_ADMISSION_TESTS
         assert spec.ruff_paths == (".",)
@@ -3038,3 +3044,22 @@ def test_public_admission_does_not_retry_rejected_source_as_full(
         runner.prepublication_admission(
             repo_root=root, evidence_root=tmp_path / "evidence"
         )
+
+
+@pytest.mark.parametrize("actual", ["ruff 0.15.21", "unavailable", "ruff 0.17.30"])
+def test_full_admission_rejects_ruff_mismatch_before_verification(
+    monkeypatch, tmp_path, actual
+):
+    root, _ = _r3n_admission_fixture(monkeypatch)
+    monkeypatch.setattr(
+        runner,
+        "check_ruff_version",
+        lambda *args: {"exit_code": 1, "expected": "ruff 0.17.3", "actual": actual},
+    )
+    monkeypatch.setattr(
+        runner,
+        "verify_checkpoint",
+        lambda *args, **kwargs: pytest.fail("expensive gate started"),
+    )
+    with pytest.raises(RuntimeError, match=f"expected ruff 0.17.3; current {actual}"):
+        runner.prepublication_admission(repo_root=root, evidence_root=tmp_path)

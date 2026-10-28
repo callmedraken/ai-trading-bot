@@ -65,6 +65,7 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
     ):
         assert ownership.current_owner(symbol) == "checkpoint_runner"
     assert ownership.current_owner("AGENTS.md") == "workflow_coordination"
+    assert ownership.current_owner("pyproject.toml") == "certification"
 
 
 def test_historical_harness_reconstructs_immutable_object_independent_of_current_bytes(
@@ -649,3 +650,15 @@ def test_current_owner_rejects_malformed_harness_without_changing_history(monkey
 
 def test_general_admission_static_scope_covers_prospective_source_static():
     assert runner.ARCH132_R3N_ADMISSION_RUFF_PATHS == (".",)
+
+
+def test_historical_toolchain_pin_reconstructs_without_repinning_current_dependencies(
+    tmp_path,
+):
+    relative = "pyproject.toml"
+    pin = runner.ARCH132_R3M_FROZEN_SOURCE_PINS[relative]
+    path = tmp_path / relative
+    path.write_text('ruff = "future current toolchain"\n', encoding="utf-8")
+    assert ownership.classify_path(relative) is ownership.PinClass.CURRENT_MUTABLE
+    assert ownership.blob_matches(tmp_path, path, pin)
+    assert not ownership.blob_matches(tmp_path, path, "0" * 40)

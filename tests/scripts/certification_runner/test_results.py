@@ -1,5 +1,9 @@
 import argparse
 import json
+import re
+import subprocess
+import sys
+import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -108,7 +112,12 @@ def test_failed_child_sets_failed_summary(
         },
     )
     monkeypatch.setattr(
-        runner, "run_static_checks", lambda *args: pytest.fail("static checks ran")
+        runner,
+        "run_static_checks",
+        lambda *args: {
+            name: {"exit_code": 0}
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
+        },
     )
     args = argparse.Namespace(
         root=tmp_path,
@@ -169,7 +178,7 @@ def test_exact_profile_lane_success_accounting(
         static_calls.append(True)
         return {
             name: {"exit_code": 0}
-            for name in ("ruff_check", "ruff_format", "git_diff_check")
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
         }
 
     monkeypatch.setattr(runner, "run_static_checks", static)
@@ -186,7 +195,7 @@ def test_exact_profile_lane_success_accounting(
     )
     result = runner.run(args)
     assert result["status"] == ("passed" if outcome == "pass" else "failed")
-    assert bool(static_calls) == (outcome == "pass")
+    assert static_calls == [True]
 
 
 @pytest.mark.parametrize("profile", runner.PROFILES)
@@ -217,12 +226,15 @@ def test_static_checks_remain_whole_repository(
     def fake_run(command, **kwargs):
         assert kwargs["cwd"] == tmp_path
         commands.append(command)
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(
+            returncode=0, stdout=f"ruff {runner.RUFF_VERSION}\n", stderr=""
+        )
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     args = argparse.Namespace(root=tmp_path, python=Path("python"), profile=profile)
     runner.run_static_checks(args, tmp_path)
     assert commands == [
+        ["python", "-m", "ruff", "--version"],
         ["python", "-m", "ruff", "check", "--no-cache", "."],
         ["python", "-m", "ruff", "format", "--check", "--no-cache", "."],
         ["git", "diff", "--check"],
@@ -273,7 +285,7 @@ def test_github_actions_runner_temp_descendant_is_allowed(
         "run_static_checks",
         lambda *args: {
             name: {"exit_code": 0}
-            for name in ("ruff_check", "ruff_format", "git_diff_check")
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
         },
     )
     args = SimpleNamespace(
@@ -352,7 +364,7 @@ def test_six_child_totals_and_single_child_failure_fail_certification(
         "run_static_checks",
         lambda *args: {
             name: {"exit_code": 0}
-            for name in ("ruff_check", "ruff_format", "git_diff_check")
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
         },
     )
     args = SimpleNamespace(
@@ -374,3 +386,193 @@ def test_six_child_totals_and_single_child_failure_fail_certification(
     if outcome in {"missing_junit", "malformed_junit"}:
         expected.update(cases=25, passed=15, skipped=10)
     assert summary["totals"] == expected
+
+
+@pytest.mark.parametrize(
+    "actual,code",
+    [
+        ("ruff 0.17.3\n", 0),
+        ("ruff 0.15.21\n", 0),
+        ("ruff 0.17.30\n", 0),
+        ("ruff 0.17.3 (unexpected)\n", 0),
+        ("", 0),
+        ("ruff 0.17.3\n", 1),
+    ],
+)
+def test_exact_ruff_version_fails_closed(monkeypatch, tmp_path, actual, code):
+    calls = []
+
+    def execute(command, **kwargs):
+        calls.append(command)
+        assert kwargs["cwd"] == tmp_path
+        assert kwargs["timeout"] == 30
+        return SimpleNamespace(returncode=code, stdout=actual, stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", execute)
+    result = runner.check_ruff_version("python", tmp_path)
+    assert result["expected"] == "ruff 0.17.3"
+    assert result["actual"] == actual.strip()
+    assert result["exit_code"] == (
+        0 if actual.strip() == "ruff 0.17.3" and not code else 1
+    )
+    assert calls == [["python", "-m", "ruff", "--version"]]
+
+
+@pytest.mark.parametrize(
+    "error", [OSError("missing Ruff"), subprocess.TimeoutExpired("ruff", 30)]
+)
+def test_unavailable_ruff_stops_canonical_static_checks(monkeypatch, tmp_path, error):
+    calls = []
+
+    def execute(command, **kwargs):
+        calls.append(command)
+        raise error
+
+    monkeypatch.setattr(runner.subprocess, "run", execute)
+    result = runner.run_static_checks(
+        SimpleNamespace(root=tmp_path, python="python"), tmp_path
+    )
+    assert set(result) == {"ruff_version"}
+    assert result["ruff_version"]["exit_code"] == 1
+    assert result["ruff_version"]["actual"] == "unavailable"
+    assert len(calls) == 1
+    assert (tmp_path / "ruff_version.stderr.log").read_text(encoding="utf-8")
+
+
+def test_local_and_canonical_static_contract_is_identical(tmp_path):
+    from scripts import checkpoint_runner as checkpoint
+
+    root = Path(runner.__file__).resolve().parents[1]
+    dev = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"
+    ]["optional-dependencies"]["dev"]
+    assert [item for item in dev if item.startswith("ruff")] == ["ruff==0.17.3"]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    assert re.findall(r'"(ruff[^"]+)"', workflow) == ["ruff==0.17.3"] * 4
+    assert runner.RUFF_VERSION == "0.17.3"
+    assert checkpoint.check_ruff_version is runner.check_ruff_version
+    assert checkpoint.CANONICAL_RUFF_ROOTS == runner.CANONICAL_RUFF_ROOTS == (".",)
+    spec = checkpoint.CheckpointSpec(
+        name=checkpoint.ARCH132_R3N_ADMISSION_NAME,
+        description="parity",
+        tests=("tests/example.py",),
+        ruff_paths=checkpoint.ARCH132_R3N_ADMISSION_RUFF_PATHS,
+        authority_check=lambda _: (),
+    )
+    steps = checkpoint.build_verification_steps(
+        spec, python_executable="python", basetemp=tmp_path
+    )
+    local = {
+        step.name: list(step.argv) for step in steps if step.name.startswith("ruff")
+    }
+    assert (
+        local
+        == runner.canonical_ruff_commands("python")
+        == {
+            "ruff_check": ["python", "-m", "ruff", "check", "--no-cache", "."],
+            "ruff_format": [
+                "python",
+                "-m",
+                "ruff",
+                "format",
+                "--check",
+                "--no-cache",
+                ".",
+            ],
+        }
+    )
+
+
+def test_canonical_formatter_reads_acquisition_validation_plan():
+    root = Path(runner.__file__).resolve().parents[1]
+    path = "docs/validation/arch146-b-historical-research-acquisition-custody-plan.md"
+    (root / path).read_bytes().decode("utf-8")
+    completed = subprocess.run(
+        [sys.executable, "-m", "ruff", "format", "--check", "--no-cache", path],
+        cwd=root,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [None, "ruff_version", "ruff_check", "ruff_format", "git_diff_check", "missing"],
+)
+def test_static_gate_precedes_children_and_persists_evidence(
+    tmp_path, monkeypatch, failure
+):
+    _profile_inventory(tmp_path, "full")
+    monkeypatch.setattr(runner, "DEFAULT_TEMP_ROOT", tmp_path)
+    events = []
+
+    def source(args):
+        events.append("source")
+        return {"head": "h", "tree": "t"}
+
+    def static(*args):
+        events.append("static")
+        results = {
+            name: {"exit_code": int(name == failure)}
+            for name in ("ruff_version", "ruff_check", "ruff_format", "git_diff_check")
+        }
+        if failure == "missing":
+            results.pop("ruff_format")
+        return results
+
+    def children(args, lanes, evidence):
+        if failure:
+            pytest.fail("pytest child started after static failure")
+        events.append("children")
+        return {name: {"exit_code": 0} for name in lanes}
+
+    monkeypatch.setattr(runner, "verify_source", source)
+    monkeypatch.setattr(runner, "run_static_checks", static)
+    monkeypatch.setattr(runner, "run_children", children)
+    args = SimpleNamespace(
+        root=tmp_path,
+        python=Path("python"),
+        expected_feature_ref=None,
+        expected_feature_head=None,
+        timeout_seconds=1,
+        temp_root=tmp_path,
+        plan=False,
+        profile="full",
+        evidence_dir=tmp_path.parent / f"{tmp_path.name}-static-evidence",
+    )
+    result = runner.run(args)
+    assert events == (
+        ["source", "static", "source"]
+        if failure
+        else ["source", "static", "children", "source", "source"]
+    )
+    assert result["status"] == ("failed" if failure else "passed")
+    assert result["final_source"] == {"head": "h", "tree": "t"}
+    assert json.loads((args.evidence_dir / "results.json").read_text()) == result
+    assert (args.evidence_dir / "inventory.json").is_file()
+    if failure:
+        assert result["children"] == {}
+        assert result["totals"] == dict(
+            cases=0, passed=0, skipped=0, failed=0, errors=0
+        )
+        assert "post_test_source" not in result
+
+
+@pytest.mark.parametrize(
+    "path", ["pyproject.toml", ".github/workflows/checkpoint-source-gates.yml"]
+)
+def test_current_toolchain_owner_rejects_version_drift(tmp_path, path):
+    root = Path(runner.__file__).resolve().parents[1]
+    for relative in ("pyproject.toml", ".github/workflows/checkpoint-source-gates.yml"):
+        destination = tmp_path / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        text = (root / relative).read_text(encoding="utf-8")
+        if relative == path:
+            text = text.replace("ruff==0.17.3", "ruff>=0.6,<1.0")
+        destination.write_text(text, encoding="utf-8")
+    assert runner.static_toolchain_contract_failures(root) == ()
+    assert runner.static_toolchain_contract_failures(tmp_path)

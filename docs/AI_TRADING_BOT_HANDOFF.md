@@ -184,10 +184,14 @@ local discovery evidence and is not part of the intended source checkpoint.
 B1-C1 was published but is not accepted or integrated. Its exact source
 identity and immutable push-triggered Checkpoint Source Gates #782 / run
 `40649744489` / attempt 1 evidence are recorded in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
-B1-C2 is a bounded corrective candidate; require focused verification and
-complete clean-candidate FEATURE and PROSPECTIVE_DEVELOP admission before its
-single ordinary push. Wait for terminal mapped GitHub CI, then ChatGPT exact-source
-review. Do not run canonical FULL locally or treat C2 as accepted/integrated.
+B1-C2 was published at HEAD `2ec59d6a8f409d469485815106c5087125b977be`,
+TREE `17c2985af56076d9aef8ec4c1b5abe2d623a7e69`. Preserve failed #783 /
+`40658848795` / attempt 1 and #782 unchanged. B1-C3 corrects static-toolchain/
+file-universe parity; require focused verification and complete clean-candidate
+FEATURE and PROSPECTIVE_DEVELOP admission before its one ordinary push. Wait for
+terminal mapped GitHub CI and STOP for ChatGPT timing review if canonical wall
+remains >=300 seconds. Do not run canonical FULL locally or treat C3 as accepted
+or integrated. The validation plan owns the failure details and exact C3 scope.
 
 B2 has no native bindings or registered host dispatcher here. Before any real
 attempt, separately review its native source/host binding and exact published
@@ -196,15 +200,11 @@ its immutable evidence and freeze the source-owned custody admission before
 normal OPEN research. The current raw-material OPEN verifier must not receive
 mixed acquired pages. R3 remains consumed/parked; LIVE remains NO-GO.
 
-### Pending 146-B1-C2 correction
+### Preserved 146-B1-C2 correction
 
-B1-C1's published canonical FULL failure is preserved as #782. The bounded C2
-candidate repairs the historical workflow reconstruction and separates frozen
-Architecture-143 pin/object checks from current mutable test bytes. The local
-admission path now adds a focused current/historical coherence bundle for the
-mutable workflow, runner, certification, source-authority and related test
-surfaces. Require full focused verification and general `ops.ps1 admit` before
-one ordinary corrective push; then wait for one terminal mapped CI result.
-The candidate grants no source acceptance or integration. No real B2 acquisition,
-credentials, holdout/custody, ACL, provider, host, paper, broker or live effect
-has occurred.
+Published C2 repaired historical workflow reconstruction and separated frozen
+Architecture-143 pin/object checks from current mutable test bytes. Its local
+coherence bundle remains in force and C3 adds the affected result/source tests.
+The next publication boundary is C3 above; C2 is not accepted or integrated.
+No real B2 acquisition, credentials, holdout/custody, ACL, provider, host, paper,
+broker or live effect has occurred.

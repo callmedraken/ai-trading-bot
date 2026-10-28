@@ -94,7 +94,7 @@ def current_owner(relative: str) -> str | None:
         "scripts/current_source_authority.py",
     }:
         return "checkpoint_runner"
-    if relative == "scripts/run_test_certification.py":
+    if relative in {"scripts/run_test_certification.py", "pyproject.toml"}:
         return "certification"
     if relative == ".github/workflows/checkpoint-source-gates.yml":
         return "ci_workflow"

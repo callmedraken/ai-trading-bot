@@ -30,6 +30,11 @@ from scripts.current_source_authority import (
     PublicationContext,
     evaluate_source_authority,
 )
+from scripts.run_test_certification import (
+    CANONICAL_RUFF_ROOTS,
+    canonical_ruff_commands,
+    check_ruff_version,
+)
 from scripts.source_authority import ast_matches as _authority_ast_matches
 from scripts.source_authority import blob_matches as _authority_blob_matches
 from scripts.source_authority import (
@@ -418,17 +423,20 @@ ARCH132_R3N_ADMISSION_TESTS: Final = (
     "tests/scripts/certification_runner/test_profiles.py",
     "tests/scripts/certification_runner/test_lanes.py",
 )
-ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = (".",)
+ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = CANONICAL_RUFF_ROOTS
 
-# Current mutable infrastructure changes add the two bounded cross-era regressions
+# Current infrastructure changes add bounded cross-era/certification regressions
 # to the ordinary local admission bundle. Canonical FULL remains GitHub-owned.
 PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS: Final = (
     "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
     "tests/experiments/test_research_strategy_production_compatibility.py",
+    "tests/scripts/certification_runner/test_results.py",
+    "tests/scripts/certification_runner/test_source.py",
 )
 PREPUBLICATION_INFRASTRUCTURE_PATHS: Final = frozenset(
     {
         ".github/workflows/checkpoint-source-gates.yml",
+        "pyproject.toml",
         "scripts/checkpoint_runner.py",
         "scripts/run_test_certification.py",
         "scripts/source_authority.py",
@@ -24457,17 +24465,22 @@ def build_verification_steps(
     junitxml: Path | None = None,
 ) -> tuple[Step, ...]:
     test_paths = spec.tests if tests is None else tuple(tests)
+    canonical = canonical_ruff_commands(python_executable)
     return (
         Step("git_diff_check", ("git", "diff", "--check")),
         Step(
             "ruff_check",
             (
-                python_executable,
-                "-m",
-                "ruff",
-                "check",
-                "--no-cache",
-                *spec.ruff_paths,
+                tuple(canonical["ruff_check"])
+                if spec.name == ARCH132_R3N_ADMISSION_NAME
+                else (
+                    python_executable,
+                    "-m",
+                    "ruff",
+                    "check",
+                    "--no-cache",
+                    *spec.ruff_paths,
+                )
             ),
             (
                 python_executable,
@@ -24482,13 +24495,17 @@ def build_verification_steps(
         Step(
             "ruff_format",
             (
-                python_executable,
-                "-m",
-                "ruff",
-                "format",
-                "--check",
-                "--no-cache",
-                *spec.ruff_paths,
+                tuple(canonical["ruff_format"])
+                if spec.name == ARCH132_R3N_ADMISSION_NAME
+                else (
+                    python_executable,
+                    "-m",
+                    "ruff",
+                    "format",
+                    "--check",
+                    "--no-cache",
+                    *spec.ruff_paths,
+                )
             ),
             (
                 python_executable,
@@ -24671,6 +24688,7 @@ def verify_checkpoint(
     *,
     repo_root: Path,
     evidence_root: Path,
+    ruff_version: Mapping[str, object] | None = None,
 ) -> tuple[bool, Path]:
     state_before = _git_state(repo_root)
     if state_before["porcelain"]:
@@ -24768,6 +24786,7 @@ def verify_checkpoint(
         "checkpoint": spec.name,
         **({"mode": "FULL"} if spec.name == ARCH132_R3N_ADMISSION_NAME else {}),
         "description": spec.description,
+        **({"ruff_version": dict(ruff_version)} if ruff_version is not None else {}),
         "status": "PASS" if passed else "FAIL",
         "phase": phase,
         "test_shard": None if shard is None else {"index": shard[0], "count": shard[1]},
@@ -24835,10 +24854,17 @@ def prepublication_admission(
         ruff_paths=ARCH132_R3N_ADMISSION_RUFF_PATHS,
         authority_check=_arch134_r3n_prepublication_authority_check,
     )
+    version = check_ruff_version(sys.executable, repo_root)
+    if version["exit_code"]:
+        raise RuntimeError(
+            f"Ruff toolchain mismatch: expected {version['expected']}; "
+            f"current {version['actual']}. STOP before static checks or pytest."
+        )
     return verify_checkpoint(
         spec,
         repo_root=repo_root,
         evidence_root=evidence_root,
+        ruff_version=version,
     )
 
 

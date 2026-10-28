@@ -254,6 +254,9 @@ def test_r3n_prepublication_admission_dispatches_current_successor_authority(
     assert result == (True, tmp_path / "report.json")
     spec = captured["spec"]
     assert spec.authority_check is runner._arch134_r3n_prepublication_authority_check
+    version = captured["kwargs"].pop("ruff_version")
+    assert version["expected"] == version["actual"] == "ruff 0.17.3"
+    assert version["exit_code"] == 0
     assert captured["kwargs"] == {
         "repo_root": tmp_path,
         "evidence_root": tmp_path / "evidence",

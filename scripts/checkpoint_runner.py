@@ -25087,6 +25087,44 @@ def _ci_changes(repo_root: Path, head: str) -> dict[str, object]:
         event_name = os.environ.get("GITHUB_EVENT_NAME")
         if event_name == "push":
             base = event.get("before")
+            if base == "0" * 40:
+                # A new branch has no event base. Only an exact single commit
+                # on today's develop can supply one; uncertainty stays FULL.
+                ref = event.get("ref")
+                if (
+                    not re.fullmatch("[0-9a-f]{40}", head)
+                    or event.get("after") != head
+                    or os.environ.get("GITHUB_SHA") != head
+                    or not isinstance(ref, str)
+                    or not ref.startswith("refs/heads/")
+                    or ref != os.environ.get("GITHUB_REF")
+                    or not ref.removeprefix("refs/heads/").startswith(
+                        REVIEWED_FEATURE_BRANCH_PREFIXES
+                    )
+                    or event.get("created") is not True
+                    or event.get("deleted") is not False
+                    or event.get("forced") is not False
+                ):
+                    return fallback
+                if (
+                    _git_output(repo_root, "rev-parse", "HEAD") != head
+                    or _git_output(repo_root, "rev-parse", "--is-shallow-repository")
+                    != "false"
+                    or _git_output(repo_root, "remote", "get-url", "origin")
+                    not in SOURCE_ORIGIN_URLS
+                ):
+                    return fallback
+                base = _remote_branch_head(repo_root, "develop")
+                if (
+                    not re.fullmatch("[0-9a-f]{40}", base)
+                    or _git_output(
+                        repo_root, "rev-parse", "refs/remotes/origin/develop"
+                    )
+                    != base
+                    or _git_output(repo_root, "rev-list", "--parents", "-n", "1", head)
+                    != f"{head} {base}"
+                ):
+                    return fallback
         elif event_name == "pull_request":
             base = event["pull_request"]["base"]["sha"]
         else:
@@ -25114,6 +25152,8 @@ def _ci_changes(repo_root: Path, head: str) -> dict[str, object]:
             return fallback
         paths = raw.removesuffix("\x00").split("\x00") if raw else []
         mode = classify_changed_paths(paths)
+        if type(mode) is not str or mode not in ("DOCS_ONLY", "FULL"):
+            return fallback
         return {
             "mode": mode,
             "base": base,

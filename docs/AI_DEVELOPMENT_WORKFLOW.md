@@ -13,9 +13,10 @@ This does not broaden a command, authorize unexpected effects or ambiguous/
 partial-state repair, permit automatic retry after ambiguity/partially consumed
 effects, override real-money NO-GO, or make source/commit authority alone
 sufficient for integration. Separately, the user has granted ChatGPT standing
-authorization for an ordinary reviewed feature-branch merge into `develop`
+authorization for ordinary reviewed feature-branch integration into `develop`
 after ChatGPT independently determines exact review, required certification,
-and merge readiness are complete. That integration authorization does not
+and merge readiness are complete. Prefer exact-SHA fast-forward integration
+under the current Architecture 132 throughput contract; PR merge is fallback-only. That integration authorization does not
 extend to Codex, rebase, amend, force-push, pull-request mutation, protected
 effects, or ambiguity repair/retry. Unexpected, ambiguous, partially completed,
 source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
@@ -74,6 +75,164 @@ Canonical mapped ROBINHOOD/FULL stays GitHub-owned and is not a local debug loop
 
 The R3M/R3N narrative below preserves predecessor chronology; its exact overlays
 are immutable records, superseded as owners of current mutable infrastructure.
+
+## Architecture 132 — current throughput and non-regression contract
+
+### First-push changed-range identity
+
+For a push with `before=0000000000000000000000000000000000000000`,
+CI may use exact current `origin/develop` only after proving the expected push
+HEAD against event `after`, `GITHUB_SHA` and actual checkout HEAD; matching event
+and environment refs in an admitted feature family; a created, non-deleted,
+non-forced push; the reviewed origin; complete non-shallow history; matching
+live and tracking develop identities; and exactly one HEAD parent equal to that
+current develop commit. The exact nonempty range then uses the same closed
+`classify_changed_paths` classifier as local `ops.ps1 admit`. Two strict
+`docs/**` changes are DOCS_ONLY. Source, tests, workflow, mixed or unknown paths
+remain FULL. Empty ranges, stale/diverged or multiple parents, multiple commits,
+unavailable refs/objects, malformed events, shallow gaps and any classification
+uncertainty remain FULL. Zero-before alone never grants the cheap route.
+Normal nonzero push and intentional `pull_request` range handling is unchanged.
+
+### Exact-SHA fast-forward integration and PR non-duplication
+
+After ChatGPT's exact-source acceptance, required certification and independent
+merge-readiness review, ordinary accepted strict-descendant feature work prefers
+FAST-FORWARD integration. Prove the exact expected old develop HEAD/tree against
+live origin immediately before integration, current develop is the accepted
+feature's exact ancestor, and no intervening develop change exists. Use ordinary
+Git `git merge --ff-only <accepted-feature-SHA>` in an admitted integration
+checkout followed by ordinary `git push origin develop`. Do not rebase, squash,
+amend, force, rewrite the feature SHA, or use arbitrary GitHub ref mutation as the
+normal path. Resulting remote develop HEAD must equal the exact accepted feature
+SHA and its tree must equal the accepted feature tree. Any changed or ambiguous
+identity is STOP; do not repair or retry automatically. This policy does not
+grant Codex integration authority.
+
+Routine already source-reviewed integration does not create a PR when exact
+fast-forward integration is available. This retains exact-SHA certification
+provenance for existing develop reuse and avoids a duplicate pull_request gate.
+A PR merge commit is fallback-only when fast-forward is unavailable, explicitly
+required, or the history no longer permits it; its resulting source still needs
+normal admission. Keep `pull_request` workflow support and protection for
+intentionally needed PRs. Do not add a second certification framework for PRs.
+
+### Canonical closeout batching and document ownership
+
+Review both canonical coordination documents after acceptance. An additional
+publication is NOT mandatory before an immediately following already-reviewed
+READ-ONLY observation in the same continuing session when executable source is
+exact-source accepted, integration is terminal green, the observation is
+independently registered and bound to that exact reviewed source, `execute=None`
+or no protected-effect authority follows, and delaying coordination publication
+cannot alter executable authority. The permitted sequence is:
+
+```text
+source acceptance -> exact fast-forward integration -> develop source gate
+-> one reviewed read-only observation
+-> one bounded canonical closeout recording BOTH integration and observation
+```
+
+The closeout remains mandatory before a protected/write effect, a new milestone
+that relies on changed coordination state, a new-session handoff whose current
+docs would materially mislead, or executable-source selection that depends on
+updated coordination state. If any batching condition is absent, close out
+before advancing. Coordination documents remain non-executable authority.
+Review is mandatory after acceptance; publication may be batched only within
+these bounds. Record a deferred closeout explicitly; do not claim it complete.
+
+`PROJECT_STATUS.md` owns the bounded dashboard: current milestone/state,
+blocker, roadmap and immediate next boundary. `AI_TRADING_BOT_HANDOFF.md` owns
+exact continuation identities, evidence paths/hashes, consumed-attempt state
+and exact operator boundary. Do not copy the same long chronology or every
+SHA/run paragraph into both. Historical detail belongs once in the relevant
+architecture, validation or history record.
+
+### Green over-certification classification
+
+Classify `CI_ROUTING_OVERCERTIFICATION` only when local exact admission proves
+a cheaper route, GitHub unexpectedly executes a strictly stronger route, that
+route completes terminal green, exact source is unchanged and no required gate
+was skipped. This is not a source failure or `PREPUBLICATION_COVERAGE_DEFECT`,
+and requires neither a CI rerun nor a replacement source commit. Preserve the
+run, inspect/classify its routing defect, and correct workflow separately.
+Under-certification or skipped required evidence remains STOP.
+
+Preserved #768 / run 40599615809 is green over-certification evidence: local
+admission was DOCS_ONLY but the new branch's zero-before push fell back FULL.
+The later #770 / run 40601133954 classified the same two-document range as
+DOCS_ONLY. #766 / run 40595810212 was duplicate PR execution; #767 /
+run 40595839765 repeated broad execution because the merge SHA differed from
+the accepted feature SHA despite an identical tree. These runs are immutable;
+this correction does not rerun them or weaken exact-SHA reuse.
+
+### Worktree discovery and guarded operator dispatch
+
+All auxiliary worktrees remain under `F:\AI\worktrees`. Never invent or derive a
+worktree path from a branch name. Use a path already proven in current evidence,
+or discover it with `git worktree list --porcelain` and require exactly one match
+on the reviewed branch + HEAD. Establish/discover identity within the same
+`& { ... }` block as dispatch; never depend on the caller's current directory.
+Before dispatch prove branch, HEAD, tree and tracked/index cleanliness.
+Absent, multiple or mismatched worktrees are pre-dispatch NOT_RUN and do not
+consume a host attempt. Parser, path and source-precondition failures before
+dispatch are also NOT_RUN. A host result exists only after registered dispatch.
+
+The two unsuccessful R2 invocations were pre-dispatch/non-consuming: a stale
+checkout did not register R2, and a guessed worktree path did not exist. Only the
+later exact R2 worktree invocation consumed R2. R2 is consumed and must not be
+rerun. Preserve its BLOCKED/HOST/HOST_TOKEN_POLICY evidence; this workflow
+checkpoint grants no host, token-policy or production change authority.
+
+Guarded operator command template (bind the reviewed constants and exact
+checkpoint-specific arguments before use; this is not an R2 invocation):
+
+```powershell
+& {
+    $ErrorActionPreference = 'Stop'
+    # Replace these literals inside this block from the accepted contract.
+    $ReviewedBranch = '<exact-reviewed-branch>'
+    $ReviewedHead = '<exact-reviewed-HEAD>'
+    $ReviewedTree = '<exact-reviewed-tree>'
+    $Checkpoint = '<registered-checkpoint>'
+    $ReviewedPreflightArguments = @() # Exact contract arguments, if required.
+    $Registry = @(git -C 'F:\AI\ai-trading-bot' worktree list --porcelain)
+    if ($LASTEXITCODE -ne 0) { throw 'NOT_RUN: worktree registry unavailable' }
+    $Records = ($Registry -join "`n") -split "`n`n"
+    $WorktreeMatches = @($Records | Where-Object {
+        ($_ -split "`n") -contains "branch refs/heads/$ReviewedBranch" -and
+        ($_ -split "`n") -contains "HEAD $ReviewedHead"
+    })
+    if ($WorktreeMatches.Count -ne 1) { throw 'NOT_RUN: worktree match not unique' }
+    $Worktree = ($WorktreeMatches[0] -split "`n")[0].Substring(9)
+    $Worktree = (Resolve-Path -LiteralPath $Worktree).Path
+    if (-not $Worktree.StartsWith('F:\AI\worktrees\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'NOT_RUN: noncanonical auxiliary worktree'
+    }
+    $Branch = git -C $Worktree branch --show-current
+    if ($LASTEXITCODE -ne 0 -or $Branch -ne $ReviewedBranch) { throw 'NOT_RUN: branch' }
+    $Head = git -C $Worktree rev-parse HEAD
+    if ($LASTEXITCODE -ne 0 -or $Head -ne $ReviewedHead) { throw 'NOT_RUN: HEAD' }
+    $Tree = git -C $Worktree rev-parse 'HEAD^{tree}'
+    if ($LASTEXITCODE -ne 0 -or $Tree -ne $ReviewedTree) { throw 'NOT_RUN: tree' }
+    $Dirty = @(git -C $Worktree status --porcelain=v1 --untracked-files=no)
+    if ($LASTEXITCODE -ne 0 -or $Dirty.Count) { throw 'NOT_RUN: tracked/index state' }
+    $EvidenceRoot = "F:\AI\temp\ai-trading-bot-checkpoints\operator-$([guid]::NewGuid().ToString('N'))"
+    & (Join-Path $Worktree 'ops.ps1') preflight $Checkpoint `
+        --evidence-root $EvidenceRoot @ReviewedPreflightArguments
+    $RunnerExit = $LASTEXITCODE
+    if ($RunnerExit -ne 0) { throw 'STOP: inspect preserved runner evidence; no retry' }
+}
+```
+
+Derive truthful current-process token facts only where the checkpoint contract
+requires them, within that same guarded scope. Allocate only a fresh evidence
+path string; do not create or reuse the evidence directory. Let the registered
+preflight own host admission, including elevation, token and security checks.
+Throw on nonzero runner exit only after it had the opportunity to preserve
+evidence. No external host/Administrator pre-screen may consume or conceal an
+attempt before registered evidence capture. A successful read-only preflight
+never grants protected execution authority.
 
 ## Architecture 132-R3M — predecessor exact develop certification reuse
 
@@ -509,8 +668,9 @@ should continue into it automatically rather than waiting for another prompt.
 After every accepted checkpoint, ChatGPT must automatically:
 
 1. accept or reject/fix the current checkpoint;
-2. review and update `docs/PROJECT_STATUS.md` and
-   `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed;
+2. review `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md`;
+   publish required updates before closing, with only the bounded same-session
+   read-only observation deferral in the current throughput contract above;
 3. determine the next milestone/checkpoint;
 4. choose ChatGPT, Luna Extra High, Astra, or Sol High according to the routing
    rules below;
@@ -668,7 +828,9 @@ ChatGPT scopes/finalizes the contract and explicitly authorizes the checkpoint
    supplies the canonical certification and no duplicate local profile is run
 -> otherwise ChatGPT selects a materially distinct local certification only when required
 -> ChatGPT accepts/rejects the resulting certification evidence
--> ChatGPT reviews/updates PROJECT_STATUS + HANDOFF
+-> ChatGPT reviews PROJECT_STATUS + HANDOFF and publishes one closeout,
+   optionally after the immediately following reviewed read-only observation
+   under the current throughput contract's exact conditions
 -> ChatGPT automatically provides and, when safe, advances into the next
    actionable milestone
 ```
@@ -760,9 +922,9 @@ This is a strict workflow invariant:
   the branch ref exactly once with an expected-parent/lease check;
 - verify the resulting commit's exact changed-file set, final HEAD/tree, and
   clean ancestry before treating the write as accepted;
-- a separate `pull_request` workflow run caused by opening or updating a PR is
-  legitimate and does not violate the rule; the invariant is one
-  **push-triggered** CI run for the logical ChatGPT-direct checkpoint;
+- an intentionally needed PR retains its separate `pull_request` gate; routine
+  source-reviewed exact fast-forward integration does not create a PR. The
+  invariant is one **push-triggered** run per logical publication;
 - GitHub CI is an admission gate, not the edit/test loop: complete all intended
   files and reasonable focused/local verification before the one branch advance;
 - multiple branch-advancing commits/pushes are prohibited inside one logical

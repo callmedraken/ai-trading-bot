@@ -13,9 +13,10 @@ This does not broaden a command, authorize unexpected effects or ambiguous/
 partial-state repair, permit automatic retry after ambiguity/partially consumed
 effects, override real-money NO-GO, or make source/commit authority alone
 sufficient for integration. Separately, the user has granted ChatGPT standing
-authorization for an ordinary reviewed feature-branch merge into `develop`
+authorization for ordinary reviewed feature-branch integration into `develop`
 after ChatGPT independently determines exact review, required certification,
-and merge readiness are complete. That integration authorization does not
+and merge readiness are complete. Prefer exact-SHA fast-forward integration
+under the current Architecture 132 throughput contract; PR merge is fallback-only. That integration authorization does not
 extend to Codex, rebase, amend, force-push, pull-request mutation, protected
 effects, or ambiguity repair/retry. Unexpected, ambiguous, partially completed,
 source-mismatched or broader-than-reviewed effects remain STOP / reconciliation.
@@ -368,7 +369,7 @@ standing rule; never present a protected effect as ordinary verification.
 
 - ChatGPT is the default architecture, milestone-planning, debugging-strategy, GitHub/diff/pull-request review, broad-audit, test-gate, merge-readiness, certification, and transition-planning agent.
 - ChatGPT milestone, review, verification, merge, and post-merge responses must automatically include the concrete next recommended step. When the next action is known, include ready-to-run operator commands or a ready-to-paste Codex prompt rather than only naming the milestone.
-- After every accepted checkpoint, ChatGPT must automatically review/update `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md` before treating the checkpoint as closed. If no material wording change is needed in one of them, explicitly report that it was reviewed and remains current.
+- After every accepted checkpoint, ChatGPT must automatically review `docs/PROJECT_STATUS.md` and `docs/AI_TRADING_BOT_HANDOFF.md`. Publish required updates before closing; only the bounded same-session read-only observation deferral below may batch publication. If no material wording change is needed in one, explicitly report that it was reviewed and remains current.
 - `develop` remains the sole primary/default startup integration reference. The former `feature/project-history-storage-foundation` compatibility/history mirror is retired at final synchronized tip `19e5859fa83656cc50dbe69f89f3badd57841165` and must not be recreated or used as an integration/startup ref. Historical references to that branch are retrieval context only. Pending feature checkpoints do not move `develop`.
 - After every accepted checkpoint, ChatGPT must determine the next milestone, choose ChatGPT/Luna/Astra/Sol High according to these rules, and continue automatically into the next safe docs-only, source-only, design-only, or read-only checkpoint when no protected effect or repository-control approval is required. Apply the standing reviewed-bounds authorization rule at effect boundaries; stop on unexpected/ambiguous scope or explicit NO-GO. Source/commit authority alone does not grant integration; the separate standing ChatGPT merge authorization above applies only after independent merge-readiness review and never permits rebase/amend/force-push or PR mutation.
 - ChatGPT may directly implement small, tightly scoped, low-risk mechanical source, test, documentation, status, handoff, or workflow changes when delegation would add overhead without useful isolation. Codex should not receive every implementation task automatically.
@@ -399,6 +400,61 @@ standing rule; never present a protected effect as ordinary verification.
 - Trading Bot auxiliary worktrees must be created under `F:\\AI\\worktrees\\...`. Do not create or adopt project worktrees under the user profile, including `C:\\Users\\John\\.codex\\worktrees\\...`; override any tool-managed default with an explicit `F:\\AI\\worktrees\\...` path before edits begin. Existing noncanonical worktrees are preserved until a separate clean-state reconciliation/removal step; never force-remove a dirty worktree.
 - When multiple worktrees are active, operate only in the explicitly named worktree/branch and never switch, clean, reset, or otherwise disturb another active worktree.
 - See `docs/AI_DEVELOPMENT_WORKFLOW.md` for the canonical review/certification cycle.
+
+## Current workflow throughput non-regression — Architecture 132
+
+The current throughput contract in `docs/AI_DEVELOPMENT_WORKFLOW.md` owns the
+operational details. These mandatory rules apply to current work:
+
+- Prefer FAST-FORWARD integration for an accepted strict-descendant feature:
+  immediately prove expected old develop HEAD/tree and no intervening change,
+  use ordinary Git `merge --ff-only` and ordinary push, and verify resulting
+  develop HEAD/tree equal the exact accepted feature SHA/tree. No rebase,
+  squash, amend, force, feature rewrite or arbitrary GitHub ref mutation.
+  ChatGPT retains independent review/certification/merge-readiness ownership;
+  this does not grant Codex integration authority.
+- Routine already source-reviewed exact fast-forward integration does not
+  create a PR. PR merge commits are fallback-only when fast-forward is
+  unavailable, explicitly required or history no longer permits it. Preserve
+  intentional `pull_request` workflow support/protection and exact-SHA reuse.
+- Review canonical status/handoff after acceptance. Publication may wait for
+  one immediately following independently registered READ-ONLY observation
+  only in the same session, after exact executable-source acceptance and
+  terminal-green integration, with exact reviewed source binding,
+  `execute=None` or no protected-effect authority, and no executable-authority
+  consequence from the delay. Then publish one bounded closeout recording BOTH
+  integration and observation. Closeout remains mandatory before a protected/
+  write effect, a milestone relying on changed coordination state, a new-session
+  handoff whose docs would mislead, or source selection depending on updates.
+  Coordination docs remain non-executable authority; report any deferral.
+- `PROJECT_STATUS.md` owns the bounded dashboard, milestone/state, blocker,
+  roadmap and immediate boundary. `AI_TRADING_BOT_HANDOFF.md` owns exact
+  continuation identities, evidence paths/hashes, consumed state and operator
+  boundary. Do not duplicate long chronology or every SHA/run paragraph;
+  historical detail belongs once in architecture/validation/history.
+- `CI_ROUTING_OVERCERTIFICATION` means local exact admission proved a cheaper
+  route, GitHub unexpectedly ran a strictly stronger route terminal green,
+  source stayed exact and no required gate was skipped. Preserve/classify the
+  run and correct workflow separately. It is not source failure or
+  `PREPUBLICATION_COVERAGE_DEFECT`, and warrants no unchanged rerun or
+  replacement source commit. Under-certification/skipped evidence remains STOP.
+- Zero-before push classification may use current origin/develop only with the
+  exact event/checkout identity, admitted feature family, available exact live
+  and tracking develop, complete history and one HEAD parent equal to develop.
+  Apply the shared closed nonempty changed-path classifier; every uncertainty
+  remains FULL. Never infer DOCS_ONLY from zero-before alone.
+- Never invent or derive a worktree path from a branch name. Use an already
+  proven path or discover exactly one reviewed branch + HEAD match from
+  `git worktree list --porcelain`. Establish identity in the same `& { ... }`
+  block as dispatch, independent of caller cwd; prove branch, HEAD, tree and
+  tracked/index cleanliness. Missing/multiple/mismatched paths and parser/path/
+  source-precondition failures before dispatch are NOT_RUN/non-consuming.
+- Guarded operator commands derive truthful token facts only if required by
+  the checkpoint contract, allocate only a fresh evidence-path string, let
+  registered preflight own host admission, and throw on nonzero runner exit
+  only after evidence preservation was possible. Do not externally pre-screen
+  host/Administrator policy. All auxiliary worktrees stay under
+  `F:\AI\worktrees`; use the canonical workflow template.
 
 ## Repository workflow
 
@@ -634,9 +690,9 @@ The required publication sequence is:
 7. treat that one branch advance as the one push-triggered source-gate event for
    the logical checkpoint.
 
-A separately triggered `pull_request` workflow run caused by opening/updating a
-PR is expected and is not a violation; the invariant is one **push-triggered**
-CI run per logical ChatGPT-direct checkpoint.
+An intentionally needed PR retains its separate `pull_request` gate. Routine
+source-reviewed exact fast-forward integration does not create a PR; the
+invariant remains one **push-triggered** run per logical publication.
 
 GitHub CI must not be used as the normal edit/test loop. Before the single branch
 advance, finish the intended source, tests, workflow edits, status/handoff

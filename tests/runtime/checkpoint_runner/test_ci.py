@@ -91,12 +91,250 @@ def test_ci_classification_uses_exact_event_base_and_nul_paths(
 @pytest.mark.parametrize(
     "base", [None, "", "0" * 40, "invalid", "g" * 40, "--malicious", 123]
 )
-def test_ci_invalid_base_falls_back_without_git(tmp_path, monkeypatch, base):
+def test_ci_invalid_base_or_zero_without_identity_falls_back_without_git(
+    tmp_path, monkeypatch, base
+):
     _event(monkeypatch, tmp_path, base)
     monkeypatch.setattr(
         runner, "_git_output", lambda *a: pytest.fail("invalid base used")
     )
     assert runner._ci_changes(tmp_path, "b" * 40)["mode"] == "FULL"
+
+
+def _first_push_identity(monkeypatch, tmp_path):
+    base, head = "a" * 40, "b" * 40
+    ref = "refs/heads/feature/test-suite-first-push"
+    event = _event(monkeypatch, tmp_path, "0" * 40)
+    payload = {
+        "before": "0" * 40,
+        "after": head,
+        "ref": ref,
+        "created": True,
+        "deleted": False,
+        "forced": False,
+    }
+    event.write_text(json.dumps(payload))
+    monkeypatch.setenv("GITHUB_SHA", head)
+    monkeypatch.setenv("GITHUB_REF", ref)
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *a: base)
+    outputs = {
+        ("rev-parse", "HEAD"): head,
+        ("rev-parse", "--is-shallow-repository"): "false",
+        (
+            "remote",
+            "get-url",
+            "origin",
+        ): "https://github.com/callmedraken/ai-trading-bot.git",
+        ("rev-parse", "refs/remotes/origin/develop"): base,
+        ("rev-list", "--parents", "-n", "1", head): f"{head} {base}",
+        ("cat-file", "-t", base): "commit",
+        ("merge-base", "--is-ancestor", base, head): "",
+    }
+    monkeypatch.setattr(runner, "_git_output", lambda repo, *a: outputs[a])
+    monkeypatch.setattr(
+        runner.subprocess,
+        "run",
+        lambda argv, **kw: subprocess.CompletedProcess(
+            argv, 0, b"docs/a.md\x00docs/b.md\x00", b""
+        ),
+    )
+    return base, head, event, payload, outputs
+
+
+@pytest.mark.parametrize(
+    "paths,expected",
+    [
+        (["docs/a.md", "docs/b.md"], "DOCS_ONLY"),
+        (["src/foo.py"], "FULL"),
+        (["tests/test_foo.py"], "FULL"),
+        ([".github/workflows/checkpoint-source-gates.yml"], "FULL"),
+        (["docs/a.md", "src/foo.py"], "FULL"),
+        (["unknown"], "FULL"),
+        ([], "FULL"),
+    ],
+)
+def test_ci_first_push_exact_develop_child_uses_closed_classifier(
+    monkeypatch, tmp_path, paths, expected
+):
+    base, head, _, _, _ = _first_push_identity(monkeypatch, tmp_path)
+    raw = ("\x00".join(paths) + "\x00").encode() if paths else b""
+
+    def diff(argv, **kwargs):
+        assert tuple(argv) == (
+            "git",
+            "diff",
+            "--name-only",
+            "-z",
+            "--no-renames",
+            base,
+            head,
+            "--",
+        )
+        return subprocess.CompletedProcess(argv, 0, raw, b"")
+
+    monkeypatch.setattr(runner.subprocess, "run", diff)
+    result = runner._ci_changes(tmp_path, head)
+    assert result["mode"] == expected
+    assert result["base"] == base
+    assert result["changed_paths"] == paths
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "stale_parent",
+        "unavailable_develop",
+        "tracking_mismatch",
+        "missing_tracking",
+        "merge",
+        "missing_parent",
+        "multiple_commits",
+        "shallow",
+        "missing_head",
+        "head_mismatch",
+        "sha_mismatch",
+        "event_head_mismatch",
+        "ref_mismatch",
+        "unadmitted_branch",
+        "missing_ref",
+        "not_created",
+        "deleted",
+        "forced",
+        "malformed_develop",
+        "missing_base_object",
+        "noncommit_base",
+        "ancestry_gap",
+        "wrong_origin",
+        "malformed_diff",
+        "failed_diff",
+        "unknown_classifier",
+        "nonpush",
+    ],
+)
+def test_ci_first_push_unproven_identity_or_range_stays_full(
+    monkeypatch, tmp_path, mutation
+):
+    base, head, event, payload, outputs = _first_push_identity(monkeypatch, tmp_path)
+    parents = ("rev-list", "--parents", "-n", "1", head)
+    if mutation in {"stale_parent", "multiple_commits"}:
+        outputs[parents] = f"{head} {'c' * 40}"
+    elif mutation == "merge":
+        outputs[parents] += " " + "c" * 40
+    elif mutation == "missing_parent":
+        outputs[parents] = head
+    elif mutation == "unavailable_develop":
+
+        def unavailable(*a):
+            raise RuntimeError("develop unavailable")
+
+        monkeypatch.setattr(runner, "_remote_branch_head", unavailable)
+    elif mutation == "malformed_develop":
+        monkeypatch.setattr(runner, "_remote_branch_head", lambda *a: "invalid")
+    elif mutation == "tracking_mismatch":
+        outputs[("rev-parse", "refs/remotes/origin/develop")] = "c" * 40
+    elif mutation == "missing_tracking":
+        del outputs[("rev-parse", "refs/remotes/origin/develop")]
+    elif mutation == "shallow":
+        outputs[("rev-parse", "--is-shallow-repository")] = "true"
+    elif mutation == "missing_head":
+        del outputs[("rev-parse", "HEAD")]
+    elif mutation == "head_mismatch":
+        outputs[("rev-parse", "HEAD")] = "c" * 40
+    elif mutation == "sha_mismatch":
+        monkeypatch.setenv("GITHUB_SHA", "c" * 40)
+    elif mutation == "event_head_mismatch":
+        payload["after"] = "c" * 40
+    elif mutation == "ref_mismatch":
+        monkeypatch.setenv("GITHUB_REF", "refs/heads/develop")
+    elif mutation == "unadmitted_branch":
+        payload["ref"] = "refs/heads/feature/other"
+        monkeypatch.setenv("GITHUB_REF", payload["ref"])
+    elif mutation == "missing_ref":
+        del payload["ref"]
+    elif mutation in {"not_created", "deleted", "forced"}:
+        payload[{"not_created": "created"}.get(mutation, mutation)] = (
+            mutation != "not_created"
+        )
+    elif mutation == "missing_base_object":
+        del outputs[("cat-file", "-t", base)]
+    elif mutation == "noncommit_base":
+        outputs[("cat-file", "-t", base)] = "tree"
+    elif mutation == "ancestry_gap":
+        del outputs[("merge-base", "--is-ancestor", base, head)]
+    elif mutation == "wrong_origin":
+        outputs[("remote", "get-url", "origin")] = "https://example.invalid/other"
+    elif mutation in {"malformed_diff", "failed_diff"}:
+        monkeypatch.setattr(
+            runner.subprocess,
+            "run",
+            lambda argv, **kw: subprocess.CompletedProcess(
+                argv, int(mutation == "failed_diff"), b"docs/a.md", b""
+            ),
+        )
+    elif mutation == "unknown_classifier":
+        monkeypatch.setattr(runner, "classify_changed_paths", lambda _: "UNKNOWN")
+    elif mutation == "nonpush":
+        monkeypatch.setenv("GITHUB_EVENT_NAME", "workflow_dispatch")
+    else:
+        pytest.fail("unhandled mutation")
+    event.write_text(json.dumps(payload))
+    assert runner._ci_changes(tmp_path, head)["mode"] == "FULL"
+
+
+def test_768_first_push_real_git_matches_local_docs_admission(monkeypatch, tmp_path):
+    root = tmp_path / "source"
+    root.mkdir()
+
+    def git(*args):
+        return subprocess.run(
+            ("git", *args), cwd=root, capture_output=True, text=True, check=True
+        ).stdout.strip()
+
+    git("init")
+    git("config", "user.name", "Routing Test")
+    git("config", "user.email", "routing@example.invalid")
+    git("remote", "add", "origin", "https://github.com/callmedraken/ai-trading-bot.git")
+    (root / "docs").mkdir()
+    for name in ("PROJECT_STATUS.md", "AI_TRADING_BOT_HANDOFF.md"):
+        (root / "docs" / name).write_text("base\n")
+    git("add", "--", "docs/PROJECT_STATUS.md", "docs/AI_TRADING_BOT_HANDOFF.md")
+    git("commit", "-m", "develop")
+    base = git("rev-parse", "HEAD")
+    git("update-ref", "refs/remotes/origin/develop", base)
+    git("checkout", "-b", "feature/test-suite-routing-regression")
+    for name in ("PROJECT_STATUS.md", "AI_TRADING_BOT_HANDOFF.md"):
+        (root / "docs" / name).write_text("closeout\n")
+    git("add", "--", "docs/PROJECT_STATUS.md", "docs/AI_TRADING_BOT_HANDOFF.md")
+    git("commit", "-m", "docs closeout")
+    head = git("rev-parse", "HEAD")
+    ref = "refs/heads/feature/test-suite-routing-regression"
+    event = _event(monkeypatch, tmp_path, "0" * 40)
+    event.write_text(
+        json.dumps(
+            {
+                "before": "0" * 40,
+                "after": head,
+                "ref": ref,
+                "created": True,
+                "deleted": False,
+                "forced": False,
+            }
+        )
+    )
+    monkeypatch.setenv("GITHUB_SHA", head)
+    monkeypatch.setenv("GITHUB_REF", ref)
+    monkeypatch.setattr(runner, "_REPOSITORY_ROOT", root)
+    monkeypatch.setattr(runner, "_remote_branch_head", lambda *a: base)
+    local = runner._prepublication_source(root)
+    ci = runner._ci_changes(root, head)
+    assert local.failures == ()
+    assert local.mode == ci["mode"] == "DOCS_ONLY"
+    assert (
+        list(local.changed_paths)
+        == ci["changed_paths"]
+        == ["docs/AI_TRADING_BOT_HANDOFF.md", "docs/PROJECT_STATUS.md"]
+    )
+    assert local.base_head == ci["base"] == base
 
 
 @pytest.mark.parametrize(
@@ -1353,6 +1591,30 @@ def test_r3n_c4_coherent_broad_attempt_two_is_not_reusable(registered):
         ]
         is False
     )
+
+
+def test_current_integration_policy_avoids_routine_pr_but_keeps_pr_protection():
+    root = Path(__file__).resolve().parents[3]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    guidance = (root / "docs/AI_DEVELOPMENT_WORKFLOW.md").read_text()
+    policy = guidance.split(
+        "### Exact-SHA fast-forward integration and PR non-duplication\n", 1
+    )[1].split("\n### ", 1)[0]
+    assert "  pull_request:\n" in workflow
+    for requirement in (
+        "exact expected old develop HEAD/tree",
+        "no intervening develop change",
+        "git merge --ff-only <accepted-feature-SHA>",
+        "git push origin develop",
+        "Resulting remote develop HEAD must equal the exact accepted feature",
+        "tree must equal the accepted feature tree",
+        "does not create a PR",
+        "PR merge commit is fallback-only",
+        "Keep `pull_request` workflow support and protection",
+        "does not\ngrant Codex integration authority",
+    ):
+        assert requirement in policy
+    assert "rebase, squash,\namend, force, rewrite the feature SHA" in policy
 
 
 def test_docs_only_general_admission_regression(monkeypatch):

@@ -1,81 +1,49 @@
 # AI Trading Bot — Current Handoff
 
-## Accepted checkpoint
+## Architecture 132 throughput and Architecture 134 R2 observation
 
-Architecture 134 diagnostic R2 is SOURCE ACCEPTED and integrated through the
-ordinary GitHub PR #32 merge path.
+Current remote `develop`:
 
-Accepted R2 feature source:
+    HEAD 4dd64b92315e6baf4ed9f25f5c603fe1b45881fb
+    TREE fa1cbd3d78a644a4d1b2be28a0acc81f27fcbc58
 
-    HEAD b70ca1ade95f122a014c45c9a2f64de900b685f5
-    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+The Architecture 132 workflow-throughput correction is SOURCE ACCEPTED. Its
+accepted feature identity is:
 
-Feature CI #765 / run 40593570365 / attempt 1 is terminal SUCCESS:
-source-static, active-tests, mapped ROBINHOOD and source-gates passed; FULL was
-skipped. Canonical ROBINHOOD recorded 11,881 cases: 11,875 passed, 6 skipped,
-0 failed/errors in 218.335 seconds.
+    HEAD 4dd64b92315e6baf4ed9f25f5c603fe1b45881fb
+    TREE fa1cbd3d78a644a4d1b2be28a0acc81f27fcbc58
+    PARENT 4f3dac09c3f137ca2b880a2b84229600065e12a2
 
-PR #32 develop integration:
+Feature CI #771 / run 40616099635 / attempt 1 / push is terminal SUCCESS. This
+was a real new-branch first push: it recovered base
+`4f3dac09c3f137ca2b880a2b84229600065e12a2` and classified the exact four
+source/workflow paths as FULL rather than falling back on the zero-before SHA.
+All four broad shards passed: shard 0 88.958 s, shard 1 295.377 s, shard 2
+254.217 s, and shard 3 232.406 s. Do not rerun #771.
 
-    HEAD d55466edece45c93bc8eef3c5cda6687eed9cf6c
-    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+The accepted feature was integrated into `develop` by ordinary exact-SHA
+fast-forward, with no merge commit and no routine PR:
 
-Develop CI #767 / run 40595839765 / attempt 1 is terminal SUCCESS:
-source-static, all four broad develop shards and source-gates passed; active-tests
-and mapped certification were skipped/reused. No R2 host preflight has run, no
-protected effect occurred, and LIVE remains NO-GO.
+    old develop 4f3dac09c3f137ca2b880a2b84229600065e12a2
+    accepted feature 4dd64b92315e6baf4ed9f25f5c603fe1b45881fb
+    result HEAD 4dd64b92315e6baf4ed9f25f5c603fe1b45881fb
+    result TREE fa1cbd3d78a644a4d1b2be28a0acc81f27fcbc58
 
-Architecture 134 diagnostic R1 is SOURCE ACCEPTED and integrated through the
-ordinary GitHub PR #29 merge path.
+Develop CI #772 / run 40617620614 / attempt 1 is terminal SUCCESS. It reported
+`MODE=FULL`, `DEVELOP_CERTIFICATION_REUSE=True`, and
+`REASON=exact_feature_broad_source_gate`; source-static and source-gates passed,
+while full-tests, active-tests and certification-tests were skipped. This is
+the first end-to-end proof of the corrected exact-SHA fast-forward integration
+and reuse path. It avoided a redundant pull_request run and a second four-shard
+develop certification campaign.
 
-Accepted R1 feature source:
+Preserve #768 / run 40599615809 as immutable green
+`CI_ROUTING_OVERCERTIFICATION`. It was routing over-certification, not a source
+failure; do not rerun or replace it.
 
-    HEAD cb78f005626a9678cd0d792aed2689e567796a6a
-    TREE 2ca9cac62c17530e5ca8be0dac658441a37037f9
-
-Feature CI #756 / run 40495681231 / attempt 1 is terminal SUCCESS:
-source-static, active-tests, mapped ROBINHOOD and source-gates passed; FULL was
-skipped. Canonical ROBINHOOD recorded 11,737 cases: 11,731 passed, 6 skipped,
-0 failed/errors in 240.41 seconds. The earlier functional publication
-`fca9026dbf8c54319ec8ee6e1c411624fbf81049` and terminal-green
-#755 / run 40490885321 remain preserved evidence.
-
-PR #29 develop integration:
-
-    HEAD d1cc9bc358d62c0e84042344d1982a92377672a5
-    TREE 2ca9cac62c17530e5ca8be0dac658441a37037f9
-
-Develop CI #758 / run 40534881440 / attempt 1 is terminal SUCCESS:
-source-static, all four broad full-test shards, exact feature certification
-reuse and source-gates passed; active-tests and certification-tests were
-skipped/reused. The later consumed R1 host result is recorded below; no protected
-effect occurred.
-
-Architecture 134 historical/current authority decoupling through C2 is SOURCE
-ACCEPTED predecessor evidence. Exact predecessor executable/source identity:
-
-    HEAD c2755c682a544bb4c24bb87889de819751715952
-    TREE a2f0dfc86431dcc8e8ed5a89476df63bcab807cd
-
-Terminal evidence:
-
-- feature #749 / run 40459691991 / attempt 1: SUCCESS;
-  source-static, active-tests, mapped ROBINHOOD and source-gates passed;
-  FULL skipped; ROBINHOOD 11,696 cases / 11,690 passed / 6 skipped /
-  0 failed/errors;
-- develop #750 / run 40473606549 / attempt 1: SUCCESS;
-  full-batch source authority passed and exact feature certification was reused;
-- preserved red #746 / 40421315451 and #747 / 40452306244: never rerun;
-- diagnostic-branch #751 / run 40474607665 / attempt 1: SUCCESS on the same
-  c2755c6 source after an unnecessary direct feature-ref synchronization.
-  Preserve it as duplicate evidence; do not rerun unchanged source.
-
-The preserved consumed predecessor diagnostic branch is:
-
-    feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-current
-
-Its accepted executable source is c2755c6. A later docs-only develop descendant
-does not require advancing that remote diagnostic ref again.
+R2 remains the exact source checkpoint below. Its real-host observation is
+consumed and blocked; the current next boundary is source-only R3. No protected
+effect occurred, and LIVE remains NO-GO.
 
 ## Preserved red compatibility correction
 
@@ -115,42 +83,56 @@ prior plan to "prepare for Monday 2026-10-26 market open" should have meant
 preparing/reviewing the deployment-admission chain; treating 10/26 as an F1R1
 trading session was a workflow/planning regression.
 
-## Consumed diagnostic R1 and integrated R2 boundary
+## Consumed diagnostic R1 and R2 host observation
 
-R1 remains SOURCE ACCEPTED and integrated at feature HEAD
-`cb78f005626a9678cd0d792aed2689e567796a6a`, tree
-`2ca9cac62c17530e5ca8be0dac658441a37037f9`. Its one real-host attempt is now
-permanently CONSUMED: `BLOCKED / HOST / HOST_FORBIDDEN_IDENTITY`,
+R1 remains separately consumed and immutable. Its accepted source identity is
+HEAD `cb78f005626a9678cd0d792aed2689e567796a6a`, tree
+`2ca9cac62c17530e5ca8be0dac658441a37037f9`. Its one real-host attempt remains
+`BLOCKED / HOST / HOST_FORBIDDEN_IDENTITY`,
 `diagnostic_process_starts=23`, `identity_stable=true`. Every effect counter is
-zero, every authority flag false, protected execution `NOT_AUTHORIZED`.
-Report SHA256 from read-only Get-FileHash:
-`c6b7be3660bcb3b2f30c2cc29a3160fab6621c31f8287b3e352885a214fb424d`.
+zero, every authority flag is false, and protected execution is
+`NOT_AUTHORIZED`. Its report SHA256 is
+`c6b7be3660bcb3b2f30c2cc29a3160fab6621c31f8287b3e352885a214fb424d`. The
+original R1 report and consumed state are unchanged.
 
-The complete first LocalGitReader source observation ran. Parent enumeration
-then rejected frozen incident evidence because R1 forbids every incident-ID
-prefix from existing. No token/ACL/security/quiescence diagnosis was reached.
-The report remains truthful evidence of that over-broad incident-presence policy;
-never rerun, repoint, modify or rewrite R1 to PASS. Incident evidence remains
-immutable, opaque and non-authoritative; it must not be deleted to make admission
-pass. No child inspection, repair, rename, promotion or reuse is authorized.
+Architecture 134 R2 source identity:
 
-R2 is SOURCE ACCEPTED and integrated through PR #32. Its source identity is
-HEAD `b70ca1ade95f122a014c45c9a2f64de900b685f5`, tree
-`1c836cf17ea5887b669db1867d0b116ac02559da`, on branch
-`feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r2-current`.
-The correction changed only the over-broad preserved-incident namespace policy:
+    HEAD b70ca1ade95f122a014c45c9a2f64de900b685f5
+    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
+    BRANCH feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r2-current
 
-- exact three frozen incident basenames may coexist only as opaque parent
-  metadata;
-- their existence grants no authority;
-- they are never opened or traversed as children;
-- incident aliases and variants remain rejected;
-- every prospective destination and partial prefix remains rejected.
+The exact R2 worktree invocation was dispatched once. Result:
 
-Security, token, SACL, runtime-Python and quiescence policy remains unchanged.
-R2 remains read-only with `execute = None`; its host preflight is NOT_RUN.
-See the [R2 contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r2.md).
+    BLOCKED / HOST / HOST_TOKEN_POLICY
+    diagnostic_process_starts=23
+    identity_stable=true
+    protected_execution=NOT_AUTHORIZED
+    production_effects=NOT_RUN
 
+Every effect counter is zero and every authority flag is false. R2 passed the
+source and corrected namespace boundary that blocked R1; the first real-host
+blocker was `HOST_TOKEN_POLICY`. Quiescence was not reached. The R2 diagnostic
+collapses several closed-policy failures into that code, so the observation
+does not establish which token identity/type/thread/elevation, group-shape,
+Administrators-enabled/elevation-consistency, or enabled-privilege predicate
+failed. Do not infer that the shell was merely elevated, recommend changing
+privilege state, or alter token policy on this evidence.
+
+Evidence is preserved at:
+
+    F:\AI\temp\ai-trading-bot-checkpoints\arch134-diagnostic-r2-56e2c7487d9b406b977546db94a1b877\arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2\preflight-20261028T003341.698664Z\report.json
+
+Report SHA256: `4fee1762e080de1d4e20eab844185b30480efcb7192ab5b8d0c1c65ca1d26677`.
+
+Two earlier invocations were pre-dispatch `NOT_RUN` and did not consume R2:
+
+- a stale checkout did not register the R2 parser;
+- a guessed worktree path did not exist.
+
+The exact worktree invocation above consumed R2 permanently. Never rerun it
+under another shell, privilege state, worktree, command variant or evidence
+root. Preserve R1 separately as consumed and unchanged. No retry, repair or
+alternate invocation is authorized.
 ## Preserved predecessor diagnostic evidence
 
 The diagnostic at source HEAD `c2755c682a544bb4c24bb87889de819751715952`,
@@ -168,24 +150,12 @@ also remains immutable and non-retryable.
 
 ## Next safe step
 
-Run exactly one registered R2 real-host read-only preflight from the exact clean
-R2 feature/operator source:
+The immediate next checkpoint is the source-only Architecture 134 R3
+token-policy diagnostic refinement. R3 will preserve the underlying token and
+security policy unchanged while emitting distinct sanitized closed subcodes:
+`TOKEN_POLICY`, `GROUP_SHAPE`, `UNEXPECTED_ADMIN_TOKEN`, and
+`UNEXPECTED_PRIVILEGE`. It must not weaken or reinterpret the policy, and it
+must not rerun R2. R3 host execution is NOT_RUN for this documentation closeout.
 
-    HEAD b70ca1ade95f122a014c45c9a2f64de900b685f5
-    TREE 1c836cf17ea5887b669db1867d0b116ac02559da
-    REFERENCE feature/robinhood-production-paper-fresh-successor-readonly-deployment-admission-diagnostic-r2-current
-
-The invocation must use a fresh nonexistent external evidence root, the exact
-reviewed HEAD/TREE/REFERENCE, truthful current-process SID and elevation, no
-manual production namespace inspection, no Administrator/source/ACL pre-screen
-outside the registered preflight, and no R1 fallback. PASS stops at
-`READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`.
-
-BLOCKED or unknown stops with preserved evidence and no retry, repair, cleanup,
-namespace mutation or alternate command. This docs closeout does not run the
-host preflight.
-
-PASS can mean only `READY_FOR_SUCCESSOR_ROOT_WRITE_AUTHORITY_AND_ACL_REVIEW`;
-no root/ACL/materialization/runtime/scheduler/F1/provider/broker/live effect is
-authorized. The fixed F1R1 dates remain 2026-11-02 and 2026-11-03 and grant no
-authority. Live remains NO-GO.
+The next owner should implement and review only that bounded diagnostic source
+checkpoint. Do not perform protected effects. LIVE remains NO-GO.

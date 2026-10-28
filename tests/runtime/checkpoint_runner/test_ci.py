@@ -21,7 +21,8 @@ from .helpers import (
 
 def _historical_workflow_view(workflow: str) -> str:
     return (
-        workflow.replace(
+        workflow.replace("              " + runner.ARCH146B1_NAME + " `\n", "", 1)
+        .replace(
             "              " + runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n",
             "",
             1,
@@ -747,6 +748,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH146B1_NAME: "full",
         runner.READONLY_ADMISSION_NAME: "robinhood",
         runner.ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
         runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME: "robinhood",

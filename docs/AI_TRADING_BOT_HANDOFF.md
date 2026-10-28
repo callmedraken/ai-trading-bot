@@ -107,7 +107,8 @@ The final 146-A C2 source is:
     branch feature/research-arch146-a-historical-research-dataset-enforcement-current
     Checkpoint Source Gates #720 / run 40178730059 / attempt 1 / SUCCESS
 
-Current develop descends from that exact commit: 56 commits ahead, zero behind.
+The accepted integration ancestry contains that exact commit; resolve the
+mutable develop tip separately at startup.
 The source module `trading_bot.experiments.historical_research_dataset` and its
 synthetic verification surface are therefore current product source. Do not
 restart 146-A.
@@ -160,3 +161,34 @@ state whether the parked Architecture 134 boundary remains unchanged, choose the
 next roadmap milestone/model, and provide the exact next prompt or operator
 command plus expected evidence and STOP conditions without requiring an
 authorization-only turn.
+
+## Pending 146-B1 source continuation
+
+Canonical source worktree:
+
+    F:\AI\worktrees\ai-trading-bot-146b1-source
+    feature/research-arch146-b-acquisition-custody-current
+
+The worktree was fast-forwarded from reviewed base b4e9fb1 to the accepted
+additive-design checkpoint c33608b3c6b56021582007a87a44d45a2c3f3972,
+tree afff9fbbebfe92de21a688cd2258cf4d45c36c7d. Its design source gate
+#781 / 40645519417 / attempt 1 is terminal SUCCESS.
+
+B1 source now supplies the injected acquisition kernel, protected persistence
+plan, canonical non-price evidence/admission, empty source-owned real-admission
+registries and successor OPEN-only verifier. No existing 145-A/146-A source
+changes. The original untracked implementation-review proposal is preserved as
+local discovery evidence and is not part of the intended source checkpoint.
+
+The source checkpoint is not accepted or integrated. No commit/push is implied
+by this pending-source record. After authorized publication, require complete
+clean-candidate FEATURE and PROSPECTIVE_DEVELOP admission, one ordinary push and
+terminal GitHub-owned FULL before ChatGPT exact-source acceptance. Do not run
+canonical FULL locally.
+
+B2 has no native bindings or registered host dispatcher here. Before any real
+attempt, separately review its native source/host binding and exact published
+historical-session authority. After B2 materialization, independently accept
+its immutable evidence and freeze the source-owned custody admission before
+normal OPEN research. The current raw-material OPEN verifier must not receive
+mixed acquired pages. R3 remains consumed/parked; LIVE remains NO-GO.

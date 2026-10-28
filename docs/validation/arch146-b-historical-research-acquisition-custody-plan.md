@@ -1,6 +1,6 @@
 # Architecture 146-B — Acquisition/Custody Validation Plan
 
-Status: **DESIGN FROZEN / DOCUMENTATION ONLY.**
+Status: **B1 SOURCE IMPLEMENTED / FOCUSED VERIFICATION; REVIEW AND CI PENDING.**
 
 ## B1 required source verification
 
@@ -188,3 +188,28 @@ Only after accepted B2 custody evidence/admission may the next product milestone
 advance to Architecture 145-B results/campaign-bundle work against DEVELOPMENT +
 WALK_FORWARD material, then the Research Results GUI and large strategy
 campaigns.
+
+## Implemented B1 verification surface
+
+Focused source modules:
+
+- `tests/experiments/test_historical_research_acquisition_custody.py`;
+- unchanged `tests/experiments/test_historical_research_dataset.py`;
+- affected `tests/runtime/checkpoint_runner/test_core.py`, `test_ci.py` and
+  `test_source_authority.py`.
+
+The kernel has no native bindings or real B2 dispatcher. Synthetic persistence
+receipts and inspections test the contract and ordering, not actual Windows ACL,
+NTFS/fsync, HTTP entitlement or credential-store behavior. Native B2 bindings
+require a later reviewed source/host boundary before the one real attempt.
+
+Public evidence carries frozen request descriptors, ordered page digests/counts,
+complete non-price manifests/snapshot, operational source/attempt identities,
+calendar identity/digest, exact roots/DACL and terminal state/effect ceilings.
+Calendar digest material includes full coverage, exchange timezone, canonical
+session dates and the supplied publication source digest. No arbitrary supplied
+calendar becomes published authority without a source-owned accepted entry.
+
+Exact clean FEATURE/PROSPECTIVE_DEVELOP admission and canonical FULL follow only
+after an explicitly authorized atomic candidate commit and publication. Neither
+local synthetic verification nor this document reports source acceptance.

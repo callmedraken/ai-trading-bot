@@ -266,7 +266,22 @@ ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH: Final = (
     "feature/robinhood-production-paper-fresh-successor-"
     "readonly-deployment-admission-diagnostic-r3-current"
 )
+ARCH146B1_NAME: Final = "arch146-b1-historical-research-acquisition-custody-source"
+ARCH146B1_BRANCH: Final = "feature/research-arch146-b-acquisition-custody-current"
+ARCH146B1_TESTS: Final = (
+    "tests/experiments/test_historical_research_acquisition_custody.py",
+    "tests/experiments/test_historical_research_dataset.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+)
+ARCH146B1_RUFF: Final = (
+    "src/trading_bot/experiments/historical_research_acquisition.py",
+    "src/trading_bot/experiments/historical_research_custody.py",
+    "scripts/checkpoint_runner.py",
+    *ARCH146B1_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH146B1_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
@@ -277,6 +292,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH146B1_NAME: "full",
     "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME: "robinhood",
@@ -26153,6 +26169,14 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         **values,
     }
+    values[ARCH146B1_NAME] = CheckpointSpec(
+        ARCH146B1_NAME,
+        "Synthetic acquisition/custody and independently admitted OPEN publication",
+        ARCH146B1_TESTS,
+        ARCH146B1_RUFF,
+        _arch146b1_authority_check,
+        remote_branch=ARCH146B1_BRANCH,
+    )
     return values
 
 
@@ -26588,9 +26612,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace(
-            "              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1
-        )
+        workflow.replace("              " + ARCH146B1_NAME + " `\n", "", 1)
+        .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
         .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
     )
@@ -26626,9 +26649,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace(
-            "              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1
-        )
+        workflow.replace("              " + ARCH146B1_NAME + " `\n", "", 1)
+        .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
         .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
     )
@@ -27583,6 +27605,100 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     return 0 if passed else 1
+
+
+def _arch146b1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Current semantic owner; no historical source pins or native dispatch."""
+    failures = []
+    spec = _checkpoint_specs().get(ARCH146B1_NAME)
+    if (
+        spec is None
+        or spec.tests != ARCH146B1_TESTS
+        or spec.ruff_paths != ARCH146B1_RUFF
+        or spec.remote_branch != ARCH146B1_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH146B1_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH146B1_NAME) != 1
+        or resolve_ci_checkpoint(_checkpoint_specs(), ARCH146B1_BRANCH, "push")
+        != ARCH146B1_NAME
+    ):
+        failures.append("146-B1 source-only registration drift")
+    forbidden = {
+        "open",
+        "exec",
+        "eval",
+        "compile",
+        "rename",
+        "replace",
+        "unlink",
+        "mkdir",
+        "makedirs",
+        "read_text",
+        "write_text",
+        "read_bytes",
+        "write_bytes",
+    }
+    for relative in ARCH146B1_RUFF[:2]:
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                name = (
+                    node.func.id
+                    if isinstance(node.func, ast.Name)
+                    else node.func.attr
+                    if isinstance(node.func, ast.Attribute)
+                    else ""
+                )
+                # String.replace is canonical timestamp formatting, not a
+                # namespace effect. No native/filesystem imports are allowed.
+                if name in forbidden - {"replace"} and not (
+                    isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Name)
+                    and node.func.value.id == "re"
+                    and name == "compile"
+                ):
+                    failures.append("146-B1 forbidden direct effect: " + name)
+            names = (
+                [item.name for item in node.names]
+                if isinstance(node, ast.Import)
+                else [node.module or ""]
+                if isinstance(node, ast.ImportFrom)
+                else []
+            )
+            if any(
+                name.startswith(
+                    (
+                        "http",
+                        "socket",
+                        "ctypes",
+                        "subprocess",
+                        "os",
+                        "pathlib",
+                        "winreg",
+                        "trading_bot.runtime",
+                        "trading_bot.review_paper",
+                        "trading_bot.supervised_release",
+                    )
+                )
+                for name in names
+            ):
+                failures.append("146-B1 forbidden effect import")
+        for node in tree.body:
+            if (
+                isinstance(node, ast.AnnAssign)
+                and isinstance(node.target, ast.Name)
+                and node.target.id
+                in {
+                    "ACCEPTED_CUSTODY_ADMISSIONS",
+                    "ACCEPTED_HISTORICAL_SESSION_AUTHORITIES",
+                }
+            ):
+                if not isinstance(node.value, ast.Tuple) or node.value.elts:
+                    failures.append(
+                        "146-B1 cannot self-admit real custody/calendar authority"
+                    )
+    return tuple(failures)
 
 
 if __name__ == "__main__":

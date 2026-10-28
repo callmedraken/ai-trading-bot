@@ -133,6 +133,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH146B1_NAME,
         runner.READONLY_ADMISSION_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
@@ -413,6 +414,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = (
                 "feature/robinhood-production-paper-premarket-wake-qualification"
             )
+        if spec.name == runner.ARCH146B1_NAME:
+            expected_branch = runner.ARCH146B1_BRANCH
         if spec.name == runner.ARCH146A_NAME:
             expected_branch = runner.ARCH146A_BRANCH
         if spec.name == runner.READONLY_ADMISSION_NAME:
@@ -1446,6 +1449,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-paper-runtime",
                 "arch134-production-paper-runtime-acl",
                 runner.ARCH146A_NAME,
+                runner.ARCH146B1_NAME,
                 "arch144-c-f1-paper-evidence-admission",
                 "arch145-a-research-robustness-live-canary-eligibility",
                 "arch134-f1r1-a-runtime-isolation",
@@ -2069,3 +2073,39 @@ def test_r3_dispatch_preserves_r2_fresh_evidence_gate_structurally():
         )
     )
     assert new == expected
+
+
+def test_b1_is_exact_source_only_full_mapping():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH146B1_NAME]
+    assert spec.preflight is None and spec.execute is None
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), runner.ARCH146B1_BRANCH, "push"
+        )
+        == spec.name
+    )
+    assert runner.resolve_ci_certification_profile(spec.name) == "full"
+    assert runner._arch146b1_authority_check(root) == ()
+    assert spec.name in current_source_authority.develop_static_checkpoints(root)
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
+    assert runner._arch134_current_batch_workflow_is_reviewed(workflow)
+    assert not runner._arch134_current_batch_workflow_is_reviewed(
+        workflow.replace("              " + spec.name + " `\n", "", 1)
+    )
+
+
+def test_b1_rejects_protected_dispatch_or_mapping_drift(monkeypatch):
+    root = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    specs[runner.ARCH146B1_NAME] = replace(
+        specs[runner.ARCH146B1_NAME], execute=lambda: {}
+    )
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert "146-B1 source-only registration drift" in runner._arch146b1_authority_check(
+        root
+    )
+
+
+def test_no_b2_operator_dispatch_is_registered():
+    assert not any(name.startswith("arch146-b2") for name in runner._checkpoint_specs())

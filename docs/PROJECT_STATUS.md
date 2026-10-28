@@ -56,11 +56,17 @@ Architecture 146-A is already in current develop ancestry. Its final C2 source i
     TREE aa1efe5057e047e0d1778f2422e45f26cbc9f5d6
     CI   #720 / run 40178730059 / attempt 1 / SUCCESS
 
-Current develop is 56 commits ahead and zero commits behind that exact source.
-Do not reimplement or republish 146-A.
+146-A remains in the accepted integration ancestry. Do not reimplement or
+republish it; verify current mutable develop separately.
 
 The active milestone is Architecture 146-B: bounded historical-data acquisition
-and custody. This closeout freezes only the design boundary. It does not read
+and custody. B1 additive source is implemented on
+`feature/research-arch146-b-acquisition-custody-current`, pending exact-source
+review, publication and GitHub-owned FULL certification. Both real custody and
+historical-session admission registries remain empty. The source-only kernel
+has no native B2 bindings or preflight/execute dispatcher. B2 remains blocked on
+source acceptance, reviewed native bindings and independently frozen published
+historical-session authority. The accepted design boundary remains in force. This checkpoint reads no real
 credentials, call Alpaca, create the holdout root, mutate ACLs, acquire data,
 open holdout bytes, run Architecture 145-B, or touch production/paper/broker/live
 state.
@@ -72,8 +78,10 @@ state.
       -> Architecture 145-B results/campaign bundle
       -> Research Results GUI
       -> large strategy/optimizer campaigns
-      -> candidate selection and deterministic robustness qualification
-      -> small paper/live-canary readiness review
+      -> candidate selection: walk-forward, sensitivity and execution stress
+      -> frozen candidate/policy
+      -> separately admitted FINAL_HOLDOUT evaluation
+      -> paper/operational validation and tiny live-canary eligibility review
       -> separately resume the parked production-host path when required
 
 LIVE remains NO-GO. A source/preflight PASS never grants broker, paper or live

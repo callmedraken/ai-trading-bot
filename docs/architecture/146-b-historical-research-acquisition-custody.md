@@ -1,6 +1,6 @@
 # Architecture 146-B — Historical Research Acquisition and Custody
 
-Status: **DESIGN FROZEN / DOCUMENTATION ONLY.** No provider, credential,
+Status: **DESIGN FROZEN / B1 SOURCE IMPLEMENTED, PENDING EXACT-SOURCE REVIEW.** No provider, credential,
 filesystem, ACL, holdout, backtest, paper, broker, production or live effect is
 authorized by this document.
 
@@ -361,3 +361,42 @@ admission remains separate.
 - authorize paper, broker or live trading.
 
 LIVE remains NO-GO.
+
+## B1 source implementation and retained effect boundary
+
+The additive public modules are
+`trading_bot.experiments.historical_research_acquisition` and
+`trading_bot.experiments.historical_research_custody`. The former is a one-use
+kernel whose credential, transport, custody, persistence and terminal-record
+ports are all injected. The latter owns canonical non-price evidence/admission,
+historical-session commitments and the successor OPEN verification interface.
+No existing 145-A or 146-A source, schema, identity or serializer changes.
+
+Both `ACCEPTED_CUSTODY_ADMISSIONS` and
+`ACCEPTED_HISTORICAL_SESSION_AUTHORITIES` are intentionally empty source-owned
+registries. Parsing an admission or supplying its hash does not add authority.
+There is no runtime registration API. Synthetic tests temporarily substitute
+synthetic entries; B1 creates no real accepted calendar or acquisition.
+
+All original bars/corporate-action pages and the complete sidecar stay behind
+the protected persistence port. Both partition manifests bind the same original
+bars-page digest vector and complete sidecar digest. Only normalized OPEN CSV,
+non-price manifests/snapshot and evidence can reach the OPEN materializer.
+OPEN file presence remains unadmitted. Success is named
+`MATERIALIZED_AWAITING_INDEPENDENT_ADMISSION`; partial/ambiguous state is terminal
+`STOP_RECONCILIATION_REQUIRED` and is never cleaned or retried by the kernel.
+
+The fixed persistence plan requires the exact two roots, Administrator ownership,
+protected Administrator/SYSTEM DACL, local NTFS, no reparse traversal and
+exclusive fresh destinations. Injected ports must provide create-only durable
+writes and verified readback receipts; the kernel checks custody inspection
+before/after protected writes and OPEN materialization. Limits are 1000 pages,
+4 MiB per response and 64 MiB per stream; out-of-bound input stops without retry.
+Numeric/timestamp bounds reject unsupported precision instead of truncating it.
+
+The registered B1 checkpoint has no preflight or execute dispatcher. No native
+HTTP, credential-store, filesystem or ACL adapter is implemented or selected by
+B1. Before B2 can run, its native bindings and exact source/host admission must
+be separately implemented/reviewed alongside the independently accepted
+published historical-session authority. The injected kernel is not itself a
+real-host readiness check or proof of native durability/security.

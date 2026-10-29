@@ -810,6 +810,47 @@ def test_real_preflight_rejects_source_before_constructing_observer(
         )
 
 
+def test_b2_source_binding_uses_tracked_only_status(monkeypatch):
+    calls = []
+    status = {"tracked": "", "untracked": "?? permitted-generated.txt"}
+
+    def fake_git(root, *arguments):
+        calls.append(arguments)
+        if arguments == ("rev-parse", "--show-toplevel"):
+            return str(ROOT)
+        if arguments == ("branch", "--show-current"):
+            return preflight.SOURCE_BRANCH
+        if arguments == ("rev-parse", "HEAD"):
+            return "a" * 40
+        if arguments == ("rev-parse", "HEAD^{tree}"):
+            return "b" * 40
+        if arguments == ("status", "--porcelain=v1", "--untracked-files=no"):
+            return status["tracked"]
+        if arguments == ("remote", "get-url", "origin"):
+            return "https://github.com/callmedraken/ai-trading-bot.git"
+        if arguments == (
+            "ls-remote",
+            "origin",
+            "refs/heads/" + preflight.SOURCE_BRANCH,
+        ):
+            return "a" * 40 + " refs/heads/" + preflight.SOURCE_BRANCH
+        raise AssertionError(arguments)
+
+    monkeypatch.setattr(preflight, "_git", fake_git)
+    preflight._source(ROOT, "a" * 40, "b" * 40)
+    assert status["untracked"] == "?? permitted-generated.txt"
+    assert ("status", "--porcelain=v1", "--untracked-files=no") in calls
+    assert not any(
+        arguments[:2] == ("status", "--porcelain")
+        and arguments != ("status", "--porcelain=v1", "--untracked-files=no")
+        for arguments in calls
+    )
+
+    status["tracked"] = " M tracked-source.py"
+    with pytest.raises(ValueError):
+        preflight._source(ROOT, "a" * 40, "b" * 40)
+
+
 class Win32Seam:
     def __init__(self, failure=None):
         self.events = []
@@ -1248,6 +1289,44 @@ def test_current_authority_rejects_production_coupling(tmp_path, injection):
     assert research_credential_boundary_isolated(tmp_path)
     target.write_text(target.read_text() + "\n" + injection + "\n", encoding="utf-8")
     assert not research_credential_boundary_isolated(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        'status", "--porcelain")',
+        'status", "--porcelain=v1")',
+        'status", "--porcelain=v1", "--untracked-files=all")',
+        'status", "--porcelain=v1", "--untracked-files=normal")',
+    ],
+)
+def test_current_authority_rejects_untracked_source_binding_regressions(
+    tmp_path, monkeypatch, replacement
+):
+    from scripts import arch146_source_authority as owner
+    from scripts import checkpoint_runner as runner
+
+    relative = Path("src/trading_bot/experiments/historical_research_b2_preflight.py")
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    assert owner.research_source_binding_tracked_only_current(tmp_path)
+    target.write_text(
+        source.replace(
+            'status", "--porcelain=v1", "--untracked-files=no")', replacement
+        ),
+        encoding="utf-8",
+    )
+    assert not owner.research_source_binding_tracked_only_current(tmp_path)
+
+    check = owner.research_source_binding_tracked_only_current
+    monkeypatch.setattr(
+        owner, "research_source_binding_tracked_only_current", lambda _: check(tmp_path)
+    )
+    assert "146 tracked-only source-binding policy drift" in (
+        runner._arch146_pre_b2_authority_check(ROOT)
+    )
 
 
 @pytest.mark.parametrize("directory", [False, True])

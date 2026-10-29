@@ -1,28 +1,31 @@
 # AI Trading Bot — Current Handoff
 
-## Pending Architecture 146 custody ACE ordering correction
+## Pending Architecture 146 B2 tracked-only source-binding correction
 
-Accepted integrated starting source (verify live remote independently):
+Accepted integrated base before this successor edit (verify live remote independently):
 
-    develop / feature starting HEAD b1716543d324dcc52b43a1598648f01b7c85bf0b
-    starting TREE b193dd705bae343661f954521730b78ccf059ec2
+    develop / feature starting HEAD 27b88cd67b467647d0857c5142a2ca7de0bc7946
+    starting TREE 13b7d3613f7f44a7bd0eab36378ae55f872ac766
     branch feature/research-arch146-b-pre-b2-readiness-current
     worktree F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current
     checkpoint arch146-b-pre-b2-readiness-source
-    mapped certification FULL (GitHub-owned)
+    feature #797 / run 40942066124 / attempt 1: canonical FULL SUCCESS
+    develop #798 / run 40949362950 / attempt 1: terminal SUCCESS by exact-source reuse
 
-Both research coupling and effective-administrator source corrections are
-integrated. Ordinary research uses a primary, non-impersonating Windows user
-token, non-elevated and without effective administrator authority (Administrators
-SID enabled AND not deny-only). Ephemeral hidden terminal input is the sole
-later credential source, persistence NONE; production Trading identity and
-Credential Manager/environment/config/file fallbacks remain excluded.
+The custody ACE multiset correction was independently accepted and fast-forward
+integrated before this successor edit. The newly identified blocker is
+ARCH146_B2_TRACKED_ONLY_SOURCE_BINDING_DEFECT: B2 source binding must ignore
+permitted untracked/generated artifacts and historical pytest permission-warning
+directories while still rejecting tracked/index changes. The current owner and
+checkpoint runner now guard the exact `status --porcelain=v1
+--untracked-files=no` composition. Credential isolation, effective-Administrator
+semantics, custody ACE semantics and all other exact-source predicates remain
+owned unchanged.
 
-Current blocker: ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT. The bounded
-source correction compares exact binary SID/mask/type/flags ACE multisets, with
-multiplicity, owner and protected DACL preserved. Protected two-ACE order and
-OPEN three-ACE permutations are equivalent; no broader permissions equivalence
-or shared SecurityPolicy.matches() change is admitted.
+No new host observation occurred after integration. The previously observed
+partial state remains evidence only and was not re-inspected. Do not inspect,
+repair, clean, recreate or retry it here. The existing direct B2 launcher has
+not been accepted as the next registered partial-state observer.
 
 ## Exact consumed state and effect boundary
 
@@ -74,10 +77,11 @@ and five scheduled optimizer-only native-MAC N/A metrics remain unchanged.
 
 ## Next step and stop condition
 
-Codex completes focused tests, bounded infrastructure/current authority checks,
-whole-root Ruff 0.17.3 and diff checks, then one clean atomic commit. Require
-general ops.ps1 admit FEATURE and PROSPECTIVE_DEVELOP PASS before one ordinary
-push. Canonical FULL runs only in that mapped GitHub CI. Return exact final
+Codex completes focused tests, bounded current-authority/checkpoint-runner
+checks, whole-root Ruff 0.17.3 and diff checks, then one clean atomic commit.
+Require general ops.ps1 admit FEATURE and PROSPECTIVE_DEVELOP PASS before one
+ordinary push. The mapped GitHub result is the only canonical certification for
+this candidate; do not run canonical FULL locally. Return exact final
 HEAD/tree/parent/remote feature identity, paths, focused/static/admission results
 and terminal workflow run/attempt/job conclusions.
 
@@ -85,4 +89,10 @@ Terminal red OR green is STOP for ChatGPT exact GitHub source/CI review. No
 second corrective publication, manual CI rerun, amend, rebase, force-push, PR,
 merge or host continuation. ChatGPT decides source/certification acceptance,
 integration and the next separately reviewed partial-state/protected boundary.
-Acquisition remains NOT_AUTHORIZED; this source task's protected effects ZERO.
+After independent exact-source review/integration, the roadmap is: establish or
+use the reviewed registered read-only partial-state continuation, make one
+read-only observation, obtain independent review, then separately review
+protected OPEN-parent creation, run the ordinary non-elevated B2 preflight,
+obtain independent READY review, and only then consider the minimal acquisition
+bridge. Acquisition remains NOT_AUTHORIZED; Architecture 134 R3 remains parked;
+LIVE remains NO-GO; this source task's protected effects are ZERO.

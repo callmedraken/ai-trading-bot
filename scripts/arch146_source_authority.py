@@ -8,6 +8,7 @@ from pathlib import Path
 from scripts.source_authority import historical_blob
 
 DATASET_SOURCE = "src/trading_bot/experiments/historical_research_dataset.py"
+B2_PREFLIGHT_SOURCE = "src/trading_bot/experiments/historical_research_b2_preflight.py"
 
 
 def dataset_preserves_146a_contract(repo_root: Path, historical_pin: str) -> bool:
@@ -149,6 +150,35 @@ def research_credential_boundary_isolated(repo_root: Path) -> bool:
             ):
                 return False
     return True
+
+
+def research_source_binding_tracked_only_current(repo_root: Path) -> bool:
+    """Own the B2 exact-source cleanliness rule without untracked enumeration."""
+    tree = ast.parse((repo_root / B2_PREFLIGHT_SOURCE).read_text(encoding="utf-8"))
+    declarations = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_source"
+    ]
+    if len(declarations) != 1 or ast.get_docstring(declarations[0]) is not None:
+        return False
+    expected = ast.parse(
+        '_git(root, "status", "--porcelain=v1", "--untracked-files=no")',
+        mode="eval",
+    ).body
+    status_calls = [
+        node
+        for node in ast.walk(declarations[0])
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "_git"
+            and len(node.args) >= 2
+            and isinstance(node.args[1], ast.Constant)
+            and node.args[1].value == "status"
+        )
+    ]
+    return len(status_calls) == 1 and ast.dump(status_calls[0]) == ast.dump(expected)
 
 
 def research_operator_token_semantics_current(repo_root: Path) -> bool:

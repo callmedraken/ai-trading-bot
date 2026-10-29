@@ -106,7 +106,7 @@ def _source(root: Path, head: str, tree: str) -> None:
         or _git(root, "branch", "--show-current") != SOURCE_BRANCH
         or _git(root, "rev-parse", "HEAD") != head
         or _git(root, "rev-parse", "HEAD^{tree}") != tree
-        or _git(root, "status", "--porcelain")
+        or _git(root, "status", "--porcelain=v1", "--untracked-files=no")
         or _git(root, "remote", "get-url", "origin")
         != "https://github.com/callmedraken/ai-trading-bot.git"
         or _git(root, "ls-remote", "origin", "refs/heads/" + SOURCE_BRANCH).split()

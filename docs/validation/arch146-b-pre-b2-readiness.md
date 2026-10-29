@@ -484,3 +484,48 @@ paths were used; no real host observer or protected namespace was invoked.
 No canonical FULL/ROBINHOOD ran locally. General admission must still prove both
 contexts on the exact clean committed unpublished candidate before the single
 push. Terminal CI is STOP for ChatGPT review, never host/acquisition authority.
+
+
+## Tracked-only source-binding successor correction
+
+The custody ACE multiset correction was independently accepted at
+27b88cd67b467647d0857c5142a2ca7de0bc7946 with tree
+13b7d3613f7f44a7bd0eab36378ae55f872ac766 and fast-forward integrated into
+develop. Feature #797 / run 40942066124 / attempt 1 remains the canonical FULL
+certification of that exact accepted tree. Develop CI #798 / run 40949362950 /
+attempt 1 reached terminal SUCCESS before this successor edit by exact-source
+certification reuse; it did not require another seven-lane FULL execution.
+
+The newly identified blocker is ARCH146_B2_TRACKED_ONLY_SOURCE_BINDING_DEFECT.
+The successor source correction changes B2 `_source()` to request exactly
+`status --porcelain=v1 --untracked-files=no`, retaining rejection of tracked or
+staged changes, conflicts, wrong worktree/branch/HEAD/TREE, wrong origin, and
+wrong live feature HEAD. The current Architecture 146 owner rejects regression
+to generic or untracked-enumerating status forms, and the registered pre-B2
+checkpoint runner surfaces that specific policy failure. Credential isolation,
+effective-Administrator semantics, exact ACE multisets, 146-A reconstruction,
+and shared Windows security semantics remain independently owned.
+
+Permitted untracked/generated artifacts and historical pytest
+permission-warning directories are known preserved state and are not a
+source-cleanliness failure. No new host observation occurred after integration;
+the previously observed partial host state remains evidence only and was not
+re-inspected. This candidate is SOURCE/DOCS/FAKE-TEST ONLY: real host
+inspection/mutation, credentials, provider access, acquisition, paper, broker,
+and live effects remain zero. Acquisition remains NOT_AUTHORIZED, Architecture
+134 R3 remains parked, and LIVE remains NO-GO.
+
+The conservative roadmap after acceptance/integration is:
+
+    tracked-only source-binding correction
+      -> independently reviewed exact-source integration
+      -> establish/use the reviewed registered read-only partial-state continuation
+      -> one read-only observation
+      -> independent review
+      -> separately reviewed protected OPEN-parent creation
+      -> ordinary non-elevated B2 preflight
+      -> independent READY review
+      -> minimal acquisition bridge
+
+The existing direct B2 launcher is not accepted as the next registered
+partial-state observer unless repository evidence later proves that separately.

@@ -1,21 +1,27 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 146 custody ACE ordering correction
+## Current checkpoint — Architecture 146 B2 tracked-only source-binding correction
 
-The effective-administrator correction is accepted and integrated at develop
-b1716543d324dcc52b43a1598648f01b7c85bf0b, tree
-b193dd705bae343661f954521730b78ccf059ec2. Verify live remote source at startup.
-The bounded custody correction is pending exact-source and mapped certification
-review on feature/research-arch146-b-pre-b2-readiness-current.
+The custody ACE multiset correction was independently accepted at
+27b88cd67b467647d0857c5142a2ca7de0bc7946, tree
+13b7d3613f7f44a7bd0eab36378ae55f872ac766, and fast-forward integrated into
+develop. Develop CI #798 / run 40949362950 / attempt 1 reached terminal SUCCESS
+before this successor edit. Feature CI #797 / run 40942066124 / attempt 1 remains
+the canonical FULL certification of that exact accepted tree; develop used exact-
+source certification reuse and did not require another seven-lane FULL execution.
 
-Current blocker: ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT. PRE-B2 #3
-ran and returned BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN / UNPROVEN_STOP,
-with effects zero. Subsequent bounded parent provisioning left only
-F:\AI\research-holdout present (one directory creation and one ACL mutation).
-The binary diagnostic proved the exact protected Administrators/SYSTEM allow
-ACEs in reverse order from source expectations. Acquisition roots and claim
-remain absent in the reported evidence. The [validation record](validation/arch146-b-pre-b2-readiness.md)
-owns the full chronology; this checkpoint performs no host inspection or repair.
+The newly identified blocker is ARCH146_B2_TRACKED_ONLY_SOURCE_BINDING_DEFECT.
+This source/docs/fake-test candidate changes only the B2 exact-source cleanliness
+predicate to tracked/index-only status and adds its current Architecture 146
+semantic owner and registered checkpoint-runner coverage. Permitted
+untracked/generated artifacts and historical pytest permission-warning
+directories are known preserved state, not a source-cleanliness failure. The
+other exact source predicates remain unchanged.
+
+No new host observation occurred after integration. The previously observed
+partial host state remains evidence only and was not re-inspected; the
+[validation record](validation/arch146-b-pre-b2-readiness.md) owns that
+chronology. This candidate performs no host inspection or repair.
 
 The correction accepts only exact ACE multisets, preserving multiplicity and
 binary SID/mask/type/flags, owner and protected DACL. Shared Windows authority
@@ -41,14 +47,13 @@ unchanged. ACCEPTED_CUSTODY_ADMISSIONS is empty.
 
 ## Next step
 
-Complete focused custody/preflight/acquisition/dataset, current-authority and
-infrastructure coherence tests, whole-root Ruff 0.17.3 and diff checks. Publish
-one atomic candidate only after FEATURE and PROSPECTIVE_DEVELOP admission PASS;
-ordinary-push once and wait for the one mapped GitHub FULL run. No canonical
-FULL locally. Terminal red or green is STOP for ChatGPT exact-source/CI review.
-No merge, PR or real host step belongs to this task. ChatGPT decides integration
-and the separately reviewed protected continuation after source acceptance.
-The partial parent state grants no retry, repair or acquisition authority.
+Complete the focused source-binding/current-authority tests, whole-root Ruff
+0.17.3 and diff checks. Publish one atomic candidate only after FEATURE and
+PROSPECTIVE_DEVELOP admission PASS; ordinary-push once and wait for the one
+mapped GitHub result. No canonical FULL locally. Terminal red or green is STOP
+for ChatGPT exact-source/CI review. No merge, PR or real host step belongs to
+this task. The partial parent state grants no retry, repair or acquisition
+authority.
 
 ## Parked boundaries and roadmap
 
@@ -57,14 +62,19 @@ its consumed observation is unchanged. No retry, alternate diagnostic or R4.
 Acquisition NOT_AUTHORIZED; this source task's protected effects ZERO.
 LIVE remains NO-GO.
 
-    custody correction acceptance/integration
-      -> separately reviewed partial-state continuation and read-only preflight
-      -> independent preflight acceptance
-      -> separately authorized one-shot acquisition/custody
-      -> independent custody admission
-      -> thin Architecture 145-B OPEN orchestration
-      -> existing compact report successor and Research Results GUI
-      -> separately admitted FINAL_HOLDOUT evaluation
+    tracked-only source-binding correction
+      -> independently reviewed exact-source integration
+      -> establish/use the reviewed registered read-only partial-state continuation
+      -> one read-only observation
+      -> independent review
+      -> separately reviewed protected OPEN-parent creation
+      -> ordinary non-elevated B2 preflight
+      -> independent READY review
+      -> minimal acquisition bridge
+
+The existing direct B2 launcher has not been accepted as the next registered
+partial-state observer. Acquisition remains NOT_AUTHORIZED; Architecture 134
+R3 remains parked; LIVE remains NO-GO.
 
 D/E remain REQUIRED_POST_B2. GUI_SOURCE_CHANGE=NOT_REQUIRED pre-B2; F remains
 NO_SOURCE_CHANGE beyond registration. V1 reports stay unchanged; five native-MAC

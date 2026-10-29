@@ -21,8 +21,6 @@ import trading_bot.experiments.historical_research_dataset as dataset
 import trading_bot.experiments.historical_research_native as native
 import trading_bot.experiments.historical_research_native_custody as disk
 import trading_bot.experiments.historical_research_sessions as sessions
-from trading_bot.review_paper import alpaca_windows_credentials as current_credentials
-from trading_bot.review_paper.unattended_host_identity import TRADING_SID
 
 from .test_historical_research_acquisition_custody import (
     ATTEMPT,
@@ -248,114 +246,330 @@ def test_open_publication_accepts_exact_published_sessions(
         verify(result, store)
 
 
-class CredentialApi:
-    def __init__(self):
-        self.reads, self.blobs = [], []
-
-    def read_fixed(self, target):
-        self.reads.append(target)
-        blob = bytearray(b"SYNTHETIC_SECRET")
-        self.blobs.append(blob)
-        return blob
+# Synthetic identities cover multiple ordinary operators; no host SID is a pin.
+OPERATOR = native.ResearchOperatorToken("S-1-5-21-11-22-33-2001", False, False)
 
 
-def test_b2_binding_reuses_retained_approved_identity_and_current_v3_reader():
-    from trading_bot.runtime.personal_desktop_first_paper_operation import (
-        PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
+@pytest.fixture
+def real_report_seam(monkeypatch):
+    """Fake OS/source seams only; never call the real host observer."""
+    monkeypatch.setattr(preflight, "_source", lambda *args: None)
+    monkeypatch.setattr(preflight, "WindowsB2ReadOnlyObserver", ReadOnlyObserver)
+    monkeypatch.setattr(native, "observe_research_operator_token", lambda: OPERATOR)
+    monkeypatch.setattr(preflight, "_REAL_PREFLIGHTS", [])
+    return preflight.run_real_b2_readonly_preflight(
+        Path("."), accepted_head="a" * 40, accepted_tree="b" * 40
     )
 
-    assert (
-        native.CREDENTIAL_ACCOUNT_SID
-        == TRADING_SID
-        == (PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid)
+
+def accepted(report):
+    return preflight.AcceptedB2Preflight(
+        report,
+        accepted_report_sha256=sha256(
+            preflight.preflight_report_bytes(report)
+        ).hexdigest(),
     )
-    assert native.credential_binding_is_current()
-    assert native.CREDENTIAL_TARGETS == (
-        "AITradingBot/MarketData/Alpaca/ApiKeyId/v3",
-        "AITradingBot/MarketData/Alpaca/ApiSecretKey/v3",
+
+
+def bound_source(report):
+    source = native.EphemeralHistoricalResearchCredentialSource(accepted(report))
+    source.bind_acquisition(
+        source_head=report.source_head,
+        source_tree=report.source_tree,
+        session_authority=sessions.published_historical_session_authority(),
     )
-    assert (
-        native.CREDENTIAL_POLICY == "windows-credential-manager-alpaca-market-data/v3"
-    )
-    source = native.WindowsHistoricalResearchCredentialSource()
-    assert source._reader is current_credentials.read_current_product_alpaca_secrets
-    assert source._sid_resolver is native.resolve_current_token_sid
+    return source
 
 
-def test_current_reader_exact_targets_sid_cleanup_and_redaction(monkeypatch):
-    api = CredentialApi()
-    scopes, events = [], []
-    monkeypatch.setattr(current_credentials, "_WindowsCredentialReader", lambda: api)
-
-    def reader():
-        events.append("read")
-        scope = current_credentials.read_current_product_alpaca_secrets()
-        scopes.append(scope)
-        return scope
-
-    def sid():
-        events.append("sid")
-        return TRADING_SID
-
-    source = native.WindowsHistoricalResearchCredentialSource.for_test(reader, sid)
-    result = source.read()
-    assert events == ["sid", "read"]
-    assert api.reads == list(native.CREDENTIAL_TARGETS)
-    assert len(api.blobs) == 2 and all(not any(blob) for blob in api.blobs)
-    assert scopes[0]._closed and scopes[0]._key == scopes[0]._secret == ""
-    assert "SYNTHETIC_SECRET" not in repr(source) + repr(result) + repr(scopes)
-    with pytest.raises(current_credentials.AlpacaCredentialReadError):
-        scopes[0].use(lambda *args: pytest.fail("closed scope used"))
-
-
-@pytest.mark.parametrize("sid", ["S-1-5-21-1", "", None])
-def test_wrong_sid_blocks_before_current_credential_reader(sid):
-    source = native.WindowsHistoricalResearchCredentialSource.for_test(
-        lambda: pytest.fail("secret read before exact SID proof"), lambda: sid
-    )
-    with pytest.raises(custody.HistoricalResearchCustodyError):
-        source.read()
-
-
-@pytest.mark.parametrize("version", ["v1", "v2"])
-def test_old_targets_rejected_without_fallback_or_secret_read(monkeypatch, version):
-    monkeypatch.setattr(
-        native,
-        "CREDENTIAL_TARGETS",
-        tuple(
-            target.replace("/v3", "/" + version) for target in native.CREDENTIAL_TARGETS
-        ),
-    )
-    source = native.WindowsHistoricalResearchCredentialSource.for_test(
-        lambda: pytest.fail("no fallback read"), lambda: TRADING_SID
-    )
-    with pytest.raises(custody.HistoricalResearchCustodyError):
-        source.read()
+@pytest.mark.parametrize("sid", [OPERATOR.sid, "S-1-5-21-55-66-77-9003"])
+def test_ordinary_operator_is_observed_without_fixed_sid(sid):
     observer = ReadOnlyObserver()
+    observer.operator_token = lambda: replace(OPERATOR, sid=sid)
     report = preflight.evaluate_b2_preflight_for_test(observer)
-    assert report.classification == "BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING"
+    assert report.classification == "SIMULATED_B2_PREREQUISITES_PASS"
+    assert report.operator_sid == sid
+    assert report.operator_elevated is report.operator_administrator is False
+    assert report.credential_source == "EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS"
+    assert report.credential_persistence == "NONE"
+    assert not any(
+        (
+            report.credential_secret_reads,
+            report.provider_calls,
+            report.writes,
+            report.acl_mutations,
+            report.acquisition_authorized,
+        )
+    )
+
+
+@pytest.mark.parametrize("field", ["elevated", "administrator"])
+def test_privileged_operator_rejected_before_roots(field):
+    observer = ReadOnlyObserver()
+    observer.operator_token = lambda: replace(OPERATOR, **{field: True})
+    report = preflight.evaluate_b2_preflight_for_test(observer)
+    assert report.classification == "BLOCKED_RESEARCH_OPERATOR_TOKEN"
+    assert observer.calls == ["close"]
+    assert getattr(report, "operator_" + field) is True
+
+
+@pytest.mark.parametrize(
+    "sid",
+    ["S-1-5-18", "S-1-5-32-544", "", None, "S-1-5-21-1", "S-1-5-21-1-2-3-4294967296"],
+)
+def test_non_user_sid_rejected(sid):
+    observer = ReadOnlyObserver()
+    observer.operator_token = lambda: replace(OPERATOR, sid=sid)
+    result = preflight.evaluate_b2_preflight_for_test(observer)
+    assert result.classification != preflight.READY
     assert observer.calls == ["close"]
 
 
-@pytest.mark.parametrize("failure", ["sid", "reader", "consumer"])
-def test_scoped_credential_failures_sanitized_and_closed(monkeypatch, failure):
-    scope = current_credentials.ScopedAlpacaSecrets("KEY", SECRET)
+def test_fake_ready_arbitrary_hash_and_copied_reports_cannot_admit(real_report_seam):
+    fake = preflight.evaluate_b2_preflight_for_test(ReadOnlyObserver())
+    for report in (
+        fake,
+        replace(fake, classification=preflight.READY),
+        replace(real_report_seam),
+    ):
+        with pytest.raises(custody.HistoricalResearchCustodyError):
+            accepted(report)
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        preflight.AcceptedB2Preflight(real_report_seam, accepted_report_sha256="0" * 64)
 
-    def fail(*args):
-        raise OSError(SECRET)
 
-    source = native.WindowsHistoricalResearchCredentialSource.for_test(
-        fail if failure == "reader" else lambda: scope,
-        fail if failure == "sid" else lambda: TRADING_SID,
+def test_ready_and_unaccepted_objects_cannot_prompt(real_report_seam, monkeypatch):
+    monkeypatch.setattr(
+        native, "interactive_research_credentials", lambda: pytest.fail("no prompt")
     )
-    if failure == "consumer":
-        monkeypatch.setattr(native, "AcquisitionCredentials", fail)
-    with pytest.raises(custody.HistoricalResearchCustodyError) as error:
+    for report in (None, OPERATOR.sid, real_report_seam, object()):
+        source = native.EphemeralHistoricalResearchCredentialSource(report)
+        with pytest.raises(custody.HistoricalResearchCustodyError):
+            source.read()
+        with pytest.raises(custody.HistoricalResearchCustodyError):
+            source.bind_acquisition(
+                source_head="a" * 40,
+                source_tree="b" * 40,
+                session_authority=sessions.published_historical_session_authority(),
+            )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "head",
+        "tree",
+        "authority",
+        "sid",
+        "elevated",
+        "administrator",
+        "requests",
+        "custody",
+        "source",
+    ],
+)
+def test_acquisition_binding_drift_blocks_before_prompt_or_claim(
+    real_report_seam, monkeypatch, vendor, change
+):
+    report = real_report_seam
+    source = native.EphemeralHistoricalResearchCredentialSource(accepted(report))
+    monkeypatch.setattr(
+        native, "interactive_research_credentials", lambda: pytest.fail("no prompt")
+    )
+    head, tree, authority = "a" * 40, "b" * 40, vendor[2]
+    if change == "head":
+        head = "c" * 40
+    if change == "tree":
+        tree = "c" * 40
+    if change == "authority":
+        authority = replace(authority, identity="unaccepted")
+    if change in ("sid", "elevated", "administrator"):
+        token = replace(
+            OPERATOR, **{change: "S-1-5-21-55-66-77-8004" if change == "sid" else True}
+        )
+        monkeypatch.setattr(native, "observe_research_operator_token", lambda: token)
+    if change == "requests":
+        report.binding["requests"] = ()
+    if change == "custody":
+        report.binding["custody_sddl"] = "wrong"
+    if change == "source":
+
+        def fail(*args):
+            raise ValueError("source drift")
+
+        monkeypatch.setattr(preflight, "_source", fail)
+    from .test_historical_research_acquisition_custody import FakeCustody, FakeTransport
+
+    store, transport = FakeCustody(), FakeTransport(vendor)
+    outcome = acquisition.HistoricalResearchAcquisitionOperator(
+        transport, source, store
+    ).run(
+        source_head=head,
+        source_tree=tree,
+        attempt_id=ATTEMPT,
+        session_authority=authority,
+    )
+    assert outcome.state == "STOP_RECONCILIATION_REQUIRED"
+    assert not store.events and not transport.calls
+
+
+def test_sid_drift_after_binding_blocks_before_input(real_report_seam, monkeypatch):
+    source = bound_source(real_report_seam)
+    monkeypatch.setattr(
+        native,
+        "observe_research_operator_token",
+        lambda: replace(OPERATOR, sid="S-1-5-21-55-66-77-8004"),
+    )
+    monkeypatch.setattr(
+        native, "interactive_research_credentials", lambda: pytest.fail("no prompt")
+    )
+    with pytest.raises(custody.HistoricalResearchCustodyError):
         source.read()
+
+
+def test_prompt_follows_claim_and_custody_admission_and_scopes_close(
+    real_report_seam, monkeypatch, vendor
+):
+    from .test_historical_research_acquisition_custody import FakeCustody, FakeTransport
+
+    store, transport = FakeCustody(), FakeTransport(vendor)
+    values = acquisition.AcquisitionCredentials("KEY", SECRET)
+
+    def prompt():
+        assert store.events and not transport.calls
+        assert any("prepare" in str(event).lower() for event in store.events)
+        return values
+
+    monkeypatch.setattr(native, "interactive_research_credentials", prompt)
+    source = native.EphemeralHistoricalResearchCredentialSource(
+        accepted(real_report_seam)
+    )
+    result = acquisition.HistoricalResearchAcquisitionOperator(
+        transport, source, store
+    ).run(
+        source_head="a" * 40,
+        source_tree="b" * 40,
+        attempt_id=ATTEMPT,
+        session_authority=vendor[2],
+    )
+    assert result.state == "MATERIALIZED_AWAITING_INDEPENDENT_ADMISSION"
+    assert values.api_key_id == values.api_secret_key == ""
+    assert SECRET not in repr(source) + repr(values) + repr(result) + str(
+        result.evidence_bytes
+    )
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        source.read()
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["", " key", "key ", "a\rb", "a\nb", "a\0b", "x" * 1025, "é" * 513, "\ud800"],
+)
+def test_interactive_shape_rejection_is_sanitized(monkeypatch, value):
+    for stream in (native.sys.stdin, native.sys.stdout, native.sys.stderr):
+        monkeypatch.setattr(stream, "isatty", lambda: True)
+    monkeypatch.setattr(native.getpass, "getpass", lambda *args: value)
+    with pytest.raises(custody.HistoricalResearchCustodyError) as error:
+        native.interactive_research_credentials()
+    assert str(error.value) == "research credential input rejected"
+    assert error.value.__context__ is None
+
+
+@pytest.mark.parametrize("failure", ["echo", "interrupt", "error", "nonterminal"])
+def test_hidden_input_has_no_echo_or_fallback_and_sanitized_errors(
+    monkeypatch, failure, capsys
+):
+    import warnings
+
+    for stream in (native.sys.stdin, native.sys.stdout, native.sys.stderr):
+        monkeypatch.setattr(stream, "isatty", lambda: failure != "nonterminal")
+
+    def read(*args):
+        if failure == "echo":
+            warnings.warn(SECRET, native.getpass.GetPassWarning, stacklevel=2)
+        if failure == "interrupt":
+            raise KeyboardInterrupt(SECRET)
+        if failure == "error":
+            raise OSError(SECRET)
+        pytest.fail("no fallback input")
+
+    monkeypatch.setattr(native.getpass, "getpass", read)
+    monkeypatch.setattr("builtins.input", lambda *args: pytest.fail("no echoed input"))
+    monkeypatch.setenv("APCA_API_KEY_ID", SECRET)
+    monkeypatch.setenv("APCA_API_SECRET_KEY", SECRET)
+    with pytest.raises(custody.HistoricalResearchCustodyError) as error:
+        native.interactive_research_credentials()
     assert SECRET not in str(error.value) + repr(error.value)
-    assert error.value.__suppress_context__
-    if failure == "consumer":
-        assert scope._closed and scope._key == scope._secret == ""
+    assert error.value.__context__ is None
+    assert SECRET not in str(capsys.readouterr())
+
+
+def test_utf8_shape_and_close_and_mutable_copy_cleanup(monkeypatch):
+    for stream in (native.sys.stdin, native.sys.stdout, native.sys.stderr):
+        monkeypatch.setattr(stream, "isatty", lambda: True)
+    values, seen = iter(("é-key", SECRET)), []
+    monkeypatch.setattr(native.getpass, "getpass", lambda *args: next(values))
+    validate = native.validate_alpaca_credential_bytes
+
+    def track(value):
+        seen.append(value)
+        validate(value)
+
+    monkeypatch.setattr(native, "validate_alpaca_credential_bytes", track)
+    result = native.interactive_research_credentials()
+    assert result.api_key_id == "é-key" and len(seen) == 2
+    assert all(not any(value) for value in seen)
+    result.close()
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        result.verify()
+
+
+def test_no_production_identity_or_persistent_secret_paths(monkeypatch):
+    from trading_bot.review_paper import alpaca_windows_credentials
+
+    def fail(*args, **kwargs):
+        pytest.fail("production credential access")
+
+    monkeypatch.setattr(
+        alpaca_windows_credentials, "read_current_product_alpaca_secrets", fail
+    )
+    monkeypatch.setattr(
+        alpaca_windows_credentials, "read_fixed_current_product_credential", fail
+    )
+    monkeypatch.setattr(alpaca_windows_credentials, "_WindowsCredentialReader", fail)
+    result = preflight.evaluate_b2_preflight_for_test(ReadOnlyObserver())
+    assert result.classification == "SIMULATED_B2_PREREQUISITES_PASS"
+    text = "\n".join(
+        (ROOT / path).read_text()
+        for path in (
+            "src/trading_bot/experiments/historical_research_native.py",
+            "src/trading_bot/experiments/historical_research_b2_preflight.py",
+        )
+    )
+    for forbidden in (
+        "TRADING_SID",
+        "approved_trading_sid",
+        "PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE",
+        "read_current_product_alpaca_secrets",
+        "CredentialManager",
+        "CredRead",
+        "CredWrite",
+        "ApiKeyId/v",
+        "ApiSecretKey/v",
+        "environ",
+        "getenv",
+        "argv",
+        "config",
+    ):
+        # argv belongs solely to nonsecret source identity parsing in preflight.
+        if forbidden == "argv":
+            assert (
+                forbidden
+                not in (
+                    ROOT / "src/trading_bot/experiments/historical_research_native.py"
+                ).read_text()
+            )
+        else:
+            assert forbidden not in text
 
 
 class Connection:
@@ -548,9 +762,9 @@ class ReadOnlyObserver:
     def __init__(self):
         self.calls = []
 
-    def current_sid(self):
-        self.calls.append("sid")
-        return TRADING_SID
+    def operator_token(self):
+        self.calls.append("token")
+        return OPERATOR
 
     def fresh_state(self):
         self.calls.append("fresh")
@@ -563,9 +777,9 @@ class ReadOnlyObserver:
 def test_pure_preflight_closed_and_simulation_never_real_ready(monkeypatch):
     observer = ReadOnlyObserver()
     result = preflight.evaluate_b2_preflight_for_test(observer)
-    assert observer.calls == ["sid", "fresh", "close"]
-    assert result.binding["credential_policy"] == native.CREDENTIAL_POLICY
-    assert result.binding["credential_account_sid"] == TRADING_SID
+    assert observer.calls == ["token", "fresh", "token", "close"]
+    assert result.operator_sid == OPERATOR.sid
+    assert result.binding["credential_source"] == native.CREDENTIAL_SOURCE
     assert result.classification == "SIMULATED_B2_PREREQUISITES_PASS"
     assert result.classification != preflight.READY
     assert (
@@ -788,11 +1002,11 @@ def test_error_body_and_non_json_header_are_preserved():
     assert result.status == 403 and result.body == body
 
 
-def test_preflight_wrong_sid_blocks_before_root_observation():
+def test_preflight_invalid_sid_blocks_before_root_observation():
     observer = ReadOnlyObserver()
-    observer.current_sid = lambda: "S-1-5-21-1"
+    observer.operator_token = lambda: replace(OPERATOR, sid="S-1-5-21-1")
     result = preflight.evaluate_b2_preflight_for_test(observer)
-    assert result.classification == "BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH"
+    assert result.classification == "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
     assert observer.calls == ["close"]
     assert (
         result.credential_secret_reads
@@ -823,3 +1037,94 @@ def test_pure_preflight_freshness_security_failures_never_ready(field):
     result = preflight.evaluate_b2_preflight_for_test(observer)
     assert result.classification == "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
     assert result.acquisition_authorized is False
+
+
+@pytest.mark.parametrize("attributes", [0, 4, 16])
+def test_native_token_facts_reject_even_filtered_administrators(
+    monkeypatch, attributes
+):
+    observation = SimpleNamespace(
+        user_sid=OPERATOR.sid,
+        elevated=False,
+        token_type=1,
+        thread_token_present=False,
+        groups=(("S-1-5-32-544", attributes),),
+    )
+    monkeypatch.setattr(
+        native,
+        "WindowsTradingTokenObserver",
+        lambda: SimpleNamespace(observe=lambda: observation),
+    )
+    token = native.observe_research_operator_token()
+    assert token.administrator is True
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        token.verify()
+
+
+@pytest.mark.parametrize("failure", ["transport", "custody", "input"])
+def test_acquisition_secret_scope_closed_on_failure(
+    real_report_seam, monkeypatch, vendor, failure
+):
+    from .test_historical_research_acquisition_custody import FakeCustody, FakeTransport
+
+    store, transport = FakeCustody(), FakeTransport(vendor)
+    value = acquisition.AcquisitionCredentials("KEY", SECRET)
+    if failure == "transport":
+        transport.error = OSError(SECRET)
+    if failure == "custody":
+        store.fail = "vendor-raw/bars/0000.json"
+
+    def prompt():
+        if failure == "input":
+            raise OSError(SECRET)
+        return value
+
+    monkeypatch.setattr(native, "interactive_research_credentials", prompt)
+    source = native.EphemeralHistoricalResearchCredentialSource(
+        accepted(real_report_seam)
+    )
+    outcome = acquisition.HistoricalResearchAcquisitionOperator(
+        transport, source, store
+    ).run(
+        source_head="a" * 40,
+        source_tree="b" * 40,
+        attempt_id=ATTEMPT,
+        session_authority=vendor[2],
+    )
+    assert outcome.state == "STOP_RECONCILIATION_REQUIRED"
+    assert SECRET not in repr(outcome) + repr(source) + str(store.events)
+    if failure != "input":
+        assert value.api_key_id == value.api_secret_key == ""
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        source.read()
+
+
+@pytest.mark.parametrize(
+    "injection",
+    [
+        "from trading_bot.review_paper.unattended_host_identity import TRADING_SID",
+        "approved_trading_sid = 'arbitrary'",
+        "research_sid = 'S-1-5-21-1-2-3-1005'",
+        (
+            "from trading_bot.review_paper.alpaca_windows_credentials "
+            "import ScopedAlpacaSecrets"
+        ),
+        "credential_target = 'AITradingBot/MarketData/Alpaca/ApiKeyId/v3'",
+        "read_current_product_alpaca_secrets()",
+        "os.environ['APCA_API_KEY_ID']",
+    ],
+)
+def test_current_authority_rejects_production_coupling(tmp_path, injection):
+    from scripts.arch146_source_authority import research_credential_boundary_isolated
+
+    for name in (
+        "historical_research_native.py",
+        "historical_research_b2_preflight.py",
+    ):
+        relative = Path("src/trading_bot/experiments") / name
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text((ROOT / relative).read_text(), encoding="utf-8")
+    assert research_credential_boundary_isolated(tmp_path)
+    target.write_text(target.read_text() + "\n" + injection + "\n", encoding="utf-8")
+    assert not research_credential_boundary_isolated(tmp_path)

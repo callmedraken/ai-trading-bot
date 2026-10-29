@@ -11,6 +11,7 @@ import json
 import re
 import subprocess
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 from pathlib import Path
 
 from trading_bot.experiments import historical_research_native as adapters
@@ -19,6 +20,8 @@ from trading_bot.experiments.historical_research_custody import (
     CUSTODY_ROOT,
     CUSTODY_SDDL,
     OPEN_ROOT,
+    HistoricalResearchCustodyError,
+    HistoricalSessionAuthority,
     frozen_request_descriptors,
     require_accepted_historical_session_authority,
 )
@@ -33,7 +36,6 @@ from trading_bot.experiments.historical_research_sessions import (
     published_historical_session_authority,
     reconcile_historical_session_model,
 )
-from trading_bot.runtime.windows_authority_security import resolve_current_token_sid
 
 SOURCE_CHECKPOINT = "arch146-b-pre-b2-readiness-source"
 SOURCE_BRANCH = "feature/research-arch146-b-pre-b2-readiness-current"
@@ -50,6 +52,11 @@ class B2PreflightReport:
     authority_digest: str
     session_count: int
     binding: dict
+    operator_sid: str | None
+    operator_elevated: bool | None
+    operator_administrator: bool | None
+    credential_source: str = adapters.CREDENTIAL_SOURCE
+    credential_persistence: str = adapters.CREDENTIAL_PERSISTENCE
     checkpoint: str = ACQUISITION_CHECKPOINT
     source_checkpoint: str = SOURCE_CHECKPOINT
     credential_secret_reads: int = 0
@@ -65,8 +72,8 @@ class WindowsB2ReadOnlyObserver:
     def __init__(self) -> None:
         self._native = WindowsCustodyNative()
 
-    def current_sid(self) -> str:
-        return resolve_current_token_sid()
+    def operator_token(self) -> adapters.ResearchOperatorToken:
+        return adapters.observe_research_operator_token()
 
     def fresh_state(self) -> CustodyFreshState:
         return self._native.observe_fresh()
@@ -115,12 +122,10 @@ def _evaluate(head: str, tree: str, observer, *, simulated: bool) -> B2Preflight
     binding = {
         "requests": frozen_request_descriptors(),
         "credential_adapter": (
-            adapters.WindowsHistoricalResearchCredentialSource.__name__
+            adapters.EphemeralHistoricalResearchCredentialSource.__name__
         ),
-        "credential_policy": adapters.CREDENTIAL_POLICY,
-        "credential_targets": adapters.CREDENTIAL_TARGETS,
-        "credential_account_sid": adapters.CREDENTIAL_ACCOUNT_SID,
-        "credential_binding_disposition": adapters.CREDENTIAL_BINDING_DISPOSITION,
+        "credential_source": adapters.CREDENTIAL_SOURCE,
+        "credential_persistence": adapters.CREDENTIAL_PERSISTENCE,
         "transport_adapter": adapters.HttpsHistoricalResearchTransport.__name__,
         "custody_adapter": WindowsHistoricalResearchCustody.__name__,
         "open_root": OPEN_ROOT,
@@ -134,24 +139,37 @@ def _evaluate(head: str, tree: str, observer, *, simulated: bool) -> B2Preflight
         "non_reparse": "NOT_OBSERVED",
         "source_binding": "SIMULATED" if simulated else "EXACT_REVIEWED_COMMAND",
     }
-    classification = "BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING"
+    classification = "BLOCKED_RESEARCH_CREDENTIAL_POLICY"
+    token = None
     try:
         if adapters.credential_binding_is_current():
-            if observer.current_sid() != adapters.CREDENTIAL_ACCOUNT_SID:
-                classification = "BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH"
-            else:
-                state = observer.fresh_state()
-                binding.update(
-                    fresh_state=state.classification,
-                    local_ntfs=state.local_ntfs,
-                    non_reparse=state.non_reparse,
-                )
-                state.verify()
-                classification = (
-                    "SIMULATED_B2_PREREQUISITES_PASS" if simulated else READY
-                )
+            observed = observer.operator_token()
+            if type(observed) is not adapters.ResearchOperatorToken:
+                raise ValueError
+            # Never report arbitrary exception/input strings as observed identity.
+            observed.verify_sid()
+            if (
+                type(observed.elevated) is not bool
+                or type(observed.administrator) is not bool
+            ):
+                raise ValueError
+            token = observed
+            classification = "BLOCKED_RESEARCH_OPERATOR_TOKEN"
+            observed.verify()
+            classification = "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
+            state = observer.fresh_state()
+            binding.update(
+                fresh_state=state.classification,
+                local_ntfs=state.local_ntfs,
+                non_reparse=state.non_reparse,
+            )
+            state.verify()
+            if observer.operator_token() != token:
+                raise ValueError
+            classification = "SIMULATED_B2_PREREQUISITES_PASS" if simulated else READY
     except Exception:
-        classification = "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
+        if classification != "BLOCKED_RESEARCH_OPERATOR_TOKEN":
+            classification = "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
     finally:
         try:
             observer.close()
@@ -165,6 +183,9 @@ def _evaluate(head: str, tree: str, observer, *, simulated: bool) -> B2Preflight
         authority.digest,
         len(authority.sessions),
         binding,
+        token.sid if token is not None else None,
+        token.elevated if token is not None else None,
+        token.administrator if token is not None else None,
     )
 
 
@@ -185,7 +206,96 @@ def run_real_b2_readonly_preflight(
         accepted_head, accepted_tree, WindowsB2ReadOnlyObserver(), simulated=False
     )
     _source(root, accepted_head, accepted_tree)
+    if result.classification == READY:
+        # Only this real observer path mints provenance. Parsed/replaced/fake
+        # reports cannot mint acceptance, even with a matching caller hash.
+        _REAL_PREFLIGHTS.append((result, preflight_report_bytes(result), root))
     return result
+
+
+# Nonsecret, process-local provenance only. No file/credential persistence and
+# no acceptance from a parsed report. Later operator wiring must retain the
+# real report across independent review; no acquisition dispatcher exists yet.
+_REAL_PREFLIGHTS: list[tuple[B2PreflightReport, bytes, Path]] = []
+
+
+def preflight_report_bytes(report: B2PreflightReport) -> bytes:
+    return json.dumps(asdict(report), sort_keys=True, separators=(",", ":")).encode()
+
+
+class AcceptedB2Preflight:
+    """Explicit independent acceptance of one exact real nonsecret report.
+
+    Construct only after review, with its independently accepted SHA256. This
+    binds prerequisites; it does not authorize acquisition or supply a SID.
+    """
+
+    def __init__(
+        self, report: B2PreflightReport, *, accepted_report_sha256: str
+    ) -> None:
+        observed = next(
+            (entry for entry in _REAL_PREFLIGHTS if entry[0] is report), None
+        )
+        if (
+            type(report) is not B2PreflightReport
+            or observed is None
+            or observed[1] != preflight_report_bytes(report)
+            or sha256(observed[1]).hexdigest() != accepted_report_sha256
+        ):
+            raise HistoricalResearchCustodyError("accepted real preflight required")
+        self._report = report
+        self._bytes = observed[1]
+        self._root = observed[2]
+
+    def recheck(self) -> None:
+        report = self._report
+        authority = published_historical_session_authority()
+        binding = report.binding
+        if (
+            preflight_report_bytes(report) != self._bytes
+            or report.classification != READY
+            or report.acquisition_authorized is not False
+            or any(
+                (
+                    report.credential_secret_reads,
+                    report.provider_calls,
+                    report.writes,
+                    report.acl_mutations,
+                )
+            )
+            or report.credential_source != adapters.CREDENTIAL_SOURCE
+            or report.credential_persistence != adapters.CREDENTIAL_PERSISTENCE
+            or report.authority_identity != authority.identity
+            or report.authority_digest != authority.digest
+            or report.session_count != len(authority.sessions)
+            or binding["requests"] != frozen_request_descriptors()
+            or binding["open_root"] != OPEN_ROOT
+            or binding["custody_root"] != CUSTODY_ROOT
+            or binding["attempt_claim"] != ATTEMPT_CLAIM_PATH
+            or binding["custody_sddl"] != CUSTODY_SDDL
+            or binding["open_sddl"] != OPEN_SDDL
+            or binding["source_binding"] != "EXACT_REVIEWED_COMMAND"
+        ):
+            raise HistoricalResearchCustodyError("accepted preflight contract drift")
+        require_accepted_historical_session_authority(authority)
+        reconcile_historical_session_model(authority)
+        _source(self._root, report.source_head, report.source_tree)
+        token = adapters.observe_research_operator_token()
+        token.verify()
+        if token != adapters.ResearchOperatorToken(
+            report.operator_sid, report.operator_elevated, report.operator_administrator
+        ):
+            raise HistoricalResearchCustodyError("accepted preflight operator drift")
+
+    def verify_acquisition(
+        self, head: str, tree: str, authority: HistoricalSessionAuthority
+    ) -> None:
+        if (head, tree) != (
+            self._report.source_head,
+            self._report.source_tree,
+        ) or authority != published_historical_session_authority():
+            raise HistoricalResearchCustodyError("acquisition preflight binding drift")
+        self.recheck()
 
 
 def main(argv: list[str] | None = None) -> int:

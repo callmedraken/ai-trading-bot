@@ -70,30 +70,63 @@ full fingerprint. The OPEN successor retains independent custody/evidence/source
 binding and resolves exactly one accepted authority. Missing, unexpected,
 exceptional-closure and duplicate bars fail; no bars are fabricated.
 
-## Native adapters and source-owned credential binding
+## Current research operator and ephemeral credential boundary
 
-B2 reuses trading_bot.review_paper.alpaca_windows_credentials exactly:
+The integrated pre-B2 base for this correction is develop
+b047d87cb7d82e61b9ef23280db90d8cf916c75b, tree
+bc075bc0cac40ebee64a682350c08dac903359e4. The same registered branch/worktree
+and mapped FULL checkpoint are retained. This corrects Architecture 146-B;
+it creates no new architecture or credential generation.
 
-    CREDENTIAL_POLICY windows-credential-manager-alpaca-market-data/v3
-    API_KEY_TARGET AITradingBot/MarketData/Alpaca/ApiKeyId/v3
-    API_SECRET_TARGET AITradingBot/MarketData/Alpaca/ApiSecretKey/v3
-    read_current_product_alpaca_secrets() -> ScopedAlpacaSecrets.use(...)
-      -> AcquisitionCredentials
+Production Trading identity, production-paper admission, /v1-/v3 Credential
+Manager readers/targets and their host state are outside the research path.
+Those production contracts remain unchanged and their real state is not read.
+The only shared credential code is the public bounded UTF-8 shape validator;
+the reviewed hidden-input warning-as-error pattern is reused without importing
+its provisioning/production authority. There is no /v4 or persistent source.
 
-The narrow B2 CREDENTIAL_ACCOUNT_SID imports retained approved TRADING_SID
-from review_paper.unattended_host_identity. A regression independently compares
-that binding with PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid.
-No host SID discovery supplies authority. Runtime read entry independently
-observes the current token SID and requires exact equality before calling the
-current /v3 reader once. Scoped use/close and native cleanup/redaction remain.
-There is no /v2, /v1, environment/config/CLI fallback or additional target.
-Identity/reader reuse imports no D1/PREPARE/EXECUTE or provider authority.
+The real preflight observes a Windows user SID and records operator_sid,
+operator_elevated and operator_administrator. Non-user, elevated, administrator
+(including filtered/deny-only Administrators membership) or unproven tokens
+block. The low-level bounded TOKEN_QUERY observer supplies facts only; its
+Trading admission policy is never called. No ordinary SID is a source constant.
+The source/persistence report values are exactly:
 
-Pure preflight now checks the fixed current /v3 source binding and current token
-SID before freshness/security observations. It no longer permanently blocks on
-an absent source binding. Fake evaluation can only report simulated readiness.
-The retained protected custody policy is unchanged; its real-host prerequisites
-must be proved separately. The preflight reads zero secrets and grants no effect.
+    credential_source = EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS
+    credential_persistence = NONE
+
+Preflight never prompts and reads zero secrets. It retains zero provider calls,
+writes and ACL mutations, acquisition_authorized=false, exact nonsecret source,
+published authority, request and custody prerequisites. Fake evaluation returns
+SIMULATED readiness only. Actual READY is minted only by the exact real observer
+path, after source checks before and after observation and stable token checks.
+
+A later independently accepted real report is represented by AcceptedB2Preflight
+with its independently reviewed canonical report SHA256. Provenance is retained
+in memory: a parsed, copied, edited or fake report cannot mint this capability,
+even with a matching supplied hash. Current source has no acceptance/acquisition
+CLI. Future reviewed operator wiring must retain the real report object across
+independent acceptance; the report printed by the read-only CLI is evidence and
+cannot itself rehydrate an acquisition capability. This checkpoint authorizes
+neither acceptance nor acquisition.
+
+The existing B1 one-shot kernel binds that capability to its exact source
+HEAD/TREE and accepted authority before durable claim. The credential source
+then rechecks exact clean/live source, authority identity/digest, request/custody
+contracts and the current same non-admin/non-elevated operator immediately
+before prompting. SID/source/contract drift blocks without input/provider calls.
+A bare READY report or arbitrary caller-supplied SID grants no input authority.
+
+Ephemeral input requires interactive local stdin/stdout/stderr. getpass fallback
+warnings are errors; no echoed-input, argv, environment, config, file, Credential
+Manager or other fallback exists. Only nonempty bounded UTF-8, no edge whitespace
+and no CR/LF/NUL are validated. This does not prove Alpaca authentication.
+Mutable input copies are cleared on every exit. AcquisitionCredentials is
+redacted and closed after provider use and on failures. Python immutable strings
+and terminal-internal copies cannot be guaranteed zeroized. Failures expose only
+fixed sanitized messages, never values, fingerprints, input lengths or raw errors.
+Custody security/freshness remains independently closed; no policy is relaxed
+and no missing parent is provisioned to obtain READY.
 
 HTTPS reuses reviewed stdlib mechanics/constants with a dedicated B1 binding:
 only the two frozen GET request families over certificate/hostname-verified TLS
@@ -128,7 +161,7 @@ identity. Directories use their final path and explicit policy, then volume
 flush. No rename, promotion, replacement, cleanup or retry API exists. Native
 qualification remains a future host boundary; all tests are fake/disposable.
 
-## Prepared real-host preflight — NOT_RUN
+## Future real-host preflight — correction source NOT_RUN
 
 Only after independent exact-source review, substitute the accepted candidate
 HEAD/TREE into this separately reviewed read-only command:
@@ -169,7 +202,7 @@ Protected effects = ZERO. Real preflight is NOT_RUN. No real credential/provider
 root/ACL/holdout/dataset/scheduler/host/paper/broker/live action, Architecture-145
 campaign or FINAL_HOLDOUT evaluation. After terminal green, stop for ChatGPT
 exact-source review. Next milestone is the single real read-only B2 host
-preflight against the accepted source-owned identity and /v3 binding. Acquisition stays separately
+preflight under the ordinary research operator against the accepted correction. Acquisition stays separately
 unauthorized until the preflight is independently reviewed and accepted.
 
 D=REQUIRED_POST_B2 / MINIMAL_ORCHESTRATION_GAP; E=REQUIRED_POST_B2 for report
@@ -200,8 +233,9 @@ discovery, fallback timing, deterministic one-lane placement, complete
 classification/partition coverage and unchanged historical timing evidence.
 Attempts 1/2 require full exact provenance; attempt 3 is rejected. Historical
 predecessor functions/pins and validation records retain their old meaning.
-The current credential adapter and pure preflight use only the source-owned
-Trading SID and /v3 generation described above.
+At that historical checkpoint the adapter/preflight required the source-owned
+Trading SID and /v3 generation. The research authority coupling correction above
+supersedes that requirement; the old consumed observations remain truthful.
 
 The 2718-session authority, its digest/bundle/manifest, model-minus-published
 2018-12-05 and 2025-01-09, empty reverse delta, global modeled calendar and 146-A
@@ -241,3 +275,72 @@ Whole-root non-mutating Ruff check/format-check and git diff --check must pass
 on the final candidate. General ops.ps1 admit owns the final clean committed
 FEATURE/PROSPECTIVE_DEVELOP proof. These focused results grant no canonical
 certification or host/effect authority.
+
+
+## Consumed observations and research coupling defect disposition
+
+The operator-reported first real read-only preflight is preserved as consumed:
+BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH. Source Trading SID ended in 1009;
+ordinary desktop operator SID ended in 1005. Its credential_secret_reads,
+provider_calls, writes and acl_mutations were all zero. It is not rewritten as
+a correct research-source decision and is not retried by this source checkpoint.
+Subsequent read-only identity reconciliation established Trading identity drift
+was false and classified WRONG_LAUNCH_PRINCIPAL. The accepted root cause is:
+
+    BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH
+      -> identity reconciliation
+      -> WRONG_LAUNCH_PRINCIPAL
+      -> ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT
+
+The dedicated Trading account was not defective. Requiring a production
+principal for ordinary historical research was the defect. Those observed SID
+suffixes are historical evidence, never new source authority constants. No
+consumed real preflight/reconciliation report is changed or recreated here.
+
+## Research coupling correction publication boundary
+
+One exact-file normal commit and one ordinary push on the existing registered
+research branch; no PR, merge, rerun, amend, rebase or force-push. General
+ops.ps1 admit evaluates FEATURE and PROSPECTIVE_DEVELOP on the same clean
+candidate. The bounded infrastructure/authority coherence bundle and affected
+146-A/B, transport and credential tests precede publication, with Ruff 0.17.3
+whole-root check/format-check and diff-check. Canonical FULL runs only in the
+single mapped GitHub CI. Terminal red OR green is STOP for ChatGPT exact review.
+NO_MUTABLE_INVENTORY_CARDINALITY_PINS and reviewed canonical attempts 1/2 remain
+unchanged; no retry is authorized by this checkpoint.
+
+After exact-source acceptance and integration, ChatGPT provides a SHORT DIRECT
+OPERATOR PROCEDURE for one real read-only preflight under the ordinary research
+operator. Only after independent acceptance can ChatGPT separately authorize
+one acquisition attempt with input immediately before the provider boundary.
+Current correction real preflight NOT_RUN; acquisition NOT_AUTHORIZED; protected
+effects ZERO; Architecture 134 R3 parked; LIVE NO-GO.
+
+
+### Research coupling correction focused verification
+
+All verification used the existing isolated Python 3.14.3 / Ruff 0.17.3
+interpreter at
+F:\AI\temp\arch146-b1-c3-toolchain-b090b5bf460b46ffacc43988e0eead14\Scripts\python.exe,
+from the canonical source worktree, with -B, pytest -q -p no:cacheprovider,
+--tb=short and a fresh external purpose-prefix-plus-GUID --basetemp per group.
+No actual token, credential store, provider or custody root was observed.
+
+- 375 passed: affected historical_research_pre_b2, acquisition_custody and
+  dataset modules. The initial fake transport fixture signature error was
+  corrected locally; the 10 affected cases then passed before broader checks.
+- 1315 passed: checkpoint test_source_authority/test_ci; certification
+  test_profiles/test_lanes/test_results/test_source; historical/current
+  deployment-admission diagnostic and research production compatibility.
+- 393 passed, one expected non-Windows assertion skipped on Windows: final
+  historical_research_pre_b2, credential generation/staging cleanup, retained
+  windows_effectful_capture_credentials/security and Alpaca HTTP modules.
+- Whole-root python -B -m ruff check --no-cache src tests scripts and
+  python -B -m ruff format --check --no-cache src tests scripts passed
+  (1106 Python files); git diff --check passed. Both Ruff phases were checked.
+
+Current-owner isolation tests also mutate production imports/targets, fallback
+access and a synthetic ordinary SID pin to prove they fail closed. No canonical
+FULL/ROBINHOOD ran locally. Final general admission must bind FEATURE and
+PROSPECTIVE_DEVELOP to the exact clean unpublished candidate before the single
+push; the resulting mapped GitHub CI is the only canonical run.

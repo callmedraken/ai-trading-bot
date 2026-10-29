@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import getpass
 import http.client
+import re
 import ssl
+import sys
+import warnings
 from collections.abc import Callable
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
+from trading_bot.arch133_verifier.token import WindowsTradingTokenObserver
 from trading_bot.experiments.historical_research_acquisition import (
     MAX_RESPONSE_BYTES,
     AcquisitionCredentials,
@@ -14,6 +21,7 @@ from trading_bot.experiments.historical_research_acquisition import (
 )
 from trading_bot.experiments.historical_research_custody import (
     HistoricalResearchCustodyError,
+    HistoricalSessionAuthority,
 )
 from trading_bot.market_data.alpaca_http import (
     ALPACA_DATA_HOST,
@@ -22,77 +30,147 @@ from trading_bot.market_data.alpaca_http import (
     ALPACA_SOCKET_TIMEOUT_SECONDS,
     _validated_response_headers,
 )
-from trading_bot.review_paper import alpaca_windows_credentials as current_credentials
 from trading_bot.review_paper.alpaca_windows_credentials import (
-    ScopedAlpacaSecrets,
-    read_current_product_alpaca_secrets,
+    validate_alpaca_credential_bytes,
 )
-from trading_bot.review_paper.unattended_host_identity import TRADING_SID
-from trading_bot.runtime.windows_authority_security import resolve_current_token_sid
 
-# Reuse only the retained approved account identity, never D1/prepare/execute
-# authority. The current token is independently observed before every read.
-CREDENTIAL_ACCOUNT_SID = TRADING_SID
-CREDENTIAL_POLICY = current_credentials.CREDENTIAL_POLICY
-CREDENTIAL_BINDING_DISPOSITION = "SOURCE_OWNED_B2_TRADING_ACCOUNT_V3"
-CREDENTIAL_TARGETS = (
-    current_credentials.API_KEY_TARGET,
-    current_credentials.API_SECRET_TARGET,
-)
+if TYPE_CHECKING:
+    from trading_bot.experiments.historical_research_b2_preflight import (
+        AcceptedB2Preflight,
+    )
+
+CREDENTIAL_SOURCE = "EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS"
+CREDENTIAL_PERSISTENCE = "NONE"
 
 
 def credential_binding_is_current() -> bool:
-    """Pure source binding; no host discovery, secret read or effect authority."""
+    """Pure research policy; no stored targets or production account binding."""
     return (
-        CREDENTIAL_ACCOUNT_SID == TRADING_SID
-        and CREDENTIAL_POLICY
-        == current_credentials.CREDENTIAL_POLICY
-        == "windows-credential-manager-alpaca-market-data/v3"
-        and CREDENTIAL_TARGETS
-        == (current_credentials.API_KEY_TARGET, current_credentials.API_SECRET_TARGET)
-        == (
-            "AITradingBot/MarketData/Alpaca/ApiKeyId/v3",
-            "AITradingBot/MarketData/Alpaca/ApiSecretKey/v3",
-        )
+        CREDENTIAL_SOURCE == "EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS"
+        and CREDENTIAL_PERSISTENCE == "NONE"
     )
 
 
-class WindowsHistoricalResearchCredentialSource:
-    """Bridge the current v3 scoped reader after exact source-owned SID proof."""
+@dataclass(frozen=True, slots=True)
+class ResearchOperatorToken:
+    sid: str
+    elevated: bool
+    administrator: bool
 
-    def __init__(self) -> None:
-        self._reader = read_current_product_alpaca_secrets
-        self._sid_resolver = resolve_current_token_sid
+    def verify_sid(self) -> None:
+        if (
+            type(self.sid) is not str
+            or re.fullmatch(
+                r"S-1-5-21-(?:[1-9][0-9]{0,9}-){3}[1-9][0-9]{0,9}", self.sid
+            )
+            is None
+            or any(int(part) > 0xFFFFFFFF for part in self.sid.split("-")[4:])
+        ):
+            raise HistoricalResearchCustodyError("research operator SID class rejected")
 
-    @classmethod
-    def for_test(
-        cls,
-        reader: Callable[[], ScopedAlpacaSecrets],
-        sid_resolver: Callable[[], str],
-    ) -> WindowsHistoricalResearchCredentialSource:
-        result = cls()
-        result._reader = reader
-        result._sid_resolver = sid_resolver
-        return result
+    def verify(self) -> None:
+        self.verify_sid()
+        if self.elevated is not False or self.administrator is not False:
+            raise HistoricalResearchCustodyError("research operator token rejected")
+
+
+def observe_research_operator_token() -> ResearchOperatorToken:
+    """Observe actual token facts; no supplied SID or account lookup is authority."""
+    # Reuse only the bounded TOKEN_QUERY observer, never Trading admission.
+    observed = WindowsTradingTokenObserver().observe()
+    if observed.token_type != 1 or observed.thread_token_present is not False:
+        raise HistoricalResearchCustodyError("research token identity unproven")
+    # Include deny-only Administrators membership: a filtered admin token is
+    # still an administrator account, even when CheckTokenMembership is false.
+    return ResearchOperatorToken(
+        observed.user_sid,
+        observed.elevated,
+        any(sid == "S-1-5-32-544" for sid, _ in observed.groups),
+    )
+
+
+def interactive_research_credentials() -> AcquisitionCredentials:
+    """Reviewed getpass warning-as-error pattern, without provisioning authority.
+
+    Called only inside the admitted one-shot credential source. Mutable UTF-8
+    copies are cleared on every exit. Python/terminal immutable string copies
+    cannot be guaranteed zeroized. Shape validation is not authentication.
+    """
+    values = []
+    result = None
+    failed = False
+    try:
+        if not all(stream.isatty() for stream in (sys.stdin, sys.stdout, sys.stderr)):
+            raise ValueError
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", getpass.GetPassWarning)
+            for prompt in ("Research Alpaca key ID: ", "Research Alpaca secret: "):
+                values.append(bytearray(getpass.getpass(prompt).encode("utf-8")))
+                validate_alpaca_credential_bytes(values[-1])
+        result = AcquisitionCredentials(*(value.decode("utf-8") for value in values))
+    except BaseException:
+        failed = True
+    finally:
+        for value in values:
+            for index in range(len(value)):
+                value[index] = 0
+    # Raise outside the handler: neither chaining nor __context__ retains input.
+    if failed or result is None:
+        raise HistoricalResearchCustodyError("research credential input rejected")
+    return result
+
+
+class EphemeralHistoricalResearchCredentialSource:
+    """No default authority. READY and caller-supplied SIDs cannot prompt.
+
+    A separately accepted real preflight and an exact B1 run are both required.
+    There is deliberately no acquisition CLI or effect dispatcher here.
+    """
+
+    def __init__(self, accepted_preflight: AcceptedB2Preflight | None = None) -> None:
+        self._accepted_preflight = accepted_preflight
+        self._bound = False
+        self._used = False
 
     def __repr__(self) -> str:
-        return "WindowsHistoricalResearchCredentialSource(<redacted>)"
+        return "EphemeralHistoricalResearchCredentialSource(<redacted>)"
+
+    def bind_acquisition(
+        self,
+        *,
+        source_head: str,
+        source_tree: str,
+        session_authority: HistoricalSessionAuthority,
+    ) -> None:
+        from trading_bot.experiments.historical_research_b2_preflight import (
+            AcceptedB2Preflight,
+        )
+
+        if self._bound or self._used:
+            raise HistoricalResearchCustodyError("research credential source consumed")
+        self._used = True
+        if type(self._accepted_preflight) is not AcceptedB2Preflight:
+            raise HistoricalResearchCustodyError("accepted real preflight required")
+        self._accepted_preflight.verify_acquisition(
+            source_head, source_tree, session_authority
+        )
+        self._bound = True
 
     def read(self) -> AcquisitionCredentials:
+        failed = False
+        result = None
         try:
-            if (
-                not credential_binding_is_current()
-                or self._sid_resolver() != CREDENTIAL_ACCOUNT_SID
-            ):
-                raise ValueError("B2 credential account binding rejected")
-            with self._reader() as scoped:
-                if type(scoped) is not ScopedAlpacaSecrets:
-                    raise ValueError("exact current credential scope required")
-                return scoped.use(AcquisitionCredentials)
-        except Exception:
-            raise HistoricalResearchCustodyError(
-                "B2 credential source failed"
-            ) from None
+            if not self._bound or not credential_binding_is_current():
+                raise ValueError
+            self._bound = False
+            # Recheck exact source/contracts and token immediately before input.
+            self._accepted_preflight.recheck()
+            result = interactive_research_credentials()
+        except BaseException:
+            failed = True
+        if failed or type(result) is not AcquisitionCredentials:
+            raise HistoricalResearchCustodyError("B2 credential source failed")
+        return result
 
 
 class HttpsHistoricalResearchTransport:
@@ -119,6 +197,7 @@ class HttpsHistoricalResearchTransport:
             or type(credentials) is not AcquisitionCredentials
         ):
             raise HistoricalResearchCustodyError("exact B1 HTTP contracts required")
+        credentials.verify()
         # Reconstruct from the closed request type, never accept caller URL/headers.
         canonical = HistoricalResearchRequest(request.stream, request.page_token)
         if request != canonical or request.descriptor != canonical.descriptor:

@@ -1,6 +1,7 @@
 """Current owner of 146-A compatibility across the additive 146-B extraction."""
 
 import ast
+import re
 from copy import deepcopy
 from pathlib import Path
 
@@ -82,3 +83,67 @@ def dataset_preserves_146a_contract(repo_root: Path, historical_pin: str) -> boo
         reconstructed.append(node)
     current.body = reconstructed
     return ast.dump(current) == ast.dump(old)
+
+
+def research_credential_boundary_isolated(repo_root: Path) -> bool:
+    """Reject production-principal/store/fallback authority in the Arch146 path."""
+    forbidden_names = {
+        "TRADING_SID",
+        "approved_trading_sid",
+        "PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE",
+        "read_current_product_alpaca_secrets",
+        "read_fixed_current_product_credential",
+        "WindowsAlpacaCredentialManagerReader",
+        "CredReadW",
+        "CredWriteW",
+        "environ",
+        "getenv",
+    }
+    for relative in (
+        "src/trading_bot/experiments/historical_research_native.py",
+        "src/trading_bot/experiments/historical_research_b2_preflight.py",
+    ):
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id in forbidden_names:
+                return False
+            if isinstance(node, ast.Attribute) and node.attr in forbidden_names:
+                return False
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                if re.fullmatch(r"S-1-5-21-(?:[0-9]+-){3}[0-9]+", node.value):
+                    return False
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                == ("trading_bot.review_paper.alpaca_windows_credentials")
+                and any(
+                    alias.name != "validate_alpaca_credential_bytes"
+                    for alias in node.names
+                )
+            ):
+                return False
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                if any(alias.name in forbidden_names for alias in node.names):
+                    return False
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and (
+                        "unattended_host_identity" in node.module
+                        or "personal_desktop_first_paper_operation" in node.module
+                    )
+                ):
+                    return False
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and any(
+                    target in node.value
+                    for target in (
+                        "AITradingBot/MarketData/Alpaca/",
+                        "windows-credential-manager-alpaca-",
+                    )
+                )
+            ):
+                return False
+    return True

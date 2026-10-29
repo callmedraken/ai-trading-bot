@@ -127,11 +127,26 @@ class AcquisitionCredentials:
     api_secret_key: str
 
     def __post_init__(self) -> None:
-        if any(
-            type(item) is not str or re.fullmatch(r"[!-~]{1,256}", item) is None
-            for item in (self.api_key_id, self.api_secret_key)
-        ):
+        self.verify()
+
+    def verify(self) -> None:
+        try:
+            valid = all(
+                type(item) is str
+                and 0 < len(item.encode("utf-8")) <= 1024
+                and item == item.strip()
+                and not any(char in item for char in "\r\n\0")
+                for item in (self.api_key_id, self.api_secret_key)
+            )
+        except UnicodeError:
+            valid = False
+        if not valid:
             raise HistoricalResearchCustodyError("invalid injected credentials")
+
+    def close(self) -> None:
+        """Drop secret references; Python immutable strings cannot be zeroized."""
+        object.__setattr__(self, "api_key_id", "")
+        object.__setattr__(self, "api_secret_key", "")
 
     def __repr__(self) -> str:
         return "AcquisitionCredentials(<redacted>)"
@@ -515,6 +530,7 @@ class HistoricalResearchAcquisitionOperator:
         self._used = True
         stage = "SOURCE_AND_ATTEMPT"
         claimed = False
+        credentials = None
         try:
             if (
                 any(
@@ -532,6 +548,15 @@ class HistoricalResearchAcquisitionOperator:
             )
 
             reconcile_historical_session_model(session_authority)
+            # Native research input additionally requires independent preflight
+            # acceptance and exact source/token binding before ANY custody effect.
+            bind = getattr(self._credentials, "bind_acquisition", None)
+            if bind is not None:
+                bind(
+                    source_head=source_head,
+                    source_tree=source_tree,
+                    session_authority=session_authority,
+                )
             stage = "DURABLE_CLAIM"
             if (
                 self._custody.claim_attempt(attempt_id, CustodyPersistencePlan())
@@ -557,6 +582,7 @@ class HistoricalResearchAcquisitionOperator:
                 credentials,
                 self._custody,
             )
+            credentials.close()
             stage = "NORMALIZATION_AND_CUSTODIAN_VERIFICATION"
             bars = normalize_historical_research_bars(pages)
             sidecar = corporate_action_sidecar(actions)
@@ -653,3 +679,6 @@ class HistoricalResearchAcquisitionOperator:
             return AcquisitionOutcome(
                 "STOP_RECONCILIATION_REQUIRED", stage + ":" + reason
             )
+        finally:
+            if type(credentials) is AcquisitionCredentials:
+                credentials.close()

@@ -417,10 +417,15 @@ Native adapters are defined only by the dedicated pre-B2 modules. Custody uses
 fixed roots, exact protected owner/DACL, explicit OPEN read policy, a create-only
 claim under the protected existing parent, no-follow held parent handles,
 local NTFS, create-only file writes, file/volume flush, same-handle readback and
-terminal preservation. No rename/promotion/cleanup path exists. The B2 credential
-account now reuses the retained approved source-owned Trading
-SID and exact current /v3 scoped reader; current token SID equality precedes
-any secret read. That identity reuse grants no provider or deployment authority.
+terminal preservation. No rename/promotion/cleanup path exists. Research uses
+EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS with credential_persistence=NONE;
+production Trading identity and Credential Manager generations supply no research
+authority. The real preflight observes a Windows user SID, non-elevated and
+non-administrator token. Independent acceptance binds its exact nonsecret report,
+source HEAD/TREE, operator SID, published authority, requests and custody policy.
+The later separately authorized B1 invocation rechecks these before any custody
+effect and again immediately before hidden terminal input. READY alone grants
+no acquisition effect. Fakes and caller-supplied SIDs cannot mint acceptance.
 Fresh parent provisioning and custody security remain closed host prerequisites;
 no missing/unproven parent is repaired by the adapter.
 

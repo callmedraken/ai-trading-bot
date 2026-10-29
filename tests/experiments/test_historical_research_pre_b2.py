@@ -836,19 +836,26 @@ def test_b2_source_binding_uses_tracked_only_status(monkeypatch):
             return "a" * 40 + " refs/heads/" + preflight.SOURCE_BRANCH
         raise AssertionError(arguments)
 
-    monkeypatch.setattr(preflight, "_git", fake_git)
-    preflight._source(ROOT, "a" * 40, "b" * 40)
-    assert status["untracked"] == "?? permitted-generated.txt"
-    assert ("status", "--porcelain=v1", "--untracked-files=no") in calls
-    assert not any(
-        arguments[:2] == ("status", "--porcelain")
-        and arguments != ("status", "--porcelain=v1", "--untracked-files=no")
-        for arguments in calls
+    production_source_worktree = preflight.SOURCE_WORKTREE
+    assert production_source_worktree == (
+        r"F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current"
     )
-
-    status["tracked"] = " M tracked-source.py"
-    with pytest.raises(ValueError):
+    with monkeypatch.context() as seam:
+        seam.setattr(preflight, "SOURCE_WORKTREE", str(ROOT))
+        seam.setattr(preflight, "_git", fake_git)
         preflight._source(ROOT, "a" * 40, "b" * 40)
+        assert status["untracked"] == "?? permitted-generated.txt"
+        assert ("status", "--porcelain=v1", "--untracked-files=no") in calls
+        assert not any(
+            arguments[:2] == ("status", "--porcelain")
+            and arguments != ("status", "--porcelain=v1", "--untracked-files=no")
+            for arguments in calls
+        )
+
+        status["tracked"] = " M tracked-source.py"
+        with pytest.raises(ValueError):
+            preflight._source(ROOT, "a" * 40, "b" * 40)
+    assert preflight.SOURCE_WORKTREE == production_source_worktree
 
 
 class Win32Seam:

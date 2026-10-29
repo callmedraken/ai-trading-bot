@@ -10,10 +10,18 @@ before this successor edit. Feature CI #797 / run 40942066124 / attempt 1 remain
 the canonical FULL certification of that exact accepted tree; develop used exact-
 source certification reuse and did not require another seven-lane FULL execution.
 
-The newly identified blocker is ARCH146_B2_TRACKED_ONLY_SOURCE_BINDING_DEFECT.
-This source/docs/fake-test candidate changes only the B2 exact-source cleanliness
-predicate to tracked/index-only status and adds its current Architecture 146
-semantic owner and registered checkpoint-runner coverage. Permitted
+The first published successor candidate was
+d346c6d13f2292c4c6b421a0abe29f284da2675c, tree
+e074bfed3c8b528d4c8e9bcf7441aa4f45f0b314. Feature CI #799 / run 40954098370 /
+attempt 1 failed and is preserved as immutable evidence, so that candidate was
+not green or accepted. Source-static and broad-1/2/4/5/6/7 succeeded; active-tests
+and broad-3 failed from the same CI-path-dependent fake-test seam. Production
+source binding and authority semantics were not defective, and no CI rerun
+occurred.
+
+The current corrective child fixes only the fake test's temporary source-path
+binding while retaining the reviewed B2 exact-source cleanliness predicate and
+registered authority coverage. Permitted
 untracked/generated artifacts and historical pytest permission-warning
 directories are known preserved state, not a source-cleanliness failure. The
 other exact source predicates remain unchanged.
@@ -47,13 +55,13 @@ unchanged. ACCEPTED_CUSTODY_ADMISSIONS is empty.
 
 ## Next step
 
-Complete the focused source-binding/current-authority tests, whole-root Ruff
-0.17.3 and diff checks. Publish one atomic candidate only after FEATURE and
-PROSPECTIVE_DEVELOP admission PASS; ordinary-push once and wait for the one
-mapped GitHub result. No canonical FULL locally. Terminal red or green is STOP
-for ChatGPT exact-source/CI review. No merge, PR or real host step belongs to
-this task. The partial parent state grants no retry, repair or acquisition
-authority.
+Complete the corrective focused source-binding/current-authority tests, whole-
+root Ruff 0.17.3 and diff checks. Publish one atomic child candidate only after
+FEATURE and PROSPECTIVE_DEVELOP admission PASS; ordinary-push once and wait for
+the one mapped GitHub result. No canonical FULL locally. Terminal red or green
+is STOP for ChatGPT exact-source/CI review. No merge, PR or real host step
+belongs to this task. The partial parent state grants no retry, repair or
+acquisition authority.
 
 ## Parked boundaries and roadmap
 

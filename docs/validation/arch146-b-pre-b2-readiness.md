@@ -529,3 +529,29 @@ The conservative roadmap after acceptance/integration is:
 
 The existing direct B2 launcher is not accepted as the next registered
 partial-state observer unless repository evidence later proves that separately.
+
+
+### Immutable CI #799 failure and corrective child checkpoint
+
+The first published tracked-only source-binding candidate was
+d346c6d13f2292c4c6b421a0abe29f284da2675c, tree
+e074bfed3c8b528d4c8e9bcf7441aa4f45f0b314. CI #799 / run 40954098370 /
+attempt 1 reached terminal FAILURE and remains immutable evidence. Source-static
+and broad-1/2/4/5/6/7 succeeded. Active-tests and broad-3 failed on the same
+test, `tests/experiments/test_historical_research_pre_b2.py::test_b2_source_binding_uses_tracked_only_status`;
+this was one CI-path-dependent test-seam failure, not two independent regressions.
+
+The exact traceback classification was
+ARCH146_B2_TRACKED_SOURCE_TEST_CI_PATH_PORTABILITY_DEFECT: GitHub executed from
+`D:\\a\\ai-trading-bot\\ai-trading-bot`, while production `SOURCE_WORKTREE`
+correctly remained the fixed canonical `F:\\AI\\worktrees\\ai-trading-bot-146b-pre-b2-readiness-current`.
+The test called `_source(ROOT, ...)` without replacing that fake-invocation seam,
+so production source binding rejected the CI checkout before reaching the fake
+Git-status behavior. No production source or authority semantic defect was
+identified. No CI rerun occurred.
+
+The corrective child checkpoint changes only the fake test's temporary source
+path binding and preserves the runtime seam assertions for tracked-only status,
+permitted simulated untracked state, tracked/index rejection and production
+constant restoration. Real host/provider/credential/acquisition/protected
+effects remained ZERO.

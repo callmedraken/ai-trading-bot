@@ -12,6 +12,14 @@ Accepted integrated base before this successor edit (verify live remote independ
     feature #797 / run 40942066124 / attempt 1: canonical FULL SUCCESS
     develop #798 / run 40949362950 / attempt 1: terminal SUCCESS by exact-source reuse
 
+The first published successor candidate was
+d346c6d13f2292c4c6b421a0abe29f284da2675c, tree
+e074bfed3c8b528d4c8e9bcf7441aa4f45f0b314. Feature CI #799 / run 40954098370 /
+attempt 1 was terminal FAILURE, not green or accepted, and remains immutable.
+Source-static and broad-1/2/4/5/6/7 succeeded; active-tests and broad-3 failed
+from the same fake-test path-binding seam. No production source/authority defect
+was identified and no CI rerun occurred.
+
 The custody ACE multiset correction was independently accepted and fast-forward
 integrated before this successor edit. The newly identified blocker is
 ARCH146_B2_TRACKED_ONLY_SOURCE_BINDING_DEFECT: B2 source binding must ignore
@@ -77,11 +85,12 @@ and five scheduled optimizer-only native-MAC N/A metrics remain unchanged.
 
 ## Next step and stop condition
 
+The corrective child changes only the fake test's temporary source-path binding.
 Codex completes focused tests, bounded current-authority/checkpoint-runner
 checks, whole-root Ruff 0.17.3 and diff checks, then one clean atomic commit.
 Require general ops.ps1 admit FEATURE and PROSPECTIVE_DEVELOP PASS before one
 ordinary push. The mapped GitHub result is the only canonical certification for
-this candidate; do not run canonical FULL locally. Return exact final
+this child; do not run canonical FULL locally. Return exact final
 HEAD/tree/parent/remote feature identity, paths, focused/static/admission results
 and terminal workflow run/attempt/job conclusions.
 

@@ -27840,6 +27840,9 @@ def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
         failures.append("146 pre-B2 source registration drift")
     try:
         from trading_bot.experiments import historical_research_custody as custody
+        from trading_bot.experiments.historical_research_native import (
+            credential_binding_is_current,
+        )
         from trading_bot.experiments.historical_research_sessions import (
             AUTHORITY_DIGEST,
             SOURCE_MANIFEST_SHA256,
@@ -27847,6 +27850,8 @@ def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
             reconcile_historical_session_model,
         )
 
+        if not credential_binding_is_current():
+            failures.append("146 B2 current v3 credential/account binding drift")
         authority = published_historical_session_authority()
         if custody.ACCEPTED_CUSTODY_ADMISSIONS or (
             custody.ACCEPTED_HISTORICAL_SESSION_AUTHORITIES != (authority,)

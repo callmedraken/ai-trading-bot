@@ -1,5 +1,32 @@
 # AI Trading Bot — Current Handoff
 
+## Current pending checkpoint — consolidated 146-B pre-B2 correction
+
+B1/C1-C6 is accepted/integrated at develop d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42
+(feature #788 / 40770164255 and develop #789 / 40771613241 SUCCESS).
+The active pre-B2 source branch is
+feature/research-arch146-b-pre-b2-readiness-current in
+F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current.
+Its published parent is 63d8698cf1f2d899a2227b0c99ba92cfac935ed6,
+TREE 96c5b5ed0a39caa5dcd56f696b4023dfe180b819.
+
+Preserve #790 / 40812384997 attempts 1 and 2; neither is retryable here.
+The bounded corrective candidate removes live inventory cardinality pins,
+supports one independently reviewed canonical attempt-2 retry under exact
+provenance, and replaces B2's stale /v2 reader with the current /v3 scoped
+reader after source-owned Trading SID proof. The published 2718-session
+authority and 146-A behavior remain unchanged.
+The [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md)
+owns correction details and evidence. This candidate remains pending exact-source
+review and mapped terminal certification.
+
+Next: focused/static checks, one clean corrective commit, both general admission
+contexts, one ordinary push and terminal mapped FULL. Stop on red or green for
+ChatGPT exact-source review. After acceptance and integration by ChatGPT, the
+next executable milestone is one separately reviewed real read-only B2 host
+preflight. Acquisition requires a later independent decision. Real preflight
+is NOT_RUN; protected effects are ZERO, R3 stays parked and LIVE remains NO-GO.
+
 ## Verified integrated checkpoint
 
 Read mutable remote `develop` live at startup. Architecture 146-B1/C1-C6 is
@@ -31,11 +58,12 @@ REPOSITORY_MODELED_CALENDAR_EXCEPTION_GAP; any additional delta is STOP.
 
 Native source bridges the existing scoped Credential Manager reader and fixed
 targets, one-attempt fixed-host HTTPS, dedicated rename-free create-only custody,
-and effects-closed read-only preflight. The credential-account/custodian binding
-is still BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING: the production
-Trading SID is source-owned but has no independent B2 custodian/credential
-acceptance. It was not discovered from the host or guessed. No fallback secret
-path exists. The preflight fails closed before observing roots while unbound.
+and effects-closed read-only preflight. B2 explicitly reuses the retained
+approved source-owned Trading SID and current /v3 reader. A runtime token SID
+mismatch blocks before secret read. Pure preflight validates the fixed source
+binding without reading secrets; fakes can report only simulated readiness.
+Custody security/freshness remains a separate closed host prerequisite. No
+fallback secret path exists and no operational/provider authority is imported.
 
 The real roots were not inspected, created or changed. No secret read, provider
 call, real ACL access/mutation, holdout read, dataset write, host/scheduler action,
@@ -53,8 +81,8 @@ with the terminal evidence preserved.
 After exact-source acceptance, ChatGPT (Sol High for security-sensitive source
 follow-up) owns the single real read-only B2 host preflight and its review. The
 ready-to-run template is in the pre-B2 record and requires the accepted exact
-candidate HEAD/TREE. The current source identity prerequisite is closed until
-independently settled; a blocked real preflight never authorizes repair or retry.
+candidate HEAD/TREE after ChatGPT acceptance/integration. A blocked real
+preflight never authorizes repair or retry.
 The acquisition remains separately unauthorized until preflight is reviewed and
 accepted. A future READY result authorizes no acquisition by itself.
 

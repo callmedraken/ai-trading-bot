@@ -70,21 +70,30 @@ full fingerprint. The OPEN successor retains independent custody/evidence/source
 binding and resolves exactly one accepted authority. Missing, unexpected,
 exceptional-closure and duplicate bars fail; no bars are fabricated.
 
-## Native adapters and closed identity prerequisite
+## Native adapters and source-owned credential binding
 
-CredentialSource bridges WindowsAlpacaCredentialManagerReader using only the two
-established ALPACA_API_KEY_ID_CREDENTIAL_TARGET and
-ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET constants. It retains exact SID checking,
-scoped use/close, native cleanup and redaction. No environment/config/CLI secret,
-additional target, fallback or real read is introduced.
+B2 reuses trading_bot.review_paper.alpaca_windows_credentials exactly:
 
-Current classification is
-BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING. The production Trading SID
-is source-owned, but that does not independently establish the B2 credential/
-custodian account; it also has no access under the protected custody DACL.
-Do not infer this identity from BA ownership, a running token, host discovery
-or credential-read success. The source-owned binding must be independently
-settled. Current preflight stops on it before observing real roots.
+    CREDENTIAL_POLICY windows-credential-manager-alpaca-market-data/v3
+    API_KEY_TARGET AITradingBot/MarketData/Alpaca/ApiKeyId/v3
+    API_SECRET_TARGET AITradingBot/MarketData/Alpaca/ApiSecretKey/v3
+    read_current_product_alpaca_secrets() -> ScopedAlpacaSecrets.use(...)
+      -> AcquisitionCredentials
+
+The narrow B2 CREDENTIAL_ACCOUNT_SID imports retained approved TRADING_SID
+from review_paper.unattended_host_identity. A regression independently compares
+that binding with PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid.
+No host SID discovery supplies authority. Runtime read entry independently
+observes the current token SID and requires exact equality before calling the
+current /v3 reader once. Scoped use/close and native cleanup/redaction remain.
+There is no /v2, /v1, environment/config/CLI fallback or additional target.
+Identity/reader reuse imports no D1/PREPARE/EXECUTE or provider authority.
+
+Pure preflight now checks the fixed current /v3 source binding and current token
+SID before freshness/security observations. It no longer permanently blocks on
+an absent source binding. Fake evaluation can only report simulated readiness.
+The retained protected custody policy is unchanged; its real-host prerequisites
+must be proved separately. The preflight reads zero secrets and grants no effect.
 
 HTTPS reuses reviewed stdlib mechanics/constants with a dedicated B1 binding:
 only the two frozen GET request families over certificate/hostname-verified TLS
@@ -151,7 +160,7 @@ Require whole-root Ruff 0.17.3 check/format-check, git diff --check, then one cl
 atomic candidate with FEATURE and PROSPECTIVE_DEVELOP ops.ps1 admit PASS.
 Canonical FULL belongs to the single mapped GitHub push; never run it locally.
 The new supported test module enters the existing 1000-ms fallback automatically
-(current FULL inventory 210). Frozen 209-module C4 timings/digest, required
+without a current-cardinality pin. Frozen 209-module C4 timings/digest, required
 122/49 baselines, seven-lane planner and workflow topology remain unchanged.
 Mapped red is STOP with terminal run/attempt evidence preserved. No amend,
 rebase, force-push, manual CI rerun, PR or merge.
@@ -160,7 +169,7 @@ Protected effects = ZERO. Real preflight is NOT_RUN. No real credential/provider
 root/ACL/holdout/dataset/scheduler/host/paper/broker/live action, Architecture-145
 campaign or FINAL_HOLDOUT evaluation. After terminal green, stop for ChatGPT
 exact-source review. Next milestone is the single real read-only B2 host
-preflight with the identity prerequisite visible. Acquisition stays separately
+preflight against the accepted source-owned identity and /v3 binding. Acquisition stays separately
 unauthorized until the preflight is independently reviewed and accepted.
 
 D=REQUIRED_POST_B2 / MINIMAL_ORCHESTRATION_GAP; E=REQUIRED_POST_B2 for report
@@ -168,3 +177,67 @@ applicability; GUI_SOURCE_CHANGE=NOT_REQUIRED pre-B2; F=NO_SOURCE_CHANGE beyond
 routine registration. V1 report is unchanged. Five native-MAC optimizer-only
 N/A metrics remain scheduled for one post-B2 publication. No new engine, report
 family or GUI. R3 remains parked. LIVE remains NO-GO.
+
+
+## Bounded corrective candidate after immutable #790 attempts
+
+Parent HEAD 63d8698cf1f2d899a2227b0c99ba92cfac935ed6,
+TREE 96c5b5ed0a39caa5dcd56f696b4023dfe180b819; direct develop base remains
+d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42.
+
+Preserve #790 / run 40812384997, attempts 1 and 2. Attempt 1 broad-4 passed
+2532 tests with pytest exit 0, then its repeated final live-origin observation
+lost connectivity. ChatGPT classified an external infrastructure transient
+and authorized one targeted same-SHA retry. Attempt 2 stopped before pytest:
+Exact successful CI source-static dependency required. Its deterministic
+attempt-1 restriction and the independent reuse restriction are corrected here.
+Neither attempt is rerun, overwritten or reinterpreted as success.
+
+The correction implements NO_MUTABLE_INVENTORY_CARDINALITY_PINS, including
+per-directory live counts and giant live-additions snapshots. Synthetic fixtures
+are deliberately synthetic. One and multiple future supported modules prove
+discovery, fallback timing, deterministic one-lane placement, complete
+classification/partition coverage and unchanged historical timing evidence.
+Attempts 1/2 require full exact provenance; attempt 3 is rejected. Historical
+predecessor functions/pins and validation records retain their old meaning.
+The current credential adapter and pure preflight use only the source-owned
+Trading SID and /v3 generation described above.
+
+The 2718-session authority, its digest/bundle/manifest, model-minus-published
+2018-12-05 and 2025-01-09, empty reverse delta, global modeled calendar and 146-A
+public behavior remain unchanged. No real-host preflight or protected effect
+is run. One clean corrective commit must pass FEATURE/PROSPECTIVE_DEVELOP
+admission, then one ordinary push and one mapped canonical CI. Terminal red
+or green is STOP for ChatGPT exact-source review; no automatic correction,
+rerun, PR, branch creation, integration or B2 acquisition is authorized.
+
+
+### Corrective focused verification
+
+All commands ran from the exact task worktree, with bytecode/cache writes
+disabled and a fresh external pytest basetemp for each group. The existing
+isolated interpreter/toolchain is
+F:\AI\temp\arch146-b1-c3-toolchain-b090b5bf460b46ffacc43988e0eead14\Scripts\python.exe
+(Python 3.14.3, Ruff 0.17.3). The shared development environment was not modified.
+
+- 258 passed: certification test_results.py, test_lanes.py, test_source.py
+  and checkpoint test_prepublication_admission_selects_infrastructure_coherence_tests.
+- 695 passed: historical_research_pre_b2, historical_research_dataset,
+  historical_research_acquisition_custody, checkpoint test_source_authority,
+  current Alpaca authentication/generation/staging-cleanup and Alpaca HTTP modules.
+- 962 passed, one expected non-Windows assertion skipped on Windows:
+  checkpoint test_core/test_ci, certification test_profiles and retained
+  windows_effectful_capture_credentials/security modules.
+
+Each group used python -B -m pytest -q -p no:cacheprovider, the named exact
+modules, --tb=short and a fresh purpose-prefix-plus-GUID external --basetemp.
+The initial local fixture failure was corrected by deriving synthetic planner
+fixtures from frozen timing membership plus synthetic future modules; it
+required no historical timing/count/hash update. The initial shared Ruff 0.15.21
+mismatch was resolved by selecting the existing isolated 0.17.3 toolchain.
+No CI debugging push occurred.
+
+Whole-root non-mutating Ruff check/format-check and git diff --check must pass
+on the final candidate. General ops.ps1 admit owns the final clean committed
+FEATURE/PROSPECTIVE_DEVELOP proof. These focused results grant no canonical
+certification or host/effect authority.

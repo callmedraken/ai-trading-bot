@@ -260,6 +260,19 @@ evidence. No external host/Administrator pre-screen may consume or conceal an
 attempt before registered evidence capture. A successful read-only preflight
 never grants protected execution authority.
 
+## Current canonical retry and inventory policy — pre-B2 correction
+
+The [current certification policy](architecture/132-tiered-certification-profiles.md#current-canonical-retry-and-inventory-policy--pre-b2-correction)
+owns NO_MUTABLE_INVENTORY_CARDINALITY_PINS and canonical attempts 1/2.
+Attempt 2 requires independent ChatGPT/operator review for one same-SHA
+infrastructure retry, complete current-attempt topology and unchanged exact
+provenance. Attempt 3+ is forbidden/non-reusable. No automatic retry exists.
+Original failed evidence remains immutable; carried successful jobs retain
+their original timestamps. Broad source-gate reuse remains attempt-1-only.
+
+The R3M/R3N predecessor account below records the historical attempt-1-only
+policy; current mapped canonical evidence follows the linked policy.
+
 ## Architecture 132-R3M — predecessor exact develop certification reuse
 
 A develop push retains mandatory source-static classification, exact local

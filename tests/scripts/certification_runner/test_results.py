@@ -655,9 +655,13 @@ def test_single_lane_execution_keeps_complete_inventory_and_plan(
         None,
         "local",
         "wrong_job",
+        "wrong_workflow",
+        "missing_run",
         "failed_static",
         "wrong_sha",
         "attempt_two",
+        "attempt_three",
+        "multiple_selection",
         "no_selection",
         "wrong_profile",
         "version",
@@ -676,13 +680,21 @@ def test_distributed_static_inheritance_is_exact_and_bounded(
         "GITHUB_SHA": "h",
         "GITHUB_RUN_ATTEMPT": "1",
         "GITHUB_RUN_ID": "123",
+        "GITHUB_REF": "refs/heads/feature/research-test",
+        "GITHUB_WORKFLOW_REF": (
+            "callmedraken/ai-trading-bot/.github/workflows/"
+            "checkpoint-source-gates.yml@refs/heads/feature/research-test"
+        ),
     }
     changes = {
         "local": ("GITHUB_ACTIONS", "false"),
         "wrong_job": ("GITHUB_JOB", "other"),
+        "wrong_workflow": ("GITHUB_WORKFLOW_REF", "other/workflow"),
+        "missing_run": ("GITHUB_RUN_ID", ""),
         "failed_static": ("SOURCE_STATIC_RESULT", "failure"),
         "wrong_sha": ("SOURCE_STATIC_HEAD", "different"),
         "attempt_two": ("GITHUB_RUN_ATTEMPT", "2"),
+        "attempt_three": ("GITHUB_RUN_ATTEMPT", "3"),
     }
     if mutation in changes:
         key, value = changes[mutation]
@@ -695,13 +707,17 @@ def test_distributed_static_inheritance_is_exact_and_bounded(
         lambda *a: {"exit_code": 1 if mutation == "version" else 0},
     )
     args = SimpleNamespace(
-        lane=None if mutation == "no_selection" else ["1"],
+        lane=None
+        if mutation == "no_selection"
+        else ["1", "2"]
+        if mutation == "multiple_selection"
+        else ["1"],
         profile="robinhood" if mutation == "wrong_profile" else "full",
         python="python",
         root=tmp_path,
         expected_head="h",
     )
-    if mutation not in (None, "version"):
+    if mutation not in (None, "version", "attempt_two"):
         with pytest.raises(runner.CertificationError, match="source-static"):
             runner.inherited_ci_static_checks(
                 args, {"head": "h", "tree": "t"}, tmp_path

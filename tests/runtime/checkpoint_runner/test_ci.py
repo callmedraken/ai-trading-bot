@@ -3437,3 +3437,150 @@ def test_full_detached_bootstrap_native_empty_stdout(tmp_path):
     assert failed.returncode != 0
     assert "Failed to inspect certification checkout branch" in failed.stderr
     assert "DETACHED_NATIVE_EMPTY_PASS" not in failed.stdout
+
+
+def _current_canonical_attempt_fixture(profile, attempt):
+    fixture = (
+        _distributed_reuse_fixture() if profile == "full" else _reuse_fixture(profile)
+    )
+    args, responses, run, jobs, runs_path, jobs_path = fixture
+    if profile == "robinhood":
+        jobs.append(
+            {
+                "name": "certification-full (broad-" + "$" + "{{ matrix.lane }})",
+                "status": "completed",
+                "conclusion": "skipped",
+                "steps": [],
+                "run_id": run["id"],
+                "head_sha": args["head"],
+                "run_attempt": attempt,
+            }
+        )
+    run["run_attempt"] = attempt
+    responses["repos/callmedraken/ai-trading-bot/actions/runs/100"]["run_attempt"] = (
+        attempt
+    )
+    for job in jobs:
+        job["run_attempt"] = attempt
+        # Carried jobs keep original timestamps in the current-attempt view.
+        job["started_at"] = "2026-10-28T01:00:00Z"
+        job["completed_at"] = "2026-10-28T01:01:00Z"
+    page = responses.pop(jobs_path)
+    jobs_path = jobs_path.replace("/attempts/1/", f"/attempts/{attempt}/")
+    page["total_count"] = len(jobs)
+    responses[jobs_path] = page
+    return args, responses, run, jobs, runs_path, jobs_path
+
+
+@pytest.mark.parametrize("profile", ["full", "robinhood"])
+@pytest.mark.parametrize("attempt", [1, 2])
+def test_current_canonical_reuse_accepts_original_or_one_reviewed_retry(
+    profile, attempt
+):
+    from copy import deepcopy
+
+    args, responses, run, jobs, _, _ = _current_canonical_attempt_fixture(
+        profile, attempt
+    )
+    preserved = deepcopy(responses)
+    result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
+    assert result["reuse"] is True
+    assert result["run_attempt"] == attempt and result["run"] == run
+    assert result["jobs"] == jobs
+    assert all(job["run_attempt"] == attempt for job in result["jobs"])
+    assert responses == preserved
+    assert all(job["started_at"] == "2026-10-28T01:00:00Z" for job in result["jobs"])
+
+
+@pytest.mark.parametrize("profile", ["full", "robinhood"])
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "sha",
+        "ref",
+        "workflow",
+        "repository",
+        "event",
+        "tree",
+        "missing_static",
+        "failed_static",
+        "missing_lane",
+        "failed_lane",
+        "malformed_lane",
+        "duplicate_lane",
+        "hygiene",
+        "active",
+        "gate",
+        "job_attempt",
+        "detail_attempt",
+        "attempt_three",
+    ],
+)
+def test_current_reviewed_retry_rejects_incomplete_or_wrong_provenance(
+    profile, mutation
+):
+    from copy import deepcopy
+
+    args, responses, run, jobs, _, jobs_path = _current_canonical_attempt_fixture(
+        profile, 2
+    )
+    prefix = "repos/callmedraken/ai-trading-bot"
+    detail = responses[f"{prefix}/actions/runs/100"]
+    lane = next(
+        job
+        for job in jobs
+        if (
+            job["name"].startswith("certification-full (broad-")
+            if profile == "full"
+            else job["name"].startswith("certification-tests (")
+        )
+    )
+    if mutation in {"sha", "ref", "workflow", "event", "repository"}:
+        key, value = {
+            "sha": ("head_sha", "c" * 40),
+            "ref": ("head_branch", "feature/research-wrong"),
+            "workflow": ("workflow_id", 999),
+            "event": ("event", "workflow_dispatch"),
+            "repository": ("repository", {"id": 999, "full_name": "other/repo"}),
+        }[mutation]
+        run[key] = detail[key] = value
+    elif mutation == "tree":
+        responses[f"{prefix}/git/commits/{args['head']}"]["tree"]["sha"] = "c" * 40
+    elif mutation == "missing_static":
+        jobs.remove(next(job for job in jobs if job["name"] == "source-static"))
+    elif mutation in {"failed_static", "active", "gate"}:
+        name = {
+            "failed_static": "source-static",
+            "active": "active-tests",
+            "gate": "source-gates",
+        }[mutation]
+        next(job for job in jobs if job["name"] == name)["conclusion"] = "failure"
+    elif mutation == "missing_lane":
+        jobs.remove(lane)
+    elif mutation == "failed_lane":
+        lane["conclusion"] = "failure"
+    elif mutation == "malformed_lane":
+        lane["name"] += " malformed"
+    elif mutation == "duplicate_lane":
+        jobs.append(deepcopy(lane))
+    elif mutation == "hygiene":
+        lane["steps"][-1]["conclusion"] = "failure"
+    elif mutation == "job_attempt":
+        lane["run_attempt"] = 1
+    elif mutation == "detail_attempt":
+        detail["run_attempt"] = 1
+    elif mutation == "attempt_three":
+        run["run_attempt"] = detail["run_attempt"] = 3
+        for job in jobs:
+            job["run_attempt"] = 3
+        responses[jobs_path.replace("/attempts/2/", "/attempts/3/")] = responses.pop(
+            jobs_path
+        )
+        jobs_path = jobs_path.replace("/attempts/2/", "/attempts/3/")
+    responses[jobs_path]["total_count"] = len(jobs)
+    assert (
+        runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)[
+            "reuse"
+        ]
+        is False
+    )

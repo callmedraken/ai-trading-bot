@@ -1156,7 +1156,7 @@ def inherited_ci_static_checks(
 ) -> dict[str, dict[str, Any]]:
     "Accept only the exact workflow's successful same-SHA static dependency."
     if not (
-        getattr(args, "lane", None)
+        getattr(args, "lane", None) in ([str(index)] for index in range(1, 8))
         and args.profile == "full"
         and os.environ.get("GITHUB_ACTIONS") == "true"
         and os.environ.get("GITHUB_JOB") == "certification-full"
@@ -1164,7 +1164,14 @@ def inherited_ci_static_checks(
         and os.environ.get("SOURCE_STATIC_HEAD") == identity["head"]
         and identity["head"] == args.expected_head
         and os.environ.get("GITHUB_SHA") == identity["head"]
-        and os.environ.get("GITHUB_RUN_ATTEMPT") == "1"
+        and os.environ.get("GITHUB_RUN_ATTEMPT") in {"1", "2"}
+        and re.fullmatch(r"[1-9][0-9]*", os.environ.get("GITHUB_RUN_ID", ""))
+        and os.environ.get("GITHUB_REF", "").startswith("refs/heads/")
+        and os.environ.get("GITHUB_WORKFLOW_REF")
+        == (
+            "callmedraken/ai-trading-bot/.github/workflows/checkpoint-source-gates.yml@"
+            + os.environ.get("GITHUB_REF", "")
+        )
     ):
         raise CertificationError(
             "Exact successful CI source-static dependency required"
@@ -1182,6 +1189,7 @@ def inherited_ci_static_checks(
             "head": identity["head"],
             "tree": identity["tree"],
             "run_id": os.environ.get("GITHUB_RUN_ID"),
+            "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
         }
     _save(evidence_dir / "inherited-static.json", checks)
     return checks

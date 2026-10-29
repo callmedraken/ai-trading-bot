@@ -187,7 +187,7 @@ def predecessor_workflow(workflow: str) -> str:
     return before + "  certification-tests:\n" + old + original
 
 
-def find_reusable(predecessor: Callable, specs: Any, **kwargs: Any) -> dict:
+def _find_reusable_topology(predecessor: Callable, specs: Any, **kwargs: Any) -> dict:
     "Prove all seven jobs before applying the unchanged run/repository proof."
     lookup = kwargs["lookup"]
     originals = {}
@@ -307,4 +307,92 @@ def find_reusable(predecessor: Callable, specs: Any, **kwargs: Any) -> dict:
             result["jobs"] = originals[path]
             if result.get("profile") == "full":
                 result["full_lane_jobs"] = list(FULL_JOB_NAMES)
+    return result
+
+
+def find_reusable(predecessor: Callable, specs: Any, **kwargs: Any) -> dict:
+    """Validate one reviewed canonical retry without repinning historical policy.
+
+    Attempt 2 is invoked only by the operator after independent review. This
+    read-only adapter does not decide retry eligibility or launch retries.
+    The historical evaluator consumes a projection of the *current attempt's*
+    complete job view. Only attempt numbers are projected after consistency
+    checks; all repository/workflow/source/topology/step checks still apply.
+    Original run/job metadata is returned as evidence, including carried jobs'
+    original timestamps. No attempt-1 API evidence is modified or replaced.
+    """
+    from scripts.checkpoint_runner import (
+        resolve_ci_certification_profile,
+        resolve_ci_checkpoint,
+    )
+
+    lookup = kwargs["lookup"]
+    runs = {}
+    details = {}
+    job_views = {}
+
+    def project_run(run):
+        checkpoint = resolve_ci_checkpoint(specs, run.get("head_branch"), "push")
+        if (
+            type(run.get("run_attempt")) is int
+            and run["run_attempt"] == 2
+            and resolve_ci_certification_profile(checkpoint) in {"full", "robinhood"}
+        ):
+            return {**run, "run_attempt": 1}
+        return run
+
+    def current_attempt_view(path: str) -> object:
+        if "/attempts/1/jobs?" in path:
+            run_id = int(path.split("/actions/runs/", 1)[1].split("/", 1)[0])
+            run = runs[run_id]
+            attempt = run["run_attempt"]
+            if type(attempt) is not int or attempt not in (1, 2):
+                raise ValueError("Canonical attempts are limited to 1 and 2")
+            actual_path = path.replace("/attempts/1/", f"/attempts/{attempt}/")
+            value = lookup(actual_path)
+            if type(value) is not dict or type(value.get("jobs")) is not list:
+                raise ValueError("Malformed current-attempt job view")
+            jobs = value["jobs"]
+            if any(
+                type(job) is not dict
+                or type(job.get("run_attempt")) is not int
+                or job["run_attempt"] != attempt
+                or job.get("run_id") != run_id
+                or job.get("head_sha") != run["head_sha"]
+                for job in jobs
+            ):
+                raise ValueError("Current-attempt job provenance mismatch")
+            job_views[run_id] = jobs
+            return {**value, "jobs": [{**job, "run_attempt": 1} for job in jobs]}
+
+        value = lookup(path)
+        if type(value) is dict and type(value.get("workflow_runs")) is list:
+            for run in value["workflow_runs"]:
+                runs[run["id"]] = run
+            return {
+                **value,
+                "workflow_runs": [project_run(run) for run in value["workflow_runs"]],
+            }
+        if type(value) is dict and "head_branch" in value and "id" in value:
+            listed = runs[value["id"]]
+            if (
+                type(value.get("run_attempt")) is not int
+                or value["run_attempt"] != listed["run_attempt"]
+            ):
+                raise ValueError("Run attempt changed during proof")
+            details[value["id"]] = value
+            return project_run(value)
+        return value
+
+    try:
+        result = _find_reusable_topology(
+            predecessor, specs, **{**kwargs, "lookup": current_attempt_view}
+        )
+    except (KeyError, ValueError, TypeError, IndexError):
+        return {"reuse": False, "reason": "provenance_not_proven"}
+    if result.get("reuse"):
+        run_id = result["run_id"]
+        result["run_attempt"] = details[run_id]["run_attempt"]
+        result["run"] = details[run_id]
+        result["jobs"] = job_views[run_id]
     return result

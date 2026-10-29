@@ -21,10 +21,8 @@ import trading_bot.experiments.historical_research_dataset as dataset
 import trading_bot.experiments.historical_research_native as native
 import trading_bot.experiments.historical_research_native_custody as disk
 import trading_bot.experiments.historical_research_sessions as sessions
-from trading_bot.runtime.windows_effectful_capture_credentials import (
-    NativeCredentialEntry,
-    WindowsAlpacaCredentialManagerReader,
-)
+from trading_bot.review_paper import alpaca_windows_credentials as current_credentials
+from trading_bot.review_paper.unattended_host_identity import TRADING_SID
 
 from .test_historical_research_acquisition_custody import (
     ATTEMPT,
@@ -252,39 +250,112 @@ def test_open_publication_accepts_exact_published_sessions(
 
 class CredentialApi:
     def __init__(self):
-        self.reads, self.releases = [], []
+        self.reads, self.blobs = [], []
 
-    def read_generic(self, target):
+    def read_fixed(self, target):
         self.reads.append(target)
-        return NativeCredentialEntry(target, 1, 2, bytearray(b"SYNTHETIC_SECRET"))
-
-    def release(self, entry):
-        self.releases.append(entry)
-        entry.blob[:] = b"\0" * len(entry.blob)
-        entry.released = True
+        blob = bytearray(b"SYNTHETIC_SECRET")
+        self.blobs.append(blob)
+        return blob
 
 
-def test_native_credentials_closed_without_source_binding():
-    source = native.WindowsHistoricalResearchCredentialSource()
-    with pytest.raises(custody.HistoricalResearchCustodyError, match="BINDING"):
-        source.read()
-
-
-def test_existing_reader_exact_targets_sid_cleanup_and_redaction(monkeypatch):
-    api = CredentialApi()
-    reader = WindowsAlpacaCredentialManagerReader.for_test(
-        native_api=api, sid_resolver=lambda: "S-1-5-21-1"
+def test_b2_binding_reuses_retained_approved_identity_and_current_v3_reader():
+    from trading_bot.runtime.personal_desktop_first_paper_operation import (
+        PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE,
     )
-    source = native.WindowsHistoricalResearchCredentialSource.for_test(reader)
-    monkeypatch.setattr(native, "CREDENTIAL_ACCOUNT_SID", "S-1-5-21-1")
+
+    assert (
+        native.CREDENTIAL_ACCOUNT_SID
+        == TRADING_SID
+        == (PERSONAL_DESKTOP_FIRST_PAPER_OPERATION_PROFILE.approved_trading_sid)
+    )
+    assert native.credential_binding_is_current()
+    assert native.CREDENTIAL_TARGETS == (
+        "AITradingBot/MarketData/Alpaca/ApiKeyId/v3",
+        "AITradingBot/MarketData/Alpaca/ApiSecretKey/v3",
+    )
+    assert (
+        native.CREDENTIAL_POLICY == "windows-credential-manager-alpaca-market-data/v3"
+    )
+    source = native.WindowsHistoricalResearchCredentialSource()
+    assert source._reader is current_credentials.read_current_product_alpaca_secrets
+    assert source._sid_resolver is native.resolve_current_token_sid
+
+
+def test_current_reader_exact_targets_sid_cleanup_and_redaction(monkeypatch):
+    api = CredentialApi()
+    scopes, events = [], []
+    monkeypatch.setattr(current_credentials, "_WindowsCredentialReader", lambda: api)
+
+    def reader():
+        events.append("read")
+        scope = current_credentials.read_current_product_alpaca_secrets()
+        scopes.append(scope)
+        return scope
+
+    def sid():
+        events.append("sid")
+        return TRADING_SID
+
+    source = native.WindowsHistoricalResearchCredentialSource.for_test(reader, sid)
     result = source.read()
-    assert api.reads == list(native.CREDENTIAL_TARGETS) and len(api.releases) == 2
-    assert all(not any(entry.blob) for entry in api.releases)
-    assert "SYNTHETIC_SECRET" not in repr(source) + repr(result)
-    monkeypatch.setattr(native, "CREDENTIAL_ACCOUNT_SID", "S-1-5-21-2")
+    assert events == ["sid", "read"]
+    assert api.reads == list(native.CREDENTIAL_TARGETS)
+    assert len(api.blobs) == 2 and all(not any(blob) for blob in api.blobs)
+    assert scopes[0]._closed and scopes[0]._key == scopes[0]._secret == ""
+    assert "SYNTHETIC_SECRET" not in repr(source) + repr(result) + repr(scopes)
+    with pytest.raises(current_credentials.AlpacaCredentialReadError):
+        scopes[0].use(lambda *args: pytest.fail("closed scope used"))
+
+
+@pytest.mark.parametrize("sid", ["S-1-5-21-1", "", None])
+def test_wrong_sid_blocks_before_current_credential_reader(sid):
+    source = native.WindowsHistoricalResearchCredentialSource.for_test(
+        lambda: pytest.fail("secret read before exact SID proof"), lambda: sid
+    )
     with pytest.raises(custody.HistoricalResearchCustodyError):
         source.read()
-    assert len(api.reads) == 2
+
+
+@pytest.mark.parametrize("version", ["v1", "v2"])
+def test_old_targets_rejected_without_fallback_or_secret_read(monkeypatch, version):
+    monkeypatch.setattr(
+        native,
+        "CREDENTIAL_TARGETS",
+        tuple(
+            target.replace("/v3", "/" + version) for target in native.CREDENTIAL_TARGETS
+        ),
+    )
+    source = native.WindowsHistoricalResearchCredentialSource.for_test(
+        lambda: pytest.fail("no fallback read"), lambda: TRADING_SID
+    )
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        source.read()
+    observer = ReadOnlyObserver()
+    report = preflight.evaluate_b2_preflight_for_test(observer)
+    assert report.classification == "BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING"
+    assert observer.calls == ["close"]
+
+
+@pytest.mark.parametrize("failure", ["sid", "reader", "consumer"])
+def test_scoped_credential_failures_sanitized_and_closed(monkeypatch, failure):
+    scope = current_credentials.ScopedAlpacaSecrets("KEY", SECRET)
+
+    def fail(*args):
+        raise OSError(SECRET)
+
+    source = native.WindowsHistoricalResearchCredentialSource.for_test(
+        fail if failure == "reader" else lambda: scope,
+        fail if failure == "sid" else lambda: TRADING_SID,
+    )
+    if failure == "consumer":
+        monkeypatch.setattr(native, "AcquisitionCredentials", fail)
+    with pytest.raises(custody.HistoricalResearchCustodyError) as error:
+        source.read()
+    assert SECRET not in str(error.value) + repr(error.value)
+    assert error.value.__suppress_context__
+    if failure == "consumer":
+        assert scope._closed and scope._key == scope._secret == ""
 
 
 class Connection:
@@ -479,7 +550,7 @@ class ReadOnlyObserver:
 
     def current_sid(self):
         self.calls.append("sid")
-        return "S-1-5-21-1"
+        return TRADING_SID
 
     def fresh_state(self):
         self.calls.append("fresh")
@@ -492,10 +563,9 @@ class ReadOnlyObserver:
 def test_pure_preflight_closed_and_simulation_never_real_ready(monkeypatch):
     observer = ReadOnlyObserver()
     result = preflight.evaluate_b2_preflight_for_test(observer)
-    assert result.classification == native.CREDENTIAL_BINDING_DISPOSITION
-    assert observer.calls == ["close"]
-    monkeypatch.setattr(native, "CREDENTIAL_ACCOUNT_SID", "S-1-5-21-1")
-    result = preflight.evaluate_b2_preflight_for_test(ReadOnlyObserver())
+    assert observer.calls == ["sid", "fresh", "close"]
+    assert result.binding["credential_policy"] == native.CREDENTIAL_POLICY
+    assert result.binding["credential_account_sid"] == TRADING_SID
     assert result.classification == "SIMULATED_B2_PREREQUISITES_PASS"
     assert result.classification != preflight.READY
     assert (
@@ -716,3 +786,40 @@ def test_error_body_and_non_json_header_are_preserved():
         acquisition.AcquisitionCredentials("KEY", SECRET),
     )
     assert result.status == 403 and result.body == body
+
+
+def test_preflight_wrong_sid_blocks_before_root_observation():
+    observer = ReadOnlyObserver()
+    observer.current_sid = lambda: "S-1-5-21-1"
+    result = preflight.evaluate_b2_preflight_for_test(observer)
+    assert result.classification == "BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH"
+    assert observer.calls == ["close"]
+    assert (
+        result.credential_secret_reads
+        == result.provider_calls
+        == result.writes
+        == result.acl_mutations
+        == 0
+    )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "local_ntfs",
+        "non_reparse",
+        "parent_policy",
+        "claim_absent",
+        "protected_absent",
+        "open_absent",
+    ],
+)
+def test_pure_preflight_freshness_security_failures_never_ready(field):
+    observer = ReadOnlyObserver()
+    observer.fresh_state = lambda: replace(
+        disk.CustodyFreshState("FRESH", True, True, True, True, True, True),
+        **{field: False},
+    )
+    result = preflight.evaluate_b2_preflight_for_test(observer)
+    assert result.classification == "BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN"
+    assert result.acquisition_authorized is False

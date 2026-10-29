@@ -1,5 +1,32 @@
 # AI Trading Bot — Project Status
 
+## Current pending checkpoint — consolidated 146-B pre-B2 correction
+
+B1/C1-C6 is accepted/integrated at develop d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42
+(feature #788 / 40770164255 and develop #789 / 40771613241 SUCCESS).
+The active pre-B2 source branch is
+feature/research-arch146-b-pre-b2-readiness-current in
+F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current.
+Its published parent is 63d8698cf1f2d899a2227b0c99ba92cfac935ed6,
+TREE 96c5b5ed0a39caa5dcd56f696b4023dfe180b819.
+
+Preserve #790 / 40812384997 attempts 1 and 2; neither is retryable here.
+The bounded corrective candidate removes live inventory cardinality pins,
+supports one independently reviewed canonical attempt-2 retry under exact
+provenance, and replaces B2's stale /v2 reader with the current /v3 scoped
+reader after source-owned Trading SID proof. The published 2718-session
+authority and 146-A behavior remain unchanged.
+The [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md)
+owns correction details and evidence. This candidate remains pending exact-source
+review and mapped terminal certification.
+
+Next: focused/static checks, one clean corrective commit, both general admission
+contexts, one ordinary push and terminal mapped FULL. Stop on red or green for
+ChatGPT exact-source review. After acceptance and integration by ChatGPT, the
+next executable milestone is one separately reviewed real read-only B2 host
+preflight. Acquisition requires a later independent decision. Real preflight
+is NOT_RUN; protected effects are ZERO, R3 stays parked and LIVE remains NO-GO.
+
 ## Current checkpoint
 
 Resolve mutable `origin/develop` live at each startup. Architecture 146-B1/C1-C6
@@ -34,9 +61,10 @@ historical paper/runtime/snapshot identities retain their existing contract.
 This candidate adds accepted published-session verification, native adapters and
 a separately executable read-only B2 preflight. It requires exact-source review
 and mapped terminal GitHub FULL; source tests cannot grant real-host readiness.
-The B2 credential-account/custodian identity binding remains a closed source
-prerequisite. Existing production Trading SID evidence does not establish that
-binding. No host identity was discovered and no credential was read.
+B2 now explicitly binds the current /v3 scoped reader to the retained approved
+source-owned Trading SID. Token SID equality must precede credential read.
+No host identity was discovered and no credential was read. Custody host
+security/freshness remains a separate closed prerequisite.
 
 B2 effects remain unauthorized. `ACCEPTED_CUSTODY_ADMISSIONS` stays empty.
 After terminal green and ChatGPT exact-source acceptance, the next milestone is

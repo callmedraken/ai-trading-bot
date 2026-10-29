@@ -417,9 +417,12 @@ Native adapters are defined only by the dedicated pre-B2 modules. Custody uses
 fixed roots, exact protected owner/DACL, explicit OPEN read policy, a create-only
 claim under the protected existing parent, no-follow held parent handles,
 local NTFS, create-only file writes, file/volume flush, same-handle readback and
-terminal preservation. No rename/promotion/cleanup path exists. Fresh parent
-provisioning and the B2 credential-account/custodian identity must be independently
-source-reviewed; a missing parent or identity is a closed prerequisite.
+terminal preservation. No rename/promotion/cleanup path exists. The B2 credential
+account now reuses the retained approved source-owned Trading
+SID and exact current /v3 scoped reader; current token SID equality precedes
+any secret read. That identity reuse grants no provider or deployment authority.
+Fresh parent provisioning and custody security remain closed host prerequisites;
+no missing/unproven parent is repaired by the adapter.
 
 The real-host preflight is read-only, separate from acquisition, and is not run
 by source gates. Source tests cannot emit real-host READY. No real B2 effects are

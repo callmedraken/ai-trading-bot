@@ -14,9 +14,6 @@ from .helpers import (
     _SUPERVISED_QUALIFICATION_TEST,
     _UNATTENDED_ACTIVATION_TEST,
     _UNATTENDED_EXECUTION_TEST,
-    _UNATTENDED_HOST_TEST,
-    _UNATTENDED_ONE_WAKE_TEST,
-    _UNATTENDED_STATE_TEST,
     _fixture_profiles,
     _lane_names,
     _profile_inventory,
@@ -31,82 +28,8 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     selected = runner.select_inventory(repository, "robinhood")
     assert runner.ROBINHOOD_REQUIRED_MODULES == _EXPECTED_ROBINHOOD
     assert len(runner.ROBINHOOD_REQUIRED_MODULES) == 49
-    assert selected == tuple(
-        sorted(
-            (
-                *_EXPECTED_ROBINHOOD,
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-                _PUBLISHED_PREPARE_TEST,
-                _PREPARE_OPERATOR_TEST,
-                _SUPERVISED_QUALIFICATION_TEST,
-                _UNATTENDED_ACTIVATION_TEST,
-                _UNATTENDED_STATE_TEST,
-                _UNATTENDED_ONE_WAKE_TEST,
-                _UNATTENDED_EXECUTION_TEST,
-                _UNATTENDED_HOST_TEST,
-                "tests/review_paper/test_unattended_publication.py",
-                "tests/review_paper/test_scratch_root_acl.py",
-                "tests/review_paper/test_retained_root_diagnostic.py",
-                "tests/review_paper/test_retained_root_acl_recovery.py",
-                "tests/review_paper/test_post_publication_verifier.py",
-                "tests/review_paper/test_post_publication_stage_diagnostic.py",
-                "tests/review_paper/test_publication_state_paper_diagnostic.py",
-                "tests/review_paper/test_publication_state_paper_corrected.py",
-                "tests/review_paper/test_arch133_scheduler_installation.py",
-                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
-                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
-                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
-                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
-                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
-                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
-                "tests/review_paper/test_arch133_reprovision_recovery.py",
-                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
-                "tests/review_paper/test_arch133_windows_rename_qualification.py",
-                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
-                "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
-                "tests/review_paper/test_arch134_f1r1_b_host_qualification.py",
-                "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
-                "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
-                "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
-                "tests/review_paper/test_successor_publication_recovery.py",
-                "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-                "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
-                "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
-                "tests/review_paper/test_supervised_release_foundation.py",
-                "tests/review_paper/test_supervised_release_bundle.py",
-                "tests/review_paper/test_supervised_release_installation.py",
-                "tests/review_paper/test_supervised_maintenance_rebind.py",
-                "tests/review_paper/test_supervised_runtime_host_admission.py",
-                "tests/review_paper/test_supervised_deployment_qualification.py",
-                "tests/review_paper/test_supervised_release_installation_operator.py",
-                "tests/review_paper/test_supervised_release_installation_reconciliation.py",
-                "tests/review_paper/test_supervised_release_publication_recovery.py",
-                "tests/review_paper/test_production_strategy_cycle.py",
-                "tests/review_paper/test_production_strategy_prepare_operator.py",
-                "tests/review_paper/test_current_production_strategy_decision.py",
-                "tests/review_paper/test_strategy_market_history.py",
-                "tests/review_paper/test_history_qualification.py",
-                "tests/review_paper/test_alpaca_authentication_qualification.py",
-                "tests/review_paper/test_pre_market_wake_qualification.py",
-                "tests/review_paper/test_pre_market_wake_overnight.py",
-                "tests/review_paper/test_d1_session_authorization.py",
-                "tests/review_paper/test_d1_session_execution.py",
-                "tests/review_paper/test_five_session_soak.py",
-                "tests/review_paper/test_five_session_soak_child.py",
-                "tests/review_paper/test_alpaca_credential_generation.py",
-                "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
-                "tests/review_paper/test_armed_production_paper_session.py",
-                "tests/review_paper/test_production_paper_runtime.py",
-                "tests/review_paper/test_production_paper_runtime_acl.py",
-                "tests/robinhood_mcp/test_historical.py",
-            )
-        )
-    )
-    assert len(selected) == 117
+    assert len(selected) == len(set(selected))
+    assert set(_EXPECTED_ROBINHOOD) <= set(selected)
     registered = {
         module
         for name, spec in checkpoint_runner._checkpoint_specs().items()
@@ -117,7 +40,7 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     assert not set(runner.SERIAL_MODULES) & set(selected)
 
 
-def test_current_profile_counts_support_partition_and_serial_allowlist() -> None:
+def test_current_profile_discovery_supports_partition_and_serial_allowlist() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.discover_inventory(root)
     profiles = {
@@ -127,101 +50,9 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert runner.PROFILES == ("full", "robinhood", "legacy", "exhaustive")
     assert _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
     assert len(runner.FULL_REQUIRED_MODULES) == 122
-    assert profiles["full"] == tuple(
-        sorted(
-            (
-                *_EXPECTED_FULL,
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-                "tests/runtime/checkpoint_runner/test_r3m_c2.py",
-                _PUBLISHED_PREPARE_TEST,
-                _PREPARE_OPERATOR_TEST,
-                _SUPERVISED_QUALIFICATION_TEST,
-                _UNATTENDED_ACTIVATION_TEST,
-                _UNATTENDED_STATE_TEST,
-                _UNATTENDED_ONE_WAKE_TEST,
-                _UNATTENDED_EXECUTION_TEST,
-                _UNATTENDED_HOST_TEST,
-                "tests/review_paper/test_unattended_publication.py",
-                "tests/review_paper/test_scratch_root_acl.py",
-                "tests/review_paper/test_retained_root_diagnostic.py",
-                "tests/review_paper/test_retained_root_acl_recovery.py",
-                "tests/review_paper/test_post_publication_verifier.py",
-                "tests/review_paper/test_post_publication_stage_diagnostic.py",
-                "tests/review_paper/test_publication_state_paper_diagnostic.py",
-                "tests/review_paper/test_publication_state_paper_corrected.py",
-                "tests/review_paper/test_arch133_scheduler_installation.py",
-                "tests/review_paper/test_arch133_fresh_activation_reprovision.py",
-                "tests/review_paper/test_arch133_reprovision_admission_diagnostic.py",
-                "tests/review_paper/test_arch133_parent_security_diagnostic.py",
-                "tests/review_paper/test_arch133_parent_policy_diagnostic.py",
-                "tests/review_paper/test_arch133_fresh_activation_reprovision_corrected.py",
-                "tests/review_paper/test_arch133_reprovision_reconciliation.py",
-                "tests/review_paper/test_arch133_reprovision_recovery.py",
-                "tests/review_paper/test_arch133_reprovision_recovery_reconciliation.py",
-                "tests/review_paper/test_arch133_windows_rename_qualification.py",
-                "tests/review_paper/test_arch133_closed_descendant_rename_qualification.py",
-                "tests/review_paper/test_arch134_f1r1_a_runtime_isolation.py",
-                "tests/review_paper/test_arch134_f1r1_b_host_qualification.py",
-                "tests/review_paper/test_arch134_f1r1_c1_qualification_operator.py",
-                "tests/review_paper/test_arch134_f1r1_d1s2_successor_readiness.py",
-                "tests/review_paper/test_arch134_f1r1_d1s3_successor_installation_operator.py",
-                "tests/review_paper/test_successor_publication_recovery.py",
-                "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-                "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
-                "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
-                "tests/review_paper/test_arch134_f1r1_d1s1_successor_soak.py",
-                "tests/review_paper/test_supervised_release_foundation.py",
-                "tests/review_paper/test_supervised_release_bundle.py",
-                "tests/review_paper/test_supervised_release_installation.py",
-                "tests/review_paper/test_supervised_maintenance_rebind.py",
-                "tests/review_paper/test_supervised_runtime_host_admission.py",
-                "tests/review_paper/test_supervised_deployment_qualification.py",
-                "tests/review_paper/test_supervised_release_installation_operator.py",
-                "tests/review_paper/test_supervised_release_installation_reconciliation.py",
-                "tests/review_paper/test_supervised_release_publication_recovery.py",
-                "tests/review_paper/test_production_strategy_cycle.py",
-                "tests/review_paper/test_production_strategy_prepare_operator.py",
-                "tests/review_paper/test_current_production_strategy_decision.py",
-                "tests/review_paper/test_strategy_market_history.py",
-                "tests/review_paper/test_history_qualification.py",
-                "tests/review_paper/test_alpaca_authentication_qualification.py",
-                "tests/review_paper/test_pre_market_wake_qualification.py",
-                "tests/review_paper/test_pre_market_wake_overnight.py",
-                "tests/review_paper/test_d1_session_authorization.py",
-                "tests/review_paper/test_d1_session_execution.py",
-                "tests/review_paper/test_five_session_soak.py",
-                "tests/review_paper/test_five_session_soak_child.py",
-                "tests/review_paper/test_alpaca_credential_generation.py",
-                "tests/review_paper/test_alpaca_credential_staging_cleanup.py",
-                "tests/review_paper/test_armed_production_paper_session.py",
-                "tests/review_paper/test_production_paper_runtime.py",
-                "tests/review_paper/test_production_paper_runtime_acl.py",
-                "tests/robinhood_mcp/test_historical.py",
-                "tests/strategies/test_production_strategy_contract.py",
-                "tests/strategies/test_production_strategy_decision.py",
-                "tests/experiments/test_research_candidate.py",
-                "tests/experiments/test_research_candidate_walk_forward.py",
-                "tests/experiments/test_research_candidate_shadow_binding.py",
-                "tests/experiments/test_research_candidate_shadow_qualification.py",
-                "tests/experiments/test_research_candidate_shadow_observation.py",
-                "tests/experiments/test_research_strategy_backtest.py",
-                "tests/experiments/test_research_strategy_definition.py",
-                "tests/experiments/test_research_strategy_walk_forward.py",
-                "tests/experiments/test_research_strategy_production_compatibility.py",
-                "tests/experiments/test_research_strategy_robustness.py",
-                "tests/experiments/test_historical_research_dataset.py",
-                "tests/experiments/test_historical_research_acquisition_custody.py",
-                "tests/experiments/test_historical_research_pre_b2.py",
-                "tests/experiments/test_research_strategy_paper_candidate_eligibility.py",
-                "tests/experiments/test_research_strategy_paper_candidate_eligibility_v2.py",
-                "tests/experiments/test_research_strategy_f1_paper_evidence_verification.py",
-                "tests/scripts/test_archive_project_history.py",
-            )
-        )
-    )
+    assert set(_EXPECTED_FULL) <= set(profiles["full"])
+    assert all(len(modules) == len(set(modules)) for modules in profiles.values())
+    runner.validate_classification(inventory, profiles)
     assert "tests/scripts/test_archive_project_history.py" in profiles["full"]
     assert "tests/scripts/test_archive_project_history.py" not in profiles["robinhood"]
     assert "tests/scripts/test_archive_project_history.py" not in profiles["legacy"]
@@ -234,12 +65,6 @@ def test_current_profile_counts_support_partition_and_serial_allowlist() -> None
     assert _UNATTENDED_ACTIVATION_TEST in profiles["full"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["robinhood"]
     assert _UNATTENDED_EXECUTION_TEST in profiles["full"]
-    assert {name: len(value) for name, value in profiles.items()} == {
-        "full": 210,
-        "robinhood": 117,
-        "legacy": 222,
-        "exhaustive": 432,
-    }
     assert profiles["exhaustive"] == inventory
     assert set(profiles["robinhood"]) <= set(profiles["full"])
     assert set(profiles["full"]).isdisjoint(profiles["legacy"])
@@ -295,20 +120,11 @@ def test_missing_or_renamed_required_module_fails_closed(
 def test_retired_families_are_legacy_and_research_is_supported() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     profiles = runner.classify_inventory(runner.discover_inventory(root))
-    expected_counts = {
-        "tests/acceptance": 1,
-        "tests/cli": 34,
-        "tests/gui": 51,
-        "tests/market_data": 8,
-        "tests/runtime": 126,
-        "tests/scripts": 1,
-    }
-    assert {
-        directory: sum(
-            Path(module).parent.as_posix() == directory for module in profiles["legacy"]
-        )
-        for directory in expected_counts
-    } == expected_counts
+    assert set(runner.LEGACY_REQUIRED_MODULES) <= set(profiles["legacy"])
+    assert set(profiles["full"]).isdisjoint(profiles["legacy"])
+    assert set(profiles["full"]) | set(profiles["legacy"]) == set(
+        profiles["exhaustive"]
+    )
     for module in (
         "tests/runtime/test_d10_arch128_r4_windows.py",
         "tests/runtime/test_personal_desktop_paper_account_authority.py",

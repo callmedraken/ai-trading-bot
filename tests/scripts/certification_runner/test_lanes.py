@@ -48,21 +48,9 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     selected = runner.select_inventory(runner.discover_inventory(root), "robinhood")
     assert "tests/review_paper/test_successor_publication_recovery.py" in selected
     current = selected
-    selected = tuple(
-        m
-        for m in selected
-        if m
-        not in {
-            "tests/runtime/checkpoint_runner/test_source_authority.py",
-            "tests/review_paper/test_successor_publication_recovery.py",
-            "tests/review_paper/test_arch134_f1r1_d1s4_rename_free_direct_installation.py",
-            "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r1.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r2.py",
-            "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic_r3.py",
-        }
-    )
+    # Exercise immutable timing evidence independently of future discovery.
+    selected = tuple(module for module, _ in runner.ROBINHOOD_MODULE_TIMINGS_MS)
+    assert set(selected) <= set(current)
     weights = runner.robinhood_module_weights(selected)
     assert len(selected) == len(runner.ROBINHOOD_MODULE_TIMINGS_MS) == 109
     assert set(weights) == set(selected)
@@ -238,13 +226,14 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     table = runner.FULL_MODULE_TIMINGS_MS
     paths = tuple(module for module, _ in table)
     assert len(paths) == len(set(paths)) == 209
-    assert len(inventory) == 210
-    added = "tests/experiments/test_historical_research_pre_b2.py"
-    assert set(inventory) - set(paths) == {added}
+    assert len(inventory) == len(set(inventory))
     assert set(paths) <= set(inventory)
     assert all(type(ms) is int and ms > 0 for _, ms in table)
     weights = runner.full_module_weights(inventory)
-    assert weights == {**dict(table), added: runner.FULL_FALLBACK_MS}
+    assert weights == {
+        **dict(table),
+        **{module: runner.FULL_FALLBACK_MS for module in set(inventory) - set(paths)},
+    }
     assert runner.FULL_FALLBACK_MS == 1000
     assert sum(dict(table).values()) == 1749660
     assert (
@@ -260,10 +249,8 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     assert tuple(lanes.items()) == tuple(repeated.items())
     assert json.dumps(lanes).encode() == json.dumps(repeated).encode()
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (30, 29, 30, 30, 30, 30, 31)
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
-    assert totals == (250094, 250095, 250095, 250094, 250095, 250094, 250093)
-    assert max(totals) == 250095 < 300000
+    assert max(totals) < 300000
 
 
 def test_c4_preserves_robinhood_legacy_and_exhaustive_placement(monkeypatch) -> None:
@@ -366,10 +353,18 @@ def test_full_duplicate_inventory_is_rejected(monkeypatch) -> None:
         runner.balance_full(("tests/domain/test_future.py",) * 2)
 
 
-def test_full_fixture_matches_frozen_timing_membership() -> None:
-    assert set(_fixture_profiles()["full"]) - {
-        "tests/experiments/test_historical_research_pre_b2.py"
-    } == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
+def test_synthetic_fixture_contains_frozen_timing_membership_and_future_fallback() -> (
+    None
+):
+    fixture = _fixture_profiles()["full"]
+    historical = dict(runner.FULL_MODULE_TIMINGS_MS)
+    assert set(historical) <= set(fixture)
+    weights = runner.full_module_weights(fixture)
+    assert {module: weights[module] for module in historical} == historical
+    assert all(
+        weights[module] == runner.FULL_FALLBACK_MS
+        for module in set(fixture) - set(historical)
+    )
 
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
@@ -922,7 +917,7 @@ def test_distributed_selectors_cover_the_exact_c4_plan_once():
         for module in lane
     ]
     assert sorted(modules) == sorted(inventory)
-    assert len(modules) == len(set(modules)) == 210
+    assert len(modules) == len(set(modules)) == len(inventory)
 
 
 @pytest.mark.parametrize(
@@ -965,3 +960,67 @@ def test_distributed_selector_rejects_incomplete_plan(mutation):
 def test_single_lane_is_full_only(profile):
     with pytest.raises(runner.CertificationError):
         runner.select_full_lane((), {}, profile, ["1"])
+
+
+@pytest.mark.parametrize("extra_count", [1, 5])
+def test_supported_future_modules_grow_without_current_inventory_repins(
+    tmp_path, extra_count
+):
+    from .helpers import _profile_inventory
+
+    # Start from the frozen timing evidence plus required classification baselines.
+    original_table = runner.FULL_MODULE_TIMINGS_MS
+    baseline = set(module for module, _ in original_table) | set(
+        _profile_inventory(tmp_path, "exhaustive")
+    )
+    for module in baseline:
+        path = tmp_path / module
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("", encoding="utf-8")
+    additions = tuple(
+        f"tests/review_paper/test_synthetic_future_{index}.py"
+        for index in range(extra_count)
+    )
+    for module in additions:
+        (tmp_path / module).write_text("", encoding="utf-8")
+    inventory = runner.discover_inventory(tmp_path)
+    assert len(inventory) == len(set(inventory))
+    assert set(inventory) == baseline | set(additions)
+    profiles = runner.classify_inventory(inventory)
+    runner.validate_classification(inventory, profiles)
+    assert set(additions) <= set(profiles["full"]) & set(profiles["robinhood"])
+    assert set(profiles["full"]).isdisjoint(profiles["legacy"])
+    assert set(profiles["full"]) | set(profiles["legacy"]) == set(inventory)
+    weights = runner.full_module_weights(profiles["full"])
+    assert all(weights[module] == runner.FULL_FALLBACK_MS for module in additions)
+    assert all(weights[module] == ms for module, ms in original_table)
+    lanes = runner.build_lanes(tmp_path, profiles["full"], "full")
+    assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
+    assert all(lanes.values()) and "serial" not in lanes
+    runner.validate_partitions(profiles["full"], tuple(lanes.values()))
+    assert lanes == runner.build_lanes(
+        tmp_path, tuple(reversed(profiles["full"])), "full"
+    )
+    for module in additions:
+        assert sum(module in lane for lane in lanes.values()) == 1
+    selections = [
+        runner.select_full_lane(profiles["full"], lanes, "full", [str(index)])
+        for index in range(1, 8)
+    ]
+    assert sorted(
+        module
+        for selection in selections
+        for lane in selection.values()
+        for module in lane
+    ) == sorted(profiles["full"])
+    assert (
+        max(sum(weights[module] for module in lane) for lane in lanes.values()) < 300000
+    )
+    assert runner.FULL_MODULE_TIMINGS_MS == original_table
+    assert len(original_table) == 209
+    assert sum(ms for _, ms in original_table) == 1749660
+    assert hashlib.sha256(
+        json.dumps(dict(original_table), sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest() == (
+        "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
+    )

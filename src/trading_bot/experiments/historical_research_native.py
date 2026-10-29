@@ -22,49 +22,72 @@ from trading_bot.market_data.alpaca_http import (
     ALPACA_SOCKET_TIMEOUT_SECONDS,
     _validated_response_headers,
 )
-from trading_bot.runtime.windows_effectful_capture import (
-    ALPACA_API_KEY_ID_CREDENTIAL_TARGET,
-    ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET,
+from trading_bot.review_paper import alpaca_windows_credentials as current_credentials
+from trading_bot.review_paper.alpaca_windows_credentials import (
+    ScopedAlpacaSecrets,
+    read_current_product_alpaca_secrets,
 )
-from trading_bot.runtime.windows_effectful_capture_credentials import (
-    WindowsAlpacaCredentialManagerReader,
+from trading_bot.review_paper.unattended_host_identity import TRADING_SID
+from trading_bot.runtime.windows_authority_security import resolve_current_token_sid
+
+# Reuse only the retained approved account identity, never D1/prepare/execute
+# authority. The current token is independently observed before every read.
+CREDENTIAL_ACCOUNT_SID = TRADING_SID
+CREDENTIAL_POLICY = current_credentials.CREDENTIAL_POLICY
+CREDENTIAL_BINDING_DISPOSITION = "SOURCE_OWNED_B2_TRADING_ACCOUNT_V3"
+CREDENTIAL_TARGETS = (
+    current_credentials.API_KEY_TARGET,
+    current_credentials.API_SECRET_TARGET,
 )
 
-# The existing production Trading SID does not establish a B2 custodian-account
-# binding. Independent source review must settle that binding, never host discovery.
-CREDENTIAL_ACCOUNT_SID: str | None = None
-CREDENTIAL_BINDING_DISPOSITION = "BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING"
-CREDENTIAL_TARGETS = (
-    ALPACA_API_KEY_ID_CREDENTIAL_TARGET,
-    ALPACA_API_SECRET_KEY_CREDENTIAL_TARGET,
-)
+
+def credential_binding_is_current() -> bool:
+    """Pure source binding; no host discovery, secret read or effect authority."""
+    return (
+        CREDENTIAL_ACCOUNT_SID == TRADING_SID
+        and CREDENTIAL_POLICY
+        == current_credentials.CREDENTIAL_POLICY
+        == "windows-credential-manager-alpaca-market-data/v3"
+        and CREDENTIAL_TARGETS
+        == (current_credentials.API_KEY_TARGET, current_credentials.API_SECRET_TARGET)
+        == (
+            "AITradingBot/MarketData/Alpaca/ApiKeyId/v3",
+            "AITradingBot/MarketData/Alpaca/ApiSecretKey/v3",
+        )
+    )
 
 
 class WindowsHistoricalResearchCredentialSource:
-    """Bridge the established SID-scoped reader to B1's redacted in-memory pair."""
+    """Bridge the current v3 scoped reader after exact source-owned SID proof."""
 
     def __init__(self) -> None:
-        self._reader = None
+        self._reader = read_current_product_alpaca_secrets
+        self._sid_resolver = resolve_current_token_sid
 
     @classmethod
     def for_test(
-        cls, reader: WindowsAlpacaCredentialManagerReader
+        cls,
+        reader: Callable[[], ScopedAlpacaSecrets],
+        sid_resolver: Callable[[], str],
     ) -> WindowsHistoricalResearchCredentialSource:
-        if type(reader) is not WindowsAlpacaCredentialManagerReader:
-            raise HistoricalResearchCustodyError("exact scoped reader required")
         result = cls()
         result._reader = reader
+        result._sid_resolver = sid_resolver
         return result
 
     def __repr__(self) -> str:
         return "WindowsHistoricalResearchCredentialSource(<redacted>)"
 
     def read(self) -> AcquisitionCredentials:
-        if CREDENTIAL_ACCOUNT_SID is None:
-            raise HistoricalResearchCustodyError(CREDENTIAL_BINDING_DISPOSITION)
         try:
-            reader = self._reader or WindowsAlpacaCredentialManagerReader()
-            with reader.read(CREDENTIAL_ACCOUNT_SID) as scoped:
+            if (
+                not credential_binding_is_current()
+                or self._sid_resolver() != CREDENTIAL_ACCOUNT_SID
+            ):
+                raise ValueError("B2 credential account binding rejected")
+            with self._reader() as scoped:
+                if type(scoped) is not ScopedAlpacaSecrets:
+                    raise ValueError("exact current credential scope required")
                 return scoped.use(AcquisitionCredentials)
         except Exception:
             raise HistoricalResearchCustodyError(

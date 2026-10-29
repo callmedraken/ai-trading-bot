@@ -8,6 +8,34 @@ PROSPECTIVE_DEVELOP evaluator before publication. Canonical mapped profiles
 remain GitHub-owned. Required baselines are unchanged; current FULL placement
 is owned by 146-B1-C4, with distributed canonical execution under C5 below.
 
+## Current canonical retry and inventory policy — pre-B2 correction
+
+Canonical attempts are bounded to 1 (original publication) or 2 (one independently
+reviewed same-SHA infrastructure retry). Attempt 3+ is forbidden and non-reusable.
+Only ChatGPT/operator review can authorize invoking attempt 2; source and CI
+never classify a failure as retryable or launch an automatic retry.
+
+Distributed FULL static inheritance accepts attempt 1 or 2 only for the exact
+successful same-SHA source-static dependency, expected HEAD and single selected
+FULL lane in the existing workflow/run. Current mapped FULL/ROBINHOOD reuse
+requires the current attempt's complete successful topology, exact repository,
+workflow/path, push event, feature ref, SHA/tree, checkpoint/profile, required
+steps, lane hygiene and distinct identities. The current adapter validates that
+view before projecting attempt numbers for the unchanged historical evaluator.
+Original run/job metadata, including carried jobs' original timestamps, is
+retained in reuse evidence. Attempt-1 failures remain immutable; attempt 2 does
+not erase them. Broad source-gate reuse still requires original attempt 1.
+
+NO_MUTABLE_INVENTORY_CARDINALITY_PINS: live acceptance uses unique discovery,
+frozen required baselines, complete/disjoint classification and exactly-once
+lane coverage. No mutable profile count, directory count, lane-size tuple or
+exact modeled-total tuple is an acceptance pin. The frozen C4 timing table is
+a subset of current FULL; its 209 timings, 1,749,660 ms total and SHA256 remain
+historical evidence. New owned modules receive FULL_FALLBACK_MS (1000 ms).
+FULL requires seven deterministic nonempty broad lanes, no serial lane and a
+modeled maximum <300000 ms. ROBINHOOD keeps four lanes; LEGACY/EXHAUSTIVE retain
+their complete/disjoint classification and reviewed serial policy.
+
 ## Current canonical FULL execution — Architecture 146-B1-C5
 
 Canonical FULL executes the seven existing lanes on seven independent hosted
@@ -30,12 +58,12 @@ its existing four-child execution; LEGACY/EXHAUSTIVE are unchanged.
 
 The current reuse adapter requires all seven uniquely named successful jobs,
 each functional/hygiene step, source-static, active-tests and source-gates in the
-same exact original attempt-1 push run. It retains original job metadata in reuse
+same exact push run, on canonical attempt 1 or reviewed attempt 2. It retains original job metadata in reuse
 evidence and delegates repository/workflow/SHA/tree/branch proof to the unchanged
 predecessor evaluator. Old shared-runner FULL, missing/duplicate/extra/malformed
-lane names, attempt 2+, partial or ambiguous evidence cannot authorize reuse.
+lane names, attempt 3+, partial or ambiguous evidence cannot authorize reuse.
 Frozen R3M/R3N evidence remains historical. C4's map, digest, placement algorithm,
-module counts and 1000-ms fallback are unchanged. #785 measures contention,
+historical timing evidence and 1000-ms fallback are unchanged. #785 measures contention,
 not replacement timing authority. See the
 [C5 validation boundary](../validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c5--distributed-canonical-full-execution).
 
@@ -49,8 +77,8 @@ total is positive; raw and canonical totals both equal 1,749,660 ms. Sorted
 compact JSON timing-map SHA256:
 `a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710`.
 
-The existing descending-time / ascending-path / lowest-total / lowest-index
-greedy algorithm yields module counts 29/29/30/30/30/31/30 and lane totals
+For that frozen historical table alone, the descending-time / ascending-path /
+lowest-total / lowest-index greedy algorithm yielded module counts 29/29/30/30/30/31/30 and lane totals
 249953/249953/249950/249952/249952/249951/249949 ms. Six lanes modeled about
 291.612 seconds before collection/process overhead, leaving inadequate room
 under the unchanged 300-second ceiling. Runtime acceptance still requires
@@ -58,7 +86,9 @@ each isolated canonical FULL lane wall strictly below 300 seconds under C5.
 There are no lane pins, runtime
 JUnit reads or adaptive history. Future owned modules retain the 1000-ms fallback.
 The exact counts/order differ from the planning approximation; they follow
-from the frozen map and existing algorithm, with the reviewed 249.953-second maximum.
+from the frozen map and existing algorithm, with the historical 249.953-second
+maximum. Current inventory may grow; these historical lane counts/totals are
+never current acceptance pins.
 
 ROBINHOOD remains four lanes; LEGACY/EXHAUSTIVE and required baselines are unchanged.
 
@@ -147,7 +177,8 @@ and develop #734 / `40271802280` both succeeded on attempt 1. #734 reused
 C4's exact skipped-job identity and rejection rules are defined once in the
 [current R3N workflow contract](../AI_DEVELOPMENT_WORKFLOW.md#architecture-132-r3n--workflow-throughput-and-current-contract-consolidation).
 The current proof binds that source-owned name to the reviewed workflow and
-retains exact job-set equality, route-specific conclusions and attempt-1 checks.
+retains exact job-set equality and route-specific conclusions. Current canonical
+attempt bounds are defined above; the R3M/R3N attempt-1 account is historical.
 Its additive authority layer preserves all R3M/R3N/C1/C2/C3 literals.
 
 The current non-effectful pre-publication admission is the GENERAL ordinary-
@@ -160,7 +191,7 @@ reconciliation, and nonempty FULL/ROBINHOOD/LEGACY/EXHAUSTIVE lane
 construction. It does not reset, rebase, merge, repair or rewrite source
 history; it runs only the small current profile/lane/CI contract tests and does
 not run protected effects, provider/broker/live paths, canonical
-FULL/ROBINHOOD, or the broad checkpoint union. Current count/topology assertions live in
+FULL/ROBINHOOD, or the broad checkpoint union. Current discovery/partition/topology assertions live in
 `tests/scripts/certification_runner/test_profiles.py`,
 `test_lanes.py`, and `tests/runtime/checkpoint_runner/test_ci.py`. Historical
 Architecture-133/134 tests retain predecessor, authority, and incident

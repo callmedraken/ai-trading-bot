@@ -117,6 +117,7 @@ def _evaluate(head: str, tree: str, observer, *, simulated: bool) -> B2Preflight
         "credential_adapter": (
             adapters.WindowsHistoricalResearchCredentialSource.__name__
         ),
+        "credential_policy": adapters.CREDENTIAL_POLICY,
         "credential_targets": adapters.CREDENTIAL_TARGETS,
         "credential_account_sid": adapters.CREDENTIAL_ACCOUNT_SID,
         "credential_binding_disposition": adapters.CREDENTIAL_BINDING_DISPOSITION,
@@ -133,9 +134,9 @@ def _evaluate(head: str, tree: str, observer, *, simulated: bool) -> B2Preflight
         "non_reparse": "NOT_OBSERVED",
         "source_binding": "SIMULATED" if simulated else "EXACT_REVIEWED_COMMAND",
     }
-    classification = adapters.CREDENTIAL_BINDING_DISPOSITION
+    classification = "BLOCKED_SOURCE_OWNED_B2_CREDENTIAL_ACCOUNT_BINDING"
     try:
-        if adapters.CREDENTIAL_ACCOUNT_SID is not None:
+        if adapters.credential_binding_is_current():
             if observer.current_sid() != adapters.CREDENTIAL_ACCOUNT_SID:
                 classification = "BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH"
             else:

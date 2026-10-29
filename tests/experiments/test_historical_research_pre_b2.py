@@ -1039,16 +1039,15 @@ def test_pure_preflight_freshness_security_failures_never_ready(field):
     assert result.acquisition_authorized is False
 
 
-@pytest.mark.parametrize("attributes", [0, 4, 16])
-def test_native_token_facts_reject_even_filtered_administrators(
-    monkeypatch, attributes
-):
+@pytest.mark.parametrize("attributes", [None, 0, 4, 16, 20, 7, 23])
+@pytest.mark.parametrize("elevated", [False, True])
+def test_native_effective_admin_facts_and_preflight(monkeypatch, attributes, elevated):
     observation = SimpleNamespace(
         user_sid=OPERATOR.sid,
-        elevated=False,
+        elevated=elevated,
         token_type=1,
         thread_token_present=False,
-        groups=(("S-1-5-32-544", attributes),),
+        groups=() if attributes is None else ((native.ADMINISTRATORS_SID, attributes),),
     )
     monkeypatch.setattr(
         native,
@@ -1056,9 +1055,83 @@ def test_native_token_facts_reject_even_filtered_administrators(
         lambda: SimpleNamespace(observe=lambda: observation),
     )
     token = native.observe_research_operator_token()
-    assert token.administrator is True
-    with pytest.raises(custody.HistoricalResearchCustodyError):
+    administrator = attributes in (4, 7)
+    assert token.administrator is administrator
+    observer = ReadOnlyObserver()
+    observer.operator_token = native.observe_research_operator_token
+    report = preflight.evaluate_b2_preflight_for_test(observer)
+    assert report.operator_administrator is administrator
+    assert report.operator_elevated is elevated
+    if administrator or elevated:
+        with pytest.raises(custody.HistoricalResearchCustodyError):
+            token.verify()
+        assert report.classification == "BLOCKED_RESEARCH_OPERATOR_TOKEN"
+        assert observer.calls == ["close"]
+    else:
         token.verify()
+        assert report.classification == "SIMULATED_B2_PREREQUISITES_PASS"
+    assert report.classification != preflight.READY
+    assert report.credential_secret_reads == report.provider_calls == 0
+    assert report.writes == report.acl_mutations == 0
+    assert report.acquisition_authorized is False
+
+
+@pytest.mark.parametrize("changes", [{"token_type": 2}, {"thread_token_present": True}])
+def test_native_nonprimary_or_impersonated_token_stays_rejected(monkeypatch, changes):
+    observation = SimpleNamespace(
+        user_sid=OPERATOR.sid,
+        elevated=False,
+        token_type=1,
+        thread_token_present=False,
+        groups=(),
+    )
+    for key, value in changes.items():
+        setattr(observation, key, value)
+    monkeypatch.setattr(
+        native,
+        "WindowsTradingTokenObserver",
+        lambda: SimpleNamespace(observe=lambda: observation),
+    )
+    with pytest.raises(custody.HistoricalResearchCustodyError):
+        native.observe_research_operator_token()
+    observer = ReadOnlyObserver()
+    observer.operator_token = native.observe_research_operator_token
+    report = preflight.evaluate_b2_preflight_for_test(observer)
+    assert report.classification != preflight.READY
+    assert observer.calls == ["close"]
+    assert report.credential_secret_reads == report.provider_calls == 0
+    assert report.writes == report.acl_mutations == 0
+    assert report.acquisition_authorized is False
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        ("and attributes & SE_GROUP_ENABLED", ""),
+        ("and not attributes & SE_GROUP_USE_FOR_DENY_ONLY", ""),
+        ("sid == ADMINISTRATORS_SID", 'sid == "S-1-5-32-544"'),
+        ("and not attributes & SE_GROUP_USE_FOR_DENY_ONLY", "and True"),
+    ],
+)
+def test_current_authority_rejects_raw_or_incomplete_admin_semantics(
+    tmp_path, before, after
+):
+    from scripts.arch146_source_authority import research_credential_boundary_isolated
+
+    relative = Path("src/trading_bot/experiments/historical_research_native.py")
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    for name in (
+        "historical_research_native.py",
+        "historical_research_b2_preflight.py",
+    ):
+        source = relative.parent / name
+        (tmp_path / source).write_text((ROOT / source).read_text(), encoding="utf-8")
+    assert research_credential_boundary_isolated(tmp_path)
+    text = target.read_text()
+    assert before in text
+    target.write_text(text.replace(before, after), encoding="utf-8")
+    assert not research_credential_boundary_isolated(tmp_path)
 
 
 @pytest.mark.parametrize("failure", ["transport", "custody", "input"])

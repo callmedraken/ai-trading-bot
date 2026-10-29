@@ -1,19 +1,23 @@
 # AI Trading Bot — Current Handoff
 
-## Pending research authority coupling correction
+## Pending effective administrator semantics correction
 
 Accepted integrated base (verify live remote independently):
 
-    develop HEAD b047d87cb7d82e61b9ef23280db90d8cf916c75b
-    develop TREE bc075bc0cac40ebee64a682350c08dac903359e4
+    develop HEAD 4dd2299f73cdb5b1d602a7182a5eccdb98aa27ef
+    develop TREE 83519c50b8538a8e7b4fea573d502f5a813197d3
     branch feature/research-arch146-b-pre-b2-readiness-current
     worktree F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current
     checkpoint arch146-b-pre-b2-readiness-source
     mapped certification FULL (GitHub-owned)
 
-This pending source correction removes Architecture 146's production Trading SID,
+The integrated prior correction removed Architecture 146's production Trading SID,
 production-paper admission and /v3 Credential Manager dependency. The ordinary
-research token must be an observed Windows user SID, non-elevated and non-admin.
+research token must be primary, non-impersonating, an observed valid local user
+SID, non-elevated and without effective administrator authority. This pending
+correction reuses the reviewed symbolic token constants: Administrators SID
+enabled AND not deny-only. Non-elevated filtered deny-only membership is allowed.
+operator_administrator means effective authority, not raw group presence.
 The source observes rather than hardcodes that SID. Ephemeral hidden terminal
 input is the sole credential source, persistence NONE; no secret fallback,
 provisioning, Credential Manager access or acquisition CLI exists.
@@ -34,7 +38,11 @@ reconciliation WRONG_LAUNCH_PRINCIPAL remain truthful. Trading identity drift
 was false; root cause ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT. Production
 Trading itself was not defective. Full disposition and original zero counters
 are in the [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md).
-No report is rewritten and no real host state is inspected in this checkpoint.
+PRE-B2 #2 remains BLOCKED_RESEARCH_OPERATOR_TOKEN with operator_sid=...-1005,
+operator_elevated=false, operator_administrator=true and effects zero. Root cause
+ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT. Neither report is rewritten;
+the observed SID suffix is historical evidence only. No real host state is
+inspected in this checkpoint.
 
 B1/C1-C6 accepted ancestry is d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42,
 feature #788 / 40770164255 and develop #789 / 40771613241 SUCCESS.
@@ -60,9 +68,12 @@ Terminal red or green is STOP for ChatGPT exact-source review. No CI rerun,
 amend, rebase, force-push, PR or merge. Return exact commit/tree, changed paths,
 focused/admission results and terminal run identity/conclusion.
 
-After exact-source acceptance/integration, ChatGPT provides a SHORT DIRECT
+After exact-source acceptance/integration, first fast-forward primary local develop
+as ordinary hygiene; ChatGPT then provides a SHORT DIRECT
 OPERATOR PROCEDURE for one ordinary-operator real read-only B2 preflight.
-Only after independent acceptance may a separately reviewed one-shot acquisition
+No dedicated Trading account or credential prompt. After independent READY review,
+advance to the minimal acquisition-bridge milestone. Only after independent
+acceptance may a separately reviewed one-shot acquisition
 be authorized, with hidden credential input immediately before provider use.
 Correction real preflight NOT_RUN; acquisition NOT_AUTHORIZED; protected effects ZERO.
 

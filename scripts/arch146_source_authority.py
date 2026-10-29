@@ -87,6 +87,8 @@ def dataset_preserves_146a_contract(repo_root: Path, historical_pin: str) -> boo
 
 def research_credential_boundary_isolated(repo_root: Path) -> bool:
     """Reject production-principal/store/fallback authority in the Arch146 path."""
+    if not research_operator_token_semantics_current(repo_root):
+        return False
     forbidden_names = {
         "TRADING_SID",
         "approved_trading_sid",
@@ -147,3 +149,48 @@ def research_credential_boundary_isolated(repo_root: Path) -> bool:
             ):
                 return False
     return True
+
+
+def research_operator_token_semantics_current(repo_root: Path) -> bool:
+    """Own the effective-admin observation, without production Trading admission."""
+    tree = ast.parse(
+        (
+            repo_root / "src/trading_bot/experiments/historical_research_native.py"
+        ).read_text(encoding="utf-8")
+    )
+    expected = ast.parse(
+        "observed = WindowsTradingTokenObserver().observe(); "
+        "\nif observed.token_type != 1 or observed.thread_token_present is not False:"
+        "\n    raise HistoricalResearchCustodyError('research token identity unproven')"
+        "\nreturn ResearchOperatorToken(observed.user_sid, observed.elevated, "
+        "any(sid == ADMINISTRATORS_SID and attributes & SE_GROUP_ENABLED "
+        "and not attributes & SE_GROUP_USE_FOR_DENY_ONLY "
+        "for sid, attributes in observed.groups))"
+    )
+    declarations = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "observe_research_operator_token"
+    ]
+    required = {
+        "ADMINISTRATORS_SID",
+        "SE_GROUP_ENABLED",
+        "SE_GROUP_USE_FOR_DENY_ONLY",
+        "WindowsTradingTokenObserver",
+    }
+    imported = {
+        alias.name
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "trading_bot.arch133_verifier.token"
+        for alias in node.names
+        if alias.asname is None
+    }
+    return (
+        required <= imported
+        and len(declarations) == 1
+        and ast.get_docstring(declarations[0]) is not None
+        and [ast.dump(node) for node in declarations[0].body[1:]]
+        == [ast.dump(node) for node in expected.body]
+    )

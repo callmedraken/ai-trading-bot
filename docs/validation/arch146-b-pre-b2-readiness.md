@@ -86,9 +86,13 @@ the reviewed hidden-input warning-as-error pattern is reused without importing
 its provisioning/production authority. There is no /v4 or persistent source.
 
 The real preflight observes a Windows user SID and records operator_sid,
-operator_elevated and operator_administrator. Non-user, elevated, administrator
-(including filtered/deny-only Administrators membership) or unproven tokens
-block. The low-level bounded TOKEN_QUERY observer supplies facts only; its
+operator_elevated and operator_administrator. operator_administrator means
+effective administrator authority: the Administrators SID must be enabled and
+not deny-only, using the reviewed arch133_verifier.token symbolic constants.
+Non-user, elevated, effectively administrator or unproven tokens block. A
+non-elevated UAC-filtered token with deny-only membership is ordinary research
+authority; primary-process and no-thread-impersonation requirements remain.
+The low-level bounded TOKEN_QUERY observer supplies facts only; its
 Trading admission policy is never called. No ordinary SID is a source constant.
 The source/persistence report values are exactly:
 
@@ -344,3 +348,62 @@ access and a synthetic ordinary SID pin to prove they fail closed. No canonical
 FULL/ROBINHOOD ran locally. Final general admission must bind FEATURE and
 PROSPECTIVE_DEVELOP to the exact clean unpublished candidate before the single
 push; the resulting mapped GitHub CI is the only canonical run.
+
+
+## Effective administrator semantics correction — PRE-B2 #2
+
+Accepted integrated parent HEAD 4dd2299f73cdb5b1d602a7182a5eccdb98aa27ef,
+TREE 83519c50b8538a8e7b4fea573d502f5a813197d3. Preserve both real observations:
+
+    PRE-B2 #1
+    BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH
+    effects zero
+
+    PRE-B2 #2
+    BLOCKED_RESEARCH_OPERATOR_TOKEN
+    operator_sid = ...-1005
+    operator_elevated = false
+    operator_administrator = true
+    effects zero
+
+The second root cause is ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT:
+raw Administrators SID presence was incorrectly reported as effective authority.
+The real observation remains unchanged; this source correction does not rerun
+or reinterpret that report. Only enabled AND non-deny-only Administrators
+membership now sets operator_administrator=true. No ordinary SID is hardcoded.
+Elevated, nonprimary, impersonated and invalid-user tokens remain rejected.
+Production Trading authority and persistent credential dependencies remain
+excluded; ephemeral hidden input remains the sole later credential source.
+Preflight cannot prompt and retains zero secret reads/provider calls/writes/ACL
+mutations and acquisition_authorized=false. Fake preflight cannot reach real READY.
+Existing accepted-preflight/acquisition bindings and custody prerequisites remain.
+
+One atomic correction, both clean-candidate admission contexts, one ordinary
+push and exactly one mapped GitHub CI; terminal red OR green is STOP for ChatGPT
+exact review. No canonical FULL locally, rerun, PR or integration. After independent
+acceptance/integration, first fast-forward the primary local develop checkout as
+ordinary hygiene, then supply the short ordinary-operator read-only preflight
+command. READY requires independent review before the minimal acquisition-bridge
+milestone. Real preflight NOT_RUN here; B2 acquisition NOT_AUTHORIZED; protected
+effects ZERO; Architecture 134 R3 parked; LIVE NO-GO.
+
+
+### Effective-admin correction focused verification
+
+Verification used the existing isolated Python 3.14.3 / Ruff 0.17.3 toolchain
+listed above, explicit worktree src imports, -B, pytest -q -p no:cacheprovider,
+--tb=short and fresh external purpose-plus-GUID --basetemp paths per group.
+
+- 888 passed: Architecture 146 pre-B2/acquisition-custody/dataset plus current
+  token, paper-account security and retained capture-credential security tests.
+- 1399 passed: checkpoint source-authority/core/CI, certification profiles/lanes/
+  results/source and both infrastructure historical/current coherence modules.
+- 139 passed: final changed pre-B2 module, including effective-admin attribute
+  combinations, elevation, primary/thread-token rejection, isolation/owner
+  regressions, fake-readiness and accepted-preflight/acquisition bindings.
+- Whole-root Ruff 0.17.3 check and format --check passed (1106 Python files);
+  git diff --check passed. Initial formatting findings and unintended Unicode
+  conversion were corrected locally before publication; final Unicode is preserved.
+
+No canonical FULL/ROBINHOOD or real host preflight ran locally. General admission
+must still bind both contexts to the exact clean committed candidate before push.

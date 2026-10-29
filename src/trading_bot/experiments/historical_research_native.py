@@ -12,7 +12,12 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from trading_bot.arch133_verifier.token import WindowsTradingTokenObserver
+from trading_bot.arch133_verifier.token import (
+    ADMINISTRATORS_SID,
+    SE_GROUP_ENABLED,
+    SE_GROUP_USE_FOR_DENY_ONLY,
+    WindowsTradingTokenObserver,
+)
 from trading_bot.experiments.historical_research_acquisition import (
     MAX_RESPONSE_BYTES,
     AcquisitionCredentials,
@@ -53,6 +58,8 @@ def credential_binding_is_current() -> bool:
 
 @dataclass(frozen=True, slots=True)
 class ResearchOperatorToken:
+    """Observed identity; administrator means enabled, non-deny-only authority."""
+
     sid: str
     elevated: bool
     administrator: bool
@@ -80,12 +87,17 @@ def observe_research_operator_token() -> ResearchOperatorToken:
     observed = WindowsTradingTokenObserver().observe()
     if observed.token_type != 1 or observed.thread_token_present is not False:
         raise HistoricalResearchCustodyError("research token identity unproven")
-    # Include deny-only Administrators membership: a filtered admin token is
-    # still an administrator account, even when CheckTokenMembership is false.
+    # Match the reviewed token semantics: deny-only membership grants no
+    # effective Administrators authority, including in a UAC-filtered token.
     return ResearchOperatorToken(
         observed.user_sid,
         observed.elevated,
-        any(sid == "S-1-5-32-544" for sid, _ in observed.groups),
+        any(
+            sid == ADMINISTRATORS_SID
+            and attributes & SE_GROUP_ENABLED
+            and not attributes & SE_GROUP_USE_FOR_DENY_ONLY
+            for sid, attributes in observed.groups
+        ),
     )
 
 

@@ -1,15 +1,17 @@
 # AI Trading Bot — Project Status
 
-## Current pending checkpoint — Architecture 146 research authority correction
+## Current pending checkpoint — Architecture 146 effective admin correction
 
 The accepted integrated pre-B2 base is develop
-b047d87cb7d82e61b9ef23280db90d8cf916c75b, tree
-bc075bc0cac40ebee64a682350c08dac903359e4. Resolve the live remote at startup.
+4dd2299f73cdb5b1d602a7182a5eccdb98aa27ef, tree
+83519c50b8538a8e7b4fea573d502f5a813197d3. Resolve the live remote at startup.
 The current source-only correction remains on
 feature/research-arch146-b-pre-b2-readiness-current in the canonical F: worktree.
-It is pending mapped certification and independent exact-source review.
+The integrated research authority coupling correction is preserved. The new
+bounded effective-admin correction is pending mapped certification and
+independent exact-source review.
 
-The consumed real preflight blocked with BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH.
+PRE-B2 #1 blocked with BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH.
 Identity reconciliation classified WRONG_LAUNCH_PRINCIPAL with no Trading
 identity drift. The accepted root cause is
 ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT: historical research incorrectly
@@ -17,8 +19,14 @@ required the production Trading principal and /v3 credentials. The Trading
 account itself is unchanged. The [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md)
 retains disposition, chronology and source/effect bounds.
 
-The correction admits observed ordinary non-admin/non-elevated research token
-facts. Preflight records operator SID and EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS,
+PRE-B2 #2 blocked with BLOCKED_RESEARCH_OPERATOR_TOKEN while non-elevated,
+reporting operator_administrator=true. Preserve that observation unchanged.
+Root cause ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT: raw group presence
+was mistaken for effective authority. The correction uses enabled AND non-deny-only
+Administrators membership; filtered deny-only tokens are accepted if otherwise
+valid. operator_administrator explicitly means effective administrator authority.
+Primary process, no thread impersonation and valid local user SID remain required.
+Preflight records operator SID and EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS,
 persistence NONE, with zero secrets/provider calls/writes/ACL mutations and
 acquisition_authorized=false. Later input requires independent real-preflight
 acceptance and matching exact source, operator, authority, requests and custody.
@@ -44,9 +52,11 @@ Codex completes focused tests, bounded infrastructure/authority coherence,
 whole-root Ruff 0.17.3 and diff-check; then one clean atomic candidate, both
 general admission contexts, one ordinary push and terminal mapped GitHub FULL.
 No canonical FULL locally. Stop on red or green for ChatGPT exact-source review.
-No PR or merge. After acceptance and integration, ChatGPT supplies a short direct
+No PR or merge. After acceptance and integration, first fast-forward primary local
+develop as ordinary hygiene; ChatGPT then supplies a short direct
 operator procedure for one real read-only B2 preflight under the ordinary
-research operator. READY grants no effects; acquisition requires separate review.
+research operator. READY grants no effects; independent review precedes the minimal
+acquisition-bridge milestone. Acquisition requires separate review; preflight cannot prompt.
 Custody prerequisites may still block and cannot be repaired under this scope.
 
 ## Parked boundaries and roadmap

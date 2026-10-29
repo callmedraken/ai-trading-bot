@@ -421,7 +421,11 @@ terminal preservation. No rename/promotion/cleanup path exists. Research uses
 EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS with credential_persistence=NONE;
 production Trading identity and Credential Manager generations supply no research
 authority. The real preflight observes a Windows user SID, non-elevated and
-non-administrator token. Independent acceptance binds its exact nonsecret report,
+without effective administrator authority (Administrators SID enabled and not
+deny-only). Non-elevated filtered deny-only membership is allowed; primary process
+and no thread impersonation remain required. operator_administrator reports this
+effective authority, not raw group presence. Independent acceptance binds its
+exact nonsecret report,
 source HEAD/TREE, operator SID, published authority, requests and custody policy.
 The later separately authorized B1 invocation rechecks these before any custody
 effect and again immediately before hidden terminal input. READY alone grants

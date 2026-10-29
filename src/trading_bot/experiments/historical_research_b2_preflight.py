@@ -54,7 +54,7 @@ class B2PreflightReport:
     binding: dict
     operator_sid: str | None
     operator_elevated: bool | None
-    operator_administrator: bool | None
+    operator_administrator: bool | None  # Effective enabled, non-deny-only authority.
     credential_source: str = adapters.CREDENTIAL_SOURCE
     credential_persistence: str = adapters.CREDENTIAL_PERSISTENCE
     checkpoint: str = ACQUISITION_CHECKPOINT

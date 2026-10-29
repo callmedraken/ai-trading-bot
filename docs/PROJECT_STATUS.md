@@ -1,89 +1,83 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 146 B2 tracked-only source-binding correction
+## Current checkpoint — Architecture 146 B2 source-binding integrated
 
-The custody ACE multiset correction was independently accepted at
-27b88cd67b467647d0857c5142a2ca7de0bc7946, tree
-13b7d3613f7f44a7bd0eab36378ae55f872ac766, and fast-forward integrated into
-develop. Develop CI #798 / run 40949362950 / attempt 1 reached terminal SUCCESS
-before this successor edit. Feature CI #797 / run 40942066124 / attempt 1 remains
-the canonical FULL certification of that exact accepted tree; develop used exact-
-source certification reuse and did not require another seven-lane FULL execution.
+Architecture 146's custody ACE multiset and tracked-only B2 source-binding
+corrections are accepted and integrated on `develop` at
+`f2a78e3c82058f3aee6d3d7145bbd9a8f00e2369`, tree
+`7d9d3898b0c802780617e9f1f397338fe0fc96d3`.
 
-The first published successor candidate was
-d346c6d13f2292c4c6b421a0abe29f284da2675c, tree
-e074bfed3c8b528d4c8e9bcf7441aa4f45f0b314. Feature CI #799 / run 40954098370 /
-attempt 1 failed and is preserved as immutable evidence, so that candidate was
-not green or accepted. Source-static and broad-1/2/4/5/6/7 succeeded; active-tests
-and broad-3 failed from the same CI-path-dependent fake-test seam. Production
-source binding and authority semantics were not defective, and no CI rerun
-occurred.
+The first tracked-only successor candidate,
+`d346c6d13f2292c4c6b421a0abe29f284da2675c`, tree
+`e074bfed3c8b528d4c8e9bcf7441aa4f45f0b314`, remains immutable failed
+evidence. Feature CI #799 / run 40954098370 / attempt 1 failed only because the
+new fake runtime-seam test retained the fixed production `SOURCE_WORKTREE`
+while GitHub ran from `D:\a\...`. It was not rerun or rewritten.
 
-The current corrective child fixes only the fake test's temporary source-path
-binding while retaining the reviewed B2 exact-source cleanliness predicate and
-registered authority coverage. Permitted
-untracked/generated artifacts and historical pytest permission-warning
-directories are known preserved state, not a source-cleanliness failure. The
-other exact source predicates remain unchanged.
+The bounded portability child `f2a78e3c82058f3aee6d3d7145bbd9a8f00e2369` / tree
+`7d9d3898b0c802780617e9f1f397338fe0fc96d3` changed only the fake test seam and coordination/validation
+docs. Feature CI #800 / run 40971719167 / attempt 1 was terminal SUCCESS:
+source-static, active-tests, source-gates and FULL broad-1 through broad-7 all
+passed. Develop CI #801 / run 40974190116 / attempt 1 was terminal SUCCESS on
+the exact same SHA and used
+`DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`; active tests
+and FULL lanes were correctly skipped.
 
-No new host observation occurred after integration. The previously observed
-partial host state remains evidence only and was not re-inspected; the
-[validation record](validation/arch146-b-pre-b2-readiness.md) owns that
-chronology. This candidate performs no host inspection or repair.
+The production B2 source-cleanliness rule is exactly tracked/index-only:
 
-The correction accepts only exact ACE multisets, preserving multiplicity and
-binary SID/mask/type/flags, owner and protected DACL. Shared Windows authority
-semantics remain unchanged. Ordinary research retains the primary,
-non-impersonating, non-elevated user token without effective administrator
-authority; filtered deny-only Administrators membership is allowed. Ephemeral
-hidden terminal input remains the sole later credential source, persistence
-NONE. Preflight never prompts or authorizes acquisition.
+    git status --porcelain=v1 --untracked-files=no
+
+Permitted unrelated generated/untracked artifacts and historical pytest
+permission-warning directories remain preserved state and are not a
+source-cleanliness failure.
+
+No new host observation occurred during either correction, certification or
+integration. The previously observed partial host state remains evidence only
+and has not been re-inspected.
 
 ## Preserved research foundations
 
-B1/C1-C6 is integrated ancestry at d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42;
-feature #788 and develop #789 succeeded. Earlier failed/cancelled CI, including
-#790 attempts 1/2, remains immutable evidence. Current inventory policy remains
-NO_MUTABLE_INVENTORY_CARDINALITY_PINS; reviewed attempts 1/2 policy is unchanged.
-
 Published authority remains exactly 2718 sessions:
-nyse-published-regular-sessions-2016-2026-v1, digest
-7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1.
-Model minus published is exactly 2018-12-05 and 2025-01-09; reverse delta empty.
-146-A behavior, global modeled calendar, HTTPS requests and custody roots remain
-unchanged. ACCEPTED_CUSTODY_ADMISSIONS is empty.
+`nyse-published-regular-sessions-2016-2026-v1`, digest
+`7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1`.
+Model minus published remains exactly 2018-12-05 and 2025-01-09; reverse delta
+is empty. Architecture 146-A behavior, global modeled calendar, request
+descriptors and custody roots remain unchanged. `ACCEPTED_CUSTODY_ADMISSIONS`
+is empty.
+
+PRE-B2 #1/#2/#3 and the parent-provisioning/binary-ACL chronology remain
+immutable consumed evidence. Architecture 134 R3 remains parked at
+`BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE`; no retry or R4. LIVE remains
+NO-GO.
 
 ## Next step
 
-Complete the corrective focused source-binding/current-authority tests, whole-
-root Ruff 0.17.3 and diff checks. Publish one atomic child candidate only after
-FEATURE and PROSPECTIVE_DEVELOP admission PASS; ordinary-push once and wait for
-the one mapped GitHub result. No canonical FULL locally. Terminal red or green
-is STOP for ChatGPT exact-source/CI review. No merge, PR or real host step
-belongs to this task. The partial parent state grants no retry, repair or
-acquisition authority.
+The next milestone is **source-only registration of a reusable Architecture 146
+read-only partial-state observer** in the unified checkpoint runner.
 
-## Parked boundaries and roadmap
+Repository review established that the current
+`arch146-b-pre-b2-readiness-source` registration is source-only and has no
+preflight function. The existing `scripts.arch146_b2_readonly_preflight`
+launcher is preserved historical/direct-preflight machinery; it is not the
+registered partial-state observer required by the current workflow.
 
-Architecture 134 R3 remains parked at BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE;
-its consumed observation is unchanged. No retry, alternate diagnostic or R4.
-Acquisition NOT_AUTHORIZED; this source task's protected effects ZERO.
-LIVE remains NO-GO.
+The successor must be read-only, source-bound, zero-effect, and limited to the
+specific partial-state facts needed to decide the next boundary. It must not
+prompt for credentials, call the provider, run the real B2 readiness preflight,
+create OPEN/custody paths, mutate ACLs, or grant acquisition authority.
 
-    tracked-only source-binding correction
-      -> independently reviewed exact-source integration
-      -> establish/use the reviewed registered read-only partial-state continuation
-      -> one read-only observation
+After that source is independently accepted and integrated:
+
+    registered read-only partial-state observer
+      -> one bounded read-only host observation
       -> independent review
-      -> separately reviewed protected OPEN-parent creation
+      -> canonical closeout
+      -> separately reviewed OPEN-parent creation if warranted
       -> ordinary non-elevated B2 preflight
       -> independent READY review
       -> minimal acquisition bridge
 
-The existing direct B2 launcher has not been accepted as the next registered
-partial-state observer. Acquisition remains NOT_AUTHORIZED; Architecture 134
-R3 remains parked; LIVE remains NO-GO.
-
-D/E remain REQUIRED_POST_B2. GUI_SOURCE_CHANGE=NOT_REQUIRED pre-B2; F remains
-NO_SOURCE_CHANGE beyond registration. V1 reports stay unchanged; five native-MAC
-optimizer-only N/A metrics remain scheduled for one post-B2 publication.
+Acquisition remains NOT_AUTHORIZED. D/E remain REQUIRED_POST_B2;
+GUI_SOURCE_CHANGE=NOT_REQUIRED pre-B2; F remains NO_SOURCE_CHANGE beyond routine
+registration. Five native-MAC optimizer-only N/A metrics remain scheduled for
+one post-B2 publication.

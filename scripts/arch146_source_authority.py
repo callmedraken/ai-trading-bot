@@ -194,3 +194,82 @@ def research_operator_token_semantics_current(repo_root: Path) -> bool:
         and [ast.dump(node) for node in declarations[0].body[1:]]
         == [ast.dump(node) for node in expected.body]
     )
+
+
+def research_custody_ace_semantics_current(repo_root: Path) -> bool:
+    """Own exact all-allow ACE multisets; never execute a native host observer.
+
+    Compare the current method's complete AST with the reviewed composition,
+    including owner/protection and binary SID/mask/type/flags. This is a current
+    semantic rule, independent of historical blobs and SDDL text ordering.
+    """
+    tree = ast.parse(
+        (
+            repo_root
+            / "src/trading_bot/experiments/historical_research_native_custody.py"
+        ).read_text(encoding="utf-8")
+    )
+    expected = ast.parse(
+        "def _security(self, handle: int, path: str, *, "
+        "directory: bool, opened: bool) -> None:"
+        "\n    facts = inspect_open_authority_object(handle, path, "
+        "AuthorityObjectKind.DIRECTORY if directory else AuthorityObjectKind.FILE)"
+        "\n    flags = 3 if directory else 0"
+        "\n    expected = [(ADMIN, 0x1F01FF, 0, flags), "
+        "(SYSTEM, 0x1F01FF, 0, flags)]"
+        "\n    if opened:"
+        "\n        expected.append((USERS, 0x1200A9, 0, flags))"
+        "\n    actual = tuple((a.principal_sid, a.access_mask, "
+        "a.ace_type, a.ace_flags) for a in facts.aces)"
+        "\n    if (facts.owner_sid != ADMIN or facts.dacl_protected is not True "
+        "or Counter(actual) != Counter(expected)):"
+        "\n        raise _error()"
+    ).body[0]
+    classes = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "WindowsCustodyNative"
+    ]
+    if len(classes) != 1:
+        return False
+    methods = [
+        node
+        for node in classes[0].body
+        if isinstance(node, ast.FunctionDef) and node.name == "_security"
+    ]
+    imports = [
+        node
+        for node in tree.body
+        if isinstance(node, ast.ImportFrom) and node.module == "collections"
+    ]
+    constants = {
+        "ADMIN": "S-1-5-32-544",
+        "SYSTEM": "S-1-5-18",
+        "USERS": "S-1-5-32-545",
+    }
+    for name, value in constants.items():
+        assignments = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == name for t in node.targets)
+        ]
+        if len(assignments) != 1 or ast.dump(assignments[0]) != ast.dump(
+            ast.parse(f"{name} = {value!r}").body[0]
+        ):
+            return False
+    return (
+        len(methods) == 1
+        and ast.dump(methods[0]) == ast.dump(expected)
+        and any(
+            alias.name == "Counter" and alias.asname is None
+            for node in imports
+            for alias in node.names
+        )
+        and not any(
+            isinstance(node, ast.Name)
+            and isinstance(node.ctx, ast.Store)
+            and node.id == "Counter"
+            for node in ast.walk(tree)
+        )
+    )

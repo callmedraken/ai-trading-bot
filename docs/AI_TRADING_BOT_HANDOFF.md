@@ -1,88 +1,88 @@
 # AI Trading Bot — Current Handoff
 
-## Pending effective administrator semantics correction
+## Pending Architecture 146 custody ACE ordering correction
 
-Accepted integrated base (verify live remote independently):
+Accepted integrated starting source (verify live remote independently):
 
-    develop HEAD 4dd2299f73cdb5b1d602a7182a5eccdb98aa27ef
-    develop TREE 83519c50b8538a8e7b4fea573d502f5a813197d3
+    develop / feature starting HEAD b1716543d324dcc52b43a1598648f01b7c85bf0b
+    starting TREE b193dd705bae343661f954521730b78ccf059ec2
     branch feature/research-arch146-b-pre-b2-readiness-current
     worktree F:\AI\worktrees\ai-trading-bot-146b-pre-b2-readiness-current
     checkpoint arch146-b-pre-b2-readiness-source
     mapped certification FULL (GitHub-owned)
 
-The integrated prior correction removed Architecture 146's production Trading SID,
-production-paper admission and /v3 Credential Manager dependency. The ordinary
-research token must be primary, non-impersonating, an observed valid local user
-SID, non-elevated and without effective administrator authority. This pending
-correction reuses the reviewed symbolic token constants: Administrators SID
-enabled AND not deny-only. Non-elevated filtered deny-only membership is allowed.
-operator_administrator means effective authority, not raw group presence.
-The source observes rather than hardcodes that SID. Ephemeral hidden terminal
-input is the sole credential source, persistence NONE; no secret fallback,
-provisioning, Credential Manager access or acquisition CLI exists.
+Both research coupling and effective-administrator source corrections are
+integrated. Ordinary research uses a primary, non-impersonating Windows user
+token, non-elevated and without effective administrator authority (Administrators
+SID enabled AND not deny-only). Ephemeral hidden terminal input is the sole
+later credential source, persistence NONE; production Trading identity and
+Credential Manager/environment/config/file fallbacks remain excluded.
 
-Preflight never prompts. Its report retains zero secret reads, provider calls,
-writes and ACL mutations, acquisition_authorized=false. Fake reports cannot mint
-real readiness/acceptance. Later acquisition binds accepted exact source HEAD/TREE,
-operator SID, authority identity/digest, requests and custody and rechecks the
-current token before input. Independent acceptance is currently process-local;
-printed/parsed CLI evidence cannot rehydrate an acquisition capability. Future
-reviewed acquisition wiring must retain the real report across independent review.
-READY or constructing a credential source never authorizes effects.
+Current blocker: ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT. The bounded
+source correction compares exact binary SID/mask/type/flags ACE multisets, with
+multiplicity, owner and protected DACL preserved. Protected two-ACE order and
+OPEN three-ACE permutations are equivalent; no broader permissions equivalence
+or shared SecurityPolicy.matches() change is admitted.
 
-## Consumed evidence and preserved source
+## Exact consumed state and effect boundary
 
-The consumed first preflight BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH and identity
-reconciliation WRONG_LAUNCH_PRINCIPAL remain truthful. Trading identity drift
-was false; root cause ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT. Production
-Trading itself was not defective. Full disposition and original zero counters
-are in the [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md).
-PRE-B2 #2 remains BLOCKED_RESEARCH_OPERATOR_TOKEN with operator_sid=...-1005,
-operator_elevated=false, operator_administrator=true and effects zero. Root cause
-ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT. Neither report is rewritten;
-the observed SID suffix is historical evidence only. No real host state is
-inspected in this checkpoint.
+PRE-B2 #3 already ran: BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN,
+operator_elevated=false, operator_administrator=false, fresh_state=UNPROVEN_STOP,
+effects zero. The [validation record](validation/arch146-b-pre-b2-readiness.md)
+preserves PRE-B2 #1/#2, discrimination and provisioning chronology.
 
-B1/C1-C6 accepted ancestry is d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42,
-feature #788 / 40770164255 and develop #789 / 40771613241 SUCCESS.
-Preserve cancelled #787 and failed #790 / 40812384997 attempts 1/2 unchanged.
-NO_MUTABLE_INVENTORY_CARDINALITY_PINS and reviewed attempts 1/2 remain intact.
+Reported bounded partial state after parent provisioning attempt #2:
 
-Published authority remains nyse-published-regular-sessions-2016-2026-v1,
-2718 sessions, digest
-7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1.
+    F:\AI\research-holdout exists
+    directories_created=1; acl_mutations=1
+    protected acquisition root F:\AI\research-holdout\arch146-v1 absent
+    attempt claim F:\AI\research-holdout\.arch146-v1-attempt.json absent
+    OPEN parent F:\AI\ai-trading-bot\data\research absent
+    OPEN root F:\AI\ai-trading-bot\data\research\arch146-v1 absent
+
+Exact repository-native binary diagnostic: owner S-1-5-32-544, protected DACL,
+non-reparse; SYSTEM then Administrators, each allow / 0x001f01ff / flags 3;
+close_ambiguous=false and diagnostic effects zero. These are preserved supplied
+observations, not new host observations by this source task. Do not inspect,
+repair, clean, recreate or retry the partial state here. Do not run the real
+preflight or real observe_fresh(), create the OPEN parent, read credentials or
+holdout bytes, or invoke provider/acquisition effects. No scheduler/runtime/
+paper/broker/live mutation is authorized.
+
+Preflight never prompts; its zero secret/provider/write/ACL counters and
+acquisition_authorized=false remain. Fake reports cannot mint real readiness.
+Later acquisition requires independent real-preflight acceptance, exact source,
+operator SID, authority, requests and custody binding. Printed/parsed CLI
+evidence cannot rehydrate the process-local acceptance capability. READY alone
+never authorizes effects.
+
+## Preserved authority and parked boundaries
+
+Published authority: nyse-published-regular-sessions-2016-2026-v1, 2718 sessions,
+digest 7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1.
 Model minus published: 2018-12-05, 2025-01-09; reverse delta empty.
-146-A/global modeled calendar, transport, custody roots and exact protected policy
-are unchanged. ACCEPTED_CUSTODY_ADMISSIONS remains empty. Ordinary-token identity
-does not relax custody security/freshness prerequisites or authorize repair.
-
-## Next step and stop condition
-
-Codex owns the bounded source implementation and focused verification, including
-the infrastructure/authority coherence bundle, whole-root Ruff 0.17.3 checks,
-and diff-check. Prepare one clean atomic candidate, run general ops.ps1 admit
-(FEATURE and PROSPECTIVE_DEVELOP), ordinary-push once, wait for the one mapped
-GitHub CI to reach terminal state. Canonical FULL must not run locally.
-Terminal red or green is STOP for ChatGPT exact-source review. No CI rerun,
-amend, rebase, force-push, PR or merge. Return exact commit/tree, changed paths,
-focused/admission results and terminal run identity/conclusion.
-
-After exact-source acceptance/integration, first fast-forward primary local develop
-as ordinary hygiene; ChatGPT then provides a SHORT DIRECT
-OPERATOR PROCEDURE for one ordinary-operator real read-only B2 preflight.
-No dedicated Trading account or credential prompt. After independent READY review,
-advance to the minimal acquisition-bridge milestone. Only after independent
-acceptance may a separately reviewed one-shot acquisition
-be authorized, with hidden credential input immediately before provider use.
-Correction real preflight NOT_RUN; acquisition NOT_AUTHORIZED; protected effects ZERO.
-
-## Parked and post-B2 boundaries
+146-A/global modeled calendar, transport and custody roots are unchanged.
+ACCEPTED_CUSTODY_ADMISSIONS remains empty. Historical failed evidence and
+NO_MUTABLE_INVENTORY_CARDINALITY_PINS remain intact.
 
 Architecture 134 R3 remains consumed/parked at
 BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE, report SHA256
 8af6ef68a5a7a0558b938806719a3b3837ab8a8716a852573ed39d05a7411cb4.
 No retry or R4. LIVE remains NO-GO. D/E are REQUIRED_POST_B2; GUI_SOURCE_CHANGE
-is NOT_REQUIRED pre-B2; F is NO_SOURCE_CHANGE beyond registration. Reuse existing
-engines, reports and GUI. V1 reports and the five scheduled optimizer-only
-native-MAC N/A metrics retain their existing disposition.
+is NOT_REQUIRED pre-B2; F is NO_SOURCE_CHANGE beyond registration. V1 reports
+and five scheduled optimizer-only native-MAC N/A metrics remain unchanged.
+
+## Next step and stop condition
+
+Codex completes focused tests, bounded infrastructure/current authority checks,
+whole-root Ruff 0.17.3 and diff checks, then one clean atomic commit. Require
+general ops.ps1 admit FEATURE and PROSPECTIVE_DEVELOP PASS before one ordinary
+push. Canonical FULL runs only in that mapped GitHub CI. Return exact final
+HEAD/tree/parent/remote feature identity, paths, focused/static/admission results
+and terminal workflow run/attempt/job conclusions.
+
+Terminal red OR green is STOP for ChatGPT exact GitHub source/CI review. No
+second corrective publication, manual CI rerun, amend, rebase, force-push, PR,
+merge or host continuation. ChatGPT decides source/certification acceptance,
+integration and the next separately reviewed partial-state/protected boundary.
+Acquisition remains NOT_AUTHORIZED; this source task's protected effects ZERO.

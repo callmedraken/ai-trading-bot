@@ -27841,6 +27841,7 @@ def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
     try:
         from scripts.arch146_source_authority import (
             research_credential_boundary_isolated,
+            research_custody_ace_semantics_current,
         )
         from trading_bot.experiments import historical_research_custody as custody
         from trading_bot.experiments.historical_research_native import (
@@ -27858,6 +27859,8 @@ def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
             or not research_credential_boundary_isolated(repo_root)
         ):
             failures.append("146 B2 ephemeral research credential policy drift")
+        if not research_custody_ace_semantics_current(repo_root):
+            failures.append("146 custody exact allow ACE multiset policy drift")
         authority = published_historical_session_authority()
         if custody.ACCEPTED_CUSTODY_ADMISSIONS or (
             custody.ACCEPTED_HISTORICAL_SESSION_AUTHORITIES != (authority,)

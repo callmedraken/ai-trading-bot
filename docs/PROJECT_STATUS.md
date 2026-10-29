@@ -1,73 +1,65 @@
 # AI Trading Bot — Project Status
 
-## Current pending checkpoint — Architecture 146 effective admin correction
+## Current checkpoint — Architecture 146 custody ACE ordering correction
 
-The accepted integrated pre-B2 base is develop
-4dd2299f73cdb5b1d602a7182a5eccdb98aa27ef, tree
-83519c50b8538a8e7b4fea573d502f5a813197d3. Resolve the live remote at startup.
-The current source-only correction remains on
-feature/research-arch146-b-pre-b2-readiness-current in the canonical F: worktree.
-The integrated research authority coupling correction is preserved. The new
-bounded effective-admin correction is pending mapped certification and
-independent exact-source review.
+The effective-administrator correction is accepted and integrated at develop
+b1716543d324dcc52b43a1598648f01b7c85bf0b, tree
+b193dd705bae343661f954521730b78ccf059ec2. Verify live remote source at startup.
+The bounded custody correction is pending exact-source and mapped certification
+review on feature/research-arch146-b-pre-b2-readiness-current.
 
-PRE-B2 #1 blocked with BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH.
-Identity reconciliation classified WRONG_LAUNCH_PRINCIPAL with no Trading
-identity drift. The accepted root cause is
-ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT: historical research incorrectly
-required the production Trading principal and /v3 credentials. The Trading
-account itself is unchanged. The [pre-B2 validation record](validation/arch146-b-pre-b2-readiness.md)
-retains disposition, chronology and source/effect bounds.
+Current blocker: ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT. PRE-B2 #3
+ran and returned BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN / UNPROVEN_STOP,
+with effects zero. Subsequent bounded parent provisioning left only
+F:\AI\research-holdout present (one directory creation and one ACL mutation).
+The binary diagnostic proved the exact protected Administrators/SYSTEM allow
+ACEs in reverse order from source expectations. Acquisition roots and claim
+remain absent in the reported evidence. The [validation record](validation/arch146-b-pre-b2-readiness.md)
+owns the full chronology; this checkpoint performs no host inspection or repair.
 
-PRE-B2 #2 blocked with BLOCKED_RESEARCH_OPERATOR_TOKEN while non-elevated,
-reporting operator_administrator=true. Preserve that observation unchanged.
-Root cause ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT: raw group presence
-was mistaken for effective authority. The correction uses enabled AND non-deny-only
-Administrators membership; filtered deny-only tokens are accepted if otherwise
-valid. operator_administrator explicitly means effective administrator authority.
-Primary process, no thread impersonation and valid local user SID remain required.
-Preflight records operator SID and EPHEMERAL_INTERACTIVE_RESEARCH_CREDENTIALS,
-persistence NONE, with zero secrets/provider calls/writes/ACL mutations and
-acquisition_authorized=false. Later input requires independent real-preflight
-acceptance and matching exact source, operator, authority, requests and custody.
-No production credential target, /v4, provisioning or acquisition CLI is added.
+The correction accepts only exact ACE multisets, preserving multiplicity and
+binary SID/mask/type/flags, owner and protected DACL. Shared Windows authority
+semantics remain unchanged. Ordinary research retains the primary,
+non-impersonating, non-elevated user token without effective administrator
+authority; filtered deny-only Administrators membership is allowed. Ephemeral
+hidden terminal input remains the sole later credential source, persistence
+NONE. Preflight never prompts or authorizes acquisition.
 
 ## Preserved research foundations
 
 B1/C1-C6 is integrated ancestry at d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42;
 feature #788 and develop #789 succeeded. Earlier failed/cancelled CI, including
-#790 attempts 1/2, remains immutable evidence. The current inventory policy is
-NO_MUTABLE_INVENTORY_CARDINALITY_PINS; the reviewed attempts 1/2 policy is unchanged.
+#790 attempts 1/2, remains immutable evidence. Current inventory policy remains
+NO_MUTABLE_INVENTORY_CARDINALITY_PINS; reviewed attempts 1/2 policy is unchanged.
 
-The accepted published authority remains exactly 2718 sessions:
+Published authority remains exactly 2718 sessions:
 nyse-published-regular-sessions-2016-2026-v1, digest
 7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1.
 Model minus published is exactly 2018-12-05 and 2025-01-09; reverse delta empty.
-146-A behavior, global modeled calendar, HTTPS requests, custody roots and
-protected security policy remain unchanged. ACCEPTED_CUSTODY_ADMISSIONS is empty.
+146-A behavior, global modeled calendar, HTTPS requests and custody roots remain
+unchanged. ACCEPTED_CUSTODY_ADMISSIONS is empty.
 
 ## Next step
 
-Codex completes focused tests, bounded infrastructure/authority coherence,
-whole-root Ruff 0.17.3 and diff-check; then one clean atomic candidate, both
-general admission contexts, one ordinary push and terminal mapped GitHub FULL.
-No canonical FULL locally. Stop on red or green for ChatGPT exact-source review.
-No PR or merge. After acceptance and integration, first fast-forward primary local
-develop as ordinary hygiene; ChatGPT then supplies a short direct
-operator procedure for one real read-only B2 preflight under the ordinary
-research operator. READY grants no effects; independent review precedes the minimal
-acquisition-bridge milestone. Acquisition requires separate review; preflight cannot prompt.
-Custody prerequisites may still block and cannot be repaired under this scope.
+Complete focused custody/preflight/acquisition/dataset, current-authority and
+infrastructure coherence tests, whole-root Ruff 0.17.3 and diff checks. Publish
+one atomic candidate only after FEATURE and PROSPECTIVE_DEVELOP admission PASS;
+ordinary-push once and wait for the one mapped GitHub FULL run. No canonical
+FULL locally. Terminal red or green is STOP for ChatGPT exact-source/CI review.
+No merge, PR or real host step belongs to this task. ChatGPT decides integration
+and the separately reviewed protected continuation after source acceptance.
+The partial parent state grants no retry, repair or acquisition authority.
 
 ## Parked boundaries and roadmap
 
 Architecture 134 R3 remains parked at BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE;
 its consumed observation is unchanged. No retry, alternate diagnostic or R4.
-Correction real preflight NOT_RUN; acquisition NOT_AUTHORIZED; protected effects ZERO.
+Acquisition NOT_AUTHORIZED; this source task's protected effects ZERO.
 LIVE remains NO-GO.
 
-    correction acceptance/integration
-      -> ordinary-operator read-only preflight and independent acceptance
+    custody correction acceptance/integration
+      -> separately reviewed partial-state continuation and read-only preflight
+      -> independent preflight acceptance
       -> separately authorized one-shot acquisition/custody
       -> independent custody admission
       -> thin Architecture 145-B OPEN orchestration

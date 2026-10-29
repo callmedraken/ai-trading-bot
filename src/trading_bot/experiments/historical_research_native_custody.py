@@ -9,6 +9,7 @@ from __future__ import annotations
 import ctypes
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass
 from functools import wraps
 from hashlib import sha256
@@ -235,7 +236,7 @@ class WindowsCustodyNative:
         if (
             facts.owner_sid != ADMIN
             or facts.dacl_protected is not True
-            or actual != tuple(expected)
+            or Counter(actual) != Counter(expected)
         ):
             raise _error()
 

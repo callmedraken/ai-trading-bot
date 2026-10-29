@@ -333,6 +333,26 @@ The protected root DACL remains the Architecture 146 design:
 - protected inheritance;
 - no ordinary-user, Trading-service or broad inherited allow ACE.
 
+### Current native custody ACE equivalence
+
+Architecture 146 verifies an exact order-insensitive multiset of binary
+(principal SID, access mask, ACE type, ACE flags) tuples, preserving multiplicity.
+Protected custody requires exactly Administrators S-1-5-32-544 and SYSTEM
+S-1-5-18, each FullControl 0x001f01ff / ACCESS_ALLOWED type 0. OPEN adds exactly
+Users S-1-5-32-545 / ReadExecute 0x1200a9 / ACCESS_ALLOWED type 0. Either protected
+order and every OPEN permutation are equivalent. Directory flags are exactly
+3 (OI/CI); file flags exactly 0. All ACEs must be explicit, never inherited.
+SDDL remains a construction descriptor; its textual order is not authority.
+
+Missing, extra or duplicate ACEs, wrong SID/mask/type/flags, deny substitution,
+wrong owner or unprotected DACL still reject. No localized account-name or
+general effective-permissions comparison is allowed. Existing final-path,
+object-kind, non-reparse, fixed-volume/NTFS and all other custody checks remain.
+Shared Windows SecurityPolicy.matches() is unchanged. The current Architecture
+146 source-authority owner guards this method's reviewed multiset composition;
+ordered tuple/list/zip equality and set-only comparison fail current admission.
+No historical blob repin or successor-pin ladder owns this current rule.
+
 B2 may use a fresh protected acquisition child under the custody root while the
 attempt is incomplete. Any attempt/evidence record outside that root contains
 non-price metadata only.

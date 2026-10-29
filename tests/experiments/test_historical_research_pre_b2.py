@@ -7,6 +7,7 @@ import ssl
 from dataclasses import asdict, replace
 from datetime import UTC, date, datetime, time, timedelta
 from hashlib import sha256
+from itertools import permutations
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import NAMESPACE_URL, uuid5
@@ -905,25 +906,71 @@ def test_win32_create_new_flush_same_handle_readback_and_link_security(
     backend.close()
 
 
-@pytest.mark.parametrize("change", ["owner", "dacl", "extra_ace", "inheritance"])
-def test_native_exact_owner_dacl_policy_rejects_drift(monkeypatch, change):
+@pytest.mark.parametrize("directory", [False, True])
+@pytest.mark.parametrize("opened", [False, True])
+@pytest.mark.parametrize(
+    "change",
+    [
+        "owner",
+        "dacl",
+        "missing_ace",
+        "extra_ace",
+        "duplicate_ace",
+        "wrong_sid",
+        "wrong_mask",
+        "wrong_type",
+        "wrong_flags",
+        "inheritance",
+    ],
+)
+def test_native_exact_owner_dacl_policy_rejects_drift(
+    monkeypatch, change, opened, directory
+):
     backend = disk.WindowsCustodyNative()
 
     def inspection(handle, path, kind):
         result = _fake_inspection(handle, path, kind)
+        if opened:
+            result.aces += (
+                SimpleNamespace(
+                    principal_sid=disk.USERS,
+                    access_mask=0x1200A9,
+                    ace_type=0,
+                    ace_flags=3 if directory else 0,
+                ),
+            )
         if change == "owner":
             result.owner_sid = disk.USERS
-        if change == "dacl":
+        elif change == "dacl":
             result.dacl_protected = False
-        if change == "extra_ace":
+        elif change == "missing_ace":
+            result.aces = result.aces[1:]
+        elif change == "extra_ace":
+            result.aces += (
+                SimpleNamespace(
+                    principal_sid="S-1-1-0",
+                    access_mask=0x1F01FF,
+                    ace_type=0,
+                    ace_flags=3 if directory else 0,
+                ),
+            )
+        elif change == "duplicate_ace":
             result.aces += result.aces[:1]
-        if change == "inheritance":
-            result.aces[0].ace_flags = 16
+        elif change == "wrong_sid":
+            result.aces[0].principal_sid = "S-1-1-0"
+        elif change == "wrong_mask":
+            result.aces[0].access_mask = 0x1200A9
+        elif change == "wrong_type":
+            result.aces[0].ace_type = 1
+        elif change == "wrong_flags":
+            result.aces[0].ace_flags = 0 if directory else 3
+        elif change == "inheritance":
+            result.aces[0].ace_flags |= 16
         return result
 
     monkeypatch.setattr(disk, "inspect_open_authority_object", inspection)
     with pytest.raises(custody.HistoricalResearchCustodyError):
-        backend._security(71, custody.CUSTODY_ROOT, directory=True, opened=False)
+        backend._security(71, custody.CUSTODY_ROOT, directory=directory, opened=opened)
 
 
 def test_native_reparse_ntfs_rejection_is_closed(monkeypatch):
@@ -1201,3 +1248,87 @@ def test_current_authority_rejects_production_coupling(tmp_path, injection):
     assert research_credential_boundary_isolated(tmp_path)
     target.write_text(target.read_text() + "\n" + injection + "\n", encoding="utf-8")
     assert not research_credential_boundary_isolated(tmp_path)
+
+
+@pytest.mark.parametrize("directory", [False, True])
+@pytest.mark.parametrize("opened", [False, True])
+def test_native_exact_allow_ace_multiset_accepts_every_permutation(
+    monkeypatch, directory, opened
+):
+    flags = 3 if directory else 0
+    expected = [(disk.ADMIN, 0x1F01FF), (disk.SYSTEM, 0x1F01FF)]
+    if opened:
+        expected.append((disk.USERS, 0x1200A9))
+    observed = []
+    for order in permutations(expected):
+        facts = SimpleNamespace(
+            owner_sid=disk.ADMIN,
+            dacl_protected=True,
+            aces=tuple(
+                SimpleNamespace(
+                    principal_sid=sid,
+                    access_mask=mask,
+                    ace_type=0,
+                    ace_flags=flags,
+                )
+                for sid, mask in order
+            ),
+        )
+
+        def inspection(handle, path, kind, facts=facts):
+            observed.append((handle, path, kind))
+            return facts
+
+        monkeypatch.setattr(disk, "inspect_open_authority_object", inspection)
+        disk.WindowsCustodyNative()._security(
+            71, "fake-custody-object", directory=directory, opened=opened
+        )
+    assert len(observed) == (6 if opened else 2)
+    assert all(
+        item
+        == (
+            71,
+            "fake-custody-object",
+            disk.AuthorityObjectKind.DIRECTORY
+            if directory
+            else disk.AuthorityObjectKind.FILE,
+        )
+        for item in observed
+    )
+
+
+@pytest.mark.parametrize(
+    "comparison",
+    [
+        "actual != tuple(expected)",
+        "list(actual) != expected",
+        "any(a != b for a, b in zip(actual, expected, strict=True))",
+        "Counter(actual) != Counter(expected) or actual != tuple(expected)",
+        "set(actual) != set(expected)",
+    ],
+)
+def test_current_custody_owner_rejects_order_sensitive_or_set_semantics(
+    tmp_path, monkeypatch, comparison
+):
+    from scripts import arch146_source_authority as owner
+    from scripts import checkpoint_runner as runner
+
+    relative = "src/trading_bot/experiments/historical_research_native_custody.py"
+    source = (ROOT / relative).read_text(encoding="utf-8")
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text(source, encoding="utf-8")
+    assert owner.research_custody_ace_semantics_current(tmp_path)
+    target.write_text(
+        source.replace("Counter(actual) != Counter(expected)", comparison),
+        encoding="utf-8",
+    )
+    assert not owner.research_custody_ace_semantics_current(tmp_path)
+    # Exercise the registered current-owner path without observing any host state.
+    check = owner.research_custody_ace_semantics_current
+    monkeypatch.setattr(
+        owner, "research_custody_ace_semantics_current", lambda _: check(tmp_path)
+    )
+    assert "146 custody exact allow ACE multiset policy drift" in (
+        runner._arch146_pre_b2_authority_check(ROOT)
+    )

@@ -1,5 +1,58 @@
 # Architecture 146-B consolidated pre-B2 source checkpoint
 
+## Current custody correction and preserved real-host chronology
+
+Effective-admin source correction is accepted/integrated at
+b1716543d324dcc52b43a1598648f01b7c85bf0b, tree
+b193dd705bae343661f954521730b78ccf059ec2. This is the exact develop and feature
+starting source for ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT. Earlier
+sections below retain their checkpoint-time source/effect statements as history.
+
+Preserve the consumed observations in order:
+
+1. PRE-B2 #1: BLOCKED_CREDENTIAL_ACCOUNT_SID_MISMATCH; root cause
+   ARCH146_RESEARCH_AUTHORITY_COUPLING_DEFECT; effects zero.
+2. PRE-B2 #2: BLOCKED_RESEARCH_OPERATOR_TOKEN; operator_elevated=false,
+   operator_administrator=true; root cause
+   ARCH146_RESEARCH_EFFECTIVE_ADMIN_SEMANTICS_DEFECT; effects zero.
+3. PRE-B2 #3: BLOCKED_HOST_FRESHNESS_OR_POLICY_UNPROVEN;
+   operator_elevated=false, operator_administrator=false,
+   fresh_state=UNPROVEN_STOP; effects zero.
+4. Read-only discrimination proved the relevant F: volume healthy/fixed/NTFS
+   and acquisition-owned roots/claim absent before parent provisioning.
+5. Parent provisioning attempt #1 failed before effects due to the guard-script
+   parameter defect. Attempt #2 created bounded partial state:
+   F:\AI\research-holdout exists, directories_created=1, acl_mutations=1;
+   protected acquisition root, attempt claim, OPEN parent and OPEN root absent.
+6. The exact repository-native binary diagnostic proved owner S-1-5-32-544,
+   dacl_protected=true, reparse=false; SYSTEM / 0x001f01ff / allow / flags 3,
+   then Administrators / 0x001f01ff / allow / flags 3;
+   close_ambiguous=false; diagnostic effects zero. Source expected those exact
+   two ACE tuples in reverse order. Accepted root cause:
+   ARCH146_CUSTODY_EQUIVALENT_ALLOW_ACE_ORDER_DEFECT.
+
+The source task preserves these supplied observations without inspecting the
+partial host state. It performs no real preflight/observe_fresh(), repair,
+provisioning, cleanup, credential/provider/acquisition/holdout operation or
+scheduler/runtime/paper/broker/live effect. Protected effects for this task ZERO.
+
+The current native rule is exact ACE multiset equality, including multiplicity
+and every binary SID/mask/type/flags field. Protected all-allow BA/SYSTEM tuples
+are accepted in either order; OPEN's exact additional Users ReadExecute
+0x1200a9 tuple is accepted in every permutation. Directories require explicit
+flags 3 and files explicit flags 0. Missing/extra/duplicate ACEs, any tuple-field
+drift, inherited/deny ACEs, wrong owner and unprotected DACL still reject.
+Existing path/kind/reparse/fixed-NTFS checks and shared Windows semantics remain.
+Current Architecture 146 authority guards the complete reviewed comparison;
+no historical predecessor is repinned. Existing production-identity/credential
+isolation and acquisition/preflight/token contracts remain unchanged.
+
+Publication: one atomic candidate, FEATURE and PROSPECTIVE_DEVELOP admission,
+one ordinary feature push and one terminal mapped GitHub FULL result. No local
+canonical FULL. Terminal red OR green is STOP for ChatGPT exact-source/CI review;
+no retry, second corrective publication, PR, merge or next host action. ChatGPT
+owns acceptance, integration and separately reviewed partial-state continuation.
+
 ## Accepted base and immutable evidence
 
     develop HEAD d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42
@@ -165,9 +218,10 @@ identity. Directories use their final path and explicit policy, then volume
 flush. No rename, promotion, replacement, cleanup or retry API exists. Native
 qualification remains a future host boundary; all tests are fake/disposable.
 
-## Future real-host preflight — correction source NOT_RUN
+## Historical preflight procedure — before consumed PRE-B2 #3
 
-Only after independent exact-source review, substitute the accepted candidate
+Historical template only, not a current invocation or retry authorization.
+At that checkpoint, after independent exact-source review, substitute the accepted candidate
 HEAD/TREE into this separately reviewed read-only command:
 
 ```powershell
@@ -407,3 +461,26 @@ listed above, explicit worktree src imports, -B, pytest -q -p no:cacheprovider,
 
 No canonical FULL/ROBINHOOD or real host preflight ran locally. General admission
 must still bind both contexts to the exact clean committed candidate before push.
+
+
+### Custody ACE ordering correction focused verification
+
+Verification used the existing isolated Python 3.14.3 / Ruff 0.17.3 toolchain
+listed above, -B, pytest -q -p no:cacheprovider --tb=short and a fresh external
+F:\AI\temp\pytest purpose-plus-GUID basetemp per group. Only fakes/disposable
+paths were used; no real host observer or protected namespace was invoked.
+
+- 964 passed, one expected non-Windows assertion skipped on Windows: Architecture
+  146 pre-B2/acquisition-custody/dataset, current paper-account token/security,
+  and retained capture-credential/security modules. Exact protected and OPEN ACE
+  permutations and rejection cases cover files and directories; current-owner
+  mutations reject tuple/list/zip ordering and set-only comparisons.
+- 1399 passed: checkpoint source-authority/core/CI, certification profiles/lanes/
+  results/source and both infrastructure historical/current coherence modules.
+- Precommit current authority and all develop-routed historical/source authority
+  checks passed. Whole-root non-mutating Ruff check and format --check passed
+  (1408 files); git diff --check passed. Shared SecurityPolicy is unchanged.
+
+No canonical FULL/ROBINHOOD ran locally. General admission must still prove both
+contexts on the exact clean committed unpublished candidate before the single
+push. Terminal CI is STOP for ChatGPT review, never host/acquisition authority.

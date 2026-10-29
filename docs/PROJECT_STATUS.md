@@ -2,45 +2,50 @@
 
 ## Current checkpoint
 
-Do not freeze the mutable `develop` tip in this status file across a
-documentation-only correction. Verify `origin/develop` live at every new task
-startup.
+Resolve mutable `origin/develop` live at each startup. Architecture 146-B1/C1-C6
+is closed, accepted and integrated at:
 
-The most recent integrated product/design checkpoint immediately before this
-workflow-only correction is:
+    HEAD d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42
+    TREE 8fb76f4db9a2401392092e70cce03401488551bf
+    feature #788 / 40770164255 / attempt 1 / SUCCESS
+    develop #789 / 40771613241 / attempt 1 / SUCCESS
 
-    HEAD 6f07e0fdaf20d335c22bc77c8cfb09a0ee47260c
-    TREE b8cb3b62033a8f7f096a02a353d3dfa81d72b130
+Develop used exact feature-certification reuse. Cancelled duplicate #787 /
+40770149444 / attempt 1 and the earlier failures remain immutable evidence in
+the [146-B validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md).
+No rerun or replacement of that evidence is authorized.
 
-Architecture 134 R3 remains SOURCE ACCEPTED and parked. The Architecture 146-B
-design/closeout fast-forward landed at the identity above. Develop Checkpoint
-Source Gates #779 / run 40642547780 / attempt 1 completed SUCCESS in
-`DOCS_ONLY` mode: source-static and source-gates passed; active-tests,
-full-tests and certification-tests were correctly skipped.
+## Active milestone — consolidated Architecture 146 pre-B2 source
 
-Worktree non-regression is now explicit: no Trading Bot auxiliary worktree may
-be created outside `F:\\AI\\worktrees\\...`. A tool-managed C:-drive
-worktree is a workflow regression even if it is clean and unused.
+The external historical-source blocker is resolved. The independently reviewed
+NYSE/ICE bundle contains 13 documents and exactly 2718 regular equity sessions
+for XNYS, America/New_York, [2016-01-01, 2026-10-24). Source-owned authority is
+`nyse-published-regular-sessions-2016-2026-v1`, digest
+`7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1`.
+Exact provenance, derivation and hashes are retained in the
+[pre-B2 source record](validation/arch146-b-pre-b2-readiness.md).
 
-## Pending feature checkpoint — Architecture 146-B1-C6
+The unchanged global modeled calendar has exactly two extra dates: 2018-12-05
+and 2025-01-09. The accepted disposition is
+`REPOSITORY_MODELED_CALENDAR_EXCEPTION_GAP`. Published authority has no dates
+absent from the model. Any other delta is STOP. 146-A verifier behavior and
+historical paper/runtime/snapshot identities retain their existing contract.
 
-C5's immutable #786 / run `40766415660` / attempt 1 passed source-static and
-active-tests and created seven isolated Windows FULL jobs. All seven stopped
-before Python/pytest at the same native-empty-output bootstrap defect.
-Classification: `PREPUBLICATION_COVERAGE_DEFECT / FULL_POWERSHELL_NATIVE_EMPTY_STDOUT`.
-C6 corrects only FULL's source-owned detached-branch capture and adds a real
-Git/Windows PowerShell 5.1 regression to the required admission/source-gate
-module. Exact-SHA checkout, C4 timing/placement and C5 topology/reuse stay intact.
-The [C6 validation record](validation/arch146-b-historical-research-acquisition-custody-plan.md#146-b1-c6--full-detached-bootstrap-native-output-correction)
-owns the failure evidence, correction and STOP conditions. C6 still requires
-clean-candidate admission and terminal mapped CI: all seven functional results
-must pass, each wall must be <300s, and every unique lane artifact must exist.
-B-E remain gated on terminal-green B1 and exact acceptance/integration.
-No protected effect occurred; acquisition/custody is unchanged.
+This candidate adds accepted published-session verification, native adapters and
+a separately executable read-only B2 preflight. It requires exact-source review
+and mapped terminal GitHub FULL; source tests cannot grant real-host readiness.
+The B2 credential-account/custodian identity binding remains a closed source
+prerequisite. Existing production Trading SID evidence does not establish that
+binding. No host identity was discovered and no credential was read.
+
+B2 effects remain unauthorized. `ACCEPTED_CUSTODY_ADMISSIONS` stays empty.
+After terminal green and ChatGPT exact-source acceptance, the next milestone is
+one real read-only B2 host preflight. Acquisition requires separate independent
+preflight review and acceptance; a READY result alone grants no effects.
 
 ## Architecture 134 host track — parked, fail closed
 
-R3's single real-host read-only observation is consumed:
+R1, R2 and R3 are separately consumed observations. R3 remains:
 
     BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE
     diagnostic_process_starts=23
@@ -48,71 +53,30 @@ R3's single real-host read-only observation is consumed:
     protected_execution=NOT_AUTHORIZED
     production_effects=NOT_RUN
 
-Every effect counter is zero and every authority flag is false.
-
-Evidence:
-
-    F:\AI\temp\ai-trading-bot-checkpoints\arch134-diagnostic-r3-ee9dd40ff6504130a662ae24a85beb14\arch134-fresh-successor-readonly-deployment-admission-diagnostic-r3\preflight-20261028T051340.768951Z\report.json
-
-SHA256:
+Every effect counter is zero and every authority flag is false. R3 report SHA256:
 
     8af6ef68a5a7a0558b938806719a3b3837ab8a8716a852573ed39d05a7411cb4
 
-R1 and R2 remain separately consumed and immutable. R3 is not retryable under
-another shell, privilege state, command variant, worktree or evidence root. No
-R4 diagnostic is currently planned. The Windows production-host admission path
-is parked until a concrete deployment/runtime-identity remediation design makes
-it a real dependency.
+No retry, alternate-shell diagnostic or R4 is planned. Resume only when a
+concrete runtime/deployment identity remediation is a direct dependency.
 
-## Research/product track — active
+## Research/product boundary and roadmap
 
-Architecture 146-A is already in current develop ancestry. Its final C2 source is:
+146-A C2 is accepted ancestry at `6906ba01bfb6a353029d695e584b2097587b81b9`,
+tree `aa1efe5057e047e0d1778f2422e45f26cbc9f5d6`, #720 / 40178730059 / attempt 1 /
+SUCCESS. Do not reimplement it.
 
-    HEAD 6906ba01bfb6a353029d695e584b2097587b81b9
-    TREE aa1efe5057e047e0d1778f2422e45f26cbc9f5d6
-    CI   #720 / run 40178730059 / attempt 1 / SUCCESS
+    pre-B2 source review
+      -> single real read-only B2 host preflight and independent review
+      -> separately authorized one-shot acquisition/custody
+      -> independent custody admission
+      -> thin Architecture 145-B OPEN campaign orchestration
+      -> existing compact report successor and Research Results GUI
+      -> later separately admitted FINAL_HOLDOUT evaluation
 
-146-A remains in the accepted integration ancestry. Do not reimplement or
-republish it; verify current mutable develop separately.
-
-The active milestone is Architecture 146-B: bounded historical-data acquisition
-and custody. Published B1-C1 source is on
-`feature/research-arch146-b-acquisition-custody-current` at HEAD
-`2208b7e637671001b02deb56751dc7687a3cf36d`, TREE
-`0b37449859b0bad78704f5324cdb19a2aa3d3475`. GitHub Checkpoint Source Gates
-#782 / run `40649744489` / attempt 1 completed FAILURE and was classified
-`PREPUBLICATION_COVERAGE_DEFECT`; the exact failures and C2 correction are
-recorded once in the [146-B validation plan](validation/arch146-b-historical-research-acquisition-custody-plan.md).
-C2/C3/C4/C5 corrections and preserved #783/#784/#785/#786 failures are recorded in the
-validation plan. C6 above is the current publication boundary; earlier functional
-passes confer no source acceptance or integration.
-
-Both real custody and historical-session admission registries remain empty.
-The source-only kernel has no native B2 bindings or preflight/execute dispatcher.
-B2 remains blocked on source acceptance, reviewed native bindings and an
-independently frozen published historical-session authority. The accepted
-146-B design boundary remains in force. No real credentials/provider call,
-holdout read, custody write, ACL mutation, host effect, paper/broker/live effect
-or Architecture-145 evaluation has occurred.
-
-The working research-prototype target is admitted OPEN SPY data through
-DEVELOPMENT and WALK_FORWARD research with deterministic execution stress, the
-existing compact report and existing Research Results GUI. FINAL_HOLDOUT,
-host remediation, paper soak, broker execution and live trading are not
-prototype prerequisites.
-
-## Foreseen roadmap
-
-    146-B design/source operator
-      -> one reviewed SPY historical acquisition + sealed holdout custody
-      -> Architecture 145-B results/campaign bundle
-      -> Research Results GUI
-      -> large strategy/optimizer campaigns
-      -> candidate selection: walk-forward, sensitivity and execution stress
-      -> frozen candidate/policy
-      -> separately admitted FINAL_HOLDOUT evaluation
-      -> paper/operational validation and tiny live-canary eligibility review
-      -> separately resume the parked production-host path when required
-
-LIVE remains NO-GO. A source/preflight PASS never grants broker, paper or live
-authority.
+D remains REQUIRED_POST_B2 / MINIMAL_ORCHESTRATION_GAP. E remains
+REQUIRED_POST_B2 for report applicability. GUI_SOURCE_CHANGE=NOT_REQUIRED
+pre-B2; F=NO_SOURCE_CHANGE beyond ordinary checkpoint registration. V1 reports
+stay unchanged. The five native-MAC optimizer-only N/A metrics remain scheduled
+for one consolidated post-B2 publication. No campaign, optimizer, backtester or
+GUI is added here. LIVE remains NO-GO.

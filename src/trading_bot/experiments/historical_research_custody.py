@@ -1,6 +1,7 @@
 """Additive 146-B custody evidence and OPEN admission; no filesystem effects.
 
-The source-owned registries are intentionally empty. Parsing a report/admission
+The custody-admission registry is intentionally empty. Published sessions are
+independently accepted source-owned non-price authority. Parsing a report/admission
 establishes consistency only. Independent review must add exact accepted entries
 before any real acquired OPEN package can be admitted.
 """
@@ -21,10 +22,14 @@ from trading_bot.experiments.historical_research_dataset import (
     HISTORICAL_RESEARCH_FULL_START,
     HistoricalResearchDatasetError,
     HistoricalResearchDatasetSnapshot,
+    HistoricalResearchDatasetVerification,
     HistoricalResearchPartitionManifest,
+    HistoricalResearchPartitionMaterial,
     HistoricalResearchPartitionRole,
+    _complete_historical_research_dataset_verification,
+    _membership,
+    _verify_historical_research_partition_physical,
     parse_historical_research_csv,
-    validate_historical_research_session_coverage,
 )
 from trading_bot.experiments.research_strategy_backtest import (
     historical_data_fingerprint,
@@ -383,7 +388,62 @@ class HistoricalResearchCustodyAdmission:
 # Only independently reviewed source changes may populate these registries.
 # Tests replace them with synthetic fixtures; no runtime registration API exists.
 ACCEPTED_CUSTODY_ADMISSIONS: tuple[HistoricalResearchCustodyAdmission, ...] = ()
-ACCEPTED_HISTORICAL_SESSION_AUTHORITIES: tuple[HistoricalSessionAuthority, ...] = ()
+from trading_bot.experiments.historical_research_sessions import (  # noqa: E402
+    published_historical_session_authority,
+)
+
+ACCEPTED_HISTORICAL_SESSION_AUTHORITIES: tuple[HistoricalSessionAuthority, ...] = (
+    published_historical_session_authority(),
+)
+
+
+def require_accepted_historical_session_authority(
+    authority: HistoricalSessionAuthority,
+) -> None:
+    """Equality and recomputed commitment are required; parsing never registers."""
+    if (
+        type(authority) is not HistoricalSessionAuthority
+        or sum(item == authority for item in ACCEPTED_HISTORICAL_SESSION_AUTHORITIES)
+        != 1
+        or authority.digest != published_historical_session_authority().digest
+    ):
+        raise HistoricalResearchCustodyError(
+            "historical session authority not accepted"
+        )
+
+
+def verify_historical_research_published_partition(
+    material: HistoricalResearchPartitionMaterial,
+    authority: HistoricalSessionAuthority,
+) -> HistoricalDataResult:
+    """146-B physical verification with exactly the independently accepted authority."""
+    require_accepted_historical_session_authority(authority)
+    data = _verify_historical_research_partition_physical(material)
+    authority.verify(data)
+    return data
+
+
+def verify_historical_research_custodian_dataset(
+    snapshot: HistoricalResearchDatasetSnapshot,
+    open_material: HistoricalResearchPartitionMaterial,
+    holdout_material: HistoricalResearchPartitionMaterial,
+    authority: HistoricalSessionAuthority,
+) -> HistoricalResearchDatasetVerification:
+    """Complete OPEN/HOLDOUT bytes plus published coverage and full fingerprint."""
+    require_accepted_historical_session_authority(authority)
+    if any(
+        type(item) is not HistoricalResearchPartitionMaterial
+        for item in (open_material, holdout_material)
+    ):
+        raise HistoricalResearchCustodyError(
+            "both physical partition materials required"
+        )
+    _membership(snapshot, open_material.manifest, holdout_material.manifest)
+    opened = verify_historical_research_published_partition(open_material, authority)
+    held = verify_historical_research_published_partition(holdout_material, authority)
+    return _complete_historical_research_dataset_verification(
+        snapshot, open_material, holdout_material, opened, held
+    )
 
 
 def real_acquisition_readiness(authority: HistoricalSessionAuthority) -> str:
@@ -476,6 +536,6 @@ def verify_historical_research_open_publication(
         open_manifest.historical_data_fingerprint,
     ):
         raise HistoricalResearchCustodyError("OPEN physical metadata mismatch")
-    validate_historical_research_session_coverage(data)
+    require_accepted_historical_session_authority(authorities[0])
     authorities[0].verify(data)
     return data

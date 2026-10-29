@@ -1,0 +1,858 @@
+{
+  "schema": "historical-research-session-source-derived-closures/v1",
+  "authority_interval": {
+    "start_inclusive": "2016-01-01",
+    "end_exclusive": "2026-10-24"
+  },
+  "derivation": "weekday filtering plus exact full-day closure dates transcribed from the bound official source bytes; no repository calendar call; early-close markings are retained as sessions",
+  "full_day_closures": [
+    {
+      "date": "2016-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-01-18",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-02-15",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-03-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-05-30",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-09-05",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-11-24",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2016-12-26",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2016-ice"
+      ]
+    },
+    {
+      "date": "2017-01-02",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-01-16",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-02-20",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-04-14",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-05-29",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-09-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-11-23",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2017-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2017-ice"
+      ]
+    },
+    {
+      "date": "2018-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-01-15",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-02-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-03-30",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-05-28",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-09-03",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-11-22",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2018-12-05",
+      "kind": "exceptional_full_day_closure",
+      "name": "National Day of Mourning for President George H. W. Bush",
+      "source_ids": [
+        "closure-2018-12-05-ice",
+        "closure-2018-12-05-regulatory"
+      ]
+    },
+    {
+      "date": "2018-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-01-21",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-02-18",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-04-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-05-27",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-09-02",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-11-28",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2019-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-01-20",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-02-17",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-04-10",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-05-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-07-03",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-09-07",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-11-26",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2020-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2018-2020-ice"
+      ]
+    },
+    {
+      "date": "2021-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-01-18",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-02-15",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-04-02",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-05-31",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-07-05",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-09-06",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-11-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2021-12-24",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2021-ice"
+      ]
+    },
+    {
+      "date": "2022-01-17",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-02-21",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-04-15",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-05-30",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-06-20",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-09-05",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-11-24",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2022-12-26",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2022-nyse"
+      ]
+    },
+    {
+      "date": "2023-01-02",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-01-16",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-02-20",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-04-07",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-05-29",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-06-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-09-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-11-23",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2023-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2023-nyse"
+      ]
+    },
+    {
+      "date": "2024-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-01-15",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-02-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-03-29",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-05-27",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-06-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-09-02",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-11-28",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2024-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2024-nyse"
+      ]
+    },
+    {
+      "date": "2025-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-01-09",
+      "kind": "exceptional_full_day_closure",
+      "name": "National Day of Mourning for President Jimmy Carter",
+      "source_ids": [
+        "closure-2025-01-09-ice",
+        "closure-2025-01-09-regulatory"
+      ]
+    },
+    {
+      "date": "2025-01-20",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-02-17",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-04-18",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-05-26",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-06-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-07-04",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-09-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-11-27",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2025-12-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2025-nyse"
+      ]
+    },
+    {
+      "date": "2026-01-01",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-01-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-02-16",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-04-03",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-05-25",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-06-19",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-07-03",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    },
+    {
+      "date": "2026-09-07",
+      "kind": "annual_exchange_holiday",
+      "name": "official annual NYSE/ICE calendar closure",
+      "source_ids": [
+        "calendar-2026-nyse"
+      ]
+    }
+  ],
+  "exceptional_closures": [
+    {
+      "date": "2018-12-05",
+      "name": "National Day of Mourning for President George H. W. Bush",
+      "closure_scope": "full-day NYSE Group equity-market closure",
+      "source_ids": [
+        "closure-2018-12-05-ice",
+        "closure-2018-12-05-regulatory"
+      ],
+      "status": "discovered_and_bound"
+    },
+    {
+      "date": "2025-01-09",
+      "name": "National Day of Mourning for President Jimmy Carter",
+      "closure_scope": "full-day NYSE Group equity-market closure",
+      "source_ids": [
+        "closure-2025-01-09-ice",
+        "closure-2025-01-09-regulatory"
+      ],
+      "status": "discovered_and_bound"
+    }
+  ]
+}

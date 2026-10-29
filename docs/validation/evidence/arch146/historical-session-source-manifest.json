@@ -1,0 +1,394 @@
+{
+  "schema": "historical-research-session-source-bundle/v1",
+  "authority": {
+    "exchange": "XNYS / NYSE",
+    "timezone": "America/New_York",
+    "start_inclusive": "2016-01-01",
+    "end_exclusive": "2026-10-24",
+    "regular_equity_sessions_only": true,
+    "early_close_days_remain_sessions": true,
+    "full_exchange_closures_excluded": true
+  },
+  "coverage": {
+    "live_official_years": [
+      2016,
+      2017,
+      2018,
+      2019,
+      2020,
+      2021,
+      2022,
+      2023,
+      2024,
+      2025,
+      2026
+    ],
+    "archived_official_years": [],
+    "missing_years": [],
+    "source_class_policy": "live-origin official ICE/NYSE documents; no archive retrieval required"
+  },
+  "ordered_source_document_ids": [
+    "calendar-2016-ice",
+    "calendar-2017-ice",
+    "calendar-2018-2020-ice",
+    "calendar-2021-ice",
+    "calendar-2022-nyse",
+    "calendar-2023-nyse",
+    "calendar-2024-nyse",
+    "calendar-2025-nyse",
+    "calendar-2026-nyse",
+    "closure-2018-12-05-ice",
+    "closure-2018-12-05-regulatory",
+    "closure-2025-01-09-ice",
+    "closure-2025-01-09-regulatory"
+  ],
+  "source_documents": [
+    {
+      "id": "calendar-2016-ice",
+      "path": "sources/calendar-2016-ice.html",
+      "publisher": "Intercontinental Exchange (ICE)",
+      "document_title": "NYSE Group 2016 Holiday Calendar and Early Closings",
+      "document_date_or_version": "2014-12-08",
+      "authority_years": [
+        2016
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://ir.theice.com/press/news-details/2014/NYSE-Group-2016-Holiday-Calendar-and-Early-Closings/default.aspx",
+      "final_resolved_url": "https://ir.theice.com/press/news-details/2014/NYSE-Group-2016-Holiday-Calendar-and-Early-Closings/default.aspx",
+      "retrieval_utc": "2026-10-29T00:09:16.4124819+00:00",
+      "http_status": 200,
+      "http_content_type": "text/html; charset=utf-8",
+      "byte_length": 78763,
+      "sha256": "e1274c0a1ca1c473b50382fae0ad338b0390d22e059a00c2f8c1df6b18909035",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": null
+    },
+    {
+      "id": "calendar-2017-ice",
+      "path": "sources/calendar-2017-ice.html",
+      "publisher": "Intercontinental Exchange (ICE)",
+      "document_title": "NYSE Group Announces 2017 Holiday and Early Closings Calendar",
+      "document_date_or_version": "2016-02-02",
+      "authority_years": [
+        2017
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://ir.theice.com/press/news-details/2016/NYSE-Group-Announces-2017-Holiday-and-Early-Closings-Calendar/default.aspx",
+      "final_resolved_url": "https://ir.theice.com/press/news-details/2016/NYSE-Group-Announces-2017-Holiday-and-Early-Closings-Calendar/default.aspx",
+      "retrieval_utc": "2026-10-29T00:09:17.0336507+00:00",
+      "http_status": 200,
+      "http_content_type": "text/html; charset=utf-8",
+      "byte_length": 77589,
+      "sha256": "7ac1b9cd06c70629be28c142e41cab0871d6e1bea29089740fe162dd64d58d46",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": null
+    },
+    {
+      "id": "calendar-2018-2020-ice",
+      "path": "sources/calendar-2018-2020-ice.html",
+      "publisher": "Intercontinental Exchange (ICE)",
+      "document_title": "NYSE Group Announces 2018, 2019 and 2020 Holiday and Early Closings Calendar",
+      "document_date_or_version": "2017-11-27",
+      "authority_years": [
+        2018,
+        2019,
+        2020
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://ir.theice.com/press/news-details/2017/NYSE-Group-Announces-2018-2019-and-2020-Holiday-and-Early-Closings-Calendar/default.aspx",
+      "final_resolved_url": "https://ir.theice.com/press/news-details/2017/NYSE-Group-Announces-2018-2019-and-2020-Holiday-and-Early-Closings-Calendar/default.aspx",
+      "retrieval_utc": "2026-10-29T00:09:17.5394664+00:00",
+      "http_status": 200,
+      "http_content_type": "text/html; charset=utf-8",
+      "byte_length": 87217,
+      "sha256": "d37b6796aa0a01e25922a4e927bea5ceeb03c34199666188d5e375d4991b7d5b",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": null
+    },
+    {
+      "id": "calendar-2021-ice",
+      "path": "sources/calendar-2021-ice.pdf",
+      "publisher": "Intercontinental Exchange (ICE)",
+      "document_title": "2021 NYSE Trading Calendar",
+      "document_date_or_version": "2020-12-17 (source footer; source typo preserved: Dec. 17 20120)",
+      "authority_years": [
+        2021
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.ice.com/publicdocs/2021_NYSE_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.ice.com/publicdocs/2021_NYSE_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:18.1290947+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 111437,
+      "sha256": "942dc4c62e56acdf3b77e44c42b11fd69482e6db2bbaf1c52e20f721cb62945a",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20201217151452"
+    },
+    {
+      "id": "calendar-2022-nyse",
+      "path": "sources/calendar-2022-nyse.pdf",
+      "publisher": "NYSE / ICE",
+      "document_title": "2022 Trading Calendar",
+      "document_date_or_version": "2021-12-13 (source footer)",
+      "authority_years": [
+        2022
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2022_Yearly_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2022_Yearly_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:18.6931798+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 111260,
+      "sha256": "2c2e63b780c4a373d8d546904ae46c8ba7e8070ad9357d23d2c92749985bb6c9",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20211213173946"
+    },
+    {
+      "id": "calendar-2023-nyse",
+      "path": "sources/calendar-2023-nyse.pdf",
+      "publisher": "NYSE / ICE",
+      "document_title": "2023 Trading Calendar",
+      "document_date_or_version": null,
+      "authority_years": [
+        2023
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2023_Yearly_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2023_Yearly_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:19.1437596+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 112881,
+      "sha256": "3d28b46a7197424c822087fb7117cdf3f303bd9a73f29660525b605f542bcfe2",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20230403162810"
+    },
+    {
+      "id": "calendar-2024-nyse",
+      "path": "sources/calendar-2024-nyse.pdf",
+      "publisher": "NYSE / ICE",
+      "document_title": "2024 Trading Calendar",
+      "document_date_or_version": "2023-12-14 (source footer)",
+      "authority_years": [
+        2024
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2024_Yearly_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2024_Yearly_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:19.5185599+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 115340,
+      "sha256": "02282e733512d1f112230372efccfd18f81599c682af94bb6f21fd9bccbfd145",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20231226115332"
+    },
+    {
+      "id": "calendar-2025-nyse",
+      "path": "sources/calendar-2025-nyse.pdf",
+      "publisher": "NYSE / ICE",
+      "document_title": "2025 Trading Calendar",
+      "document_date_or_version": "2024-12-12 (source footer)",
+      "authority_years": [
+        2025
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2025_Yearly_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/ICE_NYSE_2025_Yearly_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:19.8855409+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 115262,
+      "sha256": "3e8b540ad74474bc12a0aba473dbca28f37e0a5c1795cf66701b9a506a34226e",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20250103115926"
+    },
+    {
+      "id": "calendar-2026-nyse",
+      "path": "sources/calendar-2026-nyse.pdf",
+      "publisher": "NYSE / ICE",
+      "document_title": "2026 Trading Calendar",
+      "document_date_or_version": "2025-12-10 (source footer)",
+      "authority_years": [
+        2026
+      ],
+      "purpose": "annual_calendar",
+      "original_url": "https://www.nyse.com/publicdocs/nyse/ICE_NYSE_2026_Yearly_Trading_Calendar.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/nyse/ICE_NYSE_2026_Yearly_Trading_Calendar.pdf",
+      "retrieval_utc": "2026-10-29T00:09:20.3188452+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 232670,
+      "sha256": "70f5577eb43e60a9dbbecaae3cec23d0f02028c05c7f175013bb3e97816d394f",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20251219103258"
+    },
+    {
+      "id": "closure-2018-12-05-ice",
+      "path": "sources/closure-2018-12-05-ice.html",
+      "publisher": "Intercontinental Exchange (ICE) / NYSE Group",
+      "document_title": "New York Stock Exchange to Honor President George H. W. Bush",
+      "document_date_or_version": "2018-12-01",
+      "authority_years": [
+        2018
+      ],
+      "purpose": "exceptional_closure_announcement",
+      "original_url": "https://ir.theice.com/press/news-details/2018/New-York-Stock-Exchange-to-Honor-President-George-H-W-Bush/default.aspx",
+      "final_resolved_url": "https://ir.theice.com/press/news-details/2018/New-York-Stock-Exchange-to-Honor-President-George-H-W-Bush/default.aspx",
+      "retrieval_utc": "2026-10-29T00:09:20.5530430+00:00",
+      "http_status": 200,
+      "http_content_type": "text/html; charset=utf-8",
+      "byte_length": 75499,
+      "sha256": "38f4055ba294aa169399f10dcaa8e750328f44aac01f711dda363264ca698508",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": null
+    },
+    {
+      "id": "closure-2018-12-05-regulatory",
+      "path": "sources/closure-2018-12-05-regulatory.pdf",
+      "publisher": "NYSE Regulation",
+      "document_title": "NYSE Arca Options RB-18-06 / NYSE American RB-18-176",
+      "document_date_or_version": "2018-12-03",
+      "authority_years": [
+        2018
+      ],
+      "purpose": "exceptional_closure_regulatory",
+      "original_url": "https://www.nyse.com/publicdocs/nyse/markets/arca-options/rule-interpretations/2018/NYSE%20Arca%20Options%2018-06.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/nyse/markets/arca-options/rule-interpretations/2018/NYSE%20Arca%20Options%2018-06.pdf",
+      "retrieval_utc": "2026-10-29T00:09:21.0793837+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 152116,
+      "sha256": "046fb35bcc6e9600d96d5c7f7de63b1f59989cc04a445dbdeeb7b4e08add6e5b",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20181203164538"
+    },
+    {
+      "id": "closure-2025-01-09-ice",
+      "path": "sources/closure-2025-01-09-ice.html",
+      "publisher": "Intercontinental Exchange (ICE) / NYSE Group",
+      "document_title": "The New York Stock Exchange Will Close Markets on January 9 to Honor the Passing of Former President Jimmy Carter on National Day of Mourning",
+      "document_date_or_version": "2024-12-30",
+      "authority_years": [
+        2025
+      ],
+      "purpose": "exceptional_closure_announcement",
+      "original_url": "https://ir.theice.com/press/news-details/2024/The-New-York-Stock-Exchange-Will-Close-Markets-on-January-9-to-Honor-the-Passing-of-Former-President-Jimmy-Carter-on-National-Day-of-Mourning/default.aspx",
+      "final_resolved_url": "https://ir.theice.com/press/news-details/2024/The-New-York-Stock-Exchange-Will-Close-Markets-on-January-9-to-Honor-the-Passing-of-Former-President-Jimmy-Carter-on-National-Day-of-Mourning/default.aspx",
+      "retrieval_utc": "2026-10-29T00:09:21.8111037+00:00",
+      "http_status": 200,
+      "http_content_type": "text/html; charset=utf-8",
+      "byte_length": 73898,
+      "sha256": "316ec7c2d081fda004d2745033d16e7907073efa2c8ff71d53324b033b5a2465",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": null
+    },
+    {
+      "id": "closure-2025-01-09-regulatory",
+      "path": "sources/closure-2025-01-09-regulatory.pdf",
+      "publisher": "NYSE Regulation",
+      "document_title": "National Day of Mourning – Changes to Contrary Exercise Advice Cut-Off Time and Other Considerations or Restrictions",
+      "document_date_or_version": "2025-01-02",
+      "authority_years": [
+        2025
+      ],
+      "purpose": "exceptional_closure_regulatory",
+      "original_url": "https://www.nyse.com/publicdocs/nyse/markets/american-options/rule-interpretations/2025/National_Day_of_Mourning_20250102.pdf",
+      "final_resolved_url": "https://www.nyse.com/publicdocs/nyse/markets/american-options/rule-interpretations/2025/National_Day_of_Mourning_20250102.pdf",
+      "retrieval_utc": "2026-10-29T00:09:22.4213218+00:00",
+      "http_status": 200,
+      "http_content_type": "application/pdf",
+      "byte_length": 81203,
+      "sha256": "a4640ce5466cfa262cfe387a20f97b3bbc7ee213a9ce819c4ac7d3717db493c7",
+      "source_class": "live-origin",
+      "etag": null,
+      "last_modified": null,
+      "embedded_pdf_creation_date": "20250102141748"
+    }
+  ],
+  "exceptional_closure_bindings": [
+    {
+      "date": "2018-12-05",
+      "name": "National Day of Mourning for President George H. W. Bush",
+      "closure_scope": "full-day NYSE Group equity-market closure",
+      "source_ids": [
+        "closure-2018-12-05-ice",
+        "closure-2018-12-05-regulatory"
+      ],
+      "status": "discovered_and_bound"
+    },
+    {
+      "date": "2025-01-09",
+      "name": "National Day of Mourning for President Jimmy Carter",
+      "closure_scope": "full-day NYSE Group equity-market closure",
+      "source_ids": [
+        "closure-2025-01-09-ice",
+        "closure-2025-01-09-regulatory"
+      ],
+      "status": "discovered_and_bound"
+    }
+  ],
+  "exceptional_closure_search": {
+    "schema": "historical-research-session-exceptional-closure-search/v1",
+    "search_scope": {
+      "exchange": "XNYS / NYSE",
+      "years": "2016 through 2026-10-23",
+      "official_domains": [
+        "nyse.com",
+        "www.nyse.com",
+        "ice.com",
+        "www.ice.com",
+        "ir.theice.com"
+      ]
+    },
+    "terms": [
+      "market closure",
+      "exchange closure",
+      "unexpected close",
+      "National Day of Mourning",
+      "closed for trading",
+      "Exchanges will be closed",
+      "NYSE will be closed"
+    ],
+    "surfaces_searched": [
+      "NYSE / ICE official trading calendar and hours surfaces",
+      "ICE investor-relations NYSE press-release archive",
+      "NYSE Regulation rule-interpretation and regulatory-bulletin surfaces"
+    ],
+    "discovered_full_day_exceptional_closures": [
+      "2018-12-05",
+      "2025-01-09"
+    ],
+    "additional_full_day_exceptional_closures_found": [],
+    "archival_transport_used": false,
+    "third_party_or_reconstructed_sources_used": false,
+    "search_result_role": "discovery_only; exact authority is bound to downloaded source bytes below"
+  },
+  "bundle_sha256": "6db5b3c039dc98e6a21d5dc8e917de60305c919ea6fdf4cc8b8141185b774607"
+}

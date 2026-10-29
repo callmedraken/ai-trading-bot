@@ -568,7 +568,7 @@ def validate_historical_research_session_coverage(data: HistoricalDataResult) ->
         raise HistoricalResearchSessionCoverageError(missing, unexpected)
 
 
-def verify_historical_research_partition(
+def _verify_historical_research_partition_physical(
     material: HistoricalResearchPartitionMaterial,
     historical_result: HistoricalDataResult | None = None,
 ) -> HistoricalDataResult:
@@ -620,6 +620,15 @@ def verify_historical_research_partition(
             or historical_result != data
         ):
             raise HistoricalResearchDatasetError("supplied historical result mismatch")
+    return data
+
+
+def verify_historical_research_partition(
+    material: HistoricalResearchPartitionMaterial,
+    historical_result: HistoricalDataResult | None = None,
+) -> HistoricalDataResult:
+    """146-A: retain modeled-calendar coverage after exact physical verification."""
+    data = _verify_historical_research_partition_physical(material, historical_result)
     validate_historical_research_session_coverage(data)
     return data
 
@@ -720,6 +729,19 @@ def verify_historical_research_dataset(
     _membership(snapshot, open_material.manifest, holdout_material.manifest)
     opened = verify_historical_research_partition(open_material)
     holdout = verify_historical_research_partition(holdout_material)
+    return _complete_historical_research_dataset_verification(
+        snapshot, open_material, holdout_material, opened, holdout
+    )
+
+
+def _complete_historical_research_dataset_verification(
+    snapshot: HistoricalResearchDatasetSnapshot,
+    open_material: HistoricalResearchPartitionMaterial,
+    holdout_material: HistoricalResearchPartitionMaterial,
+    opened: HistoricalDataResult,
+    holdout: HistoricalDataResult,
+) -> HistoricalResearchDatasetVerification:
+    """Shared private full-fingerprint and receipt construction after verification."""
     full = HistoricalDataResult(
         HistoricalDataRequest(Symbol("SPY"), snapshot.start, snapshot.end),
         opened.bars + holdout.bars,

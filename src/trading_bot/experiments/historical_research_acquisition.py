@@ -28,6 +28,8 @@ from trading_bot.experiments.historical_research_custody import (
     HistoricalSessionAuthority,
     historical_research_normalized_csv,
     parse_custody_json,
+    require_accepted_historical_session_authority,
+    verify_historical_research_custodian_dataset,
 )
 from trading_bot.experiments.historical_research_dataset import (
     HISTORICAL_RESEARCH_FULL_END,
@@ -39,7 +41,6 @@ from trading_bot.experiments.historical_research_dataset import (
     HistoricalResearchPartitionMaterial,
     HistoricalResearchPartitionRole,
     parse_historical_research_csv,
-    verify_historical_research_dataset,
 )
 from trading_bot.experiments.research_strategy_backtest import (
     historical_data_fingerprint,
@@ -525,6 +526,12 @@ class HistoricalResearchAcquisitionOperator:
                 or type(session_authority) is not HistoricalSessionAuthority
             ):
                 raise _Stop("INVALID_SOURCE_ATTEMPT_OR_CALENDAR")
+            require_accepted_historical_session_authority(session_authority)
+            from trading_bot.experiments.historical_research_sessions import (
+                reconcile_historical_session_model,
+            )
+
+            reconcile_historical_session_model(session_authority)
             stage = "DURABLE_CLAIM"
             if (
                 self._custody.claim_attempt(attempt_id, CustodyPersistencePlan())
@@ -589,8 +596,9 @@ class HistoricalResearchAcquisitionOperator:
                 open_corporate_action_sha256=sha256(sidecar).hexdigest(),
                 holdout_corporate_action_sha256=sha256(sidecar).hexdigest(),
             )
-            verify_historical_research_dataset(snapshot, opened, held)
-            session_authority.verify(full)
+            verify_historical_research_custodian_dataset(
+                snapshot, opened, held, session_authority
+            )
             stage = "PROTECTED_PERSISTENCE"
             for relative, body in (
                 ("normalized/holdout/SPY.csv", held.normalized_bytes),

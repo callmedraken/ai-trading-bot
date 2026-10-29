@@ -1,6 +1,6 @@
 # Architecture 146-B — Acquisition/Custody Validation Plan
 
-Status: **B1-C3 FUNCTIONALLY GREEN / HYGIENE FAILED; B1-C4 TIMING CORRECTION PENDING.**
+Status: **B1/C1-C6 CLOSED AND INTEGRATED. Historical attempts below are immutable.**
 
 ## B1 required source verification
 
@@ -488,3 +488,16 @@ B-E remain gated until terminal-green B1 exact-source acceptance/integration.
 The native-MAC applicability contract remains: optimizer-only metrics are N/A,
 never fabricated numeric placeholders, and unavailable metrics cannot rank or
 compare.
+
+
+## B1/C1-C6 accepted closeout and pre-B2 successor
+
+B1/C1-C6 closed and integrated at HEAD d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42,
+TREE 8fb76f4db9a2401392092e70cce03401488551bf. Feature #788 / 40770164255 /
+attempt 1 is accepted SUCCESS. Develop #789 / 40771613241 / attempt 1 is SUCCESS
+with exact feature-certification reuse. Preserve cancelled duplicate #787 /
+40770149444 / attempt 1 and every earlier failed attempt. Pending language in
+the historical attempt sections describes their original boundary, not current
+milestone authority. The consolidated [pre-B2 source record](arch146-b-pre-b2-readiness.md)
+owns accepted published sessions, two-date model reconciliation and native
+adapter/preflight validation. B2 effects remain unauthorized.

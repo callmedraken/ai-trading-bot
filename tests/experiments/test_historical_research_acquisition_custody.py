@@ -15,7 +15,6 @@ import pytest
 import trading_bot.experiments.historical_research_acquisition as acquisition
 import trading_bot.experiments.historical_research_custody as custody
 import trading_bot.experiments.historical_research_dataset as dataset
-from trading_bot.market_calendar.nyse import NYSEMarketCalendar
 
 HEAD = "a" * 40
 TREE = "b" * 40
@@ -31,16 +30,11 @@ def wire(value):
 
 @pytest.fixture(scope="module")
 def vendor():
-    sessions = (
-        NYSEMarketCalendar()
-        .sessions_between(
-            datetime(2016, 1, 1, tzinfo=NY), datetime(2026, 10, 24, tzinfo=NY)
-        )
-        .sessions
-    )
+    authority = custody.ACCEPTED_HISTORICAL_SESSION_AUTHORITIES[0]
+    sessions = authority.sessions
     rows = []
     for item in sessions:
-        stamp = datetime.combine(item.session_date, time.min, NY).astimezone(UTC)
+        stamp = datetime.combine(item, time.min, NY).astimezone(UTC)
         price = (
             float(HOLDOUT_PRICE)
             if stamp >= dataset.HISTORICAL_RESEARCH_HOLDOUT_START
@@ -79,11 +73,6 @@ def vendor():
                 "next_page_token": None,
             }
         ),
-    )
-    authority = custody.HistoricalSessionAuthority(
-        "synthetic-calendar-v1",
-        tuple(item.session_date for item in sessions),
-        sha256(b"synthetic published calendar fixture").hexdigest(),
     )
     return bars, actions, authority
 
@@ -312,7 +301,7 @@ def test_mixed_pages_remain_protected_and_open_unadmitted(vendor, completed):
     assert not custody.ACCEPTED_CUSTODY_ADMISSIONS
     assert (
         custody.real_acquisition_readiness(vendor[2])
-        == "BLOCKED_HISTORICAL_SESSION_AUTHORITY"
+        == "HISTORICAL_AUTHORITY_ACCEPTED_OTHER_B2_PREREQUISITES_NOT_EVALUATED"
     )
 
 
@@ -362,6 +351,7 @@ def test_even_pinned_admission_must_match_every_evidence_field(
 
 
 def test_calendar_admission_is_independent(completed, monkeypatch):
+    monkeypatch.setattr(custody, "ACCEPTED_HISTORICAL_SESSION_AUTHORITIES", ())
     result, store = completed
     monkeypatch.setattr(
         custody, "ACCEPTED_CUSTODY_ADMISSIONS", (admission_for(result.evidence_bytes),)

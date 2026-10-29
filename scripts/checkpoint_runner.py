@@ -285,7 +285,32 @@ ARCH146B1_RUFF: Final = (
     "scripts/checkpoint_runner.py",
     *ARCH146B1_TESTS,
 )
+ARCH146_PRE_B2_NAME: Final = "arch146-b-pre-b2-readiness-source"
+ARCH146_PRE_B2_BRANCH: Final = "feature/research-arch146-b-pre-b2-readiness-current"
+ARCH146_PRE_B2_TESTS: Final = (
+    "tests/experiments/test_historical_research_pre_b2.py",
+    *ARCH146B1_TESTS,
+    "tests/runtime/test_windows_effectful_capture_credentials.py",
+    "tests/runtime/test_windows_effectful_capture_credentials_security.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/scripts/certification_runner/test_lanes.py",
+)
+ARCH146_PRE_B2_RUFF: Final = (
+    *ARCH146B1_RUFF,
+    "scripts/arch146_source_authority.py",
+    "scripts/arch146_b2_readonly_preflight.py",
+    "scripts/source_authority.py",
+    "src/trading_bot/experiments/historical_research_dataset.py",
+    "src/trading_bot/experiments/historical_research_sessions.py",
+    "src/trading_bot/experiments/historical_research_native.py",
+    "src/trading_bot/experiments/historical_research_native_custody.py",
+    "src/trading_bot/experiments/historical_research_b2_preflight.py",
+    "tests/scripts/certification_runner/helpers.py",
+    *ARCH146_PRE_B2_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH146_PRE_B2_NAME,
     ARCH146B1_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
@@ -297,6 +322,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH146_PRE_B2_NAME: "full",
     ARCH146B1_NAME: "full",
     "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
     ARCH134_READONLY_DIAGNOSTIC_NAME: "robinhood",
@@ -26240,6 +26266,14 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         **values,
     }
+    values[ARCH146_PRE_B2_NAME] = CheckpointSpec(
+        ARCH146_PRE_B2_NAME,
+        "Published authority and source-only native B2 readiness; no execution",
+        ARCH146_PRE_B2_TESTS,
+        ARCH146_PRE_B2_RUFF,
+        _arch146_pre_b2_authority_check,
+        remote_branch=ARCH146_PRE_B2_BRANCH,
+    )
     values[ARCH146B1_NAME] = CheckpointSpec(
         ARCH146B1_NAME,
         "Synthetic acquisition/custody and independently admitted OPEN publication",
@@ -26691,7 +26725,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace("              " + ARCH146B1_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
         .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
@@ -26734,7 +26769,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace("              " + ARCH146B1_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
         .replace(ARCH134_READONLY_DIAGNOSTIC_R1_NAME, ACTIVE_CI_CHECKPOINTS[0], 1)
@@ -27776,13 +27812,78 @@ def _arch146b1_authority_check(repo_root: Path) -> tuple[str, ...]:
                 and node.target.id
                 in {
                     "ACCEPTED_CUSTODY_ADMISSIONS",
-                    "ACCEPTED_HISTORICAL_SESSION_AUTHORITIES",
                 }
             ):
                 if not isinstance(node.value, ast.Tuple) or node.value.elts:
                     failures.append(
                         "146-B1 cannot self-admit real custody/calendar authority"
                     )
+    return tuple(failures)
+
+
+def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Current owner of accepted published authority and the native B2 boundary."""
+    failures = []
+    spec = _checkpoint_specs().get(ARCH146_PRE_B2_NAME)
+    if (
+        spec is None
+        or spec.tests != ARCH146_PRE_B2_TESTS
+        or spec.ruff_paths != ARCH146_PRE_B2_RUFF
+        or spec.remote_branch != ARCH146_PRE_B2_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH146_PRE_B2_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH146_PRE_B2_NAME) != 1
+        or resolve_ci_checkpoint(_checkpoint_specs(), ARCH146_PRE_B2_BRANCH, "push")
+        != ARCH146_PRE_B2_NAME
+    ):
+        failures.append("146 pre-B2 source registration drift")
+    try:
+        from trading_bot.experiments import historical_research_custody as custody
+        from trading_bot.experiments.historical_research_sessions import (
+            AUTHORITY_DIGEST,
+            SOURCE_MANIFEST_SHA256,
+            published_historical_session_authority,
+            reconcile_historical_session_model,
+        )
+
+        authority = published_historical_session_authority()
+        if custody.ACCEPTED_CUSTODY_ADMISSIONS or (
+            custody.ACCEPTED_HISTORICAL_SESSION_AUTHORITIES != (authority,)
+            or authority.digest != AUTHORITY_DIGEST
+        ):
+            failures.append("146 accepted authority/admission drift")
+        reconcile_historical_session_model(authority)
+        manifest = (
+            repo_root
+            / "docs/validation/evidence/arch146/historical-session-source-manifest.json"
+        )
+        if hashlib.sha256(manifest.read_bytes()).hexdigest() != SOURCE_MANIFEST_SHA256:
+            failures.append("146 source manifest byte drift")
+        for relative in (
+            "src/trading_bot/experiments/historical_research_native_custody.py",
+            "src/trading_bot/experiments/historical_research_b2_preflight.py",
+        ):
+            tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.Attribute)
+                    and node.attr
+                    in {
+                        "rename",
+                        "replace",
+                        "unlink",
+                        "rmdir",
+                        "rmtree",
+                        "MoveFileW",
+                        "MoveFileExW",
+                        "SetFileInformationByHandle",
+                    }
+                    and node.attr != "replace"
+                ):
+                    failures.append("146 forbidden publication/cleanup primitive")
+    except (OSError, ValueError, TypeError, KeyError):
+        failures.append("146 published authority unavailable")
     return tuple(failures)
 
 

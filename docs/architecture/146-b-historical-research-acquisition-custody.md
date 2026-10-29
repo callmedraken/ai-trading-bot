@@ -1,6 +1,6 @@
 # Architecture 146-B — Historical Research Acquisition and Custody
 
-Status: **DESIGN FROZEN / B1 SOURCE IMPLEMENTED, PENDING EXACT-SOURCE REVIEW.** No provider, credential,
+Status: **B1/C1-C6 CLOSED AND INTEGRATED; CONSOLIDATED PRE-B2 SOURCE CHECKPOINT.** No provider, credential,
 filesystem, ACL, holdout, backtest, paper, broker, production or live effect is
 authorized by this document.
 
@@ -148,9 +148,10 @@ The following successor rules are frozen:
    both partitions. Both may bind the same complete corporate-action sidecar
    digest. This is dataset-level acquisition provenance, not a claim that the
    protected raw bytes are partition-local.
-3. Custodian-side complete verification supplies the exact protected provenance
-   bytes to the unchanged 146-A verifier. Normal research supplies **none** of
-   those protected bytes.
+3. Custodian-side complete verification supplies exact protected provenance
+   bytes to the additive 146-B published-session verifier, reusing all 146-A
+   physical checks. Existing 146-A public verifier behavior is unchanged.
+   Normal research supplies **none** of those protected bytes.
 4. The real OPEN publication contains normalized OPEN CSV plus non-price
    manifests/commitments and accepted non-price custody evidence only. It does
    not contain original full-range raw pages, the complete corporate-action
@@ -282,8 +283,11 @@ B2 may perform exactly one manually initiated attempt that:
    action provenance only under protected custody;
 8. reconstructs and verifies the full 146-A snapshot/manifest chain inside the
    protected custodian boundary using the exact original provenance bytes;
-9. reconciles session coverage against the separately accepted historical-
-   session authority as well as the unchanged 146-A repository calendar check;
+9. admits session coverage against the independently accepted published-session
+   authority. The old 146-A/global modeled calendar remains historical
+   repository behavior. Its reconciliation delta is frozen to exactly
+   2018-12-05 and 2025-01-09 (model minus published), with no published-minus-
+   model dates. Any additional delta is STOP; no fabricated closure bars;
 10. materializes only normalized OPEN CSV plus non-price manifests/commitments to
     the development root after complete custodian verification;
 11. emits canonical `historical-research-custody-evidence/v1` containing only
@@ -370,13 +374,15 @@ The additive public modules are
 kernel whose credential, transport, custody, persistence and terminal-record
 ports are all injected. The latter owns canonical non-price evidence/admission,
 historical-session commitments and the successor OPEN verification interface.
-No existing 145-A or 146-A source, schema, identity or serializer changes.
+146-A schemas, identities, serializers and public verifier behavior are unchanged.
+The pre-B2 source extracts shared physical helpers only; 145-A is unchanged.
 
-Both `ACCEPTED_CUSTODY_ADMISSIONS` and
-`ACCEPTED_HISTORICAL_SESSION_AUTHORITIES` are intentionally empty source-owned
-registries. Parsing an admission or supplying its hash does not add authority.
-There is no runtime registration API. Synthetic tests temporarily substitute
-synthetic entries; B1 creates no real accepted calendar or acquisition.
+The original B1 checkpoint left both registries empty. The consolidated pre-B2
+source now populates `ACCEPTED_HISTORICAL_SESSION_AUTHORITIES` with exactly the
+independently accepted 2718-session published authority;
+`ACCEPTED_CUSTODY_ADMISSIONS` remains empty. Parsing or supplying a hash never
+adds authority. There is no runtime registration API. See the
+[pre-B2 source record](../validation/arch146-b-pre-b2-readiness.md).
 
 All original bars/corporate-action pages and the complete sidecar stay behind
 the protected persistence port. Both partition manifests bind the same original
@@ -394,9 +400,28 @@ before/after protected writes and OPEN materialization. Limits are 1000 pages,
 4 MiB per response and 64 MiB per stream; out-of-bound input stops without retry.
 Numeric/timestamp bounds reject unsupported precision instead of truncating it.
 
-The registered B1 checkpoint has no preflight or execute dispatcher. No native
-HTTP, credential-store, filesystem or ACL adapter is implemented or selected by
-B1. Before B2 can run, its native bindings and exact source/host admission must
-be separately implemented/reviewed alongside the independently accepted
-published historical-session authority. The injected kernel is not itself a
-real-host readiness check or proof of native durability/security.
+The registered B1 checkpoint has no preflight or execute dispatcher. Native
+bindings and a separately executable read-only preflight are additive pre-B2
+source; neither the B1 kernel nor fake tests establish real-host readiness.
+
+
+## Consolidated pre-B2 source boundary
+
+B1/C1-C6 is accepted/integrated at d2e9cbcb08c06eb050ee6d131ba3719d5c82ac42;
+#788 is accepted and #789 is develop reuse SUCCESS. #787 remains cancelled
+immutable evidence. The published historical source is recovered and accepted.
+The global modeled calendar and Architecture 56/57/111/paper identities remain
+unchanged. No global calendar repin is permitted by this checkpoint.
+
+Native adapters are defined only by the dedicated pre-B2 modules. Custody uses
+fixed roots, exact protected owner/DACL, explicit OPEN read policy, a create-only
+claim under the protected existing parent, no-follow held parent handles,
+local NTFS, create-only file writes, file/volume flush, same-handle readback and
+terminal preservation. No rename/promotion/cleanup path exists. Fresh parent
+provisioning and the B2 credential-account/custodian identity must be independently
+source-reviewed; a missing parent or identity is a closed prerequisite.
+
+The real-host preflight is read-only, separate from acquisition, and is not run
+by source gates. Source tests cannot emit real-host READY. No real B2 effects are
+authorized here. D/E remain post-B2, GUI source is not required pre-B2, v1 report
+is unchanged, R3 remains parked and LIVE remains NO-GO.

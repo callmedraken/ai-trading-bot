@@ -237,16 +237,19 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     table = runner.FULL_MODULE_TIMINGS_MS
     paths = tuple(module for module, _ in table)
-    assert len(paths) == len(set(paths)) == len(inventory) == 209
-    assert set(paths) == set(inventory)
+    assert len(paths) == len(set(paths)) == 209
+    assert len(inventory) == 210
+    added = "tests/experiments/test_historical_research_pre_b2.py"
+    assert set(inventory) - set(paths) == {added}
+    assert set(paths) <= set(inventory)
     assert all(type(ms) is int and ms > 0 for _, ms in table)
     weights = runner.full_module_weights(inventory)
-    assert weights == dict(table)
+    assert weights == {**dict(table), added: runner.FULL_FALLBACK_MS}
     assert runner.FULL_FALLBACK_MS == 1000
-    assert sum(weights.values()) == 1749660
+    assert sum(dict(table).values()) == 1749660
     assert (
         hashlib.sha256(
-            json.dumps(weights, sort_keys=True, separators=(",", ":")).encode()
+            json.dumps(dict(table), sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
     )
@@ -257,10 +260,10 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     assert tuple(lanes.items()) == tuple(repeated.items())
     assert json.dumps(lanes).encode() == json.dumps(repeated).encode()
     runner.validate_partitions(inventory, tuple(lanes.values()))
-    assert tuple(map(len, lanes.values())) == (29, 29, 30, 30, 30, 31, 30)
+    assert tuple(map(len, lanes.values())) == (30, 29, 30, 30, 30, 30, 31)
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
-    assert totals == (249953, 249953, 249950, 249952, 249952, 249951, 249949)
-    assert max(totals) == 249953 < 300000
+    assert totals == (250094, 250095, 250095, 250094, 250095, 250094, 250093)
+    assert max(totals) == 250095 < 300000
 
 
 def test_c4_preserves_robinhood_legacy_and_exhaustive_placement(monkeypatch) -> None:
@@ -364,9 +367,9 @@ def test_full_duplicate_inventory_is_rejected(monkeypatch) -> None:
 
 
 def test_full_fixture_matches_frozen_timing_membership() -> None:
-    assert set(_fixture_profiles()["full"]) == {
-        module for module, _ in runner.FULL_MODULE_TIMINGS_MS
-    }
+    assert set(_fixture_profiles()["full"]) - {
+        "tests/experiments/test_historical_research_pre_b2.py"
+    } == {module for module, _ in runner.FULL_MODULE_TIMINGS_MS}
 
 
 def test_full_path_and_lane_ties_and_future_supported_fallback(monkeypatch) -> None:
@@ -919,7 +922,7 @@ def test_distributed_selectors_cover_the_exact_c4_plan_once():
         for module in lane
     ]
     assert sorted(modules) == sorted(inventory)
-    assert len(modules) == len(set(modules)) == 209
+    assert len(modules) == len(set(modules)) == 210
 
 
 @pytest.mark.parametrize(

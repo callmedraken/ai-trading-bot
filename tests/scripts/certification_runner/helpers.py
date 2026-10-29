@@ -230,6 +230,7 @@ _FIXTURE_LEGACY = tuple(
 
 
 _CURRENT_FULL_ADDITIONS = (
+    "tests/experiments/test_historical_research_pre_b2.py",
     "tests/experiments/test_historical_research_acquisition_custody.py",
     "tests/experiments/test_historical_research_dataset.py",
     "tests/review_paper/test_arch134_f1r1_d1s4_r1_shared_namespace_acl_recovery.py",

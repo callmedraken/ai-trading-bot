@@ -215,6 +215,17 @@ def blob_matches(repo_root: Path, path: Path, expected: str | None) -> bool:
         expected = checkpoint_runner.ARCH134_READONLY_DIAGNOSTIC_R1_SOURCE_PINS[
             relative
         ]
+    from scripts.arch146_source_authority import (
+        DATASET_SOURCE,
+        dataset_preserves_146a_contract,
+    )
+
+    if relative == DATASET_SOURCE:
+        # One current semantic owner proves the complete old contract after the
+        # reviewed physical-helper extraction. Historical pins remain immutable.
+        return expected == checkpoint_runner.ARCH146A_SOURCE_PINS[
+            DATASET_SOURCE
+        ] and dataset_preserves_146a_contract(repo_root, expected)
     return checkpoint_runner._git_blob_sha1(path) == expected
 
 

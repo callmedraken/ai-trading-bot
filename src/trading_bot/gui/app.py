@@ -29,7 +29,7 @@ def _parse_startup_arguments(
     parser.add_argument(
         "--research-report",
         type=Path,
-        help="read one local compact historical experiment JSON report",
+        help="read one local compact report or desktop OPEN campaign JSON bundle",
     )
     parser.add_argument(
         "--market-data-snapshot",

@@ -1,26 +1,7 @@
 """Public API for deterministic offline historical market data."""
 
-from trading_bot.market_data.alpaca_daily_snapshot import (
-    ALPACA_API_KEY_ID_ENVIRONMENT_VARIABLE,
-    ALPACA_API_SECRET_KEY_ENVIRONMENT_VARIABLE,
-    ALPACA_DAILY_SNAPSHOT_DESCRIPTOR,
-    AlpacaDailySnapshotProvider,
-    alpaca_target_interval_utc,
-    build_alpaca_historical_bars_request,
-    create_alpaca_daily_snapshot_provider,
-    parse_alpaca_historical_bars_response,
-)
-from trading_bot.market_data.alpaca_http import (
-    ALPACA_DATA_HOST,
-    ALPACA_HTTPS_PORT,
-    ALPACA_RESPONSE_CHUNK_BYTES,
-    ALPACA_SOCKET_TIMEOUT_SECONDS,
-    MAX_ALPACA_RESPONSE_BYTES,
-    AlpacaHistoricalBarsRequest,
-    AlpacaHistoricalBarsTransport,
-    AlpacaHttpResponse,
-    StdlibAlpacaHistoricalBarsTransport,
-)
+from importlib import import_module
+
 from trading_bot.market_data.csv_provider import CSVHistoricalDataProvider
 from trading_bot.market_data.daily_snapshot_acceptance import (
     REJECTION_CLASSIFICATION_PRECEDENCE,
@@ -140,6 +121,34 @@ from trading_bot.market_data.provider import (
     MultiSymbolHistoricalDataProvider,
 )
 
+_LAZY_EXPORT_GROUPS = {
+    "trading_bot.market_data.alpaca_daily_snapshot": (
+        "ALPACA_API_KEY_ID_ENVIRONMENT_VARIABLE",
+        "ALPACA_API_SECRET_KEY_ENVIRONMENT_VARIABLE",
+        "ALPACA_DAILY_SNAPSHOT_DESCRIPTOR",
+        "AlpacaDailySnapshotProvider",
+        "alpaca_target_interval_utc",
+        "build_alpaca_historical_bars_request",
+        "create_alpaca_daily_snapshot_provider",
+        "parse_alpaca_historical_bars_response",
+    ),
+    "trading_bot.market_data.alpaca_http": (
+        "ALPACA_DATA_HOST",
+        "ALPACA_HTTPS_PORT",
+        "ALPACA_RESPONSE_CHUNK_BYTES",
+        "ALPACA_SOCKET_TIMEOUT_SECONDS",
+        "MAX_ALPACA_RESPONSE_BYTES",
+        "AlpacaHistoricalBarsRequest",
+        "AlpacaHistoricalBarsTransport",
+        "AlpacaHttpResponse",
+        "StdlibAlpacaHistoricalBarsTransport",
+    ),
+}
+_LAZY_EXPORTS = {
+    name: owner for owner, names in _LAZY_EXPORT_GROUPS.items() for name in names
+}
+
+
 __all__ = [
     "AdjustmentType",
     "ALPACA_API_KEY_ID_ENVIRONMENT_VARIABLE",
@@ -257,3 +266,17 @@ __all__ = [
     "verify_daily_snapshot",
     "XNYS_CALENDAR_DESCRIPTOR",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Resolve the unchanged public API only when that export is requested."""
+    owner = _LAZY_EXPORTS.get(name)
+    if owner is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(owner), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

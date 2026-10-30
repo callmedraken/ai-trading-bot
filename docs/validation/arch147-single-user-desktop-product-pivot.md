@@ -1,10 +1,14 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P2 source-only corrective validation contract; P1 accepted/
-integrated. Feature CI #809 is preserved green pre-correction source evidence,
+Status: CURRENT P3 SOURCE-ONLY validation; P2 source and real acquisition accepted.
+P3 includes the explicitly authorized scoped lazy-export authority successor;
+historical pins and security classification remain unchanged. The original
+source and the exact reviewed transformation are separately validated.
+Feature CI #809 is preserved green pre-correction source evidence,
 but exact source review rejected its P2 candidate as
-`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`. Real acquisition is `NOT_RUN`;
-no Architecture-146 preflight is restored.
+`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`. The #810 successor was accepted;
+the separately reviewed real acquisition subsequently succeeded. No old
+Architecture-146 preflight was restored.
 
 ## Scope
 
@@ -91,12 +95,12 @@ stale current assertion tied only to the retired protected-custody next action
 must be corrected inside this checkpoint; unexpected security, authority,
 credential, provider, or effect ambiguity is a STOP for ChatGPT review.
 
-After terminal CI, ChatGPT independently reviews the exact source and decides
-whether to fast-forward `develop`. After corrective-source acceptance/
-integration and develop verification, the next action is the single reviewed
-real SPY acquisition pinned to the accepted HEAD/tree, followed by sanitized
-evidence review and P3 optimizer/walk-forward work if integrity passes. No old
-B2 gate intervenes.
+After terminal CI, ChatGPT independently reviews exact P3 source and decides
+whether to fast-forward `develop`. After acceptance/integration and develop
+certification/reuse, the automatic next action is the real offline OPEN campaign,
+immediately followed by bundle review and existing Research GUI launch/inspection.
+P3 source/CI never runs that production campaign. FINAL_HOLDOUT remains unopened
+for strategy selection; no holdout admission is created or consumed.
 
 ## P2 additive focused coverage
 
@@ -127,13 +131,148 @@ from the bridge.
 
 The #809 candidate remains green CI evidence but was source-review rejected for
 `ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`. This corrective child moves
-evidence persistence before `COMPLETE`; real acquisition remains `NOT_RUN`,
-and it does not restore an Architecture-146 preflight.
+evidence persistence before `COMPLETE`; real acquisition was `NOT_RUN` during
+that source-only checkpoint. The accepted subsequent acquisition is below.
 
-Run new tests plus existing desktop, fake acquisition/custody, relevant native
-interactive/HTTPS tests, Architecture-147 registration, source authority and CI
-tests. Use fresh `F:\AI\temp\pytest\<purpose>-<GUID>` roots and
-`-p no:cacheprovider`. Complete whole-root Ruff check/format and both diff
-checks before the atomic candidate/admission/push. Canonical FULL remains
-GitHub-owned. Implementation, tests, admission and CI must never create the
-production desktop root, prompt for real credentials or send provider requests.
+## Accepted P2 source and real-data freeze
+
+Acquisition source HEAD `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
+`5652ec3e019766a66a05a9588e79e6cc8c46d70c`. Feature #810 / run 41031424114 /
+attempt 1: SUCCESS / canonical FULL. Develop #811 / run 41033045646 / attempt 1:
+SUCCESS, `DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, `OVERALL=PASS`.
+
+Both real P2 attempts are preserved truthfully:
+
+1. Earlier consumed attempt: `STOPPED`, stage `CREDENTIALS`, raw bars pages 0,
+   raw corporate-action pages 0, provider requests 0. This was a credential-stage
+   stop, not a provider/data failure. Recovery occurred only after exact read-only
+   reconciliation proved that state; no automatic retry is implied.
+2. Successful attempt: `a81baba7-7123-45eb-945d-9fb048e24607`.
+   `FULL_DATASET_INTEGRITY=PASS`, `OPEN_LOADER=PASS`. Real desktop acquisition and
+   these dataset identities are accepted.
+
+| Commitment | Accepted value |
+| --- | --- |
+| Profile | `desktop-v1` |
+| Dataset root | `F:\AI\ai-trading-bot\data\research\desktop-v1` |
+| Acquisition HEAD | `108ba9dee6ad593b3f4128ae44750d9f685ffa0d` |
+| Acquisition TREE | `5652ec3e019766a66a05a9588e79e6cc8c46d70c` |
+| Session authority | `nyse-published-regular-sessions-2016-2026-v1` |
+| Authority SHA256 | `7129170764896ad87c8110ec83523c234149393ae53739fed3764ed371ade6e1` |
+| Snapshot | `cf9cb708-89ab-589f-a75c-add17dba25a4` |
+| Full historical fingerprint | `5ebeb399-b97b-5c72-90c4-b1f764fd3109` |
+| OPEN manifest | `19ac19ef-aeed-5fcd-a3ee-7e55cec15796` |
+| OPEN normalized SHA256 | `45212bab5eab3c618c6c38d0ae00c8f06fecc4e6b025bc9ff3837920aa545421` |
+| OPEN rows | `2012` |
+| OPEN first | `2016-01-04T05:00:00+00:00` |
+| OPEN last | `2023-12-29T05:00:00+00:00` |
+| FINAL_HOLDOUT manifest | `4ec4783c-f419-5189-a9db-7293bf955410` |
+| FINAL_HOLDOUT normalized SHA256 | `b0cfaf2177726b52482c4affce73fb391dc121deecbf4d5189a4f5a05bcc1a3b` |
+| FINAL_HOLDOUT rows | `706` |
+| FINAL_HOLDOUT first | `2024-01-02T05:00:00+00:00` |
+| FINAL_HOLDOUT last | `2026-10-23T04:00:00+00:00` |
+| Corporate-action SHA256 | `9b6a6dbc45f1c5f12e8576b3bf943dec44868ef43e4ec441f37f8ce7fd9a573b` |
+| Acquisition evidence SHA256 | `5b90637cd434402962561a42d398cb925bc069420f5d322b55e40ad3cfaeb8f0` |
+
+Holdout entries above are non-price commitments from accepted P2 integrity.
+They confer no strategy-selection access. P3 does not repeat P2 integrity or
+read `normalized/holdout/SPY.csv`.
+
+## P3 synthetic source verification
+
+New focused/current modules are `test_desktop_research_campaign.py` and
+`test_desktop_research_campaign_gui.py` under `tests/experiments`. Both are
+automatically supported FULL modules through existing whole-directory ownership.
+They and retained Research GUI regressions join `ARCH147_TESTS`; no new
+checkpoint/profile or historical routing is added. Optional Qt tests run locally
+with the existing PySide6 GUI extra; pure artifact/model tests need no Qt.
+
+Required tests cover the 255-point ordered grid and UUID5 candidate uniqueness;
+every valid configuration exactly once in retained development output;
+Development isolation; descending return/ascending drawdown/canonical-parameter
+ties; exact deterministic top 32; shortlisted-only walk-forward; accepted
+non-overlapping fold chronology; the New York request-boundary projection with
+identical P2 bars; real public engine/verifier adapters on synthetic OPEN;
+per-fold evidence and descriptive summaries; sensitivity without execution;
+immutable bundle/CSV round-trips and identity; malformed/oversized/tampered
+artifacts; candidate journal integrity, interruption/resume and conflicts.
+Verification's public replay is distinct from a retained grid evaluation.
+
+The source freeze test asserts every accepted P2 binding field without opening
+the production dataset. Synthetic storage supplies equivalent structures, and
+wrong OPEN hash/manifest, snapshot, evidence, source, session, count and
+corporate-action commitments reject. The production binding/output roots cannot
+be overridden through the test seam. Ordinary execution is instrumented at
+both storage and filesystem opens: neither holdout CSV nor final loader nor
+full integrity inspector may be accessed. A fresh-process module inventory
+proves provider/credential/native/scheduler adapters are not imported.
+Unchanged public exports remain available through lazy package resolution.
+
+GUI coverage verifies campaign loading, all optional fields, truthful measured
+turnover, absent metrics, compact-report compatibility, startup/Open Report
+composition, filtering, rank sort, 2-to-4 comparison/chart and read-only details.
+No GUI starts research, mutates output, opens holdout or grants trading authority.
+
+Run P3 focused tests first with `-p no:cacheprovider` and fresh GUID basetemps
+beneath `F:\AI\temp\pytest`. Then affected backtest/walk-forward/desktop,
+historical/report/grid, Research GUI and Architecture-147/current-authority
+regressions. Complete whole-root `ruff check --no-cache .`,
+`ruff format --check --no-cache .`, both diff checks, exact-file atomic commit,
+general `ops.ps1 admit` FEATURE/PROSPECTIVE_DEVELOP PASS on identical stable
+HEAD/tree, one ordinary push and terminal mapped FULL. FULL is never run locally.
+No production campaign or generated real results are part of these checks.
+
+## Scoped export authority successor
+
+The original local preparation stopped at the historical market-data initializer
+pin. The user explicitly authorized this bounded successor within the original
+single unpublished P3 checkpoint. `READONLY_SOURCE_PINS` and all predecessor
+source maps remain unchanged. No source is reclassified CURRENT_MUTABLE.
+
+The original immutable market-data blob remains
+`3b5237e5f7a6bbfa34213f48db9aa8dc3f52fe66`. Original exact bytes still pass
+historical source acceptance. For the current lazy form only,
+`scripts/arch147_source_authority.py` reconstructs the exact allowed AST from
+that immutable Git object: only the original two Alpaca import groups are
+replaced with a static owner/name map and an exact lazy resolver. Every retained
+import and the complete public __all__ list remain exact. The experiments
+initializer receives the analogous transformation of its accepted P2 export
+surface, blob `9cae91a03fb02e3f2514f0ae8364960ad6021e8c`; no API or domain
+implementation is duplicated or replaced.
+
+Architecture-147 current authority requires both exact transformations. The
+historical graph permits original bytes or the narrowly proven market-data
+successor. Unknown predecessor pins, altered owners, missing names, changed
+public exports/resolver, extra imports/statements, rebinding, duplicate resolvers
+and eager calls fail closed. The checker parses source/Git objects only and
+never imports package implementations or invokes host/provider work.
+
+Focused successor evidence: 26 passed, including both previously blocked
+retained regressions and 18 negative initializer mutations, under fresh root
+`F:\AI\temp\pytest\arch147-export-authority-c03b838abfb8423992e45e0e4ad94017`.
+Direct current authority, historical read-only candidate authority and current
+Architecture-147 authority each returned no failures. Final P3 campaign/GUI
+focused evidence remains 37 passed (66.89s), under
+`F:\AI\temp\pytest\arch147-p3-final-focused-f9b6b8623a174b43b10634930e7252d3`.
+The earlier retained run's five bounded root-assumption/GUI compatibility
+failures were corrected and focused-verified; the successor resolved the other
+two. Preserved local failed attempts were not hidden by source publication.
+
+The complete affected authority/runner/coherence bundle then passed **759**
+tests in 131.15s, including source authority, runner core/CI, the read-only
+deployment diagnostic and research-strategy production compatibility, under
+`F:\AI\temp\pytest\arch147-authority-coherence-2c93a1812bcf437da88a81786543f387`.
+Six final CLI guard/verifier tests passed, including the added regression that
+rejects price CSV paths before reading. Whole-root Ruff check and format check
+(1425 Python files) and both diff checks passed before atomic staging. These
+are focused/source gates, not a local canonical FULL attempt.
+
+Starting source remains `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
+`5652ec3e019766a66a05a9588e79e6cc8c46d70c`. The P3 commit must be its one
+ordinary atomic child on the existing feature branch. Final source/remote and
+terminal CI identities belong to the exact post-publication handoff; this
+source document does not self-pin its containing commit or claim acceptance.
+Canonical FULL remains GitHub-owned and is not run locally. Production campaign,
+FINAL_HOLDOUT price access/admission, credentials, provider, Robinhood, paper,
+broker, scheduler, ACL and live effects remain zero throughout source work.

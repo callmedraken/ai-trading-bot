@@ -331,6 +331,15 @@ ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
     *COMMON_TESTS,
+    "tests/experiments/test_desktop_research_campaign.py",
+    "tests/experiments/test_desktop_research_campaign_gui.py",
+    "tests/experiments/test_research_strategy_backtest.py",
+    "tests/experiments/test_research_strategy_walk_forward.py",
+    "tests/gui/test_gui_a2_research_contracts.py",
+    "tests/gui/test_gui_a2_research_page_qt.py",
+    "tests/gui/test_gui_a3_research_exploration_qt.py",
+    "tests/gui/test_gui_a4_research_comparison_models.py",
+    "tests/gui/test_gui_a4_research_comparison_qt.py",
     "tests/experiments/test_historical_research_desktop_acquisition.py",
     "tests/experiments/test_historical_research_desktop.py",
     "tests/experiments/test_historical_research_acquisition_custody.py",
@@ -340,6 +349,19 @@ ARCH147_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_arch147.py",
 )
 ARCH147_RUFF: Final = (
+    "scripts/arch147_source_authority.py",
+    "scripts/source_authority.py",
+    "src/trading_bot/experiments/__init__.py",
+    "src/trading_bot/market_data/__init__.py",
+    "src/trading_bot/experiments/desktop_research_campaign.py",
+    "scripts/run_desktop_research_campaign.py",
+    "src/trading_bot/gui/desktop_campaign_service.py",
+    "src/trading_bot/gui/models.py",
+    "src/trading_bot/gui/research_page.py",
+    "src/trading_bot/gui/comparison_chart.py",
+    "src/trading_bot/gui/mock_service.py",
+    "src/trading_bot/gui/startup_composition.py",
+    "src/trading_bot/gui/app.py",
     "src/trading_bot/experiments/historical_research_desktop_acquisition.py",
     "scripts/acquire_desktop_research.py",
     "src/trading_bot/experiments/desktop_research_dataset.py",
@@ -27790,7 +27812,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Own the current ordinary desktop research profile and source route."""
-    failures = []
+    from scripts.arch147_source_authority import desktop_export_authority_failures
+
+    failures = list(desktop_export_authority_failures(repo_root))
     specs = _checkpoint_specs()
     spec = specs.get(ARCH147_NAME)
     if (
@@ -27847,6 +27871,7 @@ def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
     for relative in (
         "src/trading_bot/experiments/desktop_research_dataset.py",
         "src/trading_bot/experiments/historical_research_desktop.py",
+        "src/trading_bot/experiments/desktop_research_campaign.py",
         "src/trading_bot/portfolio/optimizer.py",
         "src/trading_bot/experiments/research_candidate.py",
         "src/trading_bot/experiments/research_candidate_walk_forward.py",

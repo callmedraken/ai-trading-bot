@@ -1,72 +1,62 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P2 acquisition bridge source
+## Current checkpoint — Architecture 147 P3 source-only campaign
 
-Architecture 147 is the controlling current product roadmap for the private
-single-user Windows desktop bot. P1 is accepted and integrated at
-`e8817e0214074b03d3d9ecd73232b7a2379276b9`, tree
-`6937032602b9524ee9db0ddd2056463d418c3aef`. Feature #807 / run
-41022636717 / attempt 1 succeeded with canonical FULL. Develop #808 / run
-41023791454 / attempt 1 succeeded with `DEVELOP_CERTIFICATION_REUSE=True`,
-`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
-P1 provides
-ordinary create-only local research storage, an OPEN-only loader, and an
-explicit final-holdout loader gated by the existing Architecture-145
-`ResearchStrategyFinalHoldoutAdmission`. The current checkpoint is
-`arch147-desktop-research-profile` on
-`feature/research-desktop-product-pivot-current`; it has no preflight and no
-execute dispatcher and maps to GitHub-owned FULL.
+P3 includes the explicitly authorized scoped lazy-export authority successor.
+The historical initializer pin and security classification remain intact; exact
+AST reconstruction admits only preserved public exports and the reviewed lazy
+resolver. Unchanged historical source stays accepted. No historical repin or
+provider/native behavior change is introduced. Publication follows the focused,
+whole-root static and both-context admission gates below.
 
-The desktop research root is the source-owned fixed path
-`F:\AI\ai-trading-bot\data\research\desktop-v1`. P1 tests use only an
-explicit temporary-root seam. No production root is created by implementation
-or tests. The storage profile has no ACL, identity, elevation or protected
-custody requirement, never overwrites a completed file, validates exact bytes
-and readback, leaves incomplete state visible, and has no namespace-promotion
-operation.
+P2 source is accepted/integrated at
+`108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
+`5652ec3e019766a66a05a9588e79e6cc8c46d70c`. Feature #810 / run
+41031424114 / attempt 1: SUCCESS / canonical FULL. Develop #811 / run
+41033045646 / attempt 1: SUCCESS, exact_feature_certification reuse,
+IDENTITY_STABLE=True and OVERALL=PASS.
 
-P2 feature CI #809 is preserved green pre-correction source evidence, but exact
-source review rejected that candidate as
-`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`: `COMPLETE` could be recorded
-before `evidence.json` was durably materialized. This bounded corrective child
-moves evidence into the desktop OPEN materialization before the kernel records
-completion. Real acquisition is `NOT_RUN`; no Architecture-146 preflight is
-restored.
+The real desktop acquisition is accepted. The first consumed attempt stopped
+at CREDENTIALS with zero provider requests or raw pages; it was recovered only
+after exact read-only reconciliation. The successful attempt is
+`a81baba7-7123-45eb-945d-9fb048e24607`. The full physical dataset integrity and
+OPEN loader passed. Exact commitments and both-attempt chronology are recorded
+once in the Architecture-147 validation document.
 
-P2 adds the desktop interactive Alpaca research acquisition bridge as another
-atomic source milestone of the same checkpoint, branch, and GitHub-owned FULL
-mapping. This source checkpoint performs zero real provider effects. It reuses
-the frozen SPY/SIP historical Market Data requests and acquisition kernel;
-Alpaca is solely the research-data source. Robinhood MCP / Agentic Trading
-remains the future brokerage execution/account boundary.
+P3 adds deterministic offline research over that frozen dataset's OPEN partition:
+255 MovingAverageCrossover configurations, Development-only ranking, top-32
+walk-forward, adjacent-parameter sensitivity, strict immutable JSON and bounded
+CSV evidence, and direct read-only integration with the existing Research page.
+It reuses the accepted strategy-native backtest and walk-forward engines.
+FINAL_HOLDOUT remains unopened for strategy selection. No holdout admission,
+PAPER_CANDIDATE, promotion or trading eligibility is created.
 
-The future explicit command verifies canonical develop/source/origin and
-tracked/index cleanliness, accepts the published 2718-session authority, and
-requires the desktop root absent before creating ordinary storage and hidden
-interactive credentials. It never retries a partial root or falls back from
-SIP. A completed dataset receives read-only full integrity verification and an
-OPEN-loader check; the result contains non-price metadata only. Strategy
-FINAL_HOLDOUT access retains the Architecture-145 admission gate.
+Current source checkpoint: `arch147-desktop-research-profile`, existing branch
+`feature/research-desktop-product-pivot-current`, no preflight/execute dispatcher,
+GitHub-owned canonical FULL. P3 implementation, admission and CI run synthetic
+tests only and perform no production research campaign. Current Research artifact
+loading supports compact reports and P3 campaign bundles; unrelated pre-Robinhood
+GUI/runtime paths retain their existing legacy classification.
 
-The normal product update model is user Start -> unattended trading/research
-workers -> user Stop -> reconcile/close -> manual update while stopped ->
-checks/migration -> user Start. The running application never self-updates;
-Task Scheduler/start-at-login and old release/install machinery are optional
-future convenience or deferred hardening, not current readiness gates.
+The production dataset is fixed at
+`F:\AI\ai-trading-bot\data\research\desktop-v1`; campaign output is ordinary
+untracked storage under `F:\AI\ai-trading-bot\reports\research\desktop-v1`.
+No production runtime/trading database or protected research root is used.
 
-P1 has no provider, credential, Robinhood, paper, broker or live effect. LIVE
-remains disabled. The consumed Architecture-146 observer and its
-`HOST_UNKNOWN` evidence remain historical evidence only and were not retried;
-the observer is not the current research dispatcher or next host action.
+The private single-user desktop model remains user Start -> unattended workers
+-> user Stop -> reconcile/close -> manual update while stopped -> checks -> user
+Start. The bot never updates itself. P4 follows real P3 result review and GUI
+inspection; credentials/provider/broker/scheduler/ACL/live effects remain outside
+this source checkpoint.
 
-P1 candidate `51c959ed80be8b658d45f8358bb73795ffab7047`, tree
-`bcf8e1d0be1237bdd08a0f03b4c8c79ef6276110`, remains preserved failed
-evidence: CI #806 / run 41019120148 / attempt 1 ended FAILURE. Source-static,
-active-tests and FULL broad-1 through broad-6 passed; broad-7 had 2265 passed
-and 2 failed. Classification: `PREPUBLICATION_COVERAGE_DEFECT`, caused by
-stale mixed-current assertions in
-`tests/experiments/test_historical_research_partial_state.py`. #806 was not
-rerun; no protected or external effects occurred.
+## Immediate next step
+
+ChatGPT independently reviews the exact P3 source and terminal mapped FULL,
+then fast-forwards develop and verifies its certification/reuse. Automatically
+provide the short guarded offline campaign command in the handoff, review the
+resulting real bundle, and launch/inspect the existing Research GUI against it.
+No provider or credential operation is needed. FINAL_HOLDOUT stays sealed; a
+later explicit robustness-policy boundary is required before any admission.
 
 ## Accepted integrated foundation
 
@@ -133,11 +123,4 @@ strategy and risk remain authoritative; Robinhood MCP is the future brokerage
 transport/execution boundary, not strategy authority. P1 does not enable real
 mutation, OAuth, account queries, order review or order placement.
 
-The immediate next step is ChatGPT exact-source review of the P2 committed
-candidate and terminal mapped CI result. After source acceptance, fast-forward
-integration and develop verification, automatically provide the single reviewed
-real SPY acquisition command pinned to the accepted HEAD/tree. The user enters
-hidden Alpaca research credentials locally. No Architecture-146 observer or B2
-preflight is a prerequisite. Review sanitized dataset evidence immediately after
-that one run, then continue to P3 optimizer/walk-forward work if integrity passes.
-Do not run real acquisition during P2 implementation, admission or CI.
+The immediate next step is the P3 exact-source review and offline-campaign sequence above.

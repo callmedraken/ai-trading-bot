@@ -99,10 +99,18 @@ class ResearchResultRow:
     parameter_label: str
     total_return: Decimal
     maximum_drawdown_percentage: Decimal
-    aggregate_one_way_turnover: Decimal
+    aggregate_one_way_turnover: Decimal | None
     total_fills: int
     exposure: Decimal | None
     return_over_drawdown: Decimal | None
+    performance_turnover: Decimal | None = None
+    closed_trade_count: int | None = None
+    walk_forward_fold_count: int | None = None
+    minimum_walk_forward_return: Decimal | None = None
+    median_walk_forward_return: Decimal | None = None
+    maximum_walk_forward_drawdown: Decimal | None = None
+    shortlisted: bool | None = None
+    research_only_leader: bool | None = None
 
     def __post_init__(self) -> None:
         if type(self.caller_ordinal) is not int or self.caller_ordinal < 0:
@@ -114,7 +122,6 @@ class ResearchResultRow:
         for name in (
             "total_return",
             "maximum_drawdown_percentage",
-            "aggregate_one_way_turnover",
         ):
             value = getattr(self, name)
             if type(value) is not Decimal or not value.is_finite():
@@ -125,12 +132,28 @@ class ResearchResultRow:
             raise ValueError("variant_label exceeds the presentation bound")
         if len(self.parameter_label) > MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS:
             raise ValueError("parameter_label exceeds the presentation bound")
-        for name in ("exposure", "return_over_drawdown"):
+        for name in (
+            "exposure",
+            "return_over_drawdown",
+            "aggregate_one_way_turnover",
+            "performance_turnover",
+            "minimum_walk_forward_return",
+            "median_walk_forward_return",
+            "maximum_walk_forward_drawdown",
+        ):
             value = getattr(self, name)
             if value is not None and (
                 type(value) is not Decimal or not value.is_finite()
             ):
                 raise TypeError(f"{name} must be a finite Decimal or None")
+        for name in ("closed_trade_count", "walk_forward_fold_count"):
+            value = getattr(self, name)
+            if value is not None and (type(value) is not int or value < 0):
+                raise ValueError(f"{name} must be a nonnegative integer or None")
+        for name in ("shortlisted", "research_only_leader"):
+            value = getattr(self, name)
+            if value is not None and type(value) is not bool:
+                raise TypeError(f"{name} must be boolean or None")
 
 
 @dataclass(frozen=True, slots=True)

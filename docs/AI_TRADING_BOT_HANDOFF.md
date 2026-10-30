@@ -1,78 +1,97 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 P2 source-only bridge
+## Current boundary — Architecture 147 P3 source-only
 
-Architecture 147 is the controlling current product roadmap for the private
-single-user Windows desktop bot. P1 is accepted/integrated at
-`e8817e0214074b03d3d9ecd73232b7a2379276b9`, tree
-`6937032602b9524ee9db0ddd2056463d418c3aef`. Feature #807 / run
-41022636717 / attempt 1: SUCCESS / canonical FULL. Develop #808 / run
-41023791454 / attempt 1: SUCCESS, `DEVELOP_CERTIFICATION_REUSE=True`,
-`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
+The user explicitly included a scoped lazy-export authority successor in P3.
+`scripts/arch147_source_authority.py` derives the exact admitted initializer AST
+from immutable predecessors and proves unchanged public names, owners, __all__,
+resolver and all other statements. Historical read-only source pins and
+SECURITY_SEMANTIC classification remain unchanged. Exact original historical
+bytes remain accepted; current P3 separately requires the reviewed lazy form.
+No provider/credential/native implementation or effect authority is changed.
+The two previously blocked retained regressions now pass. Source acceptance,
+integration and production research remain separate later steps.
 
-The current P2 source objective is the desktop interactive Alpaca research
-acquisition bridge on
-`feature/research-desktop-product-pivot-current`, checkpoint
-`arch147-desktop-research-profile`, with `preflight=None`, `execute=None`, and
-GitHub-owned canonical FULL. Its fixed production root is
-`F:\AI\ai-trading-bot\data\research\desktop-v1`; implementation and tests use
-only an explicit temporary-root seam and do not create that production root.
+Starting accepted source, local feature and origin/develop:
 
-P1 uses ordinary create-only filesystem storage, preserves the Architecture
-146-A dataset/session identities, exposes only validated OPEN data to ordinary
-research, and requires the existing Architecture-145
-`ResearchStrategyFinalHoldoutAdmission` for explicit FINAL_HOLDOUT loading.
-The optimizer and walk-forward path cannot import the final-holdout loader.
-P1 has no provider, credential, Robinhood, paper, broker, or live effect.
-Local deterministic strategy and risk remain authoritative; official
-Robinhood MCP / Agentic Trading is the future brokerage transport boundary.
+    HEAD 108ba9dee6ad593b3f4128ae44750d9f685ffa0d
+    TREE 5652ec3e019766a66a05a9588e79e6cc8c46d70c
+    worktree F:\AI\worktrees\ai-trading-bot-desktop-product-pivot-current
+    branch feature/research-desktop-product-pivot-current
+    checkpoint arch147-desktop-research-profile
+    preflight=None; execute=None; canonical FULL owned by GitHub
 
-P2 retains the frozen SPY request window (2016-01-01 through 2026-10-24), raw
-SIP daily bars, full-range corporate actions, and published 2718-session
-authority. The new one-use credential adapter binds the externally reviewed
-HEAD/tree and accepted authority, then uses the existing hidden terminal input.
-No token/elevation check or old B2 admission is involved. Exact local develop,
-canonical root/origin, tracked/index cleanliness and origin/develop identity
-precede all writes, prompts and requests. A preexisting desktop root, including
-an empty or incomplete root, stops the command without cleanup or retry.
+P2 is accepted/integrated: feature #810 / run 41031424114 / attempt 1 SUCCESS
+with canonical FULL; develop #811 / run 41033045646 / attempt 1 SUCCESS with
+DEVELOP_CERTIFICATION_REUSE=True REASON=exact_feature_certification,
+IDENTITY_STABLE=True, OVERALL=PASS. Real acquisition successful attempt:
+`a81baba7-7123-45eb-945d-9fb048e24607`. The earlier consumed attempt was
+STOPPED / CREDENTIALS with zero requests and zero raw pages. Exact read-only
+reconciliation preceded recovery; this was not a provider/data failure.
 
-P2 source/tests/admission/CI perform zero real provider effects. Fake tests use
-only temporary desktop roots. Full persisted integrity inspection reads both
-partitions internally and returns immutable non-price metadata; it grants no
-strategy holdout admission. Evidence is persisted as `evidence.json`.
+The accepted snapshot is `cf9cb708-89ab-589f-a75c-add17dba25a4`, full historical
+fingerprint commitment `5ebeb399-b97b-5c72-90c4-b1f764fd3109`. The OPEN manifest is
+`19ac19ef-aeed-5fcd-a3ee-7e55cec15796`, 2012 rows. All P2 hashes/endpoints and
+sealed holdout commitments are recorded in the Architecture-147 validation
+freeze; `ACCEPTED_DATASET_BINDING` compares those exact OPEN/non-price identities
+before production research. P3 never calls the full integrity inspector or the
+holdout loader and never reads holdout prices.
 
-The consumed Architecture-146 observer evidence remains historical and was not
-retried. Its `HOST_UNKNOWN` result is not the current research dispatcher or
-next host action. Feature CI #809 is preserved green pre-correction source
-evidence, but ChatGPT exact-source review rejected it as
-`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`: the completion marker could
-precede durable `evidence.json` materialization. The corrective
-child materializes evidence with normalized OPEN before COMPLETE. Real
-acquisition remains `NOT_RUN`; no Architecture-146 preflight is restored. The
-current next step is focused source verification and exact-source review.
+P3 emits one deterministic campaign directory under
+`F:\AI\ai-trading-bot\reports\research\desktop-v1`, with `campaign.json`,
+per-candidate development/walk-forward journals, `candidates.csv`, and final
+`bundle.json`. The immutable bundle includes full ranking, top-32 shortlist,
+two explicit disjoint walk-forward folds and immediate grid-neighbor evidence.
+The leader is Development rank 1, explicitly research-only. Qualification is
+not applied; no robustness/promotion threshold is invented from observations.
+The existing Research page accepts this bundle through `--research-report` or
+Open Report, preserving compact reports and 2-to-4-result comparison.
 
-After corrective-source acceptance/integration and develop verification, the
-next effectful step is the single reviewed real SPY acquisition, with no
-intervening Architecture or security/preflight checkpoint. Future command
-shape (not executable authority until source acceptance/integration):
+P3 remains SOURCE-ONLY until independent exact-source acceptance/integration.
+No production campaign runs during implementation, admission or CI. No
+FINAL_HOLDOUT admission is created or consumed. All source tests use synthetic
+storage; real dataset files are not source-CI fixtures.
 
-    .\.venv\Scripts\python.exe -B scripts\acquire_desktop_research.py --execute --expected-head <accepted-head> --expected-tree <accepted-tree>
+## Automatic next step after P3 acceptance/integration
 
-Run from `F:\AI\ai-trading-bot` on exact clean develop. The user enters Alpaca
-research credentials at hidden terminal prompts. Return only the compact JSON
-result. SUCCESS requires `OPEN_LOADER=PASS` and `FULL_DATASET_INTEGRITY=PASS`;
-ChatGPT then reviews sanitized identities/counts/hashes and continues into P3
-optimizer/walk-forward work. Any failure stops; preserve any partial root and
-do not retry. No Robinhood, broker, trading, ACL or scheduler effects are in P2.
+Owner: ChatGPT exact-source/CI review and fast-forward integration; the operator
+then executes one local offline campaign. After develop certification/reuse is
+verified, provide this short single-scope command, pinned to the then-reviewed
+HEAD/tree by the surrounding review. The CLI independently requires canonical
+main checkout, clean develop, canonical origin and matching local origin/develop.
+It accesses no network and prompts for no credentials.
 
-Preserved P1 failure: candidate
-`51c959ed80be8b658d45f8358bb73795ffab7047`, tree
-`bcf8e1d0be1237bdd08a0f03b4c8c79ef6276110`; CI #806 / run 41019120148 /
-attempt 1 ended FAILURE. Source-static, active-tests and FULL broad-1 through
-broad-6 passed; broad-7 had 2265 passed / 2 failed. Classification is
-`PREPUBLICATION_COVERAGE_DEFECT`: stale mixed-current assertions in
-`tests/experiments/test_historical_research_partial_state.py`. #806 was not
-rerun, and no protected or external effects occurred.
+```powershell
+& {
+    Set-StrictMode -Version Latest
+    $ErrorActionPreference = 'Stop'
+    $Repo = (Resolve-Path -LiteralPath 'F:\AI\ai-trading-bot').Path
+    Set-Location -LiteralPath $Repo
+    & .\.venv\Scripts\python.exe -B scripts\run_desktop_research_campaign.py --run
+    $Code = $LASTEXITCODE
+    if ($Code -ne 0) { throw 'STOP: preserve campaign output; review before resume' }
+}
+```
+
+This is future operator material, not authority to run before source acceptance.
+Return the compact COMPLETE JSON and its artifact path. ChatGPT reviews the
+bundle, leading and sensitive configurations, then launches/provides the exact
+existing GUI command with that bundle path and continues the next research step.
+Expected GUI shape:
+
+    .\.venv\Scripts\python.exe -B -m trading_bot.gui --research-report <bundle.json>
+
+Do not run a failed command again automatically. `--run --resume` is an explicit
+later resume after review: it requires the same exact campaign/source/dataset/
+grid/evaluation-policy context and validates existing candidate journals before
+new computation. Corrupt, partial, foreign or conflicting files stop unchanged.
+A source change yields a separate deterministic campaign directory. No cleanup,
+overwrite, protected custody, publication or runtime database is involved.
+
+FINAL_HOLDOUT remains sealed throughout campaign, review and GUI inspection.
+No promising result grants PAPER_CANDIDATE, live eligibility or trading authority.
+P4 desktop supervisor work follows real-result/GUI inspection, without an
+approval-only handoff. LIVE remains NO-GO.
 
 ## Preserved Architecture 146 historical chronology
 
@@ -220,9 +239,9 @@ desktop research path.
 
 The direct B2 launcher, `observe_fresh()`, Set-Acl, OPEN-parent creation,
 credential reads, provider invocation, acquisition, and holdout reads remain
-outside P1 and P2 source implementation and were not retried. The new desktop
-bridge adds future interactive acquisition only after source acceptance.
+outside P1 and P2 source implementation and were not retried. The accepted desktop
+bridge completed the separately reviewed P2 acquisition; P3 is offline only.
 
-The current immediate action is the Architecture-147 source candidate review
+The current immediate action is the Architecture-147 P3 source review
 described above. No registered host observer follows its CI, and no observer
 PASS or old B2 readiness state is required for desktop research.

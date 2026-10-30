@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P1 accepted/integrated, P2 source bridge.
+Status: CURRENT product roadmap; P2 source/acquisition accepted, P3 source-only.
 
 ## Product contract
 
@@ -118,9 +118,9 @@ ordinary optimizer, walk-forward, and candidate-selection modules do not import
 or call this loader. This is a software-use boundary, not a claim that the
 trusted machine owner cannot inspect files.
 
-P2 uses fake transport/credentials in tests. Its source bridge and integrity
-inspection are described below; the one real acquisition follows source
-acceptance/integration and is never executed by implementation, admission or CI.
+P2 uses fake transport/credentials in tests. Its accepted bridge performed the
+separately reviewed real acquisition after source acceptance/integration. That
+operation is never executed by implementation, admission or CI. P3 uses OPEN only.
 
 ## P2 desktop interactive acquisition bridge
 
@@ -173,11 +173,135 @@ preexisting destination and source mismatch failures remain distinct. No retry
 or SIP fallback occurs. Any existing root, including partial/empty state, stops
 a later invocation; recovery is deferred to a later reviewed action.
 
-After P2 source acceptance/integration and develop verification, automatically
-provide the single reviewed real acquisition command pinned to that HEAD/tree.
-No Architecture-146 B2 or observer gate intervenes. Review sanitized evidence
-after the user-run acquisition and continue to P3 optimizer/walk-forward work
-if integrity passes.
+P2 source and real acquisition are accepted. Exact source, terminal CI,
+both-attempt chronology and dataset commitments are frozen in the validation
+document. The first consumed attempt stopped at CREDENTIALS with zero provider
+requests/pages; exact read-only reconciliation preceded recovery. Successful
+attempt: `a81baba7-7123-45eb-945d-9fb048e24607`. No old observer was retried.
+
+## P3 offline campaign and Research Results integration
+
+P3 is SOURCE-ONLY. Source tests, admission and GitHub CI never execute the
+production campaign or open the production dataset. The future single command
+is `scripts/run_desktop_research_campaign.py --run`, invoked with the existing
+venv Python after exact-source acceptance/integration. It requires clean main
+develop and matching local origin/develop; it performs no fetch, network,
+credential, provider, Alpaca, Robinhood, broker, scheduler, ACL or live operation.
+
+`DesktopCampaignDatasetBinding` binds the exact accepted desktop-v1 acquisition
+source HEAD/tree, attempt, published-session identity/digest, snapshot, full
+historical fingerprint commitment, OPEN manifest/hash/count/endpoints,
+corporate-action digest and acquisition evidence digest. Production cannot
+substitute another desktop-v1 dataset or supply a binding override. Synthetic
+tests have an explicit test-storage-only binding seam. Validation reads only
+non-price commitments; `load_desktop_open_research()` alone reads prices.
+Neither `load_desktop_final_holdout()` nor `inspect_desktop_dataset_integrity()`
+is imported/called by the campaign, and normalized holdout CSV is never read.
+P2 full physical integrity remains accepted evidence, not a campaign operation.
+
+The source-owned v1 MovingAverageCrossover grid is short 5..60 step 5, long
+40..250 step 10, short < long, ordered short then long ascending: **255** valid
+configurations. Desired quantity is 100 shares. The explicit evaluation policy
+uses 100000 starting cash, 1 fixed commission, 5 basis-point slippage, whole
+shares, buying/selling enabled in the offline risk engine, 100% position/exposure
+ceilings and no cash-reserve fraction. Missing modeled sessions are allowed
+because P2 already proves published session coverage; no bar is fabricated.
+`trading_enabled=True` is solely the existing offline risk flag, not external
+trading authority. No margin, leverage or short position is introduced.
+
+Development search uses only [2016-01-01, 2020-01-01). The accepted calendar
+interprets request boundaries as New York dates; a source-owned additive
+`nyse-local-year-boundaries/unchanged-open-bars/v1` request projection represents
+January boundaries at New York midnight (05:00 UTC), preserving every P2 bar and
+its timestamp/OHLCV. The projected request gets its own historical fingerprint.
+No predecessor request, fingerprint or calendar semantics are changed. This
+retains final December sessions that UTC-midnight request ends would exclude
+from the engine's expected calendar range. The logical Development/WALK_FORWARD
+separation is unchanged; no 2020+ session enters ranking.
+
+Every grid configuration receives one retained development evaluation using
+`ResearchStrategyDefinition`, `ResearchStrategyEvaluationPolicy` and the public
+strategy-native backtest runner/verifier. Public verification independently
+replays the engine, as its accepted contract requires. Evidence retains source,
+definition/policy/data/run/result/evidence IDs, bars/endpoints, total return,
+drawdown, final equity, measured fills, closed trades and PerformanceReport
+turnover (executed notional / average equity). It is not relabeled historical
+aggregate one-way turnover. Decimal computation uses a fixed 50-digit context.
+
+Explicit ranking: total return descending, maximum drawdown ascending, then
+canonical numeric (short, long) configuration ascending. The full rank and
+top-32 shortlist are recorded before walk-forward; later observations never
+alter either. The direct ranking projection avoids the historical comparator's
+different metric model/tie semantics. The research-only leader is Development
+rank 1, regardless of later test returns. It grants no lifecycle stage,
+PAPER_CANDIDATE, paper/live eligibility, promotion or trading authority.
+
+The accepted fold contract requires training_start < training_end == test_start
+< test_end and each subsequent training_start == previous test_end. P3 preserves
+it with two disjoint source-owned folds, expressed in New York calendar dates:
+
+| Fold | Training [start, end) | Test [start, end) |
+| --- | --- | --- |
+| 1 | 2016-01-01, 2020-01-01 | 2020-01-01, 2021-01-01 |
+| 2 | 2021-01-01, 2022-01-01 | 2022-01-01, 2024-01-01 |
+
+This is not an expanding-window claim. 2021 is training only. Each fold side
+starts with independent engine state; indicator warmup reduces test trading
+opportunity and no development state leaks into a test. The two windows have
+different lengths; their returns/median are descriptive and not annualized.
+Only shortlisted candidates use public walk-forward execution/verification.
+Per-fold return/drawdown/bar counts and evidence, plus minimum/median return
+and maximum drawdown, are retained. No qualification policy is applied in P3;
+qualification is explicitly null. A later frozen robustness policy owns that
+decision; no thresholds are inferred from observations.
+
+Sensitivity uses already-completed Development results at (short +/-5, long)
+and (short, long +/-10). Each missing grid-edge/constraint neighbor is explicit.
+It performs no additional evaluation and infers no robustness or objective.
+
+`DesktopCampaignBundle` is immutable `desktop-research-campaign/v1` strict
+canonical JSON with typed, versioned, length-framed semantic UUID5 identities.
+Campaign identity binds source/dataset/grid/policy/folds/ranking; candidate IDs
+bind campaign and configuration; bundle identity binds all semantic evidence.
+No identity uses artifact bytes, clocks, UUID4, filesystem paths or object
+identity. Canonical parsing validates complete grid/order, provenance, ranking,
+shortlist, fold chain, summaries, sensitivity and identity without execution.
+A deterministic 255-row CSV projection makes missing walk-forward cells blank.
+
+Output is ordinary untracked reports beneath the fixed
+`F:\AI\ai-trading-bot\reports\research\desktop-v1\<campaign-id>` directory.
+It never uses a runtime database, qualification temp root or protected 146 root.
+Create-only candidate files carry semantic result IDs, fsync/readback, and an
+exact campaign header. Final CSV precedes bundle completion. An explicit later
+`--run --resume` validates exact context and all existing journals before new
+computation; completed evaluations are reused. Partial/corrupt/conflicting
+bytes, foreign contexts, missing completed files and linked output stop without
+overwrite/cleanup/automatic retry. Changed source creates another campaign ID.
+Candidates are independent and serial; multiprocessing/GPU is not required.
+
+The existing Research page accepts campaign bundles via an additive service
+selected by the existing `--research-report` option and Open Report control.
+`CompactReportResearchService` remains unchanged. Optional model fields expose
+Development rank/parameters/return/drawdown/fills, measured turnover/closed
+trades, shortlist/leader, fold count and minimum/median return/maximum drawdown
+in the selected details. The existing table, filtering, 2-to-4 comparison and
+chart remain read-only. Campaign charts label PerformanceReport turnover
+accurately; historical one-way turnover remains separate/unavailable for P3.
+Malformed, noncanonical or >10MB artifacts are bounded unavailable states.
+No GUI action starts a campaign, trades, modifies results, promotes or opens
+holdout. Package public exports load lazily to keep provider/native adapters
+out of the campaign import graph; names and requested objects are preserved.
+The explicitly authorized scoped authority successor validates the complete
+reviewed AST transformation against immutable predecessor exports. Original
+historical bytes and source pins remain accepted; security classification is
+unchanged. All other import/export/resolver changes fail closed.
+
+P3 source/tests join the existing Architecture-147 focused/current inventory;
+FULL remains GitHub-owned. No Architecture 148, new checkpoint or 146 routing
+change is introduced. Automatically after source acceptance/integration and
+develop reuse verification: real offline campaign -> bundle review -> existing
+Research GUI launch/inspection -> next research step. FINAL_HOLDOUT remains
+unopened for strategy selection throughout; no 145 admission is created.
 
 ## Deferred Architecture 146 and high-assurance machinery
 

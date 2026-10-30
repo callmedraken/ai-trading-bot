@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from trading_bot.gui.desktop_campaign_service import ResearchArtifactService
 from trading_bot.gui.market_data_models import (
     MarketDataPageState,
     unavailable_market_data_state,
@@ -30,10 +31,7 @@ from trading_bot.gui.research_candidate_lifecycle_models import (
     ResearchCandidateLifecyclePageState,
     unavailable_research_candidate_lifecycle_state,
 )
-from trading_bot.gui.research_service import (
-    CompactReportResearchService,
-    unavailable_research_state,
-)
+from trading_bot.gui.research_service import unavailable_research_state
 from trading_bot.gui.runtime_models import RuntimePageState, unavailable_runtime_state
 
 
@@ -155,7 +153,7 @@ class MockGuiApplicationService:
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""
-        return CompactReportResearchService(artifact_path).get_research_state()
+        return ResearchArtifactService(artifact_path).get_research_state()
 
 
 class ResearchReportGuiApplicationService:
@@ -173,7 +171,7 @@ class ResearchReportGuiApplicationService:
 
     def __init__(self, artifact_path: Path) -> None:
         self._overview_service = MockGuiApplicationService()
-        self._research_service = CompactReportResearchService(artifact_path)
+        self._research_service = ResearchArtifactService(artifact_path)
 
     def get_overview(self) -> ApplicationOverview:
         """Return the existing deterministic read-only overview."""
@@ -205,4 +203,4 @@ class ResearchReportGuiApplicationService:
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Load one operator-selected report through the application boundary."""
-        return CompactReportResearchService(artifact_path).get_research_state()
+        return ResearchArtifactService(artifact_path).get_research_state()

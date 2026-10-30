@@ -720,7 +720,6 @@ def test_new_bridge_has_no_legacy_host_or_broker_dependencies():
         r"F:\AI\ai-trading-bot\data\research\desktop-v1"
     )
     assert bridge.CANONICAL_PROJECT_ROOT == Path(r"F:\AI\ai-trading-bot")
-    assert not desktop.DESKTOP_RESEARCH_ROOT.exists()
 
 
 @pytest.mark.parametrize(

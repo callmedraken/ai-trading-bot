@@ -228,6 +228,18 @@ def blob_matches(repo_root: Path, path: Path, expected: str | None) -> bool:
         return expected == checkpoint_runner.ARCH146A_SOURCE_PINS[
             DATASET_SOURCE
         ] and dataset_preserves_146a_contract(repo_root, expected)
+    from scripts.arch147_source_authority import (
+        MARKET_DATA_INITIALIZER,
+        initializer_preserves_exports,
+    )
+
+    if (
+        relative == MARKET_DATA_INITIALIZER
+        and checkpoint_runner._git_blob_sha1(path) != expected
+    ):
+        # Preserve the immutable pin and SECURITY_SEMANTIC classification.
+        # Admit only the exact reviewed lazy-import transformation of that blob.
+        return initializer_preserves_exports(repo_root, relative, expected)
     return checkpoint_runner._git_blob_sha1(path) == expected
 
 

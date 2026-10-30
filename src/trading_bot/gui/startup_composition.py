@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from trading_bot.gui.desktop_campaign_service import ResearchArtifactService
 from trading_bot.gui.market_data_models import (
     MarketDataPageState,
     unavailable_market_data_state,
@@ -39,10 +40,7 @@ from trading_bot.gui.research_candidate_lifecycle_models import (
 from trading_bot.gui.research_candidate_lifecycle_service import (
     ResearchCandidateLifecycleInspectionService,
 )
-from trading_bot.gui.research_service import (
-    CompactReportResearchService,
-    unavailable_research_state,
-)
+from trading_bot.gui.research_service import unavailable_research_state
 from trading_bot.gui.runtime_evidence_service import (
     ProductionRuntimeEvidenceInspectionService,
 )
@@ -227,7 +225,7 @@ class ReadOnlyGuiApplicationService:
         self._research = (
             None
             if config.research_report is None
-            else CompactReportResearchService(config.research_report)
+            else ResearchArtifactService(config.research_report)
         )
         self._market_data = (
             None
@@ -298,7 +296,7 @@ class ReadOnlyGuiApplicationService:
                     title="Research",
                     status=PresentationStatus.INFO,
                     detail=(
-                        "Compact historical reports are presented read-only."
+                        "Compact reports and desktop campaigns are read-only."
                         if self._config.research_report is None
                         else "An explicit local historical report is configured."
                     ),
@@ -444,4 +442,4 @@ class ReadOnlyGuiApplicationService:
 
     def load_research_report(self, artifact_path: Path) -> ResearchPageState:
         """Retain the existing explicit local Research Open Report behavior."""
-        return CompactReportResearchService(artifact_path).get_research_state()
+        return ResearchArtifactService(artifact_path).get_research_state()

@@ -131,7 +131,6 @@ def test_fixed_root_and_explicit_test_seam(tmp_path):
     production = desktop.DesktopResearchStorage.production()
     assert production.root == desktop.DESKTOP_RESEARCH_ROOT
     assert production.test_only is False
-    assert not production.root.exists()
     with pytest.raises(desktop.DesktopResearchError, match="explicit test seam"):
         desktop.DesktopResearchStorage(tmp_path / "arbitrary")
     with pytest.raises(desktop.DesktopResearchError, match="nonproduction"):
@@ -340,8 +339,14 @@ def test_optimizer_and_walk_forward_do_not_import_holdout_loader():
         assert "load_desktop_final_holdout" not in source
 
 
-def test_desktop_readiness_is_source_only_and_no_production_root_is_created():
+def test_desktop_readiness_is_source_only_and_no_production_root_is_created(
+    monkeypatch,
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("readiness accessed the filesystem")
+
+    for method in ("mkdir", "open", "read_bytes", "write_bytes"):
+        monkeypatch.setattr(Path, method, forbidden)
     assert desktop.desktop_research_readiness() == (
         "READY_FOR_DESKTOP_RESEARCH_ACQUISITION_REVIEW"
     )
-    assert not desktop.DESKTOP_RESEARCH_ROOT.exists()

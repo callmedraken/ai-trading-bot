@@ -67,7 +67,7 @@ class _SortableTableItem(QTableWidgetItem):
 
 
 class ResearchPage(QWidget):
-    """Explore one bounded compact report without mutating source or domain state."""
+    """Explore a compact report or desktop campaign without mutation."""
 
     def __init__(
         self,
@@ -195,6 +195,14 @@ class ResearchPage(QWidget):
             ("fills", "Total fills"),
             ("exposure", "Exposure"),
             ("return_drawdown", "Return / drawdown"),
+            ("performance_turnover", "Turnover (executed notional / average equity)"),
+            ("closed_trades", "Closed trades"),
+            ("wf_folds", "Walk-forward folds"),
+            ("wf_minimum", "Minimum walk-forward test return"),
+            ("wf_median", "Median walk-forward test return"),
+            ("wf_drawdown", "Maximum walk-forward test drawdown"),
+            ("shortlisted", "Development shortlist"),
+            ("research_leader", "Research-only leader (no trading authority)"),
         ):
             value = QLabel("—", self._detail)
             value.setObjectName(f"researchDetail{key.title().replace('_', '')}")
@@ -352,7 +360,7 @@ class ResearchPage(QWidget):
             self._summary.clear()
             self._metadata.clear()
             self._empty.setText(
-                "Open a supported compact historical experiment JSON report to "
+                "Open a compact report or desktop OPEN campaign JSON bundle to "
                 "explore its read-only results."
             )
             return
@@ -415,8 +423,11 @@ class ResearchPage(QWidget):
                     row.maximum_drawdown_percentage,
                 ),
                 (
-                    _decimal_text(row.aggregate_one_way_turnover),
-                    row.aggregate_one_way_turnover,
+                    _optional_decimal(row.aggregate_one_way_turnover),
+                    (
+                        row.aggregate_one_way_turnover is None,
+                        row.aggregate_one_way_turnover or Decimal("0"),
+                    ),
                 ),
                 (str(row.total_fills), row.total_fills),
                 (
@@ -507,10 +518,18 @@ class ResearchPage(QWidget):
             "parameters": row.parameter_label,
             "return": _percentage(row.total_return),
             "drawdown": _percentage(row.maximum_drawdown_percentage),
-            "one_way_turnover": _decimal_text(row.aggregate_one_way_turnover),
+            "one_way_turnover": _optional_decimal(row.aggregate_one_way_turnover),
             "fills": str(row.total_fills),
             "exposure": _optional_decimal(row.exposure),
             "return_drawdown": _optional_decimal(row.return_over_drawdown),
+            "performance_turnover": _optional_decimal(row.performance_turnover),
+            "closed_trades": _optional_count(row.closed_trade_count),
+            "wf_folds": _optional_count(row.walk_forward_fold_count),
+            "wf_minimum": _optional_percentage(row.minimum_walk_forward_return),
+            "wf_median": _optional_percentage(row.median_walk_forward_return),
+            "wf_drawdown": _optional_percentage(row.maximum_walk_forward_drawdown),
+            "shortlisted": _optional_bool(row.shortlisted),
+            "research_leader": _optional_bool(row.research_only_leader),
         }
         for key, value in values.items():
             self._detail_values[key].setText(value)
@@ -552,7 +571,7 @@ class ResearchPage(QWidget):
                 row.parameter_label,
                 _percentage(row.total_return),
                 _percentage(row.maximum_drawdown_percentage),
-                _decimal_text(row.aggregate_one_way_turnover),
+                _optional_decimal(row.aggregate_one_way_turnover),
                 str(row.total_fills),
             )
             for column, value in enumerate(values):
@@ -580,3 +599,15 @@ def _percentage(value: Decimal) -> str:
 
 def _optional_decimal(value: Decimal | None) -> str:
     return "Unavailable" if value is None else _decimal_text(value)
+
+
+def _optional_percentage(value: Decimal | None) -> str:
+    return "Not evaluated" if value is None else _percentage(value)
+
+
+def _optional_count(value: int | None) -> str:
+    return "Not evaluated" if value is None else str(value)
+
+
+def _optional_bool(value: bool | None) -> str:
+    return "Unavailable" if value is None else ("Yes" if value else "No")

@@ -100,7 +100,7 @@ class ResearchComparisonChart(QWidget):
         plot_left = min(210, max(100, width // 3))
         plot_width = max(width - plot_left - 14, 40)
         bars: list[RenderedComparisonBar] = []
-        for metric in _METRICS:
+        for metric in self._metrics():
             values = tuple(_metric_value(row, metric.key) for row in self._rows)
             if metric.bipolar:
                 zero_x = plot_left + plot_width // 2
@@ -141,6 +141,21 @@ class ResearchComparisonChart(QWidget):
                     )
         return tuple(bars)
 
+    def _metrics(self) -> tuple[_MetricDefinition, ...]:
+        if self._rows and all(
+            row.performance_turnover is not None for row in self._rows
+        ):
+            return (
+                *_METRICS[:2],
+                _MetricDefinition(
+                    "performance_turnover",
+                    "Turnover",
+                    "Executed notional / average equity; no preference inferred",
+                ),
+                _METRICS[3],
+            )
+        return _METRICS
+
     def paintEvent(self, event: QPaintEvent) -> None:
         del event
         painter = QPainter(self)
@@ -159,7 +174,7 @@ class ResearchComparisonChart(QWidget):
         layout_lookup = {(item.metric, item.caller_ordinal): item for item in layouts}
         y = 8
         colors = ("#60a5fa", "#34d399", "#f59e0b", "#c084fc")
-        for metric in _METRICS:
+        for metric in self._metrics():
             title_x, context_x = _metric_header_positions(
                 painter.fontMetrics(), metric.title
             )

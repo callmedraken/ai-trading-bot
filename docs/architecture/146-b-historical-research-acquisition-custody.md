@@ -357,6 +357,24 @@ B2 may use a fresh protected acquisition child under the custody root while the
 attempt is incomplete. Any attempt/evidence record outside that root contains
 non-price metadata only.
 
+## Registered partial-state observation before the next B2 boundary
+
+`arch146-b-partial-state-readonly-observer` is a read-only successor with
+`execute=None`. Its narrow native method holds the protected parent chain and
+checks the exact parent path/kind/non-reparse/F:/NTFS/owner/protected-DACL/ACE
+multiset policy, then probes claim/protected-root/OPEN-parent/OPEN-root absence
+without data access. Only native file/path-not-found means absent; existing
+objects, unexpected errors and policy drift block. OPEN's parent need not exist.
+Two exact stable observations and deterministic unambiguous handle closure are
+required. Existing B2 observe_fresh() and readiness behavior remain unchanged.
+
+PASS means only PARTIAL_STATE_OBSERVED_EXACT. It grants no OPEN-parent creation,
+credential, provider, acquisition or protected execution authority. No real
+observation occurs during source implementation/certification. Only after
+independent source acceptance and integration may the registered observer be
+the sole next host read. Its sanitized evidence requires independent review
+before deciding any later write or ordinary B2 readiness boundary.
+
 ## Publication rule
 
 OPEN material is the only dataset content available to normal research.

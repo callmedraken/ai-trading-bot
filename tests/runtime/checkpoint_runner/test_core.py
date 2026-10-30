@@ -133,6 +133,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH146_PARTIAL_STATE_NAME,
         runner.ARCH146_PRE_B2_NAME,
         runner.ARCH146B1_NAME,
         runner.READONLY_ADMISSION_NAME,
@@ -417,6 +418,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             )
         if spec.name == runner.ARCH146_PRE_B2_NAME:
             expected_branch = runner.ARCH146_PRE_B2_BRANCH
+        if spec.name == runner.ARCH146_PARTIAL_STATE_NAME:
+            expected_branch = runner.ARCH146_PARTIAL_STATE_BRANCH
         if spec.name == runner.ARCH146B1_NAME:
             expected_branch = runner.ARCH146B1_BRANCH
         if spec.name == runner.ARCH146A_NAME:
@@ -1453,6 +1456,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "arch134-production-paper-runtime-acl",
                 runner.ARCH146A_NAME,
                 runner.ARCH146_PRE_B2_NAME,
+                runner.ARCH146_PARTIAL_STATE_NAME,
                 runner.ARCH146B1_NAME,
                 "arch144-c-f1-paper-evidence-admission",
                 "arch145-a-research-robustness-live-canary-eligibility",
@@ -1499,7 +1503,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "tests/runtime/checkpoint_runner/test_source_authority.py",
                 *expected,
             )
-        if name == runner.ARCH146_PRE_B2_NAME:
+        if name in {runner.ARCH146_PRE_B2_NAME, runner.ARCH146_PARTIAL_STATE_NAME}:
             expected = (
                 *expected,
                 "tests/runtime/checkpoint_runner/test_source_authority.py",

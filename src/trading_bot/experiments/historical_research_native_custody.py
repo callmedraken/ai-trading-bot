@@ -10,7 +10,7 @@ import ctypes
 import os
 import re
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import wraps
 from hashlib import sha256
 from pathlib import PureWindowsPath
@@ -41,6 +41,7 @@ from trading_bot.experiments.historical_research_sessions import (
 )
 from trading_bot.runtime.windows_authority_security import (
     AuthorityObjectKind,
+    SecurityInspection,
     WindowsHandle,
     inspect_open_authority_object,
     inspect_security_object_identity,
@@ -157,6 +158,17 @@ class CustodyNative(Protocol):
     ) -> PersistenceReceipt: ...
     def inspect_created(self, paths: tuple[tuple[str, bool], ...]) -> None: ...
     def close(self) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CustodyPartialState:
+    """Internal handle facts; only validated fixed facts may enter public evidence."""
+
+    classification: str
+    parent: SecurityInspection | None = None
+    local_fixed: bool = False
+    absent: tuple[bool, ...] = ()
+    close_ambiguous: bool = False
 
 
 class WindowsCustodyNative:
@@ -308,6 +320,99 @@ class WindowsCustodyNative:
             return CustodyFreshState(
                 "UNPROVEN_STOP", False, False, False, False, False, False
             )
+
+    def observe_partial_state_readonly(self) -> CustodyPartialState:
+        """Hold only the protected parent chain and probe four fixed absences.
+
+        OPEN's parent need not exist. Every open is OPEN_EXISTING/no-follow,
+        without data access or delete sharing. All handles, including existing
+        absence targets of any kind, close in reverse order before returning.
+        This method deliberately does not enter observe_fresh() or its state.
+        """
+        handles: list[int] = []
+        state = CustodyPartialState("HOST_UNKNOWN")
+
+        def open_existing(path: str, access: int) -> int | None:
+            handle = self._api(
+                "kernel32",
+                "CreateFileW",
+                [
+                    ctypes.c_wchar_p,
+                    ctypes.c_uint32,
+                    ctypes.c_uint32,
+                    ctypes.c_void_p,
+                    ctypes.c_uint32,
+                    ctypes.c_uint32,
+                    ctypes.c_void_p,
+                ],
+                ctypes.c_void_p,
+            )(path, access, 3, None, 3, 0x02200000, None)
+            if handle in (None, 0, ctypes.c_void_p(-1).value):
+                if ctypes.get_last_error() in (2, 3):
+                    return None
+                raise _error()
+            handles.append(handle)
+            return handle
+
+        try:
+            local_fixed = (
+                self._api(
+                    "kernel32", "GetDriveTypeW", [ctypes.c_wchar_p], ctypes.c_uint32
+                )("F:\\")
+                == 3
+            )
+            if not local_fixed:
+                state = CustodyPartialState("HOST_VOLUME_POLICY")
+            else:
+                parent = None
+                fixed_parent = PureWindowsPath(CUSTODY_PARENT)
+                for item in (*reversed(fixed_parent.parents), fixed_parent):
+                    path = str(item)
+                    handle = open_existing(path, 0x20080)
+                    if handle is None:
+                        raise FileNotFoundError
+                    parent = inspect_open_authority_object(
+                        handle, path, AuthorityObjectKind.DIRECTORY
+                    )
+                if parent is not None:
+                    parent = replace(
+                        parent,
+                        aces=tuple(
+                            sorted(
+                                parent.aces,
+                                key=lambda ace: (
+                                    ace.principal_sid,
+                                    ace.access_mask,
+                                    ace.ace_type,
+                                    ace.ace_flags,
+                                ),
+                            )
+                        ),
+                    )
+                absent = tuple(
+                    open_existing(path, 0x80) is None
+                    for path in (
+                        ATTEMPT_CLAIM_PATH,
+                        CUSTODY_ROOT,
+                        OPEN_PARENT,
+                        OPEN_ROOT,
+                    )
+                )
+                state = CustodyPartialState("OBSERVED", parent, local_fixed, absent)
+        except FileNotFoundError:
+            state = CustodyPartialState("HOST_PARENT_UNAVAILABLE")
+        except Exception:
+            state = CustodyPartialState("HOST_UNKNOWN")
+        finally:
+            failed = False
+            for handle in reversed(handles):
+                try:
+                    self._close(handle)
+                except Exception:
+                    failed = True
+            if failed:
+                state = replace(state, close_ambiguous=True)
+        return state
 
     def _attributes(self, sddl: str):
         native = self

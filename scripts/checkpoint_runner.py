@@ -309,7 +309,26 @@ ARCH146_PRE_B2_RUFF: Final = (
     "tests/scripts/certification_runner/helpers.py",
     *ARCH146_PRE_B2_TESTS,
 )
+ARCH146_PARTIAL_STATE_NAME: Final = "arch146-b-partial-state-readonly-observer"
+ARCH146_PARTIAL_STATE_BRANCH: Final = (
+    "feature/research-arch146-b-partial-state-observer-current"
+)
+ARCH146_PARTIAL_STATE_TESTS: Final = (
+    "tests/experiments/test_historical_research_partial_state.py",
+    "tests/experiments/test_historical_research_pre_b2.py",
+    "tests/runtime/checkpoint_runner/test_core.py",
+    "tests/runtime/checkpoint_runner/test_ci.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+)
+ARCH146_PARTIAL_STATE_RUFF: Final = (
+    "src/trading_bot/experiments/historical_research_partial_state.py",
+    "src/trading_bot/experiments/historical_research_native_custody.py",
+    "scripts/arch146_source_authority.py",
+    "scripts/checkpoint_runner.py",
+    *ARCH146_PARTIAL_STATE_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH146_PARTIAL_STATE_NAME,
     ARCH146_PRE_B2_NAME,
     ARCH146B1_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
@@ -322,6 +341,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH146_PARTIAL_STATE_NAME: "full",
     ARCH146_PRE_B2_NAME: "full",
     ARCH146B1_NAME: "full",
     "arch134-fresh-successor-readonly-deployment-admission": "robinhood",
@@ -26135,8 +26155,7 @@ def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
             or _deployment_candidate_pin is not _readonly_pin
             or _arch146a_shared_blob_pin is not _readonly_shared_blob_pin
             or _checkpoint_specs is not _readonly_checkpoint_specs
-            or preflight_checkpoint
-            is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
+            or preflight_checkpoint is not _arch146_partial_state_preflight_checkpoint
             or _arch146a_predecessor_active_inventory
             is not _readonly_predecessor_active_inventory
             or _deployment_candidate_predecessor_authority_check
@@ -26266,6 +26285,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         ),
         **values,
     }
+    values[ARCH146_PARTIAL_STATE_NAME] = CheckpointSpec(
+        ARCH146_PARTIAL_STATE_NAME,
+        "Read-only fixed partial custody state; no readiness or effect authority",
+        ARCH146_PARTIAL_STATE_TESTS,
+        ARCH146_PARTIAL_STATE_RUFF,
+        _arch146_partial_state_authority_check,
+        preflight=_arch146_partial_state_preflight,
+        execute=None,
+        remote_branch=ARCH146_PARTIAL_STATE_BRANCH,
+    )
     values[ARCH146_PRE_B2_NAME] = CheckpointSpec(
         ARCH146_PRE_B2_NAME,
         "Published authority and source-only native B2 readiness; no execution",
@@ -26725,7 +26754,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
@@ -26769,7 +26799,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R2_NAME + " `\n", "", 1)
@@ -27902,6 +27933,66 @@ def _arch146_pre_b2_authority_check(repo_root: Path) -> tuple[str, ...]:
     except (OSError, ValueError, TypeError, KeyError):
         failures.append("146 published authority unavailable")
     return tuple(failures)
+
+
+def _arch146_partial_state_preflight() -> dict[str, object]:
+    from trading_bot.experiments.historical_research_partial_state import (
+        partial_state_readonly_preflight,
+    )
+
+    return partial_state_readonly_preflight()
+
+
+def _arch146_partial_state_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Current semantic owner of the additive read-only observer registration."""
+    from scripts.arch146_source_authority import partial_state_observer_is_readonly
+
+    failures = []
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH146_PARTIAL_STATE_NAME)
+    if (
+        spec is None
+        or sum(value.name == ARCH146_PARTIAL_STATE_NAME for value in specs.values())
+        != 1
+        or spec.tests != ARCH146_PARTIAL_STATE_TESTS
+        or spec.ruff_paths != ARCH146_PARTIAL_STATE_RUFF
+        or spec.remote_branch != ARCH146_PARTIAL_STATE_BRANCH
+        or spec.preflight is not _arch146_partial_state_preflight
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH146_PARTIAL_STATE_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH146_PARTIAL_STATE_NAME) != 1
+        or resolve_ci_checkpoint(specs, ARCH146_PARTIAL_STATE_BRANCH, "push")
+        != ARCH146_PARTIAL_STATE_NAME
+    ):
+        failures.append("146 partial-state read-only registration drift")
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if workflow.count("              " + ARCH146_PARTIAL_STATE_NAME + " `\n") != 1:
+        failures.append("146 partial-state active CI membership drift")
+    if not partial_state_observer_is_readonly(repo_root):
+        failures.append("146 partial-state read-only composition drift")
+    return tuple(failures)
+
+
+def _arch146_partial_state_preflight_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    if spec.name != ARCH146_PARTIAL_STATE_NAME:
+        return _arch134_readonly_diagnostic_r3_preflight_checkpoint(
+            spec, repo_root=repo_root, evidence_root=evidence_root
+        )
+    if spec != _checkpoint_specs()[
+        ARCH146_PARTIAL_STATE_NAME
+    ] or _arch146_partial_state_authority_check(repo_root):
+        raise RuntimeError("Partial-state observer source/registration rejected")
+    return _PRE_READONLY_PREFLIGHT(
+        spec, repo_root=repo_root, evidence_root=evidence_root
+    )
+
+
+preflight_checkpoint = _arch146_partial_state_preflight_checkpoint
 
 
 _PRE_DISTRIBUTED_FIND_REUSABLE = find_reusable_ci_certification

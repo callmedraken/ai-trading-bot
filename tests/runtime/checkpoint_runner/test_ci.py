@@ -737,6 +737,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH146_PARTIAL_STATE_NAME: "full",
         runner.ARCH146_PRE_B2_NAME: "full",
         runner.ARCH146B1_NAME: "full",
         runner.READONLY_ADMISSION_NAME: "robinhood",

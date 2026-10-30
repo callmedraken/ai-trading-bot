@@ -1,6 +1,20 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 146 B2 source-binding integrated
+## Current checkpoint — Architecture 146 partial-state observer source candidate
+
+The reusable `arch146-b-partial-state-readonly-observer` is implemented as a
+source-only candidate, pending independent exact-source/CI acceptance and
+integration. Its dedicated research branch registers a read-only preflight,
+`execute=None`, and GitHub-owned canonical FULL. No host observation occurs
+during implementation or certification. The old direct B2 launcher remains
+NOT_RUN for this continuation.
+
+The candidate observes the fixed protected parent and four required absences
+twice, with exact stability, binary ACE multiset policy and checked handle
+closure. PASS means only `PARTIAL_STATE_OBSERVED_EXACT`; acquisition and
+OPEN-parent creation remain NOT_AUTHORIZED.
+
+## Accepted integrated foundation
 
 Architecture 146's custody ACE multiset and tracked-only B2 source-binding
 corrections are accepted and integrated on `develop` at
@@ -52,8 +66,9 @@ NO-GO.
 
 ## Next step
 
-The next milestone is **source-only registration of a reusable Architecture 146
-read-only partial-state observer** in the unified checkpoint runner.
+The immediate next step is independent ChatGPT review of this exact candidate
+and its terminal mapped GitHub FULL result. Terminal red OR green is STOP for
+the implementation checkpoint: no PR, merge, CI retry or real preflight here.
 
 Repository review established that the current
 `arch146-b-pre-b2-readiness-source` registration is source-only and has no
@@ -61,14 +76,13 @@ preflight function. The existing `scripts.arch146_b2_readonly_preflight`
 launcher is preserved historical/direct-preflight machinery; it is not the
 registered partial-state observer required by the current workflow.
 
-The successor must be read-only, source-bound, zero-effect, and limited to the
-specific partial-state facts needed to decide the next boundary. It must not
-prompt for credentials, call the provider, run the real B2 readiness preflight,
-create OPEN/custody paths, mutate ACLs, or grant acquisition authority.
+The new observer is source-bound, zero-effect, and limited to partial-state
+facts. It cannot prompt for credentials, call the provider, run real B2
+readiness, create OPEN/custody paths, mutate ACLs, or grant acquisition authority.
 
 After that source is independently accepted and integrated:
 
-    registered read-only partial-state observer
+    registered observer invocation (sole next host read)
       -> one bounded read-only host observation
       -> independent review
       -> canonical closeout

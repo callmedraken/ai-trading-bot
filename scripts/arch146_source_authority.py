@@ -9,6 +9,143 @@ from scripts.source_authority import historical_blob
 
 DATASET_SOURCE = "src/trading_bot/experiments/historical_research_dataset.py"
 B2_PREFLIGHT_SOURCE = "src/trading_bot/experiments/historical_research_b2_preflight.py"
+PARTIAL_STATE_SOURCE = (
+    "src/trading_bot/experiments/historical_research_partial_state.py"
+)
+
+
+def partial_state_observer_is_readonly(repo_root: Path) -> bool:
+    """Admit only the bounded observer/native call graph, never execute it."""
+    observer = ast.parse((repo_root / PARTIAL_STATE_SOURCE).read_text(encoding="utf-8"))
+    native = ast.parse(
+        (
+            repo_root
+            / "src/trading_bot/experiments/historical_research_native_custody.py"
+        ).read_text(encoding="utf-8")
+    )
+    methods = [
+        method
+        for cls in native.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "WindowsCustodyNative"
+        for method in cls.body
+        if isinstance(method, ast.FunctionDef)
+        and method.name == "observe_partial_state_readonly"
+    ]
+    if len(methods) != 1:
+        return False
+    allowed_imports = {
+        "__future__",
+        "collections",
+        "collections.abc",
+        "trading_bot.experiments.historical_research_native_custody",
+        "trading_bot.runtime.windows_authority_security",
+    }
+    allowed_observer_calls = {
+        "frozenset",
+        "tuple",
+        "type",
+        "len",
+        "any",
+        "zip",
+        "Counter",
+        "casefold",
+        "upper",
+        "CustodyPartialState",
+        "observe",
+        "_observe",
+        "_classification",
+        "WindowsCustodyNative",
+        "fromkeys",
+    }
+    allowed_native_calls = {
+        "CustodyPartialState",
+        "_api",
+        "c_void_p",
+        "get_last_error",
+        "_error",
+        "append",
+        "PureWindowsPath",
+        "reversed",
+        "str",
+        "open_existing",
+        "inspect_open_authority_object",
+        "replace",
+        "tuple",
+        "sorted",
+        "_close",
+    }
+    for tree, allowed in (
+        (observer, allowed_observer_calls),
+        (methods[0], allowed_native_calls),
+    ):
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                return False
+            if isinstance(node, ast.ImportFrom) and node.module not in allowed_imports:
+                return False
+            if isinstance(node, ast.Call):
+                name = (
+                    node.func.id
+                    if isinstance(node.func, ast.Name)
+                    else node.func.attr
+                    if isinstance(node.func, ast.Attribute)
+                    else None
+                )
+                if isinstance(node.func, ast.Call):
+                    # Only the two explicitly bounded Win32 functions below.
+                    inner = node.func
+                    if (
+                        not isinstance(inner.func, ast.Attribute)
+                        or inner.func.attr != "_api"
+                        or not isinstance(inner.func.value, ast.Name)
+                        or inner.func.value.id != "self"
+                    ):
+                        return False
+                    call = ast.unparse(node)
+                    expected = (
+                        "self._api('kernel32', 'CreateFileW', "
+                        "[ctypes.c_wchar_p, ctypes.c_uint32, ctypes.c_uint32, "
+                        "ctypes.c_void_p, ctypes.c_uint32, ctypes.c_uint32, "
+                        "ctypes.c_void_p], ctypes.c_void_p)"
+                        "(path, access, 3, None, 3, 0x02200000, None)",
+                        "self._api('kernel32', 'GetDriveTypeW', "
+                        "[ctypes.c_wchar_p], ctypes.c_uint32)('F:\\\\')",
+                    )
+                    if not any(
+                        call == ast.unparse(ast.parse(item).body[0].value)
+                        for item in expected
+                    ):
+                        return False
+                elif name not in allowed:
+                    return False
+    access_calls = [
+        ast.unparse(node)
+        for node in ast.walk(methods[0])
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "open_existing"
+    ]
+    if sorted(access_calls) != [
+        "open_existing(path, 128)",
+        "open_existing(path, 131200)",
+    ]:
+        return False
+    runner = ast.parse(
+        (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    )
+    dispatch = [
+        node
+        for node in runner.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "_arch146_partial_state_preflight"
+    ]
+    expected_dispatch = ast.parse(
+        "def _arch146_partial_state_preflight() -> dict[str, object]:"
+        "\n    from trading_bot.experiments.historical_research_partial_state "
+        "import partial_state_readonly_preflight"
+        "\n    return partial_state_readonly_preflight()"
+    ).body[0]
+    return len(dispatch) == 1 and ast.dump(dispatch[0]) == ast.dump(expected_dispatch)
 
 
 def dataset_preserves_146a_contract(repo_root: Path, historical_pin: str) -> bool:

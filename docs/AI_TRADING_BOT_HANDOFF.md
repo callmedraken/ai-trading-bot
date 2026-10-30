@@ -1,6 +1,23 @@
 # AI Trading Bot — Current Handoff
 
-## Architecture 146 B2 source-binding integrated; observer registration next
+## Architecture 146 partial-state observer — source-only review boundary
+
+This candidate starts exactly at docs closeout
+`cbc00675da352fd205d43a6fc4452f2a7fb33e22`, tree
+`9e04e944173f75d7c20e14925da5c601bada14d1`; develop #802 / run
+40974659897 / attempt 1 succeeded as DOCS_ONLY.
+
+    worktree F:\AI\worktrees\ai-trading-bot-146b-partial-state-observer-current
+    branch feature/research-arch146-b-partial-state-observer-current
+    checkpoint arch146-b-partial-state-readonly-observer
+    preflight registered; execute=None; canonical profile FULL (GitHub only)
+
+The observer remains source-only until independently accepted and integrated.
+No host observation occurs during implementation/certification. The old direct
+B2 launcher remains NOT_RUN for this continuation. Terminal CI red OR green is
+STOP for independent ChatGPT exact-source/CI review; no retry, PR or merge.
+
+## Accepted integrated B2 source foundation
 
 Current accepted integrated source (verify live remote independently):
 
@@ -76,16 +93,23 @@ binding but no preflight function. The existing
 preflight machinery and is not accepted as the next registered partial-state
 observer.
 
-Therefore the next safe checkpoint is source-only registration of a dedicated
-read-only partial-state observer through the unified checkpoint runner. It must
-be exact-source-bound and expose only sanitized facts required to distinguish
-the preserved parent/root/claim state. It must have no execute dispatcher and
-zero credential/provider/write/ACL/holdout/scheduler/paper/broker/live authority.
+The candidate now adds that dedicated registration without changing the
+source-only predecessor or its direct B2 launcher. Its narrow native method
+holds the protected parent chain, inspects the exact parent policy, and probes
+claim/protected-root/OPEN-parent/OPEN-root absence using read attributes,
+OPEN_EXISTING and no-follow. It does not require the OPEN parent to exist.
+Two identical observations and unambiguous closure are required. Evidence is
+sanitized and binds binary ACE tuples, parent/volume facts, absences and zero
+effect counters. No token/credential/provider/acquisition dispatch exists.
 
 Do NOT yet run the direct B2 launcher, `observe_fresh()`, Set-Acl, create the
 OPEN parent, read credentials, invoke the provider, acquire data, or read holdout
 bytes.
 
-After independent source acceptance/integration, ChatGPT will provide the exact
-registered read-only operator command. A read-only PASS/READY classification
-will still grant no acquisition or protected-write authority.
+The immediate next action is ChatGPT independent review of the exact committed
+candidate and terminal GitHub FULL evidence. After acceptance/integration,
+ChatGPT will provide one exact registered observer invocation as the sole next
+host read. Its PASS means only PARTIAL_STATE_OBSERVED_EXACT, never B2 READY;
+acquisition_authorized=false, open_parent_creation_authorized=false, and
+protected_execution=NOT_AUTHORIZED. Independently review that observation
+before any separately reviewed OPEN-parent creation or ordinary B2 preflight.

@@ -1,5 +1,58 @@
 # Architecture 146-B consolidated pre-B2 source checkpoint
 
+## Current successor — registered read-only partial-state observer
+
+Docs closeout `cbc00675da352fd205d43a6fc4452f2a7fb33e22`, tree
+`9e04e944173f75d7c20e14925da5c601bada14d1`, succeeded on develop #802 /
+run 40974659897 / attempt 1 / DOCS_ONLY. It is the exact parent of this
+source-only observer checkpoint. Failed #799 remains immutable and is not rerun.
+
+`arch146-b-partial-state-readonly-observer` is an additive unified-runner
+registration on `feature/research-arch146-b-partial-state-observer-current`.
+It has a read-only preflight, execute=None, and canonical FULL mapping. The
+predecessor `arch146-b-pre-b2-readiness-source` remains source-only/unchanged.
+No historical pin dictionary is repinned. Historical sections below retain
+their checkpoint-time procedures and never authorize the next host action.
+
+The narrow `WindowsCustodyNative.observe_partial_state_readonly()` holds only
+the fixed protected parent chain with no-follow handles, verifies the actual
+directory/final path/non-reparse/F:/NTFS facts through existing native security
+helpers, and records exact owner/protected DACL/binary ACE tuples. Policy uses
+the accepted Counter multiset semantics, including every SID/mask/type/flags
+field and multiplicity. It probes exactly claim, protected acquisition root,
+OPEN parent and OPEN acquisition root with read attributes/OPEN_EXISTING,
+accepting only native errors 2/3 as absence. It requires no existing OPEN parent,
+reads no contents, enumerates no directory, and closes every handle once.
+
+The registered preflight repeats the same narrow composition twice. Exact
+normalized fact equality is required; ACE ordering alone is immaterial. Drift
+blocks as HOST_STATE_DRIFT; any close ambiguity has priority and blocks as
+HOST_CLOSE_AMBIGUITY. All other exceptions become closed sanitized codes.
+Only validated fixed facts enter successful nonsecret v1 evidence; failed facts
+remain null. Evidence records schema/status/classification, parent path/kind,
+volume/filesystem, owner/protection/non-reparse, exact ACE multiset, four
+absences, stable_repetitions=2 and explicit zero counters for every requested
+effect. Acquisition/OPEN-parent creation are false and protected execution is
+NOT_AUTHORIZED. PASS means only PARTIAL_STATE_OBSERVED_EXACT, never
+READY_FOR_ONE_ARCH146_B2_ACQUISITION_ATTEMPT.
+
+Fake-native tests cover accepted ACE orders and all policy/absence/volume/path
+drift, exceptions, repeated observations, checked closure, forbidden dispatch,
+retained B2 behavior and runner evidence. No test observes the real fixed roots.
+Use fresh F:\AI\temp\pytest\<purpose>-<GUID> for every pytest invocation with
+-p no:cacheprovider. Whole-root non-mutating Ruff 0.17.3 and diff checks precede
+one atomic candidate, general FEATURE/PROSPECTIVE_DEVELOP admission, one push
+and one terminal mapped GitHub FULL. Canonical FULL never runs locally.
+
+This implementation/certification performs no real host observation, token or
+credential observation/input, provider/acquisition/holdout operation, OPEN-parent
+creation, ACL mutation, or scheduler/runtime/paper/broker/live effect. The old
+direct B2 launcher remains NOT_RUN for this continuation. Terminal red OR green
+is STOP for independent ChatGPT exact-source/CI review. After source acceptance
+and integration, one registered observer invocation is the sole next host read;
+its independent review must precede any separately reviewed write/readiness
+boundary. Architecture 134 R3 remains parked. LIVE remains NO-GO.
+
 ## Current custody correction and preserved real-host chronology
 
 Effective-admin source correction is accepted/integrated at

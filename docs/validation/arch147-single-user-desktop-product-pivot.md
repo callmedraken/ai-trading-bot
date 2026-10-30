@@ -1,6 +1,10 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P1/P2 source-only validation contract; P1 accepted/integrated.
+Status: CURRENT P2 source-only corrective validation contract; P1 accepted/
+integrated. Feature CI #809 is preserved green pre-correction source evidence,
+but exact source review rejected its P2 candidate as
+`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`. Real acquisition is `NOT_RUN`;
+no Architecture-146 preflight is restored.
 
 ## Scope
 
@@ -45,6 +49,14 @@ fingerprint semantics while delegating persistence to the injected profile.
 The protected custody adapter remains isolated legacy behavior; it is not
 constructed unconditionally by the current desktop path.
 
+For the desktop profile, `open_files` and `materialize_open` must include and
+readback-verify both `normalized/open/SPY.csv` and `evidence.json` before the
+kernel records `COMPLETE`. If evidence materialization fails, the adapter must
+report `PERSISTENCE_FAILURE`, leave a `STOPPED` terminal record and the
+destination intact, and reject a second attempt as
+`PREEXISTING_DESTINATION`. The wrapper then performs full integrity inspection,
+the OPEN loader, and only then returns sanitized success metadata.
+
 ## Focused evidence
 
 The focused P1 checks cover fixed-root/test-seam behavior, ordinary filesystem
@@ -80,11 +92,11 @@ must be corrected inside this checkpoint; unexpected security, authority,
 credential, provider, or effect ambiguity is a STOP for ChatGPT review.
 
 After terminal CI, ChatGPT independently reviews the exact source and decides
-whether to fast-forward `develop`. After P2 source acceptance/integration and
-develop verification, the automatic next action is the single reviewed real
-SPY acquisition pinned to the accepted HEAD/tree, followed by sanitized evidence
-review and P3 optimizer/walk-forward work if integrity passes. No old B2 gate
-intervenes.
+whether to fast-forward `develop`. After corrective-source acceptance/
+integration and develop verification, the next action is the single reviewed
+real SPY acquisition pinned to the accepted HEAD/tree, followed by sanitized
+evidence review and P3 optimizer/walk-forward work if integrity passes. No old
+B2 gate intervenes.
 
 ## P2 additive focused coverage
 
@@ -107,8 +119,16 @@ corruption of record, evidence, either manifest/partition, raw bars, corporate
 raw or sidecar must fail. The immutable inspection summary exposes no prices
 and grants no strategy holdout admission. Tests classify provider/pagination/
 transport/shape/validation/persistence/input failures and prove no automatic
-retry. Static checks preserve historical credential/preflight classes and
-exclude host-security, holdout-root, Robinhood and broker paths from the bridge.
+retry. New ordering regressions prove evidence and normalized OPEN are present
+before `COMPLETE`, and that evidence-write failure remains `STOPPED` with no
+success or retry. Static checks preserve historical credential/preflight
+classes and exclude host-security, holdout-root, Robinhood and broker paths
+from the bridge.
+
+The #809 candidate remains green CI evidence but was source-review rejected for
+`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`. This corrective child moves
+evidence persistence before `COMPLETE`; real acquisition remains `NOT_RUN`,
+and it does not restore an Architecture-146 preflight.
 
 Run new tests plus existing desktop, fake acquisition/custody, relevant native
 interactive/HTTPS tests, Architecture-147 registration, source authority and CI

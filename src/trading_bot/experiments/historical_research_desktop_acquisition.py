@@ -261,15 +261,6 @@ def acquire_desktop_research(
             stage, reason, observed.failure
         )
         raise DesktopAcquisitionError(stage, category)
-    failed = False
-    try:
-        storage.persist_private("evidence.json", outcome.evidence_bytes).verify(
-            "evidence.json", outcome.evidence_bytes
-        )
-    except Exception:
-        failed = True
-    if failed:
-        raise DesktopAcquisitionError("EVIDENCE", "PERSISTENCE_FAILURE")
     summary = None
     try:
         summary = inspect_desktop_dataset_integrity(storage)

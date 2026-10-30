@@ -43,14 +43,18 @@ strategy holdout admission. Evidence is persisted as `evidence.json`.
 
 The consumed Architecture-146 observer evidence remains historical and was not
 retried. Its `HOST_UNKNOWN` result is not the current research dispatcher or
-next host action. The next safe step is focused verification, exact-file
-staging, one atomic P2 commit, FEATURE + PROSPECTIVE_DEVELOP admission, one push,
-and one terminal mapped CI run, followed by ChatGPT exact-source review.
+next host action. Feature CI #809 is preserved green pre-correction source
+evidence, but ChatGPT exact-source review rejected it as
+`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`: the completion marker could
+precede durable `evidence.json` materialization. The corrective
+child materializes evidence with normalized OPEN before COMPLETE. Real
+acquisition remains `NOT_RUN`; no Architecture-146 preflight is restored. The
+current next step is focused source verification and exact-source review.
 
-After acceptance/integration and develop verification, the automatic next action
-is the single reviewed real SPY acquisition, with no intervening Architecture or
-security/preflight checkpoint. Future command shape (not executable authority
-until source acceptance/integration):
+After corrective-source acceptance/integration and develop verification, the
+next effectful step is the single reviewed real SPY acquisition, with no
+intervening Architecture or security/preflight checkpoint. Future command
+shape (not executable authority until source acceptance/integration):
 
     .\.venv\Scripts\python.exe -B scripts\acquire_desktop_research.py --execute --expected-head <accepted-head> --expected-tree <accepted-tree>
 

@@ -399,13 +399,19 @@ class DesktopResearchStorage(AcquisitionPersistence):
         snapshot: HistoricalResearchDatasetSnapshot,
         evidence_bytes: bytes,
     ) -> tuple[tuple[str, bytes], ...]:
-        del holdout, snapshot, evidence_bytes
-        return (("normalized/open/SPY.csv", opened.normalized_bytes),)
+        del holdout, snapshot
+        return (
+            ("normalized/open/SPY.csv", opened.normalized_bytes),
+            ("evidence.json", evidence_bytes),
+        )
 
     def materialize_open(
         self, files: tuple[tuple[str, bytes], ...]
     ) -> tuple[PersistenceReceipt, ...]:
-        if tuple(path for path, _ in files) != ("normalized/open/SPY.csv",):
+        if tuple(path for path, _ in files) != (
+            "normalized/open/SPY.csv",
+            "evidence.json",
+        ):
             raise DesktopResearchError("desktop OPEN materialization shape mismatch")
         return tuple(self._create(path, body) for path, body in files)
 

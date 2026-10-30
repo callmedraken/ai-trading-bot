@@ -25,6 +25,14 @@ custody requirement, never overwrites a completed file, validates exact bytes
 and readback, leaves incomplete state visible, and has no namespace-promotion
 operation.
 
+P2 feature CI #809 is preserved green pre-correction source evidence, but exact
+source review rejected that candidate as
+`ARCH147_P2_PREMATURE_COMPLETE_MARKER_DEFECT`: `COMPLETE` could be recorded
+before `evidence.json` was durably materialized. This bounded corrective child
+moves evidence into the desktop OPEN materialization before the kernel records
+completion. Real acquisition is `NOT_RUN`; no Architecture-146 preflight is
+restored.
+
 P2 adds the desktop interactive Alpaca research acquisition bridge as another
 atomic source milestone of the same checkpoint, branch, and GitHub-owned FULL
 mapping. This source checkpoint performs zero real provider effects. It reuses

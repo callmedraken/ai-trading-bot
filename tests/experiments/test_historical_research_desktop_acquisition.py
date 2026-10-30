@@ -460,6 +460,123 @@ def test_one_complete_acquisition_uses_kernel_and_frozen_requests(
     )
 
 
+def test_terminal_complete_observes_materialized_open_and_evidence(
+    composition, monkeypatch
+):
+    storage, _, _ = composition
+    materialized = {}
+    built = {}
+    receipts = {}
+    events = []
+    original_build = storage.build_evidence
+    original_materialize = storage.materialize_open
+    original_terminal = storage.record_terminal
+    original_integrity = bridge.inspect_desktop_dataset_integrity
+    original_loader = bridge.load_desktop_open_research
+
+    def build(*args, **kwargs):
+        evidence = original_build(*args, **kwargs)
+        built["evidence.json"] = evidence
+        return evidence
+
+    def materialize(files):
+        materialized.update(files)
+        receipts["files"] = original_materialize(files)
+        return receipts["files"]
+
+    def record_terminal(state, stage):
+        assert state == "MATERIALIZED_AWAITING_INDEPENDENT_ADMISSION"
+        evidence = materialized["evidence.json"]
+        assert evidence == built["evidence.json"]
+        receipts["files"][1].verify("evidence.json", evidence)
+        assert storage.read("evidence.json") == evidence
+        assert (
+            sha256(storage.read("evidence.json")).hexdigest()
+            == sha256(evidence).hexdigest()
+        )
+        assert (
+            storage.read("normalized/open/SPY.csv")
+            == materialized["normalized/open/SPY.csv"]
+        )
+        events.append("terminal")
+        return original_terminal(state, stage)
+
+    def inspect(target):
+        events.append("integrity")
+        return original_integrity(target)
+
+    def load_open(target):
+        events.append("open_loader")
+        return original_loader(target)
+
+    monkeypatch.setattr(storage, "build_evidence", build)
+    monkeypatch.setattr(storage, "materialize_open", materialize)
+    monkeypatch.setattr(storage, "record_terminal", record_terminal)
+    monkeypatch.setattr(bridge, "inspect_desktop_dataset_integrity", inspect)
+    monkeypatch.setattr(bridge, "load_desktop_open_research", load_open)
+
+    summary = acquire(composition)
+
+    assert tuple(materialized) == ("normalized/open/SPY.csv", "evidence.json")
+    assert len(materialized["evidence.json"]) > 0
+    assert events == ["terminal", "integrity", "open_loader"]
+    assert summary["status"] == "SUCCESS"
+    assert summary["OPEN_LOADER"] == summary["FULL_DATASET_INTEGRITY"] == "PASS"
+    assert all(
+        key not in summary
+        for key in ("bars", "o", "h", "l", "c", "v", "api_key_id", "api_secret_key")
+    )
+
+
+def test_evidence_materialization_failure_stops_and_retains_destination(
+    composition, monkeypatch
+):
+    storage, transport, events = composition
+    original_create = storage._create
+    evidence_attempts = []
+    post_kernel = []
+
+    monkeypatch.setattr(
+        bridge,
+        "inspect_desktop_dataset_integrity",
+        lambda target: post_kernel.append(("integrity", target)),
+    )
+    monkeypatch.setattr(
+        bridge,
+        "load_desktop_open_research",
+        lambda target: post_kernel.append(("open_loader", target)),
+    )
+
+    def fail_evidence(relative, body):
+        if relative == "evidence.json":
+            evidence_attempts.append((relative, body))
+            raise OSError(SECRET)
+        return original_create(relative, body)
+
+    monkeypatch.setattr(storage, "_create", fail_evidence)
+    with pytest.raises(bridge.DesktopAcquisitionError) as error:
+        acquire(composition)
+
+    assert error.value.classification == "PERSISTENCE_FAILURE"
+    assert post_kernel == []
+    assert len(evidence_attempts) == 1
+    assert json.loads(storage.read("acquisition.json"))["state"] == "STOPPED"
+    assert (storage.root / "normalized/open/SPY.csv").is_file()
+    assert not (storage.root / "evidence.json").exists()
+    assert storage.root.is_dir()
+    provider_calls = len(transport.requests)
+    prompt_events = list(events)
+
+    with pytest.raises(bridge.DesktopAcquisitionError) as retry_error:
+        acquire(composition)
+
+    assert retry_error.value.classification == "PREEXISTING_DESTINATION"
+    assert len(transport.requests) == provider_calls
+    assert events == prompt_events
+    assert len(evidence_attempts) == 1
+    assert json.loads(storage.read("acquisition.json"))["state"] == "STOPPED"
+
+
 @pytest.mark.parametrize(
     "relative",
     [

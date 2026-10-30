@@ -327,10 +327,27 @@ ARCH146_PARTIAL_STATE_RUFF: Final = (
     "scripts/checkpoint_runner.py",
     *ARCH146_PARTIAL_STATE_TESTS,
 )
+ARCH147_NAME: Final = "arch147-desktop-research-profile"
+ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
+ARCH147_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/experiments/test_historical_research_desktop.py",
+    "tests/experiments/test_historical_research_acquisition_custody.py",
+    "tests/experiments/test_historical_research_dataset.py",
+    "tests/experiments/test_research_strategy_robustness.py",
+    "tests/runtime/checkpoint_runner/test_arch147.py",
+)
+ARCH147_RUFF: Final = (
+    "src/trading_bot/experiments/desktop_research_dataset.py",
+    "src/trading_bot/experiments/historical_research_acquisition.py",
+    "src/trading_bot/experiments/historical_research_dataset.py",
+    "src/trading_bot/experiments/historical_research_desktop.py",
+    "scripts/checkpoint_runner.py",
+    "scripts/current_source_authority.py",
+    *ARCH147_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
-    ARCH146_PARTIAL_STATE_NAME,
-    ARCH146_PRE_B2_NAME,
-    ARCH146B1_NAME,
+    ARCH147_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
@@ -341,6 +358,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_NAME: "full",
     ARCH146_PARTIAL_STATE_NAME: "full",
     ARCH146_PRE_B2_NAME: "full",
     ARCH146B1_NAME: "full",
@@ -26310,6 +26328,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         _arch146b1_authority_check,
         remote_branch=ARCH146B1_BRANCH,
     )
+    values[ARCH147_NAME] = CheckpointSpec(
+        ARCH147_NAME,
+        "Current single-user desktop research storage and loader pivot",
+        ARCH147_TESTS,
+        ARCH147_RUFF,
+        _arch147_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH147_BRANCH,
+    )
     return values
 
 
@@ -26753,7 +26781,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
@@ -26798,7 +26827,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_NAME + " `\n", "", 1)
+        .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
         .replace("              " + ARCH134_READONLY_DIAGNOSTIC_R3_NAME + " `\n", "", 1)
@@ -27752,6 +27782,99 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     return 0 if passed else 1
+
+
+def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Own the current ordinary desktop research profile and source route."""
+    failures = []
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_NAME)
+    if (
+        spec is None
+        or spec.tests != ARCH147_TESTS
+        or spec.ruff_paths != ARCH147_RUFF
+        or spec.remote_branch != ARCH147_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH147_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_NAME) != 1
+        or resolve_ci_checkpoint(specs, ARCH147_BRANCH, "push") != ARCH147_NAME
+    ):
+        failures.append("147 desktop source-only registration drift")
+    if any(
+        name in CURRENT_ACTIVE_CI_CHECKPOINTS
+        for name in (ARCH146_PARTIAL_STATE_NAME, ARCH146_PRE_B2_NAME, ARCH146B1_NAME)
+    ):
+        failures.append("147 consumed Architecture 146 route remains current")
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if workflow.count("              " + ARCH147_NAME + " `\n") != 1:
+        failures.append("147 active CI membership drift")
+    if any(
+        "              " + name + " `\n" in workflow
+        for name in (ARCH146_PARTIAL_STATE_NAME, ARCH146_PRE_B2_NAME, ARCH146B1_NAME)
+    ):
+        failures.append("147 historical Architecture 146 workflow route remains active")
+    desktop_path = repo_root / (
+        "src/trading_bot/experiments/historical_research_desktop.py"
+    )
+    desktop_source = desktop_path.read_text(encoding="utf-8")
+    desktop_tree = ast.parse(desktop_source, filename=str(desktop_path))
+    open_loader = next(
+        node
+        for node in ast.walk(desktop_tree)
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "load_desktop_open_research"
+    )
+    if "ACCEPTED_CUSTODY_ADMISSIONS" in desktop_source or (
+        "load_desktop_final_holdout"
+        in (ast.get_source_segment(desktop_source, open_loader) or "")
+    ):
+        failures.append("147 OPEN loader crosses the final-holdout boundary")
+    if "ResearchStrategyFinalHoldoutAdmission" not in desktop_source:
+        failures.append("147 final loader admission binding missing")
+    if (
+        'DESKTOP_RESEARCH_ROOT = Path(r"F:\\AI\\ai-trading-bot\\data\\research\\'
+        'desktop-v1")' not in desktop_source
+    ):
+        failures.append("147 fixed desktop root drift")
+    for relative in (
+        "src/trading_bot/experiments/desktop_research_dataset.py",
+        "src/trading_bot/experiments/historical_research_desktop.py",
+        "src/trading_bot/portfolio/optimizer.py",
+        "src/trading_bot/experiments/research_candidate.py",
+        "src/trading_bot/experiments/research_candidate_walk_forward.py",
+        "src/trading_bot/experiments/research_strategy_walk_forward.py",
+    ):
+        candidate_path = repo_root / relative
+        candidate = candidate_path.read_text(encoding="utf-8")
+        if relative.startswith("src/trading_bot/experiments/"):
+            candidate_tree = ast.parse(candidate, filename=str(candidate_path))
+            imported = {
+                node.module or ""
+                for node in ast.walk(candidate_tree)
+                if isinstance(node, ast.ImportFrom)
+            } | {
+                alias.name
+                for node in ast.walk(candidate_tree)
+                if isinstance(node, ast.Import)
+                for alias in node.names
+            }
+            if any(
+                module.startswith(("ctypes", "win32", "winreg", "robinhood", "alpaca"))
+                for module in imported
+            ):
+                failures.append("147 desktop path has forbidden host/provider import")
+            if "ACCEPTED_CUSTODY_ADMISSIONS" in candidate:
+                failures.append("147 desktop path depends on custody admission")
+        if (
+            relative != "src/trading_bot/experiments/historical_research_desktop.py"
+            and "load_desktop_final_holdout" in candidate
+        ):
+            failures.append("147 optimizer-facing holdout import: " + relative)
+    return tuple(failures)
 
 
 def _arch146b1_authority_check(repo_root: Path) -> tuple[str, ...]:

@@ -1,6 +1,6 @@
 # Architecture 146-B consolidated pre-B2 source checkpoint
 
-## Current successor — registered read-only partial-state observer
+## Preserved historical successor — registered read-only partial-state observer
 
 ### Current corrective child — local read-only helper ownership
 
@@ -27,7 +27,7 @@ External inspect_open_authority_object stays under its existing Architecture
 Mutation tests reject selected-function invocation and extra native effects
 inside _api; alternate/effectful _close; effectful _error/constructor; native
 and carrier hooks; evidence field/default drift; and wrong direct Win32 calls.
-The exact current source still passes. Observer runtime, native partial/fresh
+The historical source checkpoint described here passed. Observer runtime, native partial/fresh
 observation methods, B2 preflight, R2/R3 wrappers, outer dispatcher and current
 dispatcher owner remain unchanged. Retained tests keep their existing meaning.
 
@@ -718,11 +718,25 @@ No real host inspection/mutation, credential read, provider call, acquisition,
 holdout read, ACL mutation, scheduler/runtime/paper/broker/live effect occurred
 in this correction or integration.
 
-Post-integration repository review establishes that
+Post-integration repository review established that
 `arch146-b-pre-b2-readiness-source` is source-only and has no registered
 preflight function. The historical/direct `scripts.arch146_b2_readonly_preflight`
-launcher is not used as the next continuation. The next source milestone is a
-dedicated reusable registered read-only partial-state observer with no execute
-dispatcher. Only after that observer is source-accepted and integrated may one
-bounded read-only host observation occur. Acquisition remains NOT_AUTHORIZED;
+launcher was not used as the next continuation. The next source milestone in
+that historical sequence was a dedicated reusable registered read-only
+partial-state observer with no execute dispatcher. That sequence is no longer
+the current product boundary. Acquisition remains NOT_AUTHORIZED;
 Architecture 134 R3 remains parked; LIVE remains NO-GO.
+# Architecture 147 current disposition
+
+The consumed read-only Architecture 146-B observation remains immutable
+evidence at
+`F:\AI\temp\ai-trading-bot-checkpoints\operator-b957c4f6bec54413887316ab17929207\arch146-b-partial-state-readonly-observer\preflight-20261030T053329.017181Z\report.json`:
+`IDENTITY_STABLE=True`, `OVERALL=BLOCKED`, `classification=HOST_UNKNOWN`,
+`stable_repetitions=2`, with zero operational counters and no authorization for
+acquisition, OPEN-parent creation, or protected execution. It was not retried.
+
+Architecture 147 replaces protected host readiness as the current desktop P1
+boundary. Ordinary desktop research uses the fixed source-owned desktop root,
+ordinary filesystem integrity, and software-enforced final-holdout admission;
+the old observer is not a current next action. This section records the new
+disposition without rewriting the historical validation chronology below.

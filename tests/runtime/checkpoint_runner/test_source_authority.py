@@ -75,7 +75,7 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
     assert ownership.current_owner("preflight_checkpoint") == "checkpoint_runner"
 
 
-def test_current_preflight_chain_and_observer_registration_pass_without_dispatch(
+def test_historical_preflight_chain_and_observer_registration_pass_without_dispatch(
     monkeypatch,
 ):
     def forbidden(*args, **kwargs):
@@ -87,11 +87,11 @@ def test_current_preflight_chain_and_observer_registration_pass_without_dispatch
     assert specs[runner.ARCH146_PARTIAL_STATE_NAME].execute is None
     assert specs[runner.ARCH146_PRE_B2_NAME].preflight is None
     assert specs[runner.ARCH146_PRE_B2_NAME].execute is None
-    assert current.current_preflight_dispatch_failures(ROOT) == ()
+    assert current.historical_preflight_dispatch_failures(ROOT) == ()
 
 
 @pytest.mark.parametrize("revision", ["r2", "r3"])
-def test_current_preflight_predecessor_authority_owns_only_its_security(
+def test_historical_preflight_predecessor_authority_owns_only_its_security(
     monkeypatch, revision
 ):
     authority = getattr(
@@ -107,12 +107,12 @@ def test_current_preflight_predecessor_authority_owns_only_its_security(
     assert authority(ROOT) == ()
     assert (
         "current preflight outer dispatcher drift"
-        in current.current_preflight_dispatch_failures(ROOT)
+        in current.historical_preflight_dispatch_failures(ROOT)
     )
 
 
 @pytest.mark.parametrize("revision", ["r2", "r3"])
-def test_current_preflight_predecessor_registration_remains_exact(
+def test_historical_preflight_predecessor_registration_remains_exact(
     monkeypatch, revision
 ):
     name = getattr(runner, f"ARCH134_READONLY_DIAGNOSTIC_{revision.upper()}_NAME")
@@ -125,13 +125,13 @@ def test_current_preflight_predecessor_registration_remains_exact(
     assert f"Diagnostic {revision.upper()} registration drift" in authority(ROOT)
     assert (
         "current preflight registration drift: " + name
-        in current.current_preflight_dispatch_failures(ROOT)
+        in current.historical_preflight_dispatch_failures(ROOT)
     )
 
 
 @pytest.mark.parametrize("revision", ["r2", "r3"])
 @pytest.mark.parametrize("suffix", ["_preflight", "_preflight_checkpoint"])
-def test_current_preflight_inner_security_ast_pins_still_fail(
+def test_historical_preflight_inner_security_ast_pins_still_fail(
     monkeypatch, revision, suffix
 ):
     name = f"_arch134_readonly_diagnostic_{revision}{suffix}"
@@ -215,7 +215,7 @@ def test_current_preflight_inner_security_ast_pins_still_fail(
         ),
     ],
 )
-def test_current_preflight_structural_owner_rejects_bypass_and_wrong_route(
+def test_historical_preflight_structural_owner_rejects_bypass_and_wrong_route(
     tmp_path, wrapper, old, new, expected
 ):
     source = (ROOT / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
@@ -230,15 +230,14 @@ def test_current_preflight_structural_owner_rejects_bypass_and_wrong_route(
     target = tmp_path / "scripts/checkpoint_runner.py"
     target.parent.mkdir()
     target.write_text(source.replace(original, modified, 1), encoding="utf-8")
-    failures = current.current_preflight_dispatch_failures(tmp_path)
+    failures = current.historical_preflight_dispatch_failures(tmp_path)
     assert any("current preflight " + expected in failure for failure in failures)
 
 
-def test_current_preflight_global_owner_is_composed_into_current_authority(monkeypatch):
+def test_current_authority_does_not_require_historical_outer_preflight(monkeypatch):
     monkeypatch.setattr(runner, "preflight_checkpoint", lambda *args, **kwargs: {})
-    assert (
-        "current preflight outer dispatcher drift"
-        in current.current_authority_check(ROOT)
+    assert "current preflight outer dispatcher drift" not in (
+        current.current_authority_check(ROOT)
     )
 
 
@@ -253,18 +252,20 @@ def test_current_preflight_global_owner_is_composed_into_current_authority(monke
         (runner.ARCH146_PRE_B2_NAME, "execute"),
     ],
 )
-def test_current_preflight_registration_cannot_gain_effects(monkeypatch, name, field):
+def test_historical_preflight_registration_cannot_gain_effects(
+    monkeypatch, name, field
+):
     specs = runner._checkpoint_specs()
     specs[name] = replace(specs[name], **{field: lambda: {}})
     monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
-    failures = current.current_preflight_dispatch_failures(ROOT)
+    failures = current.historical_preflight_dispatch_failures(ROOT)
     assert any(
         "registration drift" in failure or "source-only predecessor drift" in failure
         for failure in failures
     )
 
 
-def test_current_preflight_retains_existing_security_functions_and_pin_maps():
+def test_historical_preflight_retains_existing_security_functions_and_pin_maps():
     relative = "scripts/checkpoint_runner.py"
     preserved = subprocess.run(
         ["git", "show", "f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40:" + relative],

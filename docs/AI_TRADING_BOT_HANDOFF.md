@@ -1,6 +1,33 @@
 # AI Trading Bot — Current Handoff
 
-## Architecture 146 partial-state observer — source-only review boundary
+## Current boundary — Architecture 147 desktop research P1
+
+Architecture 147 is the controlling current product roadmap for the private
+single-user Windows desktop bot. The current source milestone is the
+source-only desktop research simplification on
+`feature/research-desktop-product-pivot-current`, checkpoint
+`arch147-desktop-research-profile`, with `preflight=None`, `execute=None`, and
+GitHub-owned canonical FULL. Its fixed production root is
+`F:\AI\ai-trading-bot\data\research\desktop-v1`; implementation and tests use
+only an explicit temporary-root seam and do not create that production root.
+
+P1 uses ordinary create-only filesystem storage, preserves the Architecture
+146-A dataset/session identities, exposes only validated OPEN data to ordinary
+research, and requires the existing Architecture-145
+`ResearchStrategyFinalHoldoutAdmission` for explicit FINAL_HOLDOUT loading.
+The optimizer and walk-forward path cannot import the final-holdout loader.
+P1 has no provider, credential, Robinhood, paper, broker, or live effect.
+Local deterministic strategy and risk remain authoritative; official
+Robinhood MCP / Agentic Trading is the future brokerage transport boundary.
+
+The consumed Architecture-146 observer evidence remains historical and was not
+retried. Its `HOST_UNKNOWN` result is not the current research dispatcher or
+next host action. The next safe step is focused verification, exact-file
+staging, FEATURE + PROSPECTIVE_DEVELOP admission, one atomic commit, one push,
+and one mapped CI run, followed by ChatGPT exact-source review. Do not run P2
+real acquisition during P1.
+
+## Preserved Architecture 146 historical chronology
 
 This candidate starts exactly at docs closeout
 `cbc00675da352fd205d43a6fc4452f2a7fb33e22`, tree
@@ -122,7 +149,7 @@ Architecture 134 R3 remains consumed/parked at
 `8af6ef68a5a7a0558b938806719a3b3837ab8a8716a852573ed39d05a7411cb4`.
 No retry or R4. LIVE remains NO-GO.
 
-## Next continuation boundary
+## Preserved historical observer boundary
 
 Repository review after #801 found no registered Architecture 146 partial-state
 observer. The current `arch146-b-pre-b2-readiness-source` checkpoint is
@@ -132,23 +159,18 @@ binding but no preflight function. The existing
 preflight machinery and is not accepted as the next registered partial-state
 observer.
 
-The candidate now adds that dedicated registration without changing the
+That historical candidate added a dedicated registration without changing the
 source-only predecessor or its direct B2 launcher. Its narrow native method
-holds the protected parent chain, inspects the exact parent policy, and probes
+held the protected parent chain, inspected the exact parent policy, and probed
 claim/protected-root/OPEN-parent/OPEN-root absence using read attributes,
-OPEN_EXISTING and no-follow. It does not require the OPEN parent to exist.
-Two identical observations and unambiguous closure are required. Evidence is
-sanitized and binds binary ACE tuples, parent/volume facts, absences and zero
-effect counters. No token/credential/provider/acquisition dispatch exists.
+OPEN_EXISTING and no-follow. It did not require the OPEN parent to exist.
+Those details remain historical evidence only and are not part of the current
+desktop research path.
 
-Do NOT yet run the direct B2 launcher, `observe_fresh()`, Set-Acl, create the
-OPEN parent, read credentials, invoke the provider, acquire data, or read holdout
-bytes.
+The direct B2 launcher, `observe_fresh()`, Set-Acl, OPEN-parent creation,
+credential reads, provider invocation, acquisition, and holdout reads remain
+outside the current P1 boundary and were not retried.
 
-The immediate next action is ChatGPT independent review of the exact committed
-candidate and terminal GitHub FULL evidence. After acceptance/integration,
-ChatGPT will provide one exact registered observer invocation as the sole next
-host read. Its PASS means only PARTIAL_STATE_OBSERVED_EXACT, never B2 READY;
-acquisition_authorized=false, open_parent_creation_authorized=false, and
-protected_execution=NOT_AUTHORIZED. Independently review that observation
-before any separately reviewed OPEN-parent creation or ordinary B2 preflight.
+The current immediate action is the Architecture-147 source candidate review
+described above. No registered host observer follows its CI, and no observer
+PASS or old B2 readiness state is required for desktop research.

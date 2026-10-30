@@ -1940,3 +1940,21 @@ GitHub ancestry review proves `origin/develop` at
 feature branch is 517 commits ahead and 0 behind, with no open PR. Architecture
 131 therefore has no remaining source or qualification checkpoint before
 repository integration. PR creation and merge remain separately protected.
+# Architecture 147 current product position
+
+Architecture 147 retains the accepted Robinhood MCP foundations already
+present in this repository: the official MCP SDK/transport boundary, OAuth,
+account resolution, quotes, historicals, order review and observation,
+synthetic/forward-paper operation, deterministic `RiskManager` integration,
+and audit/evidence models.
+
+P1 makes no Robinhood MCP call and does not modify credentials or enable order
+mutation. The intended future composition is:
+
+    local strategy -> deterministic RiskManager -> exact approved order intent
+      -> official Robinhood MCP / Agentic Trading execution
+      -> broker result/reconciliation -> durable audit
+
+MCP is transport/execution, not strategy authority. Paper remains the default;
+real mutation and explicitly armed restricted live trading are later roadmap
+milestones and must not be inferred from this source-only research checkpoint.

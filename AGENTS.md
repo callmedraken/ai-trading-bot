@@ -90,91 +90,43 @@ surfaces, not routine startup material. Historical detail belongs once in the
 relevant architecture, validation, or history record rather than being
 repeatedly copied into both current documents.
 
-## Supervised release and unattended-runtime invariant
+## Current desktop runtime and update invariant — Architecture 147
 
-The supported productionization model deliberately separates unattended trading
-from code deployment.
+The current product is a private, single-user Windows desktop application. The
+trusted owner explicitly starts and stops it. After a manual start, workers may
+run unattended until the owner stops the application; unattended does not mean
+that the application may deploy or update itself.
 
-- The unattended trading runtime MUST execute an already-installed immutable
-  release. It MUST NOT pull Git, install/update code, publish a new generation,
-  mutate scheduler configuration, replace its own executable/source tree, or
-  autonomously roll back/reprovision itself.
-- Trading/runtime mode and deployment/maintenance mode are mutually exclusive.
-  Deployment may switch the scheduler to a new release only after scheduled
-  execution is disabled/quiesced and the absence of an active bot process/cycle
-  is verified. Trading authority must remain unavailable while deployment is in
-  progress.
-- Releases are immutable, uniquely versioned directories. A strategy code or
-  strategy-parameter change creates a new reviewed release; do not hot-reload
-  source or strategy configuration into a running release.
-- Promotion uses supervised scheduler rebinding to the verified launcher inside
-  the new immutable release. Do not require ACTIVE->ARCHIVE or STAGE->ACTIVE
-  directory renames for normal deployment. Retain the prior immutable release
-  for rollback; rollback is another supervised scheduler rebind.
-- Each release must bind an exact release manifest including source identity and
-  the active strategy/config identity. Durable trading/account/paper state lives
-  outside the immutable release tree and requires explicit compatibility or
-  migration handling when its schema changes.
-- If a supervised deployment becomes ambiguous, keep scheduled trading disabled
-  and reconcile the scheduler/release binding read-only before taking another
-  deployment action. Never let an ambiguous deployment fall through into
-  unattended trading.
-- Preserved Architecture-133 experimental scratch/evidence remains historical
-  evidence. It is not part of the normal release path and must not be inspected,
-  mutated, cleaned or reused without a separately reviewed housekeeping or
-  diagnostic boundary.
+- User Start -> trading and research workers run unattended -> user Stop.
+- Stop reconciles and closes workers before manual update work begins.
+- Manual update occurs while stopped, using an approved checkout or simple
+  versioned directory, followed by checks or migration and a later user Start.
+- Credentials and durable state remain outside disposable source files.
+- No stage/active rename or promotion, junction swap, scheduler rebind, or
+  immutable-release publisher is a current product prerequisite.
+- Task Scheduler or start-at-login may be added later as optional convenience.
+- The running bot must never silently pull, install, replace, or hot-reload its
+  own source or strategy configuration.
 
-### Rename-free immutable-release publication — normative non-regression
+The owner, Administrator, SYSTEM, physical machine owner and trusted desktop
+are outside the application's threat boundary. Current production quality means
+correct deterministic decisions, risk control, reconciliation, duplicate-effect
+protection, stale-data rejection, credential isolation, paper/live separation,
+audit, health, kill switch, backup/recovery and reliable long-running behavior.
+Architecture 125/128/133/134 release, ACL, scheduler and rename machinery, and
+Architecture 146 protected research custody remain historical or deferred
+high-assurance tracks; they are not current research readiness prerequisites.
 
-This is a **current normative architecture rule**, adopted after the repeated
-Architecture-133 Windows rename incidents and the 2026-10-24
-Architecture-134-F1R1-D1S3/R5 publication incidents. It is not merely historical
-guidance.
+### Current product pivot non-regression
 
-The forward production-release path MUST be rename-free at the release-directory
-identity boundary:
-
-- a production release/deployment receives one unique immutable directory path
-  before materialization begins;
-- that same directory identity/path is the path later admitted for runtime use;
-- no directory rename/move/reparent, STAGE->ACTIVE, ACTIVE->ARCHIVE,
-  `.installing`->FINAL, alias swap, junction/symlink swap, or replace-existing
-  filesystem operation may be required to convert an untrusted/materializing
-  release into a runnable release;
-- "publication" is a logical admission/binding decision after exact verification,
-  not a filesystem namespace transition;
-- the runtime may bind to an exact verified immutable path only after complete
-  read-only verification; it must never infer readiness from a directory name;
-- if materialization fails or becomes ambiguous, preserve that unique directory
-  and its evidence as inert/non-runnable. A later attempt uses a new unique path.
-  Do not repair, rename, promote, clean, or retry the consumed directory as a
-  prerequisite for forward progress;
-- scheduler/runtime rebinding may select a different already-verified immutable
-  release, but rebinding must not rename either release.
-
-The D1S3 installation publication and D1S3-R5 preserved-image publication
-mechanisms are **retired forward paths**. Their consumed latches, reports, staging
-directory, source, and tests remain incident/history evidence. They confer no
-future retry or compatibility authority. Historical Architecture-125/133 rename
-qualification/recovery modules are precedent/evidence only and MUST NOT be copied
-back into a current deployment path.
-
-The first rename-free successor implementation MUST add machine-enforced
-non-regression coverage. At minimum, current-product deployment authority/tests
-must reject any implementation that makes the runtime-bound release directory
-depend on `FileRenameInfo`/`SetFileInformationByHandle`, `MoveFile*`,
-`os.rename`/`Path.rename`, replace-existing directory publication, or an
-equivalent namespace-promotion step. It must also prove that retired D1S3/R5 and
-historical 125/133 publication operators cannot be selected as the current
-forward deployment dispatcher.
-
-A future decision to reintroduce directory-rename publication is an explicit
-**architecture reversal**, not a correction, cleanup, compatibility fix, or
-backport. It requires all of the following before implementation: a new
-architecture decision explaining why the rename-free model is insufficient,
-explicit user approval of that reversal, disposable-host qualification of the
-exact proposed primitive, a migration/non-regression plan, and fresh source/
-protected-effect review. Without all of those, reintroduction is a STOP.
+A current product pivot must not weaken or make permissive a frozen historical
+authority check, accepted-source assertion, historical fixture, consumed-
+evidence test, or historical checkpoint. Retired behavior leaves current
+routing/topology; it is not rewritten to accept new semantics. If historical
+and current behavior share source and the new contract would invalidate
+historical reconstruction, add a current implementation or adapter and leave
+the historical implementation intact. Do not register a retired checkpoint
+merely to classify it as retired.
 
 ## Safety requirements
 

@@ -737,6 +737,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH147_NAME: "full",
         runner.ARCH146_PARTIAL_STATE_NAME: "full",
         runner.ARCH146_PRE_B2_NAME: "full",
         runner.ARCH146B1_NAME: "full",
@@ -1057,7 +1058,9 @@ def test_arch146a_registration_and_additive_successor_authority(monkeypatch):
     )
     assert runner.resolve_ci_certification_profile(spec.name) == "full"
     assert "tests/experiments/test_historical_research_dataset.py" in spec.tests
-    assert runner._arch146a_authority_check(root) == ()
+    # Architecture 146-A remains a strict historical contract check.  Its
+    # aggregate success predicate is intentionally not a current-topology
+    # assertion now that Architecture 147 owns the current research route.
     assert runner._arch134_r5_authority_check(root) == ()
     assert (
         runner._arch146a_predecessor_active_inventory()
@@ -1129,7 +1132,6 @@ def test_arch146a_c1_exact_successors_and_frozen_failed_maps(monkeypatch):
     runner._arch146a_maps()
     runner._arch146a_c1_maps()
     assert runner._arch132_r3n_c1_arch146a_c2_authority_check(root) == ()
-    assert runner._arch146a_authority_check(root) == ()
     for ast_pin, before, after in (
         (True, runner.ARCH146A_C1_AST_PREDECESSORS, runner.ARCH146A_C1_AST_PINS),
         (False, runner.ARCH146A_C1_BLOB_PREDECESSORS, runner.ARCH146A_C1_BLOB_PINS),
@@ -1171,7 +1173,6 @@ def test_arch146a_c2_solver_pin_matches_accepted_fixture_provenance():
 def test_arch146a_c2_maps_and_wrong_predecessors_fail_closed(monkeypatch):
     root = Path(runner.__file__).resolve().parents[1]
     assert runner._arch146a_c2_authority_check(root) == ()
-    assert runner._arch146a_authority_check(root) == ()
     for ast_pin, before, after in (
         (True, runner.ARCH146A_C2_AST_PREDECESSORS, runner.ARCH146A_C2_AST_PINS),
         (False, runner.ARCH146A_C2_BLOB_PREDECESSORS, runner.ARCH146A_C2_BLOB_PINS),
@@ -1692,6 +1693,14 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
     monkeypatch.setattr(runner, "_source_gate_phase", lambda: "all")
     monkeypatch.setattr(runner, "_source_gate_shard", lambda: None)
     monkeypatch.setattr(runner, "_prepublication_source", lambda _: source)
+    # Admission selection is the behavior under test.  The installed local
+    # Ruff may differ from the CI-pinned version, so keep this unit test
+    # independent of that environment detail.
+    monkeypatch.setattr(
+        runner,
+        "check_ruff_version",
+        lambda *_args, **_kwargs: {"exit_code": 0},
+    )
     captured = {}
 
     def capture(spec, **_kwargs):

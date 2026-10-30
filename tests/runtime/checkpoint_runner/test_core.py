@@ -133,6 +133,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH147_NAME,
         runner.ARCH146_PARTIAL_STATE_NAME,
         runner.ARCH146_PRE_B2_NAME,
         runner.ARCH146B1_NAME,
@@ -434,6 +435,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH
         if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH
+        if spec.name == runner.ARCH147_NAME:
+            expected_branch = runner.ARCH147_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1493,6 +1496,11 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 )
             )
         )
+        if name == runner.ARCH147_NAME:
+            expected = (
+                *runner.COMMON_TESTS,
+                "tests/runtime/checkpoint_runner/test_arch147.py",
+            )
         if name in {
             runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
             runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
@@ -2096,16 +2104,15 @@ def test_b1_is_exact_source_only_full_mapping():
         runner.resolve_ci_checkpoint(
             runner._checkpoint_specs(), runner.ARCH146B1_BRANCH, "push"
         )
-        == spec.name
+        is None
     )
     assert runner.resolve_ci_certification_profile(spec.name) == "full"
-    assert runner._arch146b1_authority_check(root) == ()
-    assert spec.name in current_source_authority.develop_static_checkpoints(root)
+    # B1 remains a strict historical source contract, but is no longer a
+    # current route or current-product success prerequisite.
+    assert spec.name not in current_source_authority.develop_static_checkpoints(root)
     workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text()
     assert runner._arch134_current_batch_workflow_is_reviewed(workflow)
-    assert not runner._arch134_current_batch_workflow_is_reviewed(
-        workflow.replace("              " + spec.name + " `\n", "", 1)
-    )
+    assert spec.name not in workflow
 
 
 def test_b1_rejects_protected_dispatch_or_mapping_drift(monkeypatch):

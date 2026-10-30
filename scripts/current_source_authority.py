@@ -58,8 +58,8 @@ def develop_static_checkpoints(repo_root: Path) -> tuple[str, ...]:
     return names
 
 
-def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
-    """Own the mutable outer chain; retain exact inner security dispatch pins.
+def historical_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
+    """Preserve the Architecture 146/134 preflight authority graph exactly.
 
     This static check never dispatches a preflight. Additive outer layers belong
     here rather than in predecessor authorities that own their own semantics.
@@ -169,6 +169,33 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
         or predecessor.execute is not None
     ):
         failures.append("current preflight source-only predecessor drift")
+    return tuple(failures)
+
+
+def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
+    """Own the current Architecture 147 route without host dispatch."""
+    from scripts import checkpoint_runner as runner
+
+    del repo_root
+    spec = runner._checkpoint_specs().get(runner.ARCH147_NAME)
+    if spec is None:
+        return ("Architecture 147 checkpoint registration missing",)
+    failures = []
+    if spec.preflight is not None:
+        failures.append("Architecture 147 current preflight must be None")
+    if spec.execute is not None:
+        failures.append("Architecture 147 current execute must be None")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_NAME:
+        failures.append("Architecture 147 is not the current first checkpoint")
+    if any(
+        name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+        for name in (
+            runner.ARCH146_PARTIAL_STATE_NAME,
+            runner.ARCH146_PRE_B2_NAME,
+            runner.ARCH146B1_NAME,
+        )
+    ):
+        failures.append("retired Architecture 146 checkpoint remains current")
     return tuple(failures)
 
 

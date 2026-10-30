@@ -245,6 +245,163 @@ class AcquisitionCustody(Protocol):
     def record_terminal(self, state: str, stage: str) -> None: ...
 
 
+class AcquisitionPersistence(Protocol):
+    """Profile-owned persistence seam used by the shared acquisition kernel.
+
+    The kernel owns request, pagination, normalization and dataset semantics.
+    A profile owns its own inspection, evidence, filesystem layout and
+    persistence rules.  In particular, the kernel never constructs a custody
+    plan or assumes that a profile has a protected Windows root.
+    """
+
+    def claim_attempt(self, attempt_id: str) -> bool: ...
+
+    def prepare(self) -> None: ...
+
+    def inspect(self) -> object: ...
+
+    def persist_raw(self, relative_path: str, body: bytes) -> PersistenceReceipt: ...
+
+    def persist_private(
+        self, relative_path: str, body: bytes
+    ) -> PersistenceReceipt: ...
+
+    def build_evidence(
+        self,
+        *,
+        source_head: str,
+        source_tree: str,
+        attempt_id: str,
+        session_authority: HistoricalSessionAuthority,
+        bars_pages: tuple[bytes, ...],
+        corporate_action_pages: tuple[bytes, ...],
+        snapshot: HistoricalResearchDatasetSnapshot,
+        open_manifest: HistoricalResearchPartitionManifest,
+        holdout_manifest: HistoricalResearchPartitionManifest,
+    ) -> bytes: ...
+
+    def verify_dataset(
+        self,
+        snapshot: HistoricalResearchDatasetSnapshot,
+        open_material: HistoricalResearchPartitionMaterial,
+        holdout_material: HistoricalResearchPartitionMaterial,
+        session_authority: HistoricalSessionAuthority,
+    ) -> None: ...
+
+    def open_files(
+        self,
+        opened: HistoricalResearchPartitionMaterial,
+        holdout: HistoricalResearchPartitionMaterial,
+        snapshot: HistoricalResearchDatasetSnapshot,
+        evidence_bytes: bytes,
+    ) -> tuple[tuple[str, bytes], ...]: ...
+
+    def materialize_open(
+        self, files: tuple[tuple[str, bytes], ...]
+    ) -> tuple[PersistenceReceipt, ...]: ...
+
+    def record_terminal(self, state: str, stage: str) -> None: ...
+
+
+class LegacyCustodyPersistenceAdapter:
+    """Keep the protected 146-B adapter available as legacy/deferred source."""
+
+    def __init__(self, custody: AcquisitionCustody) -> None:
+        self._custody = custody
+
+    def claim_attempt(self, attempt_id: str) -> bool:
+        return self._custody.claim_attempt(attempt_id, CustodyPersistencePlan())
+
+    def prepare(self) -> None:
+        self._custody.prepare_protected(CustodyPersistencePlan())
+
+    def inspect(self) -> CustodyInspection:
+        return self._custody.inspect()
+
+    def persist_raw(self, relative_path: str, body: bytes) -> PersistenceReceipt:
+        return self._custody.persist_protected(relative_path, body)
+
+    def persist_private(self, relative_path: str, body: bytes) -> PersistenceReceipt:
+        return self._custody.persist_protected(relative_path, body)
+
+    def build_evidence(
+        self,
+        *,
+        source_head: str,
+        source_tree: str,
+        attempt_id: str,
+        session_authority: HistoricalSessionAuthority,
+        bars_pages: tuple[bytes, ...],
+        corporate_action_pages: tuple[bytes, ...],
+        snapshot: HistoricalResearchDatasetSnapshot,
+        open_manifest: HistoricalResearchPartitionManifest,
+        holdout_manifest: HistoricalResearchPartitionManifest,
+    ) -> bytes:
+        return HistoricalResearchCustodyEvidence(
+            source_head,
+            source_tree,
+            attempt_id,
+            session_authority.identity,
+            session_authority.digest,
+            tuple(sha256(page).hexdigest() for page in bars_pages),
+            tuple(sha256(page).hexdigest() for page in corporate_action_pages),
+            snapshot,
+            open_manifest,
+            holdout_manifest,
+        ).to_bytes()
+
+    def verify_dataset(
+        self,
+        snapshot: HistoricalResearchDatasetSnapshot,
+        open_material: HistoricalResearchPartitionMaterial,
+        holdout_material: HistoricalResearchPartitionMaterial,
+        session_authority: HistoricalSessionAuthority,
+    ) -> None:
+        verify_historical_research_custodian_dataset(
+            snapshot, open_material, holdout_material, session_authority
+        )
+
+    @staticmethod
+    def open_files(
+        opened: HistoricalResearchPartitionMaterial,
+        holdout: HistoricalResearchPartitionMaterial,
+        snapshot: HistoricalResearchDatasetSnapshot,
+        evidence_bytes: bytes,
+    ) -> tuple[tuple[str, bytes], ...]:
+        return (
+            ("normalized/open/SPY.csv", opened.normalized_bytes),
+            ("manifests/open-partition.json", opened.manifest.to_json().encode()),
+            ("manifests/holdout-commitment.json", holdout.manifest.to_json().encode()),
+            ("manifests/dataset-commitment.json", snapshot.to_json().encode()),
+            ("manifests/custody-evidence.json", evidence_bytes),
+        )
+
+    def materialize_open(
+        self, files: tuple[tuple[str, bytes], ...]
+    ) -> tuple[PersistenceReceipt, ...]:
+        return self._custody.materialize_open(files)
+
+    def record_terminal(self, state: str, stage: str) -> None:
+        self._custody.record_terminal(state, stage)
+
+
+def _adapt_persistence(value: object) -> AcquisitionPersistence:
+    if all(
+        hasattr(value, name)
+        for name in (
+            "claim_attempt",
+            "prepare",
+            "persist_raw",
+            "persist_private",
+            "build_evidence",
+            "verify_dataset",
+            "open_files",
+        )
+    ):
+        return value  # type: ignore[return-value]
+    return LegacyCustodyPersistenceAdapter(value)  # type: ignore[arg-type]
+
+
 @dataclass(frozen=True, slots=True)
 class AcquisitionOutcome:
     state: str
@@ -289,7 +446,7 @@ def _collect(
     stream: AcquisitionStream,
     transport: AcquisitionTransport,
     credentials: AcquisitionCredentials,
-    custody: AcquisitionCustody,
+    persistence: AcquisitionPersistence,
 ) -> tuple[bytes, ...]:
     pages = []
     digests = set()
@@ -313,12 +470,10 @@ def _collect(
         total_bytes += len(response.body)
         if total_bytes > MAX_STREAM_BYTES:
             raise _Stop("STREAM_SIZE_BOUND")
-        custody.inspect().verify()
+        persistence.inspect().verify()
         relative = f"vendor-raw/{stream.value}/{index:04d}.json"
-        custody.persist_protected(relative, response.body).verify(
-            relative, response.body
-        )
-        custody.inspect().verify()
+        persistence.persist_raw(relative, response.body).verify(relative, response.body)
+        persistence.inspect().verify()
         if response.status != 200:
             if response.status in (401, 403):
                 raise _Stop("HTTP_AUTH_OR_ENTITLEMENT")
@@ -510,11 +665,11 @@ class HistoricalResearchAcquisitionOperator:
         self,
         transport: AcquisitionTransport,
         credentials: CredentialSource,
-        custody: AcquisitionCustody,
+        persistence: AcquisitionPersistence | AcquisitionCustody,
     ) -> None:
         self._transport = transport
         self._credentials = credentials
-        self._custody = custody
+        self._persistence = _adapt_persistence(persistence)
         self._used = False
 
     def run(
@@ -558,29 +713,26 @@ class HistoricalResearchAcquisitionOperator:
                     session_authority=session_authority,
                 )
             stage = "DURABLE_CLAIM"
-            if (
-                self._custody.claim_attempt(attempt_id, CustodyPersistencePlan())
-                is not True
-            ):
+            if self._persistence.claim_attempt(attempt_id) is not True:
                 raise _Stop("ATTEMPT_OR_DESTINATION_NOT_FRESH")
             claimed = True
-            stage = "PREPARE_PROTECTED"
-            self._custody.prepare_protected(CustodyPersistencePlan())
-            self._custody.inspect().verify()
+            stage = "PREPARE_STORAGE"
+            self._persistence.prepare()
+            self._persistence.inspect().verify()
             stage = "CREDENTIALS"
             credentials = self._credentials.read()
             if type(credentials) is not AcquisitionCredentials:
                 raise _Stop("INVALID_CREDENTIAL_ADAPTER")
             stage = "BARS_ACQUISITION"
             pages = _collect(
-                AcquisitionStream.BARS, self._transport, credentials, self._custody
+                AcquisitionStream.BARS, self._transport, credentials, self._persistence
             )
             stage = "CORPORATE_ACTION_ACQUISITION"
             actions = _collect(
                 AcquisitionStream.CORPORATE_ACTIONS,
                 self._transport,
                 credentials,
-                self._custody,
+                self._persistence,
             )
             credentials.close()
             stage = "NORMALIZATION_AND_CUSTODIAN_VERIFICATION"
@@ -622,10 +774,8 @@ class HistoricalResearchAcquisitionOperator:
                 open_corporate_action_sha256=sha256(sidecar).hexdigest(),
                 holdout_corporate_action_sha256=sha256(sidecar).hexdigest(),
             )
-            verify_historical_research_custodian_dataset(
-                snapshot, opened, held, session_authority
-            )
-            stage = "PROTECTED_PERSISTENCE"
+            self._persistence.verify_dataset(snapshot, opened, held, session_authority)
+            stage = "DATASET_PERSISTENCE"
             for relative, body in (
                 ("normalized/holdout/SPY.csv", held.normalized_bytes),
                 ("corporate-actions/sidecar.json", sidecar),
@@ -633,39 +783,31 @@ class HistoricalResearchAcquisitionOperator:
                 ("manifests/holdout.json", held.manifest.to_json().encode()),
                 ("manifests/snapshot.json", snapshot.to_json().encode()),
             ):
-                self._custody.inspect().verify()
-                self._custody.persist_protected(relative, body).verify(relative, body)
-                self._custody.inspect().verify()
-            evidence = HistoricalResearchCustodyEvidence(
-                source_head,
-                source_tree,
-                attempt_id,
-                session_authority.identity,
-                session_authority.digest,
-                tuple(sha256(page).hexdigest() for page in pages),
-                tuple(sha256(page).hexdigest() for page in actions),
-                snapshot,
-                opened.manifest,
-                held.manifest,
+                self._persistence.inspect().verify()
+                self._persistence.persist_private(relative, body).verify(relative, body)
+                self._persistence.inspect().verify()
+            evidence_bytes = self._persistence.build_evidence(
+                source_head=source_head,
+                source_tree=source_tree,
+                attempt_id=attempt_id,
+                session_authority=session_authority,
+                bars_pages=pages,
+                corporate_action_pages=actions,
+                snapshot=snapshot,
+                open_manifest=opened.manifest,
+                holdout_manifest=held.manifest,
             )
-            evidence_bytes = evidence.to_bytes()
             stage = "OPEN_MATERIALIZATION"
-            files = (
-                ("normalized/open/SPY.csv", opened.normalized_bytes),
-                ("manifests/open-partition.json", opened.manifest.to_json().encode()),
-                ("manifests/holdout-commitment.json", held.manifest.to_json().encode()),
-                ("manifests/dataset-commitment.json", snapshot.to_json().encode()),
-                ("manifests/custody-evidence.json", evidence_bytes),
-            )
-            self._custody.inspect().verify()
-            receipts = self._custody.materialize_open(files)
+            files = self._persistence.open_files(opened, held, snapshot, evidence_bytes)
+            self._persistence.inspect().verify()
+            receipts = self._persistence.materialize_open(files)
             if type(receipts) is not tuple or len(receipts) != len(files):
                 raise _Stop("OPEN_PERSISTENCE_AMBIGUITY")
             for receipt, (relative, body) in zip(receipts, files, strict=True):
                 receipt.verify(relative, body)
-            self._custody.inspect().verify()
+            self._persistence.inspect().verify()
             stage = "MATERIALIZED_AWAITING_INDEPENDENT_ADMISSION"
-            self._custody.record_terminal(stage, stage)
+            self._persistence.record_terminal(stage, stage)
             return AcquisitionOutcome(stage, stage, evidence_bytes)
         except Exception as exc:
             reason = "DEPENDENCY_OR_VALIDATION_FAILURE"
@@ -673,7 +815,9 @@ class HistoricalResearchAcquisitionOperator:
                 reason = str(exc)
             if claimed:
                 try:
-                    self._custody.record_terminal("STOP_RECONCILIATION_REQUIRED", stage)
+                    self._persistence.record_terminal(
+                        "STOP_RECONCILIATION_REQUIRED", stage
+                    )
                 except Exception:
                     reason = "TERMINAL_EVIDENCE_PERSISTENCE_AMBIGUITY"
             return AcquisitionOutcome(

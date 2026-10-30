@@ -1,6 +1,6 @@
 # Architecture 146-B — Historical Research Acquisition and Custody
 
-Status: **B1/C1-C6 CLOSED AND INTEGRATED; CONSOLIDATED PRE-B2 SOURCE CHECKPOINT.** No provider, credential,
+Historical status: **B1/C1-C6 CLOSED AND INTEGRATED; CONSOLIDATED PRE-B2 SOURCE CHECKPOINT.** No provider, credential,
 filesystem, ACL, holdout, backtest, paper, broker, production or live effect is
 authorized by this document.
 
@@ -475,3 +475,16 @@ The real-host preflight is read-only, separate from acquisition, and is not run
 by source gates. Source tests cannot emit real-host READY. No real B2 effects are
 authorized here. D/E remain post-B2, GUI source is not required pre-B2, v1 report
 is unchanged, R3 remains parked and LIVE remains NO-GO.
+# Architecture 147 current disposition
+
+The Architecture 146-B protected acquisition path is consumed historical and
+deferred from the current product critical path. Its observer, protected parent
+and claim ceremony, Administrator/SYSTEM custody, and host freshness sequence
+must not be repaired, weakened, or retried for desktop research.
+
+The common deterministic acquisition and normalization kernel is reused through
+a profile-owned persistence adapter. The current desktop adapter uses ordinary
+user-owned create-only storage and does not report protected custody under a
+new name. The legacy protected adapter and its tests remain available only for
+preserved historical behavior. The Architecture 146 observer is not the
+current dispatcher or next host action.

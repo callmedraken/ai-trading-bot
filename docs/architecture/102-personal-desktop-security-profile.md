@@ -257,3 +257,19 @@ live trading
 ```
 
 The next checkpoint is architecture/design for PD1, not execution.
+# Architecture 147 current disposition
+
+Architecture 102's trusted-owner threat model is reaffirmed for the current
+private single-user desktop product. The owner, Administrator, SYSTEM, and
+physical machine owner are not hostile principals the application must defend
+against. Current product readiness therefore focuses on deterministic trading
+decisions, risk, reconciliation, duplicate-effect protection, credentials
+outside source, paper/live separation, explicit live arming, audit, health,
+kill switch, backup, recovery, and reliable long-running operation.
+
+Architecture 147 replaces namespace/ACL ceremony as a current research
+prerequisite with explicit user Start/Stop and stopped manual updates. The
+running bot never self-updates. Architecture 125/128/133/134 release and host
+hardening, and Architecture 146 protected research custody, remain deferred or
+historical tracks rather than current desktop gates. This section records the
+new disposition; the historical architecture chronology below is unchanged.

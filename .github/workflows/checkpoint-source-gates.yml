@@ -22,9 +22,7 @@ permissions:
 
 env:
   AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
-              arch146-b-partial-state-readonly-observer `
-              arch146-b-pre-b2-readiness-source `
-              arch146-b1-historical-research-acquisition-custody-source `
+              arch147-desktop-research-profile `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r3 `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2 `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r1 `

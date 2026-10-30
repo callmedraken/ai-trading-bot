@@ -559,91 +559,55 @@ provide safe preflight/readiness material and state exact reviewed effect
 bounds. The user's execution authorizes only those bounds under the standing
 rule; never present a protected effect as ordinary verification.
 
-## Supervised release and unattended-runtime invariant
+## Current desktop runtime and update invariant — Architecture 147
 
-The supported productionization model deliberately separates unattended trading
-from code deployment.
+The current product is a private, single-user Windows desktop application. The
+owner explicitly starts and stops it. After Start, trading and research workers
+may run unattended until Stop; the application never updates itself.
 
-- The unattended trading runtime MUST execute an already-installed immutable
-  release. It MUST NOT pull Git, install/update code, publish a new generation,
-  mutate scheduler configuration, replace its own executable/source tree, or
-  autonomously roll back/reprovision itself.
-- Trading/runtime mode and deployment/maintenance mode are mutually exclusive.
-  Deployment may switch the scheduler to a new release only after scheduled
-  execution is disabled/quiesced and the absence of an active bot process/cycle
-  is verified. Trading authority must remain unavailable while deployment is in
-  progress.
-- Releases are immutable, uniquely versioned directories. A strategy code or
-  strategy-parameter change creates a new reviewed release; do not hot-reload
-  source or strategy configuration into a running release.
-- Promotion uses supervised scheduler rebinding to the verified launcher inside
-  the new immutable release. Do not require ACTIVE->ARCHIVE or STAGE->ACTIVE
-  directory renames for normal deployment. Retain the prior immutable release
-  for rollback; rollback is another supervised scheduler rebind.
-- Each release must bind an exact release manifest including source identity and
-  the active strategy/config identity. Durable trading/account/paper state lives
-  outside the immutable release tree and requires explicit compatibility or
-  migration handling when its schema changes.
-- If a supervised deployment becomes ambiguous, keep scheduled trading disabled
-  and reconcile the scheduler/release binding read-only before taking another
-  deployment action. Never let an ambiguous deployment fall through into
-  unattended trading.
-- Preserved Architecture-133 experimental scratch/evidence remains historical
-  evidence. It is not part of the normal release path and must not be inspected,
-  mutated, cleaned or reused without a separately reviewed housekeeping or
-  diagnostic boundary.
+    user Start
+      -> workers run unattended
+      -> user Stop
+      -> reconcile/close
+      -> manual update while stopped
+      -> checks/migration
+      -> user Start
 
-### Rename-free immutable-release publication — normative non-regression
+Manual update may use an approved checkout or simple versioned directory. State
+and credentials stay outside disposable source files. No STAGE->ACTIVE,
+ACTIVE->ARCHIVE, directory promotion, junction swap, scheduler rebind or
+immutable-release publisher is required. Task Scheduler/start-at-login remains
+an optional later convenience. The old Architecture 125/128/133/134 release,
+ACL and scheduler machinery is preserved as history/deferred hardening.
 
-This is a **current normative architecture rule**, adopted after the repeated
-Architecture-133 Windows rename incidents and the 2026-10-24
-Architecture-134-F1R1-D1S3/R5 publication incidents. It is not merely historical
-guidance.
+## Architecture 147 source milestone and authority route
 
-The forward production-release path MUST be rename-free at the release-directory
-identity boundary:
+Architecture 147 controls the current product roadmap. P1 is the source-only
+desktop research simplification: ordinary create-only local storage, the
+OPEN-only research loader, and an explicit final-holdout loader requiring the
+existing Architecture-145 admission. P1 has no provider, credential, Robinhood,
+paper, broker or live effect. The registered checkpoint is
+`arch147-desktop-research-profile`, with `preflight=None`, `execute=None`, and
+GitHub-owned canonical FULL.
 
-- a production release/deployment receives one unique immutable directory path
-  before materialization begins;
-- that same directory identity/path is the path later admitted for runtime use;
-- no directory rename/move/reparent, STAGE->ACTIVE, ACTIVE->ARCHIVE,
-  `.installing`->FINAL, alias swap, junction/symlink swap, or replace-existing
-  filesystem operation may be required to convert an untrusted/materializing
-  release into a runnable release;
-- "publication" is a logical admission/binding decision after exact verification,
-  not a filesystem namespace transition;
-- the runtime may bind to an exact verified immutable path only after complete
-  read-only verification; it must never infer readiness from a directory name;
-- if materialization fails or becomes ambiguous, preserve that unique directory
-  and its evidence as inert/non-runnable. A later attempt uses a new unique path.
-  Do not repair, rename, promote, clean, or retry the consumed directory as a
-  prerequisite for forward progress;
-- scheduler/runtime rebinding may select a different already-verified immutable
-  release, but rebinding must not rename either release.
+The normal route remains focused implementation -> focused tests -> one atomic
+candidate -> FEATURE + PROSPECTIVE_DEVELOP admission -> one push -> one CI run
+-> exact review -> fast-forward `develop` -> next milestone. New authority
+checkpoints are required only when work crosses credentials, real Robinhood
+mutation, live/risk authority, crash-sensitive external effects or actual
+Windows privilege changes. The consumed Architecture 146 observer is not the
+current research dispatcher or next host action.
 
-The D1S3 installation publication and D1S3-R5 preserved-image publication
-mechanisms are **retired forward paths**. Their consumed latches, reports, staging
-directory, source, and tests remain incident/history evidence. They confer no
-future retry or compatibility authority. Historical Architecture-125/133 rename
-qualification/recovery modules are precedent/evidence only and MUST NOT be copied
-back into a current deployment path.
+### Current product pivot non-regression
 
-The first rename-free successor implementation MUST add machine-enforced
-non-regression coverage. At minimum, current-product deployment authority/tests
-must reject any implementation that makes the runtime-bound release directory
-depend on `FileRenameInfo`/`SetFileInformationByHandle`, `MoveFile*`,
-`os.rename`/`Path.rename`, replace-existing directory publication, or an
-equivalent namespace-promotion step. It must also prove that retired D1S3/R5 and
-historical 125/133 publication operators cannot be selected as the current
-forward deployment dispatcher.
-
-A future decision to reintroduce directory-rename publication is an explicit
-**architecture reversal**, not a correction, cleanup, compatibility fix, or
-backport. It requires all of the following before implementation: a new
-architecture decision explaining why the rename-free model is insufficient,
-explicit user approval of that reversal, disposable-host qualification of the
-exact proposed primitive, a migration/non-regression plan, and fresh source/
-protected-effect review. Without all of those, reintroduction is a STOP.
+A current product pivot must not weaken or make permissive a frozen historical
+authority check, accepted-source assertion, historical fixture, consumed-
+evidence test, or historical checkpoint. Retired behavior leaves current
+routing/topology; it is not rewritten to accept new semantics. If historical
+and current behavior share source and the new contract would invalidate
+historical reconstruction, add a current implementation or adapter and leave
+the historical implementation intact. Do not register a retired checkpoint
+merely to classify it as retired.
 
 ## Roles
 
@@ -1753,7 +1717,10 @@ non-exhaustive; the live `_checkpoint_specs()` registry surfaced by
 .\ops.ps1 preflight arch128-r7
 ```
 
-The current fresh-successor diagnostic checkpoint is
+The Architecture 134 fresh-successor diagnostic checkpoint below is preserved
+historical/deferred machinery, not the current product boundary. The current
+source-only checkpoint is Architecture 147 as described above. The historical
+diagnostic checkpoint was
 `arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2`. It registers
 read-only preflight, `execute = None`, an exact R2 feature branch and GitHub-owned
 canonical ROBINHOOD. R1 is SOURCE ACCEPTED/integrated; its real-host attempt is
@@ -1763,8 +1730,9 @@ incident aliases and all prospective destination/partial prefixes. Tests use
 fakes only and never invoke the real host observer, production namespace,
 scheduler/security state or protected runtime. The
 [R2 contract](architecture/134-fresh-successor-readonly-deployment-admission-diagnostic-r2.md)
-and bounded current status/handoff own the next review boundary. No source PASS
-grants mutation. Historical R1 invocation templates confer no retry authority.
+and historical status/handoff owned that review boundary. No source PASS grants
+mutation. Historical R1 invocation templates confer no retry authority. Do not
+select this diagnostic or its observer as the current research next action.
 
 The exact #738 mapped ROBINHOOD run (`40288823461`, attempt 1) is reusable only
 when repository, workflow, event, SHA/tree, branch, profile, attempt, exact job

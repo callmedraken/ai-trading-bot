@@ -1,32 +1,34 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 146 partial-state observer source candidate
+## Current checkpoint — Architecture 147 desktop research pivot
 
-The reusable `arch146-b-partial-state-readonly-observer` is implemented as a
-source-only candidate, pending independent exact-source/CI acceptance and
-integration. Its dedicated research branch registers a read-only preflight,
-`execute=None`, and GitHub-owned canonical FULL. No host observation occurs
-during implementation or certification. The old direct B2 launcher remains
-NOT_RUN for this continuation.
+Architecture 147 is the controlling current product roadmap for the private
+single-user Windows desktop bot. P1 is a source-only product simplification:
+ordinary create-only local research storage, an OPEN-only loader, and an
+explicit final-holdout loader gated by the existing Architecture-145
+`ResearchStrategyFinalHoldoutAdmission`. The current checkpoint is
+`arch147-desktop-research-profile` on
+`feature/research-desktop-product-pivot-current`; it has no preflight and no
+execute dispatcher and maps to GitHub-owned FULL.
 
-The candidate observes the fixed protected parent and four required absences
-twice, with exact stability, binary ACE multiset policy and checked handle
-closure. PASS means only `PARTIAL_STATE_OBSERVED_EXACT`; acquisition and
-OPEN-parent creation remain NOT_AUTHORIZED.
+The desktop research root is the source-owned fixed path
+`F:\AI\ai-trading-bot\data\research\desktop-v1`. P1 tests use only an
+explicit temporary-root seam. No production root is created by implementation
+or tests. The storage profile has no ACL, identity, elevation or protected
+custody requirement, never overwrites a completed file, validates exact bytes
+and readback, leaves incomplete state visible, and has no namespace-promotion
+operation.
 
-The dispatcher-ownership child `84b07c225a9f550582d5df4c992b0fca5dfc748b`
-passed both admission contexts and GitHub #803 canonical FULL. It remained
-unaccepted: independent ChatGPT exact-source review identified
-ARCH146_PARTIAL_STATE_READONLY_HELPER_OWNERSHIP_GAP. The runtime observer
-itself was not found defective; #803 remains preserved green evidence.
+The normal product update model is user Start -> unattended trading/research
+workers -> user Stop -> reconcile/close -> manual update while stopped ->
+checks/migration -> user Start. The running application never self-updates;
+Task Scheduler/start-at-login and old release/install machinery are optional
+future convenience or deferred hardening, not current readiness gates.
 
-The new corrective child extends only current semantic ownership of the local
-error factory, evidence carrier, native constructor, API binder, CloseHandle
-helper and magic-method boundary. Runtime/dispatcher source and external ACL
-authority remain unchanged. Host observer NOT_RUN; no real host observation
-occurred. Acquisition and OPEN-parent creation remain NOT_AUTHORIZED.
-Architecture 134 R3 remains parked; LIVE remains NO-GO. Final child admission
-and one new mapped GitHub FULL precede independent source review.
+P1 has no provider, credential, Robinhood, paper, broker or live effect. LIVE
+remains disabled. The consumed Architecture-146 observer and its
+`HOST_UNKNOWN` evidence remain historical evidence only and were not retried;
+the observer is not the current research dispatcher or next host action.
 
 ## Accepted integrated foundation
 
@@ -78,34 +80,22 @@ immutable consumed evidence. Architecture 134 R3 remains parked at
 `BLOCKED / HOST / HOST_UNEXPECTED_PRIVILEGE`; no retry or R4. LIVE remains
 NO-GO.
 
-## Next step
+## Current roadmap
 
-The immediate next step is independent ChatGPT review of this exact candidate
-and its terminal mapped GitHub FULL result. Terminal red OR green is STOP for
-the implementation checkpoint: no PR, merge, CI retry or real preflight here.
+    P1  desktop research simplification
+    P2  one real SPY acquisition + verification + freeze
+    P3  real optimizer / walk-forward campaign + Research Results GUI
+    P4  long-running desktop supervisor with concurrent trading + research workers and GUI Start/Stop
+    P5  unattended synthetic/forward paper soak using existing Robinhood MCP review/quotes/history/account foundations
+    P6  explicitly armed tiny restricted live through official Robinhood MCP / Agentic Trading
+    P7  production maturity / soak / monitoring / backup / restart / reconnect / credential rotation
 
-Repository review established that the current
-`arch146-b-pre-b2-readiness-source` registration is source-only and has no
-preflight function. The existing `scripts.arch146_b2_readonly_preflight`
-launcher is preserved historical/direct-preflight machinery; it is not the
-registered partial-state observer required by the current workflow.
+Trading and research may operate concurrently after P2. Local deterministic
+strategy and risk remain authoritative; Robinhood MCP is the future brokerage
+transport/execution boundary, not strategy authority. P1 does not enable real
+mutation, OAuth, account queries, order review or order placement.
 
-The new observer is source-bound, zero-effect, and limited to partial-state
-facts. It cannot prompt for credentials, call the provider, run real B2
-readiness, create OPEN/custody paths, mutate ACLs, or grant acquisition authority.
-
-After that source is independently accepted and integrated:
-
-    registered observer invocation (sole next host read)
-      -> one bounded read-only host observation
-      -> independent review
-      -> canonical closeout
-      -> separately reviewed OPEN-parent creation if warranted
-      -> ordinary non-elevated B2 preflight
-      -> independent READY review
-      -> minimal acquisition bridge
-
-Acquisition remains NOT_AUTHORIZED. D/E remain REQUIRED_POST_B2;
-GUI_SOURCE_CHANGE=NOT_REQUIRED pre-B2; F remains NO_SOURCE_CHANGE beyond routine
-registration. Five native-MAC optimizer-only N/A metrics remain scheduled for
-one post-B2 publication.
+The immediate next step after this source checkpoint is ChatGPT exact-source
+review of the final committed candidate and terminal mapped CI result. If
+accepted and integrated, P2 is a separately reviewed real-acquisition milestone;
+do not run real acquisition during P1.

@@ -229,12 +229,13 @@ def blob_matches(repo_root: Path, path: Path, expected: str | None) -> bool:
             DATASET_SOURCE
         ] and dataset_preserves_146a_contract(repo_root, expected)
     from scripts.arch147_source_authority import (
+        EXPERIMENTS_INITIALIZER,
         MARKET_DATA_INITIALIZER,
         initializer_preserves_exports,
     )
 
     if (
-        relative == MARKET_DATA_INITIALIZER
+        relative in {MARKET_DATA_INITIALIZER, EXPERIMENTS_INITIALIZER}
         and checkpoint_runner._git_blob_sha1(path) != expected
     ):
         # Preserve the immutable pin and SECURITY_SEMANTIC classification.

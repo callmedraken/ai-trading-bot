@@ -81,6 +81,13 @@ def test_export_successor_preserves_historical_pin_and_security_classification()
     assert not successor.initializer_preserves_exports(
         ROOT, successor.EXPERIMENTS_INITIALIZER, "0" * 40
     )
+    assert ownership.blob_matches(
+        ROOT,
+        ROOT / successor.EXPERIMENTS_INITIALIZER,
+        successor.EXPERIMENTS_PREDECESSOR_BLOB,
+    )
+    assert runner._arch146a_authority_check(ROOT) == ()
+    assert runner._checkpoint_specs()[runner.ARCH146A_NAME].authority_check(ROOT) == ()
 
 
 @pytest.mark.parametrize(
@@ -153,8 +160,7 @@ def test_export_successor_rejects_any_semantic_drift(tmp_path, relative, mutatio
         else successor.EXPERIMENTS_PREDECESSOR_BLOB
     )
     assert not successor.initializer_preserves_exports(tmp_path, relative, pin)
-    if relative == successor.MARKET_DATA_INITIALIZER:
-        assert not ownership.blob_matches(tmp_path, destination, pin)
+    assert not ownership.blob_matches(tmp_path, destination, pin)
 
 
 def test_unchanged_historical_initializer_remains_exactly_accepted(tmp_path):

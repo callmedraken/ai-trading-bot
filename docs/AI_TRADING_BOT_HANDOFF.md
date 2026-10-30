@@ -12,6 +12,14 @@ No provider/credential/native implementation or effect authority is changed.
 The two previously blocked retained regressions now pass. Source acceptance,
 integration and production research remain separate later steps.
 
+Preserve unpublished parent `307d73454dd68da8fc2d72e66dd66424ca3d3a79`, tree
+`c868731984e80ee12559878bb40241d61efb5d6a`: FEATURE PASS,
+PROSPECTIVE_DEVELOP FAIL, IDENTITY_STABLE=True. Its sole failure was the
+Architecture-146-A experiments-initializer pin: the strict checker already
+validated that initializer, but shared blob routing handled only market data.
+The user explicitly authorized one ordinary corrective child and the original
+single push/CI sequence; no amend/rebase/rewrite. No failed CI exists to rerun.
+
 Starting accepted source, local feature and origin/develop:
 
     HEAD 108ba9dee6ad593b3f4128ae44750d9f685ffa0d

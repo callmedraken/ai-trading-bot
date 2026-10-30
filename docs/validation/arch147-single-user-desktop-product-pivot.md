@@ -269,8 +269,21 @@ rejects price CSV paths before reading. Whole-root Ruff check and format check
 are focused/source gates, not a local canonical FULL attempt.
 
 Starting source remains `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
-`5652ec3e019766a66a05a9588e79e6cc8c46d70c`. The P3 commit must be its one
-ordinary atomic child on the existing feature branch. Final source/remote and
+`5652ec3e019766a66a05a9588e79e6cc8c46d70c`. The first ordinary atomic child
+is `307d73454dd68da8fc2d72e66dd66424ca3d3a79`, tree
+`c868731984e80ee12559878bb40241d61efb5d6a`. It passed FEATURE but failed
+PROSPECTIVE_DEVELOP admission, IDENTITY_STABLE=True. The one failure was the
+Architecture-146-A experiments-initializer source pin: shared blob routing
+omitted that initializer despite its strict checker being present and passing.
+Preserve the failed admission without alteration at
+`F:\AI\temp\arch147-p3-admit-20084df78dcf4bf7ab397605641166d1\arch132-r3n-prepublication-admission\source-gate-20261030T221542.779819Z\report.json`.
+
+The user authorized preserving this unpublished commit and adding one ordinary
+P3 export-routing corrective child before the original single push/CI. The
+child routes both initializers through the already-reviewed exact checker and
+adds an actual registered Architecture-146-A authority regression. No pin,
+classification, export policy, registry, branch or effect boundary changes.
+No amend, rebase, rewrite or CI rerun occurs. Final source/remote and
 terminal CI identities belong to the exact post-publication handoff; this
 source document does not self-pin its containing commit or claim acceptance.
 Canonical FULL remains GitHub-owned and is not run locally. Production campaign,

@@ -9,6 +9,12 @@ resolver. Unchanged historical source stays accepted. No historical repin or
 provider/native behavior change is introduced. Publication follows the focused,
 whole-root static and both-context admission gates below.
 
+The first unpublished candidate `307d73454dd68da8fc2d72e66dd66424ca3d3a79`
+passed FEATURE admission but failed PROSPECTIVE_DEVELOP because shared blob
+routing omitted the experiments initializer. The user authorized preserving
+that commit/admission and adding one ordinary corrective child before the
+single push/CI. The child changes routing only; no pin or policy is relaxed.
+
 P2 source is accepted/integrated at
 `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
 `5652ec3e019766a66a05a9588e79e6cc8c46d70c`. Feature #810 / run

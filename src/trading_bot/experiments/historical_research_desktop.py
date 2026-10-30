@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from hashlib import sha256
 from pathlib import Path
 from uuid import UUID
@@ -23,6 +23,7 @@ from trading_bot.experiments.desktop_research_dataset import (
 from trading_bot.experiments.historical_research_acquisition import (
     AcquisitionPersistence,
     PersistenceReceipt,
+    corporate_action_sidecar,
 )
 from trading_bot.experiments.historical_research_custody import (
     HistoricalSessionAuthority,
@@ -542,16 +543,125 @@ def desktop_research_readiness() -> str:
     return "READY_FOR_DESKTOP_RESEARCH_ACQUISITION_REVIEW"
 
 
+@dataclass(frozen=True, slots=True)
+class DesktopDatasetIntegritySummary:
+    """Non-price metadata only; this grants no strategy holdout admission."""
+
+    profile: str
+    attempt_id: str
+    source_head: str
+    source_tree: str
+    session_authority_identity: str
+    session_authority_digest: str
+    snapshot_identity: str
+    open_manifest_identity: str
+    holdout_manifest_identity: str
+    full_historical_fingerprint: str
+    open_row_count: int
+    open_first_timestamp: str
+    open_last_timestamp: str
+    holdout_row_count: int
+    holdout_first_timestamp: str
+    holdout_last_timestamp: str
+    open_normalized_sha256: str
+    holdout_normalized_sha256: str
+    corporate_action_sha256: str
+    evidence_sha256: str
+
+    def to_dict(self) -> dict[str, str | int]:
+        return asdict(self)
+
+
+def inspect_desktop_dataset_integrity(
+    storage: DesktopResearchStorage,
+) -> DesktopDatasetIntegritySummary:
+    """Read both physical partitions solely for integrity; return no bars.
+
+    Reconstruct acquisition evidence and raw/sidecar commitments, then use
+    the existing complete deterministic dataset verifier. Normal research
+    continues to use load_desktop_open_research; strategy holdout access
+    still requires ResearchStrategyFinalHoldoutAdmission.
+    """
+    if type(storage) is not DesktopResearchStorage:
+        raise DesktopResearchError("exact desktop storage required")
+    _complete_record(storage)
+    snapshot, opened, holdout = _bundle(storage)
+    sidecar = _sidecar(storage, opened, holdout)
+    evidence_bytes = storage.read("evidence.json")
+    evidence = _json_object(evidence_bytes)
+    corporate_digests = _page_digests(evidence.get("corporate_page_sha256"))
+    corporate_pages = tuple(
+        storage.read(f"raw/corporate-actions/{index:04d}.json")
+        for index in range(len(corporate_digests))
+    )
+    if (
+        tuple(sha256(page).hexdigest() for page in corporate_pages) != corporate_digests
+        or corporate_action_sidecar(corporate_pages) != sidecar
+    ):
+        raise DesktopResearchError("desktop corporate raw/sidecar mismatch")
+    authority = published_historical_session_authority()
+    require_accepted_historical_session_authority(authority)
+    reconstructed = HistoricalResearchDesktopAcquisitionEvidence(
+        evidence.get("source_head"),
+        evidence.get("source_tree"),
+        evidence.get("attempt_id"),
+        authority.identity,
+        authority.digest,
+        opened.raw_vendor_page_sha256,
+        corporate_digests,
+        snapshot,
+        opened,
+        holdout,
+    )
+    if reconstructed.to_bytes() != evidence_bytes:
+        raise DesktopResearchError("desktop acquisition evidence mismatch")
+    pages = _raw_pages(storage, opened)
+    materials = tuple(
+        HistoricalResearchPartitionMaterial(
+            manifest, storage.read(path), pages, sidecar
+        )
+        for manifest, path in (
+            (opened, "normalized/open/SPY.csv"),
+            (holdout, "normalized/holdout/SPY.csv"),
+        )
+    )
+    verify_desktop_published_dataset(snapshot, *materials, authority)
+    return DesktopDatasetIntegritySummary(
+        DESKTOP_RESEARCH_PROFILE,
+        reconstructed.attempt_id,
+        reconstructed.source_head,
+        reconstructed.source_tree,
+        authority.identity,
+        authority.digest,
+        str(snapshot.snapshot_id),
+        str(opened.manifest_id),
+        str(holdout.manifest_id),
+        str(snapshot.full_historical_data_fingerprint),
+        opened.row_count,
+        opened.first_bar_timestamp.isoformat(),
+        opened.last_bar_timestamp.isoformat(),
+        holdout.row_count,
+        holdout.first_bar_timestamp.isoformat(),
+        holdout.last_bar_timestamp.isoformat(),
+        opened.normalized_file_sha256,
+        holdout.normalized_file_sha256,
+        opened.corporate_action_sha256,
+        sha256(evidence_bytes).hexdigest(),
+    )
+
+
 __all__ = [
     "DESKTOP_RESEARCH_ACQUISITION_SCHEMA",
     "DESKTOP_RESEARCH_EVIDENCE_SCHEMA",
     "DESKTOP_RESEARCH_PROFILE",
     "DESKTOP_RESEARCH_ROOT",
     "DesktopResearchError",
+    "DesktopDatasetIntegritySummary",
     "DesktopResearchInspection",
     "DesktopResearchStorage",
     "HistoricalResearchDesktopAcquisitionEvidence",
     "desktop_research_readiness",
+    "inspect_desktop_dataset_integrity",
     "load_desktop_final_holdout",
     "load_desktop_open_research",
 ]

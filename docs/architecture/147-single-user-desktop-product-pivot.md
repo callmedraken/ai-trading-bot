@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap and P1 source milestone.
+Status: CURRENT product roadmap; P1 accepted/integrated, P2 source bridge.
 
 ## Product contract
 
@@ -118,10 +118,66 @@ ordinary optimizer, walk-forward, and candidate-selection modules do not import
 or call this loader. This is a software-use boundary, not a claim that the
 trusted machine owner cannot inspect files.
 
-P2 will use fake transport/credentials in tests and one separately reviewed
-real SPY acquisition to verify OPEN and FINAL_HOLDOUT together and freeze the
-complete snapshot/fingerprint. P1 establishes the interfaces only and performs
-no real acquisition.
+P2 uses fake transport/credentials in tests. Its source bridge and integrity
+inspection are described below; the one real acquisition follows source
+acceptance/integration and is never executed by implementation, admission or CI.
+
+## P2 desktop interactive acquisition bridge
+
+P1 is accepted/integrated at `e8817e0214074b03d3d9ecd73232b7a2379276b9`:
+feature #807 canonical FULL and develop #808 succeeded; develop reused the
+exact feature certification. Failed #806 remains immutable and was not rerun.
+
+`scripts/acquire_desktop_research.py` requires `--execute`, `--expected-head`
+and `--expected-tree`. No request/root/partition override exists. Before any
+write or prompt it verifies the canonical project root, develop branch, exact
+reviewed HEAD/tree, `git status --porcelain=v1 --untracked-files=no`, canonical
+origin URL, and local origin/develop equality. It then verifies the accepted
+published authority and requires the fixed desktop root absent. Ordinary
+exclusive root creation and `DesktopResearchStorage` preparation precede input.
+
+`DesktopInteractiveResearchCredentialSource` is one-use, binds exact expected
+HEAD/tree and accepted authority through the shared kernel's bind hook, and
+uses only the reviewed `interactive_research_credentials()` hidden prompts.
+It has no persistence, environment/config/file fallback, token/SID/elevation
+observer or Credential Manager requirement. The historical
+`EphemeralHistoricalResearchCredentialSource` and `AcceptedB2Preflight` remain
+unchanged and are not used by this path.
+
+The shared `HistoricalResearchAcquisitionOperator` and existing
+`HttpsHistoricalResearchTransport` own the frozen requests, pagination,
+normalization and deterministic identities. Alpaca historical Market Data is
+the research-data source only; Robinhood MCP / Agentic Trading remains the
+future brokerage execution/account boundary. No brokerage/order adapter is
+introduced. Requests remain SPY, 1Day, 2016-01-01T00:00:00Z through
+2026-10-24T00:00:00Z, raw/SIP/USD/ascending/10000 bars and the existing full-range
+US complete corporate-actions request with ascending/1000 pagination.
+
+After acquisition the bridge saves the kernel evidence as `evidence.json`.
+`inspect_desktop_dataset_integrity()` verifies COMPLETE, reconstructs canonical
+evidence, manifests and snapshot, reads OPEN/FINAL_HOLDOUT physical bytes and
+bars raw digest vector, checks corporate raw pages against the original sidecar
+and commitments, and invokes `verify_desktop_published_dataset()` against the
+accepted 2718-session authority and full fingerprint. It returns an immutable
+summary of profile, source/attempt/dataset/manifest/authority identities,
+row counts/endpoints and SHA256 values, never OHLCV or bars. This read-only
+inspection is not strategy holdout admission. Normal research continues through
+`load_desktop_open_research()`; strategy FINAL_HOLDOUT access still requires
+`ResearchStrategyFinalHoldoutAdmission`.
+
+Success prints compact sanitized JSON including both integrity and OPEN-loader
+PASS. Failure prints only stage/classification, never exception text, response
+bodies, credentials or lengths. Authentication/entitlement, rate-limit, server,
+transport, response-shape, pagination/replay, validation, persistence,
+preexisting destination and source mismatch failures remain distinct. No retry
+or SIP fallback occurs. Any existing root, including partial/empty state, stops
+a later invocation; recovery is deferred to a later reviewed action.
+
+After P2 source acceptance/integration and develop verification, automatically
+provide the single reviewed real acquisition command pinned to that HEAD/tree.
+No Architecture-146 B2 or observer gate intervenes. Review sanitized evidence
+after the user-run acquisition and continue to P3 optimizer/walk-forward work
+if integrity passes.
 
 ## Deferred Architecture 146 and high-assurance machinery
 

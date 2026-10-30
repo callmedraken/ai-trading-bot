@@ -1,10 +1,17 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 desktop research P1
+## Current boundary — Architecture 147 P2 source-only bridge
 
 Architecture 147 is the controlling current product roadmap for the private
-single-user Windows desktop bot. The current source milestone is the
-source-only desktop research simplification on
+single-user Windows desktop bot. P1 is accepted/integrated at
+`e8817e0214074b03d3d9ecd73232b7a2379276b9`, tree
+`6937032602b9524ee9db0ddd2056463d418c3aef`. Feature #807 / run
+41022636717 / attempt 1: SUCCESS / canonical FULL. Develop #808 / run
+41023791454 / attempt 1: SUCCESS, `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
+
+The current P2 source objective is the desktop interactive Alpaca research
+acquisition bridge on
 `feature/research-desktop-product-pivot-current`, checkpoint
 `arch147-desktop-research-profile`, with `preflight=None`, `execute=None`, and
 GitHub-owned canonical FULL. Its fixed production root is
@@ -20,12 +27,39 @@ P1 has no provider, credential, Robinhood, paper, broker, or live effect.
 Local deterministic strategy and risk remain authoritative; official
 Robinhood MCP / Agentic Trading is the future brokerage transport boundary.
 
+P2 retains the frozen SPY request window (2016-01-01 through 2026-10-24), raw
+SIP daily bars, full-range corporate actions, and published 2718-session
+authority. The new one-use credential adapter binds the externally reviewed
+HEAD/tree and accepted authority, then uses the existing hidden terminal input.
+No token/elevation check or old B2 admission is involved. Exact local develop,
+canonical root/origin, tracked/index cleanliness and origin/develop identity
+precede all writes, prompts and requests. A preexisting desktop root, including
+an empty or incomplete root, stops the command without cleanup or retry.
+
+P2 source/tests/admission/CI perform zero real provider effects. Fake tests use
+only temporary desktop roots. Full persisted integrity inspection reads both
+partitions internally and returns immutable non-price metadata; it grants no
+strategy holdout admission. Evidence is persisted as `evidence.json`.
+
 The consumed Architecture-146 observer evidence remains historical and was not
 retried. Its `HOST_UNKNOWN` result is not the current research dispatcher or
 next host action. The next safe step is focused verification, exact-file
-staging, FEATURE + PROSPECTIVE_DEVELOP admission, one atomic commit, one push,
-and one mapped CI run, followed by ChatGPT exact-source review. Do not run P2
-real acquisition during P1.
+staging, one atomic P2 commit, FEATURE + PROSPECTIVE_DEVELOP admission, one push,
+and one terminal mapped CI run, followed by ChatGPT exact-source review.
+
+After acceptance/integration and develop verification, the automatic next action
+is the single reviewed real SPY acquisition, with no intervening Architecture or
+security/preflight checkpoint. Future command shape (not executable authority
+until source acceptance/integration):
+
+    .\.venv\Scripts\python.exe -B scripts\acquire_desktop_research.py --execute --expected-head <accepted-head> --expected-tree <accepted-tree>
+
+Run from `F:\AI\ai-trading-bot` on exact clean develop. The user enters Alpaca
+research credentials at hidden terminal prompts. Return only the compact JSON
+result. SUCCESS requires `OPEN_LOADER=PASS` and `FULL_DATASET_INTEGRITY=PASS`;
+ChatGPT then reviews sanitized identities/counts/hashes and continues into P3
+optimizer/walk-forward work. Any failure stops; preserve any partial root and
+do not retry. No Robinhood, broker, trading, ACL or scheduler effects are in P2.
 
 Preserved P1 failure: candidate
 `51c959ed80be8b658d45f8358bb73795ffab7047`, tree
@@ -37,6 +71,10 @@ broad-6 passed; broad-7 had 2265 passed / 2 failed. Classification is
 rerun, and no protected or external effects occurred.
 
 ## Preserved Architecture 146 historical chronology
+
+All Architecture-146 source, token and operator requirements below describe
+historical checkpoints only. They confer no current desktop prerequisite,
+dispatcher, retry or effect authority.
 
 This candidate starts exactly at docs closeout
 `cbc00675da352fd205d43a6fc4452f2a7fb33e22`, tree
@@ -53,7 +91,7 @@ No host observation occurs during implementation/certification. The old direct
 B2 launcher remains NOT_RUN for this continuation. Terminal CI red OR green is
 STOP for independent ChatGPT exact-source/CI review; no retry, PR or merge.
 
-## Current helper-authority correction
+## Historical helper-authority correction
 
     reviewed parent HEAD 84b07c225a9f550582d5df4c992b0fca5dfc748b
     reviewed parent TREE e0773a4ead9e6fa34418d819170d099356d5f5b1
@@ -92,9 +130,9 @@ The ordinary dispatcher child passed FEATURE/PROSPECTIVE_DEVELOP with stable
 identity and published the two-commit lineage once, followed by green #803.
 Preserve both commits and the original failed admission; no amend/squash.
 
-## Accepted integrated B2 source foundation
+## Historical accepted B2 source foundation
 
-Current accepted integrated source (verify live remote independently):
+Accepted historical source at that checkpoint:
 
     develop HEAD f2a78e3c82058f3aee6d3d7145bbd9a8f00e2369
     develop TREE 7d9d3898b0c802780617e9f1f397338fe0fc96d3
@@ -120,7 +158,7 @@ hidden terminal input remains the sole later credential source with persistence
 NONE. Production Trading identity and Credential Manager/environment/config/file
 fallbacks remain excluded.
 
-## Exact consumed state and effect boundary
+## Preserved historical consumed state and effect boundary
 
 Preserve the consumed observations in order:
 
@@ -178,7 +216,8 @@ desktop research path.
 
 The direct B2 launcher, `observe_fresh()`, Set-Acl, OPEN-parent creation,
 credential reads, provider invocation, acquisition, and holdout reads remain
-outside the current P1 boundary and were not retried.
+outside P1 and P2 source implementation and were not retried. The new desktop
+bridge adds future interactive acquisition only after source acceptance.
 
 The current immediate action is the Architecture-147 source candidate review
 described above. No registered host observer follows its CI, and no observer

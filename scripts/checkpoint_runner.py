@@ -331,6 +331,7 @@ ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
     *COMMON_TESTS,
+    "tests/experiments/test_historical_research_desktop_acquisition.py",
     "tests/experiments/test_historical_research_desktop.py",
     "tests/experiments/test_historical_research_acquisition_custody.py",
     "tests/experiments/test_historical_research_dataset.py",
@@ -339,6 +340,8 @@ ARCH147_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_arch147.py",
 )
 ARCH147_RUFF: Final = (
+    "src/trading_bot/experiments/historical_research_desktop_acquisition.py",
+    "scripts/acquire_desktop_research.py",
     "src/trading_bot/experiments/desktop_research_dataset.py",
     "src/trading_bot/experiments/historical_research_acquisition.py",
     "src/trading_bot/experiments/historical_research_dataset.py",

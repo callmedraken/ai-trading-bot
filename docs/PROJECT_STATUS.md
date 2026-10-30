@@ -1,9 +1,15 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 desktop research pivot
+## Current checkpoint — Architecture 147 P2 acquisition bridge source
 
 Architecture 147 is the controlling current product roadmap for the private
-single-user Windows desktop bot. P1 is a source-only product simplification:
+single-user Windows desktop bot. P1 is accepted and integrated at
+`e8817e0214074b03d3d9ecd73232b7a2379276b9`, tree
+`6937032602b9524ee9db0ddd2056463d418c3aef`. Feature #807 / run
+41022636717 / attempt 1 succeeded with canonical FULL. Develop #808 / run
+41023791454 / attempt 1 succeeded with `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, `OVERALL=PASS`.
+P1 provides
 ordinary create-only local research storage, an OPEN-only loader, and an
 explicit final-holdout loader gated by the existing Architecture-145
 `ResearchStrategyFinalHoldoutAdmission`. The current checkpoint is
@@ -18,6 +24,21 @@ or tests. The storage profile has no ACL, identity, elevation or protected
 custody requirement, never overwrites a completed file, validates exact bytes
 and readback, leaves incomplete state visible, and has no namespace-promotion
 operation.
+
+P2 adds the desktop interactive Alpaca research acquisition bridge as another
+atomic source milestone of the same checkpoint, branch, and GitHub-owned FULL
+mapping. This source checkpoint performs zero real provider effects. It reuses
+the frozen SPY/SIP historical Market Data requests and acquisition kernel;
+Alpaca is solely the research-data source. Robinhood MCP / Agentic Trading
+remains the future brokerage execution/account boundary.
+
+The future explicit command verifies canonical develop/source/origin and
+tracked/index cleanliness, accepts the published 2718-session authority, and
+requires the desktop root absent before creating ordinary storage and hidden
+interactive credentials. It never retries a partial root or falls back from
+SIP. A completed dataset receives read-only full integrity verification and an
+OPEN-loader check; the result contains non-price metadata only. Strategy
+FINAL_HOLDOUT access retains the Architecture-145 admission gate.
 
 The normal product update model is user Start -> unattended trading/research
 workers -> user Stop -> reconcile/close -> manual update while stopped ->
@@ -104,7 +125,11 @@ strategy and risk remain authoritative; Robinhood MCP is the future brokerage
 transport/execution boundary, not strategy authority. P1 does not enable real
 mutation, OAuth, account queries, order review or order placement.
 
-The immediate next step after this source checkpoint is ChatGPT exact-source
-review of the final committed candidate and terminal mapped CI result. If
-accepted and integrated, P2 is a separately reviewed real-acquisition milestone;
-do not run real acquisition during P1.
+The immediate next step is ChatGPT exact-source review of the P2 committed
+candidate and terminal mapped CI result. After source acceptance, fast-forward
+integration and develop verification, automatically provide the single reviewed
+real SPY acquisition command pinned to the accepted HEAD/tree. The user enters
+hidden Alpaca research credentials locally. No Architecture-146 observer or B2
+preflight is a prerequisite. Review sanitized dataset evidence immediately after
+that one run, then continue to P3 optimizer/walk-forward work if integrity passes.
+Do not run real acquisition during P2 implementation, admission or CI.

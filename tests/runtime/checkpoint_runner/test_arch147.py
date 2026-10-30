@@ -17,6 +17,17 @@ def test_arch147_is_current_source_only_full_without_effect_dispatch():
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_NAME] == "full"
     assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] == runner.ARCH147_NAME
     assert (
+        spec.tests.count(
+            "tests/experiments/test_historical_research_desktop_acquisition.py"
+        )
+        == 1
+    )
+    assert "scripts/acquire_desktop_research.py" in spec.ruff_paths
+    assert (
+        "src/trading_bot/experiments/historical_research_desktop_acquisition.py"
+        in spec.ruff_paths
+    )
+    assert (
         spec.tests.count("tests/experiments/test_historical_research_partial_state.py")
         == 1
     )

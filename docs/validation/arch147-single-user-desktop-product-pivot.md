@@ -1,6 +1,6 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P1 source-only validation contract.
+Status: CURRENT P1/P2 source-only validation contract; P1 accepted/integrated.
 
 ## Scope
 
@@ -80,5 +80,40 @@ must be corrected inside this checkpoint; unexpected security, authority,
 credential, provider, or effect ambiguity is a STOP for ChatGPT review.
 
 After terminal CI, ChatGPT independently reviews the exact source and decides
-whether to fast-forward `develop`. P2 real SPY acquisition is a later
-separately reviewed milestone.
+whether to fast-forward `develop`. After P2 source acceptance/integration and
+develop verification, the automatic next action is the single reviewed real
+SPY acquisition pinned to the accepted HEAD/tree, followed by sanitized evidence
+review and P3 optimizer/walk-forward work if integrity passes. No old B2 gate
+intervenes.
+
+## P2 additive focused coverage
+
+P1 is accepted/integrated at `e8817e0214074b03d3d9ecd73232b7a2379276b9`,
+tree `6937032602b9524ee9db0ddd2056463d418c3aef`. Feature #807 / run
+41022636717 / attempt 1 succeeded with canonical FULL; develop #808 / run
+41023791454 / attempt 1 succeeded with exact_feature_certification reuse,
+stable identity and OVERALL PASS. Failed #806 remains immutable, not rerun.
+
+P2 adds `test_historical_research_desktop_acquisition.py` and its source/CLI to
+the existing `arch147-desktop-research-profile` test/Ruff inventory only.
+No checkpoint, active CI entry, profile or dispatcher is added. Source-only
+tests cover exact credential binding, accepted authority, one-use hidden input,
+sanitized errors/repr, canonical source checks before storage/prompt/provider,
+tracked/index-only cleanliness, fixed-root absent-first behavior, and synthetic
+full acquisition composition through the existing kernel and frozen requests.
+
+Completed synthetic stores must pass full physical integrity plus OPEN loading;
+corruption of record, evidence, either manifest/partition, raw bars, corporate
+raw or sidecar must fail. The immutable inspection summary exposes no prices
+and grants no strategy holdout admission. Tests classify provider/pagination/
+transport/shape/validation/persistence/input failures and prove no automatic
+retry. Static checks preserve historical credential/preflight classes and
+exclude host-security, holdout-root, Robinhood and broker paths from the bridge.
+
+Run new tests plus existing desktop, fake acquisition/custody, relevant native
+interactive/HTTPS tests, Architecture-147 registration, source authority and CI
+tests. Use fresh `F:\AI\temp\pytest\<purpose>-<GUID>` roots and
+`-p no:cacheprovider`. Complete whole-root Ruff check/format and both diff
+checks before the atomic candidate/admission/push. Canonical FULL remains
+GitHub-owned. Implementation, tests, admission and CI must never create the
+production desktop root, prompt for real credentials or send provider requests.

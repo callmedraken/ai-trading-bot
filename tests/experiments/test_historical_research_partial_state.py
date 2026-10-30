@@ -346,7 +346,7 @@ def test_arbitrary_native_and_observer_exceptions_are_sanitized(monkeypatch):
     assert secret not in json.dumps(result)
 
 
-def test_registration_and_current_readonly_authority():
+def test_arch146_historical_registration_and_security_are_preserved():
     specs = runner._checkpoint_specs()
     spec = specs[runner.ARCH146_PARTIAL_STATE_NAME]
     assert sum(value.name == spec.name for value in specs.values()) == 1
@@ -357,13 +357,24 @@ def test_registration_and_current_readonly_authority():
     assert spec.preflight is runner._arch146_partial_state_preflight
     assert spec.execute is None
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(spec.name) == 1
-    assert runner.resolve_ci_checkpoint(specs, spec.remote_branch, "push") == spec.name
-    assert runner._arch146_partial_state_authority_check(ROOT) == ()
     assert authority.partial_state_observer_is_readonly(ROOT)
     predecessor = specs[runner.ARCH146_PRE_B2_NAME]
     assert predecessor.preflight is predecessor.execute is None
     assert predecessor.remote_branch == runner.ARCH146_PRE_B2_BRANCH
+
+
+def test_current_research_route_is_arch147():
+    specs = runner._checkpoint_specs()
+    retired_branch = specs[runner.ARCH146_PARTIAL_STATE_NAME].remote_branch
+
+    assert runner.ARCH146_PARTIAL_STATE_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.resolve_ci_checkpoint(specs, retired_branch, "push") is None
+    assert runner.ARCH147_NAME in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_NAME] == "full"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH147_BRANCH, "push")
+        == runner.ARCH147_NAME
+    )
 
 
 @pytest.mark.parametrize(
@@ -674,27 +685,29 @@ def test_existing_b2_and_freshness_sources_remain_exact():
         assert (ROOT / relative).read_bytes().replace(b"\r\n", b"\n") == old
 
 
-def test_runner_preflight_evidence_is_readonly(monkeypatch, tmp_path):
-    FakeWin32(monkeypatch)
+def test_current_runner_rejects_retired_observer_before_host_observation(
+    monkeypatch, tmp_path
+):
+    fake = FakeWin32(monkeypatch)
+    native_entries = []
+    fake_api = fake.api
+
+    def track_native_entry(*args):
+        native_entries.append(args)
+        return fake_api(*args)
+
+    monkeypatch.setattr(disk.WindowsCustodyNative, "_api", track_native_entry)
     spec = runner._checkpoint_specs()[runner.ARCH146_PARTIAL_STATE_NAME]
-    source = {
-        "head": "a" * 40,
-        "tree": "b" * 40,
-        "branch": spec.remote_branch,
-        "porcelain": "",
-    }
-    monkeypatch.setattr(runner, "_git_state", lambda _: source.copy())
-    monkeypatch.setattr(runner, "_remote_branch_head", lambda *args: source["head"])
-    passed, path = runner.preflight_checkpoint(
-        spec, repo_root=ROOT, evidence_root=tmp_path
-    )
-    report = json.loads(path.read_text())
-    assert passed and report["kind"] == "read_only_preflight"
-    assert report["protected_execution"] == "NOT_AUTHORIZED"
-    assert report["result"]["classification"] == "PARTIAL_STATE_OBSERVED_EXACT"
+    with pytest.raises(RuntimeError) as exc_info:
+        runner.preflight_checkpoint(spec, repo_root=ROOT, evidence_root=tmp_path)
+
+    assert str(exc_info.value) == "Partial-state observer source/registration rejected"
+    assert native_entries == []
+    assert not fake.opened and not fake.closed and not fake.inspected
+    assert list(tmp_path.iterdir()) == []
 
 
-def test_current_dispatch_admits_observer_and_preserves_old_delegation(monkeypatch):
+def test_retired_arch146_dispatcher_preserves_pre_b2_delegation(monkeypatch):
     assert (
         runner.preflight_checkpoint
         is runner._arch146_partial_state_preflight_checkpoint
@@ -715,7 +728,7 @@ def test_current_dispatch_admits_observer_and_preserves_old_delegation(monkeypat
 
 
 @pytest.mark.parametrize("dirty,remote", [(True, "a" * 40), (False, "c" * 40)])
-def test_runner_source_failure_prevents_native_observation(
+def test_retired_arch146_source_failure_prevents_native_observation(
     monkeypatch, tmp_path, dirty, remote
 ):
     fake = FakeWin32(monkeypatch)

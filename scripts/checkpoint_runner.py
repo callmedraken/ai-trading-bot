@@ -334,6 +334,7 @@ ARCH147_TESTS: Final = (
     "tests/experiments/test_historical_research_desktop.py",
     "tests/experiments/test_historical_research_acquisition_custody.py",
     "tests/experiments/test_historical_research_dataset.py",
+    "tests/experiments/test_historical_research_partial_state.py",
     "tests/experiments/test_research_strategy_robustness.py",
     "tests/runtime/checkpoint_runner/test_arch147.py",
 )

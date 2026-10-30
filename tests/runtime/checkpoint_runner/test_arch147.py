@@ -16,6 +16,10 @@ def test_arch147_is_current_source_only_full_without_effect_dispatch():
     assert spec.execute is None
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_NAME] == "full"
     assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] == runner.ARCH147_NAME
+    assert (
+        spec.tests.count("tests/experiments/test_historical_research_partial_state.py")
+        == 1
+    )
 
 
 def test_consumed_architecture_146_observer_is_not_current_route():

@@ -30,6 +30,15 @@ remains disabled. The consumed Architecture-146 observer and its
 `HOST_UNKNOWN` evidence remain historical evidence only and were not retried;
 the observer is not the current research dispatcher or next host action.
 
+P1 candidate `51c959ed80be8b658d45f8358bb73795ffab7047`, tree
+`bcf8e1d0be1237bdd08a0f03b4c8c79ef6276110`, remains preserved failed
+evidence: CI #806 / run 41019120148 / attempt 1 ended FAILURE. Source-static,
+active-tests and FULL broad-1 through broad-6 passed; broad-7 had 2265 passed
+and 2 failed. Classification: `PREPUBLICATION_COVERAGE_DEFECT`, caused by
+stale mixed-current assertions in
+`tests/experiments/test_historical_research_partial_state.py`. #806 was not
+rerun; no protected or external effects occurred.
+
 ## Accepted integrated foundation
 
 Architecture 146's custody ACE multiset and tracked-only B2 source-binding

@@ -27,6 +27,15 @@ staging, FEATURE + PROSPECTIVE_DEVELOP admission, one atomic commit, one push,
 and one mapped CI run, followed by ChatGPT exact-source review. Do not run P2
 real acquisition during P1.
 
+Preserved P1 failure: candidate
+`51c959ed80be8b658d45f8358bb73795ffab7047`, tree
+`bcf8e1d0be1237bdd08a0f03b4c8c79ef6276110`; CI #806 / run 41019120148 /
+attempt 1 ended FAILURE. Source-static, active-tests and FULL broad-1 through
+broad-6 passed; broad-7 had 2265 passed / 2 failed. Classification is
+`PREPUBLICATION_COVERAGE_DEFECT`: stale mixed-current assertions in
+`tests/experiments/test_historical_research_partial_state.py`. #806 was not
+rerun, and no protected or external effects occurred.
+
 ## Preserved Architecture 146 historical chronology
 
 This candidate starts exactly at docs closeout

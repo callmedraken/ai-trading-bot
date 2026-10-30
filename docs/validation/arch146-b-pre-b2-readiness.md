@@ -2,6 +2,47 @@
 
 ## Current successor — registered read-only partial-state observer
 
+### Preserved failed local admission and separately scoped corrective child
+
+Original observer candidate HEAD
+`f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40`, tree
+`1da5d05c1f14c5552249f3cdc5fcf7c47a9afcd4`, passed FEATURE and failed
+PROSPECTIVE_DEVELOP. Publication NOT_RUN; remote feature ABSENT; canonical
+CI NOT_RUN; real effects ZERO. It is not source accepted and is not rewritten.
+Preserved report:
+
+    F:\AI\temp\ai-trading-bot-checkpoints\arch146-partial-state-admission-b4bb897e0238467f8011e728028e3d8e\arch132-r3n-prepublication-admission\source-gate-20261030T002810.261183Z\report.json
+
+Classification: ARCH146_CURRENT_PREFLIGHT_DISPATCHER_OWNERSHIP_DEFECT.
+R2 and R3 each still required the global preflight dispatcher to be the R3
+wrapper. R3 composes R2, so those two stale predicates produced three failures:
+R2 drift directly, R2 drift through R3, and R3 drift. The observer itself was
+not the known failure. Historical R2/R3 host evidence is unchanged.
+
+The separately scoped ordinary child removes only those stale R2/R3 alias
+claims and moves the candidate's outer-alias claim out of predecessor
+reconstruction into `current_source_authority.current_preflight_dispatch_failures`.
+That sole current owner verifies the observer -> R3 -> R2 -> base chain
+structurally, retains the existing exact R1/R2/R3 security dispatcher pins,
+rejects bypass/recursion/wrong-checkpoint/protected routing and arbitrary global
+replacement, and verifies registered preflights plus execute=None. The old
+pre-B2 checkpoint remains source-only. No predecessor pin ladder is introduced.
+The Architecture 146 observer/native implementation and evidence are unchanged.
+
+Focused fake/static regressions must prove separation of mutable outer-chain
+ownership from exact R2/R3 security ownership, followed by retained R2/R3 and
+observer tests, whole-root Ruff 0.17.3, and diff checks. One ordinary child
+commit preserves f49dd2d2 unchanged. General admission on the exact final
+two-commit lineage must prove FEATURE and PROSPECTIVE_DEVELOP PASS with stable
+identity before one first push. Either admission failure is STOP with no
+automatic further correction or publication. GitHub alone owns canonical FULL;
+terminal red OR green is STOP for independent review. No host observer follows
+CI; source acceptance and integration are still prerequisites. All real
+host/token/credential/provider/protected-filesystem/acquisition/holdout/
+scheduler/runtime/paper/broker/live effects remain ZERO.
+
+### Original observer contract and integrated foundation
+
 Docs closeout `cbc00675da352fd205d43a6fc4452f2a7fb33e22`, tree
 `9e04e944173f75d7c20e14925da5c601bada14d1`, succeeded on develop #802 /
 run 40974659897 / attempt 1 / DOCS_ONLY. It is the exact parent of this

@@ -6,6 +6,7 @@ focused tests, remote identity admission and canonical certification are callers
 
 from __future__ import annotations
 
+import ast
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -57,12 +58,127 @@ def develop_static_checkpoints(repo_root: Path) -> tuple[str, ...]:
     return names
 
 
+def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
+    """Own the mutable outer chain; retain exact inner security dispatch pins.
+
+    This static check never dispatches a preflight. Additive outer layers belong
+    here rather than in predecessor authorities that own their own semantics.
+    """
+    from scripts import checkpoint_runner as runner
+
+    failures = []
+    outer = "_arch146_partial_state_preflight_checkpoint"
+    if runner.preflight_checkpoint is not getattr(runner, outer):
+        failures.append("current preflight outer dispatcher drift")
+    tree = ast.parse(
+        (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    )
+    declarations = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
+    functions = {node.name: node for node in declarations}
+    if len(functions) != len(declarations):
+        return (*failures, "current preflight duplicate declarations")
+    expected_outer = ast.parse(
+        "def _arch146_partial_state_preflight_checkpoint("
+        "spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path"
+        ") -> tuple[bool, Path | None]:"
+        "\n    if spec.name != ARCH146_PARTIAL_STATE_NAME:"
+        "\n        return _arch134_readonly_diagnostic_r3_preflight_checkpoint("
+        "spec, repo_root=repo_root, evidence_root=evidence_root)"
+        "\n    if spec != _checkpoint_specs()[ARCH146_PARTIAL_STATE_NAME] "
+        "or _arch146_partial_state_authority_check(repo_root):"
+        "\n        raise RuntimeError("
+        "'Partial-state observer source/registration rejected')"
+        "\n    return _PRE_READONLY_PREFLIGHT("
+        "spec, repo_root=repo_root, evidence_root=evidence_root)"
+    ).body[0]
+    if outer not in functions or ast.dump(functions[outer]) != ast.dump(expected_outer):
+        failures.append("current preflight observer routing drift")
+    for name, checkpoint, delegate in (
+        (
+            "_arch134_readonly_diagnostic_r3_preflight_checkpoint",
+            "ARCH134_READONLY_DIAGNOSTIC_R3_NAME",
+            "_arch134_readonly_diagnostic_r2_preflight_checkpoint",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r2_preflight_checkpoint",
+            "ARCH134_READONLY_DIAGNOSTIC_R2_NAME",
+            "_readonly_preflight_checkpoint",
+        ),
+    ):
+        expected_guard = ast.parse(
+            f"if spec.name != {checkpoint}:"
+            f"\n    return {delegate}(spec, repo_root=repo_root, "
+            "evidence_root=evidence_root)"
+        ).body[0]
+        function = functions.get(name)
+        if (
+            function is None
+            or not function.body
+            or ast.dump(function.body[0]) != ast.dump(expected_guard)
+            or getattr(runner, name).__name__ != name
+        ):
+            failures.append("current preflight delegation drift: " + name)
+    # Existing SECURITY_SEMANTIC maps remain the exact owners of whole R2/R3
+    # wrappers, including evidence-root guards and absence of protected dispatch.
+    for pins in (
+        runner.ARCH134_READONLY_DIAGNOSTIC_R2_DISPATCH_PINS,
+        runner.ARCH134_READONLY_DIAGNOSTIC_R3_DISPATCH_PINS,
+    ):
+        for name, pin in pins.items():
+            if name not in functions or not ownership.ast_matches(
+                repo_root, name, functions[name], pin
+            ):
+                failures.append("current preflight security dispatch drift: " + name)
+    for name, pin in (
+        (
+            "_arch134_readonly_diagnostic_r1_preflight",
+            runner.ARCH134_READONLY_DIAGNOSTIC_R1_DISPATCH_AST,
+        ),
+        (
+            "_readonly_preflight_checkpoint",
+            runner.ARCH134_READONLY_DIAGNOSTIC_R1_PREFLIGHT_AST,
+        ),
+    ):
+        if name not in functions or not ownership.ast_matches(
+            repo_root, name, functions[name], pin
+        ):
+            failures.append("current preflight security dispatch drift: " + name)
+    specs = runner._checkpoint_specs()
+    for name, preflight in (
+        (runner.ARCH146_PARTIAL_STATE_NAME, runner._arch146_partial_state_preflight),
+        (
+            runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+            runner._arch134_readonly_diagnostic_r1_preflight,
+        ),
+        (
+            runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+            runner._arch134_readonly_diagnostic_r2_preflight,
+        ),
+        (
+            runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
+            runner._arch134_readonly_diagnostic_r3_preflight,
+        ),
+    ):
+        spec = specs.get(name)
+        if spec is None or spec.preflight is not preflight or spec.execute is not None:
+            failures.append("current preflight registration drift: " + name)
+    predecessor = specs.get(runner.ARCH146_PRE_B2_NAME)
+    if (
+        predecessor is None
+        or predecessor.preflight is not None
+        or predecessor.execute is not None
+    ):
+        failures.append("current preflight source-only predecessor drift")
+    return tuple(failures)
+
+
 def current_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Compose canonical current owners, independently of historical blobs."""
     from scripts import checkpoint_runner as runner
     from scripts import run_test_certification as certification
 
     failures = list(ownership.ownership_failures(repo_root))
+    failures.extend(current_preflight_dispatch_failures(repo_root))
     failures.extend(certification.static_toolchain_contract_failures(repo_root))
     specs = runner._checkpoint_specs()
     if any(name != spec.name for name, spec in specs.items()):

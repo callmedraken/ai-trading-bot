@@ -63,6 +63,8 @@ def current_owner(relative: str) -> str | None:
         in {
             "evaluate_source_authority",
             "current_authority_check",
+            "current_preflight_dispatch_failures",
+            "preflight_checkpoint",
             "develop_static_checkpoints",
             "current_owner",
             "classify_path",

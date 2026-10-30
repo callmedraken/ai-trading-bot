@@ -14,6 +14,16 @@ twice, with exact stability, binary ACE multiset policy and checked handle
 closure. PASS means only `PARTIAL_STATE_OBSERVED_EXACT`; acquisition and
 OPEN-parent creation remain NOT_AUTHORIZED.
 
+The original local candidate `f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40`
+passed FEATURE but failed PROSPECTIVE_DEVELOP admission; publication and
+canonical CI were NOT_RUN, remote feature ABSENT, real effects ZERO. The
+separately scoped child corrects
+ARCH146_CURRENT_PREFLIGHT_DISPATCHER_OWNERSHIP_DEFECT: two stale R2/R3 claims
+on the outer dispatcher composed into three prospective failures. One current
+runner owner now validates the additive chain; R2/R3 security source, pins and
+registrations remain exact. The observer implementation is unchanged. Both
+admission contexts must pass on the child before its first publication.
+
 ## Accepted integrated foundation
 
 Architecture 146's custody ACE multiset and tracked-only B2 source-binding

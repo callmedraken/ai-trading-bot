@@ -26155,7 +26155,6 @@ def _readonly_candidate_authority_check(repo_root: Path) -> tuple[str, ...]:
             or _deployment_candidate_pin is not _readonly_pin
             or _arch146a_shared_blob_pin is not _readonly_shared_blob_pin
             or _checkpoint_specs is not _readonly_checkpoint_specs
-            or preflight_checkpoint is not _arch146_partial_state_preflight_checkpoint
             or _arch146a_predecessor_active_inventory
             is not _readonly_predecessor_active_inventory
             or _deployment_candidate_predecessor_authority_check
@@ -27149,8 +27148,6 @@ def _arch134_readonly_diagnostic_r2_authority_check(repo_root: Path) -> tuple[st
         or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
         != spec.name
         or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
-        or preflight_checkpoint
-        is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
     ):
         failures.append("Diagnostic R2 registration drift")
     for relative, pin in ARCH134_READONLY_DIAGNOSTIC_R2_SOURCE_PINS.items():
@@ -27268,8 +27265,6 @@ def _arch134_readonly_diagnostic_r3_authority_check(repo_root: Path) -> tuple[st
         or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
         != spec.name
         or CI_CERTIFICATION_PROFILES.get(spec.name) != "robinhood"
-        or preflight_checkpoint
-        is not _arch134_readonly_diagnostic_r3_preflight_checkpoint
     ):
         failures.append("Diagnostic R3 registration drift")
     for relative, pin in ARCH134_READONLY_DIAGNOSTIC_R3_SOURCE_PINS.items():

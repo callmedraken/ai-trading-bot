@@ -17,6 +17,23 @@ No host observation occurs during implementation/certification. The old direct
 B2 launcher remains NOT_RUN for this continuation. Terminal CI red OR green is
 STOP for independent ChatGPT exact-source/CI review; no retry, PR or merge.
 
+Preserved unpublished observer candidate:
+
+    HEAD f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40
+    TREE 1da5d05c1f14c5552249f3cdc5fcf7c47a9afcd4
+    FEATURE PASS; PROSPECTIVE_DEVELOP FAIL (three composed failures)
+    publication NOT_RUN; remote feature ABSENT; canonical CI NOT_RUN
+    real effects ZERO; source acceptance NOT_GRANTED
+
+Accepted diagnosis: ARCH146_CURRENT_PREFLIGHT_DISPATCHER_OWNERSHIP_DEFECT.
+Two stale R2/R3 predicates require R3 to remain the global outer wrapper; R3's
+R2 composition produces three failures. The separately authorized ordinary
+child moves that ownership into current source authority without changing
+R2/R3 exact security dispatch, pins, evidence guards or observer behavior.
+Preserve the original candidate and failed admission report; no amend/squash.
+The final two-commit lineage may be pushed once only after both admission
+contexts PASS with stable exact identity. Any admission failure is STOP.
+
 ## Accepted integrated B2 source foundation
 
 Current accepted integrated source (verify live remote independently):

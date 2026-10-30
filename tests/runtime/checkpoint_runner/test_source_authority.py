@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import ast
+import copy
 import hashlib
 import json
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 
@@ -66,6 +68,245 @@ def test_classification_has_one_current_owner_and_preserves_security_evidence():
         assert ownership.current_owner(symbol) == "checkpoint_runner"
     assert ownership.current_owner("AGENTS.md") == "workflow_coordination"
     assert ownership.current_owner("pyproject.toml") == "certification"
+    assert (
+        ownership.current_owner("current_preflight_dispatch_failures")
+        == "checkpoint_runner"
+    )
+    assert ownership.current_owner("preflight_checkpoint") == "checkpoint_runner"
+
+
+def test_current_preflight_chain_and_observer_registration_pass_without_dispatch(
+    monkeypatch,
+):
+    def forbidden(*args, **kwargs):
+        pytest.fail("static authority dispatched a host or protected action")
+
+    monkeypatch.setattr(runner, "_PRE_READONLY_PREFLIGHT", forbidden)
+    monkeypatch.setattr(runner, "_arch146_partial_state_preflight", forbidden)
+    specs = runner._checkpoint_specs()
+    assert specs[runner.ARCH146_PARTIAL_STATE_NAME].execute is None
+    assert specs[runner.ARCH146_PRE_B2_NAME].preflight is None
+    assert specs[runner.ARCH146_PRE_B2_NAME].execute is None
+    assert current.current_preflight_dispatch_failures(ROOT) == ()
+
+
+@pytest.mark.parametrize("revision", ["r2", "r3"])
+def test_current_preflight_predecessor_authority_owns_only_its_security(
+    monkeypatch, revision
+):
+    authority = getattr(
+        runner, f"_arch134_readonly_diagnostic_{revision}_authority_check"
+    )
+    assert (
+        runner.preflight_checkpoint
+        is runner._arch146_partial_state_preflight_checkpoint
+    )
+    assert authority(ROOT) == ()
+    # The predecessor does not own any later outer alias, even a rejected one.
+    monkeypatch.setattr(runner, "preflight_checkpoint", lambda *args, **kwargs: None)
+    assert authority(ROOT) == ()
+    assert (
+        "current preflight outer dispatcher drift"
+        in current.current_preflight_dispatch_failures(ROOT)
+    )
+
+
+@pytest.mark.parametrize("revision", ["r2", "r3"])
+def test_current_preflight_predecessor_registration_remains_exact(
+    monkeypatch, revision
+):
+    name = getattr(runner, f"ARCH134_READONLY_DIAGNOSTIC_{revision.upper()}_NAME")
+    authority = getattr(
+        runner, f"_arch134_readonly_diagnostic_{revision}_authority_check"
+    )
+    specs = runner._checkpoint_specs()
+    specs[name] = replace(specs[name], preflight=lambda: {})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    assert f"Diagnostic {revision.upper()} registration drift" in authority(ROOT)
+    assert (
+        "current preflight registration drift: " + name
+        in current.current_preflight_dispatch_failures(ROOT)
+    )
+
+
+@pytest.mark.parametrize("revision", ["r2", "r3"])
+@pytest.mark.parametrize("suffix", ["_preflight", "_preflight_checkpoint"])
+def test_current_preflight_inner_security_ast_pins_still_fail(
+    monkeypatch, revision, suffix
+):
+    name = f"_arch134_readonly_diagnostic_{revision}{suffix}"
+    parse = runner._top_level_functions
+
+    def changed(tree):
+        functions = parse(tree)
+        functions[name] = copy.deepcopy(functions[name])
+        functions[name].body.append(ast.Pass())
+        return functions
+
+    monkeypatch.setattr(runner, "_top_level_functions", changed)
+    authority = getattr(
+        runner, f"_arch134_readonly_diagnostic_{revision}_authority_check"
+    )
+    assert f"Diagnostic {revision.upper()} dispatch drift: {name}" in authority(ROOT)
+
+
+@pytest.mark.parametrize(
+    "wrapper,old,new,expected",
+    [
+        (
+            "_arch146_partial_state_preflight_checkpoint",
+            "_arch134_readonly_diagnostic_r3_preflight_checkpoint(",
+            "_arch134_readonly_diagnostic_r2_preflight_checkpoint(",
+            "observer routing drift",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r3_preflight_checkpoint",
+            "_arch134_readonly_diagnostic_r2_preflight_checkpoint(",
+            "_readonly_preflight_checkpoint(",
+            "delegation drift",
+        ),
+        (
+            "_arch146_partial_state_preflight_checkpoint",
+            "_arch134_readonly_diagnostic_r3_preflight_checkpoint(",
+            "_arch146_partial_state_preflight_checkpoint(",
+            "observer routing drift",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r3_preflight_checkpoint",
+            "return _arch134_readonly_diagnostic_r2_preflight_checkpoint(",
+            "return _arch134_readonly_diagnostic_r3_preflight_checkpoint(",
+            "delegation drift",
+        ),
+        (
+            "_arch146_partial_state_preflight_checkpoint",
+            "spec.name != ARCH146_PARTIAL_STATE_NAME",
+            "spec.name != ARCH146_PRE_B2_NAME",
+            "observer routing drift",
+        ),
+        (
+            "_arch146_partial_state_preflight_checkpoint",
+            "return _PRE_READONLY_PREFLIGHT(",
+            "return execute_checkpoint(",
+            "observer routing drift",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r2_preflight_checkpoint",
+            "return _readonly_preflight_checkpoint(",
+            "return _PRE_READONLY_PREFLIGHT(",
+            "delegation drift",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r2_preflight",
+            "return preflight()",
+            "return execute_checkpoint()",
+            "security dispatch drift",
+        ),
+        (
+            "_arch134_readonly_diagnostic_r3_preflight",
+            "return preflight()",
+            "return execute_checkpoint()",
+            "security dispatch drift",
+        ),
+        (
+            "_readonly_preflight_checkpoint",
+            "return _PRE_READONLY_PREFLIGHT(",
+            "return execute_checkpoint(",
+            "security dispatch drift",
+        ),
+    ],
+)
+def test_current_preflight_structural_owner_rejects_bypass_and_wrong_route(
+    tmp_path, wrapper, old, new, expected
+):
+    source = (ROOT / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    function = next(
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.FunctionDef) and node.name == wrapper
+    )
+    original = ast.get_source_segment(source, function)
+    assert old in original
+    modified = original.replace(old, new, 1)
+    target = tmp_path / "scripts/checkpoint_runner.py"
+    target.parent.mkdir()
+    target.write_text(source.replace(original, modified, 1), encoding="utf-8")
+    failures = current.current_preflight_dispatch_failures(tmp_path)
+    assert any("current preflight " + expected in failure for failure in failures)
+
+
+def test_current_preflight_global_owner_is_composed_into_current_authority(monkeypatch):
+    monkeypatch.setattr(runner, "preflight_checkpoint", lambda *args, **kwargs: {})
+    assert (
+        "current preflight outer dispatcher drift"
+        in current.current_authority_check(ROOT)
+    )
+
+
+@pytest.mark.parametrize(
+    "name,field",
+    [
+        (runner.ARCH146_PARTIAL_STATE_NAME, "execute"),
+        (runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME, "execute"),
+        (runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME, "execute"),
+        (runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME, "execute"),
+        (runner.ARCH146_PRE_B2_NAME, "preflight"),
+        (runner.ARCH146_PRE_B2_NAME, "execute"),
+    ],
+)
+def test_current_preflight_registration_cannot_gain_effects(monkeypatch, name, field):
+    specs = runner._checkpoint_specs()
+    specs[name] = replace(specs[name], **{field: lambda: {}})
+    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: specs)
+    failures = current.current_preflight_dispatch_failures(ROOT)
+    assert any(
+        "registration drift" in failure or "source-only predecessor drift" in failure
+        for failure in failures
+    )
+
+
+def test_current_preflight_retains_existing_security_functions_and_pin_maps():
+    relative = "scripts/checkpoint_runner.py"
+    preserved = subprocess.run(
+        ["git", "show", "f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40:" + relative],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout.decode()
+    current_tree = ast.parse((ROOT / relative).read_text(encoding="utf-8"))
+    old_tree = ast.parse(preserved)
+
+    def security_declarations(tree):
+        return {
+            node.name: ast.dump(node)
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name
+            in {
+                "_arch134_readonly_diagnostic_r1_preflight",
+                "_arch134_readonly_diagnostic_r2_preflight",
+                "_arch134_readonly_diagnostic_r2_preflight_checkpoint",
+                "_arch134_readonly_diagnostic_r3_preflight",
+                "_arch134_readonly_diagnostic_r3_preflight_checkpoint",
+            }
+        }
+
+    def pins(tree):
+        return [
+            ast.dump(node)
+            for node in tree.body
+            if isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id
+            in {
+                "ARCH134_READONLY_DIAGNOSTIC_R2_SOURCE_PINS",
+                "ARCH134_READONLY_DIAGNOSTIC_R3_SOURCE_PINS",
+                "ARCH134_READONLY_DIAGNOSTIC_R2_DISPATCH_PINS",
+                "ARCH134_READONLY_DIAGNOSTIC_R3_DISPATCH_PINS",
+            }
+        ]
+
+    assert security_declarations(current_tree) == security_declarations(old_tree)
+    assert len(pins(current_tree)) == 4 and pins(current_tree) == pins(old_tree)
 
 
 def test_historical_harness_reconstructs_immutable_object_independent_of_current_bytes(

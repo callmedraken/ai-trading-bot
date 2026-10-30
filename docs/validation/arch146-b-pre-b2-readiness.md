@@ -2,7 +2,46 @@
 
 ## Current successor — registered read-only partial-state observer
 
-### Preserved failed local admission and separately scoped corrective child
+### Current corrective child — local read-only helper ownership
+
+Parent HEAD `84b07c225a9f550582d5df4c992b0fca5dfc748b`, tree
+`e0773a4ead9e6fa34418d819170d099356d5f5b1`, passed both general admission
+contexts and #803 / run 40983454094 / attempt 1 / SUCCESS / canonical FULL.
+It remained unaccepted because independent ChatGPT exact-source review found
+ARCH146_PARTIAL_STATE_READONLY_HELPER_OWNERSHIP_GAP. The runtime observer
+itself was not found defective. #803 remains preserved green evidence and is
+not rerun; neither parent commit is amended, squashed or rewritten.
+
+The existing Architecture 146 current authority now owns expected AST shapes
+for local _error, CustodyPartialState, WindowsCustodyNative.__init__, _api and
+_close. The error factory retains only its fixed exception construction. The
+frozen/slots carrier retains its five fields/defaults and no executable hooks.
+The constructor initializes only the in-memory dictionary; _api only binds the
+Win32 function; _close invokes only the reviewed CloseHandle/error path. Native
+class interception hooks, duplicate/rebound helper definitions and helper-shape
+drift reject. Existing direct observer/native call checks and exact Win32
+invocation restrictions remain. No historical dictionaries/blobs are repinned.
+External inspect_open_authority_object stays under its existing Architecture
+134 runtime-ACL authority; its source/pins are not duplicated or changed.
+
+Mutation tests reject selected-function invocation and extra native effects
+inside _api; alternate/effectful _close; effectful _error/constructor; native
+and carrier hooks; evidence field/default drift; and wrong direct Win32 calls.
+The exact current source still passes. Observer runtime, native partial/fresh
+observation methods, B2 preflight, R2/R3 wrappers, outer dispatcher and current
+dispatcher owner remain unchanged. Retained tests keep their existing meaning.
+
+No real host observation occurred. Host observer NOT_RUN; acquisition and
+OPEN-parent creation NOT_AUTHORIZED; all real host/token/credential/provider/
+protected-filesystem/acquisition/holdout/scheduler/runtime/paper/broker/live
+effects ZERO. Architecture 134 R3 remains parked; LIVE remains NO-GO.
+One ordinary child must pass focused tests, whole-root Ruff 0.17.3, diff checks
+and final FEATURE/PROSPECTIVE_DEVELOP admission with stable exact identity.
+Admission failure is STOP. Only after both PASS may one push trigger one new
+mapped GitHub FULL; no canonical FULL locally and no #803 rerun. Terminal red
+OR green is STOP for independent review, without a host observer invocation.
+
+### Earlier dispatcher-ownership correction and failed local admission
 
 Original observer candidate HEAD
 `f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40`, tree

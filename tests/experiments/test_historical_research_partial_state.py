@@ -410,6 +410,233 @@ def test_current_owner_rejects_forbidden_observer_calls(tmp_path, bad_call):
     assert not authority.partial_state_observer_is_readonly(tmp_path)
 
 
+@pytest.fixture
+def helper_authority_source(tmp_path):
+    for relative in (
+        authority.PARTIAL_STATE_SOURCE,
+        "src/trading_bot/experiments/historical_research_native_custody.py",
+        "scripts/checkpoint_runner.py",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            (ROOT / relative).read_text(encoding="utf-8"), encoding="utf-8"
+        )
+    return tmp_path
+
+
+def test_helper_authority_accepts_reviewed_local_graph(helper_authority_source):
+    assert authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
+@pytest.mark.parametrize(
+    "helper,old,new",
+    [
+        ("_api", "return function", "function()\n        return function"),
+        ("_api", "return function", "self._close(1)\n        return function"),
+        (
+            "_api",
+            "return function",
+            "ctypes.WinDLL('kernel32').CreateDirectoryW(None, None)"
+            "\n        return function",
+        ),
+        (
+            "_api",
+            "function.argtypes, function.restype = arguments, result",
+            "function.argtypes, function.restype = arguments, result"
+            "\n        function()",
+        ),
+        ("_api", 'if os.name != "nt":', "if False:"),
+        ("_close", '"CloseHandle"', '"CreateFileW"'),
+        ("_close", '"CloseHandle"', '"WriteFile"'),
+        ("_close", '"CloseHandle"', '"CreateDirectoryW"'),
+        ("_close", "raise _error()", "self.create_directory('fixed', opened=False)"),
+        (
+            "_close",
+            "if not self._api",
+            "self.flush_namespace()\n        if not self._api",
+        ),
+        (
+            "_error",
+            "return HistoricalResearchCustodyError",
+            "effect()\n    return HistoricalResearchCustodyError",
+        ),
+        ("_error", "B2 custody STOP/reconciliation required", "arbitrary exception"),
+        (
+            "__init__",
+            "self._directories: dict[str, int] = {}",
+            "self._directories: dict[str, int] = {}"
+            "\n        self._api('kernel32', 'WriteFile', [], None)",
+        ),
+        (
+            "__init__",
+            "self._directories: dict[str, int] = {}",
+            "self._directories: dict[str, int] = {}\n        self.observe_fresh()",
+        ),
+        (
+            "__init__",
+            "self._directories: dict[str, int] = {}",
+            "self._directories: dict[str, int] = effect()",
+        ),
+    ],
+)
+def test_helper_authority_rejects_helper_body_mutations(
+    helper_authority_source, helper, old, new
+):
+    target = helper_authority_source / (
+        "src/trading_bot/experiments/historical_research_native_custody.py"
+    )
+    source = target.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    cls = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "WindowsCustodyNative"
+    )
+    scope = tree.body if helper == "_error" else cls.body
+    definition = next(
+        node
+        for node in scope
+        if isinstance(node, ast.FunctionDef) and node.name == helper
+    )
+    original = ast.get_source_segment(source, definition)
+    assert original.count(old) == 1
+    modified = source.replace(original, original.replace(old, new, 1), 1)
+    ast.parse(modified)  # Mutations must be valid Python, not syntax-error rejection.
+    target.write_text(modified, encoding="utf-8")
+    assert not authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
+@pytest.mark.parametrize(
+    "class_name,hook",
+    [
+        ("WindowsCustodyNative", "__new__"),
+        ("WindowsCustodyNative", "__getattribute__"),
+        ("WindowsCustodyNative", "__getattr__"),
+        ("WindowsCustodyNative", "__setattr__"),
+        ("WindowsCustodyNative", "__delattr__"),
+        ("WindowsCustodyNative", "__del__"),
+        ("CustodyPartialState", "__init__"),
+        ("CustodyPartialState", "__new__"),
+        ("CustodyPartialState", "__post_init__"),
+        ("CustodyPartialState", "__getattribute__"),
+        ("CustodyPartialState", "__getattr__"),
+        ("CustodyPartialState", "__setattr__"),
+        ("CustodyPartialState", "__del__"),
+    ],
+)
+def test_helper_authority_rejects_executable_hooks(
+    helper_authority_source, class_name, hook
+):
+    target = helper_authority_source / (
+        "src/trading_bot/experiments/historical_research_native_custody.py"
+    )
+    source = target.read_text(encoding="utf-8")
+    old = f"class {class_name}:"
+    new = old + f"\n    def {hook}(self, *args):\n        effect()\n"
+    assert source.count(old) == 1
+    target.write_text(source.replace(old, new, 1), encoding="utf-8")
+    assert not authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ("classification: str", "classification: str = 'PASS'"),
+        (
+            "parent: SecurityInspection | None = None",
+            "parent: SecurityInspection | None = effect()",
+        ),
+        ("local_fixed: bool = False", "local_fixed: bool = True"),
+        ("absent: tuple[bool, ...] = ()", "absent: tuple[bool, ...] = (True,)"),
+        ("close_ambiguous: bool = False", "close_ambiguous: bool = True"),
+        ("close_ambiguous: bool = False", "extra: str = 'new-field'"),
+        ("@dataclass(frozen=True, slots=True)", "@dataclass(frozen=False, slots=True)"),
+        ("@dataclass(frozen=True, slots=True)", "@dataclass(frozen=True, slots=False)"),
+    ],
+)
+def test_helper_authority_rejects_evidence_carrier_drift(
+    helper_authority_source, old, new
+):
+    target = helper_authority_source / (
+        "src/trading_bot/experiments/historical_research_native_custody.py"
+    )
+    source = target.read_text(encoding="utf-8")
+    cls = next(
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.ClassDef) and node.name == "CustodyPartialState"
+    )
+    original = ast.get_source_segment(source, cls)
+    # Decorators are outside ClassDef's source segment.
+    if old.startswith("@dataclass"):
+        marker = old + "\n" + original
+    else:
+        marker = original
+    assert old in marker and source.count(marker) == 1
+    target.write_text(
+        source.replace(marker, marker.replace(old, new, 1), 1), encoding="utf-8"
+    )
+    assert not authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
+@pytest.mark.parametrize(
+    "old,new",
+    [
+        ('"CreateFileW"', '"WriteFile"'),
+        ('"GetDriveTypeW"', '"CreateDirectoryW"'),
+        (
+            "(path, access, 3, None, 3, 0x02200000, None)",
+            "(path, access, 3, None, 1, 0x02200000, None)",
+        ),
+        ("open_existing(path, 0x80)", "open_existing(path, 0xC0000000)"),
+    ],
+)
+def test_helper_authority_retains_exact_direct_win32_restrictions(
+    helper_authority_source, old, new
+):
+    target = helper_authority_source / (
+        "src/trading_bot/experiments/historical_research_native_custody.py"
+    )
+    source = target.read_text(encoding="utf-8")
+    cls = next(
+        node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.ClassDef) and node.name == "WindowsCustodyNative"
+    )
+    method = next(
+        node
+        for node in cls.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name == "observe_partial_state_readonly"
+    )
+    original = ast.get_source_segment(source, method)
+    assert original.count(old) == 1
+    target.write_text(
+        source.replace(original, original.replace(old, new, 1), 1), encoding="utf-8"
+    )
+    assert not authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        "_error = effect",
+        "CustodyPartialState = effect",
+        "WindowsCustodyNative._api = effect",
+        "setattr(WindowsCustodyNative, '_close', effect)",
+        "if True:\n    def _error():\n        effect()",
+    ],
+)
+def test_helper_authority_rejects_rebinding(helper_authority_source, extra):
+    target = helper_authority_source / (
+        "src/trading_bot/experiments/historical_research_native_custody.py"
+    )
+    with target.open("a", encoding="utf-8") as output:
+        output.write("\n" + extra + "\n")
+    assert not authority.partial_state_observer_is_readonly(helper_authority_source)
+
+
 def test_existing_b2_and_freshness_sources_remain_exact():
     relative = "src/trading_bot/experiments/historical_research_native_custody.py"
     old = subprocess.run(

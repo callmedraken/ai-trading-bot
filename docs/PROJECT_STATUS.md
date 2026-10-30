@@ -14,15 +14,19 @@ twice, with exact stability, binary ACE multiset policy and checked handle
 closure. PASS means only `PARTIAL_STATE_OBSERVED_EXACT`; acquisition and
 OPEN-parent creation remain NOT_AUTHORIZED.
 
-The original local candidate `f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40`
-passed FEATURE but failed PROSPECTIVE_DEVELOP admission; publication and
-canonical CI were NOT_RUN, remote feature ABSENT, real effects ZERO. The
-separately scoped child corrects
-ARCH146_CURRENT_PREFLIGHT_DISPATCHER_OWNERSHIP_DEFECT: two stale R2/R3 claims
-on the outer dispatcher composed into three prospective failures. One current
-runner owner now validates the additive chain; R2/R3 security source, pins and
-registrations remain exact. The observer implementation is unchanged. Both
-admission contexts must pass on the child before its first publication.
+The dispatcher-ownership child `84b07c225a9f550582d5df4c992b0fca5dfc748b`
+passed both admission contexts and GitHub #803 canonical FULL. It remained
+unaccepted: independent ChatGPT exact-source review identified
+ARCH146_PARTIAL_STATE_READONLY_HELPER_OWNERSHIP_GAP. The runtime observer
+itself was not found defective; #803 remains preserved green evidence.
+
+The new corrective child extends only current semantic ownership of the local
+error factory, evidence carrier, native constructor, API binder, CloseHandle
+helper and magic-method boundary. Runtime/dispatcher source and external ACL
+authority remain unchanged. Host observer NOT_RUN; no real host observation
+occurred. Acquisition and OPEN-parent creation remain NOT_AUTHORIZED.
+Architecture 134 R3 remains parked; LIVE remains NO-GO. Final child admission
+and one new mapped GitHub FULL precede independent source review.
 
 ## Accepted integrated foundation
 

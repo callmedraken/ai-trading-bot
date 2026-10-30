@@ -17,7 +17,29 @@ No host observation occurs during implementation/certification. The old direct
 B2 launcher remains NOT_RUN for this continuation. Terminal CI red OR green is
 STOP for independent ChatGPT exact-source/CI review; no retry, PR or merge.
 
-Preserved unpublished observer candidate:
+## Current helper-authority correction
+
+    reviewed parent HEAD 84b07c225a9f550582d5df4c992b0fca5dfc748b
+    reviewed parent TREE e0773a4ead9e6fa34418d819170d099356d5f5b1
+    feature #803 / run 40983454094 / attempt 1: SUCCESS / canonical FULL
+    source acceptance NOT_GRANTED; host observer NOT_RUN; real effects ZERO
+
+Independent ChatGPT exact-source review identified
+ARCH146_PARTIAL_STATE_READONLY_HELPER_OWNERSHIP_GAP after #803. The runtime
+observer itself was not found defective. Preserve #803 unchanged; no rerun.
+The new ordinary child extends current semantic ownership of the local helper
+graph only, without changing observer/native runtime or dispatcher source.
+The external inspect_open_authority_object authority remains with Architecture
+134 runtime ACLs. No historical repin or successor ladder is introduced.
+
+No real host observation occurred. Acquisition and OPEN-parent creation remain
+NOT_AUTHORIZED. Architecture 134 R3 remains parked; LIVE remains NO-GO.
+Both final child admission contexts must PASS with stable exact identity before
+one ordinary push and one new mapped GitHub FULL. Admission failure, or terminal
+CI red OR green, is STOP for independent review. No registered host observer
+follows CI; source acceptance and develop integration remain separate.
+
+## Preserved original prepublication evidence
 
     HEAD f49dd2d2ef7eb0944fdc8d91ba0c275fbb65dc40
     TREE 1da5d05c1f14c5552249f3cdc5fcf7c47a9afcd4
@@ -30,9 +52,9 @@ Two stale R2/R3 predicates require R3 to remain the global outer wrapper; R3's
 R2 composition produces three failures. The separately authorized ordinary
 child moves that ownership into current source authority without changing
 R2/R3 exact security dispatch, pins, evidence guards or observer behavior.
-Preserve the original candidate and failed admission report; no amend/squash.
-The final two-commit lineage may be pushed once only after both admission
-contexts PASS with stable exact identity. Any admission failure is STOP.
+The ordinary dispatcher child passed FEATURE/PROSPECTIVE_DEVELOP with stable
+identity and published the two-commit lineage once, followed by green #803.
+Preserve both commits and the original failed admission; no amend/squash.
 
 ## Accepted integrated B2 source foundation
 

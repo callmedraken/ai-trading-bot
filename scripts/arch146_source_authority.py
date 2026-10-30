@@ -23,6 +23,85 @@ def partial_state_observer_is_readonly(repo_root: Path) -> bool:
             / "src/trading_bot/experiments/historical_research_native_custody.py"
         ).read_text(encoding="utf-8")
     )
+    # These local dependencies can run before or beneath the bounded method.
+    # Own their semantics here, without historical blob pins or duplicating the
+    # external Architecture-134 authority/security implementation.
+    expected_helpers = ast.parse(
+        "def _error() -> HistoricalResearchCustodyError:"
+        "\n    return HistoricalResearchCustodyError("
+        "'B2 custody STOP/reconciliation required')"
+        "\n@dataclass(frozen=True, slots=True)"
+        "\nclass CustodyPartialState:"
+        "\n    '''Internal handle facts; only validated fixed facts "
+        "may enter public evidence.'''"
+        "\n    classification: str"
+        "\n    parent: SecurityInspection | None = None"
+        "\n    local_fixed: bool = False"
+        "\n    absent: tuple[bool, ...] = ()"
+        "\n    close_ambiguous: bool = False"
+        "\nclass WindowsCustodyNative:"
+        "\n    def __init__(self) -> None:"
+        "\n        self._directories: dict[str, int] = {}"
+        "\n    def _api(self, library: str, name: str, arguments: list, result):"
+        "\n        if os.name != 'nt':"
+        "\n            raise _error()"
+        "\n        function = getattr("
+        "ctypes.WinDLL(library, use_last_error=True), name)"
+        "\n        function.argtypes, function.restype = arguments, result"
+        "\n        return function"
+        "\n    def _close(self, handle: int) -> None:"
+        "\n        if not self._api('kernel32', 'CloseHandle', "
+        "[ctypes.c_void_p], ctypes.c_int)(handle):"
+        "\n            raise _error()"
+    )
+    declarations = [
+        node
+        for node in native.body
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef))
+    ]
+    for expected in expected_helpers.body[:2]:
+        found = [node for node in declarations if node.name == expected.name]
+        if len(found) != 1 or ast.dump(found[0]) != ast.dump(expected):
+            return False
+    classes = [node for node in declarations if node.name == "WindowsCustodyNative"]
+    if len(classes) != 1 or not isinstance(classes[0], ast.ClassDef):
+        return False
+    cls = classes[0]
+    if cls.bases or cls.keywords or cls.decorator_list or cls.type_params:
+        return False
+    native_methods = [node for node in cls.body if isinstance(node, ast.FunctionDef)]
+    if len({node.name for node in native_methods}) != len(native_methods):
+        return False
+    for node in cls.body:
+        if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+            if type(node.value.value) is str:
+                continue
+        if not isinstance(node, ast.FunctionDef) or (
+            node.name.startswith("__") and node.name != "__init__"
+        ):
+            return False
+    for expected in expected_helpers.body[2].body:
+        found = [node for node in native_methods if node.name == expected.name]
+        if len(found) != 1 or ast.dump(found[0]) != ast.dump(expected):
+            return False
+    # Reject rebinding the owned helper names outside their declarations too.
+    owned = {node.name for node in expected_helpers.body}
+    for node in native.body:
+        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+            continue
+        if any(
+            (isinstance(item, ast.Name) and item.id in owned)
+            or (
+                isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                and item.name in owned
+            )
+            for item in ast.walk(node)
+        ):
+            return False
+        if isinstance(node, (ast.Import, ast.ImportFrom)) and any(
+            (alias.asname or alias.name.split(".")[0]) in owned for alias in node.names
+        ):
+            return False
     methods = [
         method
         for cls in native.body

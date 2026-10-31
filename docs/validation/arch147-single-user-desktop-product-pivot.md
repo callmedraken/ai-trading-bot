@@ -1,6 +1,6 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P4 SOURCE-ONLY validation; P2/P3 accepted and real-run complete.
+Status: CURRENT P4 ACCEPTED/INTEGRATED validation; no-network runtime smoke pending; P2/P3 accepted and real-run complete.
 
 ## Accepted P3 closeout and real result
 
@@ -88,19 +88,38 @@ Unresolved state never becomes a clean Stop. Recovery is visible and manual;
 P4 never deletes prior evidence, force kills, auto-restarts or updates itself.
 See the architecture document for full lifecycle and close policy.
 
-Terminal publication identity, focused counts, admission and CI evidence are
-reported in the implementation handoff after verification, not self-pinned into
-this candidate. After acceptance/integration and develop reuse verification,
-the short source-owned launcher supports one explicit no-network Start/Stop
-smoke. P5 source work follows that successful smoke; LIVE remains disabled.
+P4 source is accepted/integrated at
+`e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
+`1d2f57afb1d5cddc9487352519f92cced5554f9d`. Original P4 source
+`5fb96f758b6f2bb2af302f5725fdf7ad03bfc138` produced feature CI #815 /
+run `41172155619`, which is preserved terminal red because Qt-backed tests
+were collected without PySide6 in source-gate test jobs. That was a CI
+dependency-coverage defect, not a P4 runtime semantic failure.
 
-Prepublication local evidence: application/GUI batches passed 87 and 38 tests;
-the shared checkpoint/source-authority and retained Supervisor integration batch
-passed 634 tests. An earlier focused registry/profile batch passed 255
-parameterized cases (overlapping the shared batch). All 79 develop-routed static
-checkpoint authorities plus current authority returned no failures. These are
-focused/static checks, not a local canonical FULL. Final exact committed
-both-context admission and GitHub certification remain required.
+Corrective child `e5e800ad...` changed only the source-gate workflow dependency
+coverage and its deterministic runner regression. Its focused verification
+reported 1161 passing focused cases plus the targeted CI regression, whole-root
+Ruff/diff PASS, FEATURE PASS, PROSPECTIVE_DEVELOP PASS and stable identity.
+Feature CI #816 / run `41175037719` / attempt 1 is terminal SUCCESS with
+canonical FULL. After exact fast-forward integration, develop CI #817 / run
+`41177055270` / attempt 1 is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True` for `exact_feature_certification`.
+Source-static and source-gates passed; active-tests, fallback full-tests,
+Robinhood certification and all seven canonical FULL lanes were skipped.
+No duplicate canonical broad run was performed.
+
+Prepublication P4 local evidence also includes application/GUI batches of 87 and
+38 tests, a 634-test shared checkpoint/source-authority and retained Supervisor
+integration batch, and the earlier 255-case overlapping registry/profile batch.
+All 79 develop-routed static checkpoint authorities plus current authority
+returned no failures. These are focused/static checks, not another local
+canonical FULL.
+
+No production GUI/worker runtime, journal, credentials, network, provider,
+broker, account, scheduler, ACL or holdout effect occurred during source
+implementation, admission, CI or integration. The source-owned launcher now
+supports exactly one reviewed no-network Start/Stop smoke. That smoke remains
+NOT_RUN; P5 architecture work follows a successful smoke. LIVE remains disabled.
 
 ## Preserved P1–P3 source implementation chronology
 

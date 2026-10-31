@@ -1,80 +1,80 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 P4 source-only
+## Current boundary — Architecture 147 P4 integrated; smoke pending
 
-Starting accepted integrated source:
+Accepted integrated source:
 
-    HEAD b9d52c4934517ea67b8c18f4d6f967bfd576ecf7
-    TREE 755054f71489491f0214489e35827ba2bb51c74e
-    worktree F:\AI\ai-trading-bot
-    branch feature/research-desktop-supervisor-current
+    HEAD e5e800ad99da8dd1c09fa36202d5ff8b648c1daf
+    TREE 1d2f57afb1d5cddc9487352519f92cced5554f9d
+    branch develop
     checkpoint arch147-desktop-supervisor
-    preflight=None; execute=None; canonical FULL owned by GitHub
+    preflight=None; execute=None
 
-The branch matches the already-reviewed `feature/research-*` push trigger.
-P3's accepted integration and real research/GUI review supersede the previous
-P3 corrective-child handoff. Develop #814 / run `41151276520` / attempt 1 is
-SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, `exact_feature_certification`,
-`IDENTITY_STABLE=True`, `OVERALL=PASS`. Historical P3 #812 and its corrective
-lineage remain immutable; their chronology stays in the validation record.
+P4 source was independently accepted before integration. Original source
+`5fb96f758b6f2bb2af302f5725fdf7ad03bfc138` produced preserved failed feature
+CI #815 / run `41172155619`: Qt-backed tests were collected without PySide6.
+Corrective child `e5e800ad99da8dd1c09fa36202d5ff8b648c1daf` changed only
+`.github/workflows/checkpoint-source-gates.yml` and
+`tests/runtime/checkpoint_runner/test_ci.py` to install the exact PySide6
+bound in test-bearing source-gate jobs and prove that coverage deterministically.
 
-P4 has five closed lifecycle states: STOPPED, STARTING, RUNNING, STOPPING,
-FAILED. Duplicate Start is a no-op; Stop is idempotent. Fatal worker failures
-stop the peer and leave FAILED, with no automatic restart. Clean Stop alone
-permits another generation. A worker/operation timeout leaves visible attention,
-retained ownership and no new generation; there is no force kill or automatic
-recovery. GUI close requests normal asynchronous Stop and waits for confirmed
-closure; unresolved children prevent close.
+Feature CI #816 / run `41175037719` / attempt 1 is terminal SUCCESS with
+canonical FULL. Develop CI #817 / run `41177055270` / attempt 1 is terminal
+SUCCESS with exact-feature certification reuse: source-static and source-gates
+succeeded; active-tests, fallback full-tests, Robinhood certification and all
+seven canonical FULL lanes were skipped. Do not repeat canonical FULL locally or
+rerun either immutable CI result.
 
-Production composition uses one inert trading thread and one independent
-research thread. Research verifies only the accepted existing P3 bundle and
-waits for explicitly queued bounded offline inspection work. It never starts a
-campaign. Trading has no strategy, orders, positions, ledger or transport.
-Research receives no trading state or lifecycle controls. External trading
-transport is NOT_CONNECTED / P5 deferred; simulated paper default, LIVE disabled.
-P3 research results have no strategy-selection or promotion authority.
+P4 has five lifecycle states: STOPPED, STARTING, RUNNING, STOPPING, FAILED.
+Explicit Start admits one generation with exactly one trading and one research
+worker. Duplicate Start is a no-op. Stop is idempotent, signals both workers,
+then requires research closure plus trading reconciliation/closure before
+STOPPED. Fatal failure stops the peer and leaves FAILED; there is no automatic
+restart or force-kill-as-success.
 
-The JSONL journal and exclusive lifetime lock are ordinary local state under
-`F:\AI\desktop-bot-state\p4`, outside the checkout. Strict replay checks schema,
-sequence, generation, UTC, closed events/diagnostics and legal transitions.
-Unresolved prior STARTING/RUNNING/STOPPING/FAILED, malformed bytes or stale
-ownership blocks Start. Preserve it for explicit reconciliation; do not delete,
-overwrite, retry or manufacture a STOPPED record.
+Trading is deliberately inert and NOT_CONNECTED: no strategy, orders, positions,
+ledger, broker, credentials or network. Research only verifies the accepted P3
+campaign bundle through the bounded public reader and never selects or promotes a
+strategy. LIVE remains disabled and FINAL_HOLDOUT sealed.
 
-Implementation/admission/CI do not launch the production GUI or create its
-journal, read the accepted production bundle, run research, open FINAL_HOLDOUT,
-or access credentials/providers/brokers/accounts/schedulers/ACLs. Tests use
-synthetic bundles and fresh external temporary roots. Historical read-only
-Supervisor semantics, lazy-export authority and frozen source checks remain.
+The production JSONL journal and lifetime lock live outside source at
+`F:\AI\desktop-bot-state\p4\lifecycle.jsonl` and `.lock`. Malformed or
+unresolved state, stale ownership or unconfirmed closure blocks Start. Preserve
+such state for explicit reconciliation; do not delete, overwrite, manufacture a
+STOPPED record or automatically retry.
 
-## Immediate next step and success evidence
+## Immediate operator boundary
 
-Owner: Codex implements and runs focused checks, whole-root combined Ruff/diff,
-current/historical source authority, one atomic exact-file commit, general
-`ops.ps1 admit` in FEATURE and PROSPECTIVE_DEVELOP, one ordinary push, then polls
-its one mapped CI to terminal. Return exact HEAD/tree/parent, file set, focused
-counts, admission report and run identity. No local canonical FULL, PR or merge.
-A deterministic uncovered pin/fixture/ownership CI failure is preserved and
-classified PREPUBLICATION_COVERAGE_DEFECT for ChatGPT review.
+The main checkout is not assumed to be on `develop` and must not be switched or
+cleaned to satisfy this milestone. The current canonical develop worktree created
+for integration is:
 
-Next owner: ChatGPT independently reviews the exact source and CI, integrates
-only if accepted, then verifies develop reuse. Only after that boundary, launch:
+    F:\AI\worktrees\ai-trading-bot-p4-integration-e5e800a
 
-```powershell
-& {
-    Set-StrictMode -Version Latest
-    $ErrorActionPreference = 'Stop'
-    $Repo = (Resolve-Path -LiteralPath 'F:\AI\ai-trading-bot').Path
-    Set-Location -LiteralPath $Repo
-    & .\.venv\Scripts\python.exe -B scripts\run_desktop_bot.py
-    $Code = $LASTEXITCODE
-    if ($Code -ne 0) { throw 'STOP: preserve runtime journal and review diagnostics' }
-}
-```
+Before the smoke, synchronize that worktree only by a reviewed fetch plus
+fast-forward to the current remote docs-closeout commit. Then launch the
+source-owned desktop bot with its existing venv. No credentials or network are
+involved.
 
-The reviewed operator clicks Start once, observes both workers RUNNING, clicks
-Stop, observes STOPPED after trading reconciliation and both closures, then
-closes the GUI. Verify the durable final STOPPED record and accepted research
-identity; no credentials or network are involved. This future smoke is not run
-by the source-only checkpoint. Continue to P5 source work after successful
-smoke, without an approval-only turn. LIVE remains NO-GO and FINAL_HOLDOUT sealed.
+The reviewed operator performs one smoke only:
+
+1. Start the GUI.
+2. Click Start once.
+3. Confirm trading and research both report RUNNING and the accepted P3
+   campaign/bundle identity is displayed.
+4. Click Stop once.
+5. Confirm durable STOPPED only after research closure and trading
+   reconciliation/closure.
+6. Close the GUI normally.
+
+If Start is blocked, state becomes FAILED/attention, closure is unconfirmed, or
+the launcher exits nonzero, preserve the journal/lock and diagnostics and stop.
+Do not retry, delete or repair the runtime state without review.
+
+After a successful smoke, continue automatically to Architecture 147 P5
+architecture/discovery. The user has explicitly authorized parallel Codex
+subagents for that architecture work. Use them read-only to map Robinhood MCP,
+risk/order/reconciliation, runtime recovery, GUI/operator and test/CI surfaces,
+then synthesize one implementation DAG before source changes. Retired
+Architecture 133/134 deployment ceremony and Architecture 146 protected custody
+must not become P5 prerequisites. LIVE remains NO-GO.

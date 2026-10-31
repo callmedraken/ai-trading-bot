@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 source-only.
+Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted/integrated with runtime smoke pending.
 
 ## Product contract
 
@@ -401,3 +401,12 @@ only after a confirmed Stop. No network, provider, credential, account, broker,
 scheduler, ACL, final-holdout loader/integrity/admission or protected checkpoint
 runner belongs to this composition. P5 will separately compose the accepted
 official Robinhood MCP foundations.
+
+P4 source is accepted and integrated on `develop` at
+`e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
+`1d2f57afb1d5cddc9487352519f92cced5554f9d`. Original feature CI #815 is
+preserved red for missing PySide6 source-gate dependency coverage. Corrective
+feature CI #816 is terminal green with canonical FULL, and develop CI #817 is
+terminal green with exact-feature certification reuse and no duplicate broad
+execution. The no-network owner Start/Stop runtime smoke remains NOT_RUN and is
+the only remaining P4 acceptance operation before P5 architecture work.

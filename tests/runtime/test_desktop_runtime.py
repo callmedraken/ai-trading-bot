@@ -447,6 +447,68 @@ def test_slow_health_never_blocks_operator_status_or_stop(make_supervisor):
         gate.set()
 
 
+def test_source_registered_workers_do_not_create_health_operation_threads(
+    make_supervisor, monkeypatch
+):
+    supervisor, _ = make_supervisor()
+    original_call = supervisor._call
+    bounded_health_reads = []
+
+    def track(operation, timeout, owner=None):
+        if getattr(operation, "__name__", "") == "read_untrusted_health":
+            bounded_health_reads.append(owner)
+        return original_call(operation, timeout, owner)
+
+    monkeypatch.setattr(supervisor, "_call", track)
+    assert supervisor.start()
+    eventually(lambda: supervisor.status().state is L.RUNNING)
+    time.sleep(0.12)
+    supervisor.stop()
+    assert supervisor.wait()
+    assert bounded_health_reads == []
+
+
+def test_cached_health_registration_does_not_spread_to_overrides_or_markers(
+    make_supervisor, monkeypatch
+):
+    supervisor, _ = make_supervisor()
+    original_call = supervisor._call
+    bounded_health_reads = []
+
+    def track(operation, timeout, owner=None):
+        if getattr(operation, "__name__", "") == "read_untrusted_health":
+            bounded_health_reads.append(owner)
+        return original_call(operation, timeout, owner)
+
+    monkeypatch.setattr(supervisor, "_call", track)
+
+    class SourceWorkerSubclass(runtime.LocalTradingWorker):
+        def health(self):
+            return runtime.WorkerHealth()
+
+    class MarkerSpoofWorker(FakeWorker):
+        __cached_health_worker__ = True
+
+    instance_override = runtime.LocalTradingWorker()
+    instance_override.health = lambda: runtime.WorkerHealth()
+    monkeypatch.setattr(
+        runtime.LocalResearchWorker,
+        "health",
+        lambda self: runtime.WorkerHealth(),
+    )
+    workers = (
+        SourceWorkerSubclass(),
+        MarkerSpoofWorker(),
+        instance_override,
+        runtime.LocalResearchWorker(),
+    )
+
+    for worker in workers:
+        assert supervisor._health(worker) == runtime.WorkerHealth()
+
+    assert bounded_health_reads == list(workers)
+
+
 def test_stop_during_slow_factory_never_starts_later_worker(make_supervisor):
     gate, entered = Event(), Event()
     trading = FakeWorker()

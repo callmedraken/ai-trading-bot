@@ -1,6 +1,7 @@
 """Qt presentation shell for the GUI application foundation."""
 
 from dataclasses import replace
+from typing import Protocol
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent
@@ -17,8 +18,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from trading_bot.desktop_runtime import DesktopSupervisor
+from trading_bot.desktop_paper.presentation import DesktopPaperSnapshot
+from trading_bot.desktop_runtime import DesktopStatus, DesktopSupervisor
 from trading_bot.gui.desktop_control import DesktopControl
+from trading_bot.gui.desktop_paper_panel import DesktopPaperPanel
 from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
 from trading_bot.gui.evidence_source_navigation import EvidenceSourcePageTarget
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
@@ -80,6 +83,16 @@ _STATUS_PROPERTIES = {
 }
 
 
+class DesktopPaperRuntimeController(Protocol):
+    """Qt lifecycle and cached snapshot boundary for the P5 runtime."""
+
+    def snapshot(self) -> DesktopPaperSnapshot: ...
+    def status(self) -> DesktopStatus: ...
+    def start(self) -> bool: ...
+    def stop(self) -> None: ...
+    def dispose(self) -> bool: ...
+
+
 class MainWindow(QMainWindow):
     """Artifact presentation shell with optional current desktop controls."""
 
@@ -88,12 +101,15 @@ class MainWindow(QMainWindow):
         service: GuiApplicationService,
         *,
         desktop_controller: DesktopSupervisor | None = None,
+        paper_controller: DesktopPaperRuntimeController | None = None,
     ) -> None:
         super().__init__()
-        self._desktop_controller = desktop_controller
+        self._desktop_controller: (
+            DesktopSupervisor | DesktopPaperRuntimeController | None
+        ) = paper_controller if paper_controller is not None else desktop_controller
         self._desktop_close_pending = False
         self._overview = service.get_overview()
-        if desktop_controller is not None:
+        if paper_controller is None and desktop_controller is not None:
             self._overview = replace(
                 self._overview,
                 mode=OperatingMode.SIMULATED_PAPER,
@@ -102,6 +118,52 @@ class MainWindow(QMainWindow):
                     "Start runs the local trading and offline research workers. "
                     "Trading is inert; external transport is not connected. "
                     "Stop reconciles and closes both before manual updates."
+                ),
+            )
+        if paper_controller is not None:
+            selected = paper_controller.snapshot().binding is not None
+            self._overview = replace(
+                self._overview,
+                mode=OperatingMode.SIMULATED_PAPER,
+                environment="Local desktop · simulated paper evaluation",
+                summary=(
+                    (
+                        "The desktop runs a local simulated-paper evaluation over "
+                        "the OPEN replay lane. Paper strategy: Selection required. "
+                        "Trading unavailable until an accepted PAPER_EVALUATION "
+                        "binding is installed."
+                    )
+                    if not selected
+                    else (
+                        "The desktop runs a local simulated-paper evaluation over "
+                        "the OPEN replay lane using the explicitly configured "
+                        "PAPER_EVALUATION binding. LIVE is unavailable."
+                    )
+                ),
+                components=(
+                    ComponentStatus(
+                        key="paper",
+                        title="Simulated paper evaluation",
+                        status=(
+                            PresentationStatus.INFO
+                            if selected
+                            else PresentationStatus.UNAVAILABLE
+                        ),
+                        detail=(
+                            "Explicit paper strategy binding is configured."
+                            if selected
+                            else "Paper strategy: Selection required"
+                        ),
+                    ),
+                    ComponentStatus(
+                        key="research",
+                        title="Offline research",
+                        status=PresentationStatus.INFO,
+                        detail=(
+                            "Research artifacts remain read-only and do not select "
+                            "the paper strategy."
+                        ),
+                    ),
                 ),
             )
         research_state = service.get_research_state()
@@ -152,8 +214,21 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
 
         home = self._build_home_page(self._overview)
-        if desktop_controller is not None:
-            self._desktop_control = DesktopControl(desktop_controller, home)
+        if self._desktop_controller is not None:
+            if paper_controller is not None:
+                self._desktop_control = DesktopControl(
+                    paper_controller,
+                    home,
+                    heading=(
+                        "Desktop bot · local simulated-paper evaluation · LIVE disabled"
+                    ),
+                    transport_note="no broker connection",
+                    research_waiting=(
+                        "Research: idle; no bundle acquisition or campaign scheduled"
+                    ),
+                )
+            else:
+                self._desktop_control = DesktopControl(desktop_controller, home)
             home.layout().insertWidget(0, self._desktop_control)
             self._desktop_close_timer = QTimer(self)
             self._desktop_close_timer.timeout.connect(self._finish_desktop_close)
@@ -166,6 +241,11 @@ class MainWindow(QMainWindow):
         )
         self._stack.addWidget(self._research_lifecycle_page)
         self._paper_page = PaperPage(paper_state, self)
+        if paper_controller is not None:
+            self._desktop_paper_panel = DesktopPaperPanel(
+                paper_controller, self._paper_page
+            )
+            self._paper_page.layout().insertWidget(0, self._desktop_paper_panel)
         self._stack.addWidget(self._paper_page)
         self._paper_account_page = PaperAccountPage(paper_account_state, self)
         self._stack.addWidget(self._paper_account_page)

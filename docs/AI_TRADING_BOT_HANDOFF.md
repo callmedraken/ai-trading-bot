@@ -44,52 +44,47 @@ smoke merely to refresh it.
 LIVE remains disabled. FINAL_HOLDOUT remains sealed. P4 grants no broker/order
 authority.
 
-## Current next milestone — P5 architecture/discovery
+## Current checkpoint — ARCH147_P5A_DESKTOP_SIMULATED_PAPER
 
-The product target is a private single-user Windows desktop trading bot, not a
-hostile-administrator deployment platform. The owner explicitly authorizes
-parallel Codex subagents for P5 architecture/discovery and subsequent bounded
-implementation where interfaces are frozen.
+Accepted implementation base:
 
-Architecture discovery is read-only. It should map and reuse existing components
-before proposing new ones, especially:
+    HEAD 79dff6341241af8e126c37060bf4c0968af36778
+    TREE 226e974ec43512d53aa1591eb5efeb0f808bf1cb
+    branch develop
 
-- `trading_bot.risk.RiskManager`;
-- `ReviewPaperStore` and review-paper ledger/account reconstruction;
-- `RobinhoodReviewPaperCycle`;
-- typed `trading_bot.robinhood_mcp` account/quote/history/review boundaries;
-- existing order/execution and paper-account presentation primitives;
-- the accepted P4 DesktopSupervisor worker/lifecycle seam.
+Primary worktree: `F:\AI\worktrees\ai-trading-bot-desktop-paper-cycle-current`.
+Feature branch: `feature/research-desktop-paper-cycle-current`.
+Checkpoint: `arch147-desktop-paper-cycle`; `preflight=None`, `execute=None`;
+canonical certification `full`, GitHub-owned. This source candidate grants no
+runtime operation and is pending terminal CI, exact-source review/integration.
 
-Treat old Architecture 133/134 installation/rename/scheduler/ACL machinery and
-Architecture 146 protected custody as historical/deferred. Treat older PD2 /
-personal-desktop production-authority machinery as selective reuse candidates,
-not inherited prerequisites: justify any piece that genuinely simplifies P5.
+No production/default PAPER_EVALUATION binding exists. The descriptive P3
+55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` is not an accepted
+production or default paper strategy. P5 requires an explicit immutable typed
+PaperStrategyBinding (family/version, symbol, parameters, research provenance,
+PAPER_EVALUATION purpose, no qualification policy and no live eligibility).
+Without an accepted binding, production reports
+`PAPER_EVALUATION_SELECTION_REQUIRED` and admits no trading. Synthetic injected
+fixtures are tests only. OPEN observation acquisition and strategy selection
+remain separate; FINAL_HOLDOUT stays sealed.
 
-The preferred implementation decomposition to validate is:
+P5 uses `F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
+`F:\AI\desktop-bot-state\p5\lifecycle.jsonl`; tests inject fresh external
+temporary paths. Neither production P5 file is created during implementation.
+The P4 journal and accepted smoke remain untouched. P5 uses DesktopSupervisor
+and a distinct instance of the accepted LifecycleJournal. Clean Stop/reopen and
+SQLite commit-before-ack idempotency are supported; stale lifecycle locks or
+unresolved process-death evidence fail closed without repair. P5C owns recovery.
 
-    P5A local unattended SIMULATED_PAPER
-        strategy -> RiskManager -> exact intent -> durable synthetic fill/account
-        -> restart/idempotency -> GUI visibility
-
-    P5B Robinhood MCP read/review forward paper
-        account/quotes/history/review-only transport
-        -> local strategy/risk remain authoritative
-        -> zero order placement
-
-    P5C unattended multi-session paper soak
-        cadence/session handling -> reconnect/backoff -> startup reconciliation
-        -> stale-data rejection -> health/audit -> kill switch
-
-    P6 separately reviewed broker mutation
-        explicit live arming + tiny limits + exact Robinhood execution
-
-P5 architecture/discovery performs no provider operation, credential read,
-broker mutation, FINAL_HOLDOUT access, branch publication or runtime-state
-mutation. Once ChatGPT accepts the synthesized DAG, freeze interfaces and use
-parallel bounded implementation worktrees/subagents where dependencies allow.
-Each publication remains one atomic prepared checkpoint, focused verification,
-both-context admission where applicable, one push and one terminal CI. Do not
-use CI as an edit/debug loop.
+Finish implementation/focused verification and stop before commit/push for
+ChatGPT's strategy/publication decision. Eventual atomic publication, admission,
+terminal canonical FULL and exact-source review remain pending. The next
+operation is filtered-trend/multi-asset research and explicit strategy selection,
+not a production P5 smoke. SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC are representable
+bindings only; no acquisition or new strategy-family implementation is included.
+Do not launch during source work. No provider, account,
+credentials, Robinhood, Alpaca, broker, holdout, scheduler, ACL or live operation
+is authorized by source PASS. P5B read/review-only transport follows separately;
+P6 remains the separately reviewed broker-mutation boundary.
 
 Also remove or update any tests and docs that referenced the old behavior.

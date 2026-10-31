@@ -739,6 +739,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH147_P5A_NAME: "full",
         runner.ARCH147_P4_NAME: "full",
         runner.ARCH147_NAME: "full",
         runner.ARCH146_PARTIAL_STATE_NAME: "full",

@@ -9,11 +9,21 @@ from trading_bot.desktop_runtime import DesktopSupervisor
 class DesktopControl(QWidget):
     """Widgets call only the injected supervisor service; no worker access."""
 
-    def __init__(self, controller: DesktopSupervisor, parent: QWidget) -> None:
+    def __init__(
+        self,
+        controller: DesktopSupervisor,
+        parent: QWidget,
+        *,
+        heading: str = "Desktop bot · inert trading worker · LIVE disabled",
+        transport_note: str = "deferred to P5",
+        research_waiting: str = "Research: awaiting local bundle verification",
+    ) -> None:
         super().__init__(parent)
         self._controller = controller
         layout = QVBoxLayout(self)
-        title = QLabel("Desktop bot · inert trading worker · LIVE disabled", self)
+        self._transport_note = transport_note
+        self._research_waiting = research_waiting
+        title = QLabel(heading, self)
         layout.addWidget(title)
         self.status_label = QLabel(self)
         self.status_label.setObjectName("desktopStatus")
@@ -41,12 +51,12 @@ class DesktopControl(QWidget):
             f"Application: {status.state.value} | Generation: {status.generation}\n"
             f"Trading: {status.trading.state.value} | "
             f"Research: {status.research.state.value}\n"
-            f"Transport: {status.transport} (deferred to P5)\n"
+            f"Transport: {status.transport} ({self._transport_note})\n"
             f"Diagnostic: {status.diagnostic.value}\n"
             + (
                 f"Campaign: {artifact.campaign_id}\nBundle: {artifact.bundle_id}"
                 if artifact
-                else "Research: awaiting local bundle verification"
+                else self._research_waiting
             )
         )
         self.start_button.setEnabled(status.can_start)

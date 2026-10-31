@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted with runtime smoke complete; P5 architecture/design current.
+Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted with runtime smoke complete; P5A frozen simulated-paper source checkpoint current.
 
 ## Product contract
 
@@ -328,10 +328,10 @@ retry, repair, or current observer dispatch.
 
 ## Current checkpoint
 
-The current registered checkpoint is `arch147-desktop-supervisor` on
-`feature/research-desktop-supervisor-current`, with `preflight=None`,
-`execute=None`, and GitHub-owned canonical FULL. The P3 research checkpoint
-remains available on its own branch. The normal development route
+The current registered checkpoint is `arch147-desktop-paper-cycle` on
+`feature/research-desktop-paper-cycle-current`, with `preflight=None`,
+`execute=None`, and GitHub-owned canonical FULL. The accepted P4 supervisor and P3 research checkpoints
+remain registered behind P5A on their own branches. The normal development route
 is focused implementation -> focused tests -> one atomic candidate -> FEATURE +
 PROSPECTIVE_DEVELOP admission -> one push -> one CI -> exact review ->
 fast-forward `develop`. Source PASS grants no provider or live effect.
@@ -424,3 +424,107 @@ SIMULATED_PAPER worker composed into the existing P4 lifecycle, using local
 strategy and deterministic RiskManager authority plus durable restart-safe paper
 account state. Robinhood MCP read/review composition follows as a separate P5
 slice; broker mutation remains P6.
+
+
+## P5A frozen local simulated-paper contract
+
+P5A is SOURCE ONLY until exact review, canonical FULL and integration. It adds
+`desktop_paper` and `scripts/run_desktop_paper_bot.py` while retaining the P4
+inert launcher. Production P5 state is separate:
+`F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
+`F:\AI\desktop-bot-state\p5\lifecycle.jsonl`. No production file is created
+by source tests/admission/CI. The accepted P4 smoke is complete and not repeated.
+
+No production/default PAPER_EVALUATION candidate has been accepted. The P3
+55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` remains descriptive
+research evidence. Production composition without an explicit accepted binding
+reports `PAPER_EVALUATION_SELECTION_REQUIRED` before creating financial or
+lifecycle state. It never silently falls back to that candidate or another.
+The unavailable production view constructs no workers and reads no research
+bundle. An explicitly injected test composition retains the independent P4
+LocalResearchWorker with its idle queue; future accepted-binding installation
+will own provenance validation and the particular research job.
+
+PaperStrategyBinding is immutable and typed: strategy_family, strategy_version,
+symbol, parameter_set, research_campaign_id, research_bundle_id,
+research_candidate_id, provenance_digest, purpose PAPER_EVALUATION,
+qualification_policy=None and live_eligible=False. Configuration identity derives
+from versioned semantic material. The worker consumes this small configuration
+and a narrow injected evaluator over immutable inputs returning TradeProposal
+or None, with no ranking, generic plugin/expression execution, selection,
+campaign execution or holdout capability. Synthetic MA fixtures confer no
+selection authority. Future plain MA, percentage band, ADX, Donchian, long
+momentum and ATR-risk overlay research can use the seam; those families and
+selection policy are not implemented here. Planned SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC
+symbols are representable bindings only. Existing SPY OPEN observation access is
+separate from strategy selection, and no new acquisition or fabricated dataset
+is introduced. The account reconstructs multiple validated Symbol positions,
+but scheduling remains one binding/observation lane. No qualification policy,
+PAPER_CANDIDATE promotion, production qualification or live eligibility follows.
+
+The independent versioned paper policy is SIMULATED_PAPER / PAPER_EVALUATION /
+OPEN_REPLAY: starting cash 100000; position 0.20, total exposure 0.80, new position
+0.20, cash reserve 0.10; maximum order notional 20000; whole shares; BUY and SELL
+enabled; estimated and fill commission 1; adverse slippage 5 bps; replay interval
+0.10 seconds. P3 evaluation_policy is not trading authority.
+Runtime composition rejects a different policy before state creation; policy
+changes require a reviewed successor independently of strategy selection.
+
+For session N, strategy sees completed bars only through N-1 close; the execution
+mark is N open. Warmup is explicit and exhaustion waits without rewinding.
+Missing/invalid prices reject rather than become zero. BUY fills at open*1.0005,
+SELL at open*0.9995 in a fixed Decimal context. RiskContext.current_price is that
+same synthetic fill price; commission is included in both risk and ledger.
+TradeProposal, RiskManager, OrderEngine and PaperLedger retain domain authority.
+
+SQLite is the sole durable financial authority, with foreign keys, strong
+synchronous durability and atomic ordered history. A transaction retains config,
+observation/history cutoff, proposal or WARMUP/NO_SIGNAL, full ordered risk
+reasons/approved quantity, intent/order/events/fill, account, cursor and control
+version. Reopen reconstructs the complete effect chain and duplicate membership;
+compact ledger state alone is insufficient. Malformed schema/corrupt chains
+fail closed without repair. Configuration history is append-only.
+P5A creates and validates only the initial configuration; a different revision
+is rejected on reopen. A later reviewed stopped-state revision API may extend
+that history. The evaluator can read immutable last-committed account state;
+its marked values may be from a prior session and grant no admission authority.
+Financial IDs are explicit versioned semantic UUID5; no path, clock, process generation,
+serialized bytes or UUID4 default enters them. The unique slot binds account +
+lane + symbol + execution session independently of configuration revision.
+Exact repeats read back; conflicts leave durable diagnostics with no new effect.
+
+Kill is durable and all-side: once latched it pauses replay without consuming a
+future session and permits neither BUY nor SELL. New-buys disabled maps to the
+existing RiskContext.new_trading_enabled gate; risk-reducing SELL remains
+available without kill. Transaction ordering decides races truthfully. A bounded
+stopped-only control clears kill; active worker ownership refuses it. No database
+deletion/editing is an operator procedure.
+
+One paper worker thread owns replay/store work and publishes immutable cached
+snapshots. Qt never reads SQLite or invokes worker/provider methods. Start/Stop
+remain DesktopSupervisor controls. Stop interrupts cadence, blocks later cycle
+admission, lets an admitted transaction commit/rollback, reconstructs/verifies
+account, then reports closed. EXHAUSTED is RUNNING idle, not failure. Explicit
+source-owned cached-health opt-in avoids poll-operation threads for reviewed
+workers; unknown/custom workers retain bounded calls with no naming heuristics.
+
+The existing Paper page retains historical content and adds current mode/lane/
+purpose, exact binding family/symbol/parameters/provenance, activity/session/mark,
+signal/risk/reasons,
+quantities/order/fill/rejection, cash/positions/realized P&L and complete-mark-only
+equity/unrealized P&L, controls and bounded diagnostics. Missing values remain
+unavailable and stale marks are labelled. Transport is NOT_CONNECTED and LIVE
+is false. Without a binding it shows "Paper strategy: Selection required" and
+trading unavailable, with no GUI candidate-selection control.
+No network/provider/credentials/account/Robinhood/Alpaca/holdout/
+scheduler/ACL/live capability belongs to the P5 production composition.
+
+Lifecycle truth remains the accepted LifecycleJournal. P5A supports clean
+Start/Stop/reopen and SQLite financial crash consistency/commit-before-ack
+idempotency. It does not recover unclean process death: stale lock or unresolved
+journal remains FAILED/attention, with no deletion, manufactured STOPPED or
+auto-repair. P5C owns the separately reviewed process-recovery adapter. Finish
+source implementation/focused verification and stop before commit/push for
+ChatGPT's strategy/publication decision. The next operation is filtered-trend/
+multi-asset research and explicit paper strategy selection; no production P5
+smoke is ready.

@@ -1,6 +1,6 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: P4 ACCEPTED/COMPLETE validation; P5 architecture/design current; P2/P3 accepted and real-run complete.
+Status: P4 ACCEPTED/COMPLETE validation; P5A source-only verification pending; P2/P3 accepted and real-run complete.
 
 ## Accepted P3 closeout and real result
 
@@ -444,3 +444,43 @@ and independent ChatGPT review.
 Canonical FULL remains GitHub-owned and is not run locally. Production campaign,
 FINAL_HOLDOUT price access/admission, credentials, provider, Robinhood, paper,
 broker, scheduler, ACL and live effects remain zero throughout source work.
+
+
+## P5A source verification boundary
+
+`arch147-desktop-paper-cycle` on `feature/research-desktop-paper-cycle-current`
+is the first current checkpoint, with no preflight/execute and explicit
+GitHub-owned canonical FULL. P4/P3 remain current exactly once; retired 146
+stays non-current. Both current workflow projections remove the P5A addition
+before immutable predecessor comparison. Historical AST pins/catalogs/Git
+objects are unchanged. New P5 test modules have explicit FULL ownership.
+PySide6 remains installed in every test-bearing source-gate job.
+
+The frozen contract is the P5A section of Architecture 147. Required focused
+coverage includes transaction rollback and commit-before-ack readback; exact and
+conflicting slots; duplicate order/fill/event identity; clean reconstruction;
+malformed schema/corrupt chain; Stop and kill ordering; new-buy risk gating with
+SELL availability; prior-close/next-open lookahead; warmup/exhaustion; invalid
+prices; exact adverse slippage/risk price and commission/whole-share limits;
+cached GUI snapshots/historical Paper preservation; P4 inert behavior;
+trusted-only cached health; import boundaries and OPEN-only loading.
+
+Tests use synthetic fixtures and unique external pytest roots, never production
+P5 state or a real launch. SQLite financial durability is not an application
+crash-recovery claim: a stale lifecycle journal/lock remains failed/attention,
+with process recovery deferred to P5C. P4 accepted smoke is frozen.
+
+One atomic candidate above accepted base
+`79dff6341241af8e126c37060bf4c0968af36778` must pass focused checks, combined
+non-mutating Ruff on `src scripts tests`, diff checks, and exact FEATURE plus
+PROSPECTIVE_DEVELOP admission before one push. Canonical FULL runs only on
+GitHub; the source handoff records its exact terminal run and candidate identity.
+No local FULL, production launch, provider, credential, broker or FINAL_HOLDOUT
+effect occurs. Implementation/focused verification stops before commit/push for
+ChatGPT's strategy/publication decision. No default production binding exists;
+the descriptive P3 55/100 candidate is not selection authority. Negative tests
+require `PAPER_EVALUATION_SELECTION_REQUIRED`, no state creation or trading, and
+truthful unavailable GUI values without a binding. Explicit synthetic bindings
+exercise multiple symbols/families as data without strategy selection authority.
+The next operation is filtered-trend/multi-asset research and explicit strategy
+selection; no production P5 smoke is ready.

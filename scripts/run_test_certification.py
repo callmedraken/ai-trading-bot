@@ -595,6 +595,14 @@ FULL_DIRECTORIES = (
     "tests/strategies",
 )
 FULL_EXACT_MODULES = (
+    "tests/desktop_paper/test_configuration.py",
+    "tests/desktop_paper/test_observations.py",
+    "tests/desktop_paper/test_store.py",
+    "tests/desktop_paper/test_engine.py",
+    "tests/desktop_paper/test_worker.py",
+    "tests/desktop_paper/test_composition.py",
+    "tests/desktop_paper/test_gui.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
     "tests/cli/test_create_research_session_bundle.py",
     "tests/cli/test_historical_experiment.py",
     "tests/cli/test_historical_experiment_pairwise_config.py",

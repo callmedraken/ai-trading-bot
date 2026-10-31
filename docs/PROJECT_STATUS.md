@@ -25,30 +25,37 @@ manual Start, concurrent trading/research workers, manual Stop, deterministic
 closure/reconciliation and no automatic restart or self-update. P4 trading
 remains intentionally inert; LIVE remains disabled and FINAL_HOLDOUT sealed.
 
-P5 architecture/discovery is now the current milestone. The goal is the shortest
-safe path to a usable unattended simulated-paper prototype, then Robinhood MCP
-read/review forward-paper operation, then restart/recovery/multi-session paper
-soak. Existing RiskManager, review-paper ledger/store, Robinhood MCP adapters,
-paper-cycle components and GUI account surfaces should be reused where they
-simplify the product. Historical Architecture 133/134 deployment ceremony and
-Architecture 146 protected custody remain non-prerequisites.
+P5A implements the frozen local unattended SIMULATED_PAPER / PAPER_EVALUATION
+prototype on OPEN_REPLAY, with independent paper risk policy, transactional
+SQLite account/effect history, clean Stop/reopen and cached GUI visibility.
+No production/default PAPER_EVALUATION strategy is accepted or selected.
+The descriptive P3 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d`
+(55/100 moving averages) is historical research evidence, not selection authority.
+P5 consumes an immutable typed strategy binding and a narrow injected evaluator;
+absent an explicitly accepted binding, trading fails closed with
+`PAPER_EVALUATION_SELECTION_REQUIRED`. Synthetic fixtures grant no qualification,
+PAPER_CANDIDATE promotion or live eligibility.
+FINAL_HOLDOUT remains sealed and no live or broker authority is introduced.
+
+The source-only checkpoint is `arch147-desktop-paper-cycle` on
+`feature/research-desktop-paper-cycle-current`, with no preflight/execute and
+GitHub-owned canonical FULL. Exact-source review and integration remain pending;
+implementation, admission and CI do not launch the production P5 application.
+P4 remains intact as the accepted inert launcher with separate frozen state.
+P5A supports SQLite financial durability, not automatic recovery of an unclean
+application death: stale/unresolved lifecycle evidence remains failed/attention.
+P5C owns the later process-recovery adapter.
 
 ## Immediate next step
 
-Run the read-only P5 architecture/discovery checkpoint using Astra as lead with
-explicitly authorized parallel subagents. Map Robinhood MCP, local
-strategy/risk/order/ledger/reconciliation, P4 runtime/recovery, GUI/operator and
-test/CI surfaces, then synthesize one implementation DAG before source edits.
-
-The preferred shape to validate is P5A local unattended simulated paper with
-durable restart/idempotency and GUI visibility; P5B Robinhood MCP
-account/quote/history/review-only composition with zero order placement; P5C
-unattended multi-session reconnect/recovery/health/kill-switch soak. P6 remains
-the first separately reviewed broker-mutation/live boundary.
-
-Do not create a new admission framework, revive retired deployment/custody
-machinery, open FINAL_HOLDOUT, read credentials or perform provider/broker
-effects during architecture discovery.
+Complete P5A implementation and focused verification, then stop before commit
+or push for ChatGPT's strategy/publication decision. Eventual publication still
+requires one atomic candidate, FEATURE/PROSPECTIVE_DEVELOP admission, terminal
+GitHub canonical FULL and exact-source review. The next operational milestone
+is filtered-trend/multi-asset research and explicit paper strategy selection;
+no production P5 smoke is ready. Planned SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC
+symbols are representable bindings only, not acquisition or execution authority.
+No real P5 launch or production-state creation occurs during source work.
 
 ## Roadmap
 

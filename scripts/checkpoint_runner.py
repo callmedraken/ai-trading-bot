@@ -400,7 +400,33 @@ ARCH147_P4_RUFF: Final = (
     "src/trading_bot/gui/main_window.py",
     *ARCH147_P4_TESTS,
 )
+ARCH147_P5A_NAME: Final = "arch147-desktop-paper-cycle"
+ARCH147_P5A_BRANCH: Final = "feature/research-desktop-paper-cycle-current"
+ARCH147_P5A_TESTS: Final = (
+    *ARCH147_P4_TESTS,
+    "tests/desktop_paper/test_configuration.py",
+    "tests/desktop_paper/test_observations.py",
+    "tests/desktop_paper/test_store.py",
+    "tests/desktop_paper/test_engine.py",
+    "tests/desktop_paper/test_worker.py",
+    "tests/desktop_paper/test_composition.py",
+    "tests/desktop_paper/test_gui.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
+    "tests/risk/test_manager.py",
+    "tests/execution/test_order_engine.py",
+    "tests/ledger/test_ledger.py",
+    "tests/review_paper/test_intent_bridge.py",
+    "tests/experiments/test_desktop_research_campaign.py",
+)
+ARCH147_P5A_RUFF: Final = (
+    *ARCH147_P4_RUFF,
+    "src/trading_bot/desktop_paper",
+    "src/trading_bot/gui/desktop_paper_panel.py",
+    "scripts/run_desktop_paper_bot.py",
+    *ARCH147_P5A_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH147_P5A_NAME,
     ARCH147_P4_NAME,
     ARCH147_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
@@ -413,6 +439,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
     ARCH146_PARTIAL_STATE_NAME: "full",
@@ -26404,6 +26431,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_P4_BRANCH,
     )
+    values[ARCH147_P5A_NAME] = CheckpointSpec(
+        ARCH147_P5A_NAME,
+        "Offline desktop simulated-paper evaluation cycle",
+        ARCH147_P5A_TESTS,
+        ARCH147_P5A_RUFF,
+        _arch147_p5a_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH147_P5A_BRANCH,
+    )
     return values
 
 
@@ -26847,7 +26884,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_P5A_NAME + " `\n", "", 1)
+        .replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
         .replace("              " + ARCH147_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
@@ -26894,7 +26932,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_P5A_NAME + " `\n", "", 1)
+        .replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
         .replace("              " + ARCH147_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
@@ -27948,6 +27987,81 @@ def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch147_p5a_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Current offline-paper source topology; never dispatch runtime effects."""
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_P5A_NAME)
+    failures = []
+    if (
+        spec is None
+        or spec.tests != ARCH147_P5A_TESTS
+        or spec.ruff_paths != ARCH147_P5A_RUFF
+        or spec.authority_check is not _arch147_p5a_authority_check
+        or spec.remote_branch != ARCH147_P5A_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH147_P5A_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:3]
+        != (ARCH147_P5A_NAME, ARCH147_P4_NAME, ARCH147_NAME)
+        or any(
+            CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) != 1
+            for name in (ARCH147_P5A_NAME, ARCH147_P4_NAME, ARCH147_NAME)
+        )
+        or resolve_ci_checkpoint(specs, ARCH147_P5A_BRANCH, "push") != ARCH147_P5A_NAME
+    ):
+        failures.append("147 P5A source-only registration drift")
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if not _arch134_current_batch_workflow_is_reviewed(workflow):
+        failures.append("147 P5A workflow projection drift")
+    required_paper_modules = (
+        "__init__.py",
+        "configuration.py",
+        "observations.py",
+        "models.py",
+        "store.py",
+        "worker.py",
+        "composition.py",
+        "presentation.py",
+    )
+    package = repo_root / "src/trading_bot/desktop_paper"
+    for name in required_paper_modules:
+        if not (package / name).is_file():
+            failures.append("147 P5A source missing: " + name)
+    paths = tuple(package.glob("*.py")) + (
+        repo_root / "scripts/run_desktop_paper_bot.py",
+    )
+    forbidden = (
+        "robinhood",
+        "oauth",
+        "alpaca",
+        "credential",
+        "final_holdout",
+        "historical_research_acquisition",
+        "run_desktop_research_campaign",
+    )
+    for path in paths:
+        if not path.is_file():
+            failures.append("147 P5A source missing: " + path.name)
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            claims = []
+            if isinstance(node, ast.Import):
+                claims = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                claims = [node.module or "", *(alias.name for alias in node.names)]
+            if any(word in claim.lower() for claim in claims for word in forbidden):
+                failures.append("147 P5A forbidden import: " + path.name)
+            if path.name == "worker.py" and any(
+                "experiments" in claim or "research" in claim for claim in claims
+            ):
+                failures.append("147 P5A worker imports research authority")
+    return tuple(failures)
+
+
 def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Own P4 registration and the offline supervisor's narrow import boundary."""
     specs = _checkpoint_specs()
@@ -27964,7 +28078,7 @@ def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P4_NAME) != "full"
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_P4_NAME) != 1
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[0] != ARCH147_P4_NAME
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:2] != (ARCH147_P5A_NAME, ARCH147_P4_NAME)
         or resolve_ci_checkpoint(specs, ARCH147_P4_BRANCH, "push") != ARCH147_P4_NAME
     ):
         failures.append("147 P4 desktop supervisor source-only registration drift")

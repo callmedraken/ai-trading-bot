@@ -104,6 +104,46 @@ class TradingWorker(Worker, Protocol):
     def reconcile_and_close(self, timeout: float) -> bool: ...
 
 
+_CACHED_HEALTH_METHODS: dict[type[object], Callable[[object], object]] = {}
+
+
+def register_cached_health_worker[CachedHealthWorkerT](
+    worker_type: type[CachedHealthWorkerT],
+) -> type[CachedHealthWorkerT]:
+    """Explicitly opt one exact source-owned class into direct cached health.
+
+    The registry captures the class's own original ``health`` implementation.
+    Runtime subclasses, class monkeypatches, and per-instance overrides do not
+    inherit the registration and remain on the supervisor's bounded call path.
+    """
+    if not isinstance(worker_type, type):
+        raise TypeError("cached-health registration requires a worker class")
+    health_method = worker_type.__dict__.get("health")
+    if not callable(health_method):
+        raise TypeError("cached-health workers must define their own health method")
+    previous = _CACHED_HEALTH_METHODS.get(worker_type)
+    if previous is not None and previous is not health_method:
+        raise ValueError("cached-health worker registration cannot be replaced")
+    _CACHED_HEALTH_METHODS[worker_type] = health_method
+    return worker_type
+
+
+def _registered_cached_health_method(
+    worker: Worker,
+) -> Callable[[object], object] | None:
+    worker_type = type(worker)
+    registered = _CACHED_HEALTH_METHODS.get(worker_type)
+    if registered is None or worker_type.__dict__.get("health") is not registered:
+        return None
+    try:
+        instance_attributes = object.__getattribute__(worker, "__dict__")
+    except (AttributeError, TypeError):
+        instance_attributes = {}
+    if "health" in instance_attributes:
+        return None
+    return registered
+
+
 class JournalError(ValueError):
     """Malformed, conflicting or incomplete runtime chronology."""
 
@@ -275,6 +315,7 @@ class LifecycleJournal:
             self._owned = False
 
 
+@register_cached_health_worker
 class LocalTradingWorker:
     """Inert P4 worker: no strategy, positions, ledger, files or transport."""
 
@@ -354,6 +395,7 @@ def inspect_bundle(job: InspectBundle) -> ArtifactIdentity:
     return identity
 
 
+@register_cached_health_worker
 class LocalResearchWorker:
     """Independent state and a one-slot offline queue; no trading reference."""
 
@@ -587,13 +629,17 @@ class DesktopSupervisor:
         return result[0]
 
     def _health(self, worker: Worker) -> WorkerHealth:
-        # These two source-owned implementations only copy a dataclass under a
-        # short private lock. Keep routine production polling thread-free.
-        health = (
-            worker.health()
-            if type(worker) in (LocalTradingWorker, LocalResearchWorker)
-            else self._call(worker.health, self._timeout, worker)
-        )
+        # Only classes explicitly registered with their original own method
+        # can use the direct path. Unknown/injected workers keep bounded calls.
+        cached_health = _registered_cached_health_method(worker)
+        if cached_health is not None:
+            health = cached_health(worker)
+        else:
+
+            def read_untrusted_health() -> object:
+                return worker.health()
+
+            health = self._call(read_untrusted_health, self._timeout, worker)
         if type(health) is not WorkerHealth:
             raise TypeError("bounded worker health required")
         return health

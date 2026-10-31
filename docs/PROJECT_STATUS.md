@@ -1,60 +1,61 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P4 accepted/integrated; runtime smoke pending
+## Current checkpoint — Architecture 147 P4 accepted/complete; P5 architecture current
 
-P4 is accepted and integrated on `develop` at
+P4 is fully accepted. Source is integrated at
 `e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
-`1d2f57afb1d5cddc9487352519f92cced5554f9d`. The original P4 source commit
-`5fb96f758b6f2bb2af302f5725fdf7ad03bfc138` reached feature CI #815 but that
-run failed because Qt-backed tests were collected without the required PySide6
-dependency. That red run is preserved. Corrective child `e5e800ad...` changed
-only source-gate dependency coverage plus its deterministic CI regression.
-Feature CI #816 / run `41175037719` / attempt 1 succeeded with canonical FULL.
-Develop CI #817 / run `41177055270` / attempt 1 then succeeded using
-`exact_feature_certification` reuse: source-static and source-gates passed and
-the active, fallback FULL, Robinhood and seven canonical FULL lanes were skipped.
+`1d2f57afb1d5cddc9487352519f92cced5554f9d`. Feature CI #816 /
+run `41175037719` / attempt 1 succeeded with canonical FULL. Develop CI #817 /
+run `41177055270` / attempt 1 succeeded with exact-feature certification
+reuse and no duplicate broad execution. The coordination closeout at
+`545f21621c15c682f19d10df3a3d1ecf86f8a77c`, tree
+`07bb44a2975c44fd62e68a9cc8f3b9f99a0bbd8e`, passed docs-only CI #818.
 
-P4 provides the ordinary private single-user desktop lifecycle: explicit GUI
-Start runs one inert local trading worker and one independent offline research
-worker concurrently; Stop cancels research, reconciles/closes trading, and
-reports STOPPED only after closure is confirmed. External trading transport
-remains NOT_CONNECTED and deferred to P5; simulated paper is the default and
-LIVE remains disabled. Research only verifies the accepted existing P3 bundle;
-it does not rerun the optimizer, choose a strategy, promote a candidate or open
-FINAL_HOLDOUT.
+The one reviewed no-network production Start/Stop smoke then succeeded at that
+exact source. Generation 1 reached RUNNING with both trading and research
+RUNNING, accepted P3 campaign `11d55269-7e13-57aa-a3bf-1e20e486204b` and
+bundle `b771cf92-a09f-5f18-86d3-e03b65e04fe9`, transport NOT_CONNECTED and
+diagnostic NONE. Stop produced the durable ordered journal sequence
+RESEARCH_STOPPED -> TRADING_RECONCILED -> TRADING_STOPPED -> STOPPED, with
+diagnostic NONE throughout. The launcher exited 0 and
+`ARCH147_P4_NO_NETWORK_SMOKE=PASS`. Do not repeat the smoke.
 
-The production lifecycle journal remains ordinary JSONL at
-`F:\AI\desktop-bot-state\p4\lifecycle.jsonl`, outside source. Unresolved,
-malformed or stale ownership blocks Start and must be preserved for explicit
-operator reconciliation. There is no automatic restart, destructive recovery,
-force-kill-as-success or self-update. Architecture 133/134 deployment ceremony
-and Architecture 146 protected custody remain historical/deferred rather than
-current product prerequisites.
+P4 therefore establishes the ordinary private single-user desktop lifecycle:
+manual Start, concurrent trading/research workers, manual Stop, deterministic
+closure/reconciliation and no automatic restart or self-update. P4 trading
+remains intentionally inert; LIVE remains disabled and FINAL_HOLDOUT sealed.
+
+P5 architecture/discovery is now the current milestone. The goal is the shortest
+safe path to a usable unattended simulated-paper prototype, then Robinhood MCP
+read/review forward-paper operation, then restart/recovery/multi-session paper
+soak. Existing RiskManager, review-paper ledger/store, Robinhood MCP adapters,
+paper-cycle components and GUI account surfaces should be reused where they
+simplify the product. Historical Architecture 133/134 deployment ceremony and
+Architecture 146 protected custody remain non-prerequisites.
 
 ## Immediate next step
 
-Run exactly one reviewed no-network P4 GUI Start/Stop smoke from a canonical
-`develop` worktree synchronized to the current remote. Click Start once and
-confirm both workers reach RUNNING plus the accepted P3 campaign/bundle identity;
-then click Stop and confirm durable STOPPED only after research closure, trading
-reconciliation and trading closure. If the runtime enters FAILED/attention or
-the journal is unresolved, preserve the journal and lock evidence and stop:
-do not delete, repair or automatically retry.
+Run the read-only P5 architecture/discovery checkpoint using Astra as lead with
+explicitly authorized parallel subagents. Map Robinhood MCP, local
+strategy/risk/order/ledger/reconciliation, P4 runtime/recovery, GUI/operator and
+test/CI surfaces, then synthesize one implementation DAG before source edits.
 
-After a successful smoke, proceed directly to P5 architecture/discovery. For P5,
-parallel read-only Codex subagents are explicitly authorized to map the existing
-Robinhood MCP foundations, local risk/order/reconciliation path, runtime recovery,
-GUI/operator surfaces and current test/CI ownership. Synthesize those findings
-before implementation so bounded implementation slices can run in parallel
-without reviving retired deployment/ACL/scheduler/custody gates. P5 effects and
-all later live effects require their own separately reviewed composition.
+The preferred shape to validate is P5A local unattended simulated paper with
+durable restart/idempotency and GUI visibility; P5B Robinhood MCP
+account/quote/history/review-only composition with zero order placement; P5C
+unattended multi-session reconnect/recovery/health/kill-switch soak. P6 remains
+the first separately reviewed broker-mutation/live boundary.
+
+Do not create a new admission framework, revive retired deployment/custody
+machinery, open FINAL_HOLDOUT, read credentials or perform provider/broker
+effects during architecture discovery.
 
 ## Roadmap
 
     P1  desktop research simplification — accepted
     P2  real SPY acquisition + verification + freeze — accepted
     P3  optimizer / walk-forward campaign + Research Results GUI — accepted, real run complete
-    P4  desktop concurrent workers + GUI Start/Stop — accepted/integrated; no-network smoke pending
-    P5  unattended synthetic/forward paper soak using official Robinhood MCP foundations
+    P4  desktop concurrent workers + GUI Start/Stop — accepted and smoke complete
+    P5  unattended synthetic/forward paper soak using official Robinhood MCP foundations — current architecture/design
     P6  explicitly armed tiny restricted live through official Robinhood MCP / Agentic Trading
     P7  production soak / monitoring / backup / restart / reconnect / credential rotation

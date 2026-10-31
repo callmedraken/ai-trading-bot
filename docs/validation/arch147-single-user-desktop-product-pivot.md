@@ -1,6 +1,6 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P4 ACCEPTED/INTEGRATED validation; no-network runtime smoke pending; P2/P3 accepted and real-run complete.
+Status: P4 ACCEPTED/COMPLETE validation; P5 architecture/design current; P2/P3 accepted and real-run complete.
 
 ## Accepted P3 closeout and real result
 
@@ -117,9 +117,25 @@ canonical FULL.
 
 No production GUI/worker runtime, journal, credentials, network, provider,
 broker, account, scheduler, ACL or holdout effect occurred during source
-implementation, admission, CI or integration. The source-owned launcher now
-supports exactly one reviewed no-network Start/Stop smoke. That smoke remains
-NOT_RUN; P5 architecture work follows a successful smoke. LIVE remains disabled.
+implementation, admission, CI or integration.
+
+The separately reviewed one-shot P4 runtime smoke then ran from
+`545f21621c15c682f19d10df3a3d1ecf86f8a77c`, tree
+`07bb44a2975c44fd62e68a9cc8f3b9f99a0bbd8e`. GUI observation showed
+Application RUNNING, Trading RUNNING, Research RUNNING, generation 1,
+NOT_CONNECTED transport and Diagnostic NONE, with exact accepted P3 campaign
+`11d55269-7e13-57aa-a3bf-1e20e486204b` and bundle
+`b771cf92-a09f-5f18-86d3-e03b65e04fe9`.
+
+The durable journal then recorded contiguous shutdown evidence:
+sequence 5 STOP_REQUESTED, 6 RESEARCH_STOPPED, 7 TRADING_RECONCILED,
+8 TRADING_STOPPED and 9 STOPPED. Every record used generation 1, schema
+`desktop-runtime/v1` and diagnostic NONE. The launcher returned
+`P4_GUI_EXIT=0` and `ARCH147_P4_NO_NETWORK_SMOKE=PASS`. This is accepted
+runtime evidence and is not to be repeated merely to refresh proof.
+
+P4 is therefore complete. P5 architecture/design follows with no inherited
+broker or live authority. LIVE remains disabled and FINAL_HOLDOUT sealed.
 
 ## Preserved P1–P3 source implementation chronology
 

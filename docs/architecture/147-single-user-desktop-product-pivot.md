@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted/integrated with runtime smoke pending.
+Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted with runtime smoke complete; P5 architecture/design current.
 
 ## Product contract
 
@@ -408,5 +408,19 @@ P4 source is accepted and integrated on `develop` at
 preserved red for missing PySide6 source-gate dependency coverage. Corrective
 feature CI #816 is terminal green with canonical FULL, and develop CI #817 is
 terminal green with exact-feature certification reuse and no duplicate broad
-execution. The no-network owner Start/Stop runtime smoke remains NOT_RUN and is
-the only remaining P4 acceptance operation before P5 architecture work.
+execution.
+
+The one reviewed no-network owner runtime smoke completed successfully from
+`545f21621c15c682f19d10df3a3d1ecf86f8a77c`, tree
+`07bb44a2975c44fd62e68a9cc8f3b9f99a0bbd8e`. Generation 1 reached RUNNING
+with both workers RUNNING, diagnostic NONE and the accepted P3 campaign/bundle
+identity. Stop journaled STOP_REQUESTED, RESEARCH_STOPPED, TRADING_RECONCILED,
+TRADING_STOPPED and finally STOPPED as contiguous sequences 5..9, all diagnostic
+NONE. The launcher exited 0. P4 runtime acceptance is complete; do not repeat
+the smoke.
+
+P5 architecture/design is now current. Its first goal is a useful local
+SIMULATED_PAPER worker composed into the existing P4 lifecycle, using local
+strategy and deterministic RiskManager authority plus durable restart-safe paper
+account state. Robinhood MCP read/review composition follows as a separate P5
+slice; broker mutation remains P6.

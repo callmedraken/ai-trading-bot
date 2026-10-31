@@ -15,6 +15,17 @@ routing omitted the experiments initializer. The user authorized preserving
 that commit/admission and adding one ordinary corrective child before the
 single push/CI. The child changes routing only; no pin or policy is relaxed.
 
+The initializer-routing child is preserved at
+`06f6e2181863ac000c2f94a56c2d342a895211c7`, tree
+`f899294eb96f4a397302721ae94307dcda26d938`. Its terminal feature evidence is
+GitHub #812 / run `41138345080` / attempt 1: SUCCESS. ChatGPT exact-source
+review then found `P3_PRIVATE_HELPER_BOUNDARY_DEFECT`: the CLI and GUI
+production modules imported private helpers across module boundaries. The
+current bounded corrective child removes those imports through a public
+campaign-bundle loader and local GUI path presentation logic. #812 remains
+green evidence and is not rerun; `develop` remains at the accepted P2
+`108ba9dee6ad593b3f4128ae44750d9f685ffa0d`. No real campaign ran.
+
 P2 source is accepted/integrated at
 `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`, tree
 `5652ec3e019766a66a05a9588e79e6cc8c46d70c`. Feature #810 / run
@@ -57,12 +68,14 @@ this source checkpoint.
 
 ## Immediate next step
 
-ChatGPT independently reviews the exact P3 source and terminal mapped FULL,
-then fast-forwards develop and verifies its certification/reuse. Automatically
-provide the short guarded offline campaign command in the handoff, review the
-resulting real bundle, and launch/inspect the existing Research GUI against it.
-No provider or credential operation is needed. FINAL_HOLDOUT stays sealed; a
-later explicit robustness-policy boundary is required before any admission.
+Complete the bounded private-helper boundary corrective child, run its focused
+tests and both-context admission, publish one ordinary child, and wait for its
+single terminal mapped CI run. Then ChatGPT performs exact-source review before
+any develop fast-forward. The initializer authority correction, 255-point
+grid, ranking, top-32 shortlist, Development interval, fold plan, identities,
+canonical artifacts, OPEN-only behavior, GUI result fields and sealed
+FINAL_HOLDOUT semantics remain unchanged. No real campaign, provider or
+credential operation is permitted during this child.
 
 ## Accepted integrated foundation
 

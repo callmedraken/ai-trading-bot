@@ -896,6 +896,13 @@ def _read(path: Path) -> bytes:
     return body
 
 
+def read_desktop_campaign_bundle(path: Path) -> DesktopCampaignBundle:
+    """Read and strictly validate one bounded desktop campaign bundle."""
+    if not isinstance(path, Path):
+        raise TypeError("path must be exactly pathlib.Path")
+    return DesktopCampaignBundle.from_bytes(_read(path))
+
+
 def _write_once(path: Path, body: bytes) -> None:
     if path.exists() or path.is_symlink():
         if _read(path) != body:

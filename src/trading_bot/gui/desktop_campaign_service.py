@@ -6,11 +6,11 @@ from pathlib import Path
 
 from trading_bot.experiments.desktop_research_campaign import (
     MAX_ARTIFACT_BYTES,
-    DesktopCampaignBundle,
-    _read,
     rank_development,
+    read_desktop_campaign_bundle,
 )
 from trading_bot.gui.models import (
+    MAX_RESEARCH_SOURCE_PATH_CHARACTERS,
     ResearchPageState,
     ResearchReportStatus,
     ResearchReportView,
@@ -18,10 +18,22 @@ from trading_bot.gui.models import (
 )
 from trading_bot.gui.research_service import (
     CompactReportResearchService,
-    _bounded_source_path,
-    _is_supported_local_json_path,
     unavailable_research_state,
 )
+
+
+def _is_supported_campaign_json_path(artifact_path: Path) -> bool:
+    return (
+        artifact_path.suffix.casefold() == ".json"
+        and not artifact_path.anchor.startswith("\\\\")
+    )
+
+
+def _bounded_campaign_source_path(artifact_path: Path) -> str:
+    display = str(artifact_path.resolve(strict=False))
+    if len(display) <= MAX_RESEARCH_SOURCE_PATH_CHARACTERS:
+        return display
+    return "…" + display[-(MAX_RESEARCH_SOURCE_PATH_CHARACTERS - 1) :]
 
 
 class DesktopCampaignResearchService:
@@ -34,9 +46,9 @@ class DesktopCampaignResearchService:
 
     def get_research_state(self) -> ResearchPageState:
         try:
-            if not _is_supported_local_json_path(self._path):
+            if not _is_supported_campaign_json_path(self._path):
                 raise ValueError
-            bundle = DesktopCampaignBundle.from_bytes(_read(self._path))
+            bundle = read_desktop_campaign_bundle(self._path)
             walks = {w.candidate_id: w for w in bundle.walk_forward}
             ranks = {
                 row.candidate_id: rank
@@ -98,7 +110,7 @@ class DesktopCampaignResearchService:
                         "FINAL_HOLDOUT sealed; walk-forward qualification not applied."
                     ),
                     rows=tuple(rows),
-                    source_path=_bounded_source_path(self._path),
+                    source_path=_bounded_campaign_source_path(self._path),
                 ),
             )
         except (OSError, ValueError, TypeError, KeyError, RecursionError):
@@ -120,7 +132,7 @@ class ResearchArtifactService:
     def get_research_state(self) -> ResearchPageState:
         # A small bounded schema probe; malformed input stays unavailable.
         try:
-            if not _is_supported_local_json_path(self._path):
+            if not _is_supported_campaign_json_path(self._path):
                 raise ValueError
             with self._path.open("rb") as handle:
                 body = handle.read(MAX_ARTIFACT_BYTES + 1)

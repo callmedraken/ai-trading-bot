@@ -12,9 +12,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from trading_bot.experiments.desktop_research_campaign import (  # noqa: E402
-    DesktopCampaignBundle,
     DesktopCampaignError,
-    _read,
+    read_desktop_campaign_bundle,
     run_desktop_campaign,
 )
 from trading_bot.experiments.historical_research_desktop import (  # noqa: E402
@@ -67,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
                 or args.verify.anchor.startswith("\\\\")
             ):
                 raise DesktopCampaignError("verify requires a local JSON report")
-            bundle = DesktopCampaignBundle.from_bytes(_read(args.verify))
+            bundle = read_desktop_campaign_bundle(args.verify)
             output = {"status": "VERIFIED", "bundle_id": bundle.bundle_id}
         else:
             head, tree = _source_identity()
@@ -80,7 +79,7 @@ def main(argv: list[str] | None = None) -> int:
             # Source drift during a long run stops the command; preserve reports.
             if _source_identity() != (head, tree):
                 raise DesktopCampaignError("source changed during campaign")
-            bundle = DesktopCampaignBundle.from_bytes(_read(path))
+            bundle = read_desktop_campaign_bundle(path)
             output = {
                 "status": "COMPLETE",
                 "artifact": str(path),

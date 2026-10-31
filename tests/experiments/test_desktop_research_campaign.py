@@ -523,6 +523,12 @@ def test_cli_verify_never_runs_or_constructs_storage(
     storage, tmp_path, engine_fakes, monkeypatch, capsys
 ):
     artifact = run(storage, tmp_path / "reports", synthetic_binding(storage))
+    assert (
+        campaign.read_desktop_campaign_bundle(artifact).to_bytes()
+        == artifact.read_bytes()
+    )
+    with pytest.raises(TypeError, match="exactly pathlib.Path"):
+        campaign.read_desktop_campaign_bundle(str(artifact))
     monkeypatch.setattr(
         cli, "run_desktop_campaign", lambda *a, **k: pytest.fail("campaign executed")
     )
@@ -587,6 +593,27 @@ def test_import_and_effect_boundary():
         )
         for name in modules
     )
+
+
+def test_production_modules_do_not_import_private_project_symbols():
+    root = Path(__file__).resolve().parents[2]
+    paths = (
+        root / "scripts" / "run_desktop_research_campaign.py",
+        root / "src" / "trading_bot" / "gui" / "desktop_campaign_service.py",
+    )
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or not (
+                node.module or ""
+            ).startswith(("scripts.", "trading_bot.")):
+                continue
+            private_names = tuple(
+                alias.name for alias in node.names if alias.name.startswith("_")
+            )
+            assert not private_names, (
+                f"{path} imports private project symbols {private_names}"
+            )
 
 
 def test_lazy_public_exports_resolve_to_the_original_objects():
@@ -669,6 +696,10 @@ def test_cli_source_guard_precedes_storage_and_campaign(
 
 
 def test_cli_verify_rejects_price_csv_before_reading(monkeypatch, capsys):
-    monkeypatch.setattr(cli, "_read", lambda *a: pytest.fail("price file read"))
+    monkeypatch.setattr(
+        cli,
+        "read_desktop_campaign_bundle",
+        lambda *a: pytest.fail("price file read"),
+    )
     assert cli.main(["--verify", "normalized/holdout/SPY.csv"]) == 1
     assert json.loads(capsys.readouterr().out)["status"] == "STOPPED"

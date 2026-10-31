@@ -12,6 +12,17 @@ No provider/credential/native implementation or effect authority is changed.
 The two previously blocked retained regressions now pass. Source acceptance,
 integration and production research remain separate later steps.
 
+Feature #812 / run `41138345080` / attempt 1 is preserved terminal green
+evidence for exact feature source `06f6e2181863ac000c2f94a56c2d342a895211c7`,
+tree `f899294eb96f4a397302721ae94307dcda26d938`; it was not a failed CI run
+and must not be rerun. ChatGPT exact-source review classified the new issue as
+`P3_PRIVATE_HELPER_BOUNDARY_DEFECT`: the CLI and GUI production modules
+depended on underscore-prefixed helpers from other project modules. The
+current corrective child starts from that exact source and replaces those
+dependencies with one public bounded campaign-bundle loader plus local GUI
+path presentation helpers. `develop` remains accepted P2
+`108ba9dee6ad593b3f4128ae44750d9f685ffa0d`; no real campaign ran.
+
 Preserve unpublished parent `307d73454dd68da8fc2d72e66dd66424ca3d3a79`, tree
 `c868731984e80ee12559878bb40241d61efb5d6a`: FEATURE PASS,
 PROSPECTIVE_DEVELOP FAIL, IDENTITY_STABLE=True. Its sole failure was the
@@ -250,6 +261,10 @@ credential reads, provider invocation, acquisition, and holdout reads remain
 outside P1 and P2 source implementation and were not retried. The accepted desktop
 bridge completed the separately reviewed P2 acquisition; P3 is offline only.
 
-The current immediate action is the Architecture-147 P3 source review
-described above. No registered host observer follows its CI, and no observer
-PASS or old B2 readiness state is required for desktop research.
+The current immediate action is the bounded Architecture-147 P3 private-helper
+boundary corrective child described above. Its source-only checks must preserve
+the initializer authority result and all P3 research/GUI semantics. No
+registered host observer follows its CI, and no observer PASS or old B2
+readiness state is required for desktop research. After the child reaches a
+terminal CI result, stop for ChatGPT exact-source review; do not run the real
+campaign or open FINAL_HOLDOUT before acceptance/integration.

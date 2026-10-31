@@ -10,6 +10,19 @@ but exact source review rejected its P2 candidate as
 the separately reviewed real acquisition subsequently succeeded. No old
 Architecture-146 preflight was restored.
 
+The preserved P3 initializer-routing candidate is exact source
+`06f6e2181863ac000c2f94a56c2d342a895211c7`, tree
+`f899294eb96f4a397302721ae94307dcda26d938`; GitHub #812 / run `41138345080` /
+attempt 1 is terminal SUCCESS and remains unchanged. ChatGPT exact-source
+review found `P3_PRIVATE_HELPER_BOUNDARY_DEFECT`: production CLI/GUI modules
+imported private helpers from other project modules. The current corrective
+child exposes one public bounded campaign-bundle loader and owns the tiny GUI
+path validation/presentation operations locally. `develop` remains the
+accepted P2 `108ba9dee6ad593b3f4128ae44750d9f685ffa0d`; #812 is not rerun and
+no real campaign ran. The initializer authority proof, P3 grid/ranking/
+shortlist/fold/identity/canonical-byte semantics, OPEN-only behavior, GUI
+result fields and FINAL_HOLDOUT seal are unchanged.
+
 ## Scope
 
 This checkpoint establishes the ordinary single-user desktop research profile,
@@ -278,14 +291,15 @@ omitted that initializer despite its strict checker being present and passing.
 Preserve the failed admission without alteration at
 `F:\AI\temp\arch147-p3-admit-20084df78dcf4bf7ab397605641166d1\arch132-r3n-prepublication-admission\source-gate-20261030T221542.779819Z\report.json`.
 
-The user authorized preserving this unpublished commit and adding one ordinary
-P3 export-routing corrective child before the original single push/CI. The
-child routes both initializers through the already-reviewed exact checker and
-adds an actual registered Architecture-146-A authority regression. No pin,
-classification, export policy, registry, branch or effect boundary changes.
-No amend, rebase, rewrite or CI rerun occurs. Final source/remote and
-terminal CI identities belong to the exact post-publication handoff; this
-source document does not self-pin its containing commit or claim acceptance.
+That first child remains preserved as immutable source/admission history. The
+new ordinary child is a source-review correction only: it removes production
+cross-module underscore dependencies without changing checkpoint registration,
+profile, initializer authority, accepted P3 research semantics, GUI result
+fields or effect boundaries. No amend, rebase, rewrite or #812 rerun occurs.
+The child performs no production campaign, FINAL_HOLDOUT access/admission,
+credential/provider/Robinhood/paper/broker/scheduler/ACL/live effect. Its
+terminal CI result and exact final identity are recorded only after publication
+and independent ChatGPT review.
 Canonical FULL remains GitHub-owned and is not run locally. Production campaign,
 FINAL_HOLDOUT price access/admission, credentials, provider, Robinhood, paper,
 broker, scheduler, ACL and live effects remain zero throughout source work.

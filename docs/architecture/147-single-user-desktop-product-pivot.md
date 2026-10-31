@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2 source/acquisition accepted, P3 source-only.
+Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 source-only.
 
 ## Product contract
 
@@ -181,8 +181,9 @@ attempt: `a81baba7-7123-45eb-945d-9fb048e24607`. No old observer was retried.
 
 ## P3 offline campaign and Research Results integration
 
-P3 is SOURCE-ONLY. Source tests, admission and GitHub CI never execute the
-production campaign or open the production dataset. The future single command
+P3 source implementation was SOURCE-ONLY; its accepted real offline run is now
+complete. Source tests, admission and GitHub CI never execute the production
+campaign or open the production dataset. The source-owned single command
 is `scripts/run_desktop_research_campaign.py --run`, invoked with the existing
 venv Python after exact-source acceptance/integration. It requires clean main
 develop and matching local origin/develop; it performs no fetch, network,
@@ -296,9 +297,9 @@ reviewed AST transformation against immutable predecessor exports. Original
 historical bytes and source pins remain accepted; security classification is
 unchanged. All other import/export/resolver changes fail closed.
 
-P3 source/tests join the existing Architecture-147 focused/current inventory;
-FULL remains GitHub-owned. No Architecture 148, new checkpoint or 146 routing
-change is introduced. Automatically after source acceptance/integration and
+P3 source/tests joined the existing Architecture-147 focused/current inventory;
+FULL remained GitHub-owned. P3 introduced no new architecture, checkpoint or
+146 routing change. Its accepted post-integration sequence was
 develop reuse verification: real offline campaign -> bundle review -> existing
 Research GUI launch/inspection -> next research step. FINAL_HOLDOUT remains
 unopened for strategy selection throughout; no 145 admission is created.
@@ -327,9 +328,76 @@ retry, repair, or current observer dispatch.
 
 ## Current checkpoint
 
-The registered source checkpoint is `arch147-desktop-research-profile` on
-`feature/research-desktop-product-pivot-current`, with `preflight=None`,
-`execute=None`, and GitHub-owned canonical FULL. The normal development route
+The current registered checkpoint is `arch147-desktop-supervisor` on
+`feature/research-desktop-supervisor-current`, with `preflight=None`,
+`execute=None`, and GitHub-owned canonical FULL. The P3 research checkpoint
+remains available on its own branch. The normal development route
 is focused implementation -> focused tests -> one atomic candidate -> FEATURE +
 PROSPECTIVE_DEVELOP admission -> one push -> one CI -> exact review ->
 fast-forward `develop`. Source PASS grants no provider or live effect.
+
+## P4 ordinary desktop supervisor
+
+`trading_bot.desktop_runtime` owns lifecycle and immutable bounded health;
+`scripts/run_desktop_bot.py` composes it into the existing PySide6 MainWindow.
+The optional current Home controls never reinterpret the historical read-only
+Supervisor models, adapter, promotion fields or `supervisor_connected=False`.
+The current P4 service displays P3 campaign bundles in the same Research page;
+the normal historical read-only GUI retains compact-report support as well.
+
+Explicit Start admits one generation: STOPPED -> STARTING -> RUNNING. Exactly
+one trading and one research worker run on separate owned non-daemon threads;
+one asynchronous coordinator handles startup, health and shutdown outside Qt.
+Duplicate Start returns false. Stop is idempotent and signals both workers
+before waiting on either: STOPPING -> research closed -> trading reconciled and
+closed -> STOPPED. A Stop during startup drains the already-admitted start;
+late start acknowledgments remain journaled. There is no automatic restart.
+
+Factories construct only and workers implement small injected start, stop,
+bounded close and health interfaces; trading also exposes reconcile-and-close.
+Injected blocking operations are bounded by owned operation threads. A timeout
+retains ownership, stops the peer and leaves terminal FAILED/attention; it never
+force-kills or reports successful closure. Timed-out worker operations cannot
+overlap a close, and a late factory result remains owned. Production health
+copies only private immutable snapshots; Qt reads cached supervisor facts and
+never invokes worker methods. The default per-operation close bound is 2s.
+Shutdown waits at most that bound per operation plus 0.1s scheduling allowance
+for close; a failed operation does not suppress the peer's shutdown attempt.
+
+P4 trading is deliberately inert: its live thread waits for Stop and reconciles
+the empty local lifecycle. It has no strategy, ledger, order, position, file,
+broker or research capability. Presentation explicitly says inert trading and
+NOT_CONNECTED, deferred to P5; simulated paper is default and LIVE disabled.
+Research owns a separate one-slot queue and supports exactly one offline job:
+read/strictly verify a bounded local campaign bundle. Its initial production job
+checks the accepted P3 campaign/bundle IDs and SHA256, then it remains available.
+No campaign runs on Start. Research never receives trading references, risk,
+mode, arming, accounts or lifecycle authority. The supervisor shares only health
+and artifact identity, with no candidate/configuration selection boundary.
+This I/O-only verification needs no CPU research process or multiprocessing
+framework. Future CPU-bound campaign execution requires a separate process
+composition; it must not enter Qt's event loop.
+
+The ordinary external journal is
+`F:\AI\desktop-bot-state\p4\lifecycle.jsonl`. Each fsynced JSONL event has schema
+`desktop-runtime/v1`, contiguous sequence, local integer generation, UTC, closed
+event and sanitized diagnostic enum. These chronology numbers are not financial
+or research-domain identities. Replay rejects duplicate/unknown fields, partial
+records, invalid UTC, conflicts and false STOPPED without both worker closure
+facts and trading reconciliation. A create-exclusive lifetime lock prevents two
+application instances from admitting the same journal. Prior unresolved state,
+malformed state, stale ownership or write failure blocks Start. Preserve it for
+operator-visible recovery; P4 performs no automatic repair, retry or deletion of
+unresolved state. Successful clean close alone releases the ordinary lock.
+The journal has a 4 MB admission cap; archival is deferred operator work while
+stopped, not a running self-maintenance feature.
+
+Closing the window requests normal asynchronous Stop and keeps Qt alive while
+closure completes. Failed/unconfirmed closure refuses window exit and keeps
+diagnostics visible. The launcher's finalizer also requests Stop on non-window
+Qt exit and cannot report success for unresolved workers. The application has
+no update, live, order, promotion or holdout control. Manual updates are allowed
+only after a confirmed Stop. No network, provider, credential, account, broker,
+scheduler, ACL, final-holdout loader/integrity/admission or protected checkpoint
+runner belongs to this composition. P5 will separately compose the accepted
+official Robinhood MCP foundations.

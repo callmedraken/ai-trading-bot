@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from scripts import checkpoint_runner as runner
+from scripts import source_authority as ownership
 
 from .helpers import (
     _EXPECTED_RETAINED_CHECKPOINTS,
@@ -737,6 +738,7 @@ def test_broad_push_policy_mutations_fail_closed(old, new):
 
 def test_ci_certification_profile_mapping_is_explicit_and_bounded():
     assert runner.CI_CERTIFICATION_PROFILES == {
+        runner.ARCH147_P4_NAME: "full",
         runner.ARCH147_NAME: "full",
         runner.ARCH146_PARTIAL_STATE_NAME: "full",
         runner.ARCH146_PRE_B2_NAME: "full",
@@ -3263,6 +3265,45 @@ def test_current_distributed_full_workflow_is_exact_and_isolated():
     predecessor = predecessor_workflow(workflow)
     assert "certification-full" not in predecessor
     assert not runner._arch134_current_batch_workflow_is_reviewed(predecessor)
+
+
+def test_p4_workflow_projection_preserves_historical_owner_and_fails_closed():
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow_path = root / ".github/workflows/checkpoint-source-gates.yml"
+    workflow = workflow_path.read_text(encoding="utf-8")
+    source = (root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
+    functions = {
+        node.name: node
+        for node in ast.parse(source).body
+        if isinstance(node, ast.FunctionDef)
+    }
+    names = (
+        "_arch134_current_batch_workflow_is_reviewed",
+        "_arch134_readonly_diagnostic_batch_workflow_successor",
+    )
+    for name in names:
+        expected = runner.ARCH134_READONLY_DIAGNOSTIC_NEW_AST_PINS[name]
+        assert ownership.current_owner(name) == "checkpoint_runner"
+        assert ownership.classify_path(name) is ownership.PinClass.CURRENT_MUTABLE
+        assert ownership.ast_matches(root, name, functions[name], expected)
+
+    p4_row = "              " + runner.ARCH147_P4_NAME + " `\n"
+    assert workflow.count(p4_row) == 1
+    predicates = (
+        runner._arch134_current_batch_workflow_is_reviewed,
+        runner._batch_workflow_is_reviewed,
+    )
+    for predicate in predicates:
+        assert predicate(workflow)
+        assert not predicate(workflow.replace(p4_row, "", 1))
+        assert not predicate(workflow.replace(p4_row, p4_row + p4_row, 1))
+        assert not predicate(
+            workflow.replace(
+                p4_row,
+                "              " + runner.ARCH147_P4_NAME + "\n",
+                1,
+            )
+        )
 
 
 @pytest.mark.parametrize(

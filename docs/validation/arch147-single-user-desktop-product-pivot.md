@@ -1,6 +1,112 @@
 # Architecture 147 — Desktop product pivot validation
 
-Status: CURRENT P3 SOURCE-ONLY validation; P2 source and real acquisition accepted.
+Status: CURRENT P4 SOURCE-ONLY validation; P2/P3 accepted and real-run complete.
+
+## Accepted P3 closeout and real result
+
+P3's public-helper correction is accepted/integrated at
+`b9d52c4934517ea67b8c18f4d6f967bfd576ecf7`, tree
+`755054f71489491f0214489e35827ba2bb51c74e`. Develop #814 / run
+`41151276520` / attempt 1 is SUCCESS, with exact-feature certification reuse,
+IDENTITY_STABLE=True and OVERALL=PASS. The accepted real campaign and GUI
+inspection reported by the operator contain 255 candidates, 32 shortlisted
+walk-forward results and LOADED / 255 GUI rows:
+
+    campaign_id 11d55269-7e13-57aa-a3bf-1e20e486204b
+    bundle_id b771cf92-a09f-5f18-86d3-e03b65e04fe9
+    bundle SHA256 b883298824f346bca0cf41e83b214f35229f741aab784130602ed7eeea66f66d
+
+Development rank 1 remains research-only candidate
+`2e0eea52-0f36-5261-976b-c3e6ea299acf` (35/50): return `0.094971015`,
+drawdown `0.027108157815096180365937479989239356275125079838597`,
+walk-forward returns `0.066993175` and `-0.065377215`, median `0.000807980`,
+maximum walk-forward drawdown `0.13670401`.
+
+The descriptively strongest observed minimum/median-fold-return and maximum
+fold-drawdown configuration is candidate
+`cc8b7b1d-c480-5fb9-9836-d7230ea2690d` (55/100): Development return
+`0.081506445`, drawdown
+`0.028098358511127682090840288708938760639881545456235`, fold returns
+`0.064235075` and `0.015644635`, minimum `0.015644635`, median `0.039939855`,
+maximum walk-forward drawdown `0.03660648`. These are descriptive observations,
+not a qualification policy. `qualification_policy` remains null. Neither
+candidate is promoted or selected for P4 trading; no PAPER_CANDIDATE, production
+strategy authority, trading eligibility or final-holdout admission exists.
+FINAL_HOLDOUT remains sealed. P4 implementation never rereads production data.
+
+## P4 source checkpoint and verification contract
+
+P4 uses `feature/research-desktop-supervisor-current` in the verified main
+checkout, with `arch147-desktop-supervisor`, no preflight/execute dispatcher,
+and GitHub-owned FULL. The branch matches the existing reviewed
+`feature/research-*` workflow trigger. One atomic candidate, both-context
+admission, one ordinary push and one terminal CI result precede independent
+ChatGPT exact-source review. No local canonical FULL, PR, merge, production
+GUI/worker smoke or provider/broker effect occurs during this source checkpoint.
+
+Focused tests cover separate concurrent RUNNING workers, one pair per Start,
+duplicate Start, partial-start rollback, Stop during startup, idempotent Stop,
+trading reconciliation before STOPPED, closure failures/timeouts, health failure
+propagation, no restart, cached GUI health, responsive Qt controls, async
+close/reconcile, refused close with unresolved workers, queue bounds, immutable
+P3 artifact verification/display, malformed/conflicting journal replay, stale
+ownership, clean reopen and sanitized diagnostics. Synthetic P3 fixtures prove
+the existing Research page still loads its accepted campaign type. Historical
+Supervisor presentation tests continue to require zero active controls and
+unchanged recorded-only/promotion semantics on that historical page.
+
+The literal whole-root Ruff commands were attempted. Lint passed, but formatter
+discovery hit preserved historical `.pytest-*-temp` directories and generated
+fixtures, producing access errors/a Ruff panic. Those artifacts were untouched.
+Both combined non-mutating Ruff phases then passed on `src scripts tests`, with
+a Git inventory proof that these roots cover every tracked Python file and all
+new P4 Python files. Diff checks passed. No persistent exclusion or historical
+artifact cleanup was added; GitHub certifies the clean checkout normally.
+
+A fresh-process source-owned import probe proves the P4 composition loads no
+Alpaca, Robinhood, credential, scheduler, host or native adapter. GUI historical
+adapter exports retain the original owning objects and public `__all__`, but
+load only when requested. The compact-report parser is deferred until explicit
+legacy compact selection. Current `DesktopGuiService` selects P3 campaign
+bundles only; the existing normal read-only GUI retains compact-report support.
+The current worker imports only the public bounded bundle reader, never the
+campaign runner, final-holdout loader, full integrity inspector or admission.
+No trading-domain state or strategy configuration is supplied to research.
+
+Source authority keeps P3 registered and Architecture 146 retired. P4 is the
+new current route. Existing authority classifies both Architecture-134 workflow
+projection functions as CURRENT_MUTABLE; historical AST pins reconstruct their
+immutable Git objects. Two narrow current-owner projections remove the P4 row
+before predecessor comparison. Historical pins/catalog/dispatch and function
+bindings remain unchanged. These current-owner changes use the existing
+classification and receive explicit reconstruction/topology regressions.
+
+Production journal/lock lives outside source at
+`F:\AI\desktop-bot-state\p4\lifecycle.jsonl`. Runtime generation is an ordinary
+local chronology counter; UTC records contain only bounded enums and facts.
+Unresolved state never becomes a clean Stop. Recovery is visible and manual;
+P4 never deletes prior evidence, force kills, auto-restarts or updates itself.
+See the architecture document for full lifecycle and close policy.
+
+Terminal publication identity, focused counts, admission and CI evidence are
+reported in the implementation handoff after verification, not self-pinned into
+this candidate. After acceptance/integration and develop reuse verification,
+the short source-owned launcher supports one explicit no-network Start/Stop
+smoke. P5 source work follows that successful smoke; LIVE remains disabled.
+
+Prepublication local evidence: application/GUI batches passed 87 and 38 tests;
+the shared checkpoint/source-authority and retained Supervisor integration batch
+passed 634 tests. An earlier focused registry/profile batch passed 255
+parameterized cases (overlapping the shared batch). All 79 develop-routed static
+checkpoint authorities plus current authority returned no failures. These are
+focused/static checks, not a local canonical FULL. Final exact committed
+both-context admission and GitHub certification remain required.
+
+## Preserved P1–P3 source implementation chronology
+
+The following records describe their original source-only boundaries, before
+the subsequently accepted P3 integration and real run above.
+
 P3 includes the explicitly authorized scoped lazy-export authority successor;
 historical pins and security classification remain unchanged. The original
 source and the exact reviewed transformation are separately validated.

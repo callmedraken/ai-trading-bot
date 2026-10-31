@@ -18,6 +18,7 @@ def _historical_workflow_view(workflow: str) -> str:
 
     workflow = predecessor_workflow(workflow)
     for name in (
+        runner.ARCH147_P4_NAME,
         runner.ARCH147_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
         runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,

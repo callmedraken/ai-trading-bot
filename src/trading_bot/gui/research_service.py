@@ -1,17 +1,13 @@
 """Read-only adapter from compact research artifacts to GUI presentation state."""
 
+from __future__ import annotations
+
 from decimal import Decimal
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from trading_bot.cli.exceptions import HistoricalExperimentReportOutputError
-from trading_bot.cli.historical_experiment_report_serialization import (
-    deserialize_compact_report_json,
-)
 from trading_bot.execution.state_fingerprints import canonical_decimal
-from trading_bot.experiments import (
-    HistoricalExperimentGridAssignment,
-    HistoricalExperimentReport,
-)
 from trading_bot.gui.models import (
     MAX_RESEARCH_METADATA_SUMMARY_CHARACTERS,
     MAX_RESEARCH_PARAMETER_LABEL_CHARACTERS,
@@ -24,10 +20,25 @@ from trading_bot.gui.models import (
     ResearchResultRow,
 )
 
+if TYPE_CHECKING:
+    from trading_bot.experiments import (
+        HistoricalExperimentGridAssignment,
+        HistoricalExperimentReport,
+    )
+
 MAX_RESEARCH_RESULT_ROWS = 500
 MAX_RESEARCH_ARTIFACT_BYTES = 10_000_000
 MAX_RESEARCH_FILTER_CHARACTERS = 200
 _UNAVAILABLE_MESSAGE = "No supported compact historical experiment report is available."
+
+
+def deserialize_compact_report_json(payload: bytes) -> HistoricalExperimentReport:
+    """Defer the unchanged legacy compact parser until explicitly selected."""
+    from trading_bot.cli.historical_experiment_report_serialization import (
+        deserialize_compact_report_json as deserialize,
+    )
+
+    return deserialize(payload)
 
 
 class CompactReportResearchService:

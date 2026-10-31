@@ -177,16 +177,20 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
     from scripts import checkpoint_runner as runner
 
     del repo_root
-    spec = runner._checkpoint_specs().get(runner.ARCH147_NAME)
-    if spec is None:
-        return ("Architecture 147 checkpoint registration missing",)
+    specs = runner._checkpoint_specs()
+    current = specs.get(runner.ARCH147_P4_NAME)
+    predecessor = specs.get(runner.ARCH147_NAME)
+    if current is None or predecessor is None:
+        return ("Architecture 147 P3/P4 checkpoint registration missing",)
     failures = []
-    if spec.preflight is not None:
-        failures.append("Architecture 147 current preflight must be None")
-    if spec.execute is not None:
-        failures.append("Architecture 147 current execute must be None")
-    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_NAME:
-        failures.append("Architecture 147 is not the current first checkpoint")
+    if current.preflight is not None or current.execute is not None:
+        failures.append("Architecture 147 P4 must not dispatch host effects")
+    if predecessor.preflight is not None or predecessor.execute is not None:
+        failures.append("Architecture 147 P3 must remain source-only")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P4_NAME:
+        failures.append("Architecture 147 P4 is not the current first checkpoint")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH147_NAME) != 1:
+        failures.append("Architecture 147 P3 current route was not preserved")
     if any(
         name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
         for name in (
@@ -206,6 +210,7 @@ def current_authority_check(repo_root: Path) -> tuple[str, ...]:
 
     failures = list(ownership.ownership_failures(repo_root))
     failures.extend(current_preflight_dispatch_failures(repo_root))
+    failures.extend(runner._arch147_p4_authority_check(repo_root))
     failures.extend(certification.static_toolchain_contract_failures(repo_root))
     specs = runner._checkpoint_specs()
     if any(name != spec.name for name, spec in specs.items()):

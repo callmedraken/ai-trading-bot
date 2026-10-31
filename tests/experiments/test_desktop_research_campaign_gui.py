@@ -79,6 +79,56 @@ def artifact(tmp_path, bundle):
     return path
 
 
+def test_p4_inspects_and_displays_campaign_without_research_or_trading_authority(
+    artifact, bundle, tmp_path, monkeypatch
+):
+    import time
+    from hashlib import sha256
+
+    from trading_bot.desktop_runtime import (
+        ArtifactIdentity,
+        DesktopSupervisor,
+        InspectBundle,
+        Lifecycle,
+        LifecycleJournal,
+        LocalResearchWorker,
+    )
+    from trading_bot.gui.desktop_service import DesktopGuiService
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("P4 attempted a campaign")
+
+    monkeypatch.setattr(campaign, "run_desktop_campaign", forbidden)
+    before = artifact.read_bytes()
+    identity = ArtifactIdentity(bundle.campaign_id, bundle.bundle_id)
+    job = InspectBundle(artifact, sha256(before).hexdigest(), identity)
+    service = DesktopGuiService(artifact)
+    assert service.get_research_state().report.row_count == 255
+    assert service.get_research_state().report.report_id == bundle.bundle_id
+    assert service.get_production_strategy_state().contract is None
+    assert bundle.to_dict()["qualification_policy"] is None
+    supervisor = DesktopSupervisor(
+        LifecycleJournal(tmp_path / "runtime.jsonl"),
+        research_factory=lambda: LocalResearchWorker(job),
+    )
+    try:
+        supervisor.start()
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if supervisor.status().research.artifact == identity:
+                break
+            time.sleep(0.01)
+        status = supervisor.status()
+        assert status.research.artifact == identity
+        assert status.trading.state is status.research.state is Lifecycle.RUNNING
+        assert status.transport == "NOT_CONNECTED" and not status.live_enabled
+    finally:
+        supervisor.stop()
+        assert supervisor.wait()
+        supervisor.dispose()
+    assert artifact.read_bytes() == before
+
+
 def test_adapter_loads_all_candidates_and_truthful_optional_fields(artifact, bundle):
     state = DesktopCampaignResearchService(artifact).get_research_state()
     assert state.status is ResearchReportStatus.LOADED

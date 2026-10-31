@@ -20,7 +20,8 @@ def test_arch147_is_current_source_only_full_without_effect_dispatch():
     assert spec.preflight is None
     assert spec.execute is None
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_NAME] == "full"
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] == runner.ARCH147_NAME
+    assert runner.ARCH147_NAME in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] == runner.ARCH147_P4_NAME
     assert (
         spec.tests.count(
             "tests/experiments/test_historical_research_desktop_acquisition.py"

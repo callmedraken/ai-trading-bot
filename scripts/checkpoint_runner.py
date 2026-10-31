@@ -372,7 +372,36 @@ ARCH147_RUFF: Final = (
     "scripts/current_source_authority.py",
     *ARCH147_TESTS,
 )
+ARCH147_P4_NAME: Final = "arch147-desktop-supervisor"
+ARCH147_P4_BRANCH: Final = "feature/research-desktop-supervisor-current"
+ARCH147_P4_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/test_desktop_runtime.py",
+    "tests/runtime/test_desktop_runtime_gui.py",
+    "tests/experiments/test_desktop_research_campaign_gui.py",
+    "tests/gui/test_gui_a2_research_contracts.py",
+    "tests/gui/test_gui_a8_startup_composition.py",
+    "tests/gui/test_gui_a15_supervisor_page_qt.py",
+    "tests/gui/test_gui_a15_production_strategy_models.py",
+    "tests/gui/test_gui_a15_production_strategy_service.py",
+    "tests/gui/test_gui_a15_system_and_evidence_integration.py",
+    "tests/gui/test_gui_a15_startup_composition.py",
+)
+ARCH147_P4_RUFF: Final = (
+    "scripts/checkpoint_runner.py",
+    "scripts/current_source_authority.py",
+    "scripts/run_test_certification.py",
+    "scripts/run_desktop_bot.py",
+    "src/trading_bot/desktop_runtime.py",
+    "src/trading_bot/gui/__init__.py",
+    "src/trading_bot/gui/research_service.py",
+    "src/trading_bot/gui/desktop_service.py",
+    "src/trading_bot/gui/desktop_control.py",
+    "src/trading_bot/gui/main_window.py",
+    *ARCH147_P4_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH147_P4_NAME,
     ARCH147_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
@@ -384,6 +413,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
     ARCH146_PARTIAL_STATE_NAME: "full",
     ARCH146_PRE_B2_NAME: "full",
@@ -26364,6 +26394,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_BRANCH,
     )
+    values[ARCH147_P4_NAME] = CheckpointSpec(
+        ARCH147_P4_NAME,
+        "Current single-user desktop supervisor lifecycle and GUI controls",
+        ARCH147_P4_TESTS,
+        ARCH147_P4_RUFF,
+        _arch147_p4_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH147_P4_BRANCH,
+    )
     return values
 
 
@@ -26807,7 +26847,8 @@ def _arch134_current_batch_workflow_is_reviewed(workflow: str) -> bool:
     ):
         return False
     translated = (
-        workflow.replace("              " + ARCH147_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
+        .replace("              " + ARCH147_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
@@ -26853,7 +26894,8 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
     ):
         return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
     translated = (
-        workflow.replace("              " + ARCH147_NAME + " `\n", "", 1)
+        workflow.replace("              " + ARCH147_P4_NAME + " `\n", "", 1)
+        .replace("              " + ARCH147_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PARTIAL_STATE_NAME + " `\n", "", 1)
         .replace("              " + ARCH146_PRE_B2_NAME + " `\n", "", 1)
         .replace("              " + ARCH146B1_NAME + " `\n", "", 1)
@@ -27903,6 +27945,251 @@ def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
             and "load_desktop_final_holdout" in candidate
         ):
             failures.append("147 optimizer-facing holdout import: " + relative)
+    return tuple(failures)
+
+
+def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Own P4 registration and the offline supervisor's narrow import boundary."""
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_P4_NAME)
+    failures = []
+    if (
+        spec is None
+        or spec.tests != ARCH147_P4_TESTS
+        or spec.ruff_paths != ARCH147_P4_RUFF
+        or spec.authority_check is not _arch147_p4_authority_check
+        or spec.remote_branch != ARCH147_P4_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH147_P4_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_P4_NAME) != 1
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[0] != ARCH147_P4_NAME
+        or resolve_ci_checkpoint(specs, ARCH147_P4_BRANCH, "push") != ARCH147_P4_NAME
+    ):
+        failures.append("147 P4 desktop supervisor source-only registration drift")
+    if (
+        ARCH147_NAME not in CURRENT_ACTIVE_CI_CHECKPOINTS
+        or CI_CERTIFICATION_PROFILES.get(ARCH147_NAME) != "full"
+        or resolve_ci_checkpoint(specs, ARCH147_BRANCH, "push") != ARCH147_NAME
+    ):
+        failures.append("147 P3 desktop research route was not preserved")
+    if any(
+        name in CURRENT_ACTIVE_CI_CHECKPOINTS
+        for name in (ARCH146_PARTIAL_STATE_NAME, ARCH146_PRE_B2_NAME, ARCH146B1_NAME)
+    ):
+        failures.append("147 P4 consumed Architecture 146 route remains current")
+
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    for name in (ARCH147_P4_NAME, ARCH147_NAME):
+        if workflow.count("              " + name + " `\n") != 1:
+            failures.append("147 P4 active CI membership drift: " + name)
+
+    def import_claims(relative: str) -> tuple[tuple[str, str], ...]:
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        claims = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                claims.extend((alias.name, "*") for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                module = "." * node.level + (node.module or "")
+                claims.extend((module, alias.name) for alias in node.names)
+        return tuple(sorted(claims))
+
+    expected_imports = {
+        "src/trading_bot/desktop_runtime.py": (
+            ("__future__", "annotations"),
+            ("json", "*"),
+            ("os", "*"),
+            ("collections.abc", "Callable"),
+            ("dataclasses", "dataclass"),
+            ("datetime", "UTC"),
+            ("datetime", "datetime"),
+            ("enum", "StrEnum"),
+            ("pathlib", "Path"),
+            ("queue", "Empty"),
+            ("queue", "Full"),
+            ("queue", "Queue"),
+            ("threading", "Event"),
+            ("threading", "Lock"),
+            ("threading", "Thread"),
+            ("threading", "current_thread"),
+            ("typing", "Protocol"),
+            ("uuid", "UUID"),
+            ("hashlib", "sha256"),
+            (
+                "trading_bot.experiments.desktop_research_campaign",
+                "read_desktop_campaign_bundle",
+            ),
+        ),
+        "src/trading_bot/gui/desktop_control.py": (
+            ("PySide6.QtCore", "QTimer"),
+            ("PySide6.QtWidgets", "QHBoxLayout"),
+            ("PySide6.QtWidgets", "QLabel"),
+            ("PySide6.QtWidgets", "QPushButton"),
+            ("PySide6.QtWidgets", "QVBoxLayout"),
+            ("PySide6.QtWidgets", "QWidget"),
+            ("trading_bot.desktop_runtime", "DesktopSupervisor"),
+        ),
+        "scripts/run_desktop_bot.py": (
+            ("__future__", "annotations"),
+            ("argparse", "*"),
+            ("sys", "*"),
+            ("pathlib", "Path"),
+            ("trading_bot.desktop_runtime", "ArtifactIdentity"),
+            ("trading_bot.desktop_runtime", "DesktopSupervisor"),
+            ("trading_bot.desktop_runtime", "InspectBundle"),
+            ("trading_bot.desktop_runtime", "LifecycleJournal"),
+            ("trading_bot.desktop_runtime", "LocalResearchWorker"),
+            ("PySide6.QtWidgets", "QApplication"),
+            ("trading_bot.gui.main_window", "MainWindow"),
+            ("trading_bot.gui.desktop_service", "DesktopGuiService"),
+        ),
+        "src/trading_bot/gui/desktop_service.py": (
+            ("pathlib", "Path"),
+            (
+                "trading_bot.gui.desktop_campaign_service",
+                "DesktopCampaignResearchService",
+            ),
+            ("trading_bot.gui.market_data_models", "MarketDataPageState"),
+            ("trading_bot.gui.market_data_models", "unavailable_market_data_state"),
+            ("trading_bot.gui.models", "ApplicationOverview"),
+            ("trading_bot.gui.models", "ComponentStatus"),
+            ("trading_bot.gui.models", "OperatingMode"),
+            ("trading_bot.gui.models", "PresentationStatus"),
+            ("trading_bot.gui.models", "ResearchPageState"),
+            (
+                "trading_bot.gui.operator_observability_models",
+                "OperatorOperationsPageState",
+            ),
+            (
+                "trading_bot.gui.operator_observability_models",
+                "unavailable_operator_operations_state",
+            ),
+            ("trading_bot.gui.paper_account_models", "PaperAccountPageState"),
+            (
+                "trading_bot.gui.paper_account_models",
+                "unavailable_paper_account_state",
+            ),
+            ("trading_bot.gui.paper_models", "PaperPageState"),
+            ("trading_bot.gui.paper_models", "unavailable_paper_state"),
+            (
+                "trading_bot.gui.production_strategy_models",
+                "ProductionStrategyPageState",
+            ),
+            (
+                "trading_bot.gui.production_strategy_models",
+                "unavailable_production_strategy_state",
+            ),
+            (
+                "trading_bot.gui.research_candidate_lifecycle_models",
+                "ResearchCandidateLifecyclePageState",
+            ),
+            (
+                "trading_bot.gui.research_candidate_lifecycle_models",
+                "unavailable_research_candidate_lifecycle_state",
+            ),
+            ("trading_bot.gui.research_service", "unavailable_research_state"),
+            ("trading_bot.gui.runtime_models", "RuntimePageState"),
+            ("trading_bot.gui.runtime_models", "unavailable_runtime_state"),
+        ),
+    }
+    for relative, expected in expected_imports.items():
+        if import_claims(relative) != tuple(sorted(expected)):
+            failures.append("147 P4 effect import boundary drift: " + relative)
+
+    main_window_claims = import_claims("src/trading_bot/gui/main_window.py")
+    if (
+        main_window_claims.count(("trading_bot.desktop_runtime", "DesktopSupervisor"))
+        != 1
+        or main_window_claims.count(
+            ("trading_bot.gui.desktop_control", "DesktopControl")
+        )
+        != 1
+    ):
+        failures.append("147 P4 optional GUI controller imports drift")
+
+    def module_import_claims(relative: str) -> tuple[tuple[str, str], ...]:
+        tree = ast.parse((repo_root / relative).read_text(encoding="utf-8"))
+        claims = []
+        for node in tree.body:
+            if isinstance(node, ast.Import):
+                claims.extend((alias.name, "*") for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                module = "." * node.level + (node.module or "")
+                claims.extend((module, alias.name) for alias in node.names)
+        return tuple(sorted(claims))
+
+    gui_package_imports = module_import_claims("src/trading_bot/gui/__init__.py")
+    deferred_gui_modules = (
+        "trading_bot.gui.startup_composition",
+        "trading_bot.gui.paper_inspection_service",
+        "trading_bot.gui.verified_genesis_paper_account_inspection_service",
+        "trading_bot.gui.verified_snapshot_inspection_service",
+        "trading_bot.gui.verified_successor_paper_account_inspection_service",
+    )
+    if any(module in deferred_gui_modules for module, _ in gui_package_imports):
+        failures.append("147 P4 GUI package eagerly imports deferred adapters")
+    if (
+        "trading_bot.cli.historical_experiment_report_serialization",
+        "deserialize_compact_report_json",
+    ) in module_import_claims("src/trading_bot/gui/research_service.py"):
+        failures.append("147 P4 compact legacy parser import is not deferred")
+
+    forbidden_modules = (
+        "alpaca",
+        "robinhood",
+        "win32",
+        "winreg",
+        "ctypes",
+        "requests",
+        "httpx",
+        "websocket",
+    )
+    forbidden_project_prefixes = (
+        "trading_bot.alpaca",
+        "trading_bot.robinhood",
+        "trading_bot.execution",
+        "trading_bot.risk",
+        "trading_bot.broker",
+        "trading_bot.live",
+        "trading_bot.supervised_release",
+    )
+    reviewed_sources = (
+        "src/trading_bot/desktop_runtime.py",
+        "src/trading_bot/gui/desktop_control.py",
+        "src/trading_bot/gui/main_window.py",
+        "src/trading_bot/gui/__init__.py",
+        "src/trading_bot/gui/research_service.py",
+        "src/trading_bot/gui/desktop_service.py",
+        "scripts/run_desktop_bot.py",
+    )
+    forbidden_source_tokens = (
+        "load_desktop_final_holdout",
+        "ResearchStrategyFinalHoldoutAdmission",
+        "ACCEPTED_CUSTODY_ADMISSIONS",
+        "historical_research_desktop",
+    )
+    for relative in reviewed_sources:
+        source = (repo_root / relative).read_text(encoding="utf-8")
+        claims = import_claims(relative)
+        forbidden_import = False
+        for module, name in claims:
+            if module.split(".", 1)[0] in forbidden_modules:
+                forbidden_import = True
+            if module.startswith(forbidden_project_prefixes):
+                if not (
+                    relative == "src/trading_bot/gui/research_service.py"
+                    and module == "trading_bot.execution.state_fingerprints"
+                    and name == "canonical_decimal"
+                ):
+                    forbidden_import = True
+        if forbidden_import:
+            failures.append("147 P4 forbidden effect import: " + relative)
+        if any(token in source for token in forbidden_source_tokens):
+            failures.append("147 P4 forbidden holdout path: " + relative)
     return tuple(failures)
 
 

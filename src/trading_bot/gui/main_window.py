@@ -1,6 +1,9 @@
 """Qt presentation shell for the GUI application foundation."""
 
-from PySide6.QtCore import Qt
+from dataclasses import replace
+
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -14,6 +17,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trading_bot.desktop_runtime import DesktopSupervisor
+from trading_bot.gui.desktop_control import DesktopControl
 from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
 from trading_bot.gui.evidence_source_navigation import EvidenceSourcePageTarget
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
@@ -76,11 +81,29 @@ _STATUS_PROPERTIES = {
 
 
 class MainWindow(QMainWindow):
-    """Read-only native application shell backed by a GUI service protocol."""
+    """Artifact presentation shell with optional current desktop controls."""
 
-    def __init__(self, service: GuiApplicationService) -> None:
+    def __init__(
+        self,
+        service: GuiApplicationService,
+        *,
+        desktop_controller: DesktopSupervisor | None = None,
+    ) -> None:
         super().__init__()
+        self._desktop_controller = desktop_controller
+        self._desktop_close_pending = False
         self._overview = service.get_overview()
+        if desktop_controller is not None:
+            self._overview = replace(
+                self._overview,
+                mode=OperatingMode.SIMULATED_PAPER,
+                environment="Local desktop · P4 inert workers",
+                summary=(
+                    "Start runs the local trading and offline research workers. "
+                    "Trading is inert; external transport is not connected. "
+                    "Stop reconciles and closes both before manual updates."
+                ),
+            )
         research_state = service.get_research_state()
         paper_state = service.get_paper_state()
         paper_account_state = service.get_paper_account_state()
@@ -128,7 +151,14 @@ class MainWindow(QMainWindow):
         self._stack = QStackedWidget(root)
         self._stack.setObjectName("pageStack")
 
-        self._stack.addWidget(self._build_home_page(self._overview))
+        home = self._build_home_page(self._overview)
+        if desktop_controller is not None:
+            self._desktop_control = DesktopControl(desktop_controller, home)
+            home.layout().insertWidget(0, self._desktop_control)
+            self._desktop_close_timer = QTimer(self)
+            self._desktop_close_timer.timeout.connect(self._finish_desktop_close)
+            self._desktop_close_timer.start(50)
+        self._stack.addWidget(home)
         self._research_page = ResearchPage(research_state, service, self)
         self._stack.addWidget(self._research_page)
         self._research_lifecycle_page = ResearchCandidateLifecyclePage(
@@ -168,6 +198,23 @@ class MainWindow(QMainWindow):
         self._navigation.currentRowChanged.connect(self._stack.setCurrentIndex)
         self._navigation.setCurrentRow(0)
         self._apply_style()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        """Asynchronous normal Stop on close; failed closure refuses GUI exit."""
+        if self._desktop_controller is None:
+            super().closeEvent(event)
+            return
+        if self._desktop_controller.status().can_close:
+            if self._desktop_controller.dispose():
+                event.accept()
+                return
+        self._desktop_close_pending = True
+        self._desktop_controller.stop()
+        event.ignore()
+
+    def _finish_desktop_close(self) -> None:
+        if self._desktop_close_pending and self._desktop_controller.status().can_close:
+            self.close()
 
     @property
     def page_ids(self) -> tuple[str, ...]:

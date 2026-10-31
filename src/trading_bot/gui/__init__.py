@@ -1,5 +1,7 @@
 """Public, Qt-free presentation contracts for the desktop GUI."""
 
+from importlib import import_module
+
 from trading_bot.gui.evidence_explorer import (
     MAX_EVIDENCE_TIMELINE_FILTER_CHARACTERS,
     EvidenceTimelineFilter,
@@ -75,7 +77,6 @@ from trading_bot.gui.paper_account_models import (
     VerifiedPaperAccountView,
     unavailable_paper_account_state,
 )
-from trading_bot.gui.paper_inspection_service import PaperOperationInspectionService
 from trading_bot.gui.paper_models import (
     MAX_PAPER_RECEIPT_PATH_CHARACTERS,
     PaperInspectionClassification,
@@ -121,10 +122,6 @@ from trading_bot.gui.runtime_models import (
     unavailable_runtime_state,
 )
 from trading_bot.gui.services import GuiApplicationService, ResearchReportLoader
-from trading_bot.gui.startup_composition import (
-    GuiStartupConfiguration,
-    ReadOnlyGuiApplicationService,
-)
 from trading_bot.gui.supervisor_adapter import build_supervisor_state
 from trading_bot.gui.supervisor_models import (
     SupervisorConsistency,
@@ -144,15 +141,21 @@ from trading_bot.gui.system_health_models import (
     SystemHealthPageState,
     SystemHealthStatus,
 )
-from trading_bot.gui.verified_genesis_paper_account_inspection_service import (
-    VerifiedGenesisPaperAccountInspectionService,
-)
-from trading_bot.gui.verified_snapshot_inspection_service import (
-    VerifiedSnapshotInspectionService,
-)
-from trading_bot.gui.verified_successor_paper_account_inspection_service import (
-    VerifiedSuccessorPaperAccountInspectionService,
-)
+
+_LAZY_EXPORTS = {
+    "PaperOperationInspectionService": "trading_bot.gui.paper_inspection_service",
+    "GuiStartupConfiguration": "trading_bot.gui.startup_composition",
+    "ReadOnlyGuiApplicationService": "trading_bot.gui.startup_composition",
+    "VerifiedGenesisPaperAccountInspectionService": (
+        "trading_bot.gui.verified_genesis_paper_account_inspection_service"
+    ),
+    "VerifiedSnapshotInspectionService": (
+        "trading_bot.gui.verified_snapshot_inspection_service"
+    ),
+    "VerifiedSuccessorPaperAccountInspectionService": (
+        "trading_bot.gui.verified_successor_paper_account_inspection_service"
+    ),
+}
 
 __all__ = [
     "MAX_PRODUCTION_STRATEGY_BYTES",
@@ -272,3 +275,17 @@ __all__ = [
     "unavailable_paper_account_state",
     "unavailable_paper_state",
 ]
+
+
+def __getattr__(name: str) -> object:
+    """Load unchanged historical adapters only when explicitly requested."""
+    owner = _LAZY_EXPORTS.get(name)
+    if owner is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(owner), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

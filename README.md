@@ -115,8 +115,28 @@ Launch with:
 python -m trading_bot.gui
 ```
 
-The current GUI remains local/read-only and does not connect to production
-authority, credentials, provider transport, brokerage, or paper/live execution.
+That entry point remains the local read-only artifact/evidence GUI.
+
+Architecture 147 P4 adds the current desktop Start/Stop controls in the same
+window. After P4 exact-source acceptance/integration, launch with:
+
+```powershell
+.\.venv\Scripts\python.exe -B scripts\run_desktop_bot.py
+```
+
+Start runs an inert trading worker and a separate offline research worker;
+Stop cancels research and reconciles/closes trading before reporting STOPPED.
+Closing the window requests the same normal Stop and waits for confirmed
+closure. External trading transport is NOT_CONNECTED, deferred to P5; LIVE
+remains disabled. P4 selects local P3 campaign bundles; the read-only entry
+point above also supports legacy compact reports. Research results never select
+a production strategy. No credentials, network, provider, broker, scheduler or
+ACL operation is involved.
+
+Ordinary lifecycle state is stored outside source at
+`F:\AI\desktop-bot-state\p4\lifecycle.jsonl`. Preserve unresolved journal/lock
+state for review; no automatic recovery or retry is implemented. Manual updates
+occur only while fully stopped. The application never updates itself.
 
 When using a shared virtual environment from another worktree, follow
 [`docs/AI_DEVELOPMENT_WORKFLOW.md`](docs/AI_DEVELOPMENT_WORKFLOW.md) so imports

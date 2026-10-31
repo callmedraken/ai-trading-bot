@@ -22,6 +22,7 @@ permissions:
 
 env:
   AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
+              arch147-desktop-supervisor `
               arch147-desktop-research-profile `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r3 `
               arch134-fresh-successor-readonly-deployment-admission-diagnostic-r2 `

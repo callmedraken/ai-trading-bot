@@ -134,6 +134,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
 
     assert set(specs) == {
         runner.ARCH147_NAME,
+        runner.ARCH147_P4_NAME,
         runner.ARCH146_PARTIAL_STATE_NAME,
         runner.ARCH146_PRE_B2_NAME,
         runner.ARCH146B1_NAME,
@@ -437,6 +438,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH
         if spec.name == runner.ARCH147_NAME:
             expected_branch = runner.ARCH147_BRANCH
+        if spec.name == runner.ARCH147_P4_NAME:
+            expected_branch = runner.ARCH147_P4_BRANCH
         assert spec.remote_branch == expected_branch
 
     assert specs["arch128-parent-acl-repair"].execute is not None
@@ -1461,6 +1464,7 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 runner.ARCH146_PRE_B2_NAME,
                 runner.ARCH146_PARTIAL_STATE_NAME,
                 runner.ARCH146B1_NAME,
+                runner.ARCH147_P4_NAME,
                 "arch144-c-f1-paper-evidence-admission",
                 "arch145-a-research-robustness-live-canary-eligibility",
                 "arch134-f1r1-a-runtime-isolation",

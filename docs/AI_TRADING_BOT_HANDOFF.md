@@ -55,8 +55,21 @@ Accepted implementation base:
 Primary worktree: `F:\AI\worktrees\ai-trading-bot-desktop-paper-cycle-current`.
 Feature branch: `feature/research-desktop-paper-cycle-current`.
 Checkpoint: `arch147-desktop-paper-cycle`; `preflight=None`, `execute=None`;
-canonical certification `full`, GitHub-owned. This source candidate grants no
-runtime operation and is pending terminal CI, exact-source review/integration.
+canonical certification `full`, GitHub-owned. The initial P5A source candidate
+was published once at HEAD
+`834a0eb638a75f00385144b8473152402bad31f5`, tree
+`071b222c8a1ee78d0e2e787659268c6cdf782098`. Feature CI run `41198164554`,
+attempt 1, is preserved terminal red: source-static and active tests passed,
+while canonical FULL failed only in broad-5 on the stale P4-first assertion.
+The classification is `PREPUBLICATION_COVERAGE_DEFECT`; the red commit remains
+immutable and grants no runtime operation.
+
+The current corrective child is
+`ARCH147_P5A_C1_PREPUBLICATION_COVERAGE`. It closes the stale current-route
+assertion and adds that module to the required P5A prepublication coverage.
+The child is pending its affected/full focused checks, authority, admission,
+one ordinary push and terminal mapped GitHub FULL, followed by exact-source
+review and integration.
 
 No production/default PAPER_EVALUATION binding exists. The descriptive P3
 55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` is not an accepted
@@ -76,15 +89,18 @@ and a distinct instance of the accepted LifecycleJournal. Clean Stop/reopen and
 SQLite commit-before-ack idempotency are supported; stale lifecycle locks or
 unresolved process-death evidence fail closed without repair. P5C owns recovery.
 
-Finish implementation/focused verification and stop before commit/push for
-ChatGPT's strategy/publication decision. Eventual atomic publication, admission,
-terminal canonical FULL and exact-source review remain pending. The next
-operation is filtered-trend/multi-asset research and explicit strategy selection,
-not a production P5 smoke. SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC are representable
-bindings only; no acquisition or new strategy-family implementation is included.
-Do not launch during source work. No provider, account,
-credentials, Robinhood, Alpaca, broker, holdout, scheduler, ACL or live operation
-is authorized by source PASS. P5B read/review-only transport follows separately;
-P6 remains the separately reviewed broker-mutation boundary.
+The C1 child must complete its focused checks, current/routed authority,
+FEATURE/PROSPECTIVE_DEVELOP admission, one normal child publication and
+terminal mapped GitHub FULL before exact-source acceptance and integration.
+Filtered-trend/multi-asset research and explicit strategy selection remain the
+next milestone only after that green acceptance/integration boundary; this
+child does not start it. Production P5 smoke remains blocked because no
+`PAPER_EVALUATION` strategy is selected. SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC are
+representable bindings only; no acquisition or new strategy-family
+implementation is included. Do not launch during source work. No production,
+provider, account, credentials, Robinhood, Alpaca, broker, holdout, scheduler,
+ACL or live operation is authorized by source PASS. P5B read/review-only
+transport follows separately; P6 remains the separately reviewed
+broker-mutation boundary.
 
 Also remove or update any tests and docs that referenced the old behavior.

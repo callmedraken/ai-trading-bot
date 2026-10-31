@@ -412,6 +412,7 @@ ARCH147_P5A_TESTS: Final = (
     "tests/desktop_paper/test_composition.py",
     "tests/desktop_paper/test_gui.py",
     "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
+    "tests/experiments/test_historical_research_partial_state.py",
     "tests/risk/test_manager.py",
     "tests/execution/test_order_engine.py",
     "tests/ledger/test_ledger.py",

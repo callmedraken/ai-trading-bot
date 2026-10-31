@@ -37,25 +37,39 @@ absent an explicitly accepted binding, trading fails closed with
 PAPER_CANDIDATE promotion or live eligibility.
 FINAL_HOLDOUT remains sealed and no live or broker authority is introduced.
 
-The source-only checkpoint is `arch147-desktop-paper-cycle` on
-`feature/research-desktop-paper-cycle-current`, with no preflight/execute and
-GitHub-owned canonical FULL. Exact-source review and integration remain pending;
-implementation, admission and CI do not launch the production P5 application.
-P4 remains intact as the accepted inert launcher with separate frozen state.
+The initial P5A source-only publication was made once at
+`834a0eb638a75f00385144b8473152402bad31f5`, tree
+`071b222c8a1ee78d0e2e787659268c6cdf782098`, on
+`feature/research-desktop-paper-cycle-current`. Its feature CI run
+`41198164554`, attempt 1, is preserved terminal red: source-static and active
+tests passed, while canonical FULL failed only in broad-5 on the stale
+P4-first current-route assertion. The classification is
+`PREPUBLICATION_COVERAGE_DEFECT`. No P5A production/provider/credential/broker/
+FINAL_HOLDOUT effect occurred. P4 remains intact as the accepted inert launcher
+with separate frozen state.
+
+The current corrective child is `ARCH147_P5A_C1_PREPUBLICATION_COVERAGE`.
+It updates the stale current-route assertion and adds that cross-architecture
+module to the required P5A prepublication coverage, so the same defect is
+caught before a future publication. The original red commit remains immutable;
+the child must use one normal commit and one ordinary push after its focused,
+static, authority and admission gates pass. The child does not launch the
+production P5 application.
 P5A supports SQLite financial durability, not automatic recovery of an unclean
 application death: stale/unresolved lifecycle evidence remains failed/attention.
 P5C owns the later process-recovery adapter.
 
 ## Immediate next step
 
-Complete P5A implementation and focused verification, then stop before commit
-or push for ChatGPT's strategy/publication decision. Eventual publication still
-requires one atomic candidate, FEATURE/PROSPECTIVE_DEVELOP admission, terminal
-GitHub canonical FULL and exact-source review. The next operational milestone
-is filtered-trend/multi-asset research and explicit paper strategy selection;
-no production P5 smoke is ready. Planned SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC
-symbols are representable bindings only, not acquisition or execution authority.
-No real P5 launch or production-state creation occurs during source work.
+Complete the C1 affected and complete focused gates, current/routed authority,
+FEATURE/PROSPECTIVE_DEVELOP admission, one corrective child publication and
+terminal GitHub canonical FULL, then obtain exact-source acceptance and
+integration. Filtered-trend/multi-asset research remains the next milestone
+only after P5A reaches terminal green, exact-source acceptance and integration.
+No production P5 smoke is ready because no `PAPER_EVALUATION` strategy is
+selected. Planned SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC symbols are representable
+bindings only, not acquisition or execution authority. No real P5 launch or
+production-state creation occurs during source work.
 
 ## Roadmap
 

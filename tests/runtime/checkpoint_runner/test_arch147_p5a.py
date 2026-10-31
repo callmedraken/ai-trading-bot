@@ -35,6 +35,18 @@ def test_p5a_source_only_current_route_and_explicit_full_ownership():
     assert new_tests <= set(spec.tests)
 
 
+def test_p5a_inventory_carries_current_route_regression_exactly_once():
+    spec = runner._checkpoint_specs()[runner.ARCH147_P5A_NAME]
+    route_test = "tests/experiments/test_historical_research_partial_state.py"
+
+    assert spec.tests.count(route_test) == 1
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:3] == (
+        runner.ARCH147_P5A_NAME,
+        runner.ARCH147_P4_NAME,
+        runner.ARCH147_NAME,
+    )
+
+
 @pytest.mark.parametrize(
     "name", [runner.ARCH147_P5A_NAME, runner.ARCH147_P4_NAME, runner.ARCH147_NAME]
 )

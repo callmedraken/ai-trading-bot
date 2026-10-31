@@ -1,12 +1,18 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 P4 complete; P5 architecture current
+## Current boundary — Architecture 147 P5A accepted/integrated; filtered-trend research next
 
-Current accepted develop source before this P4 operational closeout:
+Current accepted develop source:
 
-    HEAD 545f21621c15c682f19d10df3a3d1ecf86f8a77c
-    TREE 07bb44a2975c44fd62e68a9cc8f3b9f99a0bbd8e
+    HEAD 1b7dae71e2988f82074dd285d099bf3227944266
+    TREE 333514e7051cb07dcb6edc32fb82f4de9147d0d6
     branch develop
+
+P5A feature CI `41209242802` / attempt 1 passed source-static, active-tests and
+all seven canonical FULL lanes. ChatGPT exact-source review accepted the feature
+chain and fast-forwarded develop to the exact C1 SHA. Develop CI
+`41235406233` / attempt 1 passed source-static/source-gates with exact-feature
+certification reuse; duplicate active/FULL execution was skipped.
 
 P4 source is accepted/integrated. Feature CI #816 / run `41175037719` /
 attempt 1 succeeded with canonical FULL. Develop CI #817 / run
@@ -44,63 +50,68 @@ smoke merely to refresh it.
 LIVE remains disabled. FINAL_HOLDOUT remains sealed. P4 grants no broker/order
 authority.
 
-## Current checkpoint — ARCH147_P5A_DESKTOP_SIMULATED_PAPER
+## Accepted checkpoint — ARCH147_P5A_DESKTOP_SIMULATED_PAPER
 
-Accepted implementation base:
-
-    HEAD 79dff6341241af8e126c37060bf4c0968af36778
-    TREE 226e974ec43512d53aa1591eb5efeb0f808bf1cb
-    branch develop
-
-Primary worktree: `F:\AI\worktrees\ai-trading-bot-desktop-paper-cycle-current`.
+Checkpoint: `arch147-desktop-paper-cycle`.
 Feature branch: `feature/research-desktop-paper-cycle-current`.
-Checkpoint: `arch147-desktop-paper-cycle`; `preflight=None`, `execute=None`;
-canonical certification `full`, GitHub-owned. The initial P5A source candidate
-was published once at HEAD
-`834a0eb638a75f00385144b8473152402bad31f5`, tree
-`071b222c8a1ee78d0e2e787659268c6cdf782098`. Feature CI run `41198164554`,
-attempt 1, is preserved terminal red: source-static and active tests passed,
-while canonical FULL failed only in broad-5 on the stale P4-first assertion.
-The classification is `PREPUBLICATION_COVERAGE_DEFECT`; the red commit remains
-immutable and grants no runtime operation.
+Canonical certification profile: `full`, GitHub-owned.
+`preflight=None`; `execute=None`.
 
-The current corrective child is
-`ARCH147_P5A_C1_PREPUBLICATION_COVERAGE`. It closes the stale current-route
-assertion and adds that module to the required P5A prepublication coverage.
-The child is pending its affected/full focused checks, authority, admission,
-one ordinary push and terminal mapped GitHub FULL, followed by exact-source
-review and integration.
+The original source commit
+`834a0eb638a75f00385144b8473152402bad31f5` / tree
+`071b222c8a1ee78d0e2e787659268c6cdf782098` remains preserved with CI
+`41198164554` / attempt 1 terminal red after broad-5 exposed a stale current
+route assertion. That is immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence.
+
+Corrective child `ARCH147_P5A_C1_PREPUBLICATION_COVERAGE` is accepted at
+`1b7dae71e2988f82074dd285d099bf3227944266` / tree
+`333514e7051cb07dcb6edc32fb82f4de9147d0d6`. Its focused gate passed 1,070
+cases; current/routed authority and FEATURE/PROSPECTIVE_DEVELOP admission passed
+with stable identity. Feature CI `41209242802` / attempt 1 passed all source,
+active and seven FULL lanes. Develop integration CI `41235406233` / attempt 1
+passed with exact-feature certification reuse.
+
+P5A provides the local SIMULATED_PAPER / PAPER_EVALUATION infrastructure:
+transactional SQLite financial state, deterministic effect identities, OPEN-only
+no-lookahead replay, existing RiskManager/OrderEngine/PaperLedger authority,
+durable kill/new-buy controls, clean Stop/reopen and cached GUI presentation.
+The strategy and symbol are immutable typed bindings rather than hard-coded
+55/100/SPY assumptions.
 
 No production/default PAPER_EVALUATION binding exists. The descriptive P3
-55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` is not an accepted
-production or default paper strategy. P5 requires an explicit immutable typed
-PaperStrategyBinding (family/version, symbol, parameters, research provenance,
-PAPER_EVALUATION purpose, no qualification policy and no live eligibility).
-Without an accepted binding, production reports
-`PAPER_EVALUATION_SELECTION_REQUIRED` and admits no trading. Synthetic injected
-fixtures are tests only. OPEN observation acquisition and strategy selection
-remain separate; FINAL_HOLDOUT stays sealed.
+55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` remains historical
+research evidence only. Without an accepted binding, production reports
+`PAPER_EVALUATION_SELECTION_REQUIRED`, creates no P5 financial state and admits
+no trading. FINAL_HOLDOUT remains sealed and no live/broker authority exists.
 
-P5 uses `F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
-`F:\AI\desktop-bot-state\p5\lifecycle.jsonl`; tests inject fresh external
-temporary paths. Neither production P5 file is created during implementation.
-The P4 journal and accepted smoke remain untouched. P5 uses DesktopSupervisor
-and a distinct instance of the accepted LifecycleJournal. Clean Stop/reopen and
-SQLite commit-before-ack idempotency are supported; stale lifecycle locks or
-unresolved process-death evidence fail closed without repair. P5C owns recovery.
+P5 uses
+`F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
+`F:\AI\desktop-bot-state\p5\lifecycle.jsonl` only after a real accepted
+binding is supplied and the runtime is explicitly launched. Neither was created
+during P5A source work. P4 state and its accepted smoke remain untouched.
+Unclean application-death recovery is intentionally deferred to P5C.
 
-The C1 child must complete its focused checks, current/routed authority,
-FEATURE/PROSPECTIVE_DEVELOP admission, one normal child publication and
-terminal mapped GitHub FULL before exact-source acceptance and integration.
-Filtered-trend/multi-asset research and explicit strategy selection remain the
-next milestone only after that green acceptance/integration boundary; this
-child does not start it. Production P5 smoke remains blocked because no
-`PAPER_EVALUATION` strategy is selected. SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC are
-representable bindings only; no acquisition or new strategy-family
-implementation is included. Do not launch during source work. No production,
-provider, account, credentials, Robinhood, Alpaca, broker, holdout, scheduler,
-ACL or live operation is authorized by source PASS. P5B read/review-only
-transport follows separately; P6 remains the separately reviewed
-broker-mutation boundary.
+## Immediate next milestone — filtered-trend / multi-asset research
+
+Start a bounded source-only research successor from this exact develop source.
+Freeze the planned ETF universe:
+
+    SPY QQQ IWM EFA EEM TLT GLD PDBC
+
+Test the predeclared moving-average confirmation families without combinatorial
+stacking: baseline MA, percentage band, ADX, Donchian confirmation and long-term
+momentum; ATR is descriptive/risk research rather than a new directional vote in
+the first campaign.
+
+The successor must keep strategy selection and runtime binding separate. It
+must not install a P5 PAPER_EVALUATION binding automatically, launch P5
+production state, contact Robinhood, create broker/live effects, or access the
+existing FINAL_HOLDOUT. Any real multi-asset data acquisition is a separately
+reviewed effect after source acceptance/integration.
+
+After the research campaign returns its deterministic shortlist, ChatGPT reviews
+cross-asset/regime robustness and issues a separate small PAPER_EVALUATION
+binding checkpoint. Only after that binding exists is a production P5 simulated
+paper smoke eligible.
 
 Also remove or update any tests and docs that referenced the old behavior.

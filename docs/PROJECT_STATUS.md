@@ -76,6 +76,16 @@ P5 production state or granting live/broker authority. The resulting shortlist
 will be reviewed before a separate small PAPER_EVALUATION binding checkpoint.
 Production P5 smoke remains blocked until that binding exists.
 
+The filtered-trend source parent was published once at
+`d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
+`af5592e93cffe484ee73471a4070ea4f722c564b`, with direct parent
+`6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`; GitHub run `41246258225` /
+attempt 1 was terminal-success. ChatGPT exact-source review found that the
+MA_ADX implementation and its test used the same incorrect rising-ADX policy
+for both serialized parameters. No integration occurred. C1 corrects only the
+ADX20 threshold-only versus ADX25_RISING threshold-plus-rising distinction;
+no real acquisition is authorized until C1 is accepted and integrated.
+
 ## Roadmap
 
     P1  desktop research simplification — accepted

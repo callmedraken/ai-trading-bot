@@ -14,6 +14,10 @@ complete cross-asset summaries, lexicographic ties, canonical bundle tampering,
 immutable output and detached reporting. Existing P3/P4/P5A and current authority
 regressions remain in the affected checkpoint union. New research test modules
 are supported FULL ownership; frozen historical required tuples are unchanged.
+The filtered-trend strategy tests explicitly distinguish threshold-only ADX20
+(`Wilder ADX(14) >= 20`) from ADX25_RISING (`Wilder ADX(14) >= 25` and current
+ADX greater than prior ADX); the canonical Wilder-ADX numeric tests remain
+unchanged.
 
 Prepublication requires the complete focused union, current/routed authority,
 historical reconstruction/coherence checks, whole-root combined Ruff/diff,

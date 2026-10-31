@@ -57,7 +57,8 @@ automatically generated combinations, new thresholds or expanded MA grid.
 | --- | --- | --- |
 | BASE_MA | No further confirmation | fast < slow |
 | MA_PERCENT_BAND | fast > slow*(1+band), band .005/.010/.015 | fast < slow*(1-band) |
-| MA_ADX | Wilder ADX(14) >=20 or >=25 AND rising from prior ADX | fast < slow |
+| MA_ADX / parameter "20" (ADX20) | Wilder ADX(14) >= 20 | fast < slow |
+| MA_ADX / parameter "25" (ADX25_RISING) | Wilder ADX(14) >= 25 **and** current ADX > prior ADX | fast < slow |
 | MA_DONCHIAN | latest completed close > prior 20 or 55 completed-session high | fast < slow |
 | MA_LONG_MOMENTUM | completed 252-session return >0 OR separate variant close >=90% of prior 252-session high | fast < slow |
 

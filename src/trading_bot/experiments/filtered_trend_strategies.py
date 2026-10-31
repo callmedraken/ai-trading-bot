@@ -239,10 +239,13 @@ def _entry_filter_passes(
         assert adx_values is not None
         current_adx = adx_values[index]
         previous_adx = adx_values[index - 1] if index else None
+        if config.parameter == "20":
+            return current_adx is not None and current_adx >= Decimal("20")
+        assert config.parameter == "25"
         return (
             current_adx is not None
             and previous_adx is not None
-            and current_adx >= Decimal(config.parameter)
+            and current_adx >= Decimal("25")
             and current_adx > previous_adx
         )
     if family == "MA_DONCHIAN":

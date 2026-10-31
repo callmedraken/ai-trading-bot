@@ -6,6 +6,7 @@ from decimal import Context, Decimal, localcontext
 
 import pytest
 
+import trading_bot.experiments.filtered_trend_strategies as strategies
 from trading_bot.domain.market import Bar, Symbol
 from trading_bot.experiments.filtered_trend_strategies import (
     StrategyConfig,
@@ -115,18 +116,54 @@ def test_non_band_families_exit_on_strictly_bearish_ma_without_confirmation() ->
             assert signal(config, bars, invested=True) == "SELL"
 
 
-def test_adx_entry_requires_threshold_and_rising_adx() -> None:
-    closes = [Decimal("100")] * 50 + [
-        Decimal("100") + Decimal(index) / 10 for index in range(1, 31)
-    ]
-    bars = _bars(closes)
-    for threshold in ("20", "25"):
-        states = signal_series(_config("MA_ADX", threshold), bars)
-        assert "BUY" in states[50:]
-        assert states[-1] == "BUY"
+@pytest.mark.parametrize(
+    ("current", "previous", "expected_20", "expected_25"),
+    [
+        ("20", "20", "BUY", "HOLD"),
+        ("20", "21", "BUY", "HOLD"),
+        ("25", "26", "BUY", "HOLD"),
+        ("25", "24", "BUY", "BUY"),
+        ("19", "18", "HOLD", "HOLD"),
+        ("24", "23", "BUY", "HOLD"),
+    ],
+)
+def test_adx_variants_have_distinct_threshold_and_rising_policies(
+    monkeypatch: pytest.MonkeyPatch,
+    current: str,
+    previous: str,
+    expected_20: str,
+    expected_25: str,
+) -> None:
+    bars = _bars([Decimal("100")] * 50 + [Decimal("101")])
 
-    flat = _bars([Decimal("100")] * 260)
-    assert signal(_config("MA_ADX", "20"), flat, False) == "HOLD"
+    def fake_adx_values(
+        fake_bars: tuple[Bar, ...], period: int
+    ) -> tuple[Decimal | None, ...]:
+        assert fake_bars is bars
+        assert period == 14
+        values: list[Decimal | None] = [None] * len(fake_bars)
+        values[-2] = Decimal(previous)
+        values[-1] = Decimal(current)
+        return tuple(values)
+
+    monkeypatch.setattr(strategies, "_wilder_adx_values", fake_adx_values)
+
+    assert signal(_config("MA_ADX", "20"), bars, False) == expected_20
+    assert signal(_config("MA_ADX", "25"), bars, False) == expected_25
+
+
+def test_adx_variants_exit_on_bearish_ma_without_adx_admission(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bars = _bars([Decimal("101")] * 50 + [Decimal("99")])
+    monkeypatch.setattr(
+        strategies,
+        "_wilder_adx_values",
+        lambda fake_bars, period: (None,) * len(fake_bars),
+    )
+
+    for threshold in ("20", "25"):
+        assert signal(_config("MA_ADX", threshold), bars, True) == "SELL"
 
 
 def test_donchian_breakout_compares_latest_close_to_prior_highs_only() -> None:

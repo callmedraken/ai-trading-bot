@@ -123,4 +123,17 @@ cross-asset/regime robustness and issues a separate small PAPER_EVALUATION
 binding checkpoint. Only after that binding exists is a production P5 simulated
 paper smoke eligible.
 
+## Corrective checkpoint — ARCH147_FILTERED_TREND_C1_ADX_CONTRACT
+
+The published filtered-trend parent is preserved at
+`d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
+`af5592e93cffe484ee73471a4070ea4f722c564b`, direct parent
+`6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`; it was published once and GitHub
+run `41246258225` / attempt 1 was terminal-success. ChatGPT exact-source review
+found the MA_ADX semantic mismatch: implementation and required strategy test
+both incorrectly required rising ADX for the serialized `"20"` and `"25"`
+variants. No integration occurred. C1 corrects only the ADX20 threshold-only
+and ADX25_RISING threshold-plus-rising policy distinction. No real acquisition
+is authorized until C1 is accepted and integrated.
+
 Also remove or update any tests and docs that referenced the old behavior.

@@ -595,6 +595,7 @@ FULL_DIRECTORIES = (
     "tests/strategies",
 )
 FULL_EXACT_MODULES = (
+    "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
     "tests/desktop_paper/test_configuration.py",
     "tests/desktop_paper/test_observations.py",
     "tests/desktop_paper/test_store.py",

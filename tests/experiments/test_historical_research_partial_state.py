@@ -363,20 +363,35 @@ def test_arch146_historical_registration_and_security_are_preserved():
     assert predecessor.remote_branch == runner.ARCH146_PRE_B2_BRANCH
 
 
-def test_current_research_route_is_arch147_p5a_with_p4_and_p3_preserved():
+def test_current_research_route_is_filtered_trend_then_p5a_with_p4_and_p3_preserved():
     specs = runner._checkpoint_specs()
     retired_branch = specs[runner.ARCH146_PARTIAL_STATE_NAME].remote_branch
     current = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
 
     assert runner.ARCH146_PARTIAL_STATE_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
     assert runner.resolve_ci_checkpoint(specs, retired_branch, "push") is None
-    assert current[0] == runner.ARCH147_P5A_NAME
+    assert current[:4] == (
+        runner.ARCH147_FILTERED_TREND_NAME,
+        runner.ARCH147_P5A_NAME,
+        runner.ARCH147_P4_NAME,
+        runner.ARCH147_NAME,
+    )
+    assert current.count(runner.ARCH147_FILTERED_TREND_NAME) == 1
     assert current.count(runner.ARCH147_P5A_NAME) == 1
     assert current.count(runner.ARCH147_P4_NAME) == 1
     assert current.count(runner.ARCH147_NAME) == 1
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_P5A_NAME] == "full"
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_P4_NAME] == "full"
     assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_NAME] == "full"
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_FILTERED_TREND_NAME] == (
+        "full"
+    )
+    assert (
+        runner.resolve_ci_checkpoint(
+            specs, runner.ARCH147_FILTERED_TREND_BRANCH, "push"
+        )
+        == runner.ARCH147_FILTERED_TREND_NAME
+    )
     assert (
         runner.resolve_ci_checkpoint(specs, runner.ARCH147_P5A_BRANCH, "push")
         == runner.ARCH147_P5A_NAME

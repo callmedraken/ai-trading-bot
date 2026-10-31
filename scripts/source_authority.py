@@ -39,6 +39,10 @@ CURRENT_MUTABLE_CONSTANTS = frozenset(
     {
         "CURRENT_ACTIVE_CI_CHECKPOINTS",
         "CI_CERTIFICATION_PROFILES",
+        "ARCH147_FILTERED_TREND_NAME",
+        "ARCH147_FILTERED_TREND_BRANCH",
+        "ARCH147_FILTERED_TREND_TESTS",
+        "ARCH147_FILTERED_TREND_RUFF",
         "COMMON_TESTS",
         "COMMON_RUFF_PATHS",
         "READONLY_ADMISSION_TESTS",
@@ -62,6 +66,9 @@ def current_owner(relative: str) -> str | None:
         or relative
         in {
             "evaluate_source_authority",
+            "_arch147_batch_workflow_is_reviewed",
+            "_arch147_current_batch_workflow_is_reviewed",
+            "_arch147_filtered_trend_authority_check",
             "current_authority_check",
             "current_preflight_dispatch_failures",
             "preflight_checkpoint",

@@ -63,8 +63,13 @@ process-recovery adapter.
 
 ## Immediate next step
 
-Architecture 147 P5A is closed. The next source milestone is the bounded
-filtered-trend / multi-asset research successor. It will research the predeclared
+Architecture 147 P5A is closed. The source-only filtered-trend / multi-asset
+research successor is implemented
+on its isolated feature branch; exact-source review, GitHub-owned FULL and
+integration remain pending. Its frozen contract is in
+[Architecture 147 research](architecture/147-filtered-trend-multi-asset-research.md).
+The accepted P5A design remains unchanged. This successor will research the
+predeclared
 SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC universe and moving-average confirmation
 families without installing a paper binding, opening FINAL_HOLDOUT, launching
 P5 production state or granting live/broker authority. The resulting shortlist

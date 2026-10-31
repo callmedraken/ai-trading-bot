@@ -179,7 +179,12 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
     del repo_root
     specs = runner._checkpoint_specs()
     failures = []
-    for name in (runner.ARCH147_P5A_NAME, runner.ARCH147_P4_NAME, runner.ARCH147_NAME):
+    for name in (
+        runner.ARCH147_FILTERED_TREND_NAME,
+        runner.ARCH147_P5A_NAME,
+        runner.ARCH147_P4_NAME,
+        runner.ARCH147_NAME,
+    ):
         spec = specs.get(name)
         if spec is None:
             failures.append("Architecture 147 checkpoint registration missing: " + name)
@@ -187,8 +192,10 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
             failures.append("Architecture 147 must not dispatch host effects: " + name)
         if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) != 1:
             failures.append("Architecture 147 current route membership drift: " + name)
-    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P5A_NAME:
-        failures.append("Architecture 147 P5A is not the current first checkpoint")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_FILTERED_TREND_NAME:
+        failures.append(
+            "Architecture 147 filtered-trend is not the current first checkpoint"
+        )
     if any(
         name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
         for name in (
@@ -208,6 +215,7 @@ def current_authority_check(repo_root: Path) -> tuple[str, ...]:
 
     failures = list(ownership.ownership_failures(repo_root))
     failures.extend(current_preflight_dispatch_failures(repo_root))
+    failures.extend(runner._arch147_filtered_trend_authority_check(repo_root))
     failures.extend(runner._arch147_p4_authority_check(repo_root))
     failures.extend(runner._arch147_p5a_authority_check(repo_root))
     failures.extend(certification.static_toolchain_contract_failures(repo_root))

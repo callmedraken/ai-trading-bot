@@ -93,7 +93,16 @@ Unclean application-death recovery is intentionally deferred to P5C.
 
 ## Immediate next milestone — filtered-trend / multi-asset research
 
-Start a bounded source-only research successor from this exact develop source.
+The source-only successor is implemented on
+`feature/research-filtered-trend-multi-asset-current`, checkpoint
+`arch147-filtered-trend-multi-asset-research`, from accepted coordination source
+HEAD `6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`, tree
+`df682c11568f4ecf2c3cd03898faa44906d7b296`. GitHub-owned FULL, independent
+exact-source review and integration remain required; no merge is performed by
+this implementation task. The [frozen contract](architecture/147-filtered-trend-multi-asset-research.md)
+and [validation plan](validation/arch147-filtered-trend-multi-asset-research.md)
+own its details. After terminal-green source CI, ChatGPT reviews the exact
+commit/tree, then decides acceptance/integration before any real acquisition.
 Freeze the planned ETF universe:
 
     SPY QQQ IWM EFA EEM TLT GLD PDBC

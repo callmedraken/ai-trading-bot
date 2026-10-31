@@ -1,6 +1,10 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2/P3 accepted and real-run complete; P4 accepted with runtime smoke complete; P5A frozen simulated-paper source checkpoint current.
+Status: CURRENT product roadmap; P2/P3 real-run complete; P4 smoke complete; P5A accepted/integrated; filtered-trend research source successor pending acceptance.
+
+The bounded [filtered-trend multi-asset research contract](147-filtered-trend-multi-asset-research.md)
+extends research only. Accepted P5A financial/runtime design and the sealed
+FINAL_HOLDOUT remain unchanged; no production strategy binding is selected.
 
 ## Product contract
 

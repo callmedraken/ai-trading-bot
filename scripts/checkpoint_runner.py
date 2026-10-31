@@ -327,6 +327,40 @@ ARCH146_PARTIAL_STATE_RUFF: Final = (
     "scripts/checkpoint_runner.py",
     *ARCH146_PARTIAL_STATE_TESTS,
 )
+ARCH147_FILTERED_TREND_NAME: Final = "arch147-filtered-trend-multi-asset-research"
+ARCH147_FILTERED_TREND_BRANCH: Final = (
+    "feature/research-filtered-trend-multi-asset-current"
+)
+ARCH147_FILTERED_TREND_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch147.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
+    "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+    "tests/scripts/certification_runner/test_profiles.py",
+    "tests/experiments/test_filtered_trend_data.py",
+    "tests/experiments/test_filtered_trend_strategies.py",
+    "tests/experiments/test_filtered_trend_campaign.py",
+    "tests/experiments/test_filtered_trend_bundle.py",
+    "tests/experiments/test_historical_research_partial_state.py",
+    "tests/experiments/test_research_strategy_production_compatibility.py",
+    "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+)
+ARCH147_FILTERED_TREND_RUFF: Final = (
+    "scripts/checkpoint_runner.py",
+    "scripts/arch147_source_authority.py",
+    "scripts/current_source_authority.py",
+    "scripts/run_test_certification.py",
+    "scripts/source_authority.py",
+    "scripts/run_filtered_trend_research.py",
+    "src/trading_bot/experiments/filtered_trend_data.py",
+    "src/trading_bot/experiments/filtered_trend_strategies.py",
+    "src/trading_bot/experiments/filtered_trend_campaign.py",
+    "src/trading_bot/experiments/filtered_trend_bundle.py",
+    "tests/runtime/checkpoint_runner/helpers.py",
+    "tests/runtime/checkpoint_runner/__init__.py",
+    *ARCH147_FILTERED_TREND_TESTS,
+)
 ARCH147_NAME: Final = "arch147-desktop-research-profile"
 ARCH147_BRANCH: Final = "feature/research-desktop-product-pivot-current"
 ARCH147_TESTS: Final = (
@@ -427,6 +461,7 @@ ARCH147_P5A_RUFF: Final = (
     *ARCH147_P5A_TESTS,
 )
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH147_FILTERED_TREND_NAME,
     ARCH147_P5A_NAME,
     ARCH147_P4_NAME,
     ARCH147_NAME,
@@ -440,6 +475,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_FILTERED_TREND_NAME: "full",
     ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
     ARCH147_NAME: "full",
@@ -26412,6 +26448,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         _arch146b1_authority_check,
         remote_branch=ARCH146B1_BRANCH,
     )
+    values[ARCH147_FILTERED_TREND_NAME] = CheckpointSpec(
+        ARCH147_FILTERED_TREND_NAME,
+        "Source-only filtered-trend multi-asset historical research",
+        ARCH147_FILTERED_TREND_TESTS,
+        ARCH147_FILTERED_TREND_RUFF,
+        _arch147_filtered_trend_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH147_FILTERED_TREND_BRANCH,
+    )
     values[ARCH147_NAME] = CheckpointSpec(
         ARCH147_NAME,
         "Current single-user desktop research storage and loader pivot",
@@ -26947,6 +26993,115 @@ def _arch134_readonly_diagnostic_batch_workflow_successor(workflow: str) -> bool
 
 
 _batch_workflow_is_reviewed = _arch134_readonly_diagnostic_batch_workflow_successor
+
+
+def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
+    """Project the current route onto the frozen R3M predecessor predicate."""
+    from scripts.distributed_full import predecessor_workflow
+
+    if workflow.count("  certification-full:\n") != 1:
+        return False
+    try:
+        predecessor = predecessor_workflow(workflow)
+    except ValueError:
+        return False
+    triggers = (
+        "name: Checkpoint Source Gates\n\non:\n  push:\n    branches:\n"
+        "      - develop\n"
+        "      - feature/d10c-durable-wake-evidence\n"
+        "      - feature/d10c-r8-terminal-halt\n"
+        "      - feature/d10c-r8-incident-reconciliation\n"
+        '      - "feature/robinhood-*"\n'
+        '      - "feature/research-*"\n'
+        '      - "feature/test-suite-*"\n'
+        "  pull_request:\n  workflow_dispatch:\n\n"
+    )
+    if not workflow.startswith(triggers):
+        return False
+    active = tuple(
+        name
+        for name in CURRENT_ACTIVE_CI_CHECKPOINTS
+        if name
+        not in {
+            ARCH134_D1R6_NAME,
+            ARCH134_D1R7_NAME,
+            ARCH134_D1R8_NAME,
+            ARCH134_F1_NAME,
+            ARCH144C_NAME,
+        }
+    )
+    block = (
+        "  AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-\n"
+        + "".join(f"              {name} {chr(96)}\n" for name in active[:-1])
+        + f"              {active[-1]}\n"
+    )
+    base_row = f"              {ACTIVE_CI_CHECKPOINTS[0]} {chr(96)}\n"
+    if predecessor.count(block) != 1 or predecessor.count(base_row):
+        return False
+    translated = predecessor
+    for name in (
+        ARCH147_FILTERED_TREND_NAME,
+        ARCH147_P5A_NAME,
+        ARCH147_P4_NAME,
+        ARCH147_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+    ):
+        row = f"              {name} {chr(96)}\n"
+        if translated.count(row) != 1:
+            return False
+        translated = translated.replace(row, "", 1)
+    for name in (
+        ARCH146_PARTIAL_STATE_NAME,
+        ARCH146_PRE_B2_NAME,
+        ARCH146B1_NAME,
+    ):
+        translated = translated.replace(f"              {name} {chr(96)}\n", "", 1)
+    r1_row = f"              {ARCH134_READONLY_DIAGNOSTIC_R1_NAME} {chr(96)}\n"
+    if translated.count(r1_row) != 1:
+        return False
+    translated = translated.replace(
+        r1_row,
+        f"              {ACTIVE_CI_CHECKPOINTS[0]} {chr(96)}\n",
+        1,
+    )
+    return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(translated)
+
+
+def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
+    """Accept the exact current route or a separately reconstructed predecessor."""
+    if _arch147_current_batch_workflow_is_reviewed(workflow):
+        return True
+    current_names = (
+        ARCH147_FILTERED_TREND_NAME,
+        ARCH147_P5A_NAME,
+        ARCH147_P4_NAME,
+        ARCH147_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
+        ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
+    )
+    historical_row = f"              {ACTIVE_CI_CHECKPOINTS[0]} {chr(96)}\n"
+    if (
+        workflow.count("  certification-full:\n") != 0
+        or workflow.count(historical_row) != 1
+        or any(
+            f"              {name} {chr(96)}\n" in workflow for name in current_names
+        )
+    ):
+        return False
+    return _ARCH132_R3M_PREDECESSOR_BATCH_WORKFLOW_IS_REVIEWED(workflow)
+
+
+# Keep the exact pinned historical/current wrapper ASTs intact. The current
+# route is projected here before the frozen predecessor predicate runs.
+_arch134_current_batch_workflow_is_reviewed = (
+    _arch147_current_batch_workflow_is_reviewed
+)
+_arch134_readonly_diagnostic_batch_workflow_successor = (
+    _arch147_current_batch_workflow_is_reviewed
+)
+_batch_workflow_is_reviewed = _arch147_batch_workflow_is_reviewed
 
 
 _ARCH134_PREVIOUS_PREDECESSOR_AUTHORITY = (
@@ -27892,6 +28047,68 @@ def main(argv: Sequence[str] | None = None) -> int:
     return 0 if passed else 1
 
 
+def _arch147_filtered_trend_authority_check(
+    repo_root: Path,
+) -> tuple[str, ...]:
+    """Own the current filtered-trend route without dispatching effects."""
+    from scripts import run_test_certification as certification
+
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_FILTERED_TREND_NAME)
+    failures = []
+    expected_route = (
+        ARCH147_FILTERED_TREND_NAME,
+        ARCH147_P5A_NAME,
+        ARCH147_P4_NAME,
+        ARCH147_NAME,
+    )
+    if (
+        spec is None
+        or spec.tests != ARCH147_FILTERED_TREND_TESTS
+        or spec.ruff_paths != ARCH147_FILTERED_TREND_RUFF
+        or spec.authority_check is not _arch147_filtered_trend_authority_check
+        or spec.remote_branch != ARCH147_FILTERED_TREND_BRANCH
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or CI_CERTIFICATION_PROFILES.get(ARCH147_FILTERED_TREND_NAME) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4] != expected_route
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_FILTERED_TREND_NAME) != 1
+        or resolve_ci_checkpoint(specs, ARCH147_FILTERED_TREND_BRANCH, "push")
+        != ARCH147_FILTERED_TREND_NAME
+    ):
+        failures.append("147 filtered-trend source-only registration drift")
+    if "tests/experiments" not in certification.FULL_DIRECTORIES:
+        failures.append("147 filtered-trend experiments are not FULL-owned")
+    required_tests = (
+        "tests/experiments/test_filtered_trend_data.py",
+        "tests/experiments/test_filtered_trend_strategies.py",
+        "tests/experiments/test_filtered_trend_campaign.py",
+        "tests/experiments/test_filtered_trend_bundle.py",
+        "tests/experiments/test_historical_research_partial_state.py",
+        "tests/experiments/test_research_strategy_production_compatibility.py",
+        "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
+        "tests/runtime/checkpoint_runner/test_arch147.py",
+        "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
+        "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
+        "tests/runtime/checkpoint_runner/test_source_authority.py",
+    )
+    for relative in required_tests:
+        if relative not in ARCH147_FILTERED_TREND_TESTS:
+            failures.append("147 filtered-trend checkpoint test inventory drift")
+        if not (repo_root / relative).is_file():
+            failures.append("147 filtered-trend test missing: " + relative)
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    row = f"              {ARCH147_FILTERED_TREND_NAME} {chr(96)}\n"
+    if workflow.count(row) != 1 or not _arch147_current_batch_workflow_is_reviewed(
+        workflow
+    ):
+        failures.append("147 filtered-trend active CI projection drift")
+    return tuple(failures)
+
+
 def _arch147_authority_check(repo_root: Path) -> tuple[str, ...]:
     """Own the current ordinary desktop research profile and source route."""
     from scripts.arch147_source_authority import desktop_export_authority_failures
@@ -28003,8 +28220,13 @@ def _arch147_p5a_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.execute is not None
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P5A_NAME) != "full"
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:3]
-        != (ARCH147_P5A_NAME, ARCH147_P4_NAME, ARCH147_NAME)
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4]
+        != (
+            ARCH147_FILTERED_TREND_NAME,
+            ARCH147_P5A_NAME,
+            ARCH147_P4_NAME,
+            ARCH147_NAME,
+        )
         or any(
             CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) != 1
             for name in (ARCH147_P5A_NAME, ARCH147_P4_NAME, ARCH147_NAME)
@@ -28079,7 +28301,8 @@ def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P4_NAME) != "full"
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_P4_NAME) != 1
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:2] != (ARCH147_P5A_NAME, ARCH147_P4_NAME)
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:3]
+        != (ARCH147_FILTERED_TREND_NAME, ARCH147_P5A_NAME, ARCH147_P4_NAME)
         or resolve_ci_checkpoint(specs, ARCH147_P4_BRANCH, "push") != ARCH147_P4_NAME
     ):
         failures.append("147 P4 desktop supervisor source-only registration drift")

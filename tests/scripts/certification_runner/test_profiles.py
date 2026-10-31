@@ -197,6 +197,22 @@ def test_new_supported_files_are_discovered_and_admitted(
     assert module not in runner.select_inventory(inventory, "legacy")
 
 
+def test_arch147_filtered_trend_research_modules_are_full_owned() -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    modules = {
+        "tests/experiments/test_filtered_trend_data.py",
+        "tests/experiments/test_filtered_trend_strategies.py",
+        "tests/experiments/test_filtered_trend_campaign.py",
+        "tests/experiments/test_filtered_trend_bundle.py",
+    }
+    inventory = runner.discover_inventory(root)
+    full = set(runner.select_inventory(inventory, "full"))
+    legacy = set(runner.select_inventory(inventory, "legacy"))
+    assert "tests/experiments" in runner.FULL_DIRECTORIES
+    assert modules <= full
+    assert modules.isdisjoint(legacy)
+
+
 @pytest.mark.parametrize("profile", ("full", "robinhood", "legacy", "exhaustive"))
 @pytest.mark.parametrize(
     "module",

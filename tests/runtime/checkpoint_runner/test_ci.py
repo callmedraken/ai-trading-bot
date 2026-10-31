@@ -4,6 +4,7 @@ import ast
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import replace
@@ -3304,6 +3305,45 @@ def test_p4_workflow_projection_preserves_historical_owner_and_fails_closed():
                 1,
             )
         )
+
+
+def test_p4_gui_dependency_is_installed_in_supported_execution_jobs():
+    root = Path(runner.__file__).resolve().parents[1]
+    workflow = (root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+
+    def job_section(name: str) -> str:
+        start_marker = f"  {name}:\n"
+        start = workflow.index(start_marker)
+        remainder = workflow[start + len(start_marker) :]
+        next_job = re.search(r"\n  [a-z][a-z0-9-]*:\n", remainder)
+        if next_job is None:
+            return workflow[start:]
+        return workflow[start : start + len(start_marker) + next_job.start()]
+
+    def installed_packages(section: str) -> set[str]:
+        packages: set[str] = set()
+        for match in re.finditer(
+            r"(?ms)^\s*python -m pip install --disable-pip-version-check `\n"
+            r"(?P<arguments>(?:\s+\"[^\"]+\"(?: `)?\n)+)",
+            section,
+        ):
+            packages.update(re.findall(r"\"([^\"]+)\"", match.group("arguments")))
+        return packages
+
+    gui_jobs = (
+        "active-tests",
+        "full-tests",
+        "certification-tests",
+        "certification-full",
+    )
+    for job in gui_jobs:
+        assert "PySide6>=6.10.1,<6.11" in installed_packages(job_section(job))
+
+    assert "PySide6>=6.10.1,<6.11" not in installed_packages(
+        job_section("source-static")
+    )
 
 
 @pytest.mark.parametrize(

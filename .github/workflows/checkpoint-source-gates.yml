@@ -267,7 +267,8 @@ jobs:
           python -m pip install --disable-pip-version-check `
             "pytest>=8.0,<9.0" `
             "ruff==0.17.3" `
-            "tzdata>=2024.1,<2027.0"
+            "tzdata>=2024.1,<2027.0" `
+            "PySide6>=6.10.1,<6.11"
 
       - name: Verify active checkpoint tests
         env:
@@ -318,7 +319,8 @@ jobs:
           python -m pip install --disable-pip-version-check `
             "pytest>=8.0,<9.0" `
             "ruff==0.17.3" `
-            "tzdata>=2024.1,<2027.0"
+            "tzdata>=2024.1,<2027.0" `
+            "PySide6>=6.10.1,<6.11"
 
       - name: Record broad test shard start
         shell: powershell
@@ -392,7 +394,8 @@ jobs:
           python -m pip install --disable-pip-version-check `
             "pytest>=8.0,<9.0" `
             "ruff==0.17.3" `
-            "tzdata>=2024.1,<2027.0"
+            "tzdata>=2024.1,<2027.0" `
+            "PySide6>=6.10.1,<6.11"
 
       - name: Install FULL optimizer dependency
         if: needs.source-static.outputs.certification_profile == 'full'
@@ -522,7 +525,8 @@ jobs:
           python -m pip install --disable-pip-version-check `
             "pytest>=8.0,<9.0" `
             "ruff==0.17.3" `
-            "tzdata>=2024.1,<2027.0"
+            "tzdata>=2024.1,<2027.0" `
+            "PySide6>=6.10.1,<6.11"
 
       - name: Install FULL optimizer dependency
         if: needs.source-static.outputs.certification_profile == 'full'

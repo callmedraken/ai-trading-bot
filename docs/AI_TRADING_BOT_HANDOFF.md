@@ -1,12 +1,25 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 filtered-trend C2 provider compatibility correction pending
+## Current boundary — Architecture 147 filtered-trend C2 accepted/integrated; real acquisition next
 
 Current accepted develop source before this coordination closeout:
 
-    HEAD e48f55bb5bfce2725a1244e9fba97bdaa8c74b47
-    TREE b04fef2ffa44e680e70bd1462d51a90d40256317
+    HEAD bed872c660bb36384f057e5e9c556dbbb7609037
+    TREE 4fff6ac66c097608634d4e024f4cc0c6c29b7579
     branch develop
+
+C2 exact source was first published on the bounded correction branch. Run
+`41284238424` / attempt 1 is preserved red because that unmapped branch used
+the generic four-shard FULL fallback; shard 2 completed verification but tripped
+the 300-second wall-time guard at 349.572 seconds. No rerun occurred.
+
+The exact same C2 commit was then fast-forwarded to the registered filtered-trend
+checkpoint branch. Canonical run `41342652706` / attempt 1 passed
+source-static, active-tests, broad-1 through broad-7 and source-gates. Generic
+full-tests and Robinhood certification were skipped. ChatGPT exact-source review
+accepted C2 and fast-forwarded develop to the exact C2 SHA. Develop integration
+run `41343862704` / attempt 1 passed source-static/source-gates with
+exact-feature certification reuse and no duplicate active/FULL execution.
 
 Filtered-trend corrective feature CI `41250779521` / attempt 1 passed
 source-static, active-tests and all seven canonical FULL lanes. ChatGPT
@@ -135,23 +148,19 @@ No filter stacking or post-result grid expansion is allowed. FINAL_HOLDOUT
 remains sealed. The campaign produces descriptive research only:
 `qualification_policy=null`, `paper_binding=null`, `live_eligible=false`.
 
-The filtered-trend source and ADX C1 are accepted and integrated. Before real
-acquisition began, exact-source compatibility review found that the parser
-rejected Alpaca's documented optional top-level `currency` response field.
-C2 changes only provider response-shape compatibility. Real acquisition has
-not started and is not authorized until C2 is accepted and integrated.
+The filtered-trend source, ADX C1 and C2 provider-response compatibility
+correction are accepted and integrated. C2 exact source is
+`bed872c660bb36384f057e5e9c556dbbb7609037`, tree
+`4fff6ac66c097608634d4e024f4cc0c6c29b7579`. No real acquisition has
+started.
 
-## Immediate next operation — C2 provider-response correction
+## Immediate next operation — reviewed real acquisition
 
-Complete the bounded C2 source correction and its focused gates. Do not perform
-real Alpaca acquisition, access credentials, run the real campaign, access
-FINAL_HOLDOUT, launch P5 production, or contact Robinhood/broker/live paths.
-After C2 is accepted and integrated, the separately reviewed next operation is
-one real acquisition of the fixed eight-symbol adjusted dataset using the
-accepted integrated develop identity, the existing bounded Alpaca HTTPS
-transport and hidden ephemeral interactive research credentials.
+Perform one real acquisition of the fixed eight-symbol adjusted dataset using
+the accepted coordination-closeout develop identity, the existing bounded
+Alpaca HTTPS transport and hidden ephemeral interactive research credentials.
 
-## Post-C2 reviewed real acquisition boundary
+## Reviewed real acquisition boundary
 
 The operation must:
 

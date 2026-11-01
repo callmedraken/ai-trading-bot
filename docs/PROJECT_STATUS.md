@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 filtered-trend C2 provider compatibility correction pending
+## Current checkpoint — Architecture 147 filtered-trend C2 accepted/integrated; real acquisition next
 
 P4 is fully accepted. Source is integrated at
 `e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
@@ -63,36 +63,48 @@ process-recovery adapter.
 
 ## Immediate next step
 
-The filtered-trend / multi-asset source milestone and ADX C1 correction are
-accepted and integrated. Before any real acquisition, exact-source review found
-that the parser rejected Alpaca's documented optional top-level `currency`
-response field. C2 corrects only that provider response-shape compatibility:
-`bars` and `next_page_token` remain required; optional `currency`, when
-returned, must be exactly `USD`; all other root fields remain rejected.
+The filtered-trend / multi-asset source milestone, ADX C1 correction, and C2
+provider-response compatibility correction are accepted and integrated.
 
-Initial source commit `d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
-`af5592e93cffe484ee73471a4070ea4f722c564b`, passed feature CI
-`41246258225` / attempt 1, including all seven GitHub-owned FULL lanes.
-ChatGPT exact-source review then found the MA_ADX policy mismatch. Corrective
-child `3e99e8adc28e5f390edd9eb65bdbed80d1f100ca`, tree
-`133ba237812c0b0ade9352d440793697c1c79691`, corrected ADX20 to
-threshold-only and ADX25_RISING to threshold-plus-rising without changing the
-30-configuration identity grid. Child CI `41250779521` / attempt 1 passed
-source-static, active-tests and all seven canonical FULL lanes.
+C2 is exact commit `bed872c660bb36384f057e5e9c556dbbb7609037`, tree
+`4fff6ac66c097608634d4e024f4cc0c6c29b7579`, direct child of accepted
+develop `e48f55bb5bfce2725a1244e9fba97bdaa8c74b47`. It changes only the
+documented Alpaca response compatibility contract: `bars` and
+`next_page_token` remain required; optional `currency`, when present, must
+be exact `USD`; arbitrary extra root fields remain rejected.
 
-ChatGPT accepted the corrected two-commit chain and fast-forwarded `develop`
-to `3e99e8adc28e5f390edd9eb65bdbed80d1f100ca`. Develop integration CI
-`41254635989` / attempt 1 passed source-static/source-gates and reused the
-exact-feature certification; duplicate active/FULL execution was skipped.
+The first C2 publication run `41284238424` / attempt 1 is preserved terminal
+red because the new correction branch was not mapped to the filtered-trend
+checkpoint and therefore used the legacy four-shard generic FULL fallback.
+Its shard 2 verification passed but the fallback shard wall time reached
+349.572 seconds and tripped the 300-second hygiene guard. That run was not
+rerun and is not classified as PREPUBLICATION_COVERAGE_DEFECT.
+
+The exact same C2 commit was then fast-forwarded to the registered
+`feature/research-filtered-trend-multi-asset-current` checkpoint branch.
+Canonical run `41342652706` / attempt 1 resolved
+`arch147-filtered-trend-multi-asset-research`, route ACTIVE, profile FULL;
+source-static, active-tests, broad-1 through broad-7, and source-gates all
+passed. Generic full-tests and Robinhood certification were skipped.
+
+ChatGPT exact-source review accepted C2 and fast-forwarded `develop` to the
+exact C2 SHA. Develop integration run `41343862704` / attempt 1 passed
+source-static/source-gates, proved exact-feature certification reuse, and
+skipped duplicate active/FULL execution.
 
 No Alpaca call, credential read, real dataset, campaign, FINAL_HOLDOUT, P5
-production state, Robinhood, broker or live effect occurred during source work,
-certification or integration.
+production state, Robinhood, broker, or live effect occurred through C2
+integration.
 
-Real acquisition has not started. It is not authorized until C2 is accepted
-and integrated. Until then, no Alpaca credentials, provider call, real dataset,
-campaign, FINAL_HOLDOUT, P5 production state, Robinhood, broker, or live path
-may be accessed.
+The next reviewed effect is one create-only acquisition of the fixed
+SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC 2016-2023 dataset using
+`ALPACA_ALL_ADJUSTED_PRICE_V1`. It must run from the clean dedicated develop
+worktree at the accepted coordination-closeout identity, use hidden ephemeral
+credentials and the existing bounded Alpaca HTTPS transport, perform no retry,
+and leave any partial destination visible on failure. After dataset validation
+succeeds, run the accepted offline filtered-trend campaign exactly once and
+return its deterministic top-10 shortlist for review. Do not install a
+PAPER_EVALUATION binding automatically.
 
 ## Roadmap
 

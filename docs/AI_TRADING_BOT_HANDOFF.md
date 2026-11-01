@@ -1,11 +1,11 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 filtered-trend source accepted/integrated; real acquisition next
+## Current boundary — Architecture 147 filtered-trend C2 provider compatibility correction pending
 
 Current accepted develop source before this coordination closeout:
 
-    HEAD 3e99e8adc28e5f390edd9eb65bdbed80d1f100ca
-    TREE 133ba237812c0b0ade9352d440793697c1c79691
+    HEAD e48f55bb5bfce2725a1244e9fba97bdaa8c74b47
+    TREE b04fef2ffa44e680e70bd1462d51a90d40256317
     branch develop
 
 Filtered-trend corrective feature CI `41250779521` / attempt 1 passed
@@ -135,11 +135,23 @@ No filter stacking or post-result grid expansion is allowed. FINAL_HOLDOUT
 remains sealed. The campaign produces descriptive research only:
 `qualification_policy=null`, `paper_binding=null`, `live_eligible=false`.
 
-## Immediate next operation — reviewed real acquisition
+The filtered-trend source and ADX C1 are accepted and integrated. Before real
+acquisition began, exact-source compatibility review found that the parser
+rejected Alpaca's documented optional top-level `currency` response field.
+C2 changes only provider response-shape compatibility. Real acquisition has
+not started and is not authorized until C2 is accepted and integrated.
 
-Perform exactly one real acquisition of the fixed eight-symbol adjusted dataset
-using the accepted integrated develop identity, the existing bounded Alpaca HTTPS
+## Immediate next operation — C2 provider-response correction
+
+Complete the bounded C2 source correction and its focused gates. Do not perform
+real Alpaca acquisition, access credentials, run the real campaign, access
+FINAL_HOLDOUT, launch P5 production, or contact Robinhood/broker/live paths.
+After C2 is accepted and integrated, the separately reviewed next operation is
+one real acquisition of the fixed eight-symbol adjusted dataset using the
+accepted integrated develop identity, the existing bounded Alpaca HTTPS
 transport and hidden ephemeral interactive research credentials.
+
+## Post-C2 reviewed real acquisition boundary
 
 The operation must:
 

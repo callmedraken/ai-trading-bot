@@ -1,6 +1,7 @@
 # Architecture 147 — Filtered-trend multi-asset research
 
-Status: source-only implementation; exact-source acceptance and integration pending.
+Status: ADX C1 source accepted/integrated; C2 provider-response compatibility
+correction pending.
 Checkpoint: `arch147-filtered-trend-multi-asset-research`.
 Branch: `feature/research-filtered-trend-multi-asset-current`.
 Canonical certification: GitHub-owned FULL; preflight=None; execute=None.
@@ -45,6 +46,14 @@ Pagination,
 universe, request semantics, coverage and canonical data are checked before a
 complete dataset can be written. A later separately reviewed operator adapter
 owns any real credentials and acquisition. No 2024+ bars may be acquired or read.
+
+The documented multi-symbol response requires the top-level `bars` and
+`next_page_token` fields. The provider-optional top-level `currency` field is
+accepted when present only when it is exactly the frozen requested `USD`;
+responses without it remain valid. Every other top-level field is rejected.
+This response-shape compatibility rule does not change the frozen request,
+price basis, adjustment, feed, asof, date bounds, pagination, or dataset
+identity contract.
 
 ## Frozen strategies and timing
 

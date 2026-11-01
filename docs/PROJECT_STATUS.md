@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 filtered-trend source accepted/integrated; real acquisition next
+## Current checkpoint — Architecture 147 filtered-trend C2 provider compatibility correction pending
 
 P4 is fully accepted. Source is integrated at
 `e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
@@ -63,7 +63,12 @@ process-recovery adapter.
 
 ## Immediate next step
 
-The filtered-trend / multi-asset source milestone is accepted and integrated.
+The filtered-trend / multi-asset source milestone and ADX C1 correction are
+accepted and integrated. Before any real acquisition, exact-source review found
+that the parser rejected Alpaca's documented optional top-level `currency`
+response field. C2 corrects only that provider response-shape compatibility:
+`bars` and `next_page_token` remain required; optional `currency`, when
+returned, must be exactly `USD`; all other root fields remain rejected.
 
 Initial source commit `d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
 `af5592e93cffe484ee73471a4070ea4f722c564b`, passed feature CI
@@ -84,13 +89,10 @@ No Alpaca call, credential read, real dataset, campaign, FINAL_HOLDOUT, P5
 production state, Robinhood, broker or live effect occurred during source work,
 certification or integration.
 
-The next reviewed effect is one create-only acquisition of the fixed
-SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC 2016-2023 dataset using
-`ALPACA_ALL_ADJUSTED_PRICE_V1`. Acquisition must use the accepted integrated
-develop identity, hidden ephemeral credentials, the existing bounded HTTPS
-transport, no retry, and a fresh destination. After dataset validation succeeds,
-the explicit offline campaign runs once and returns the deterministic top-10
-shortlist for ChatGPT review. No PAPER_EVALUATION binding is installed yet.
+Real acquisition has not started. It is not authorized until C2 is accepted
+and integrated. Until then, no Alpaca credentials, provider call, real dataset,
+campaign, FINAL_HOLDOUT, P5 production state, Robinhood, broker, or live path
+may be accessed.
 
 ## Roadmap
 

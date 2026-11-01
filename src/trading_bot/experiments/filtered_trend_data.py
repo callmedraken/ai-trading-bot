@@ -618,8 +618,18 @@ def parse_alpaca_page(
         raise
     except (ValueError, TypeError, UnicodeError, RecursionError):
         raise FilteredTrendDataError("provider response is not strict JSON") from None
-    if type(root) is not dict or set(root) != {"bars", "next_page_token"}:
+    required_root_fields = frozenset({"bars", "next_page_token"})
+    allowed_root_fields = required_root_fields | {"currency"}
+    if (
+        type(root) is not dict
+        or not required_root_fields <= set(root)
+        or not set(root) <= allowed_root_fields
+    ):
         raise FilteredTrendDataError("provider response fields do not match the schema")
+    if "currency" in root and (
+        type(root["currency"]) is not str or root["currency"] != CURRENCY
+    ):
+        raise FilteredTrendDataError("provider response currency is invalid")
     token = root["next_page_token"]
     if token is not None and (
         type(token) is not str or not token or len(token) > MAX_PAGE_TOKEN_LENGTH

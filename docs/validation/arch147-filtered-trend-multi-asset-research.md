@@ -19,6 +19,18 @@ The filtered-trend strategy tests explicitly distinguish threshold-only ADX20
 ADX greater than prior ADX); the canonical Wilder-ADX numeric tests remain
 unchanged.
 
+## C2 provider-response compatibility coverage
+
+The C2 correction keeps the multi-symbol response root strict: `bars` and
+`next_page_token` are required, `currency` is optional, and every other root
+field is rejected. Both legal response shapes are covered: currency absent and
+`currency="USD"`. A returned non-USD currency, a non-string currency, an
+unrelated root field, and duplicate `currency` JSON keys are rejected. The
+request assertion remains frozen at `currency=USD`; this correction adds no
+provider, credential, dataset, campaign, holdout, or production effect.
+The final focused filtered-trend union passed 115 tests, and the separate
+current/routed authority check passed 87 tests.
+
 Prepublication requires the complete focused union, current/routed authority,
 historical reconstruction/coherence checks, whole-root combined Ruff/diff,
 exact intended-file staging, one normal atomic commit and `ops.ps1 admit`:

@@ -85,6 +85,7 @@ def _alpaca_json_page(
     symbol: str,
     bars: tuple[Bar, ...],
     next_page_token: str | None,
+    currency: object | None = None,
 ) -> bytes:
     rows = []
     for ordinal, bar in enumerate(bars):
@@ -100,12 +101,17 @@ def _alpaca_json_page(
             values.extend((f'"n":{bar.volume // 2}', f'"vw":{format(bar.close, "f")}'))
         rows.append("{" + ",".join(values) + "}")
     token = json.dumps(next_page_token)
+    currency_field = ""
+    if currency is not None:
+        currency_field = ',"currency":' + json.dumps(currency)
     return (
         '{"bars":{'
         + json.dumps(symbol)
         + ":["
         + ",".join(rows)
-        + ']},"next_page_token":'
+        + "]}"
+        + currency_field
+        + ',"next_page_token":'
         + token
         + "}"
     ).encode("utf-8")
@@ -364,6 +370,15 @@ def test_alpaca_page_parser_accepts_documented_multi_symbol_bar_fields() -> None
     assert page.next_page_token == "next/2"
 
 
+def test_alpaca_page_parser_accepts_optional_requested_currency() -> None:
+    payload = _alpaca_json_page("SPY", _bars("SPY")[:1], None, currency=CURRENCY)
+
+    page = parse_alpaca_page(payload, HistoricalBarsRequest("SPY"))
+
+    assert len(page.bars) == 1
+    assert page.next_page_token is None
+
+
 @pytest.mark.parametrize(
     "payload,match",
     [
@@ -387,6 +402,23 @@ def test_alpaca_page_parser_accepts_documented_multi_symbol_bar_fields() -> None
             b'{"bars":{"SPY":[{"t":"2016-01-04T05:00:00Z",'
             b'"t":"2016-01-04T05:00:00Z","o":100,"h":101,"l":99,'
             b'"c":100,"v":1}]},"next_page_token":null}',
+            "duplicate JSON field",
+        ),
+        (
+            _alpaca_json_page("SPY", _bars("SPY")[:1], None, currency="EUR"),
+            "provider response currency is invalid",
+        ),
+        (
+            _alpaca_json_page("SPY", _bars("SPY")[:1], None, currency=123),
+            "provider response currency is invalid",
+        ),
+        (
+            b'{"bars":{"SPY":[]},"next_page_token":null,"unexpected":1}',
+            "provider response fields",
+        ),
+        (
+            b'{"bars":{"SPY":[]},"currency":"USD","currency":"USD",'
+            b'"next_page_token":null}',
             "duplicate JSON field",
         ),
         (
@@ -429,7 +461,9 @@ def test_fake_alpaca_json_transport_acquires_and_stores_dataset(tmp_path: Path) 
             page_size = 1300
             end = min(offset + page_size, len(source_bars))
             token = str(end) if end < len(source_bars) else None
-            return _alpaca_json_page(symbol, source_bars[offset:end], token)
+            return _alpaca_json_page(
+                symbol, source_bars[offset:end], token, currency=CURRENCY
+            )
 
     sender = FakeSender()
     dataset = acquire_dataset(AlpacaPageTransport(sender))

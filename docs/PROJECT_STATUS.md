@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P5A accepted/integrated; filtered-trend research next
+## Current checkpoint — Architecture 147 filtered-trend source accepted/integrated; real acquisition next
 
 P4 is fully accepted. Source is integrated at
 `e5e800ad99da8dd1c09fa36202d5ff8b648c1daf`, tree
@@ -63,28 +63,34 @@ process-recovery adapter.
 
 ## Immediate next step
 
-Architecture 147 P5A is closed. The source-only filtered-trend / multi-asset
-research successor is implemented
-on its isolated feature branch; exact-source review, GitHub-owned FULL and
-integration remain pending. Its frozen contract is in
-[Architecture 147 research](architecture/147-filtered-trend-multi-asset-research.md).
-The accepted P5A design remains unchanged. This successor will research the
-predeclared
-SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC universe and moving-average confirmation
-families without installing a paper binding, opening FINAL_HOLDOUT, launching
-P5 production state or granting live/broker authority. The resulting shortlist
-will be reviewed before a separate small PAPER_EVALUATION binding checkpoint.
-Production P5 smoke remains blocked until that binding exists.
+The filtered-trend / multi-asset source milestone is accepted and integrated.
 
-The filtered-trend source parent was published once at
-`d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
-`af5592e93cffe484ee73471a4070ea4f722c564b`, with direct parent
-`6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`; GitHub run `41246258225` /
-attempt 1 was terminal-success. ChatGPT exact-source review found that the
-MA_ADX implementation and its test used the same incorrect rising-ADX policy
-for both serialized parameters. No integration occurred. C1 corrects only the
-ADX20 threshold-only versus ADX25_RISING threshold-plus-rising distinction;
-no real acquisition is authorized until C1 is accepted and integrated.
+Initial source commit `d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
+`af5592e93cffe484ee73471a4070ea4f722c564b`, passed feature CI
+`41246258225` / attempt 1, including all seven GitHub-owned FULL lanes.
+ChatGPT exact-source review then found the MA_ADX policy mismatch. Corrective
+child `3e99e8adc28e5f390edd9eb65bdbed80d1f100ca`, tree
+`133ba237812c0b0ade9352d440793697c1c79691`, corrected ADX20 to
+threshold-only and ADX25_RISING to threshold-plus-rising without changing the
+30-configuration identity grid. Child CI `41250779521` / attempt 1 passed
+source-static, active-tests and all seven canonical FULL lanes.
+
+ChatGPT accepted the corrected two-commit chain and fast-forwarded `develop`
+to `3e99e8adc28e5f390edd9eb65bdbed80d1f100ca`. Develop integration CI
+`41254635989` / attempt 1 passed source-static/source-gates and reused the
+exact-feature certification; duplicate active/FULL execution was skipped.
+
+No Alpaca call, credential read, real dataset, campaign, FINAL_HOLDOUT, P5
+production state, Robinhood, broker or live effect occurred during source work,
+certification or integration.
+
+The next reviewed effect is one create-only acquisition of the fixed
+SPY/QQQ/IWM/EFA/EEM/TLT/GLD/PDBC 2016-2023 dataset using
+`ALPACA_ALL_ADJUSTED_PRICE_V1`. Acquisition must use the accepted integrated
+develop identity, hidden ephemeral credentials, the existing bounded HTTPS
+transport, no retry, and a fresh destination. After dataset validation succeeds,
+the explicit offline campaign runs once and returns the deterministic top-10
+shortlist for ChatGPT review. No PAPER_EVALUATION binding is installed yet.
 
 ## Roadmap
 

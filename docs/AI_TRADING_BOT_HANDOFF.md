@@ -1,12 +1,19 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 P5A accepted/integrated; filtered-trend research next
+## Current boundary — Architecture 147 filtered-trend source accepted/integrated; real acquisition next
 
-Current accepted develop source:
+Current accepted develop source before this coordination closeout:
 
-    HEAD 1b7dae71e2988f82074dd285d099bf3227944266
-    TREE 333514e7051cb07dcb6edc32fb82f4de9147d0d6
+    HEAD 3e99e8adc28e5f390edd9eb65bdbed80d1f100ca
+    TREE 133ba237812c0b0ade9352d440793697c1c79691
     branch develop
+
+Filtered-trend corrective feature CI `41250779521` / attempt 1 passed
+source-static, active-tests and all seven canonical FULL lanes. ChatGPT
+exact-source review accepted the corrected feature chain and fast-forwarded
+develop to the exact C1 SHA. Develop CI `41254635989` / attempt 1 passed
+source-static/source-gates with exact-feature certification reuse; duplicate
+active/FULL execution was skipped.
 
 P5A feature CI `41209242802` / attempt 1 passed source-static, active-tests and
 all seven canonical FULL lanes. ChatGPT exact-source review accepted the feature
@@ -91,49 +98,66 @@ binding is supplied and the runtime is explicitly launched. Neither was created
 during P5A source work. P4 state and its accepted smoke remain untouched.
 Unclean application-death recovery is intentionally deferred to P5C.
 
-## Immediate next milestone — filtered-trend / multi-asset research
+## Accepted checkpoint — filtered-trend / multi-asset research
 
-The source-only successor is implemented on
-`feature/research-filtered-trend-multi-asset-current`, checkpoint
-`arch147-filtered-trend-multi-asset-research`, from accepted coordination source
-HEAD `6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`, tree
-`df682c11568f4ecf2c3cd03898faa44906d7b296`. GitHub-owned FULL, independent
-exact-source review and integration remain required; no merge is performed by
-this implementation task. The [frozen contract](architecture/147-filtered-trend-multi-asset-research.md)
-and [validation plan](validation/arch147-filtered-trend-multi-asset-research.md)
-own its details. After terminal-green source CI, ChatGPT reviews the exact
-commit/tree, then decides acceptance/integration before any real acquisition.
-Freeze the planned ETF universe:
+Checkpoint: `arch147-filtered-trend-multi-asset-research`.
+Feature branch: `feature/research-filtered-trend-multi-asset-current`.
+Canonical certification: GitHub-owned FULL.
 
-    SPY QQQ IWM EFA EEM TLT GLD PDBC
+The initial source commit
+`d1e9d881f99121f56d6d24639d0b594cd68b107a` / tree
+`af5592e93cffe484ee73471a4070ea4f722c564b` passed GitHub run
+`41246258225` / attempt 1. Exact-source review found one semantic defect:
+both ADX variants required rising ADX.
 
-Test the predeclared moving-average confirmation families without combinatorial
-stacking: baseline MA, percentage band, ADX, Donchian confirmation and long-term
-momentum; ATR is descriptive/risk research rather than a new directional vote in
-the first campaign.
+Corrective child
+`3e99e8adc28e5f390edd9eb65bdbed80d1f100ca` / tree
+`133ba237812c0b0ade9352d440793697c1c79691` preserves the 30-candidate grid
+while implementing the frozen policies exactly:
 
-The successor must keep strategy selection and runtime binding separate. It
-must not install a P5 PAPER_EVALUATION binding automatically, launch P5
-production state, contact Robinhood, create broker/live effects, or access the
-existing FINAL_HOLDOUT. Any real multi-asset data acquisition is a separately
-reviewed effect after source acceptance/integration.
+    ADX20         Wilder ADX(14) >= 20
+    ADX25_RISING  Wilder ADX(14) >= 25 AND current ADX > prior ADX
 
-After the research campaign returns its deterministic shortlist, ChatGPT reviews
-cross-asset/regime robustness and issues a separate small PAPER_EVALUATION
-binding checkpoint. Only after that binding exists is a production P5 simulated
-paper smoke eligible.
+Its focused union passed 1,426 cases; FEATURE/PROSPECTIVE_DEVELOP admission
+passed with stable identity; GitHub run `41250779521` / attempt 1 passed
+source-static, active-tests and all seven FULL lanes. Develop integration run
+`41254635989` / attempt 1 passed with exact-feature certification reuse.
 
-## Corrective checkpoint — ARCH147_FILTERED_TREND_C1_ADX_CONTRACT
+The accepted research contract freezes:
 
-The published filtered-trend parent is preserved at
-`d1e9d881f99121f56d6d24639d0b594cd68b107a`, tree
-`af5592e93cffe484ee73471a4070ea4f722c564b`, direct parent
-`6bd95977a17e386bd756ae7bd7b2368ccf1c4e8f`; it was published once and GitHub
-run `41246258225` / attempt 1 was terminal-success. ChatGPT exact-source review
-found the MA_ADX semantic mismatch: implementation and required strategy test
-both incorrectly required rising ADX for the serialized `"20"` and `"25"`
-variants. No integration occurred. C1 corrects only the ADX20 threshold-only
-and ADX25_RISING threshold-plus-rising policy distinction. No real acquisition
-is authorized until C1 is accepted and integrated.
+    universe  SPY QQQ IWM EFA EEM TLT GLD PDBC
+    period    2016-01-01 through 2024-01-01 exclusive
+    basis     ALPACA_ALL_ADJUSTED_PRICE_V1
+    grid      30 exact configurations
+    regimes   2019, 2020, 2021, 2022, 2023 + continuous 2019-2023
+
+No filter stacking or post-result grid expansion is allowed. FINAL_HOLDOUT
+remains sealed. The campaign produces descriptive research only:
+`qualification_policy=null`, `paper_binding=null`, `live_eligible=false`.
+
+## Immediate next operation — reviewed real acquisition
+
+Perform exactly one real acquisition of the fixed eight-symbol adjusted dataset
+using the accepted integrated develop identity, the existing bounded Alpaca HTTPS
+transport and hidden ephemeral interactive research credentials.
+
+The operation must:
+
+- verify exact clean local `develop` and matching `origin/develop` before
+  prompting or networking;
+- use `adjustment=all`, SIP, USD, daily bars and the frozen 2016-2023 bounds;
+- contact only Alpaca market-data historical bars;
+- make no broker/trading/Robinhood/P5/FINAL_HOLDOUT call;
+- use a fresh create-only destination;
+- never print or persist credentials;
+- make no automatic retry or repair;
+- validate complete exact NYSE-session coverage for all eight symbols before
+  accepting the dataset.
+
+After acquisition succeeds, run the accepted offline
+`scripts/run_filtered_trend_research.py` exactly once against that dataset and
+a fresh report directory. Return dataset identity, campaign ID, bundle ID,
+top-10 shortlist and report paths to ChatGPT. Do not install a P5 strategy
+binding automatically.
 
 Also remove or update any tests and docs that referenced the old behavior.

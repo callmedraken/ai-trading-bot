@@ -13,6 +13,10 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication, QLabel
 
+from trading_bot.desktop_paper.configuration import (
+    PaperStrategyBinding,
+    create_paper_evaluation_config,
+)
 from trading_bot.desktop_paper.models import (
     PaperAccountState,
     PaperControlState,
@@ -218,6 +222,50 @@ def test_panel_shows_binding_provenance_and_incomplete_marks_truthfully(
         label.textFormat() is Qt.TextFormat.PlainText
         for label in panel.findChildren(QLabel)
     )
+
+
+def test_panel_displays_accepted_filtered_trend_binding_without_claims(
+    paper_config,
+) -> None:
+    _application()
+    binding = PaperStrategyBinding(
+        "FILTERED_TREND_BASE_MA",
+        "filtered-trend-base-ma/v1",
+        Symbol("SPY"),
+        (("fast", 35), ("slow", 50)),
+        uuid5(TEST_NAMESPACE, "accepted-campaign"),
+        uuid5(TEST_NAMESPACE, "accepted-bundle"),
+        uuid5(TEST_NAMESPACE, "accepted-candidate"),
+        "b" * 64,
+    )
+    config = create_paper_evaluation_config(binding, paper_config.policy)
+    snapshot = DesktopPaperSnapshot(
+        binding=binding,
+        state=Lifecycle.STOPPED,
+        activity="WAITING",
+        diagnostic="",
+        financial=_financial(config),
+        stale=False,
+    )
+    panel = DesktopPaperPanel(
+        FakePaperController(
+            snapshot, _status(Lifecycle.STOPPED, can_start=True, can_stop=False)
+        )
+    )
+
+    assert panel.selection_label.text() == (
+        "Paper strategy: FILTERED_TREND_BASE_MA filtered-trend-base-ma/v1 · SPY"
+    )
+    assert panel.findChild(QLabel, "desktopPaperFieldParameters").text() == (
+        "fast=35; slow=50"
+    )
+    assert panel.findChild(QLabel, "desktopPaperFieldPurpose").text() == (
+        "PAPER_EVALUATION"
+    )
+    assert panel.findChild(QLabel, "desktopPaperFieldQualificationPolicy").text() == (
+        "None"
+    )
+    assert panel.findChild(QLabel, "desktopPaperFieldLiveEligible").text() == ("False")
 
 
 def test_panel_displays_complete_latest_cycle_snapshot(paper_config) -> None:

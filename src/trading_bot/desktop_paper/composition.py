@@ -40,6 +40,7 @@ class DesktopPaperRuntime:
         self,
         config: PaperEvaluationConfig | None = None,
         *,
+        unavailable_diagnostic: str | None = None,
         evaluator: PaperStrategyEvaluator | None = None,
         source_factory: Callable[[], OpenReplayObservationSource] | None = None,
         database: Path = PAPER_DATABASE,
@@ -49,7 +50,13 @@ class DesktopPaperRuntime:
     ) -> None:
         self._lock = Lock()
         self._worker: DesktopPaperWorker | None = None
-        self._snapshot = DesktopPaperSnapshot()
+        self._snapshot = DesktopPaperSnapshot(
+            diagnostic=(
+                unavailable_diagnostic
+                if unavailable_diagnostic is not None
+                else "PAPER_EVALUATION_SELECTION_REQUIRED"
+            )
+        )
         self._control_pending = False
         self._supervisor: DesktopSupervisor | None = None
         self._store_factory: Callable[[], PaperEvaluationStore] | None = None

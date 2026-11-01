@@ -1,4 +1,4 @@
-"""No-selection production boundary and accepted supervisor reuse."""
+"""Paper binding production boundary and accepted supervisor reuse."""
 
 import importlib.util
 import json
@@ -65,12 +65,36 @@ def test_no_binding_is_unavailable_before_creating_any_state(tmp_path):
     assert list(tmp_path.iterdir()) == []
 
 
-def test_new_launcher_has_no_selected_strategy():
+def test_launcher_missing_bundle_keeps_no_selection_before_state(tmp_path):
     path = Path(__file__).resolve().parents[2] / "scripts/run_desktop_paper_bot.py"
     spec = importlib.util.spec_from_file_location("p5_launcher_test", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert module.build_runtime().snapshot().binding is None
+    runtime = module.build_runtime(tmp_path / "missing-bundle.json")
+    assert runtime.snapshot().binding is None
+    assert runtime.snapshot().diagnostic == "PAPER_EVALUATION_SELECTION_REQUIRED"
+    assert runtime.status().can_start is False
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_launcher_uses_explicit_binding_loader_without_starting_runtime(
+    monkeypatch, paper_config
+):
+    path = Path(__file__).resolve().parents[2] / "scripts/run_desktop_paper_bot.py"
+    spec = importlib.util.spec_from_file_location("p5_launcher_binding_test", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    monkeypatch.setattr(
+        module,
+        "load_accepted_paper_evaluation_config",
+        lambda ignored: paper_config,
+    )
+
+    runtime = module.build_runtime(Path("synthetic-bundle.json"))
+
+    assert runtime.snapshot().binding == paper_config.binding
+    assert runtime.snapshot().diagnostic == ""
+    assert runtime.snapshot().financial is None
 
 
 def test_production_import_graph_contains_no_transport_or_acquisition():

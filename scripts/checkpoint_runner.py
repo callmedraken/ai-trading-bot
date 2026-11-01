@@ -445,6 +445,8 @@ ARCH147_P5A_TESTS: Final = (
     "tests/desktop_paper/test_worker.py",
     "tests/desktop_paper/test_composition.py",
     "tests/desktop_paper/test_gui.py",
+    "tests/desktop_paper/test_evaluator.py",
+    "tests/desktop_paper/test_research_binding.py",
     "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
     "tests/experiments/test_historical_research_partial_state.py",
     "tests/risk/test_manager.py",

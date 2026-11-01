@@ -603,6 +603,8 @@ FULL_EXACT_MODULES = (
     "tests/desktop_paper/test_worker.py",
     "tests/desktop_paper/test_composition.py",
     "tests/desktop_paper/test_gui.py",
+    "tests/desktop_paper/test_evaluator.py",
+    "tests/desktop_paper/test_research_binding.py",
     "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
     "tests/cli/test_create_research_session_bundle.py",
     "tests/cli/test_historical_experiment.py",

@@ -477,10 +477,17 @@ PROSPECTIVE_DEVELOP admission before one push. Canonical FULL runs only on
 GitHub; the source handoff records its exact terminal run and candidate identity.
 No local FULL, production launch, provider, credential, broker or FINAL_HOLDOUT
 effect occurs. Implementation/focused verification stops before commit/push for
-ChatGPT's strategy/publication decision. No default production binding exists;
-the descriptive P3 55/100 candidate is not selection authority. Negative tests
-require `PAPER_EVALUATION_SELECTION_REQUIRED`, no state creation or trading, and
-truthful unavailable GUI values without a binding. Explicit synthetic bindings
-exercise multiple symbols/families as data without strategy selection authority.
-The next operation is filtered-trend/multi-asset research and explicit strategy
-selection; no production P5 smoke is ready.
+ChatGPT's strategy/publication decision. B1 installs one production binding
+only through the accepted external filtered-trend bundle. It proves the exact
+bundle/campaign/dataset/source identities, rank-1 `BASE_MA` 35/50 candidate,
+frozen universe ordinal 1 `SPY`, null qualification policy, false live
+eligibility, ten-entry shortlist, and bundle-byte SHA-256 provenance. Missing,
+malformed, stale, wrong-candidate, wrong-symbol, or otherwise mismatched input
+remains unavailable with bounded diagnostics and no financial state creation;
+the descriptive P3 55/100 candidate is never a fallback. The evaluator reuses
+the accepted BASE_MA primitive over completed bars only and returns intent to
+the existing RiskManager/OrderEngine path. GUI coverage shows the binding and
+does not claim qualification or live readiness. The checkpoint performs no P5
+launch, provider/credential/broker/Robinhood/holdout/live effect. The next
+milestone is one reviewed no-network P5 `PAPER_EVALUATION` smoke on
+`OPEN_REPLAY`, before P5B forward-paper data.

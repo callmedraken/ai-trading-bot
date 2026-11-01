@@ -4,7 +4,8 @@ Status: CURRENT product roadmap; P2/P3 real-run complete; P4 smoke complete; P5A
 
 The bounded [filtered-trend multi-asset research contract](147-filtered-trend-multi-asset-research.md)
 extends research only. Accepted P5A financial/runtime design and the sealed
-FINAL_HOLDOUT remain unchanged; no production strategy binding is selected.
+FINAL_HOLDOUT remain unchanged; the separate B1 checkpoint owns one explicit
+production strategy binding.
 
 ## Product contract
 
@@ -439,15 +440,16 @@ inert launcher. Production P5 state is separate:
 `F:\AI\desktop-bot-state\p5\lifecycle.jsonl`. No production file is created
 by source tests/admission/CI. The accepted P4 smoke is complete and not repeated.
 
-No production/default PAPER_EVALUATION candidate has been accepted. The P3
-55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` remains descriptive
-research evidence. Production composition without an explicit accepted binding
-reports `PAPER_EVALUATION_SELECTION_REQUIRED` before creating financial or
-lifecycle state. It never silently falls back to that candidate or another.
-The unavailable production view constructs no workers and reads no research
-bundle. An explicitly injected test composition retains the independent P4
-LocalResearchWorker with its idle queue; future accepted-binding installation
-will own provenance validation and the particular research job.
+The P3 55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` remains
+descriptive research evidence and is never a fallback. B1 installs exactly one
+`PAPER_EVALUATION` binding from the accepted filtered-trend bundle: rank-1
+shortlist candidate `BASE_MA` 35/50 and frozen universe ordinal 1 `SPY`.
+The loader reads and validates the external bundle bytes, derives their
+lowercase SHA-256 provenance digest, and fails closed before financial or
+lifecycle state when the bundle is missing, malformed, or mismatched. The
+unavailable production view remains the same when no accepted binding is
+available. An explicitly injected test composition retains the independent P4
+`LocalResearchWorker` with its idle queue.
 
 PaperStrategyBinding is immutable and typed: strategy_family, strategy_version,
 symbol, parameter_set, research_campaign_id, research_bundle_id,
@@ -529,6 +531,7 @@ idempotency. It does not recover unclean process death: stale lock or unresolved
 journal remains FAILED/attention, with no deletion, manufactured STOPPED or
 auto-repair. P5C owns the separately reviewed process-recovery adapter. Finish
 source implementation/focused verification and stop before commit/push for
-ChatGPT's strategy/publication decision. The next operation is filtered-trend/
-multi-asset research and explicit paper strategy selection; no production P5
-smoke is ready.
+ChatGPT's strategy/publication decision. B1 is source-only and does not launch
+P5 or contact a provider. The following milestone is one reviewed no-network
+P5 `PAPER_EVALUATION` smoke on `OPEN_REPLAY`; Robinhood read/review forward
+paper data remains a later P5B boundary.

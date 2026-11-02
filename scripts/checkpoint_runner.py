@@ -462,7 +462,30 @@ ARCH147_P5A_RUFF: Final = (
     "scripts/run_desktop_paper_bot.py",
     *ARCH147_P5A_TESTS,
 )
+ARCH147_P5B_NAME: Final = "arch147-p5b-robinhood-read-reconcile"
+ARCH147_P5B_BRANCH: Final = "feature/robinhood-p5b-read-reconcile-current"
+ARCH147_P5B_TESTS: Final = (
+    *ARCH147_P5A_TESTS,
+    "tests/desktop_paper/test_robinhood_read.py",
+    "tests/desktop_paper/test_robinhood_preflight.py",
+    "tests/desktop_paper/test_robinhood_gui.py",
+    "tests/robinhood_mcp/test_current_read_transport.py",
+    "tests/robinhood_mcp/test_sdk_transport.py",
+    "tests/robinhood_mcp/test_account_resolution.py",
+    "tests/robinhood_mcp/test_adapter.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p5b.py",
+    "tests/runtime/checkpoint_runner/test_arch131.py",
+    "tests/runtime/checkpoint_runner/test_source_authority.py",
+)
+ARCH147_P5B_RUFF: Final = (
+    *ARCH147_P5A_RUFF,
+    "src/trading_bot/robinhood_mcp/current_read_transport.py",
+    "src/trading_bot/gui/broker_read_panel.py",
+    "scripts/arch147_p5b_source.py",
+    *ARCH147_P5B_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH147_P5B_NAME,
     ARCH147_FILTERED_TREND_NAME,
     ARCH147_P5A_NAME,
     ARCH147_P4_NAME,
@@ -477,6 +500,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_P5B_NAME: "full",
     ARCH147_FILTERED_TREND_NAME: "full",
     ARCH147_P5A_NAME: "full",
     ARCH147_P4_NAME: "full",
@@ -26480,6 +26504,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_P4_BRANCH,
     )
+    values[ARCH147_P5B_NAME] = CheckpointSpec(
+        ARCH147_P5B_NAME,
+        "Current Robinhood read/account reconciliation; zero broker mutations",
+        ARCH147_P5B_TESTS,
+        ARCH147_P5B_RUFF,
+        _arch147_p5b_authority_check,
+        preflight=_arch147_p5b_preflight,
+        execute=None,
+        remote_branch=ARCH147_P5B_BRANCH,
+    )
     values[ARCH147_P5A_NAME] = CheckpointSpec(
         ARCH147_P5A_NAME,
         "Offline desktop simulated-paper evaluation cycle",
@@ -27042,6 +27076,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         return False
     translated = predecessor
     for name in (
+        ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
         ARCH147_P4_NAME,
@@ -27075,6 +27110,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     if _arch147_current_batch_workflow_is_reviewed(workflow):
         return True
     current_names = (
+        ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
         ARCH147_P4_NAME,
@@ -28059,6 +28095,7 @@ def _arch147_filtered_trend_authority_check(
     spec = specs.get(ARCH147_FILTERED_TREND_NAME)
     failures = []
     expected_route = (
+        ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
         ARCH147_P4_NAME,
@@ -28074,7 +28111,7 @@ def _arch147_filtered_trend_authority_check(
         or spec.execute is not None
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_FILTERED_TREND_NAME) != "full"
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4] != expected_route
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:5] != expected_route
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_FILTERED_TREND_NAME) != 1
         or resolve_ci_checkpoint(specs, ARCH147_FILTERED_TREND_BRANCH, "push")
         != ARCH147_FILTERED_TREND_NAME
@@ -28222,8 +28259,9 @@ def _arch147_p5a_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.execute is not None
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P5A_NAME) != "full"
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4]
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:5]
         != (
+            ARCH147_P5B_NAME,
             ARCH147_FILTERED_TREND_NAME,
             ARCH147_P5A_NAME,
             ARCH147_P4_NAME,
@@ -28255,9 +28293,17 @@ def _arch147_p5a_authority_check(repo_root: Path) -> tuple[str, ...]:
     for name in required_paper_modules:
         if not (package / name).is_file():
             failures.append("147 P5A source missing: " + name)
-    paths = tuple(package.glob("*.py")) + (
-        repo_root / "scripts/run_desktop_paper_bot.py",
-    )
+    # P5B successors have separate read-only authority; P5A remains offline.
+    paths = tuple(
+        path
+        for path in package.glob("*.py")
+        if path.name
+        not in {
+            "robinhood_read.py",
+            "robinhood_reconciliation.py",
+            "robinhood_preflight.py",
+        }
+    ) + (repo_root / "scripts/run_desktop_paper_bot.py",)
     forbidden = (
         "robinhood",
         "oauth",
@@ -28303,8 +28349,13 @@ def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P4_NAME) != "full"
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_P4_NAME) != 1
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:3]
-        != (ARCH147_FILTERED_TREND_NAME, ARCH147_P5A_NAME, ARCH147_P4_NAME)
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4]
+        != (
+            ARCH147_P5B_NAME,
+            ARCH147_FILTERED_TREND_NAME,
+            ARCH147_P5A_NAME,
+            ARCH147_P4_NAME,
+        )
         or resolve_ci_checkpoint(specs, ARCH147_P4_BRANCH, "push") != ARCH147_P4_NAME
     ):
         failures.append("147 P4 desktop supervisor source-only registration drift")
@@ -28779,6 +28830,33 @@ def _distributed_find_reusable_ci_certification(specs, **kwargs):
 
 
 find_reusable_ci_certification = _distributed_find_reusable_ci_certification
+
+
+def _arch147_p5b_authority_check(repo_root: Path) -> tuple[str, ...]:
+    from scripts.arch147_p5b_source import authority_failures
+
+    return authority_failures(repo_root)
+
+
+def _arch147_p5b_preflight() -> dict[str, object]:
+    from trading_bot.desktop_paper.robinhood_preflight import preflight
+
+    return preflight()
+
+
+def _arch147_p5b_preflight_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    if spec.name != ARCH147_P5B_NAME:
+        return _arch146_partial_state_preflight_checkpoint(
+            spec, repo_root=repo_root, evidence_root=evidence_root
+        )
+    from scripts.arch147_p5b_source import run_preflight
+
+    return run_preflight(spec, repo_root=repo_root, evidence_root=evidence_root)
+
+
+preflight_checkpoint = _arch147_p5b_preflight_checkpoint
 
 
 if __name__ == "__main__":

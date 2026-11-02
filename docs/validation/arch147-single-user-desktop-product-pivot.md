@@ -489,5 +489,7 @@ the accepted BASE_MA primitive over completed bars only and returns intent to
 the existing RiskManager/OrderEngine path. GUI coverage shows the binding and
 does not claim qualification or live readiness. The checkpoint performs no P5
 launch, provider/credential/broker/Robinhood/holdout/live effect. The next
-milestone is one reviewed no-network P5 `PAPER_EVALUATION` smoke on
-`OPEN_REPLAY`, before P5B forward-paper data.
+milestone was the reviewed no-network P5 `PAPER_EVALUATION` smoke on
+`OPEN_REPLAY`. Corrected B2 is now complete; the current successor is the
+separate [P5B-lite read/account/reconciliation source boundary](arch147-p5b-robinhood-read-reconciliation.md),
+with no order reviews, forward-paper fills or prolonged paper soak.

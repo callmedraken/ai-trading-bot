@@ -17,7 +17,8 @@ def test_p5a_source_only_current_route_and_explicit_full_ownership():
     spec = specs[runner.ARCH147_P5A_NAME]
     assert spec.remote_branch == runner.ARCH147_P5A_BRANCH
     assert spec.preflight is spec.execute is spec.remote_head_env is None
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:4] == (
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:5] == (
+        runner.ARCH147_P5B_NAME,
         runner.ARCH147_FILTERED_TREND_NAME,
         runner.ARCH147_P5A_NAME,
         runner.ARCH147_P4_NAME,
@@ -33,7 +34,13 @@ def test_p5a_source_only_current_route_and_explicit_full_ownership():
         for path in (ROOT / "tests/desktop_paper").glob("test_*.py")
     }
     assert new_tests <= set(certification.FULL_EXACT_MODULES)
-    assert new_tests <= set(spec.tests)
+    p5b = specs[runner.ARCH147_P5B_NAME]
+    assert new_tests <= set(p5b.tests)
+    assert new_tests - {
+        "tests/desktop_paper/test_robinhood_read.py",
+        "tests/desktop_paper/test_robinhood_preflight.py",
+        "tests/desktop_paper/test_robinhood_gui.py",
+    } <= set(spec.tests)
 
 
 def test_p5a_inventory_carries_current_route_regression_exactly_once():
@@ -41,7 +48,8 @@ def test_p5a_inventory_carries_current_route_regression_exactly_once():
     route_test = "tests/experiments/test_historical_research_partial_state.py"
 
     assert spec.tests.count(route_test) == 1
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:4] == (
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:5] == (
+        runner.ARCH147_P5B_NAME,
         runner.ARCH147_FILTERED_TREND_NAME,
         runner.ARCH147_P5A_NAME,
         runner.ARCH147_P4_NAME,

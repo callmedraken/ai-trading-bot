@@ -10,48 +10,32 @@ boundaries decide what may actually happen.
 
 ## Current status
 
-The active product line is the Robinhood review-paper path using the
-Architecture-133 supervised immutable-release productionization model.
+The current product is the Architecture-147 private single-user Windows
+desktop application, manually started/stopped and manually updated while
+stopped. Adjusted acquisition, filtered-trend research, the 35/50 SPY
+PAPER_EVALUATION binding and the no-network OPEN_REPLAY smoke are complete.
 
-Architecture 133-AF is FULL certified. Architecture **133-AG**, the reviewed
-protected immutable-release installation operator and read-only host preflight,
-is source-accepted on implementation HEAD
-141c5cb17d4183ee0f65a1b93c85d415ae2b8c14 / tree
-b1743eb5d954b34ff9bd14fdc7a7a105727b1bc7, with Checkpoint Source Gates
-#405 / 38043472442 successful.
+P5B-lite source adds a separate official Robinhood read/account/reconciliation
+baseline with zero order reviews, previews or mutations. Source is pending
+exact acceptance, terminal GitHub FULL and integration before one separately
+reviewed protected read-only preflight. No prolonged paper soak is planned.
+LIVE remains unavailable pending a separate explicitly armed restricted-live
+checkpoint. Historical Architecture-131 review-paper and Architecture-133
+release machinery retain their frozen semantics and are not current startup
+prerequisites.
 
-AG introduces the first reviewed production installation invocation surface but
-has not executed it. It derives all release policy internally, verifies the exact
-clean live branch, performs a read-only real-host readiness check, consumes a
-fixed no-retry durable attempt latch before entering the accepted one-shot AC
-installer, and grants no scheduler/provider/Paper-v2/wake/broker/live authority.
-
-The next gate is the real **read-only AG preflight** on this final documentation
-closeout source. If that host readiness check passes, the same exact source must
-receive one FULL current-product certification before the single protected
-installation attempt is authorized. In particular, AG does not provision the
-required protected F:\AITradingBot\releases parent and does not repair or clean
-conflicting FINAL/STAGING state.
-
-Production/live trading remains **NO-GO**. No immutable release has yet been
-installed through AG and no scheduler rebind/start, runtime wake, provider,
-Paper-v2, broker or live effect is authorized by source acceptance.
-
-See docs/PROJECT_STATUS.md and docs/AI_TRADING_BOT_HANDOFF.md for the canonical
-resume state and the Architecture-133 authority/validation documents for the
-active protected transition.
+See [project status](docs/PROJECT_STATUS.md), [current handoff](docs/AI_TRADING_BOT_HANDOFF.md)
+and the [P5B-lite contract](docs/architecture/147-p5b-robinhood-read-reconciliation.md).
 
 ## Product direction
 
 The long-term progression is:
 
-1. Complete the separately reviewed operational acceptance for unattended simulated-paper deployment while preserving fail-closed authority and reconciliation.
-2. Add broker-paper integration with real broker identifiers, submit/cancel/replace, partial fills, rejects, reconciliation, idempotency, and ambiguous-submit recovery.
-3. Complete a broker-paper soak and operational-hardening phase.
-4. Add explicit live-readiness controls, separate live credentials, account verification, kill switch, strict risk limits, outage/stale-data behavior, and startup reconciliation.
-5. Permit only a tiny restricted live deployment after all acceptance gates are satisfied.
-6. Deepen AI/strategy capabilities only after operational safety and reconciliation are trustworthy.
-7. Finish with a polished GUI for research, backtesting, account/portfolio views, paper/live operations, system health, recovery, audit history, settings, and safety controls.
+1. Complete P5B-lite source acceptance and one separately reviewed read-only broker baseline.
+2. Implement P6 as a separate source/effect checkpoint with explicit live arming, account verification, deterministic risk, reconciliation and hard tiny notional limits.
+3. Permit tiny restricted live only after all separate acceptance/effect gates pass.
+4. Mature monitoring, backup/recovery, restart, reconnect, credential rotation and long-running reliability.
+5. Deepen strategy capabilities and GUI presentation through the same reviewed risk and execution boundaries.
 
 The GUI is a presentation and operator-control layer. It must use the same
 reviewed application/service boundaries as CLI, automation, and tests and may

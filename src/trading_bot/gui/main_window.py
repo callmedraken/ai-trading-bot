@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from trading_bot.desktop_paper.presentation import DesktopPaperSnapshot
 from trading_bot.desktop_runtime import DesktopStatus, DesktopSupervisor
+from trading_bot.gui.broker_read_panel import RobinhoodReadPanel
 from trading_bot.gui.desktop_control import DesktopControl
 from trading_bot.gui.desktop_paper_panel import DesktopPaperPanel
 from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
@@ -241,6 +242,8 @@ class MainWindow(QMainWindow):
         )
         self._stack.addWidget(self._research_lifecycle_page)
         self._paper_page = PaperPage(paper_state, self)
+        self.robinhood_read_panel = RobinhoodReadPanel(self._paper_page)
+        self._paper_page.layout().insertWidget(0, self.robinhood_read_panel)
         if paper_controller is not None:
             self._desktop_paper_panel = DesktopPaperPanel(
                 paper_controller, self._paper_page

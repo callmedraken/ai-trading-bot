@@ -68,7 +68,7 @@ def historical_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
 
     failures = []
     outer = "_arch146_partial_state_preflight_checkpoint"
-    if runner.preflight_checkpoint is not getattr(runner, outer):
+    if runner.preflight_checkpoint is not runner._arch147_p5b_preflight_checkpoint:
         failures.append("current preflight outer dispatcher drift")
     tree = ast.parse(
         (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
@@ -192,10 +192,17 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
             failures.append("Architecture 147 must not dispatch host effects: " + name)
         if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(name) != 1:
             failures.append("Architecture 147 current route membership drift: " + name)
-    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_FILTERED_TREND_NAME:
-        failures.append(
-            "Architecture 147 filtered-trend is not the current first checkpoint"
-        )
+    p5b = specs.get(runner.ARCH147_P5B_NAME)
+    if (
+        p5b is None
+        or p5b.preflight is not runner._arch147_p5b_preflight
+        or p5b.execute is not None
+    ):
+        failures.append("Architecture 147 P5B read-only preflight registration drift")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH147_P5B_NAME) != 1:
+        failures.append("Architecture 147 P5B route membership drift")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P5B_NAME:
+        failures.append("Architecture 147 P5B is not the current first checkpoint")
     if any(
         name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
         for name in (
@@ -215,6 +222,7 @@ def current_authority_check(repo_root: Path) -> tuple[str, ...]:
 
     failures = list(ownership.ownership_failures(repo_root))
     failures.extend(current_preflight_dispatch_failures(repo_root))
+    failures.extend(runner._arch147_p5b_authority_check(repo_root))
     failures.extend(runner._arch147_filtered_trend_authority_check(repo_root))
     failures.extend(runner._arch147_p4_authority_check(repo_root))
     failures.extend(runner._arch147_p5a_authority_check(repo_root))

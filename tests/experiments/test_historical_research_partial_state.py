@@ -363,14 +363,15 @@ def test_arch146_historical_registration_and_security_are_preserved():
     assert predecessor.remote_branch == runner.ARCH146_PRE_B2_BRANCH
 
 
-def test_current_research_route_is_filtered_trend_then_p5a_with_p4_and_p3_preserved():
+def test_current_route_is_p5b_with_filtered_trend_p5a_p4_and_p3_preserved():
     specs = runner._checkpoint_specs()
     retired_branch = specs[runner.ARCH146_PARTIAL_STATE_NAME].remote_branch
     current = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
 
     assert runner.ARCH146_PARTIAL_STATE_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
     assert runner.resolve_ci_checkpoint(specs, retired_branch, "push") is None
-    assert current[:4] == (
+    assert current[:5] == (
+        runner.ARCH147_P5B_NAME,
         runner.ARCH147_FILTERED_TREND_NAME,
         runner.ARCH147_P5A_NAME,
         runner.ARCH147_P4_NAME,
@@ -737,10 +738,7 @@ def test_current_runner_rejects_retired_observer_before_host_observation(
 
 
 def test_retired_arch146_dispatcher_preserves_pre_b2_delegation(monkeypatch):
-    assert (
-        runner.preflight_checkpoint
-        is runner._arch146_partial_state_preflight_checkpoint
-    )
+    assert runner.preflight_checkpoint is runner._arch147_p5b_preflight_checkpoint
     assert runner._readonly_candidate_authority_check(ROOT) == ()
     spec = runner._checkpoint_specs()[runner.ARCH146_PRE_B2_NAME]
     calls = []

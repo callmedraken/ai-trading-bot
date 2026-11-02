@@ -1,6 +1,11 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; P2/P3 real-run complete; P4 smoke complete; P5A accepted/integrated; filtered-trend research source successor pending acceptance.
+Status: CURRENT product roadmap; real adjusted acquisition and filtered-trend campaign complete; P4 smoke complete; P5A/B1 accepted/integrated; B2 OPEN_REPLAY smoke complete; P5B-lite source pending acceptance.
+
+The [P5B-lite read/account/reconciliation contract](147-p5b-robinhood-read-reconciliation.md)
+owns the additive current Robinhood read boundary. Frozen Architecture 131
+transport/review semantics are preserved separately. No prolonged paper soak
+is planned; P6 remains a separate explicitly armed live source/effect boundary.
 
 The bounded [filtered-trend multi-asset research contract](147-filtered-trend-multi-asset-research.md)
 extends research only. Accepted P5A financial/runtime design and the sealed
@@ -45,7 +50,7 @@ review, order placement, paper effect, broker effect, or live effect.
     P2  one real SPY acquisition + verification + freeze
     P3  real optimizer / walk-forward campaign + Research Results GUI
     P4  long-running desktop supervisor with concurrent trading + research workers and GUI Start/Stop
-    P5  unattended synthetic/forward paper soak using existing Robinhood MCP review/quotes/history/account foundations
+    P5  accepted OPEN_REPLAY smoke followed by a separately reviewed read/account/reconciliation baseline; no prolonged soak
     P6  explicitly armed tiny restricted live through official Robinhood MCP / Agentic Trading
     P7  production maturity / soak / monitoring / backup / restart / reconnect / credential rotation
 
@@ -529,9 +534,10 @@ Lifecycle truth remains the accepted LifecycleJournal. P5A supports clean
 Start/Stop/reopen and SQLite financial crash consistency/commit-before-ack
 idempotency. It does not recover unclean process death: stale lock or unresolved
 journal remains FAILED/attention, with no deletion, manufactured STOPPED or
-auto-repair. P5C owns the separately reviewed process-recovery adapter. Finish
-source implementation/focused verification and stop before commit/push for
-ChatGPT's strategy/publication decision. B1 is source-only and does not launch
-P5 or contact a provider. The following milestone is one reviewed no-network
-P5 `PAPER_EVALUATION` smoke on `OPEN_REPLAY`; Robinhood read/review forward
-paper data remains a later P5B boundary.
+auto-repair. P5C owns the separately reviewed process-recovery adapter. B1's
+35/50 SPY binding is accepted/integrated and the corrected no-network B2
+`PAPER_EVALUATION` / `OPEN_REPLAY` smoke is complete. The current successor is
+P5B-lite read/account/reconciliation source, followed only after acceptance and
+integration by one separately reviewed read-only provider baseline. P5B-lite
+does not use historical order review or forward-paper fills. No prolonged paper
+soak is planned.

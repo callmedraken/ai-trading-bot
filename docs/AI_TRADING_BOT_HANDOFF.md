@@ -1,184 +1,67 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — Architecture 147 filtered-trend C2 accepted/integrated; real acquisition next
+## Current boundary — P5B-lite source only, no provider attempt
 
-Current accepted develop source before this coordination closeout:
+Implementation worktree:
+`F:\AI\worktrees\ai-trading-bot-p5b-read-reconcile-current`.
+Branch: `feature/robinhood-p5b-read-reconcile-current`.
+Direct parent must remain accepted develop:
 
-    HEAD bed872c660bb36384f057e5e9c556dbbb7609037
-    TREE 4fff6ac66c097608634d4e024f4cc0c6c29b7579
-    branch develop
+    HEAD 6924085675d9058b79324120faec9cb4025b6329
+    TREE e18653587334655c380dbc528510a364d58aaf19
 
-C2 exact source was first published on the bounded correction branch. Run
-`41284238424` / attempt 1 is preserved red because that unmapped branch used
-the generic four-shard FULL fallback; shard 2 completed verification but tripped
-the 300-second wall-time guard at 349.572 seconds. No rerun occurred.
+B1 is accepted/integrated. Feature CI `41366532747` and develop integration
+CI `41367640239` succeeded. Real adjusted acquisition and the frozen
+filtered-trend campaign are complete. Accepted binding:
 
-The exact same C2 commit was then fast-forwarded to the registered filtered-trend
-checkpoint branch. Canonical run `41342652706` / attempt 1 passed
-source-static, active-tests, broad-1 through broad-7 and source-gates. Generic
-full-tests and Robinhood certification were skipped. ChatGPT exact-source review
-accepted C2 and fast-forwarded develop to the exact C2 SHA. Develop integration
-run `41343862704` / attempt 1 passed source-static/source-gates with
-exact-feature certification reuse and no duplicate active/FULL execution.
+    FILTERED_TREND_BASE_MA / filtered-trend-base-ma/v1
+    SPY / fast=35 / slow=50 / PAPER_EVALUATION / live_eligible=False
+    campaign 48ae05d5-ede1-5461-9da9-b5d7744cefad
+    bundle 3b86c5e0-6053-53af-a499-d297265f3cd8
+    candidate 31397ce5-5dc7-5887-b29a-efc5075c5ebf
+    bundle SHA256 80ff955ce2544f0799d8c1fdc1f77f9c337ecf2b25d01731dda1add90ef392f7
 
-Filtered-trend corrective feature CI `41250779521` / attempt 1 passed
-source-static, active-tests and all seven canonical FULL lanes. ChatGPT
-exact-source review accepted the corrected feature chain and fast-forwarded
-develop to the exact C1 SHA. Develop CI `41254635989` / attempt 1 passed
-source-static/source-gates with exact-feature certification reuse; duplicate
-active/FULL execution was skipped.
+B2's first import attempt was a non-consuming STOP. Corrected B2:
+IMPORT_SOURCE_AUTHORITY=PASS; OPEN_REPLAY_SMOKE=PASS; first fill BUY 1 SPY at
+cursor 51; restart 51 -> 52; fill count 1 -> 1; no duplicate fill; network
+attempts 0; FINAL_HOLDOUT accesses 0; final runtime STOPPED. Production P5
+SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 
-P5A feature CI `41209242802` / attempt 1 passed source-static, active-tests and
-all seven canonical FULL lanes. ChatGPT exact-source review accepted the feature
-chain and fast-forwarded develop to the exact C1 SHA. Develop CI
-`41235406233` / attempt 1 passed source-static/source-gates with exact-feature
-certification reuse; duplicate active/FULL execution was skipped.
+## Next milestone — P5B-lite read baseline
 
-P4 source is accepted/integrated. Feature CI #816 / run `41175037719` /
-attempt 1 succeeded with canonical FULL. Develop CI #817 / run
-`41177055270` / attempt 1 succeeded using exact-feature certification reuse;
-no duplicate broad lane ran. Docs-only closeout CI #818 succeeded.
+Registered checkpoint: `arch147-p5b-robinhood-read-reconcile`.
+Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
+Verify/source authority is effect-free; preflight is the sole later provider
+entry; execute=None. Source publication is pending exact-source review and
+integration. Do not merge as part of implementation.
 
-The reviewed one-shot P4 production smoke is also complete and must not be
-repeated. It ran at the exact source above with no network or credentials:
+The successor transport exposes get_accounts, get_portfolio,
+get_equity_positions, get_equity_quotes and get_equity_orders only. Frozen
+Architecture 131 transport bytes and its historical four-tool allowlist remain
+unchanged. P5A's accepted external bundle, 35/50 SPY binding, OPEN_REPLAY,
+RiskManager/OrderEngine, controls and idempotency remain authoritative.
 
-    SMOKE_HEAD=545f21621c15c682f19d10df3a3d1ecf86f8a77c
-    SMOKE_TREE=07bb44a2975c44fd62e68a9cc8f3b9f99a0bbd8e
-    P4_GUI_EXIT=0
-    ARCH147_P4_NO_NETWORK_SMOKE=PASS
+After terminal feature green, ChatGPT owns exact-source review and
+fast-forward integration readiness. Only after accepted develop integration
+will ChatGPT issue the bounded protected command:
 
-Generation 1 visibly reached Application/Trading/Research RUNNING with
-Diagnostic NONE, transport NOT_CONNECTED and the accepted P3 identities:
+    .\ops.ps1 preflight arch147-p5b-robinhood-read-reconcile
 
-    campaign 11d55269-7e13-57aa-a3bf-1e20e486204b
-    bundle   b771cf92-a09f-5f18-86d3-e03b65e04fe9
+This is future readiness material, not authorization to run it now. The
+preflight requires exact clean source matching both feature and remote develop;
+creates fresh external attempt/evidence files; permits only necessary official
+OAuth/token-storage access, capability discovery, and the five reviewed read
+tools; has no retry loop; and requires unchanged production SQLite/lifecycle
+identities. Maximum review, preview, placement, cancel, broker mutation, P5
+financial-state mutation, FINAL_HOLDOUT access and Alpaca call counts are zero.
+Sanitized evidence contains only account SHA256 and bounded observation
+summaries/commitments. Raw account number, tokens and provider payloads are not
+persisted. See [contract](architecture/147-p5b-robinhood-read-reconciliation.md)
+and [validation](validation/arch147-p5b-robinhood-read-reconciliation.md).
 
-The durable shutdown chronology was:
-
-    sequence 5 STOP_REQUESTED
-    sequence 6 RESEARCH_STOPPED
-    sequence 7 TRADING_RECONCILED
-    sequence 8 TRADING_STOPPED
-    sequence 9 STOPPED
-
-Every record used generation 1 and diagnostic NONE. This proves the P4 contract:
-research closure precedes final STOPPED, trading reconciliation precedes trading
-closure, both workers close before durable STOPPED, and the launcher can exit 0.
-The journal is accepted evidence; do not delete, rewrite or manufacture a second
-smoke merely to refresh it.
-
-LIVE remains disabled. FINAL_HOLDOUT remains sealed. P4 grants no broker/order
-authority.
-
-## Accepted checkpoint — ARCH147_P5A_DESKTOP_SIMULATED_PAPER
-
-Checkpoint: `arch147-desktop-paper-cycle`.
-Feature branch: `feature/research-desktop-paper-cycle-current`.
-Canonical certification profile: `full`, GitHub-owned.
-`preflight=None`; `execute=None`.
-
-The original source commit
-`834a0eb638a75f00385144b8473152402bad31f5` / tree
-`071b222c8a1ee78d0e2e787659268c6cdf782098` remains preserved with CI
-`41198164554` / attempt 1 terminal red after broad-5 exposed a stale current
-route assertion. That is immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence.
-
-Corrective child `ARCH147_P5A_C1_PREPUBLICATION_COVERAGE` is accepted at
-`1b7dae71e2988f82074dd285d099bf3227944266` / tree
-`333514e7051cb07dcb6edc32fb82f4de9147d0d6`. Its focused gate passed 1,070
-cases; current/routed authority and FEATURE/PROSPECTIVE_DEVELOP admission passed
-with stable identity. Feature CI `41209242802` / attempt 1 passed all source,
-active and seven FULL lanes. Develop integration CI `41235406233` / attempt 1
-passed with exact-feature certification reuse.
-
-P5A provides the local SIMULATED_PAPER / PAPER_EVALUATION infrastructure:
-transactional SQLite financial state, deterministic effect identities, OPEN-only
-no-lookahead replay, existing RiskManager/OrderEngine/PaperLedger authority,
-durable kill/new-buy controls, clean Stop/reopen and cached GUI presentation.
-The strategy and symbol are immutable typed bindings rather than hard-coded
-55/100/SPY assumptions.
-
-No production/default PAPER_EVALUATION binding exists. The descriptive P3
-55/100 candidate `cc8b7b1d-c480-5fb9-9836-d7230ea2690d` remains historical
-research evidence only. Without an accepted binding, production reports
-`PAPER_EVALUATION_SELECTION_REQUIRED`, creates no P5 financial state and admits
-no trading. FINAL_HOLDOUT remains sealed and no live/broker authority exists.
-
-P5 uses
-`F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
-`F:\AI\desktop-bot-state\p5\lifecycle.jsonl` only after a real accepted
-binding is supplied and the runtime is explicitly launched. Neither was created
-during P5A source work. P4 state and its accepted smoke remain untouched.
-Unclean application-death recovery is intentionally deferred to P5C.
-
-## Accepted checkpoint — filtered-trend / multi-asset research
-
-Checkpoint: `arch147-filtered-trend-multi-asset-research`.
-Feature branch: `feature/research-filtered-trend-multi-asset-current`.
-Canonical certification: GitHub-owned FULL.
-
-The initial source commit
-`d1e9d881f99121f56d6d24639d0b594cd68b107a` / tree
-`af5592e93cffe484ee73471a4070ea4f722c564b` passed GitHub run
-`41246258225` / attempt 1. Exact-source review found one semantic defect:
-both ADX variants required rising ADX.
-
-Corrective child
-`3e99e8adc28e5f390edd9eb65bdbed80d1f100ca` / tree
-`133ba237812c0b0ade9352d440793697c1c79691` preserves the 30-candidate grid
-while implementing the frozen policies exactly:
-
-    ADX20         Wilder ADX(14) >= 20
-    ADX25_RISING  Wilder ADX(14) >= 25 AND current ADX > prior ADX
-
-Its focused union passed 1,426 cases; FEATURE/PROSPECTIVE_DEVELOP admission
-passed with stable identity; GitHub run `41250779521` / attempt 1 passed
-source-static, active-tests and all seven FULL lanes. Develop integration run
-`41254635989` / attempt 1 passed with exact-feature certification reuse.
-
-The accepted research contract freezes:
-
-    universe  SPY QQQ IWM EFA EEM TLT GLD PDBC
-    period    2016-01-01 through 2024-01-01 exclusive
-    basis     ALPACA_ALL_ADJUSTED_PRICE_V1
-    grid      30 exact configurations
-    regimes   2019, 2020, 2021, 2022, 2023 + continuous 2019-2023
-
-No filter stacking or post-result grid expansion is allowed. FINAL_HOLDOUT
-remains sealed. The campaign produces descriptive research only:
-`qualification_policy=null`, `paper_binding=null`, `live_eligible=false`.
-
-The filtered-trend source, ADX C1 and C2 provider-response compatibility
-correction are accepted and integrated. C2 exact source is
-`bed872c660bb36384f057e5e9c556dbbb7609037`, tree
-`4fff6ac66c097608634d4e024f4cc0c6c29b7579`. No real acquisition has
-started.
-
-## Immediate next operation — reviewed real acquisition
-
-Perform one real acquisition of the fixed eight-symbol adjusted dataset using
-the accepted coordination-closeout develop identity, the existing bounded
-Alpaca HTTPS transport and hidden ephemeral interactive research credentials.
-
-## Reviewed real acquisition boundary
-
-The operation must:
-
-- verify exact clean local `develop` and matching `origin/develop` before
-  prompting or networking;
-- use `adjustment=all`, SIP, USD, daily bars and the frozen 2016-2023 bounds;
-- contact only Alpaca market-data historical bars;
-- make no broker/trading/Robinhood/P5/FINAL_HOLDOUT call;
-- use a fresh create-only destination;
-- never print or persist credentials;
-- make no automatic retry or repair;
-- validate complete exact NYSE-session coverage for all eight symbols before
-  accepting the dataset.
-
-After acquisition succeeds, run the accepted offline
-`scripts/run_filtered_trend_research.py` exactly once against that dataset and
-a fresh report directory. Return dataset identity, campaign ID, bundle ID,
-top-10 shortlist and report paths to ChatGPT. Do not install a P5 strategy
-binding automatically.
-
-Also remove or update any tests and docs that referenced the old behavior.
+No OAuth, Credential Manager read, Robinhood MCP request, brokerage read,
+production launch or live effect is performed during this source checkpoint.
+After a successful separately reviewed read baseline, continue toward P6 tiny
+explicitly armed live through a separate source/effect checkpoint with hard
+notional limits; no prolonged paper soak is planned. LIVE remains unavailable
+until those separate gates are implemented and accepted.

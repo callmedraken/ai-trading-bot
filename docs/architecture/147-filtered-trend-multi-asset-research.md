@@ -1,7 +1,9 @@
 # Architecture 147 — Filtered-trend multi-asset research
 
-Status: ADX C1 source accepted/integrated; C2 provider-response compatibility
-correction pending.
+Status: source, ADX C1 and C2 accepted/integrated; real adjusted acquisition
+and the frozen campaign complete. B1 binding and corrected B2 OPEN_REPLAY
+smoke are complete; current next boundary is separately owned
+[P5B-lite read/account/reconciliation](147-p5b-robinhood-read-reconciliation.md).
 Checkpoint: `arch147-filtered-trend-multi-asset-research`.
 Branch: `feature/research-filtered-trend-multi-asset-current`.
 Canonical certification: GitHub-owned FULL; preflight=None; execute=None.

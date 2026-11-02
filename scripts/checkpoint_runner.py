@@ -491,6 +491,7 @@ ARCH147_P6_TESTS: Final = (
     "tests/desktop_live/test_configuration.py",
     "tests/desktop_live/test_strategy.py",
     "tests/desktop_live/test_models.py",
+    "tests/desktop_live/test_preflight.py",
     "tests/desktop_live/test_execution.py",
     "tests/robinhood_mcp/test_current_live_transport.py",
     "tests/gui/test_live_state.py",
@@ -27787,6 +27788,18 @@ def execute_checkpoint(
             "protected execution source is not the live remote branch head: "
             f"local={state_before['head']} "
             f"remote={remote_head} branch={remote_branch}"
+        )
+
+    if spec.name == ARCH147_P6_NAME:
+        from scripts.arch147_p6_tiny_live_source import (
+            require_protected_execution_source,
+        )
+
+        require_protected_execution_source(
+            spec,
+            repo_root=repo_root,
+            evidence_root=evidence_root,
+            state=state_before,
         )
 
     evidence_dir = evidence_root / spec.name / f"execute-{_stamp()}"

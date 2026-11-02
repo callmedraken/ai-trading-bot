@@ -44,11 +44,9 @@ from trading_bot.robinhood_mcp.current_live_transport import (
 )
 from trading_bot.robinhood_mcp.historical import RobinhoodDailyHistoryRequest
 
-P5B_EVIDENCE_PATH = (
+P5B_EVIDENCE_ROOT = (
     Path(r"F:\AI\temp\ai-trading-bot-checkpoints")
     / "arch147-p5b-robinhood-read-reconcile"
-    / "preflight-20261102T072935.789294Z"
-    / "report.json"
 )
 P5B_BASE_HEAD = "7ff86d06a99bcdf349d5e20846d139a554d8be46"
 P5B_BASE_TREE = "095c51cedc1c656616123c3acf88148b16b71aa2"
@@ -74,47 +72,71 @@ class P5BBaselineEvidence:
 
 
 def load_p5b_baseline_evidence(
-    path: Path = P5B_EVIDENCE_PATH,
+    evidence_root: Path = P5B_EVIDENCE_ROOT,
     *,
     expected_source_head: str,
     expected_source_tree: str,
 ) -> P5BBaselineEvidence:
-    """Load PASS evidence and retain only sanitized continuity material."""
+    """Load exactly one matching PASS report from the stable P5B root."""
     try:
-        body = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+        reports = sorted(evidence_root.glob("preflight-*/report.json"))
+    except (OSError, ValueError):
         raise LivePreflightError("P5B_EVIDENCE_UNAVAILABLE") from None
-    if not isinstance(body, dict) or body.get("status") != "PASS":
-        raise LivePreflightError("P5B_EVIDENCE_NOT_PASS")
-    if (
-        body.get("source_head") != expected_source_head
-        or body.get("source_tree") != expected_source_tree
-    ):
-        raise LivePreflightError("P5B_EVIDENCE_SOURCE_MISMATCH")
-    result = body.get("result")
-    if not isinstance(result, dict):
-        result = body
-    observation = result.get("observation")
-    if not isinstance(observation, dict):
-        raise LivePreflightError("P5B_EVIDENCE_OBSERVATION_MISSING")
-    fingerprint = observation.get("account_fingerprint")
-    if (
-        not isinstance(fingerprint, str)
-        or len(fingerprint) != 64
-        or any(c not in "0123456789abcdef" for c in fingerprint)
-    ):
-        raise LivePreflightError("P5B_EVIDENCE_ACCOUNT_FINGERPRINT_INVALID")
-    if (
-        observation.get("position_count") != 0
-        or observation.get("order_count") != 0
-        or observation.get("local_expected_broker_effect_count") != 0
-        or result.get("mutation_call_count", 0) != 0
-        or result.get("order_review_count", 0) != 0
-        or result.get("order_placement_count", 0) != 0
-        or result.get("order_cancel_count", 0) != 0
-        or result.get("production_state_unchanged") is False
-    ):
-        raise LivePreflightError("P5B_EVIDENCE_BASELINE_NOT_CLEAN")
+
+    matches: list[tuple[dict[str, object], dict[str, object], str]] = []
+    for path in reports:
+        try:
+            body = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError, RecursionError):
+            continue
+        if not isinstance(body, dict) or body.get("status") != "PASS":
+            continue
+        if (
+            body.get("source_head") != expected_source_head
+            or body.get("source_tree") != expected_source_tree
+        ):
+            continue
+        result = body.get("result")
+        if not isinstance(result, dict):
+            result = body
+        observation = result.get("observation")
+        if not isinstance(observation, dict):
+            continue
+        if any(
+            result.get(field) != 0
+            for field in (
+                "mutation_call_count",
+                "order_review_count",
+                "order_preview_count",
+                "order_placement_count",
+                "order_cancel_count",
+                "p5_financial_state_mutation_count",
+            )
+        ):
+            continue
+        if result.get("production_state_unchanged") is not True:
+            continue
+        if any(
+            observation.get(field) != 0
+            for field in (
+                "position_count",
+                "order_count",
+                "local_expected_broker_effect_count",
+            )
+        ):
+            continue
+        fingerprint = observation.get("account_fingerprint")
+        if (
+            not isinstance(fingerprint, str)
+            or len(fingerprint) != 64
+            or any(c not in "0123456789abcdef" for c in fingerprint)
+        ):
+            continue
+        matches.append((body, observation, fingerprint))
+
+    if len(matches) != 1:
+        raise LivePreflightError("P5B_EVIDENCE_MATCH_COUNT")
+    _, observation, fingerprint = matches[0]
     return P5BBaselineEvidence(
         expected_source_head,
         expected_source_tree,

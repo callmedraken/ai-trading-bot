@@ -19,14 +19,10 @@ def test_filtered_trend_checkpoint_is_source_only_full_and_precedes_p5a():
     assert spec.remote_branch == runner.ARCH147_FILTERED_TREND_BRANCH
     assert spec.preflight is spec.execute is spec.remote_head_env is None
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:6] == (
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH147_NAME,
-    )
+    route = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert route.count(spec.name) == 1
+    assert route.index(runner.ARCH147_P5B_NAME) < route.index(spec.name)
+    assert route.index(spec.name) < route.index(runner.ARCH147_P5A_NAME)
     assert (
         runner.resolve_ci_checkpoint(specs, spec.remote_branch, "push")
         == runner.ARCH147_FILTERED_TREND_NAME

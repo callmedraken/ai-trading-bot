@@ -2,8 +2,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 
+import pytest
+
 from trading_bot.desktop_live.configuration import TinyLivePolicy
-from trading_bot.desktop_live.execution import LiveStateStore, execute_plan
+from trading_bot.desktop_live.execution import (
+    LIVE_ARM_VALUE,
+    LiveStateStore,
+    execute_plan,
+)
 from trading_bot.desktop_live.models import (
     LiveExecutionPlan,
     LivePlanState,
@@ -99,7 +105,7 @@ def test_disarmed_plan_stops_before_any_mutation(tmp_path, monkeypatch):
     result = execute_plan(
         _plan(),
         transport=transport,
-        now=datetime(2026, 11, 2, 14, 1, tzinfo=UTC),
+        now=datetime(2026, 11, 2, 14, 31, tzinfo=UTC),
         state_store=LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl"),
         source_head="a" * 40,
         source_tree="b" * 40,
@@ -108,3 +114,71 @@ def test_disarmed_plan_stops_before_any_mutation(tmp_path, monkeypatch):
     )
     assert result.reason == "LIVE_DISARMED"
     assert transport.placed == 0
+
+
+@pytest.mark.parametrize(
+    "provider_state",
+    ["partially_filled", "partially-filled", "pending", "open"],
+)
+def test_nonterminal_post_trade_state_is_consumed_and_never_reconciled(
+    tmp_path, monkeypatch, provider_state
+):
+    transport = _FakeTransport()
+    observations = 0
+
+    def observe(*args, **kwargs):
+        nonlocal observations
+        observations += 1
+        if observations == 1:
+            return SimpleNamespace(
+                account_fingerprint="d" * 64,
+                positions=(),
+                orders=(),
+            )
+        return SimpleNamespace(
+            account_fingerprint="d" * 64,
+            positions=(SimpleNamespace(symbol="SPY", quantity=Decimal("0.001")),),
+            orders=(
+                SimpleNamespace(
+                    order_id="provider-order-1",
+                    cumulative_quantity=Decimal("0.001"),
+                    state=provider_state,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(
+        "trading_bot.desktop_live.execution.observe_robinhood_baseline", observe
+    )
+    store = LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl")
+    plan = _plan()
+    result = execute_plan(
+        plan,
+        transport=transport,
+        now=datetime(2026, 11, 2, 14, 31, tzinfo=UTC),
+        state_store=store,
+        source_head="a" * 40,
+        source_tree="b" * 40,
+        arm_token=LIVE_ARM_VALUE,
+        plan_digest=plan.plan_sha256,
+    )
+
+    assert result.status == "STOPPED"
+    assert result.receipt is None
+    assert result.reason == "POST_TRADE_RECONCILIATION_BLOCKED"
+    assert store.marker.is_file()
+    assert transport.placed == 1
+
+    retry = execute_plan(
+        plan,
+        transport=transport,
+        now=datetime(2026, 11, 2, 14, 31, tzinfo=UTC),
+        state_store=store,
+        source_head="a" * 40,
+        source_tree="b" * 40,
+        arm_token=LIVE_ARM_VALUE,
+        plan_digest=plan.plan_sha256,
+    )
+
+    assert retry.reason == "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY"
+    assert transport.placed == 1

@@ -194,12 +194,12 @@ def execute_plan(
     quantity = order.cumulative_quantity
     position_quantity = _spy_quantity(post)
     state = order.state.casefold()
-    if state in {"filled", "partially_filled", "partially-filled"}:
+    if state == "filled":
         if position_quantity <= 0 or quantity <= 0:
             return ExecutionResult(
                 "STOPPED", None, "POST_TRADE_POSITION_MISMATCH", 1, 0
             )
-        status = "FILLED" if state == "filled" else "PARTIALLY_FILLED"
+        status = "FILLED"
         disposition = LiveMutationDisposition.RECONCILED
     elif state in {"rejected", "canceled", "cancelled"} and position_quantity == 0:
         status = state.upper()

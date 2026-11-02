@@ -152,6 +152,60 @@ def authority_failures(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _runner_callable_matches(
+    value: object, expected_name: str, repo_root: Path
+) -> bool:
+    code = getattr(value, "__code__", None)
+    return bool(
+        callable(value)
+        and getattr(value, "__name__", None) == expected_name
+        and code is not None
+        and Path(code.co_filename).resolve()
+        == (repo_root / "scripts/checkpoint_runner.py").resolve()
+    )
+
+
+def _same_p6_registration(spec: object, canonical: object, repo_root: Path) -> bool:
+    """Match P6 registration semantics without relying on module identity."""
+    from scripts import checkpoint_runner as runner
+
+    try:
+        if any(
+            getattr(spec, field) != getattr(canonical, field)
+            for field in (
+                "name",
+                "description",
+                "tests",
+                "ruff_paths",
+                "remote_branch",
+                "remote_head_env",
+            )
+        ):
+            return False
+        return (
+            _runner_callable_matches(
+                spec.authority_check,
+                "_arch147_p6_authority_check",
+                repo_root,
+            )
+            and _runner_callable_matches(
+                spec.preflight,
+                "_arch147_p6_preflight",
+                repo_root,
+            )
+            and _runner_callable_matches(
+                spec.execute,
+                "_arch147_p6_execute",
+                repo_root,
+            )
+            and canonical.authority_check is runner._arch147_p6_authority_check
+            and canonical.preflight is runner._arch147_p6_preflight
+            and canonical.execute is runner._arch147_p6_execute
+        )
+    except AttributeError:
+        return False
+
+
 def _external_evidence_root(repo_root: Path, evidence_root: Path) -> None:
     if (
         not evidence_root.is_absolute()
@@ -173,17 +227,21 @@ def _external_evidence_root(repo_root: Path, evidence_root: Path) -> None:
             raise RuntimeError("P6 evidence alias rejected")
 
 
-def run_preflight(
-    spec: object, *, repo_root: Path, evidence_root: Path
-) -> tuple[bool, Path | None]:
-    """Run the reviewed P6 preflight only when explicitly requested."""
-
+def _require_p6_source_admission(
+    spec: object,
+    *,
+    repo_root: Path,
+    before: dict[str, object],
+    evidence_root: Path | None = None,
+) -> None:
+    """Require one clean, integrated, current-authority source before an attempt."""
     from scripts import checkpoint_runner as runner
 
     canonical = runner._checkpoint_specs()[runner.ARCH147_P6_NAME]
-    if spec != canonical or authority_failures(repo_root):
+    if not _same_p6_registration(spec, canonical, repo_root) or authority_failures(
+        repo_root
+    ):
         raise RuntimeError("P6 source registration rejected")
-    before = runner._git_state(repo_root)
     if before["porcelain"] or before["branch"] not in (
         "develop",
         runner.ARCH147_P6_BRANCH,
@@ -194,12 +252,55 @@ def run_preflight(
         "https://github.com/callmedraken/ai-trading-bot.git"
     ):
         raise RuntimeError("P6 origin rejected")
-    if (
-        runner._remote_branch_head(repo_root, runner.ARCH147_P6_BRANCH)
-        != before["head"]
-    ):
-        raise RuntimeError("P6 feature source is not the remote head")
-    _external_evidence_root(repo_root, evidence_root)
+    feature = runner._remote_branch_head(repo_root, runner.ARCH147_P6_BRANCH)
+    develop = runner._remote_branch_head(repo_root, "develop")
+    if feature != before["head"] or develop != before["head"]:
+        raise RuntimeError("P6 accepted develop integration required")
+    from scripts.current_source_authority import (
+        PublicationContext,
+        evaluate_source_authority,
+    )
+
+    authority = evaluate_source_authority(
+        candidate_source=repo_root,
+        publication_context=PublicationContext.PROSPECTIVE_DEVELOP,
+    )
+    if not authority.passed:
+        raise RuntimeError("P6 integrated source authority rejected")
+    if evidence_root is not None:
+        _external_evidence_root(repo_root, evidence_root)
+
+
+def require_protected_execution_source(
+    spec: object,
+    *,
+    repo_root: Path,
+    evidence_root: Path,
+    state: dict[str, object],
+) -> None:
+    """Apply P6 source admission immediately before the runner attempt marker."""
+    _require_p6_source_admission(
+        spec,
+        repo_root=repo_root,
+        before=state,
+        evidence_root=evidence_root,
+    )
+
+
+def run_preflight(
+    spec: object, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    """Run the reviewed P6 preflight only when explicitly requested."""
+
+    from scripts import checkpoint_runner as runner
+
+    before = runner._git_state(repo_root)
+    _require_p6_source_admission(
+        spec,
+        repo_root=repo_root,
+        before=before,
+        evidence_root=evidence_root,
+    )
     directory = evidence_root / spec.name / ("preflight-" + runner._stamp())
     directory.mkdir(parents=True, exist_ok=False)
     with (directory / "attempt.json").open("x", encoding="utf-8") as stream:

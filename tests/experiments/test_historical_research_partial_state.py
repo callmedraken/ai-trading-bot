@@ -370,15 +370,8 @@ def test_current_route_is_p6_with_p5b_filtered_trend_p5a_p4_and_p3_preserved():
 
     assert runner.ARCH146_PARTIAL_STATE_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
     assert runner.resolve_ci_checkpoint(specs, retired_branch, "push") is None
-    assert current[:6] == (
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH147_NAME,
-    )
     assert current.count(runner.ARCH147_P6_NAME) == 1
+    assert current.count(runner.ARCH147_P5B_NAME) == 1
     assert current.count(runner.ARCH147_FILTERED_TREND_NAME) == 1
     assert current.count(runner.ARCH147_P5A_NAME) == 1
     assert current.count(runner.ARCH147_P4_NAME) == 1

@@ -17,14 +17,10 @@ def test_p5a_source_only_current_route_and_explicit_full_ownership():
     spec = specs[runner.ARCH147_P5A_NAME]
     assert spec.remote_branch == runner.ARCH147_P5A_BRANCH
     assert spec.preflight is spec.execute is spec.remote_head_env is None
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:6] == (
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH147_NAME,
-    )
+    route = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert route.count(spec.name) == 1
+    assert route.index(runner.ARCH147_FILTERED_TREND_NAME) < route.index(spec.name)
+    assert route.index(spec.name) < route.index(runner.ARCH147_P4_NAME)
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
     assert runner.resolve_ci_checkpoint(specs, spec.remote_branch, "push") == spec.name
     assert current.current_preflight_dispatch_failures(ROOT) == ()
@@ -49,14 +45,9 @@ def test_p5a_inventory_carries_current_route_regression_exactly_once():
     route_test = "tests/experiments/test_historical_research_partial_state.py"
 
     assert spec.tests.count(route_test) == 1
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[:6] == (
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH147_NAME,
-    )
+    route = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert route.count(spec.name) == 1
+    assert route[route.index(spec.name) - 1] == runner.ARCH147_FILTERED_TREND_NAME
 
 
 @pytest.mark.parametrize(

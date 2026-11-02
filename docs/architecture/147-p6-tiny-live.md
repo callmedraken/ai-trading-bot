@@ -29,20 +29,30 @@ There is no generic public tool dispatcher. The mutation methods are explicit
 `review_equity_order`, `place_equity_order`, and `cancel_equity_order`, and the
 cancel path accepts only one exact owned order identifier.
 
-Preflight loads the external accepted P5B report, resolves the canonical
-Agentic account, compares the runtime fingerprint, confirms zero positions and
-working orders, acquires at least 60 completed raw regular daily bars through
-the strict Robinhood history parser, composes the existing `RiskManager`, and
-returns a sanitized immutable plan. Preflight never places or cancels.
+Preflight admits only a clean source whose remote P6 feature branch and remote
+`develop` both equal the local HEAD, and whose prospective-develop/current
+source authority passes. Those guards run before the external attempt
+directory is created. It then discovers exactly one matching PASS report under
+the stable external P5B checkpoint root, requiring the accepted P5B HEAD/tree,
+zero mutation/review/place/cancel effects and unchanged production state. It
+resolves the canonical Agentic account, compares the runtime fingerprint,
+confirms zero positions and working orders, acquires at least 60 completed raw
+regular daily bars through the strict Robinhood history parser, composes the
+existing `RiskManager`, and returns a sanitized immutable plan. Preflight never
+places or cancels.
 
 Execution is disarmed by default and requires both the reviewed arm token
 `AI_TRADING_BOT_P6_LIVE_ARM=LIVE_SPY_MAX_10_USD` and the exact plan SHA256 in
 `AI_TRADING_BOT_P6_PLAN_SHA256`. It repeats account, broker-state, review and
-source/session drift checks, creates a durable attempt marker before place,
-places at most once, and classifies an exception as `MAY_HAVE_OCCURRED` with no
-automatic retry. Post-trade history and position reconciliation is finite and
-sanitized. The first successful fill disables additional buys by default; the
-kill path may cancel only the exact owned open order and never liquidates a
+source/session drift checks. The protected runner repeats the integrated
+feature/develop source admission before creating its execution attempt, so a
+feature-only source cannot run P6. It creates a durable attempt marker before
+place, places at most once, and classifies an exception as `MAY_HAVE_OCCURRED`
+with no automatic retry. Post-trade history and position reconciliation is
+finite and sanitized: only terminal broker states reconcile successfully;
+partial, pending, open or other working states remain stopped with the consumed
+attempt marker. The first successful fill disables additional buys by default;
+the kill path may cancel only the exact owned open order and never liquidates a
 fill.
 
 The GUI is presentation-only. It may display sanitized cached plan/state facts,

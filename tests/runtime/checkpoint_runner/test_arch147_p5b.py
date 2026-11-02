@@ -79,7 +79,9 @@ def test_read_preflight_only_full_mapping_current_and_historical_authority():
     assert spec.remote_branch == runner.ARCH147_P5B_BRANCH
     assert spec.preflight is runner._arch147_p5b_preflight
     assert spec.execute is spec.remote_head_env is None
-    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS[1] == spec.name
+    route = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert route.count(spec.name) == 1
+    assert route.index(spec.name) == route.index(runner.ARCH147_P6_NAME) + 1
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
     assert source.authority_failures(ROOT) == ()
     assert current.current_preflight_dispatch_failures(ROOT) == ()

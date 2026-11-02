@@ -68,7 +68,8 @@ def historical_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
 
     failures = []
     outer = "_arch146_partial_state_preflight_checkpoint"
-    if runner.preflight_checkpoint is not runner._arch147_p5b_preflight_checkpoint:
+    current_outer = "_arch147_p6_preflight_checkpoint"
+    if runner.preflight_checkpoint is not runner._arch147_p6_preflight_checkpoint:
         failures.append("current preflight outer dispatcher drift")
     tree = ast.parse(
         (repo_root / "scripts/checkpoint_runner.py").read_text(encoding="utf-8")
@@ -91,8 +92,23 @@ def historical_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
         "\n    return _PRE_READONLY_PREFLIGHT("
         "spec, repo_root=repo_root, evidence_root=evidence_root)"
     ).body[0]
+    expected_current_outer = ast.parse(
+        "def _arch147_p6_preflight_checkpoint("
+        "spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path"
+        ") -> tuple[bool, Path | None]:"
+        "\n    if spec.name != ARCH147_P6_NAME:"
+        "\n        return _arch147_p5b_preflight_checkpoint("
+        "spec, repo_root=repo_root, evidence_root=evidence_root)"
+        "\n    from scripts.arch147_p6_tiny_live_source import run_preflight"
+        "\n    return run_preflight("
+        "spec, repo_root=repo_root, evidence_root=evidence_root)"
+    ).body[0]
     if outer not in functions or ast.dump(functions[outer]) != ast.dump(expected_outer):
         failures.append("current preflight observer routing drift")
+    if current_outer not in functions or ast.dump(functions[current_outer]) != ast.dump(
+        expected_current_outer
+    ):
+        failures.append("current preflight outer dispatcher drift")
     for name, checkpoint, delegate in (
         (
             "_arch134_readonly_diagnostic_r3_preflight_checkpoint",
@@ -179,6 +195,17 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
     del repo_root
     specs = runner._checkpoint_specs()
     failures = []
+    p6 = specs.get(runner.ARCH147_P6_NAME)
+    if (
+        p6 is None
+        or p6.preflight is not runner._arch147_p6_preflight
+        or p6.execute is not runner._arch147_p6_execute
+    ):
+        failures.append("Architecture 147 P6 live registration drift")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH147_P6_NAME) != 1:
+        failures.append("Architecture 147 P6 route membership drift")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P6_NAME:
+        failures.append("Architecture 147 P6 is not the current first checkpoint")
     for name in (
         runner.ARCH147_FILTERED_TREND_NAME,
         runner.ARCH147_P5A_NAME,
@@ -201,8 +228,8 @@ def current_preflight_dispatch_failures(repo_root: Path) -> tuple[str, ...]:
         failures.append("Architecture 147 P5B read-only preflight registration drift")
     if runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH147_P5B_NAME) != 1:
         failures.append("Architecture 147 P5B route membership drift")
-    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P5B_NAME:
-        failures.append("Architecture 147 P5B is not the current first checkpoint")
+    if runner.CURRENT_ACTIVE_CI_CHECKPOINTS[1] != runner.ARCH147_P5B_NAME:
+        failures.append("Architecture 147 P5B is not the current second checkpoint")
     if any(
         name in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
         for name in (
@@ -222,6 +249,7 @@ def current_authority_check(repo_root: Path) -> tuple[str, ...]:
 
     failures = list(ownership.ownership_failures(repo_root))
     failures.extend(current_preflight_dispatch_failures(repo_root))
+    failures.extend(runner._arch147_p6_authority_check(repo_root))
     failures.extend(runner._arch147_p5b_authority_check(repo_root))
     failures.extend(runner._arch147_filtered_trend_authority_check(repo_root))
     failures.extend(runner._arch147_p4_authority_check(repo_root))

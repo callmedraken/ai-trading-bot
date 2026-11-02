@@ -97,7 +97,7 @@ def test_historical_preflight_predecessor_authority_owns_only_its_security(
     authority = getattr(
         runner, f"_arch134_readonly_diagnostic_{revision}_authority_check"
     )
-    assert runner.preflight_checkpoint is runner._arch147_p5b_preflight_checkpoint
+    assert runner.preflight_checkpoint is runner._arch147_p6_preflight_checkpoint
     assert authority(ROOT) == ()
     # The predecessor does not own any later outer alias, even a rejected one.
     monkeypatch.setattr(runner, "preflight_checkpoint", lambda *args, **kwargs: None)

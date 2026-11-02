@@ -1,23 +1,23 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — P5B-lite C2 source correction, no provider attempt
+## Current boundary — P6 tiny-live source, no provider attempt
 
-P5B source was accepted and integrated at `c820f09edb68c85ff16eb77034ab4e3c15365b3e`;
-develop integration run `41389597879` succeeded. The first protected
-invocation stopped before attempt creation. Source authority and Git identity
-were clean; the defect was duplicate Python module identity under `python -m`
-(`__main__` versus `scripts.checkpoint_runner`). The corrective checkpoint
-changes only semantic registration comparison. Provider/read implementation is
-unchanged, no credential/provider/broker/live effect occurred, and the
-protected provider attempt remains unused.
+Accepted P5B baseline source:
+
+    HEAD 7ff86d06a99bcdf349d5e20846d139a554d8be46
+    TREE 095c51cedc1c656616123c3acf88148b16b71aa2
+
+P5B protected evidence is PASS and read-only: the live Agentic account
+resolver, SPY quote, portfolio, position and order schemas worked; position
+and order baselines were zero; mutation/review/place/cancel counts were zero;
+and production state stayed unchanged. The external P5B report supplies the
+account fingerprint at runtime; it is not present in source or docs.
 
 Implementation worktree:
-`F:\AI\worktrees\ai-trading-bot-p5b-read-reconcile-current`.
-Branch: `feature/robinhood-p5b-read-reconcile-current`.
-Direct parent must remain accepted develop:
-
-    HEAD 6924085675d9058b79324120faec9cb4025b6329
-    TREE e18653587334655c380dbc528510a364d58aaf19
+`F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`.
+Branch: `feature/robinhood-p6-tiny-live-current`.
+Direct parent is the accepted develop source above. The implementation is
+source-only and has made no OAuth, provider, broker, order or live-state call.
 
 B1 is accepted/integrated. Feature CI `41366532747` and develop integration
 CI `41367640239` succeeded. Real adjusted acquisition and the frozen
@@ -36,41 +36,27 @@ cursor 51; restart 51 -> 52; fill count 1 -> 1; no duplicate fill; network
 attempts 0; FINAL_HOLDOUT accesses 0; final runtime STOPPED. Production P5
 SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 
-## Next milestone — P5B-lite read baseline
+## Next milestone — P6 tiny-live publication
 
-Registered checkpoint: `arch147-p5b-robinhood-read-reconcile`.
+Registered checkpoint: `arch147-p6-tiny-live`.
 Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
-Verify/source authority is effect-free; preflight is the sole later provider
-entry; execute=None. Corrective source publication is pending exact-source
-review and integration reuse. Do not merge as part of implementation.
+Verify/source authority is effect-free; the registered preflight and execute
+functions are not run during this implementation checkpoint. The current live
+surface is separate from P5B and exposes only explicit reads, review, place and
+cancel methods after advertised-schema discovery. It requires dollar orders;
+there is no share-quantity fallback, generic public dispatch, option/crypto
+surface or GUI placement button.
 
-The successor transport exposes get_accounts, get_portfolio,
-get_equity_positions, get_equity_quotes and get_equity_orders only. Frozen
-Architecture 131 transport bytes and its historical four-tool allowlist remain
-unchanged. P5A's accepted external bundle, 35/50 SPY binding, OPEN_REPLAY,
-RiskManager/OrderEngine, controls and idempotency remain authoritative.
+The P6 policy is SPY-only, accepted FILTERED_TREND_BASE_MA 35/50, long equities
+only, maximum $10 per order and $10 gross exposure, one working order, and
+regular-hours GFD market orders. Plans are immutable and sanitized; raw account
+numbers remain in memory only. Execution is disarmed unless both reviewed
+environment interlocks match the exact plan digest. A failed placement is
+`MAY_HAVE_OCCURRED` with no retry, and the first fill disables further buys by
+default. See [contract](architecture/147-p6-tiny-live.md) and
+[validation](validation/arch147-p6-tiny-live.md).
 
 After terminal feature green, ChatGPT owns exact-source review and
-fast-forward integration readiness. Only after accepted develop integration
-will ChatGPT issue the bounded protected command:
-
-    .\ops.ps1 preflight arch147-p5b-robinhood-read-reconcile
-
-This is future readiness material, not authorization to run it now. The
-preflight requires exact clean source matching both feature and remote develop;
-creates fresh external attempt/evidence files; permits only necessary official
-OAuth/token-storage access, capability discovery, and the five reviewed read
-tools; has no retry loop; and requires unchanged production SQLite/lifecycle
-identities. Maximum review, preview, placement, cancel, broker mutation, P5
-financial-state mutation, FINAL_HOLDOUT access and Alpaca call counts are zero.
-Sanitized evidence contains only account SHA256 and bounded observation
-summaries/commitments. Raw account number, tokens and provider payloads are not
-persisted. See [contract](architecture/147-p5b-robinhood-read-reconciliation.md)
-and [validation](validation/arch147-p5b-robinhood-read-reconciliation.md).
-
-No OAuth, Credential Manager read, Robinhood MCP request, brokerage read,
-production launch or live effect is performed during this source checkpoint.
-After a successful separately reviewed read baseline, continue toward P6 tiny
-explicitly armed live through a separate source/effect checkpoint with hard
-notional limits; no prolonged paper soak is planned. LIVE remains unavailable
-until those separate gates are implemented and accepted.
+fast-forward integration readiness. Only after that review may a later
+operator run the separately bounded P6 preflight; a source PASS grants no live
+authority.

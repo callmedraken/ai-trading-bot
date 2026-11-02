@@ -1,49 +1,40 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P5B-lite C2 source correction
+## Current checkpoint — Architecture 147 P6 tiny-live source checkpoint
 
-P5B source was accepted and integrated at `c820f09edb68c85ff16eb77034ab4e3c15365b3e`;
-develop integration run `41389597879` succeeded. The first protected invocation
-stopped before attempt creation because `python -m` loaded the runner as both
-`__main__` and `scripts.checkpoint_runner`, causing a CLI module-identity
-registration mismatch. Normal source authority and Git identities were clean.
-The C2 correction changes only registration comparison; provider/read
-implementation remains unchanged. No credential, provider, broker or live
-effect occurred, and the protected provider attempt remains unused.
+The accepted P5B Robinhood read/reconciliation baseline is the exact source
+`7ff86d06a99bcdf349d5e20846d139a554d8be46`, tree
+`095c51cedc1c656616123c3acf88148b16b71aa2`. Its protected evidence is PASS:
+Agentic account resolution, SPY quote, portfolio, positions and order schemas
+worked; position and order baselines were zero; review/place/cancel and all
+mutation counts were zero; and production state remained unchanged. The
+account fingerprint is loaded from the external report and is not hard-coded
+in source or documentation.
 
-Real adjusted acquisition and the frozen filtered-trend campaign are complete.
-B1 is accepted/integrated at `6924085675d9058b79324120faec9cb4025b6329`,
-tree `e18653587334655c380dbc528510a364d58aaf19`. Feature CI `41366532747`
-and develop integration CI `41367640239` succeeded.
+P6 is a separate source/effect boundary in
+`F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`, branch
+`feature/robinhood-p6-tiny-live-current`. It is restricted to SPY,
+`FILTERED_TREND_BASE_MA / filtered-trend-base-ma/v1`, the accepted 35/50
+configuration, long equities, one working order and a maximum $10 order and
+$10 gross exposure. P5A remains `PAPER_EVALUATION` with `live_eligible=False`;
+P6 does not rewrite or promote that historical binding.
 
-The accepted PAPER_EVALUATION binding is FILTERED_TREND_BASE_MA,
-`filtered-trend-base-ma/v1`, SPY, fast=35 / slow=50. The external bundle
-remains mandatory; P3's descriptive 55/100 candidate is not a fallback.
-RiskManager, OrderEngine, paper accounting, kill/new-buy controls and durable
-cursor/idempotency remain the local simulated-paper authorities.
-
-The first B2 import attempt was a non-consuming STOP. Corrected B2 passed
-IMPORT_SOURCE_AUTHORITY and OPEN_REPLAY_SMOKE: first fill BUY 1 SPY at cursor
-51, restart 51 -> 52, fill count 1 -> 1, no duplicate fill, network attempts
-0, FINAL_HOLDOUT accesses 0, final runtime STOPPED. Production P5 SQLite and
-lifecycle state remained absent. No prolonged paper soak is planned.
-
-P5B-lite adds source for a separate Robinhood read/account/reconciliation
-baseline through the official Trading MCP. It observes existing account
-activity and expects zero locally attributable broker effects. It does not
-supply paper risk/account authority, review an order or enable broker mutation.
-Its corrective source is pending exact review, terminal mapped FULL and
-integration reuse.
-See the [P5B-lite contract](architecture/147-p5b-robinhood-read-reconciliation.md).
+The P6 source includes a schema-discovered explicit live transport, immutable
+sanitized plans, P5B continuity checks, completed raw daily history, existing
+RiskManager composition, bounded review/reconciliation, create-only attempt
+markers and a disarmed-by-default execution entry point. No provider,
+credential, broker, order, live-state or FINAL_HOLDOUT effect occurs during
+this source checkpoint. The GUI exposes cached sanitized state only and has
+no arm or placement control.
 
 ## Immediate next step
 
-Complete the single P5B-lite atomic publication and GitHub-owned canonical FULL.
-ChatGPT then reviews the exact source and integration readiness. Only after
-accepted develop integration may ChatGPT issue the one protected read-only
-`ops.ps1 preflight arch147-p5b-robinhood-read-reconcile` boundary. Do not invoke
-it during implementation, admission or CI. No OAuth/provider read has occurred
-in this current desktop lineage. A source PASS grants no provider authority.
+Complete the single P6 atomic publication and GitHub-owned canonical FULL.
+ChatGPT then reviews the exact source and integration readiness. Do not invoke
+the registered P6 preflight or execute boundary during implementation,
+admission or CI. A source PASS grants no provider, credential, broker or live
+authority; any later protected action requires the separately reviewed exact
+P5B evidence and operator interlocks.
 
 ## Roadmap
 

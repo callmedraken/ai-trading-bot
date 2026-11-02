@@ -41,7 +41,8 @@ def authority_failures(repo_root: Path) -> tuple[str, ...]:
         or spec.preflight is not runner._arch147_p5b_preflight
         or spec.execute is not None
         or spec.remote_head_env is not None
-        or runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P5B_NAME
+        or runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P6_NAME
+        or runner.CURRENT_ACTIVE_CI_CHECKPOINTS[1] != runner.ARCH147_P5B_NAME
         or runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(runner.ARCH147_P5B_NAME) != 1
         or runner.CI_CERTIFICATION_PROFILES.get(runner.ARCH147_P5B_NAME) != "full"
         or runner.resolve_ci_checkpoint(

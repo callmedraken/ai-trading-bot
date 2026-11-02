@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Protocol
 
+from trading_bot.gui.live_state import LiveGuiState
 from trading_bot.gui.market_data_models import MarketDataPageState
 from trading_bot.gui.models import ApplicationOverview, ResearchPageState
 from trading_bot.gui.operator_observability_models import OperatorOperationsPageState
@@ -62,4 +63,8 @@ class GuiApplicationService(ResearchReportLoader, Protocol):
 
     def get_production_strategy_state(self) -> ProductionStrategyPageState:
         """Return bounded explicit strategy evidence without promotion authority."""
+        ...
+
+    def get_live_state(self) -> LiveGuiState:
+        """Return sanitized cached live state without execution authority."""
         ...

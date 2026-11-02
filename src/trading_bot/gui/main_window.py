@@ -27,6 +27,7 @@ from trading_bot.gui.evidence_navigation import EvidenceNavigationTarget
 from trading_bot.gui.evidence_source_navigation import EvidenceSourcePageTarget
 from trading_bot.gui.evidence_timeline_adapter import build_evidence_timeline_state
 from trading_bot.gui.evidence_timeline_page import EvidenceTimelinePage
+from trading_bot.gui.live_state import LiveStatePanel, unavailable_live_state
 from trading_bot.gui.market_data_page import MarketDataPage
 from trading_bot.gui.models import (
     ApplicationOverview,
@@ -215,6 +216,12 @@ class MainWindow(QMainWindow):
         self._stack.setObjectName("pageStack")
 
         home = self._build_home_page(self._overview)
+        live_state = (
+            service.get_live_state()
+            if hasattr(service, "get_live_state")
+            else unavailable_live_state()
+        )
+        home.layout().insertWidget(0, LiveStatePanel(live_state, home))
         if self._desktop_controller is not None:
             if paper_controller is not None:
                 self._desktop_control = DesktopControl(

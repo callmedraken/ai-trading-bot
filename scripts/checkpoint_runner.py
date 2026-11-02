@@ -484,7 +484,29 @@ ARCH147_P5B_RUFF: Final = (
     "scripts/arch147_p5b_source.py",
     *ARCH147_P5B_TESTS,
 )
+ARCH147_P6_NAME: Final = "arch147-p6-tiny-live"
+ARCH147_P6_BRANCH: Final = "feature/robinhood-p6-tiny-live-current"
+ARCH147_P6_TESTS: Final = (
+    *ARCH147_P5B_TESTS,
+    "tests/desktop_live/test_configuration.py",
+    "tests/desktop_live/test_strategy.py",
+    "tests/desktop_live/test_models.py",
+    "tests/desktop_live/test_execution.py",
+    "tests/robinhood_mcp/test_current_live_transport.py",
+    "tests/gui/test_live_state.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p6.py",
+)
+ARCH147_P6_RUFF: Final = (
+    *ARCH147_P5B_RUFF,
+    "src/trading_bot/robinhood_mcp/current_live_transport.py",
+    "src/trading_bot/desktop_live",
+    "src/trading_bot/gui/live_state.py",
+    "scripts/arch147_p6_tiny_live_source.py",
+    "tests/runtime/checkpoint_runner/helpers.py",
+    *ARCH147_P6_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
+    ARCH147_P6_NAME,
     ARCH147_P5B_NAME,
     ARCH147_FILTERED_TREND_NAME,
     ARCH147_P5A_NAME,
@@ -500,6 +522,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_P6_NAME: "full",
     ARCH147_P5B_NAME: "full",
     ARCH147_FILTERED_TREND_NAME: "full",
     ARCH147_P5A_NAME: "full",
@@ -26514,6 +26537,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_P5B_BRANCH,
     )
+    values[ARCH147_P6_NAME] = CheckpointSpec(
+        ARCH147_P6_NAME,
+        "Architecture 147 tiny-live source boundary with explicit operator arm",
+        ARCH147_P6_TESTS,
+        ARCH147_P6_RUFF,
+        _arch147_p6_authority_check,
+        preflight=_arch147_p6_preflight,
+        execute=_arch147_p6_execute,
+        remote_branch=ARCH147_P6_BRANCH,
+    )
     values[ARCH147_P5A_NAME] = CheckpointSpec(
         ARCH147_P5A_NAME,
         "Offline desktop simulated-paper evaluation cycle",
@@ -27076,6 +27109,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         return False
     translated = predecessor
     for name in (
+        ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
@@ -27110,6 +27144,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     if _arch147_current_batch_workflow_is_reviewed(workflow):
         return True
     current_names = (
+        ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
@@ -28095,6 +28130,7 @@ def _arch147_filtered_trend_authority_check(
     spec = specs.get(ARCH147_FILTERED_TREND_NAME)
     failures = []
     expected_route = (
+        ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
         ARCH147_P5A_NAME,
@@ -28111,7 +28147,7 @@ def _arch147_filtered_trend_authority_check(
         or spec.execute is not None
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_FILTERED_TREND_NAME) != "full"
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:5] != expected_route
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:6] != expected_route
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_FILTERED_TREND_NAME) != 1
         or resolve_ci_checkpoint(specs, ARCH147_FILTERED_TREND_BRANCH, "push")
         != ARCH147_FILTERED_TREND_NAME
@@ -28259,8 +28295,9 @@ def _arch147_p5a_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.execute is not None
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P5A_NAME) != "full"
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:5]
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:6]
         != (
+            ARCH147_P6_NAME,
             ARCH147_P5B_NAME,
             ARCH147_FILTERED_TREND_NAME,
             ARCH147_P5A_NAME,
@@ -28349,8 +28386,9 @@ def _arch147_p4_authority_check(repo_root: Path) -> tuple[str, ...]:
         or spec.remote_head_env is not None
         or CI_CERTIFICATION_PROFILES.get(ARCH147_P4_NAME) != "full"
         or CURRENT_ACTIVE_CI_CHECKPOINTS.count(ARCH147_P4_NAME) != 1
-        or CURRENT_ACTIVE_CI_CHECKPOINTS[:4]
+        or CURRENT_ACTIVE_CI_CHECKPOINTS[:5]
         != (
+            ARCH147_P6_NAME,
             ARCH147_P5B_NAME,
             ARCH147_FILTERED_TREND_NAME,
             ARCH147_P5A_NAME,
@@ -28844,6 +28882,24 @@ def _arch147_p5b_preflight() -> dict[str, object]:
     return preflight()
 
 
+def _arch147_p6_authority_check(repo_root: Path) -> tuple[str, ...]:
+    from scripts.arch147_p6_tiny_live_source import authority_failures
+
+    return authority_failures(repo_root)
+
+
+def _arch147_p6_preflight() -> dict[str, object]:
+    from trading_bot.desktop_live.preflight import preflight
+
+    return preflight()
+
+
+def _arch147_p6_execute() -> dict[str, object]:
+    from trading_bot.desktop_live.execution import execute
+
+    return execute()
+
+
 def _arch147_p5b_preflight_checkpoint(
     spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
 ) -> tuple[bool, Path | None]:
@@ -28856,7 +28912,19 @@ def _arch147_p5b_preflight_checkpoint(
     return run_preflight(spec, repo_root=repo_root, evidence_root=evidence_root)
 
 
-preflight_checkpoint = _arch147_p5b_preflight_checkpoint
+def _arch147_p6_preflight_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path | None]:
+    if spec.name != ARCH147_P6_NAME:
+        return _arch147_p5b_preflight_checkpoint(
+            spec, repo_root=repo_root, evidence_root=evidence_root
+        )
+    from scripts.arch147_p6_tiny_live_source import run_preflight
+
+    return run_preflight(spec, repo_root=repo_root, evidence_root=evidence_root)
+
+
+preflight_checkpoint = _arch147_p6_preflight_checkpoint
 
 
 if __name__ == "__main__":

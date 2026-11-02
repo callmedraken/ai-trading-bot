@@ -3,6 +3,7 @@
 from pathlib import Path
 
 from trading_bot.gui.desktop_campaign_service import ResearchArtifactService
+from trading_bot.gui.live_state import LiveGuiState, unavailable_live_state
 from trading_bot.gui.market_data_models import (
     MarketDataPageState,
     unavailable_market_data_state,
@@ -46,6 +47,10 @@ class MockGuiApplicationService:
     def get_production_strategy_state(self) -> ProductionStrategyPageState:
         """Return the disconnected strategy default."""
         return unavailable_production_strategy_state()
+
+    def get_live_state(self) -> LiveGuiState:
+        """Return the disconnected, non-actionable live default."""
+        return unavailable_live_state()
 
     def get_overview(self) -> ApplicationOverview:
         """Return deterministic read-only overview state."""
@@ -168,6 +173,10 @@ class ResearchReportGuiApplicationService:
     def get_production_strategy_state(self) -> ProductionStrategyPageState:
         """Return the disconnected strategy default."""
         return unavailable_production_strategy_state()
+
+    def get_live_state(self) -> LiveGuiState:
+        """Report selection never grants live execution authority."""
+        return unavailable_live_state()
 
     def __init__(self, artifact_path: Path) -> None:
         self._overview_service = MockGuiApplicationService()

@@ -22,6 +22,7 @@ permissions:
 
 env:
   AI_TRADING_BOT_ACTIVE_CHECKPOINTS: >-
+              arch147-p6-tiny-live `
               arch147-p5b-robinhood-read-reconcile `
               arch147-filtered-trend-multi-asset-research `
               arch147-desktop-paper-cycle `

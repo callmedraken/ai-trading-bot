@@ -593,8 +593,11 @@ FULL_DIRECTORIES = (
     "tests/robinhood_mcp",
     "tests/simulation",
     "tests/strategies",
+    "tests/desktop_live",
 )
 FULL_EXACT_MODULES = (
+    "tests/gui/test_live_state.py",
+    "tests/runtime/checkpoint_runner/test_arch147_p6.py",
     "tests/desktop_paper/test_robinhood_read.py",
     "tests/desktop_paper/test_robinhood_preflight.py",
     "tests/desktop_paper/test_robinhood_gui.py",

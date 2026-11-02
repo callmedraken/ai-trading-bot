@@ -110,6 +110,16 @@ def test_registered_dispatch_creates_sanitized_exact_source_evidence_once(
     monkeypatch, tmp_path
 ):
     spec, state, calls = fake_admission(monkeypatch)
+    real_resolve = type(ROOT).resolve
+    reviewed_root = source.Path(r"F:\AI\worktrees") / "arch147-p5b-test-fixture"
+
+    def fixture_resolve(self, *args, **kwargs):
+        if self == ROOT:
+            return reviewed_root
+        return real_resolve(self, *args, **kwargs)
+
+    monkeypatch.setattr(type(ROOT), "resolve", fixture_resolve)
+    assert reviewed_root.parent == source.Path(r"F:\AI\worktrees")
     monkeypatch.setattr(runner, "_stamp", lambda: "fixed-attempt")
     passed, path = runner.preflight_checkpoint(
         spec, repo_root=ROOT, evidence_root=tmp_path

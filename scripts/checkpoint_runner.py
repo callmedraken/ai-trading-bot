@@ -490,7 +490,7 @@ ARCH147_P6_TESTS: Final = (
     *ARCH147_P5B_TESTS,
     "tests/desktop_live/test_configuration.py",
     "tests/desktop_live/test_strategy.py",
-    "tests/desktop_live/test_models.py",
+    "tests/desktop_live/test_live_models.py",
     "tests/desktop_live/test_preflight.py",
     "tests/desktop_live/test_execution.py",
     "tests/robinhood_mcp/test_current_live_transport.py",

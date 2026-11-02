@@ -36,6 +36,7 @@ def authority_failures(repo_root: Path) -> tuple[str, ...]:
         or spec.authority_check is not runner._arch147_p6_authority_check
         or spec.preflight is not runner._arch147_p6_preflight
         or spec.execute is not runner._arch147_p6_execute
+        or runner.execute_checkpoint is not runner._arch147_p6_execute_checkpoint
         or spec.remote_branch != runner.ARCH147_P6_BRANCH
         or spec.remote_head_env is not None
         or runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0] != runner.ARCH147_P6_NAME

@@ -27790,18 +27790,6 @@ def execute_checkpoint(
             f"remote={remote_head} branch={remote_branch}"
         )
 
-    if spec.name == ARCH147_P6_NAME:
-        from scripts.arch147_p6_tiny_live_source import (
-            require_protected_execution_source,
-        )
-
-        require_protected_execution_source(
-            spec,
-            repo_root=repo_root,
-            evidence_root=evidence_root,
-            state=state_before,
-        )
-
     evidence_dir = evidence_root / spec.name / f"execute-{_stamp()}"
     evidence_dir.mkdir(parents=True, exist_ok=False)
     attempt_path = evidence_dir / "attempt.json"
@@ -28937,7 +28925,34 @@ def _arch147_p6_preflight_checkpoint(
     return run_preflight(spec, repo_root=repo_root, evidence_root=evidence_root)
 
 
+_PRE_ARCH147_P6_EXECUTE_CHECKPOINT = execute_checkpoint
+
+
+def _arch147_p6_execute_checkpoint(
+    spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
+) -> tuple[bool, Path]:
+    if spec.name != ARCH147_P6_NAME:
+        return _PRE_ARCH147_P6_EXECUTE_CHECKPOINT(
+            spec, repo_root=repo_root, evidence_root=evidence_root
+        )
+    from scripts.arch147_p6_tiny_live_source import (
+        require_protected_execution_source,
+    )
+
+    state = _git_state(repo_root)
+    require_protected_execution_source(
+        spec,
+        repo_root=repo_root,
+        evidence_root=evidence_root,
+        state=state,
+    )
+    return _PRE_ARCH147_P6_EXECUTE_CHECKPOINT(
+        spec, repo_root=repo_root, evidence_root=evidence_root
+    )
+
+
 preflight_checkpoint = _arch147_p6_preflight_checkpoint
+execute_checkpoint = _arch147_p6_execute_checkpoint
 
 
 if __name__ == "__main__":

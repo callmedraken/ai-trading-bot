@@ -149,6 +149,58 @@ def authority_failures(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _runner_callable_matches(
+    value: object, expected_name: str, repo_root: Path
+) -> bool:
+    code = getattr(value, "__code__", None)
+    return bool(
+        callable(value)
+        and getattr(value, "__name__", None) == expected_name
+        and code is not None
+        and Path(code.co_filename).resolve()
+        == (repo_root / "scripts/checkpoint_runner.py").resolve()
+    )
+
+
+def _same_p5b_registration(spec: object, canonical: object, repo_root: Path) -> bool:
+    """Match P5B registration without relying on duplicate module identity."""
+    from scripts import checkpoint_runner as runner
+
+    try:
+        if any(
+            getattr(spec, field) != getattr(canonical, field)
+            for field in (
+                "name",
+                "description",
+                "tests",
+                "ruff_paths",
+                "remote_branch",
+            )
+        ):
+            return False
+        if not (
+            spec.remote_head_env is canonical.remote_head_env is None
+            and spec.execute is canonical.execute is None
+        ):
+            return False
+        return (
+            _runner_callable_matches(
+                spec.authority_check,
+                "_arch147_p5b_authority_check",
+                repo_root,
+            )
+            and _runner_callable_matches(
+                spec.preflight,
+                "_arch147_p5b_preflight",
+                repo_root,
+            )
+            and canonical.authority_check is runner._arch147_p5b_authority_check
+            and canonical.preflight is runner._arch147_p5b_preflight
+        )
+    except AttributeError:
+        return False
+
+
 def _external_evidence_root(repo_root: Path, evidence_root: Path) -> None:
     production = Path(r"F:\AI\desktop-bot-state")
     if (
@@ -187,7 +239,9 @@ def run_preflight(
     from scripts import checkpoint_runner as runner
 
     canonical = runner._checkpoint_specs()[runner.ARCH147_P5B_NAME]
-    if spec != canonical or authority_failures(repo_root):
+    if not _same_p5b_registration(spec, canonical, repo_root) or authority_failures(
+        repo_root
+    ):
         raise RuntimeError("P5B source registration rejected")
     resolved = repo_root.resolve()
     if resolved != Path(r"F:\AI\ai-trading-bot") and resolved.parent != Path(

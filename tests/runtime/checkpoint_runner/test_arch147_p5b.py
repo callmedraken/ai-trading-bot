@@ -3,7 +3,7 @@
 import json
 from dataclasses import replace
 from pathlib import Path
-from types import SimpleNamespace
+from types import FunctionType, SimpleNamespace
 
 import pytest
 
@@ -11,8 +11,67 @@ from scripts import arch147_p5b_source as source
 from scripts import checkpoint_runner as runner
 from scripts import current_source_authority as current
 from scripts import run_test_certification as certification
+from trading_bot.desktop_paper import robinhood_preflight
 
 ROOT = Path(runner.__file__).resolve().parents[1]
+
+
+def _arch147_p5b_preflight():
+    return {}
+
+
+def _clone_p5b_callbacks():
+    return (
+        FunctionType(
+            runner._arch147_p5b_authority_check.__code__,
+            runner._arch147_p5b_authority_check.__globals__,
+            runner._arch147_p5b_authority_check.__name__,
+        ),
+        FunctionType(
+            runner._arch147_p5b_preflight.__code__,
+            runner._arch147_p5b_preflight.__globals__,
+            runner._arch147_p5b_preflight.__name__,
+        ),
+    )
+
+
+def test_p5b_registration_matches_cloned_callbacks_but_rejects_drift():
+    canonical = runner._checkpoint_specs()[runner.ARCH147_P5B_NAME]
+    cloned_authority, cloned_preflight = _clone_p5b_callbacks()
+    foreign = replace(
+        canonical,
+        authority_check=cloned_authority,
+        preflight=cloned_preflight,
+    )
+
+    assert foreign != canonical
+    assert source._same_p5b_registration(foreign, canonical, ROOT)
+
+    changed = {
+        "name": "other",
+        "description": "other",
+        "tests": canonical.tests + ("tests/other.py",),
+        "ruff_paths": canonical.ruff_paths + ("other.py",),
+        "remote_branch": "other",
+        "remote_head_env": "OTHER_HEAD",
+        "execute": lambda: None,
+    }
+    for field, value in changed.items():
+        assert not source._same_p5b_registration(
+            replace(foreign, **{field: value}), canonical, ROOT
+        )
+
+    wrong_name = FunctionType(
+        runner._arch147_p5b_preflight.__code__,
+        runner._arch147_p5b_preflight.__globals__,
+        "wrong_name",
+    )
+    assert not source._same_p5b_registration(
+        replace(foreign, preflight=wrong_name), canonical, ROOT
+    )
+    assert not source._same_p5b_registration(
+        replace(foreign, preflight=_arch147_p5b_preflight), canonical, ROOT
+    )
 
 
 def test_read_preflight_only_full_mapping_current_and_historical_authority():
@@ -47,13 +106,17 @@ def test_workflow_projection_rejects_changed_p5b_route(mutation):
 
 def fake_admission(monkeypatch):
     calls = []
+    canonical = runner._checkpoint_specs()[runner.ARCH147_P5B_NAME]
+    _, cloned_preflight = _clone_p5b_callbacks()
     spec = replace(
-        runner._checkpoint_specs()[runner.ARCH147_P5B_NAME],
-        preflight=lambda: (
-            calls.append("read") or {"status": "PASS", "mutation_call_count": 0}
-        ),
+        canonical,
+        preflight=cloned_preflight,
     )
-    monkeypatch.setattr(runner, "_checkpoint_specs", lambda: {spec.name: spec})
+    monkeypatch.setattr(
+        robinhood_preflight,
+        "preflight",
+        lambda: calls.append("read") or {"status": "PASS", "mutation_call_count": 0},
+    )
     monkeypatch.setattr(source, "authority_failures", lambda root: ())
     state = {
         "head": "a" * 40,

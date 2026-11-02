@@ -1,6 +1,15 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — P5B-lite source only, no provider attempt
+## Current boundary — P5B-lite C2 source correction, no provider attempt
+
+P5B source was accepted and integrated at `c820f09edb68c85ff16eb77034ab4e3c15365b3e`;
+develop integration run `41389597879` succeeded. The first protected
+invocation stopped before attempt creation. Source authority and Git identity
+were clean; the defect was duplicate Python module identity under `python -m`
+(`__main__` versus `scripts.checkpoint_runner`). The corrective checkpoint
+changes only semantic registration comparison. Provider/read implementation is
+unchanged, no credential/provider/broker/live effect occurred, and the
+protected provider attempt remains unused.
 
 Implementation worktree:
 `F:\AI\worktrees\ai-trading-bot-p5b-read-reconcile-current`.
@@ -32,8 +41,8 @@ SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 Registered checkpoint: `arch147-p5b-robinhood-read-reconcile`.
 Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
 Verify/source authority is effect-free; preflight is the sole later provider
-entry; execute=None. Source publication is pending exact-source review and
-integration. Do not merge as part of implementation.
+entry; execute=None. Corrective source publication is pending exact-source
+review and integration reuse. Do not merge as part of implementation.
 
 The successor transport exposes get_accounts, get_portfolio,
 get_equity_positions, get_equity_quotes and get_equity_orders only. Frozen

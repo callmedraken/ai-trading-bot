@@ -1,5 +1,14 @@
 # Architecture 147 P5B-lite — source validation
 
+The first protected invocation stopped before attempt creation with a
+post-integration CLI module-identity registration defect: `python -m` loaded
+the runner as both `__main__` and `scripts.checkpoint_runner`. Source and Git
+identity checks were clean. The C2 correction compares the exact P5B
+registration fields and callback source provenance without requiring duplicate
+module callback object identity. It does not change provider/read
+implementation or effect ceilings. No credential, provider, broker or live
+effect occurred, and the protected provider attempt remains unused.
+
 All implementation tests use synthetic MCP/account/portfolio/position/quote/
 order responses. No actual preflight, OAuth factory invocation, Credential
 Manager read, provider call, brokerage operation or production launch is part

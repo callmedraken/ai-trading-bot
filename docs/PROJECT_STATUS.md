@@ -1,6 +1,15 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P5B-lite source preparation
+## Current checkpoint — Architecture 147 P5B-lite C2 source correction
+
+P5B source was accepted and integrated at `c820f09edb68c85ff16eb77034ab4e3c15365b3e`;
+develop integration run `41389597879` succeeded. The first protected invocation
+stopped before attempt creation because `python -m` loaded the runner as both
+`__main__` and `scripts.checkpoint_runner`, causing a CLI module-identity
+registration mismatch. Normal source authority and Git identities were clean.
+The C2 correction changes only registration comparison; provider/read
+implementation remains unchanged. No credential, provider, broker or live
+effect occurred, and the protected provider attempt remains unused.
 
 Real adjusted acquisition and the frozen filtered-trend campaign are complete.
 B1 is accepted/integrated at `6924085675d9058b79324120faec9cb4025b6329`,
@@ -23,7 +32,8 @@ P5B-lite adds source for a separate Robinhood read/account/reconciliation
 baseline through the official Trading MCP. It observes existing account
 activity and expects zero locally attributable broker effects. It does not
 supply paper risk/account authority, review an order or enable broker mutation.
-Its source is pending exact review, terminal mapped FULL and integration.
+Its corrective source is pending exact review, terminal mapped FULL and
+integration reuse.
 See the [P5B-lite contract](architecture/147-p5b-robinhood-read-reconciliation.md).
 
 ## Immediate next step

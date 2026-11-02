@@ -7,7 +7,8 @@ identity checks were clean. The C2 correction compares the exact P5B
 registration fields and callback source provenance without requiring duplicate
 module callback object identity. It does not change provider/read
 implementation or effect ceilings. No credential, provider, broker or live
-effect occurred, and the protected provider attempt remains unused.
+effect occurred during that invocation; at that checkpoint the protected
+provider attempt remained unused.
 
 All implementation tests use synthetic MCP/account/portfolio/position/quote/
 order responses. No actual preflight, OAuth factory invocation, Credential
@@ -45,7 +46,12 @@ or rerun unchanged CI. Published failed evidence remains immutable.
 Exact final source, test totals, admission evidence and terminal run/attempt
 belong in the implementation handoff. This document does not claim pending
 certification or source acceptance. No merge is authorized to the implementation
-agent. ChatGPT owns exact-source review and integration readiness; only after
-accepted develop integration will it issue the one protected read-only preflight.
+agent. P5B source is now accepted/integrated at
+`7ff86d06a99bcdf349d5e20846d139a554d8be46`. The later separately reviewed
+read-only preflight is PASS: schema discovery/account/SPY/portfolio/position/order
+reads succeeded, position/order baselines were zero, all review/place/cancel
+and mutation counts were zero, and production state stayed unchanged. The
+account fingerprint remains in external evidence. Do not rerun that baseline.
+ChatGPT owns review of the separate P6 consumed-attempt source correction.
 No paper soak follows that baseline. P6 requires a separate reviewed source/
 effect checkpoint with explicit live arming and hard live notional limits.

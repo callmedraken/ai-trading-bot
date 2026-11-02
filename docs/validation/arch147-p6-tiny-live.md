@@ -37,3 +37,31 @@ transport, GUI and checkpoint-authority tests. Ruff check/format and the
 repository source-authority evaluator are also required. GitHub owns the
 registered canonical FULL certification; no local provider preflight or
 execute run is part of the source checkpoint.
+
+## Consumed-attempt correction
+
+Synthetic tests distinguish failure before marker ownership (zero placement),
+marker/initial-lifecycle failure after consumption (zero placement, no retry),
+placement invocation raising (one attempted placement), and successful placement
+followed by parsing, observation, reconciliation or lifecycle persistence failure
+(one placement, consumed and MAY_HAVE_OCCURRED). Diagnostic persistence may also
+fail without erasing the returned evidence. Each consumed scenario verifies a
+second invocation makes zero additional placement calls and preserves the marker.
+Open/pending/partially-filled states remain stopped and unreconciled; filled,
+rejected and canceled terminal states retain truthful persisted reconciliation.
+Dispatch tests use fakes to prove P6 source admission precedes delegation and
+non-P6 checkpoints preserve predecessor delegation. No implementation-body,
+AST-hash, line, helper-layout or ordinal pin is added by this correction.
+
+## Preserved publication chronology
+
+The accepted P6 baseline is `5330957b0c7c55d133503a1953ab38f97db31d92`, tree
+`8690f9af86000447b08d6c140567796f3403e779`. Feature run `41515801379` and
+develop run `41517145924` reached terminal success. Earlier feature failures
+`41422233785` (`67ef2f6`), `41436540116` (`8dbee51`) and `41514454782`
+(`f2b9f9a`) remain preserved; no failed attempt is rewritten or rerun. The wrapper
+correction isolates current P6 admission from the frozen historical
+`execute_checkpoint` body; the later test-module rename resolves collection
+identity. This source-only correction is based on that accepted integrated
+baseline and must earn its own admission and terminal mapped canonical FULL.
+Its publication does not authorize provider, credential, broker or live effects.

@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P6 tiny-live source checkpoint
+## Current checkpoint — Architecture 147 P6 consumed-attempt evidence correction
 
 The accepted P5B Robinhood read/reconciliation baseline is the exact source
 `7ff86d06a99bcdf349d5e20846d139a554d8be46`, tree
@@ -10,6 +10,12 @@ worked; position and order baselines were zero; review/place/cancel and all
 mutation counts were zero; and production state remained unchanged. The
 account fingerprint is loaded from the external report and is not hard-coded
 in source or documentation.
+
+P6 source publication and develop integration are complete at the accepted
+baseline recorded in the handoff. The current source-only correction preserves
+truthful placement counts and consumed-attempt evidence when parsing,
+reconciliation or lifecycle persistence fails after placement. Its new candidate
+still requires admission, mapped canonical FULL and exact-source review.
 
 P6 is a separate source/effect boundary in
 `F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`, branch
@@ -29,9 +35,9 @@ no arm or placement control.
 
 ## Immediate next step
 
-Complete the single P6 atomic publication and GitHub-owned canonical FULL.
-ChatGPT then reviews the exact source and integration readiness. Do not invoke
-the registered P6 preflight or execute boundary during implementation,
+Complete this correction as one atomic publication with GitHub-owned canonical
+FULL. ChatGPT then reviews its exact source and integration readiness. Do not
+invoke the registered P6 preflight or execute boundary during implementation,
 admission or CI. A source PASS grants no provider, credential, broker or live
 authority; any later protected action requires the separately reviewed exact
 P5B evidence and operator interlocks.
@@ -40,8 +46,8 @@ P5B evidence and operator interlocks.
 
     P1-P4 accepted; real research and desktop lifecycle smoke complete
     P5A accepted; B1 35/50 SPY binding and B2 OPEN_REPLAY smoke complete
-    P5B-lite read/account/reconciliation source and then one reviewed read-only preflight
-    P6 separate source/effect checkpoint for tiny explicitly armed live with hard notional limits
+    P5B-lite accepted/integrated; reviewed read-only provider baseline PASS
+    P6 source accepted/integrated; consumed-attempt evidence correction before any live boundary
     P7 production monitoring / backup / restart / reconnect / credential rotation
 
 LIVE remains disabled. FINAL_HOLDOUT remains sealed. Architecture 131 stays a

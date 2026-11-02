@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; real adjusted acquisition and filtered-trend campaign complete; P4 smoke complete; P5A/B1 accepted/integrated; B2 OPEN_REPLAY smoke complete; P5B-lite source pending acceptance.
+Status: CURRENT product roadmap; real adjusted acquisition and filtered-trend campaign complete; P4 smoke complete; P5A/B1 accepted/integrated; B2 OPEN_REPLAY smoke complete; P5B-lite accepted/integrated with read-only provider baseline PASS; P6 source accepted/integrated; source-only consumed-attempt correction pending.
 
 The [P5B-lite read/account/reconciliation contract](147-p5b-robinhood-read-reconciliation.md)
 owns the additive current Robinhood read boundary. Frozen Architecture 131
@@ -338,11 +338,14 @@ retry, repair, or current observer dispatch.
 
 ## Current checkpoint
 
-The current registered checkpoint is `arch147-desktop-paper-cycle` on
-`feature/research-desktop-paper-cycle-current`, with `preflight=None`,
-`execute=None`, and GitHub-owned canonical FULL. The accepted P4 supervisor and P3 research checkpoints
-remain registered behind P5A on their own branches. The normal development route
-is focused implementation -> focused tests -> one atomic candidate -> FEATURE +
+The current registered checkpoint is `arch147-p6-tiny-live` on
+`feature/robinhood-p6-tiny-live-current`, with separately gated preflight and
+execution, and GitHub-owned canonical FULL. P6 source is accepted/integrated at
+`5330957b0c7c55d133503a1953ab38f97db31d92`; the current consumed-attempt evidence
+correction is source-only and requires its own admission, certification and
+review. P5B is accepted/integrated and its read-only provider baseline is PASS.
+P5A, P4 and P3 remain registered on their own branches. The normal development
+route is focused implementation -> focused tests -> one atomic candidate -> FEATURE +
 PROSPECTIVE_DEVELOP admission -> one push -> one CI -> exact review ->
 fast-forward `develop`. Source PASS grants no provider or live effect.
 
@@ -438,7 +441,7 @@ slice; broker mutation remains P6.
 
 ## P5A frozen local simulated-paper contract
 
-P5A is SOURCE ONLY until exact review, canonical FULL and integration. It adds
+P5A source is accepted and integrated. Its source-only implementation added
 `desktop_paper` and `scripts/run_desktop_paper_bot.py` while retaining the P4
 inert launcher. Production P5 state is separate:
 `F:\AI\desktop-bot-state\p5\simulated-paper.sqlite` and
@@ -536,8 +539,10 @@ idempotency. It does not recover unclean process death: stale lock or unresolved
 journal remains FAILED/attention, with no deletion, manufactured STOPPED or
 auto-repair. P5C owns the separately reviewed process-recovery adapter. B1's
 35/50 SPY binding is accepted/integrated and the corrected no-network B2
-`PAPER_EVALUATION` / `OPEN_REPLAY` smoke is complete. The current successor is
-P5B-lite read/account/reconciliation source, followed only after acceptance and
-integration by one separately reviewed read-only provider baseline. P5B-lite
+`PAPER_EVALUATION` / `OPEN_REPLAY` smoke is complete. P5B-lite
+read/account/reconciliation source is accepted/integrated, and its
+separately reviewed read-only provider baseline is PASS with zero mutations.
+P6 source is accepted/integrated; the current source-only correction closes
+post-placement evidence truthfulness before any P6 protected attempt. P5B-lite
 does not use historical order review or forward-paper fills. No prolonged paper
 soak is planned.

@@ -48,8 +48,16 @@ source/session drift checks. The protected runner repeats the integrated
 feature/develop source admission before creating its execution attempt, so a
 feature-only source cannot run P6. It creates a durable attempt marker before
 place, places at most once, and classifies an exception as `MAY_HAVE_OCCURRED`
-with no automatic retry. Post-trade history and position reconciliation is
-finite and sanitized: only terminal broker states reconcile successfully;
+with no automatic retry. Placement count and attempt consumption are separate:
+a failure before marker creation has zero place calls; an existing or partial
+marker consumes the attempt even if placement has not been invoked. After
+placement invocation, parsing, observation, reconciliation and lifecycle-write
+exceptions retain exactly one place call, a consumed attempt and
+`MAY_HAVE_OCCURRED`. Diagnostic-write failure cannot erase that classification.
+Only a successfully persisted terminal reconciliation returns a receipt; all
+consumed attempts prohibit another placement on a second invocation. The marker
+and any partial lifecycle evidence are preserved without repair. Post-trade
+history and position reconciliation is finite and sanitized: only terminal broker states reconcile successfully;
 partial, pending, open or other working states remain stopped with the consumed
 attempt marker. The first successful fill disables additional buys by default;
 the kill path may cancel only the exact owned open order and never liquidates a

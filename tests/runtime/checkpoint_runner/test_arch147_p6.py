@@ -12,15 +12,18 @@ from scripts import current_source_authority as current
 ROOT = Path(runner.__file__).resolve().parents[1]
 
 
-def test_p6_is_registered_first_with_bounded_live_dispatch():
+def test_p6_is_registered_with_bounded_live_dispatch():
     spec = runner._checkpoint_specs()[runner.ARCH147_P6_NAME]
     assert spec.remote_branch == runner.ARCH147_P6_BRANCH
     assert spec.preflight is runner._arch147_p6_preflight
     assert spec.execute is runner._arch147_p6_execute
     route = runner.CURRENT_ACTIVE_CI_CHECKPOINTS
     assert route.count(spec.name) == 1
-    assert route.index(runner.ARCH147_P6_NAME) + 1 == route.index(
-        runner.ARCH147_P5B_NAME
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), spec.remote_branch, "push"
+        )
+        == spec.name
     )
     assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
     assert authority_failures(ROOT) == ()
@@ -216,4 +219,53 @@ def test_p6_execute_integration_admission_blocks_before_attempt(
     with pytest.raises(RuntimeError):
         runner.execute_checkpoint(spec, repo_root=ROOT, evidence_root=tmp_path)
 
+    assert not list(tmp_path.iterdir())
+
+
+def test_p6_execute_admits_exact_source_before_delegation(monkeypatch, tmp_path):
+    spec = runner._checkpoint_specs()[runner.ARCH147_P6_NAME]
+    state = {"head": "a" * 40, "tree": "b" * 40, "porcelain": ""}
+    calls = []
+    monkeypatch.setattr(runner, "_git_state", lambda root: dict(state))
+
+    def admit(actual, *, repo_root, evidence_root, state):
+        assert actual is spec
+        assert repo_root == ROOT
+        assert evidence_root == tmp_path
+        assert state == {"head": "a" * 40, "tree": "b" * 40, "porcelain": ""}
+        calls.append("admission")
+
+    def delegate(actual, *, repo_root, evidence_root):
+        assert actual is spec
+        assert (repo_root, evidence_root) == (ROOT, tmp_path)
+        assert calls == ["admission"]
+        calls.append("delegation")
+        return False, tmp_path / "synthetic-report.json"
+
+    monkeypatch.setattr(source, "require_protected_execution_source", admit)
+    monkeypatch.setattr(runner, "_PRE_ARCH147_P6_EXECUTE_CHECKPOINT", delegate)
+    assert runner.execute_checkpoint(spec, repo_root=ROOT, evidence_root=tmp_path) == (
+        False,
+        tmp_path / "synthetic-report.json",
+    )
+    assert calls == ["admission", "delegation"]
+    assert not list(tmp_path.iterdir())
+
+
+def test_non_p6_execution_preserves_predecessor_delegation(monkeypatch, tmp_path):
+    spec = runner._checkpoint_specs()[runner.ARCH147_P5B_NAME]
+    calls = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("non-P6 checkpoint entered P6 source admission")
+
+    def delegate(actual, *, repo_root, evidence_root):
+        calls.append((actual, repo_root, evidence_root))
+        return False, tmp_path / "synthetic-report.json"
+
+    monkeypatch.setattr(source, "require_protected_execution_source", forbidden)
+    monkeypatch.setattr(runner, "_git_state", forbidden)
+    monkeypatch.setattr(runner, "_PRE_ARCH147_P6_EXECUTE_CHECKPOINT", delegate)
+    runner.execute_checkpoint(spec, repo_root=ROOT, evidence_root=tmp_path)
+    assert calls == [(spec, ROOT, tmp_path)]
     assert not list(tmp_path.iterdir())

@@ -1,6 +1,11 @@
 # Architecture 147 P5B-lite — Robinhood read/account/reconciliation
 
-Status: source-only successor, pending exact-source acceptance and integration.
+Status: source accepted/integrated at
+`7ff86d06a99bcdf349d5e20846d139a554d8be46`; the separately reviewed read-only
+provider baseline is PASS with zero broker mutations and unchanged production
+state. P6 source is accepted/integrated at
+`5330957b0c7c55d133503a1953ab38f97db31d92`; its consumed-attempt evidence
+correction is a new source-only checkpoint, not permission for live execution.
 The accepted B1 binding and corrected B2 OPEN_REPLAY smoke precede this work.
 There is no prolonged paper soak. P6 tiny explicitly armed live remains a
 separate source/effect checkpoint with hard notional limits and separate review.
@@ -83,7 +88,8 @@ evidence remains visible. No automatic retry, cleanup or ambiguity repair is
 permitted. The command is invoked only after separate ChatGPT exact-source and
 effect review; registration/source PASS is not provider authorization.
 
-Allowed future effects: necessary official OAuth/token-storage access,
+The reviewed read-only boundary permits necessary official OAuth/token-storage
+access,
 capability discovery, the five reads and sanitized external evidence writes.
 Maximum broker mutations, order reviews/previews, placements, cancels, P5
 financial-state mutations, FINAL_HOLDOUT accesses and Alpaca calls are all zero.

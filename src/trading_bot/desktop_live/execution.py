@@ -50,6 +50,17 @@ class ExecutionResult:
     reason: str
     place_call_count: int
     cancel_call_count: int
+    attempt_consumed: bool = False
+
+    @property
+    def effect_disposition(self) -> str:
+        if self.receipt is not None:
+            return "RECONCILED"
+        if self.place_call_count or self.reason == "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY":
+            return "MAY_HAVE_OCCURRED"
+        if self.attempt_consumed:
+            return "LIVE_MUTATION_ATTEMPT_STARTED"
+        return "NO_MUTATION"
 
 
 class LiveStateStore:
@@ -113,7 +124,7 @@ def execute_plan(
     if target != plan.target_session or not opening:
         return _blocked("TARGET_SESSION_OR_OPENING_WINDOW_CHANGED", 0, 0)
     if state_store.marker.exists():
-        return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0)
+        return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0, consumed=True)
 
     account_number = resolve_account(transport.get_accounts()).account_number
     fresh = observe_robinhood_baseline(transport, observed_at=now)
@@ -148,6 +159,9 @@ def execute_plan(
     ):
         return _blocked("EXECUTION_REVIEW_DRIFT", 0, 0)
 
+    # Resolve the callable before consuming authority; attribute lookup is not
+    # a placement invocation.
+    place = transport.place_equity_order
     local_order_id = _local_order_id(plan)
     try:
         state_store.start_attempt(
@@ -155,41 +169,78 @@ def execute_plan(
             plan_sha256=plan.plan_sha256,
         )
     except FileExistsError:
-        return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0)
-    state_store.append(
-        {
-            "status": "LIVE_MUTATION_ATTEMPT_STARTED",
-            "local_order_id": local_order_id,
-            "plan_sha256": plan.plan_sha256,
-        }
-    )
-    try:
-        response = transport.place_equity_order(arguments)
+        return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0, consumed=True)
     except Exception:
+        # Even a partial marker write consumes the attempt. If marker inspection
+        # fails, preserve the uncertainty rather than allowing a retry.
+        try:
+            consumed = state_store.marker.exists()
+        except OSError:
+            consumed = True
+        return ExecutionResult(
+            "STOPPED" if consumed else "BLOCKED",
+            None,
+            "ATTEMPT_MARKER_PERSISTENCE_FAILED",
+            0,
+            0,
+            consumed,
+        )
+    try:
         state_store.append(
             {
-                "status": "MAY_HAVE_OCCURRED",
+                "status": "LIVE_MUTATION_ATTEMPT_STARTED",
                 "local_order_id": local_order_id,
-                "automatic_retry": "NO_AUTOMATIC_RETRY",
+                "plan_sha256": plan.plan_sha256,
             }
         )
-        return ExecutionResult(
-            "STOPPED",
-            None,
-            "MAY_HAVE_OCCURRED",
-            1,
-            0,
+    except Exception:
+        return ExecutionResult("STOPPED", None, "CONSUMED_BEFORE_PLACEMENT", 0, 0, True)
+    try:
+        response = place(arguments)
+        return _reconcile_placement(
+            plan,
+            response=response,
+            transport=transport,
+            now=now,
+            state_store=state_store,
+            local_order_id=local_order_id,
         )
+    except Exception:
+        # Placement invocation, parsing, reconciliation and lifecycle persistence
+        # share one consumed boundary. A failed diagnostic write cannot erase it.
+        try:
+            state_store.append(
+                {
+                    "status": "MAY_HAVE_OCCURRED",
+                    "local_order_id": local_order_id,
+                    "automatic_retry": "NO_AUTOMATIC_RETRY",
+                }
+            )
+        except Exception:
+            pass
+        return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 1, 0, True)
+
+
+def _reconcile_placement(
+    plan: LiveExecutionPlan,
+    *,
+    response: object,
+    transport: object,
+    now: datetime,
+    state_store: LiveStateStore,
+    local_order_id: str,
+) -> ExecutionResult:
+    """Reconcile an already invoked placement inside its consumed boundary."""
     provider_order_id = _provider_order_id(response)
     if provider_order_id is None:
-        return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 1, 0)
+        return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 1, 0, True)
 
     post = observe_robinhood_baseline(transport, observed_at=now)
     matching = tuple(
         order for order in post.orders if order.order_id == provider_order_id
     )
     if len(matching) != 1:
-        return ExecutionResult("STOPPED", None, "AMBIGUOUS_PROVIDER_ORDER", 1, 0)
+        return ExecutionResult("STOPPED", None, "AMBIGUOUS_PROVIDER_ORDER", 1, 0, True)
     order = matching[0]
     quantity = order.cumulative_quantity
     position_quantity = _spy_quantity(post)
@@ -197,7 +248,7 @@ def execute_plan(
     if state == "filled":
         if position_quantity <= 0 or quantity <= 0:
             return ExecutionResult(
-                "STOPPED", None, "POST_TRADE_POSITION_MISMATCH", 1, 0
+                "STOPPED", None, "POST_TRADE_POSITION_MISMATCH", 1, 0, True
             )
         status = "FILLED"
         disposition = LiveMutationDisposition.RECONCILED
@@ -206,7 +257,7 @@ def execute_plan(
         disposition = LiveMutationDisposition.RECONCILED
     else:
         return ExecutionResult(
-            "STOPPED", None, "POST_TRADE_RECONCILIATION_BLOCKED", 1, 0
+            "STOPPED", None, "POST_TRADE_RECONCILIATION_BLOCKED", 1, 0, True
         )
     receipt = LiveExecutionReceipt(
         local_order_id,
@@ -231,7 +282,7 @@ def execute_plan(
             "additional_buy_enabled": False,
         }
     )
-    return ExecutionResult("PASS", receipt, "RECONCILED", 1, 0)
+    return ExecutionResult("PASS", receipt, "RECONCILED", 1, 0, True)
 
 
 def kill_owned_order(
@@ -296,23 +347,27 @@ def execute() -> dict[str, object]:
             arm_token=os.environ.get(LIVE_ARM_ENV),
             plan_digest=os.environ.get(LIVE_PLAN_DIGEST_ENV),
         )
-        return {
-            "status": result.status,
-            "reason": result.reason,
-            "receipt": None if result.receipt is None else asdict(result.receipt),
-            "place_call_count": result.place_call_count,
-            "cancel_call_count": result.cancel_call_count,
-            "effect_disposition": (
-                "RECONCILED" if result.receipt is not None else result.reason
-            ),
-        }
     except Exception:
         return {
             "status": "BLOCKED",
             "reason": "P6_EXECUTION_REJECTED",
             "place_call_count": 0,
             "cancel_call_count": 0,
+            "effect_disposition": "NO_MUTATION",
+            "attempt_consumed": False,
+            "automatic_retry": "NO_AUTOMATIC_RETRY",
         }
+
+    return {
+        "status": result.status,
+        "reason": result.reason,
+        "receipt": None if result.receipt is None else asdict(result.receipt),
+        "place_call_count": result.place_call_count,
+        "cancel_call_count": result.cancel_call_count,
+        "effect_disposition": result.effect_disposition,
+        "attempt_consumed": result.attempt_consumed,
+        "automatic_retry": "NO_AUTOMATIC_RETRY",
+    }
 
 
 def plan_from_sanitized(raw: object) -> LiveExecutionPlan:
@@ -453,5 +508,7 @@ def _working(state: str) -> bool:
     }
 
 
-def _blocked(reason: str, place: int, cancel: int) -> ExecutionResult:
-    return ExecutionResult("BLOCKED", None, reason, place, cancel)
+def _blocked(
+    reason: str, place: int, cancel: int, *, consumed: bool = False
+) -> ExecutionResult:
+    return ExecutionResult("BLOCKED", None, reason, place, cancel, consumed)

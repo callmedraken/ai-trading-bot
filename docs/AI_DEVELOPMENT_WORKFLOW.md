@@ -40,6 +40,25 @@ workflow prose or current status/handoff. Current semantic owners validate those
 concepts once; historical milestones must not introduce new current-path exact
 claims or successor repin chains.
 
+### Semantic checks for current mutable behavior
+
+Immutable historical evidence and genuine security contracts may remain exact.
+Current mutable infrastructure and tests should normally verify semantic behavior.
+An exact AST, blob, full-function body, current-file representation, declaration
+position or list ordinal requires a documented reason that the exact
+representation itself is the protected contract. Before preserving such a check,
+ask: "Is this exact structure itself a required security/effect invariant?"
+
+If harmless current implementation structure moves, replace the affected brittle
+assertion with the required behavior rather than advancing a snapshot or creating
+a successor repinning chain. Prefer stable seams, wrappers and interfaces with
+behavior assertions: correct checkpoint resolution, required source admission
+before protected delegation, unchanged predecessor delegation, and consumed
+attempts that cannot place again. Keep immutable historical pins, incident
+evidence, SECURITY_SEMANTIC contracts, exact effect-time HEAD/tree requirements
+and external protocol/schema constraints intact. Scope cleanup to the affected
+surface; this is not authorization for a repository-wide refactor.
+
 The required preparation/publication order is:
 
 ```text

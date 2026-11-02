@@ -53,6 +53,25 @@ Dispatch tests use fakes to prove P6 source admission precedes delegation and
 non-P6 checkpoints preserve predecessor delegation. No implementation-body,
 AST-hash, line, helper-layout or ordinal pin is added by this correction.
 
+## Shared cancel-result correction
+
+The consumer audit covers every `ExecutionResult` constructor in `execute_plan`,
+`_reconcile_placement`, `kill_owned_order` and `_blocked`, plus the sanitized
+`execute` projection. Cancellation now distinguishes new call counts from
+preserved consumed authority. Synthetic exact-owned cancellation success and
+post-invocation transport failure both retain one cancel call, zero place calls,
+consumption and `MAY_HAVE_OCCURRED`; neither claims terminal cancellation.
+Existing or racing cancel markers block another call with zero new counts.
+Unlatched kill and ambiguous ownership remain pre-cancel/no-effect. Partial
+marker failures preserve consumed state without a call. Returned evidence
+contains no raw provider exception text. Existing placement tests retain the
+consumed-before-placement and persisted terminal-reconciliation contract.
+
+The source-wide caller search found no operator caller of `kill_owned_order`:
+`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED`. This correction adds synthetic
+tests only, with no protected cancel operator or GUI cancellation. A separately
+reviewed operator-reachability milestone is required before first live execution.
+
 ## Preserved publication chronology
 
 The accepted P6 baseline is `5330957b0c7c55d133503a1953ab38f97db31d92`, tree
@@ -65,3 +84,12 @@ correction isolates current P6 admission from the frozen historical
 identity. This source-only correction is based on that accepted integrated
 baseline and must earn its own admission and terminal mapped canonical FULL.
 Its publication does not authorize provider, credential, broker or live effects.
+
+The placement-evidence correction `c665b8d2ae0bc3df39c8a249388d60605d6fa87c`,
+tree `75ab3718dd92c497ab38e162db2d01980619033b`, completed GitHub run
+`41530516256` successfully on attempt 1. ChatGPT exact-source review rejected
+integration because the shared result abstraction misclassified cancel effects.
+This was a source-level review blocker, not a CI failure. That published commit
+and terminal-green evidence remain immutable. The shared cancel-result
+correction is its ordinary child and requires fresh admission and mapped FULL;
+develop remains at the accepted baseline pending independent exact-source review.

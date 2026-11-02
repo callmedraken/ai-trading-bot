@@ -56,7 +56,15 @@ class ExecutionResult:
     def effect_disposition(self) -> str:
         if self.receipt is not None:
             return "RECONCILED"
-        if self.place_call_count or self.reason == "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY":
+        if (
+            self.place_call_count
+            or self.cancel_call_count
+            or self.reason
+            in {
+                "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY",
+                "PRESERVE_CONSUMED_CANCEL_NO_RETRY",
+            }
+        ):
             return "MAY_HAVE_OCCURRED"
         if self.attempt_consumed:
             return "LIVE_MUTATION_ATTEMPT_STARTED"
@@ -301,19 +309,38 @@ def kill_owned_order(
         return _blocked("ORDER_OWNERSHIP_AMBIGUOUS", 0, 0)
     cancel_marker = state_store.marker.with_name("cancel-attempt.json")
     if cancel_marker.exists():
-        return _blocked("PRESERVE_CONSUMED_CANCEL_NO_RETRY", 0, 1)
+        return _blocked("PRESERVE_CONSUMED_CANCEL_NO_RETRY", 0, 0, consumed=True)
+    # Resolve the callable before consumption; lookup is not a cancel invocation.
+    cancel = transport.cancel_equity_order
     cancel_store = LiveStateStore(cancel_marker, state_store.lifecycle)
     try:
         cancel_store.start_attempt(
             local_order_id=_local_order_id(plan), plan_sha256=plan.plan_sha256
         )
     except FileExistsError:
-        return _blocked("PRESERVE_CONSUMED_CANCEL_NO_RETRY", 0, 1)
-    response = transport.cancel_equity_order(
-        {"account_number": account_number, "order_id": provider_order_id}
+        return _blocked("PRESERVE_CONSUMED_CANCEL_NO_RETRY", 0, 0, consumed=True)
+    except Exception:
+        try:
+            consumed = cancel_marker.exists()
+        except OSError:
+            consumed = True
+        return ExecutionResult(
+            "STOPPED" if consumed else "BLOCKED",
+            None,
+            "CANCEL_MARKER_PERSISTENCE_FAILED",
+            0,
+            0,
+            consumed,
+        )
+    try:
+        cancel({"account_number": account_number, "order_id": provider_order_id})
+    except Exception:
+        # The durable marker remains consumed even if the provider response is lost.
+        return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 0, 1, True)
+    # A request acknowledgement does not prove terminal cancellation.
+    return ExecutionResult(
+        "PASS", None, "EXACT_OWNED_ORDER_CANCEL_REQUESTED", 0, 1, True
     )
-    del response
-    return ExecutionResult("PASS", None, "EXACT_OWNED_ORDER_CANCEL_REQUESTED", 0, 1)
 
 
 def execute() -> dict[str, object]:

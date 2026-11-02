@@ -23,9 +23,13 @@ P6 source was accepted and integrated with feature and develop identical at:
 
 Feature run `41515801379` and develop run `41517145924` succeeded. The earlier
 red P6 runs remain immutable; the P6 validation record preserves their chronology.
-This is the direct parent of the new source-only consumed-attempt correction.
-Its candidate CI/acceptance/integration is pending, not inherited from the parent.
-The correction has made no OAuth, provider, broker, order or live-state call.
+The current correction starts from published feature HEAD
+`c665b8d2ae0bc3df39c8a249388d60605d6fa87c`, tree
+`75ab3718dd92c497ab38e162db2d01980619033b`, one commit beyond that develop
+baseline. Run `41530516256` is terminal green, attempt 1; exact-source review
+rejected integration because cancel effects were misclassified. Its ordinary
+child requires its own admission, canonical FULL and independent review. No P6
+OAuth, provider, broker, order or live-state call has occurred in this correction.
 
 B1 is accepted/integrated. Feature CI `41366532747` and develop integration
 CI `41367640239` succeeded. Real adjusted acquisition and the frozen
@@ -44,7 +48,7 @@ cursor 51; restart 51 -> 52; fill count 1 -> 1; no duplicate fill; network
 attempts 0; FINAL_HOLDOUT accesses 0; final runtime STOPPED. Production P5
 SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 
-## Next milestone — P6 correction publication and exact-source review
+## Next milestone — P6 cancel-result correction and exact-source review
 
 Registered checkpoint: `arch147-p6-tiny-live`.
 Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
@@ -63,7 +67,14 @@ environment interlocks match the exact plan digest. A failed placement is
 `MAY_HAVE_OCCURRED` with no retry. The correction retains one attempted place
 call through parsing, post-trade reconciliation and lifecycle-write failures;
 a marker consumed before placement retains zero place calls and forbids retry.
-The first fill disables further buys by default. See
+The first fill disables further buys by default. The published placement
+correction is terminal green but rejected for integration by exact-source review;
+the cancel-result defect and preserved publication identities are recorded in
+validation. The current child correction must preserve consumed cancel authority,
+truthful per-invocation counts and sanitized uncertainty.
+`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED`: no reviewed operator caller of
+`kill_owned_order` exists. Implementing that caller requires a separate reviewed
+milestone before first live execution. See
 [contract](architecture/147-p6-tiny-live.md) and
 [validation](validation/arch147-p6-tiny-live.md).
 

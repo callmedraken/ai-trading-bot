@@ -422,3 +422,141 @@ def test_pre_ownership_observation_failure_reports_zero_calls(
     assert result["attempt_consumed"] is False
     assert result["effect_disposition"] == "NO_MUTATION"
     assert not store.marker.exists()
+
+
+class _CancelTransport(_FakeTransport):
+    def __init__(self, *, raises=False):
+        super().__init__()
+        self.cancel_arguments = []
+        self.raises = raises
+
+    def cancel_equity_order(self, arguments):
+        self.cancel_arguments.append(arguments)
+        if self.raises:
+            raise RuntimeError("SYNTHETIC_RAW_PROVIDER_SECRET must not escape")
+        return {"data": {"status": "cancel_requested"}}
+
+
+def _kill(plan, transport, store, *, latched=True, order_id="owned-provider-order-1"):
+    return execution.kill_owned_order(
+        plan=plan,
+        transport=transport,
+        account_number="SYNTHETIC",
+        provider_order_id=order_id,
+        kill_latched=latched,
+        state_store=store,
+    )
+
+
+def _assert_cancel_retry_blocked(plan, transport, store):
+    marker = store.marker.with_name("cancel-attempt.json")
+    before = marker.read_bytes()
+    calls = list(transport.cancel_arguments)
+    retry = _kill(plan, transport, store)
+    assert retry.status == "BLOCKED"
+    assert retry.reason == "PRESERVE_CONSUMED_CANCEL_NO_RETRY"
+    assert retry.attempt_consumed
+    assert retry.effect_disposition == "MAY_HAVE_OCCURRED"
+    assert retry.receipt is None
+    assert retry.place_call_count == retry.cancel_call_count == 0
+    assert transport.placed == 0
+    assert transport.cancel_arguments == calls
+    assert marker.read_bytes() == before
+
+
+@pytest.mark.parametrize("raises", [False, True])
+def test_exact_owned_cancel_is_consumed_without_claiming_terminal_state(
+    tmp_path, raises
+):
+    plan = _plan()
+    store = LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl")
+    transport = _CancelTransport(raises=raises)
+
+    result = _kill(plan, transport, store)
+
+    assert result.status == ("STOPPED" if raises else "PASS")
+    assert result.reason == (
+        "MAY_HAVE_OCCURRED" if raises else "EXACT_OWNED_ORDER_CANCEL_REQUESTED"
+    )
+    assert result.effect_disposition == "MAY_HAVE_OCCURRED"
+    assert result.attempt_consumed
+    assert result.receipt is None
+    assert result.place_call_count == transport.placed == 0
+    assert result.cancel_call_count == len(transport.cancel_arguments) == 1
+    assert transport.cancel_arguments == [
+        {"account_number": "SYNTHETIC", "order_id": "owned-provider-order-1"}
+    ]
+    assert "SYNTHETIC_RAW_PROVIDER_SECRET" not in repr(result)
+    marker = store.marker.with_name("cancel-attempt.json")
+    assert json.loads(marker.read_text())["automatic_retry"] == "NO_AUTOMATIC_RETRY"
+    assert not store.marker.exists()
+    _assert_cancel_retry_blocked(plan, transport, store)
+
+
+def test_existing_cancel_marker_preserves_uncertainty_with_zero_new_calls(tmp_path):
+    plan = _plan()
+    store = LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl")
+    transport = _CancelTransport()
+    store.marker.with_name("cancel-attempt.json").write_text("preserved partial marker")
+    _assert_cancel_retry_blocked(plan, transport, store)
+    assert transport.cancel_arguments == []
+
+
+@pytest.mark.parametrize(
+    ("latched", "order_id", "reason"),
+    [
+        (False, "owned-provider-order-1", "KILL_NOT_LATCHED"),
+        (True, "", "ORDER_OWNERSHIP_AMBIGUOUS"),
+    ],
+)
+def test_kill_before_cancel_authority_is_zero_effect(
+    tmp_path, latched, order_id, reason
+):
+    store = LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl")
+    transport = _CancelTransport()
+    result = _kill(_plan(), transport, store, latched=latched, order_id=order_id)
+    assert result.reason == reason
+    assert result.status == "BLOCKED"
+    assert result.effect_disposition == "NO_MUTATION"
+    assert not result.attempt_consumed
+    assert result.receipt is None
+    assert result.cancel_call_count == result.place_call_count == transport.placed == 0
+    assert transport.cancel_arguments == []
+    assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("failure", ["before_marker", "partial_marker", "marker_race"])
+def test_cancel_marker_failures_never_invoke_transport(tmp_path, monkeypatch, failure):
+    plan = _plan()
+    store = LiveStateStore(tmp_path / "attempt.json", tmp_path / "life.jsonl")
+    transport = _CancelTransport()
+    marker = store.marker.with_name("cancel-attempt.json")
+
+    def fail_start(self, **kwargs):
+        if failure != "before_marker":
+            self.marker.write_text("preserved partial marker")
+        if failure == "marker_race":
+            raise FileExistsError("synthetic competing cancel attempt")
+        raise OSError("SYNTHETIC_RAW_PROVIDER_SECRET marker failure")
+
+    monkeypatch.setattr(LiveStateStore, "start_attempt", fail_start)
+    result = _kill(plan, transport, store)
+    assert result.place_call_count == result.cancel_call_count == transport.placed == 0
+    assert transport.cancel_arguments == []
+    assert result.receipt is None
+    assert "SYNTHETIC_RAW_PROVIDER_SECRET" not in repr(result)
+    assert result.attempt_consumed == (failure != "before_marker")
+    assert (
+        result.effect_disposition
+        == {
+            "before_marker": "NO_MUTATION",
+            "partial_marker": "LIVE_MUTATION_ATTEMPT_STARTED",
+            "marker_race": "MAY_HAVE_OCCURRED",
+        }[failure]
+    )
+    if failure == "before_marker":
+        assert result.status == "BLOCKED"
+        assert not marker.exists()
+    else:
+        assert result.status == ("BLOCKED" if failure == "marker_race" else "STOPPED")
+        _assert_cancel_retry_blocked(plan, transport, store)

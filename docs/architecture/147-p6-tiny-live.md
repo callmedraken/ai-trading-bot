@@ -61,7 +61,15 @@ history and position reconciliation is finite and sanitized: only terminal broke
 partial, pending, open or other working states remain stopped with the consumed
 attempt marker. The first successful fill disables additional buys by default;
 the kill path may cancel only the exact owned open order and never liquidates a
-fill.
+fill. Cancellation consumes its own create-only marker before invoking the exact
+owned order's cancel method. A request acknowledgement or transport exception
+returns one cancel call, zero placement calls, a consumed attempt and
+`MAY_HAVE_OCCURRED`, without a terminal cancellation receipt. An existing cancel
+marker blocks another invocation with zero new calls and preserves uncertainty.
+Marker persistence failure before invocation reports zero calls and retains any
+partial marker as consumed. No reviewed operator entry point currently calls
+`kill_owned_order`; operator reachability is a separate milestone before first
+live execution.
 
 The GUI is presentation-only. It may display sanitized cached plan/state facts,
 but it has no arm, place or cancel control. P6 state is separate from the P5

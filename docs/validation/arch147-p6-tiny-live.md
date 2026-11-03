@@ -53,7 +53,7 @@ Dispatch tests use fakes to prove P6 source admission precedes delegation and
 non-P6 checkpoints preserve predecessor delegation. No implementation-body,
 AST-hash, line, helper-layout or ordinal pin is added by this correction.
 
-## Shared cancel-result correction
+## Historical shared cancel-result correction (before operator reachability)
 
 The consumer audit covers every `ExecutionResult` constructor in `execute_plan`,
 `_reconcile_placement`, `kill_owned_order` and `_blocked`, plus the sanitized
@@ -93,3 +93,52 @@ This was a source-level review blocker, not a CI failure. That published commit
 and terminal-green evidence remain immutable. The shared cancel-result
 correction is its ordinary child and requires fresh admission and mapped FULL;
 develop remains at the accepted baseline pending independent exact-source review.
+
+
+## Current exact-owned kill source candidate
+
+The current candidate adds durable ownership and a separate operator arm;
+publication remains pending independent exact-source review and integration.
+All verification uses synthetic state and fakes. No real CLI, P6 preflight,
+execute, credential/OAuth access, provider read, review/place/cancel, production
+P6 state or FINAL_HOLDOUT access is part of this milestone.
+
+The registered existing execution and P6 authority test modules cover:
+
+- integrated source admission before any provider construction, including dirty,
+  origin/feature/develop/branch/authority drift and unstable source;
+- immutable READY plan/digest/source and exact binding validation; missing,
+  mismatched or malformed bindings fail closed; no arbitrary provider ID input;
+- create-only binding persistence before the first post-placement observation;
+  existing/conflicting/partial bindings are preserved and persistence failures
+  keep exactly one place call, consumed uncertainty and no retry;
+- a separate kill arm with no placement-arm dependency;
+- canonical account fingerprint and exact-order corroboration; similar SPY
+  orders cannot replace the bound ID;
+- zero-cancel terminal fill/cancel/rejection, one cancel for a working order,
+  acknowledgement followed by exactly one immediate bounded observation;
+- partial-fill cancellation of the remainder only with monotonic cumulative
+  fills and exactly consistent surviving SPY position; no liquidation;
+- still-working/missing/parse/account failures and cancel exceptions preserve
+  uncertainty, consumption and no retry; existing cancel markers allow terminal
+  observation with zero new cancel calls;
+- create-only external sanitized evidence and persistence-failure truthfulness;
+  raw synthetic exception/secret/account/order text is absent from kill reports;
+- a kill-only fake with no review/place/sell/options/crypto/generic capabilities,
+  semantic source capability checks, and the unchanged presentation-only GUI.
+
+The shared-consumer audit includes `execute_plan`, `_reconcile_placement`,
+`kill_owned_order`, `execute`, ownership helpers, operator preparation and
+reconciliation, existing placement/cancel evidence tests and the P6 source
+checker. `ExecutionResult`, its disposition logic and placement receipt shape
+remain unchanged. Placement adds only strict ID parsing, the durable binding
+inside its consumed boundary and an existing-binding pre-place stop. The
+primitive no longer accepts a raw caller-supplied provider ID; it reloads the
+binding. `KillResult` owns terminal cancellation reconciliation separately.
+The explicit transport constructor is public for both admitted callers.
+
+The P6 source inventory includes ownership and operator modules. Tests remain
+in the existing registered P6 modules, so shared checkpoint runner, `ops.ps1`,
+registry, workflow topology and historical pins need no change. Checks are
+semantic; no current function-body/AST hash, line/helper-order or ordinal pin
+is added. Canonical FULL remains GitHub-owned for the single publication.

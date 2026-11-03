@@ -67,9 +67,9 @@ returns one cancel call, zero placement calls, a consumed attempt and
 `MAY_HAVE_OCCURRED`, without a terminal cancellation receipt. An existing cancel
 marker blocks another invocation with zero new calls and preserves uncertainty.
 Marker persistence failure before invocation reports zero calls and retains any
-partial marker as consumed. No reviewed operator entry point currently calls
-`kill_owned_order`; operator reachability is a separate milestone before first
-live execution.
+partial marker as consumed. The exact-owned kill operator below supplies the
+separate operator boundary; its source still requires independent exact review
+and integration before any protected invocation.
 
 The GUI is presentation-only. It may display sanitized cached plan/state facts,
 but it has no arm, place or cancel control. P6 state is separate from the P5
@@ -78,3 +78,88 @@ simulated-paper store and is not created by imports, tests, admission or CI.
 No provider, credential, broker, order or live-state effect is performed by the
 source checkpoint itself. The registered preflight and execute boundaries are
 later operator actions and are not run during publication.
+
+
+## Exact-owned-order kill operator source candidate
+
+This additive source candidate remains under `arch147-p6-tiny-live` on
+`feature/robinhood-p6-tiny-live-current`. It grants no protected invocation.
+The GUI remains presentation-only, with no arm, place or cancel controls.
+
+Placement strictly parses the returned provider order token (1-128 ASCII
+letters, digits, hyphens or underscores; conflicting `id`/`order_id` values
+are rejected). Before any subsequent broker observation, it creates and fsyncs
+`owned-order.json` alongside the existing P6 placement marker under
+`F:\AI\desktop-bot-state\p6`. Its schema is `arch147-p6-owned-order/v1` and
+binds the immutable plan SHA256, deterministic `p6-local-order/v1` SHA256 and
+exact provider order ID. This protected local binding retains the raw ID for
+cancellation; kill evidence uses its SHA256.
+Existing bindings, including identical, mismatched or partial bindings, are
+never overwritten or repaired. A placement marker or existing binding blocks
+another placement. Binding persistence failure after invocation remains one
+place call, consumed, `MAY_HAVE_OCCURRED`, and no automatic retry. Missing
+ownership evidence never permits guessing from broker order similarities.
+
+The source-owned CLI is `python -m trading_bot.desktop_live.kill_operator`.
+It accepts only `--plan`, `--plan-sha256` and `--evidence-dir`; there is no
+provider-order-ID input or generic tool dispatcher. Use a Python environment
+bound to this exact source and launch from the admitted repository root.
+The evidence destination must be fresh, absolute, outside the source tree and
+free of aliases/reparse points. Admission reuses the existing P6 evaluator:
+clean source, reviewed origin, remote P6 feature == local HEAD, remote develop
+== local HEAD, prospective-develop/current authority PASS and stable HEAD/tree.
+This admission runs before transport or credential construction. Then the
+immutable READY plan and supplied exact digest, plan source, zero initial P6
+position/order baseline and durable ownership binding must validate. The
+binding must name the same plan and deterministic local order. Last, require
+`AI_TRADING_BOT_P6_KILL_ARM=CANCEL_EXACT_OWNED_P6_ORDER`.
+The kill path has no dependency on `AI_TRADING_BOT_P6_LIVE_ARM`; disabling
+BUY/placement authority must leave the kill boundary available.
+
+After local admission, create-only sanitized external attempt evidence is
+persisted before constructing the existing explicit current-live transport.
+Resolve the canonical Agentic account and require its fingerprint to equal
+the plan. A bounded observation uses the existing strict account, portfolio,
+position, quote and Agentic-order parser and its finite page/item/seven-day
+window limits. Find exactly the ID from the binding; no other SPY order can
+substitute. SPY, buy, Agentic placement and the plan's target session corroborate
+ownership. Missing, duplicated, incompatible or unknown-state observations
+stop without cancellation. The seven-day window never authorizes a fallback
+for an older missing order.
+
+An already terminal order yields zero cancel calls and truthful terminal facts.
+FILLED remains a surviving position; CANCELED/CANCELLED and REJECTED are
+reported only with internally consistent cumulative fills and SPY position.
+No sell, liquidation, options, crypto, review or placement call is reachable
+from this operator. Terminal cancellation of a partially filled order means
+cancellation of the remainder: cumulative fill must not decrease and SPY
+position must exactly equal the plan baseline plus the cumulative fill. The
+filled position survives and additional BUY remains disabled. Rejection
+requires zero fill. FILLED requires positive fill and matching position.
+
+For a working bound order, `kill_owned_order` reloads the durable binding,
+requires it still equals the observed binding,
+creates its existing cancel-attempt marker and invokes cancel at most once.
+A cancel API acknowledgement is never terminal proof. One deterministic,
+immediate bounded read-only observation follows an acknowledged invocation;
+there is no sleep, polling loop or automatic retry. Still-working, missing,
+malformed, account-drift or inconsistent post-cancel observations are STOPPED,
+consumed and `MAY_HAVE_OCCURRED`. Cancel transport failure retains one call,
+consumed uncertainty and no retry. Marker write/race failures preserve the
+accepted primitive's per-invocation counts and consumption semantics.
+
+An existing cancel marker permits a fresh bounded read-only observation, never
+a second cancel. A now-terminal order reports terminal broker facts with zero
+new cancel calls; a still-working order remains consumed/unreconciled. Never
+erase, replace or repair the marker. Every recovery invocation needs fresh
+external evidence and the same local/source/kill interlocks.
+
+Evidence uses fixed diagnostics and order-ID SHA256 rather than the raw ID,
+and records HEAD/tree, plan/local-order identity, pre/post states, cancel count,
+fill/position quantities, disposition, consumption, reconciliation and
+`automatic_retry=NO_AUTOMATIC_RETRY`. It excludes raw account identifiers,
+OAuth material and provider exception text. Evidence-write failure preserves
+returned effect/count/consumption facts and reports STOPPED. The typed kill
+result is separate from the placement `ExecutionResult` and receipt contract.
+No source test, admission or CI invocation runs this real CLI or creates
+production P6 state. No P6 preflight follows this publication automatically.

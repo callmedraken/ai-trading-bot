@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P6 source accepted and integrated
+## Current checkpoint - P6 kill-operator source candidate pending exact review
 
 The accepted P5B Robinhood read/reconciliation baseline is the exact source
 `7ff86d06a99bcdf349d5e20846d139a554d8be46`, tree
@@ -34,13 +34,17 @@ markers and a disarmed-by-default execution entry point. No provider,
 credential, broker, order, live-state or FINAL_HOLDOUT effect occurs during
 this source checkpoint. The GUI exposes cached sanitized state only and has
 no arm, placement or cancellation control.
-`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED` remains true. P6 preflight
-has not run and live execution has not occurred.
+The additive exact-owned kill-operator source candidate is pending independent
+exact-source review and integration. It adds create-only placement ownership,
+a separate kill arm, at most one exact-owned cancel and bounded terminal
+reconciliation without liquidation. This candidate is not accepted/integrated.
+P6 preflight has not run and live execution has not occurred.
 
 ## Immediate next step
 
-The immediate next milestone is the separately reviewed P6 kill-operator
-boundary. P6 preflight must not run until that boundary is accepted,
+The immediate next step is ChatGPT exact-source review of the published P6
+kill-operator candidate, its mapped GitHub FULL evidence and integration
+readiness. P6 preflight must not run until that boundary is accepted,
 integrated and closed out. A source PASS grants no provider, credential,
 broker or live authority. P7 still follows the P6 live trial and reconciliation
 boundary.
@@ -50,7 +54,7 @@ boundary.
     P1-P4 accepted; real research and desktop lifecycle smoke complete
     P5A accepted; B1 35/50 SPY binding and B2 OPEN_REPLAY smoke complete
     P5B-lite accepted/integrated; reviewed read-only provider baseline PASS
-    P6 source accepted/integrated; reviewed kill operator before live
+    P6 baseline integrated; kill-operator source candidate pending exact review
     P7 production monitoring / backup / restart / reconnect / credential rotation
 
 LIVE remains disabled. FINAL_HOLDOUT remains sealed. Architecture 131 stays a

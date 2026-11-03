@@ -1,6 +1,6 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary — P6 source accepted/integrated, no P6 provider attempt
+## Current boundary - P6 kill-operator candidate pending exact review
 
 Accepted P5B baseline source:
 
@@ -16,7 +16,7 @@ account fingerprint at runtime; it is not present in source or docs.
 Implementation worktree:
 `F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`.
 Branch: `feature/robinhood-p6-tiny-live-current`.
-P6 source is accepted and integrated with feature and develop identical at:
+The accepted placement/cancel source baseline was integrated at:
 
     HEAD 14c2a20b19381ca9ffb27d67faa873d8cecc283b
     TREE a949f9bad6f1538d2243c489cdddfc02deaf4f1d
@@ -45,7 +45,7 @@ cursor 51; restart 51 -> 52; fill count 1 -> 1; no duplicate fill; network
 attempts 0; FINAL_HOLDOUT accesses 0; final runtime STOPPED. Production P5
 SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 
-## Next milestone — P6 kill-operator boundary before first live execution
+## Current candidate and next step - exact-source review before integration
 
 Registered checkpoint: `arch147-p6-tiny-live`.
 Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
@@ -71,13 +71,30 @@ validation. The accepted result semantics preserve consumed cancel authority,
 truthful per-invocation counts and sanitized uncertainty. A cancel request
 acknowledgment is not terminal cancellation; only terminal broker
 reconciliation may be reported as terminal.
-`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED`: no reviewed operator caller of
-`kill_owned_order` exists. Implementing that caller requires a separate reviewed
-milestone before first live execution. See
-[contract](architecture/147-p6-tiny-live.md) and
-[validation](validation/arch147-p6-tiny-live.md).
+The current additive kill-operator source candidate is on the same registered
+checkpoint and feature branch, based on integrated startup source:
 
-The next milestone is a separately reviewed operator-reachable exact-owned-order
-kill/cancel boundary before first live execution. P6 preflight must not run
-until that milestone is accepted, integrated and closed out. A source PASS
-grants no live authority.
+    HEAD fad9b1bd73dcbf9971d2bd771ee38a503d2d8bfd
+    TREE fb1f4da66304776a10b598bae1f13d25b0f89674
+    develop docs-only CI 41561984888 / attempt 1 / SUCCESS / MODE=DOCS_ONLY
+
+The candidate remains unaccepted and unintegrated pending ChatGPT exact-source
+review and mapped canonical FULL evidence. Publication does not move develop.
+The source-owned CLI is `trading_bot.desktop_live.kill_operator`; it takes an
+immutable plan path, exact digest and fresh external evidence destination,
+never an arbitrary provider order ID. Placement creates and fsyncs the exact
+plan/local/provider ownership binding once under the P6 state root, before
+later broker reads. Kill has an independent explicit arm and no BUY-arm
+dependency, admits integrated source before credentials/provider construction,
+cancels at most once and observes once afterward. Recovery with a consumed
+cancel marker is observation-only. Partial fills survive cancellation of the
+remainder; there is no liquidation or additional BUY authority. Details and
+synthetic verification belong in the [contract](architecture/147-p6-tiny-live.md)
+and [validation](validation/arch147-p6-tiny-live.md).
+
+Next owner: ChatGPT, exact GitHub source/diff and terminal mapped FULL review,
+then independent integration-readiness determination. Preserve the one
+publication attempt; stop on source/CI/authority uncertainty. No merge or PR
+mutation is delegated here. P6 preflight, execute and the real kill operator
+must not run during or after this source publication. They remain protected
+boundaries after acceptance, integration and documentation closeout.

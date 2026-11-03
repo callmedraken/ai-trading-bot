@@ -19,6 +19,15 @@ from trading_bot.desktop_live.models import (
     TradabilityObservation,
     parse_order_review,
 )
+from trading_bot.desktop_live.ownership import (
+    OwnedOrderBinding,
+    create_binding,
+    load_binding,
+    provider_order_id,
+)
+from trading_bot.desktop_live.ownership import (
+    local_order_id as _local_order_id,
+)
 from trading_bot.desktop_live.preflight import (
     _order_arguments,
     _source_identity,
@@ -78,6 +87,13 @@ class LiveStateStore:
         self.marker = marker
         self.lifecycle = lifecycle
 
+    @property
+    def ownership_path(self) -> Path:
+        return self.marker.with_name("owned-order.json")
+
+    def bind_order(self, plan: LiveExecutionPlan, provider_id: str) -> None:
+        create_binding(self.ownership_path, plan, provider_id)
+
     def start_attempt(self, *, local_order_id: str, plan_sha256: str) -> None:
         self.marker.parent.mkdir(parents=True, exist_ok=True)
         with self.marker.open("x", encoding="utf-8") as stream:
@@ -133,6 +149,9 @@ def execute_plan(
         return _blocked("TARGET_SESSION_OR_OPENING_WINDOW_CHANGED", 0, 0)
     if state_store.marker.exists():
         return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0, consumed=True)
+
+    if state_store.ownership_path.exists():
+        return _blocked("EXISTING_OWNERSHIP_BINDING_NO_PLACEMENT", 0, 0)
 
     account_number = resolve_account(transport.get_accounts()).account_number
     fresh = observe_robinhood_baseline(transport, observed_at=now)
@@ -243,6 +262,9 @@ def _reconcile_placement(
     if provider_order_id is None:
         return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 1, 0, True)
 
+    # Persist exact ownership before any later broker read. Failure stays inside
+    # the already consumed placement boundary; no second placement is allowed.
+    state_store.bind_order(plan, provider_order_id)
     post = observe_robinhood_baseline(transport, observed_at=now)
     matching = tuple(
         order for order in post.orders if order.order_id == provider_order_id
@@ -298,14 +320,18 @@ def kill_owned_order(
     plan: LiveExecutionPlan,
     transport: object,
     account_number: str,
-    provider_order_id: str,
     kill_latched: bool,
     state_store: LiveStateStore,
+    expected_binding: OwnedOrderBinding | None = None,
 ) -> ExecutionResult:
     """Cancel only one exact owned open order; never liquidate a fill."""
     if not kill_latched:
         return _blocked("KILL_NOT_LATCHED", 0, 0)
-    if not provider_order_id:
+    try:
+        binding = load_binding(state_store.ownership_path, plan)
+        if expected_binding is not None and binding != expected_binding:
+            return _blocked("ORDER_OWNERSHIP_CHANGED", 0, 0)
+    except Exception:
         return _blocked("ORDER_OWNERSHIP_AMBIGUOUS", 0, 0)
     cancel_marker = state_store.marker.with_name("cancel-attempt.json")
     if cancel_marker.exists():
@@ -333,7 +359,9 @@ def kill_owned_order(
             consumed,
         )
     try:
-        cancel({"account_number": account_number, "order_id": provider_order_id})
+        cancel(
+            {"account_number": account_number, "order_id": binding.provider_order_id}
+        )
     except Exception:
         # The durable marker remains consumed even if the provider response is lost.
         return ExecutionResult("STOPPED", None, "MAY_HAVE_OCCURRED", 0, 1, True)
@@ -363,7 +391,7 @@ def execute() -> dict[str, object]:
         if os.environ.get(LIVE_PLAN_DIGEST_ENV) != plan.plan_sha256:
             return {"status": "BLOCKED", "reason": "PLAN_DIGEST_MISMATCH"}
         head, tree = _source_identity()
-        transport = _transport()
+        transport = create_live_transport()
         result = execute_plan(
             plan,
             transport=transport,
@@ -471,7 +499,8 @@ def plan_from_sanitized(raw: object) -> LiveExecutionPlan:
     return plan
 
 
-def _transport() -> object:
+def create_live_transport() -> object:
+    """Construct the explicit live facade; callers must admit authority first."""
     from trading_bot.robinhood_mcp.current_live_transport import (
         RobinhoodCurrentLiveTransport,
     )
@@ -497,22 +526,18 @@ def _idempotency_key(plan: LiveExecutionPlan, transport: object) -> str | None:
     return None
 
 
-def _local_order_id(plan: LiveExecutionPlan) -> str:
-    import hashlib
-
-    return hashlib.sha256(
-        ("p6-local-order/v1:" + plan.plan_sha256).encode("ascii")
-    ).hexdigest()
-
-
 def _provider_order_id(response: object) -> str | None:
     if not isinstance(response, dict):
         return None
     data = response.get("data")
     if not isinstance(data, dict):
         return None
-    value = data.get("id", data.get("order_id"))
-    return value if isinstance(value, str) and value else None
+    if "id" in data and "order_id" in data and data["id"] != data["order_id"]:
+        return None
+    try:
+        return provider_order_id(data.get("id", data.get("order_id")))
+    except ValueError:
+        return None
 
 
 def _spy_quantity(snapshot: object) -> Decimal:

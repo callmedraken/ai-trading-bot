@@ -269,3 +269,90 @@ def test_non_p6_execution_preserves_predecessor_delegation(monkeypatch, tmp_path
     runner.execute_checkpoint(spec, repo_root=ROOT, evidence_root=tmp_path)
     assert calls == [(spec, ROOT, tmp_path)]
     assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        "dirty",
+        "feature",
+        "develop",
+        "branch",
+        "authority",
+        "prospective",
+        "origin",
+        "unstable",
+    ],
+)
+def test_kill_reuses_integrated_admission_without_provider_or_attempt(
+    monkeypatch, tmp_path, mismatch
+):
+    _, state, calls = _fake_p6_admission(monkeypatch)
+    if mismatch == "dirty":
+        state["porcelain"] = "M file"
+    elif mismatch == "branch":
+        state["branch"] = "other"
+    elif mismatch == "authority":
+        monkeypatch.setattr(source, "authority_failures", lambda root: ("rejected",))
+    elif mismatch == "prospective":
+        monkeypatch.setattr(
+            current,
+            "evaluate_source_authority",
+            lambda **kwargs: SimpleNamespace(passed=False),
+        )
+    elif mismatch == "origin":
+        monkeypatch.setattr(runner, "_git_output", lambda *args: "other-origin")
+    elif mismatch == "unstable":
+        states = iter([state, {**state, "tree": "f" * 40}])
+        monkeypatch.setattr(runner, "_git_state", lambda root: next(states))
+    else:
+        branch = runner.ARCH147_P6_BRANCH if mismatch == "feature" else "develop"
+        monkeypatch.setattr(
+            runner,
+            "_remote_branch_head",
+            lambda root, name: "e" * 40 if name == branch else state["head"],
+        )
+    with pytest.raises(RuntimeError):
+        source.require_kill_source(ROOT, tmp_path / "new-evidence")
+    assert calls == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_kill_integrated_admission_is_read_only_and_returns_exact_identity(
+    monkeypatch, tmp_path
+):
+    _, state, calls = _fake_p6_admission(monkeypatch)
+    assert source.require_kill_source(ROOT, tmp_path / "new-evidence") == (
+        state["head"],
+        state["tree"],
+    )
+    assert calls == []
+    assert not list(tmp_path.iterdir())
+
+
+def test_p6_source_inventory_owns_kill_and_binding():
+    assert {
+        "src/trading_bot/desktop_live/ownership.py",
+        "src/trading_bot/desktop_live/kill_operator.py",
+    } <= set(source.P6_MODULES)
+
+
+@pytest.mark.parametrize(
+    "capability",
+    [
+        "place_equity_order",
+        "review_equity_order",
+        "place_option_order",
+        "place_crypto_order",
+        "call_tool",
+        "LIVE_ARM_ENV",
+    ],
+)
+def test_kill_source_checker_rejects_unreviewed_authority(capability):
+    import ast
+
+    assert source.kill_surface_failures(ast.parse("transport." + capability))
+    assert source.kill_surface_failures(ast.parse("from anything import " + capability))
+    assert (
+        source.kill_surface_failures(ast.parse("transport.get_equity_orders({})")) == ()
+    )

@@ -18,6 +18,8 @@ P6_MODULES = (
     "src/trading_bot/desktop_live/risk.py",
     "src/trading_bot/desktop_live/preflight.py",
     "src/trading_bot/desktop_live/execution.py",
+    "src/trading_bot/desktop_live/ownership.py",
+    "src/trading_bot/desktop_live/kill_operator.py",
     "src/trading_bot/gui/live_state.py",
 )
 
@@ -93,6 +95,9 @@ def authority_failures(repo_root: Path) -> tuple[str, ...]:
             failures.append("147 P6 forbidden effect dependency: " + relative)
         if "PAPER_EVALUATION" in source and relative.endswith("execution.py"):
             failures.append("147 P6 execution crosses paper binding")
+
+        if relative.endswith("kill_operator.py"):
+            failures.extend(kill_surface_failures(tree))
 
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
@@ -336,3 +341,50 @@ def run_preflight(
         f"IDENTITY_STABLE={stable} EVIDENCE={path}"
     )
     return passed, path
+
+
+def require_kill_source(repo_root: Path, evidence_directory: Path) -> tuple[str, str]:
+    """Reuse integrated P6 admission before kill credential/provider construction."""
+    from scripts import checkpoint_runner as runner
+
+    before = runner._git_state(repo_root)
+    _require_p6_source_admission(
+        runner._checkpoint_specs()[runner.ARCH147_P6_NAME],
+        repo_root=repo_root,
+        before=before,
+        evidence_root=evidence_directory,
+    )
+    if before != runner._git_state(repo_root):
+        raise RuntimeError("P6 source identity changed during kill admission")
+    return str(before["head"]), str(before["tree"])
+
+
+def kill_surface_failures(tree: ast.Module) -> tuple[str, ...]:
+    """Security surface checks, independent of helper layout or current bodies."""
+    forbidden = {
+        "execute",
+        "execute_plan",
+        "review_equity_order",
+        "place_equity_order",
+        "place_option_order",
+        "place_crypto_order",
+        "sell",
+        "call_tool",
+        "LIVE_ARM_ENV",
+        "LIVE_ARM_VALUE",
+    }
+    names = (
+        {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)}
+        | {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        | {
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for alias in node.names
+        }
+    )
+    return (
+        ("147 P6 kill exposes placement or generic authority",)
+        if names & forbidden
+        else ()
+    )

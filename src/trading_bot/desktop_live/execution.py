@@ -31,7 +31,7 @@ from trading_bot.desktop_live.ownership import (
 from trading_bot.desktop_live.preflight import (
     _order_arguments,
     _source_identity,
-    _target_session,
+    resolve_target_session,
 )
 from trading_bot.desktop_paper.robinhood_read import resolve_account
 from trading_bot.desktop_paper.robinhood_reconciliation import (
@@ -144,9 +144,11 @@ def execute_plan(
     if plan_digest != plan.plan_sha256:
         return _blocked("PLAN_DIGEST_MISMATCH", 0, 0)
     now = now.astimezone(UTC)
-    target, opening = _target_session(now)
-    if target != plan.target_session or not opening:
-        return _blocked("TARGET_SESSION_OR_OPENING_WINDOW_CHANGED", 0, 0)
+    target, regular_open = resolve_target_session(now)
+    if plan.target_session < target:
+        return _blocked("TARGET_SESSION_EXPIRED", 0, 0)
+    if target != plan.target_session or not regular_open:
+        return _blocked("REGULAR_SESSION_NOT_OPEN", 0, 0)
     if state_store.marker.exists():
         return _blocked("PRESERVE_CONSUMED_ATTEMPT_NO_RETRY", 0, 0, consumed=True)
 

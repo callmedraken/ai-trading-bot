@@ -73,6 +73,7 @@ def _plan() -> LiveExecutionPlan:
 class _FakeTransport:
     def __init__(self):
         self.placed = 0
+        self.canceled = 0
 
     def get_accounts(self):
         return {
@@ -101,6 +102,10 @@ class _FakeTransport:
         del arguments
         self.placed += 1
         return {"data": {"id": "provider-order-1"}}
+
+    def cancel_equity_order(self, arguments):
+        self.canceled += 1
+        raise AssertionError("placement admission cannot cancel")
 
 
 def test_disarmed_plan_stops_before_any_mutation(tmp_path, monkeypatch):
@@ -1182,3 +1187,102 @@ def test_filled_quantity_must_match_known_total_order_quantity(ready_kill):
     assert result["post_cancel_state"] == "FILLED"
     assert result["classification"] == "UNRECONCILED"
     assert result["cancel_call_count"] == 0
+
+
+@pytest.mark.parametrize(
+    "instant",
+    [
+        "2026-11-02T14:30:00+00:00",  # Exact 09:30 ET open.
+        "2026-11-02T14:35:00+00:00",  # Former five-minute cutoff.
+        "2026-11-02T15:15:00+00:00",  # 10:15 ET.
+        "2026-11-02T17:00:00+00:00",  # Noon ET.
+        "2026-11-02T19:30:00+00:00",  # 14:30 ET.
+        "2026-11-02T20:59:59+00:00",  # Last second before regular close.
+    ],
+)
+def test_execution_admits_entire_target_regular_session(
+    ready_execution, monkeypatch, instant
+):
+    plan, transport, store = ready_execution
+    now = datetime.fromisoformat(instant)
+    monkeypatch.setattr(execution, "datetime", SimpleNamespace(now=lambda tz: now))
+    result = execution.execute()
+    assert result["status"] == "PASS"
+    assert result["receipt"]["state"] == "FILLED"
+    assert result["place_call_count"] == transport.placed == 1
+    assert result["cancel_call_count"] == transport.canceled == 0
+    assert result["attempt_consumed"] is True
+    assert result["effect_disposition"] == "RECONCILED"
+    assert load_binding(store.ownership_path, plan).plan_sha256 == plan.plan_sha256
+    _assert_consumed_retry(transport, store)
+
+
+@pytest.mark.parametrize(
+    "instant,reason",
+    [
+        ("2026-10-30T16:00:00+00:00", "REGULAR_SESSION_NOT_OPEN"),
+        ("2026-11-01T17:00:00+00:00", "REGULAR_SESSION_NOT_OPEN"),
+        ("2026-11-02T12:00:00+00:00", "REGULAR_SESSION_NOT_OPEN"),
+        ("2026-11-02T14:29:59+00:00", "REGULAR_SESSION_NOT_OPEN"),
+        ("2026-11-02T21:00:00+00:00", "TARGET_SESSION_EXPIRED"),
+        ("2026-11-02T23:00:00+00:00", "TARGET_SESSION_EXPIRED"),
+        ("2026-11-03T17:00:00+00:00", "TARGET_SESSION_EXPIRED"),
+    ],
+)
+def test_session_timing_block_has_no_provider_calls_or_consumption(
+    ready_execution, monkeypatch, instant, reason
+):
+    plan, transport, store = ready_execution
+    now = datetime.fromisoformat(instant)
+    monkeypatch.setattr(execution, "datetime", SimpleNamespace(now=lambda tz: now))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("timing must block before broker reads/review or marker")
+
+    monkeypatch.setattr(transport, "get_accounts", forbidden)
+    monkeypatch.setattr(transport, "review_equity_order", forbidden)
+    monkeypatch.setattr(store, "start_attempt", forbidden)
+    result = execution.execute()
+    assert result["status"] == "BLOCKED"
+    assert result["reason"] == reason
+    assert result["place_call_count"] == transport.placed == 0
+    assert result["cancel_call_count"] == transport.canceled == 0
+    assert result["attempt_consumed"] is False
+    assert result["effect_disposition"] == "NO_MUTATION"
+    assert not store.marker.exists()
+    assert not store.lifecycle.exists()
+    assert not store.ownership_path.exists()
+    assert plan.target_session == "2026-11-02"
+
+
+def test_same_premarket_plan_can_execute_later_without_consumed_authority(
+    ready_execution, monkeypatch
+):
+    plan, transport, store = ready_execution
+    digest = plan.plan_sha256
+    premarket = datetime(2026, 11, 2, 12, tzinfo=UTC)
+    monkeypatch.setattr(
+        execution, "datetime", SimpleNamespace(now=lambda tz: premarket)
+    )
+    blocked = execution.execute()
+    assert blocked["reason"] == "REGULAR_SESSION_NOT_OPEN"
+    assert blocked["place_call_count"] == transport.placed == 0
+    assert blocked["cancel_call_count"] == transport.canceled == 0
+    assert blocked["attempt_consumed"] is False
+    assert blocked["effect_disposition"] == "NO_MUTATION"
+    assert not store.marker.exists()
+    assert not store.lifecycle.exists()
+    assert not store.ownership_path.exists()
+
+    noon = datetime(2026, 11, 2, 17, tzinfo=UTC)
+    monkeypatch.setattr(execution, "datetime", SimpleNamespace(now=lambda tz: noon))
+    result = execution.execute()
+    assert result["status"] == "PASS"
+    assert result["receipt"]["state"] == "FILLED"
+    assert result["place_call_count"] == transport.placed == 1
+    assert result["cancel_call_count"] == transport.canceled == 0
+    assert result["attempt_consumed"] is True
+    assert result["effect_disposition"] == "RECONCILED"
+    assert load_binding(store.ownership_path, plan).plan_sha256 == digest
+    assert plan.plan_sha256 == digest
+    _assert_consumed_retry(transport, store)

@@ -6,7 +6,7 @@ import hashlib
 import json
 import subprocess
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -54,7 +54,6 @@ P6_STATE_FILES = (
     Path(r"F:\AI\desktop-bot-state\p6\live.sqlite"),
     Path(r"F:\AI\desktop-bot-state\p6\lifecycle.jsonl"),
 )
-OPENING_WINDOW = timedelta(minutes=5)
 NEW_YORK = ZoneInfo("America/New_York")
 
 
@@ -185,7 +184,7 @@ def build_live_plan(
 
     history = parse_equity_historicals_response(history_response, history_request)
     strategy = decide_live_strategy(history, None, policy)
-    target_session, window_open = _target_session(now)
+    target_session, _ = resolve_target_session(now)
     if strategy.decision is LiveStrategyDecision.NO_ACTION:
         return LiveExecutionPlan.create(
             source_head=source_head,
@@ -209,16 +208,6 @@ def build_live_plan(
             review=None,
             provider_warning_summary=(),
             state=LivePlanState.NO_ACTION,
-        )
-    if not window_open:
-        return _blocked_plan(
-            source_head,
-            source_tree,
-            policy,
-            target_session,
-            strategy,
-            observation,
-            "OPENING_WINDOW_CLOSED_NO_RETRY",
         )
     tradability = parse_tradability(
         transport.get_equity_tradability({"symbols": ["SPY"]})
@@ -437,17 +426,18 @@ def _spy_quantity(observation: RobinhoodReconciliationSnapshot) -> Decimal:
     )
 
 
-def _target_session(now: datetime) -> tuple[str, bool]:
-    local = now.astimezone(NEW_YORK)
+def resolve_target_session(now: datetime) -> tuple[str, bool]:
+    """Return the next executable published session and whether it is open."""
+    local = utc(now).astimezone(NEW_YORK)
     authority = NYSEPublishedRegularSessionAuthority()
     schedule = authority.schedule_for(local.date())
-    if schedule is None:
+    if schedule is None or local >= schedule.closes_at:
         session = NYSEMarketCalendar().next_session(now).session_date
         schedule = authority.schedule_for(session)
-    assert schedule is not None
-    local_now = now.astimezone(NEW_YORK)
-    opening = schedule.opens_at <= local_now < schedule.opens_at + OPENING_WINDOW
-    return schedule.session_date.isoformat(), opening
+    if schedule is None:
+        raise LivePreflightError("PUBLISHED_SESSION_UNAVAILABLE")
+    regular_open = schedule.opens_at <= local < schedule.closes_at
+    return schedule.session_date.isoformat(), regular_open
 
 
 def _order_arguments(

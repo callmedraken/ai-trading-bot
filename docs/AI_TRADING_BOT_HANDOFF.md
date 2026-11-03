@@ -1,6 +1,6 @@
 # AI Trading Bot — Current Handoff
 
-## Current boundary - P6 kill-operator candidate pending exact review
+## Current boundary - P6 kill-operator accepted/integrated
 
 Accepted P5B baseline source:
 
@@ -45,7 +45,7 @@ cursor 51; restart 51 -> 52; fill count 1 -> 1; no duplicate fill; network
 attempts 0; FINAL_HOLDOUT accesses 0; final runtime STOPPED. Production P5
 SQLite and lifecycle remained absent. Do not repeat the smoke or start a soak.
 
-## Current candidate and next step - exact-source review before integration
+## Accepted/integrated kill boundary and next step
 
 Registered checkpoint: `arch147-p6-tiny-live`.
 Canonical certification: GitHub-owned FULL, broad-1 through broad-7.
@@ -71,30 +71,32 @@ validation. The accepted result semantics preserve consumed cancel authority,
 truthful per-invocation counts and sanitized uncertainty. A cancel request
 acknowledgment is not terminal cancellation; only terminal broker
 reconciliation may be reported as terminal.
-The current additive kill-operator source candidate is on the same registered
+The accepted/integrated additive kill operator is on the same registered
 checkpoint and feature branch, based on integrated startup source:
 
-    HEAD fad9b1bd73dcbf9971d2bd771ee38a503d2d8bfd
-    TREE fb1f4da66304776a10b598bae1f13d25b0f89674
-    develop docs-only CI 41561984888 / attempt 1 / SUCCESS / MODE=DOCS_ONLY
+    IMPLEMENTATION HEAD f1558b97e60bb32fae2a9f1de23226d261418d99
+    IMPLEMENTATION TREE ed4a5a962aa6edd98235bf90dffb10e84a935b40
+    feature FULL 41575733423 / attempt 1 / SUCCESS
+    develop integration 41588005188 / attempt 1 / SUCCESS
+    develop certification reuse: exact_feature_certification
 
-The candidate remains unaccepted and unintegrated pending ChatGPT exact-source
-review and mapped canonical FULL evidence. Publication does not move develop.
-The source-owned CLI is `trading_bot.desktop_live.kill_operator`; it takes an
-immutable plan path, exact digest and fresh external evidence destination,
-never an arbitrary provider order ID. Placement creates and fsyncs the exact
-plan/local/provider ownership binding once under the P6 state root, before
-later broker reads. Kill has an independent explicit arm and no BUY-arm
-dependency, admits integrated source before credentials/provider construction,
-cancels at most once and observes once afterward. Recovery with a consumed
-cancel marker is observation-only. Partial fills survive cancellation of the
-remainder; there is no liquidation or additional BUY authority. Details and
-synthetic verification belong in the [contract](architecture/147-p6-tiny-live.md)
-and [validation](validation/arch147-p6-tiny-live.md).
+The source review accepted the exact durable plan/local/provider ownership
+binding, separate kill arm
+`AI_TRADING_BOT_P6_KILL_ARM=CANCEL_EXACT_OWNED_P6_ORDER`, and no dependency on
+the placement BUY arm. The source-owned CLI admits integrated source before
+credential/provider construction, takes an immutable plan path and exact digest,
+and never accepts an arbitrary provider order ID. Placement creates and fsyncs
+the binding once under the P6 state root. The kill path invokes cancel exactly
+zero or one time, and an existing consumed marker permits observation only, never
+a second cancel. A cancel acknowledgement is not terminal cancellation; one
+bounded reconciliation observation follows. Partial fills survive cancellation
+of the remainder, and there is no liquidation or additional BUY authority.
+Details and synthetic verification belong in the
+[contract](architecture/147-p6-tiny-live.md) and
+[validation](validation/arch147-p6-tiny-live.md).
 
-Next owner: ChatGPT, exact GitHub source/diff and terminal mapped FULL review,
-then independent integration-readiness determination. Preserve the one
-publication attempt; stop on source/CI/authority uncertainty. No merge or PR
-mutation is delegated here. P6 preflight, execute and the real kill operator
-must not run during or after this source publication. They remain protected
-boundaries after acceptance, integration and documentation closeout.
+Next step: ChatGPT exact review of this docs-only closeout and fast-forward
+integration, then one P6 read-only preflight from the final integrated source.
+P6 preflight, execute and the real kill operator must not run during this
+closeout. Source PASS or preflight PASS grants no live execution authority;
+live placement remains a later separate protected boundary.

@@ -67,10 +67,12 @@ marker failures preserve consumed state without a call. Returned evidence
 contains no raw provider exception text. Existing placement tests retain the
 consumed-before-placement and persisted terminal-reconciliation contract.
 
-The source-wide caller search found no operator caller of `kill_owned_order`:
-`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED`. This correction adds synthetic
-tests only, with no protected cancel operator or GUI cancellation. A separately
-reviewed operator-reachability milestone is required before first live execution.
+At the time of this historical shared-result correction, the source-wide caller
+search found no operator caller of `kill_owned_order`:
+`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED`. This preserved chronology
+describes that earlier source state only. The later accepted/integrated P6
+implementation adds the protected/disarmed operator reachability; no real kill
+invocation or GUI cancellation has occurred.
 
 ## Preserved publication chronology
 
@@ -81,24 +83,30 @@ develop run `41517145924` reached terminal success. Earlier feature failures
 (`f2b9f9a`) remain preserved; no failed attempt is rewritten or rerun. The wrapper
 correction isolates current P6 admission from the frozen historical
 `execute_checkpoint` body; the later test-module rename resolves collection
-identity. This source-only correction is based on that accepted integrated
-baseline and must earn its own admission and terminal mapped canonical FULL.
-Its publication does not authorize provider, credential, broker or live effects.
+identity. At that historical point, this source-only correction was based on that
+accepted integrated baseline and still had to earn its own admission and terminal
+mapped canonical FULL. Its publication did not authorize provider, credential,
+broker or live effects.
 
 The placement-evidence correction `c665b8d2ae0bc3df39c8a249388d60605d6fa87c`,
 tree `75ab3718dd92c497ab38e162db2d01980619033b`, completed GitHub run
 `41530516256` successfully on attempt 1. ChatGPT exact-source review rejected
 integration because the shared result abstraction misclassified cancel effects.
 This was a source-level review blocker, not a CI failure. That published commit
-and terminal-green evidence remain immutable. The shared cancel-result
-correction is its ordinary child and requires fresh admission and mapped FULL;
-develop remains at the accepted baseline pending independent exact-source review.
+and terminal-green evidence remain immutable. At that historical point, the
+shared cancel-result correction was its ordinary child and required fresh
+admission and mapped FULL; develop remained at the accepted baseline pending
+independent exact-source review.
 
 
-## Current exact-owned kill source candidate
+## Current exact-owned kill implementation — accepted/integrated
 
-The current candidate adds durable ownership and a separate operator arm;
-publication remains pending independent exact-source review and integration.
+The accepted/integrated implementation is `f1558b97e60bb32fae2a9f1de23226d261418d99`,
+tree `ed4a5a962aa6edd98235bf90dffb10e84a935b40`. Feature canonical FULL
+`41575733423` passed on attempt 1; develop integration CI `41588005188` passed
+on attempt 1 and reused the exact feature certification. Source review accepted
+the exact durable binding, separate kill interlock, at-most-one-cancel
+semantics, observation-only recovery and terminal reconciliation behavior.
 All verification uses synthetic state and fakes. No real CLI, P6 preflight,
 execute, credential/OAuth access, provider read, review/place/cancel, production
 P6 state or FINAL_HOLDOUT access is part of this milestone.
@@ -141,4 +149,5 @@ The P6 source inventory includes ownership and operator modules. Tests remain
 in the existing registered P6 modules, so shared checkpoint runner, `ops.ps1`,
 registry, workflow topology and historical pins need no change. Checks are
 semantic; no current function-body/AST hash, line/helper-order or ordinal pin
-is added. Canonical FULL remains GitHub-owned for the single publication.
+is added. The accepted feature and develop evidence above remains GitHub-owned;
+no protected effect occurred during implementation, certification or integration.

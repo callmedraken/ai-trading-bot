@@ -1,6 +1,6 @@
 # Architecture 147 — Single-user desktop product pivot
 
-Status: CURRENT product roadmap; real adjusted acquisition and filtered-trend campaign complete; P4 smoke complete; P5A/B1 accepted/integrated; B2 OPEN_REPLAY smoke complete; P5B-lite accepted/integrated with read-only provider baseline PASS; P6 source accepted/integrated; source-only consumed-attempt correction pending.
+Status: CURRENT product roadmap; real adjusted acquisition and filtered-trend campaign complete; P4 smoke complete; P5A/B1 accepted/integrated; B2 OPEN_REPLAY smoke complete; P5B-lite accepted/integrated with read-only provider baseline PASS; P6 source, consumed-attempt correction and kill reachability accepted/integrated; one read-only preflight next.
 
 The [P5B-lite read/account/reconciliation contract](147-p5b-robinhood-read-reconciliation.md)
 owns the additive current Robinhood read boundary. Frozen Architecture 131
@@ -51,7 +51,8 @@ review, order placement, paper effect, broker effect, or live effect.
     P3  real optimizer / walk-forward campaign + Research Results GUI
     P4  long-running desktop supervisor with concurrent trading + research workers and GUI Start/Stop
     P5  accepted OPEN_REPLAY smoke followed by a separately reviewed read/account/reconciliation baseline; no prolonged soak
-    P6  explicitly armed tiny restricted live through official Robinhood MCP / Agentic Trading
+    P6  accepted/integrated source -> one read-only preflight -> READY plan review
+        -> one explicitly armed <= $10 live trial -> post-trade reconciliation
     P7  production maturity / soak / monitoring / backup / restart / reconnect / credential rotation
 
 Trading and research may operate concurrently after P2. Paper trading remains
@@ -340,10 +341,13 @@ retry, repair, or current observer dispatch.
 
 The current registered checkpoint is `arch147-p6-tiny-live` on
 `feature/robinhood-p6-tiny-live-current`, with separately gated preflight and
-execution, and GitHub-owned canonical FULL. P6 source is accepted/integrated at
-`5330957b0c7c55d133503a1953ab38f97db31d92`; the current consumed-attempt evidence
-correction is source-only and requires its own admission, certification and
-review. P5B is accepted/integrated and its read-only provider baseline is PASS.
+execution, and GitHub-owned canonical FULL. P6 source, consumed-attempt
+truthfulness correction and exact-owned kill reachability are accepted/integrated
+at implementation source `f1558b97e60bb32fae2a9f1de23226d261418d99`, tree
+`ed4a5a962aa6edd98235bf90dffb10e84a935b40`. One P6 read-only preflight is next;
+after READY plan review, one explicitly armed `<= $10` live trial and post-trade
+reconciliation follow. P5B is accepted/integrated and its read-only provider
+baseline is PASS.
 P5A, P4 and P3 remain registered on their own branches. The normal development
 route is focused implementation -> focused tests -> one atomic candidate -> FEATURE +
 PROSPECTIVE_DEVELOP admission -> one push -> one CI -> exact review ->
@@ -542,7 +546,8 @@ auto-repair. P5C owns the separately reviewed process-recovery adapter. B1's
 `PAPER_EVALUATION` / `OPEN_REPLAY` smoke is complete. P5B-lite
 read/account/reconciliation source is accepted/integrated, and its
 separately reviewed read-only provider baseline is PASS with zero mutations.
-P6 source is accepted/integrated; the current source-only correction closes
-post-placement evidence truthfulness before any P6 protected attempt. P5B-lite
+P6 source, consumed-attempt truthfulness correction and exact-owned kill boundary
+are accepted/integrated; one P6 read-only preflight remains before any protected
+attempt. P5B-lite
 does not use historical order review or forward-paper fills. No prolonged paper
 soak is planned.

@@ -68,8 +68,9 @@ returns one cancel call, zero placement calls, a consumed attempt and
 marker blocks another invocation with zero new calls and preserves uncertainty.
 Marker persistence failure before invocation reports zero calls and retains any
 partial marker as consumed. The exact-owned kill operator below supplies the
-separate operator boundary; its source still requires independent exact review
-and integration before any protected invocation.
+separate operator boundary. Operator reachability is implemented and accepted
+in the current P6 source, but the operator remains protected and disarmed until
+it is explicitly invoked under its reviewed interlocks.
 
 The GUI is presentation-only. It may display sanitized cached plan/state facts,
 but it has no arm, place or cancel control. P6 state is separate from the P5
@@ -80,11 +81,17 @@ source checkpoint itself. The registered preflight and execute boundaries are
 later operator actions and are not run during publication.
 
 
-## Exact-owned-order kill operator source candidate
+## Exact-owned-order kill operator
 
-This additive source candidate remains under `arch147-p6-tiny-live` on
-`feature/robinhood-p6-tiny-live-current`. It grants no protected invocation.
-The GUI remains presentation-only, with no arm, place or cancel controls.
+This additive current capability is accepted/integrated at implementation source
+`f1558b97e60bb32fae2a9f1de23226d261418d99`, tree
+`ed4a5a962aa6edd98235bf90dffb10e84a935b40`, under
+`arch147-p6-tiny-live` on `feature/robinhood-p6-tiny-live-current`. It grants no
+protected invocation by itself: the operator remains protected/disarmed until
+its reviewed interlocks are explicitly satisfied. No real kill invocation has
+occurred. The GUI remains presentation-only, with no arm, place or cancel
+controls. P6 read-only preflight is next; live placement remains a later,
+separate protected boundary.
 
 Placement strictly parses the returned provider order token (1-128 ASCII
 letters, digits, hyphens or underscores; conflicting `id`/`order_id` values

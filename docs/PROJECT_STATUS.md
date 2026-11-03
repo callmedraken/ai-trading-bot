@@ -1,6 +1,6 @@
 # AI Trading Bot — Project Status
 
-## Current checkpoint — Architecture 147 P6 shared cancel-result correction
+## Current checkpoint — Architecture 147 P6 source accepted and integrated
 
 The accepted P5B Robinhood read/reconciliation baseline is the exact source
 `7ff86d06a99bcdf349d5e20846d139a554d8be46`, tree
@@ -11,13 +11,13 @@ mutation counts were zero; and production state remained unchanged. The
 account fingerprint is loaded from the external report and is not hard-coded
 in source or documentation.
 
-P6 source publication and develop integration are complete at the accepted
-baseline recorded in the handoff. The subsequent placement-evidence correction
-passed CI but exact-source review rejected integration because the shared result
-misclassified cancel effects. The current source-only correction preserves
-placement behavior and adds truthful consumed-cancel evidence. It requires fresh
-admission, mapped canonical FULL and exact-source review. The kill operator is
-not implemented and remains a separate milestone before first live execution.
+The P6 placement and cancel consumed-attempt truthfulness corrections are
+complete and accepted/integrated at exact HEAD
+`14c2a20b19381ca9ffb27d67faa873d8cecc283b`, tree
+`a949f9bad6f1538d2243c489cdddfc02deaf4f1d`. Feature CI run `41535508444`
+passed on attempt 1 with canonical FULL. Develop CI run `41554499626` passed on
+attempt 1 and reused the exact feature certification. No provider or live
+effect occurred during source publication or integration.
 
 P6 is a separate source/effect boundary in
 `F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`, branch
@@ -33,23 +33,24 @@ RiskManager composition, bounded review/reconciliation, create-only attempt
 markers and a disarmed-by-default execution entry point. No provider,
 credential, broker, order, live-state or FINAL_HOLDOUT effect occurs during
 this source checkpoint. The GUI exposes cached sanitized state only and has
-no arm or placement control.
+no arm, placement or cancellation control.
+`P6_KILL_OPERATOR_REACHABILITY=NOT_IMPLEMENTED` remains true. P6 preflight
+has not run and live execution has not occurred.
 
 ## Immediate next step
 
-Complete this correction as one atomic publication with GitHub-owned canonical
-FULL. ChatGPT then reviews its exact source and integration readiness. Do not
-invoke the registered P6 preflight or execute boundary during implementation,
-admission or CI. A source PASS grants no provider, credential, broker or live
-authority; any later protected action requires the separately reviewed exact
-P5B evidence and operator interlocks.
+The immediate next milestone is the separately reviewed P6 kill-operator
+boundary. P6 preflight must not run until that boundary is accepted,
+integrated and closed out. A source PASS grants no provider, credential,
+broker or live authority. P7 still follows the P6 live trial and reconciliation
+boundary.
 
 ## Roadmap
 
     P1-P4 accepted; real research and desktop lifecycle smoke complete
     P5A accepted; B1 35/50 SPY binding and B2 OPEN_REPLAY smoke complete
     P5B-lite accepted/integrated; reviewed read-only provider baseline PASS
-    P6 baseline integrated; cancel-result correction, then reviewed kill operator before live
+    P6 source accepted/integrated; reviewed kill operator before live
     P7 production monitoring / backup / restart / reconnect / credential rotation
 
 LIVE remains disabled. FINAL_HOLDOUT remains sealed. Architecture 131 stays a

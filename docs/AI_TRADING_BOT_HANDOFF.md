@@ -1,24 +1,37 @@
 # AI Trading Bot — Current Handoff
 
-## Current source correction — provider contract; review pending
+## Current source correction — P6 daily history; review pending
 
-The P6 provider-contract correction starts from integrated
-`c8eba0fd7fe8f629820b28db40aa5a4e8de7c5e0`, tree
-`bdeddc8e1c2a2d5f7475e42c91f0dccc800974e0`, on
-`feature/robinhood-p6-tiny-live-current`. The
-[P6 contract](architecture/147-p6-tiny-live.md) owns the corrected schemas,
-request/response handling and preserved blocked-attempt chronology. Neither
-preserved preflight attempt may be rerun or edited; the two subsequent schema
-observations are diagnostics, not additional preflight attempts. Earlier
-no-attempt statements below describe their historical source checkpoint.
+The current daily-history correction starts from integrated source:
 
-Immediate next step: ChatGPT exact-source review after one feature publication
-and terminal mapped GitHub FULL. If independently accepted, exact ff-only
-integration and terminal develop certification reuse precede exactly one fresh
-read-only P6 preflight through the non-terminating guarded wrapper, with no
-intervening docs-only publication. Implementation/certification must not run
-preflight or access real OAuth/provider/live state. Source PASS does not
-authorize live placement; that remains a separate protected boundary.
+    HEAD 7af23442ef212a29d02b9f7645deebbfa826f668
+    TREE 550ae6a92deb38656f92ccac62b938603bba4a1b
+
+Worktree: `F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`.
+Branch: `feature/robinhood-p6-tiny-live-current`.
+P6 selects exactly the latest 60 completed XNYS sessions with the shared request's
+unchanged `long_window + 1` semantics (P6 passes 59). Its additive current-live
+parser validates exact midnight UTC session-date labels and maps only internal
+timestamps to published opens. Optional session/interpolation semantics, strict
+coverage/staleness checks, raw retention and the fixed sanitized history failure
+code are owned by the [P6 contract](architecture/147-p6-tiny-live.md).
+Architecture-134 history source/pins remain frozen and unchanged.
+
+All three consumed preflight attempts and diagnostics remain untouched. The
+contract records the third blocked attempt (one historical call; zero later
+tradability/approval/review/place/cancel), valid source-bound observation and
+invalid earlier import provenance. Implementation uses only synthetic providers;
+no real OAuth, preflight, diagnostic or live state is accessed. Earlier
+no-attempt statements below describe historical source checkpoints.
+
+Immediate next step: ChatGPT independent exact-source review after one atomic
+source/test/docs publication and terminal mapped GitHub FULL. If accepted,
+exact ff-only integration and terminal develop exact-feature certification reuse
+precede exactly one fresh guarded read-only P6 preflight bound to the integrated
+HEAD/tree, with no intervening docs-only publication. Inspect latest completed
+history, tradability, approval, review and READY/NO_ACTION; place/cancel remain
+zero. Source PASS never authorizes placement; separately reviewed/armed <= $10
+execution remains a later protected boundary.
 
 ## Current boundary - P6 kill-operator accepted/integrated
 
@@ -115,7 +128,7 @@ Details and synthetic verification belong in the
 [contract](architecture/147-p6-tiny-live.md) and
 [validation](validation/arch147-p6-tiny-live.md).
 
-Next step: ChatGPT exact-source review of the provider-contract correction after
+Next step: ChatGPT exact-source review of the daily-history correction after
 terminal feature certification, following the current correction section above.
 No preflight, execute or real kill operator invocation occurs during this source
 correction. Live placement remains a later separate protected boundary.

@@ -1,16 +1,20 @@
 # AI Trading Bot — Project Status
 
-## Current source correction — provider contract; review pending
+## Current source correction — P6 daily history; review pending
 
-The P6 provider-contract correction preserves the SPY 35/50, dollar-only $10
-trial and consumed/no-retry policy. It separates review and placement arguments,
-uses deterministic provider UUID `ref_id`, sanitizes review conditions and binds
-only `data.order.id`. Details and preserved blocked-attempt chronology belong in
-the [P6 contract](architecture/147-p6-tiny-live.md); the active source boundary
-and next review are in the [handoff](AI_TRADING_BOT_HANDOFF.md).
+The current P6 correction starts from integrated `7af23442ef212a29d02b9f7645deebbfa826f668`
+(tree `550ae6a92deb38656f92ccac62b938603bba4a1b`). It requests exactly the
+latest 60 completed XNYS sessions and validates current provider midnight daily
+labels before mapping internally to published regular opens. Optional session/
+interpolation fields remain strictly constrained; stale/gapped evidence blocks.
+Architecture-134 history remains frozen. Strategy, provider order contract,
+execution/kill and consumed/no-retry semantics remain unchanged.
 
-No real provider, OAuth, preflight, review/place/cancel or live effect occurs in
-this source checkpoint. Earlier no-attempt statements below are historical.
+The [P6 contract](architecture/147-p6-tiny-live.md) owns the response contract,
+third consumed blocked preflight's truthful counts, source-bound diagnostic and
+all preserved attempt chronology. No real provider/OAuth/preflight/history/
+review/place/cancel/live effect occurs during this correction. Earlier no-attempt
+statements below describe historical source checkpoints.
 
 ## Current checkpoint - P6 kill-operator accepted/integrated
 
@@ -58,9 +62,10 @@ production-state or FINAL_HOLDOUT effect has occurred.
 
 ## Immediate next step
 
-ChatGPT exact-source review of the provider-contract correction is next, after
-terminal feature certification. Follow the current correction section above for
-integration, certification reuse and the later single fresh read-only preflight.
+ChatGPT independent exact-source review of the daily-history correction is next,
+after one atomic publication and terminal GitHub-owned FULL certification.
+Follow the current correction section above for integration, certification reuse
+and the later single fresh read-only preflight.
 One explicitly armed `<= $10` live trial and post-trade reconciliation remain
 separate requirements before P7 production maturity.
 
@@ -69,7 +74,8 @@ separate requirements before P7 production maturity.
     P1-P4 accepted; real research and desktop lifecycle smoke complete
     P5A accepted; B1 35/50 SPY binding and B2 OPEN_REPLAY smoke complete
     P5B-lite accepted/integrated; reviewed read-only provider baseline PASS
-    P6 kill-operator accepted/integrated; read-only preflight next, then one
+    P6 kill-operator accepted/integrated; daily-history source review next, then
+        integrated/certified read-only preflight, followed by one
         explicitly armed <= $10 live trial and post-trade reconciliation
     P7 production monitoring / backup / restart / reconnect / credential rotation
 

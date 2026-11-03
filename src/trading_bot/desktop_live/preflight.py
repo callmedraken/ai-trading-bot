@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -26,6 +28,7 @@ from trading_bot.desktop_live.models import (
 )
 from trading_bot.desktop_live.risk import build_live_risk
 from trading_bot.desktop_live.strategy import (
+    MIN_COMPLETED_BARS,
     LiveStrategyDecision,
     decide_live_strategy,
 )
@@ -34,8 +37,13 @@ from trading_bot.desktop_paper.robinhood_reconciliation import (
     RobinhoodReconciliationSnapshot,
     observe_robinhood_baseline,
 )
+from trading_bot.domain import Bar
 from trading_bot.market_calendar import NYSEMarketCalendar
-from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalendar
+from trading_bot.market_data import (
+    XNYS_CALENDAR_DESCRIPTOR,
+    BoundMarketCalendar,
+    DailySnapshotBar,
+)
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
@@ -43,7 +51,10 @@ from trading_bot.robinhood_mcp.current_live_transport import (
     CurrentLiveTransportError,
     RobinhoodCurrentLiveTransport,
 )
-from trading_bot.robinhood_mcp.historical import RobinhoodDailyHistoryRequest
+from trading_bot.robinhood_mcp.historical import (
+    RobinhoodDailyHistory,
+    RobinhoodDailyHistoryRequest,
+)
 
 P5B_EVIDENCE_ROOT = (
     Path(r"F:\AI\temp\ai-trading-bot-checkpoints")
@@ -56,6 +67,8 @@ P6_STATE_FILES = (
     Path(r"F:\AI\desktop-bot-state\p6\lifecycle.jsonl"),
 )
 NEW_YORK = ZoneInfo("America/New_York")
+_P6_HISTORY_MAX_BYTES = 4 * 1024 * 1024
+_P6_HISTORY_PRICE = re.compile(r"[0-9]+(?:\.[0-9]+)?\Z")
 
 
 class LivePreflightError(RuntimeError):
@@ -73,6 +86,7 @@ _FAILURE_CODES = {
             "FIRST_SPY_POSITION_NOT_ZERO",
             "UNEXPECTED_WORKING_ORDER",
             "PUBLISHED_SESSION_UNAVAILABLE",
+            "P6_HISTORY_RESPONSE_INVALID",
         }
     ),
     CurrentLiveTransportError: frozenset(
@@ -217,11 +231,11 @@ def build_live_plan(
     observation = observe_robinhood_baseline(transport, observed_at=now)
     _require_clean_first_baseline(observation, p5b)
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    history_request = RobinhoodDailyHistoryRequest(LIVE_SYMBOL, now, 60, calendar)
+    history_request = RobinhoodDailyHistoryRequest(
+        LIVE_SYMBOL, now, MIN_COMPLETED_BARS - 1, calendar
+    )
     history_response = transport.get_equity_historicals(history_request.arguments())
-    from trading_bot.robinhood_mcp.historical import parse_equity_historicals_response
-
-    history = parse_equity_historicals_response(history_response, history_request)
+    history = parse_p6_current_live_history(history_response, history_request)
     strategy = decide_live_strategy(history, None, policy)
     target_session, _ = resolve_target_session(now)
     if strategy.decision is LiveStrategyDecision.NO_ACTION:
@@ -324,6 +338,135 @@ def build_live_plan(
         provider_warning_summary=warnings,
         state=state,
     )
+
+
+def parse_p6_current_live_history(
+    payload: Mapping[str, object], request: RobinhoodDailyHistoryRequest
+) -> RobinhoodDailyHistory:
+    """Validate current daily labels before mapping to published XNYS opens.
+
+    This is a P6 successor boundary; Architecture 134's parser stays frozen.
+    The unmodified structured payload is retained only in canonical audit bytes,
+    never projected into the sanitized plan or preflight evidence.
+    """
+    if (
+        type(request) is not RobinhoodDailyHistoryRequest
+        or request.symbol != LIVE_SYMBOL
+        or request.long_window != MIN_COMPLETED_BARS - 1
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    root = _p6_history_object(payload, {"data", "guide"})
+    if type(root["guide"]) is not str or not root["guide"].strip():
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    data = _p6_history_object(root["data"], {"results"}, {"not_found"})
+    not_found = data.get("not_found")
+    if not_found is not None and not (type(not_found) is list and len(not_found) == 0):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    results = data["results"]
+    if type(results) is not list or len(results) != 1:
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    result = _p6_history_object(results[0], {"symbol", "interval", "bounds", "bars"})
+    if (
+        result["symbol"] != "SPY"
+        or result["interval"] != "day"
+        or result["bounds"] != "regular"
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    sessions = request.sessions()
+    raw_bars = result["bars"]
+    if (
+        len(sessions) != MIN_COMPLETED_BARS
+        or type(raw_bars) is not list
+        or len(raw_bars) != MIN_COMPLETED_BARS
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    authority = NYSEPublishedRegularSessionAuthority()
+    bars = []
+    for raw, session in zip(raw_bars, sessions, strict=True):
+        item = _p6_history_object(
+            raw,
+            {
+                "begins_at",
+                "open_price",
+                "high_price",
+                "low_price",
+                "close_price",
+                "volume",
+            },
+            {"session", "interpolated"},
+        )
+        if "session" in item and (
+            type(item["session"]) is not str or item["session"] != "reg"
+        ):
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+        if "interpolated" in item and item["interpolated"] is not False:
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+        # Exact string equality also rejects offsets, fractional seconds, invalid
+        # dates and same-date arbitrary times. Never sort, shift or drop bars.
+        if (
+            type(item["begins_at"]) is not str
+            or item["begins_at"] != f"{session.session_date.isoformat()}T00:00:00Z"
+        ):
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+        schedule = authority.schedule_for(session.session_date)
+        if schedule is None or schedule.closes_at >= request.requested_at:
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+        volume = item["volume"]
+        if type(volume) is not int or volume <= 0:
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+        try:
+            bar = Bar(
+                request.symbol,
+                schedule.opens_at,
+                *(
+                    _p6_history_price(item[key])
+                    for key in ("open_price", "high_price", "low_price", "close_price")
+                ),
+                volume,
+            )
+        except (TypeError, ValueError):
+            raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID") from None
+        bars.append(DailySnapshotBar(session, bar))
+    try:
+        response_bytes = (
+            json.dumps(
+                payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+                allow_nan=False,
+            )
+            + "\n"
+        ).encode("utf-8")
+    except (TypeError, ValueError, UnicodeError, RecursionError):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID") from None
+    if len(response_bytes) > _P6_HISTORY_MAX_BYTES:
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    return RobinhoodDailyHistory(request, tuple(bars), response_bytes)
+
+
+def _p6_history_object(
+    value: object, required: set[str], optional: set[str] | frozenset[str] = frozenset()
+) -> Mapping[str, object]:
+    if (
+        not isinstance(value, Mapping)
+        or not required <= set(value) <= required | optional
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    return value
+
+
+def _p6_history_price(value: object) -> Decimal:
+    if (
+        type(value) is not str
+        or len(value) > 128
+        or _P6_HISTORY_PRICE.fullmatch(value) is None
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    price = Decimal(value)
+    if not price.is_finite() or price <= 0:
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
+    return price
 
 
 def preflight() -> dict[str, object]:

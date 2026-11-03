@@ -65,8 +65,8 @@ directory is created. It then discovers exactly one matching PASS report under
 the stable external P5B checkpoint root, requiring the accepted P5B HEAD/tree,
 zero mutation/review/place/cancel effects and unchanged production state. It
 resolves the canonical Agentic account, compares the runtime fingerprint,
-confirms zero positions and working orders, acquires at least 60 completed raw
-regular daily bars through the strict Robinhood history parser, composes the
+confirms zero positions and working orders, acquires exactly the latest 60
+completed raw regular daily bars through the P6 current-live parser, composes the
 existing `RiskManager`, and returns a sanitized immutable plan. Preflight never
 places or cancels.
 
@@ -204,7 +204,7 @@ No source test, admission or CI invocation runs this real CLI or creates
 production P6 state. No P6 preflight follows this publication automatically.
 
 
-## Current provider-contract correction and preserved observations
+## Prior provider-contract correction and preserved observations
 
 This correction starts at integrated `c8eba0fd7fe8f629820b28db40aa5a4e8de7c5e0`,
 tree `bdeddc8e1c2a2d5f7475e42c91f0dccc800974e0`. It changes only current P6
@@ -212,7 +212,7 @@ transport/order handling, synthetic regressions and directly related docs;
 shared runner, registry, workflow and historical authority are unchanged.
 Review requires the observed direct `data` object, not synthetic `data.result`.
 
-Preserve both external P6 read-only preflight attempts under
+The first two external P6 read-only preflight attempts are preserved under
 `F:\AI\temp\ai-trading-bot-checkpoints` without editing or rerunning them:
 
 - `arch147-p6-readonly-preflight-ba74d5b258a54279916537e5cf7435d5` returned
@@ -228,4 +228,104 @@ the basis for this correction; implementation must not repeat those observations
 After independent exact-source acceptance, exact ff-only integration and terminal
 develop certification reuse, the next protected step is exactly one fresh P6
 read-only preflight through the non-terminating guarded wrapper. Source success
-never authorizes live placement. Neither prior attempt is retried or repointed.
+never authorizes live placement. No prior attempt is retried or repointed; the third consumed attempt is recorded below.
+
+
+## Current daily-history boundary correction — source review pending
+
+Starting source is integrated HEAD `7af23442ef212a29d02b9f7645deebbfa826f668`,
+tree `550ae6a92deb38656f92ccac62b938603bba4a1b`. This additive P6 correction
+leaves `robinhood_mcp/historical.py`, Architecture-134 qualification source,
+its frozen source pins/tests/docs and all shared runner/workflow topology
+unchanged. Provider-contract, execution, ownership and kill semantics remain
+unchanged. Strategy remains SPY BASE_MA 35/50 with the accepted candidate
+identity and unchanged math/digest material.
+
+P6 constructs `RobinhoodDailyHistoryRequest` with
+`long_window=MIN_COMPLETED_BARS - 1` (59). The shared helper still selects
+`long_window + 1` sessions. P6 therefore requests exactly the latest 60
+published, completed XNYS sessions as of observation time, including the latest
+selected completed session. During November 3's regular session this ends on
+November 2, 2026. The single request explicitly sends one SPY symbol,
+start/end times, `interval=day`, `bounds=regular`, `adjustment_type=none`.
+There is no retry, shifted/larger range, padding, sorting, history fallback or
+second request.
+
+`parse_p6_current_live_history` requires exactly `data` and nonblank text
+`guide` at root; `data` requires `results` and permits only optional `not_found`
+(absent, null or an empty list). Nonempty/malformed `not_found` blocks.
+Exactly one result must contain exactly `symbol`, `interval`, `bounds`, `bars`,
+echoing SPY/day/regular. Output `adjustment_type` is not advertised or required;
+raw unadjusted semantics remain bound by the explicit request. Unknown fields
+at every envelope/result/bar level block.
+
+Exactly 60 bars must match the selected session tuple in its given order.
+Each `begins_at` must be exactly that session date plus `T00:00:00Z`: exact
+RFC3339 UTC seconds at midnight, with no offset/fractional or regular-open
+compatibility variant. Only after exact date validation is internal
+`Bar.timestamp` normalized to that session's published `schedule.opens_at`.
+Missing, extra, stale, duplicate, reversed, skipped or future sessions block;
+a stale 60-bar prefix ending October 30 cannot substitute for a selection
+ending November 2. No provider payload is rewritten for normalization.
+
+Bar required fields are `begins_at`, four OHLC price fields and `volume`.
+Optional `session`, when present, must be exactly text `reg`; omission is
+allowed only with the independent regular request/echo and exact selected-date
+contract. Optional `interpolated`, when present, must be exact boolean false;
+true or any non-boolean blocks. Omission is allowed only with positive integer
+volume, regular bounds and exact consecutive selected-session coverage.
+Prices are positive finite bounded decimal strings (128 characters maximum,
+no exponent); volume is a positive integer, never bool/float. Existing `Bar`
+OHLC consistency checks still apply. Nothing is imputed or gap-filled.
+
+Canonical raw structured-response bytes retain the entire unmodified payload,
+including provider midnight labels and original optional-field presence, with
+sorted keys, compact JSON, ASCII escaping, no NaN, a trailing newline and a
+4 MiB ceiling. These audit bytes and provider `guide` are never copied into
+sanitized P6 plan/preflight evidence. No OAuth material, account identifier or
+arbitrary exception text is added. Current-history rejection surfaces only
+`P6_PLAN_BUILD_BLOCKED` / `P6_HISTORY_RESPONSE_INVALID`. Transport call failures
+remain distinct (`LIVE_REQUEST_FAILED`) with invocation-before-call accounting.
+The strategy receives exactly 60 completed bars on this path; its minimum stays
+60 and its digest still binds count, previous session, fast/slow averages,
+raw signal and invested state.
+
+### Third consumed preflight and source-bound historical observation
+
+Preserve all three consumed attempts and every existing diagnostic unchanged.
+The third is
+`arch147-p6-readonly-preflight-4481295e3a534bdab82f792f06868069`, bound to the
+starting HEAD/tree above. It returned `P6_PLAN_BUILD_BLOCKED`,
+`failure_code=NONE`, `identity_stable=True`, production state unchanged.
+Truthful invocation counts were accounts=2, portfolio=1, positions=1, quotes=1,
+orders=1, historicals=1; tradability=0, trade approval=0, review=0, place=0,
+cancel=0. No live mutation occurred.
+
+The valid source-bound historical diagnostic inserted the reviewed worktree's
+`src` before any `trading_bot` import and used the same starting HEAD/tree.
+It invoked exactly one historical tool and no other Robinhood tool. The old
+P6 request selected 61 sessions; the provider returned 60 bars, first
+`2026-08-07T00:00:00Z`, last `2026-10-30T00:00:00Z`. All 60 parsed dates
+matched expected XNYS sessions, all had `session=reg`, all omitted
+`interpolated`, and zero timestamps equaled the published regular open.
+Root keys were `data`/`guide`, data contained `results`, and the result contained
+`bars`/`bounds`/`interval`/`symbol` with SPY/day/regular and no adjustment echo.
+The frozen parser reported `BAR_COUNT_OR_SESSION_GAP`. Production state was
+unchanged. The earlier diagnostic importing from `F:\AI\ai-trading-bot` is
+invalid source evidence and supplies no behavioral authority. The preserved
+tools/list/schema observations are diagnostics, not preflight attempts.
+No provider/OAuth diagnostic or real preflight is repeated in this correction.
+
+### Review and next protected boundary
+
+One atomic source/test/docs publication requires focused synthetic regressions,
+Ruff/diff, FEATURE and PROSPECTIVE_DEVELOP admission, then one GitHub-owned
+canonical FULL run. No local FULL or real provider/OAuth/preflight/history/
+review/place/cancel/live effect is part of implementation or certification.
+After independent ChatGPT exact-source acceptance, exact ff-only integration
+and terminal develop exact-feature certification reuse precede exactly one
+fresh guarded read-only P6 preflight bound to the integrated HEAD/tree, with
+no intervening docs-only commit. Preserve all three consumed attempts. Inspect
+latest completed history, tradability, approval, review and READY/NO_ACTION;
+place/cancel remain zero. Source acceptance never authorizes placement; a
+separately reviewed/armed <= $10 execution remains a later protected boundary.

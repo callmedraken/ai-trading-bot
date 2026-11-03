@@ -14,9 +14,9 @@ prove the following before publication:
    current Architecture 147 live mutation methods.
 3. Tool discovery fails closed when any required tool or dollar-order schema is
    absent; no share-quantity fallback or generic dispatch exists.
-4. Strategy evaluation uses only the accepted SPY 35/50 BASE_MA signal over at
-   least 60 completed raw regular daily bars and never uses FINAL_HOLDOUT or
-   Alpaca data.
+4. Strategy evaluation uses only the accepted SPY 35/50 BASE_MA signal over exactly
+   the latest 60 completed raw regular daily bars on the current-live path and
+   never uses FINAL_HOLDOUT or Alpaca data.
 5. Risk rejects non-SPY, short, leveraged, unsupported, over-$10 or over-$10
    gross exposure intents and proves cash/equity coverage before a BUY.
 6. Plans are immutable, source- and digest-bound, sanitized, and preserve
@@ -151,3 +151,21 @@ registry, workflow topology and historical pins need no change. Checks are
 semantic; no current function-body/AST hash, line/helper-order or ordinal pin
 is added. The accepted feature and develop evidence above remains GitHub-owned;
 no protected effect occurred during implementation, certification or integration.
+
+
+## Current P6 daily-history successor validation
+
+Synthetic tests cover exactly 60 selected sessions (shared request long_window=59),
+latest-completed-session inclusion, current midnight labels, published-open
+normalization, unmodified bounded canonical audit bytes, optional session/reg
+and interpolated/false semantics, strict envelope/OHLCV, and rejection of stale,
+gapped, duplicate, reversed, extra or future sessions. History validation through
+the fake transport/preflight path yields `P6_PLAN_BUILD_BLOCKED` with fixed
+`P6_HISTORY_RESPONSE_INVALID`, one attempted historical call and zero later
+tradability/approval/review/place/cancel; transport `LIVE_REQUEST_FAILED` remains
+distinct. Sanitized evidence excludes provider guide/parser detail. Strategy
+receives exactly 60 bars with unchanged MA35/50 math and digest fields.
+Architecture-134 historical source/qualification/pins and shared runner topology
+are unchanged. Prior consumed attempts/diagnostics remain untouched; their
+chronology is owned by the [P6 contract](../architecture/147-p6-tiny-live.md).
+No real provider/OAuth/preflight/history/order/live effect occurs during testing.

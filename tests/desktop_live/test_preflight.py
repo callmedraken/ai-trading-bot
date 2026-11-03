@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -196,27 +197,22 @@ class _PlanTransport:
         request = RobinhoodDailyHistoryRequest(
             preflight.LIVE_SYMBOL,
             self.now,
-            60,
+            preflight.MIN_COMPLETED_BARS - 1,
             BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
         )
         assert arguments == request.arguments()
-        authority = NYSEPublishedRegularSessionAuthority()
         bars = []
         for index, session in enumerate(request.sessions()):
-            schedule = authority.schedule_for(session.session_date)
             price = str(100 + index if self.rising else 200 - index)
             bars.append(
                 {
-                    "begins_at": schedule.opens_at.astimezone(UTC).strftime(
-                        "%Y-%m-%dT%H:%M:%SZ"
-                    ),
+                    "begins_at": f"{session.session_date.isoformat()}T00:00:00Z",
                     "open_price": price,
                     "high_price": price,
                     "low_price": price,
                     "close_price": price,
                     "volume": 100,
                     "session": "reg",
-                    "interpolated": False,
                 }
             )
         return {
@@ -226,7 +222,6 @@ class _PlanTransport:
                         "symbol": "SPY",
                         "interval": "day",
                         "bounds": "regular",
-                        "adjustment_type": "none",
                         "bars": bars,
                     }
                 ]
@@ -666,3 +661,390 @@ def test_review_drift_and_malformed_conditions_block_sanitized_preflight(
     assert result["order_placement_count"] == result["order_cancel_count"] == 0
     assert transport.placed == transport.canceled == 0
     assert result["production_state_unchanged"]
+
+
+@pytest.fixture
+def current_history():
+    now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
+    request = RobinhoodDailyHistoryRequest(
+        preflight.LIVE_SYMBOL,
+        now,
+        preflight.MIN_COMPLETED_BARS - 1,
+        BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
+    )
+    payload = _PlanTransport(now).get_equity_historicals(request.arguments())
+    return request, payload
+
+
+def test_p6_requests_exactly_latest_60_and_shared_request_still_adds_one(
+    current_history, monkeypatch, plan_builder
+):
+    request, _ = current_history
+    assert request.long_window == preflight.MIN_COMPLETED_BARS - 1 == 59
+    assert len(request.sessions()) == preflight.MIN_COMPLETED_BARS == 60
+    assert request.sessions()[-1].session_date.isoformat() == "2026-11-02"
+    older_contract = RobinhoodDailyHistoryRequest(
+        request.symbol, request.requested_at, 60, request.calendar
+    )
+    assert len(older_contract.sessions()) == 61
+    assert older_contract.sessions()[1:] == request.sessions()
+    authority = NYSEPublishedRegularSessionAuthority()
+    first = authority.schedule_for(request.sessions()[0].session_date)
+    last = authority.schedule_for(request.sessions()[-1].session_date)
+    assert request.arguments() == {
+        "symbols": ["SPY"],
+        "start_time": first.opens_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "end_time": last.closes_at.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "interval": "day",
+        "bounds": "regular",
+        "adjustment_type": "none",
+    }
+    seen = []
+    original = preflight.decide_live_strategy
+
+    def strategy(history, position, policy):
+        assert history.request.long_window == 59
+        result = original(history, position, policy)
+        assert len(history.bars) == result.completed_bar_count == 60
+        assert result.previous_completed_session == "2026-11-02"
+        seen.append(result)
+        return result
+
+    monkeypatch.setattr(preflight, "decide_live_strategy", strategy)
+    plan, transport = plan_builder("2026-11-03T17:00:00+00:00")
+    assert plan.state is LivePlanState.READY
+    assert plan.signal_values_digest == seen[0].values_digest
+    assert dict(transport.call_counts)["get_equity_historicals"] == 1
+
+
+@pytest.mark.parametrize("session_present", (True, False))
+@pytest.mark.parametrize("interpolated_present", (True, False))
+@pytest.mark.parametrize("not_found", ("absent", None, []))
+def test_current_history_maps_only_exact_dates_and_retains_unmodified_raw_bytes(
+    current_history, session_present, interpolated_present, not_found
+):
+    request, payload = current_history
+    if not_found != "absent":
+        payload["data"]["not_found"] = not_found
+    raw_bars = payload["data"]["results"][0]["bars"]
+    for item in raw_bars:
+        if not session_present:
+            del item["session"]
+        if interpolated_present:
+            item["interpolated"] = False
+    before = deepcopy(payload)
+    history = preflight.parse_p6_current_live_history(payload, request)
+    assert payload == before
+    assert len(history.bars) == 60
+    assert history.bars[-1].session.session_date.isoformat() == "2026-11-02"
+    authority = NYSEPublishedRegularSessionAuthority()
+    for raw, item, session in zip(
+        raw_bars, history.bars, request.sessions(), strict=True
+    ):
+        assert item.session == session
+        assert raw["begins_at"] == f"{session.session_date.isoformat()}T00:00:00Z"
+        assert (
+            item.bar.timestamp == authority.schedule_for(session.session_date).opens_at
+        )
+        assert item.bar.timestamp.astimezone(UTC).hour != 0
+    assert history.response_bytes == (
+        json.dumps(
+            payload,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        )
+        + "\n"
+    ).encode("utf-8")
+    assert json.loads(history.response_bytes) == before
+    assert "adjustment_type" not in payload["data"]["results"][0]
+
+
+@pytest.mark.parametrize(
+    "scope,field,value",
+    [
+        ("root", "data", None),
+        ("root", "guide", ""),
+        ("root", "guide", " \t"),
+        ("root", "guide", None),
+        ("root", "guide", 1),
+        ("data", "results", []),
+        ("data", "results", {}),
+        ("data", "results", [None]),
+        ("data", "results", [{}, {}]),
+        ("data", "not_found", ["SPY"]),
+        ("data", "not_found", {}),
+        ("data", "not_found", ""),
+        ("data", "not_found", False),
+        ("result", "symbol", "QQQ"),
+        ("result", "interval", "hour"),
+        ("result", "bounds", "extended"),
+        ("result", "bars", None),
+        ("bar", "session", "pre"),
+        ("bar", "session", "post"),
+        ("bar", "session", ""),
+        ("bar", "session", None),
+        ("bar", "session", 1),
+        ("bar", "session", False),
+        ("bar", "interpolated", True),
+        ("bar", "interpolated", "false"),
+        ("bar", "interpolated", 0),
+        ("bar", "interpolated", None),
+        ("bar", "interpolated", []),
+        ("bar", "volume", 0),
+        ("bar", "volume", -1),
+        ("bar", "volume", True),
+        ("bar", "volume", False),
+        ("bar", "volume", 100.0),
+        ("bar", "volume", "100"),
+        ("bar", "volume", None),
+        ("bar", "begins_at", "2026-02-30T00:00:00Z"),
+        ("bar", "begins_at", None),
+        ("bar", "begins_at", 0),
+        ("bar", "begins_at", SECRET),
+    ],
+)
+def test_current_history_rejects_contract_drift(current_history, scope, field, value):
+    request, payload = current_history
+    result = payload["data"]["results"][0]
+    target = {
+        "root": payload,
+        "data": payload["data"],
+        "result": result,
+        "bar": result["bars"][0],
+    }[scope]
+    target[field] = value
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+@pytest.mark.parametrize(
+    "field", ("open_price", "high_price", "low_price", "close_price")
+)
+@pytest.mark.parametrize(
+    "value",
+    (
+        "0",
+        "-1",
+        "NaN",
+        "Infinity",
+        "1e2",
+        "1E2",
+        "",
+        " 1",
+        "1\n",
+        ".5",
+        "1.",
+        "1" * 129,
+        1,
+        1.0,
+        True,
+        None,
+    ),
+)
+def test_current_history_requires_bounded_positive_decimal_text(
+    current_history, field, value
+):
+    request, payload = current_history
+    payload["data"]["results"][0]["bars"][0][field] = value
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    (
+        ("high_price", "99"),
+        ("low_price", "101"),
+        ("open_price", "102"),
+        ("close_price", "98"),
+    ),
+)
+def test_current_history_retains_bar_ohlc_consistency(current_history, field, value):
+    request, payload = current_history
+    payload["data"]["results"][0]["bars"][0][field] = value
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "59",
+        "61",
+        "stale",
+        "duplicate",
+        "missing-middle",
+        "reversed",
+        "future",
+        "same-date",
+        "exact-open",
+        "offset",
+        "fractional",
+        "date-only",
+        "lower-z",
+    ),
+)
+def test_current_history_rejects_count_gaps_order_staleness_and_non_midnight_labels(
+    current_history, defect
+):
+    request, payload = current_history
+    result = payload["data"]["results"][0]
+    bars = result["bars"]
+    if defect == "59":
+        bars.pop()
+    elif defect == "61":
+        bars.append(deepcopy(bars[-1]))
+    elif defect == "stale":
+        stale_request = RobinhoodDailyHistoryRequest(
+            request.symbol,
+            datetime(2026, 11, 2, 17, 0, tzinfo=UTC),
+            59,
+            request.calendar,
+        )
+        for bar, session in zip(bars, stale_request.sessions(), strict=True):
+            bar["begins_at"] = f"{session.session_date.isoformat()}T00:00:00Z"
+        assert bars[-1]["begins_at"] == "2026-10-30T00:00:00Z"
+    elif defect == "duplicate":
+        bars[30] = deepcopy(bars[29])
+    elif defect == "missing-middle":
+        bars.pop(30)
+        bars.append(deepcopy(bars[-1]))
+    elif defect == "reversed":
+        bars.reverse()
+    elif defect == "future":
+        bars[-1]["begins_at"] = "2026-11-03T00:00:00Z"
+    else:
+        label = bars[0]["begins_at"]
+        if defect == "same-date":
+            bars[0]["begins_at"] = label.replace("T00:", "T01:")
+        elif defect == "exact-open":
+            schedule = NYSEPublishedRegularSessionAuthority().schedule_for(
+                request.sessions()[0].session_date
+            )
+            bars[0]["begins_at"] = schedule.opens_at.astimezone(UTC).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+        elif defect == "offset":
+            bars[0]["begins_at"] = label.replace("Z", "+00:00")
+        elif defect == "fractional":
+            bars[0]["begins_at"] = label.replace("Z", ".000Z")
+        elif defect == "date-only":
+            bars[0]["begins_at"] = label[:10]
+        else:
+            bars[0]["begins_at"] = label.replace("Z", "z")
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+@pytest.mark.parametrize("scope", ("root", "data", "result", "bar"))
+@pytest.mark.parametrize("change", ("missing", "unknown"))
+def test_current_history_rejects_missing_and_unknown_schema_fields(
+    current_history, scope, change
+):
+    request, payload = current_history
+    result = payload["data"]["results"][0]
+    target = {
+        "root": payload,
+        "data": payload["data"],
+        "result": result,
+        "bar": result["bars"][0],
+    }[scope]
+    if change == "unknown":
+        target["unadvertised"] = SECRET
+    else:
+        del target[
+            {
+                "root": "guide",
+                "data": "results",
+                "result": "symbol",
+                "bar": "open_price",
+            }[scope]
+        ]
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+def test_current_history_rejects_unadvertised_adjustment_echo(current_history):
+    request, payload = current_history
+    payload["data"]["results"][0]["adjustment_type"] = "none"
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+def test_current_history_retention_has_explicit_byte_ceiling(current_history):
+    request, payload = current_history
+    payload["guide"] = "x" * (4 * 1024 * 1024)
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_HISTORY_RESPONSE_INVALID$"
+    ):
+        preflight.parse_p6_current_live_history(payload, request)
+
+
+@pytest.mark.parametrize("failure", ("history-contract", "history-transport"))
+def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
+    monkeypatch, preflight_environment, plan_builder, failure
+):
+    # Use the real transport invocation boundary with an entirely fake SDK.
+    now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
+    payload = _PlanTransport(now).get_equity_historicals(
+        RobinhoodDailyHistoryRequest(
+            preflight.LIVE_SYMBOL,
+            now,
+            59,
+            BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
+        ).arguments()
+    )
+    payload["guide"] = SECRET
+    payload["data"]["results"][0]["bars"][30]["close_price"] = SECRET
+
+    class Session(_PreflightSession):
+        async def call_tool(self, name, arguments):
+            assert name in {"get_accounts", "get_equity_historicals"}
+            self.calls.append(name)
+            if name == "get_accounts":
+                response = {
+                    "data": {
+                        "accounts": [
+                            {"account_number": "SYNTHETIC", "agentic_allowed": True}
+                        ]
+                    }
+                }
+            elif failure == "history-transport":
+                raise RuntimeError(SECRET)
+            else:
+                response = payload
+            return SimpleNamespace(is_error=False, structured_content=response)
+
+    session = Session()
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+    monkeypatch.setattr(preflight, "_transport", lambda: transport)
+    monkeypatch.setattr(preflight, "datetime", SimpleNamespace(now=lambda _: now))
+    result = preflight.preflight()
+    expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+    expected["get_accounts"] = expected["get_equity_historicals"] = 1
+    code = (
+        "P6_HISTORY_RESPONSE_INVALID"
+        if failure == "history-contract"
+        else "LIVE_REQUEST_FAILED"
+    )
+    _assert_blocked(
+        result, "P6_PLAN_BUILD_BLOCKED", expected, preflight_environment, code=code
+    )
+    assert session.calls == ["get_accounts", "get_equity_historicals"]
+    assert dict(transport.call_counts) == expected
+    assert "guide" not in json.dumps(result)
+    assert "close_price" not in json.dumps(result)

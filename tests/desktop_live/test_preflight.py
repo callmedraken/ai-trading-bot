@@ -13,6 +13,11 @@ from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalenda
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
+from trading_bot.robinhood_mcp.current_live_transport import (
+    LIVE_TOOL_SURFACE,
+    CurrentLiveTransportError,
+    RobinhoodCurrentLiveTransport,
+)
 from trading_bot.robinhood_mcp.historical import RobinhoodDailyHistoryRequest
 
 HEAD = "7ff86d06a99bcdf349d5e20846d139a554d8be46"
@@ -159,11 +164,17 @@ class _PlanTransport:
         self.reviews = 0
         self.placed = 0
         self.canceled = 0
+        self._counts = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+    @property
+    def call_counts(self):
+        return tuple(self._counts.items())
 
     def discover_required_capabilities(self):
         pass
 
     def get_accounts(self):
+        self._counts["get_accounts"] += 1
         return {
             "data": {
                 "accounts": [{"account_number": "SYNTHETIC", "agentic_allowed": True}]
@@ -178,6 +189,7 @@ class _PlanTransport:
     get_equity_orders = get_portfolio
 
     def get_equity_historicals(self, arguments):
+        self._counts["get_equity_historicals"] += 1
         request = RobinhoodDailyHistoryRequest(
             preflight.LIVE_SYMBOL,
             self.now,
@@ -220,6 +232,7 @@ class _PlanTransport:
         }
 
     def get_equity_tradability(self, arguments):
+        self._counts["get_equity_tradability"] += 1
         return {
             "data": {
                 "symbol": "SPY",
@@ -230,10 +243,12 @@ class _PlanTransport:
         }
 
     def get_trade_approval_setting(self, arguments):
+        self._counts["get_trade_approval_setting"] += 1
         return {"data": {"enabled": False}}
 
     def review_equity_order(self, arguments):
         self.reviews += 1
+        self._counts["review_equity_order"] += 1
         return {"data": {**arguments, "warnings": []}}
 
     def place_equity_order(self, arguments):
@@ -261,9 +276,15 @@ def plan_builder(monkeypatch):
         preflight, "observe_robinhood_baseline", lambda *args, **kwargs: observation
     )
 
-    def build(instant, *, rising=True):
+    def build(instant, *, rising=True, through_preflight=False):
         now = datetime.fromisoformat(instant)
         transport = _PlanTransport(now, rising=rising)
+        if through_preflight:
+            monkeypatch.setattr(preflight, "_transport", lambda: transport)
+            monkeypatch.setattr(
+                preflight, "datetime", SimpleNamespace(now=lambda _: now)
+            )
+            return preflight.preflight(), transport
         plan = preflight.build_live_plan(
             transport=transport,
             p5b=preflight.P5BBaselineEvidence(HEAD, TREE, "a" * 64, 0, 0),
@@ -305,3 +326,232 @@ def test_no_action_preflight_has_no_market_time_gate(
     assert plan.target_session == target
     assert plan.requested_dollars == 0
     assert transport.reviews == 0
+
+
+SECRET = "SECRET_OAUTH_ACCOUNT_PROVIDER_PAYLOAD"
+
+
+@pytest.fixture
+def preflight_environment(monkeypatch):
+    before = {"live.sqlite": {"exists": False, "sha256": None}}
+    monkeypatch.setattr(preflight, "_production_identities", lambda: before)
+    monkeypatch.setattr(preflight, "_source_identity", lambda: (HEAD, TREE))
+    monkeypatch.setattr(
+        preflight,
+        "load_p5b_baseline_evidence",
+        lambda **_: preflight.P5BBaselineEvidence(HEAD, TREE, "a" * 64, 0, 0),
+    )
+
+    def forbidden():
+        raise AssertionError("real transport construction is forbidden")
+
+    monkeypatch.setattr(preflight, "_transport", forbidden)
+    return before
+
+
+def _assert_blocked(result, diagnostic, counts, before, *, code="NONE"):
+    assert result["status"] == "BLOCKED"
+    assert result["diagnostic"] == diagnostic
+    assert result["failure_code"] == code
+    assert result["plan"] is None
+    assert result["provider_call_counts"] == counts
+    assert result["order_review_count"] == counts.get("review_equity_order", 0)
+    assert result["order_placement_count"] == result["order_cancel_count"] == 0
+    assert (
+        result["production_state_before"] == result["production_state_after"] == before
+    )
+    assert result["production_state_unchanged"] is True
+    assert SECRET not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "seam,diagnostic,code",
+    (
+        ("_source_identity", "P6_SOURCE_IDENTITY_BLOCKED", "NONE"),
+        (
+            "load_p5b_baseline_evidence",
+            "P5B_EVIDENCE_BLOCKED",
+            "P5B_EVIDENCE_MATCH_COUNT",
+        ),
+        ("_transport", "P6_TRANSPORT_CONSTRUCTION_BLOCKED", "NONE"),
+    ),
+)
+def test_failure_before_transport_is_sanitized(
+    monkeypatch, preflight_environment, seam, diagnostic, code
+):
+    def fail(*args, **kwargs):
+        if code != "NONE":
+            raise preflight.LivePreflightError(code)
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(preflight, seam, fail)
+    result = preflight.preflight()
+    _assert_blocked(result, diagnostic, {}, preflight_environment, code=code)
+    expected = (None, None) if seam == "_source_identity" else (HEAD, TREE)
+    assert (result["source_head"], result["source_tree"]) == expected
+
+
+class _PreflightSession:
+    """Fake SDK boundary for blocked preflight invocation accounting."""
+
+    def __init__(self, *, fail_review=False):
+        self.fail_review = fail_review
+        self.calls = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return None
+
+    async def list_tools(self, cursor=None):
+        fields = (
+            "account_number",
+            "symbol",
+            "side",
+            "type",
+            "market_hours",
+            "time_in_force",
+            "dollar_amount",
+            "order_id",
+        )
+        return SimpleNamespace(
+            next_cursor=None,
+            tools=[
+                SimpleNamespace(
+                    name=name,
+                    inputSchema={
+                        "properties": dict.fromkeys(fields, {}),
+                        "required": ["dollar_amount"],
+                    },
+                )
+                for name in LIVE_TOOL_SURFACE
+            ],
+        )
+
+    async def call_tool(self, name, arguments):
+        assert name not in {"place_equity_order", "cancel_equity_order"}
+        self.calls.append(name)
+        if name == "review_equity_order" and self.fail_review:
+            raise RuntimeError(SECRET)
+        return SimpleNamespace(is_error=False, structured_content={"data": {}})
+
+
+@pytest.mark.parametrize("progress", ("constructed", "read", "review"))
+def test_downstream_failure_retains_transport_and_invocations(
+    monkeypatch, preflight_environment, progress
+):
+    session = _PreflightSession(fail_review=True)
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+    monkeypatch.setattr(preflight, "_transport", lambda: transport)
+
+    def fail_plan(**kwargs):
+        assert kwargs["transport"] is transport
+        if progress in {"read", "review"}:
+            transport.get_accounts()
+        if progress == "review":
+            transport.review_equity_order({})
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(preflight, "build_live_plan", fail_plan)
+    result = preflight.preflight()
+    expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+    expected["get_accounts"] = int(progress in {"read", "review"})
+    expected["review_equity_order"] = int(progress == "review")
+    _assert_blocked(
+        result,
+        "P6_PLAN_BUILD_BLOCKED",
+        expected,
+        preflight_environment,
+        code="LIVE_REQUEST_FAILED" if progress == "review" else "NONE",
+    )
+    assert result["source_head"] == HEAD
+    assert result["source_tree"] == TREE
+    assert result["provider_call_counts"] == dict(transport.call_counts)
+    assert session.calls == [name for name, count in expected.items() if count]
+
+
+@pytest.mark.parametrize(
+    "error,code",
+    (
+        (RuntimeError("LIVE_REQUEST_FAILED"), "NONE"),
+        (CurrentLiveTransportError(SECRET), "NONE"),
+        (preflight.LivePreflightError(SECRET), "NONE"),
+        (CurrentLiveTransportError("LIVE_DISCOVERY_FAILED"), "LIVE_DISCOVERY_FAILED"),
+        (
+            preflight.LivePreflightError("P5B_EVIDENCE_UNAVAILABLE"),
+            "P5B_EVIDENCE_UNAVAILABLE",
+        ),
+    ),
+)
+def test_failure_detail_requires_allowlisted_type_and_exact_code(
+    monkeypatch, preflight_environment, error, code
+):
+    def fail(**kwargs):
+        raise error
+
+    monkeypatch.setattr(preflight, "load_p5b_baseline_evidence", fail)
+    _assert_blocked(
+        preflight.preflight(),
+        "P5B_EVIDENCE_BLOCKED",
+        {},
+        preflight_environment,
+        code=code,
+    )
+
+
+@pytest.mark.parametrize("rising", (True, False), ids=("READY", "NO_ACTION"))
+def test_successful_preflight_retains_complete_counts(
+    preflight_environment, plan_builder, rising
+):
+    result, transport = plan_builder(
+        "2026-11-02T17:00:00+00:00", rising=rising, through_preflight=True
+    )
+    assert result["status"] == "PASS"
+    assert result["diagnostic"] == result["failure_code"] == "NONE"
+    assert result["plan"]["plan_state"] == ("READY" if rising else "NO_ACTION")
+    expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+    expected["get_accounts"] = expected["get_equity_historicals"] = 1
+    for name in (
+        "get_equity_tradability",
+        "get_trade_approval_setting",
+        "review_equity_order",
+    ):
+        expected[name] = int(rising)
+    assert result["provider_call_counts"] == expected == dict(transport.call_counts)
+    assert result["order_review_count"] == int(rising)
+    assert result["order_placement_count"] == result["order_cancel_count"] == 0
+    assert transport.placed == transport.canceled == 0
+    assert result["production_state_unchanged"] is True
+
+
+@pytest.mark.parametrize("unavailable", (False, True))
+def test_changed_or_unavailable_state_blocks_without_erasing_completed_plan(
+    monkeypatch, preflight_environment, plan_builder, unavailable
+):
+    before = preflight_environment
+    after = {"live.sqlite": {"exists": None if unavailable else True, "sha256": None}}
+    snapshots = iter((after, after) if unavailable else (before, after))
+    monkeypatch.setattr(preflight, "_production_identities", lambda: next(snapshots))
+    result, _ = plan_builder("2026-11-02T17:00:00+00:00", through_preflight=True)
+    assert result["status"] == "BLOCKED"
+    assert result["diagnostic"] == "P6_STATE_CHANGED_OR_UNAVAILABLE"
+    assert result["production_state_unchanged"] is False
+    assert result["production_state_before"] == (after if unavailable else before)
+    assert result["production_state_after"] == after
+    assert result["plan"]["plan_state"] == "READY"
+    assert result["order_review_count"] == 1
+
+
+def test_state_read_failure_is_unavailable_rather_than_absent(monkeypatch, tmp_path):
+    state = tmp_path / "synthetic-state"
+    state.write_bytes(b"synthetic")
+    monkeypatch.setattr(preflight, "P6_STATE_FILES", (state,))
+
+    def fail_read(self):
+        raise OSError(SECRET)
+
+    monkeypatch.setattr(Path, "read_bytes", fail_read)
+    assert preflight._production_identities() == {
+        state.name: {"exists": None, "sha256": None}
+    }

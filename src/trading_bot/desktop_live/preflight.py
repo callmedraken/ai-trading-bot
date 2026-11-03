@@ -40,6 +40,7 @@ from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
 from trading_bot.robinhood_mcp.current_live_transport import (
+    CurrentLiveTransportError,
     RobinhoodCurrentLiveTransport,
 )
 from trading_bot.robinhood_mcp.historical import RobinhoodDailyHistoryRequest
@@ -59,6 +60,44 @@ NEW_YORK = ZoneInfo("America/New_York")
 
 class LivePreflightError(RuntimeError):
     """Sanitized P6 preflight rejection."""
+
+
+# Only exact reviewed exception types and exact fixed codes may enter evidence.
+_FAILURE_CODES = {
+    LivePreflightError: frozenset(
+        {
+            "P5B_EVIDENCE_UNAVAILABLE",
+            "P5B_EVIDENCE_MATCH_COUNT",
+            "ACCOUNT_FINGERPRINT_DRIFT",
+            "P5B_BROKER_BASELINE_DRIFT",
+            "FIRST_SPY_POSITION_NOT_ZERO",
+            "UNEXPECTED_WORKING_ORDER",
+            "PUBLISHED_SESSION_UNAVAILABLE",
+        }
+    ),
+    CurrentLiveTransportError: frozenset(
+        {
+            "LIVE_METHOD_REJECTED",
+            "LIVE_EVENT_LOOP_REJECTED",
+            "LIVE_REQUEST_FAILED",
+            "LIVE_CAPABILITY_MISSING",
+            "LIVE_RESULT_INVALID",
+            "LIVE_DISCOVERY_FAILED",
+            "LIVE_DISCOVERY_INVALID",
+            "LIVE_DISCOVERY_CURSOR_INVALID",
+            "LIVE_DISCOVERY_BOUND_EXCEEDED",
+            "LIVE_DOLLAR_ORDER_SCHEMA_MISSING",
+            "LIVE_SCHEMA_INVALID",
+        }
+    ),
+}
+
+
+def _failure_code(error: Exception) -> str:
+    codes = _FAILURE_CODES.get(type(error), ())
+    if len(error.args) == 1 and type(error.args[0]) is str and error.args[0] in codes:
+        return error.args[0]
+    return "NONE"
 
 
 @dataclass(frozen=True, slots=True)
@@ -296,13 +335,21 @@ def build_live_plan(
 def preflight() -> dict[str, object]:
     """The later registered P6 preflight; never place or cancel an order."""
     before = _production_identities()
+    transport = None
+    source_head = source_tree = None
+    plan = None
+    failure_code = "NONE"
+    diagnostic = "P6_SOURCE_IDENTITY_BLOCKED"
     try:
         source_head, source_tree = _source_identity()
+        diagnostic = "P5B_EVIDENCE_BLOCKED"
         baseline = load_p5b_baseline_evidence(
             expected_source_head=P5B_BASE_HEAD,
             expected_source_tree=P5B_BASE_TREE,
         )
+        diagnostic = "P6_TRANSPORT_CONSTRUCTION_BLOCKED"
         transport = _transport()
+        diagnostic = "P6_PLAN_BUILD_BLOCKED"
         plan = build_live_plan(
             transport=transport,
             p5b=baseline,
@@ -312,33 +359,31 @@ def preflight() -> dict[str, object]:
         )
         status = "PASS"
         diagnostic = "NONE"
-    except Exception:
-        plan = None
+    except Exception as error:
         status = "BLOCKED"
-        diagnostic = "P6_PREFLIGHT_BLOCKED"
-        transport = None
+        failure_code = _failure_code(error)
     after = _production_identities()
-    unchanged = before == after
+    unchanged = before == after and all(
+        identity["exists"] is not None
+        for snapshot in (before, after)
+        for identity in snapshot.values()
+    )
     if not unchanged:
         status = "BLOCKED"
         diagnostic = "P6_STATE_CHANGED_OR_UNAVAILABLE"
+    counts = {} if transport is None else dict(transport.call_counts)
     result = {
         "schema": "arch147-p6-tiny-live-preflight/v1",
+        "source_head": source_head,
+        "source_tree": source_tree,
         "status": status,
         "diagnostic": diagnostic,
+        "failure_code": failure_code,
         "plan": None if plan is None else plan.sanitized(),
-        "provider_call_counts": {}
-        if transport is None
-        else dict(transport.call_counts),
-        "order_review_count": 0
-        if transport is None
-        else dict(transport.call_counts).get("review_equity_order", 0),
-        "order_placement_count": 0
-        if transport is None
-        else dict(transport.call_counts).get("place_equity_order", 0),
-        "order_cancel_count": 0
-        if transport is None
-        else dict(transport.call_counts).get("cancel_equity_order", 0),
+        "provider_call_counts": counts,
+        "order_review_count": counts.get("review_equity_order", 0),
+        "order_placement_count": counts.get("place_equity_order", 0),
+        "order_cancel_count": counts.get("cancel_equity_order", 0),
         "production_state_before": before,
         "production_state_after": after,
         "production_state_unchanged": unchanged,
@@ -383,7 +428,7 @@ def _production_identities() -> dict[str, object]:
                 else None,
             }
         except OSError:
-            result[path.name] = {"exists": False, "sha256": None}
+            result[path.name] = {"exists": None, "sha256": None}
     return result
 
 

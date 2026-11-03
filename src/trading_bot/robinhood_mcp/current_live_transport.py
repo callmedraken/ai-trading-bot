@@ -73,6 +73,7 @@ class RobinhoodCurrentLiveTransport:
 
     @property
     def call_counts(self) -> tuple[tuple[str, int], ...]:
+        """Count tool invocation attempts, including failed provider calls."""
         return tuple(self._counts.items())
 
     @property
@@ -179,13 +180,13 @@ class RobinhoodCurrentLiveTransport:
         self._validate_mutation_schemas()
         if name not in self._schemas:
             raise CurrentLiveTransportError("LIVE_CAPABILITY_MISSING")
+        self._counts[name] += 1
         result = await client.call_tool(name, arguments)
         payload = getattr(result, "structured_content", None)
         if getattr(result, "is_error", None) is not False or not isinstance(
             payload, Mapping
         ):
             raise CurrentLiveTransportError("LIVE_RESULT_INVALID")
-        self._counts[name] += 1
         return dict(payload)
 
     def _discover(self) -> tuple[AdvertisedTool, ...]:

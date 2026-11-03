@@ -165,6 +165,9 @@ class _PlanTransport:
         self.placed = 0
         self.canceled = 0
         self._counts = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+        self.review_changes = {}
+        self.setting_approval = False
+        self.review_arguments = []
 
     @property
     def call_counts(self):
@@ -244,12 +247,22 @@ class _PlanTransport:
 
     def get_trade_approval_setting(self, arguments):
         self._counts["get_trade_approval_setting"] += 1
-        return {"data": {"enabled": False}}
+        return {"data": {"enabled": self.setting_approval}}
 
     def review_equity_order(self, arguments):
         self.reviews += 1
         self._counts["review_equity_order"] += 1
-        return {"data": {**arguments, "warnings": []}}
+        self.review_arguments.append(dict(arguments))
+        return {
+            "data": {
+                **{
+                    key: arguments[key]
+                    for key in ("symbol", "side", "type", "dollar_amount")
+                },
+                "order_checks": {},
+                **self.review_changes,
+            }
+        }
 
     def place_equity_order(self, arguments):
         self.placed += 1
@@ -276,9 +289,18 @@ def plan_builder(monkeypatch):
         preflight, "observe_robinhood_baseline", lambda *args, **kwargs: observation
     )
 
-    def build(instant, *, rising=True, through_preflight=False):
+    def build(
+        instant,
+        *,
+        rising=True,
+        through_preflight=False,
+        review_changes=None,
+        setting_approval=False,
+    ):
         now = datetime.fromisoformat(instant)
         transport = _PlanTransport(now, rising=rising)
+        transport.review_changes = review_changes or {}
+        transport.setting_approval = setting_approval
         if through_preflight:
             monkeypatch.setattr(preflight, "_transport", lambda: transport)
             monkeypatch.setattr(
@@ -414,6 +436,8 @@ class _PreflightSession:
             "time_in_force",
             "dollar_amount",
             "order_id",
+            "ref_id",
+            "quantity",
         )
         return SimpleNamespace(
             next_cursor=None,
@@ -422,7 +446,11 @@ class _PreflightSession:
                     name=name,
                     inputSchema={
                         "properties": dict.fromkeys(fields, {}),
-                        "required": ["dollar_amount"],
+                        "required": (
+                            ["account_number", "order_id"]
+                            if name == "cancel_equity_order"
+                            else ["account_number", "symbol", "side", "type"]
+                        ),
                     },
                 )
                 for name in LIVE_TOOL_SURFACE
@@ -555,3 +583,86 @@ def test_state_read_failure_is_unavailable_rather_than_absent(monkeypatch, tmp_p
     assert preflight._production_identities() == {
         state.name: {"exists": None, "sha256": None}
     }
+
+
+def test_preflight_sends_only_exact_dollar_review_contract(plan_builder):
+    plan, transport = plan_builder("2026-11-02T17:00:00+00:00")
+    assert transport.review_arguments == [
+        {
+            "account_number": "SYNTHETIC",
+            "symbol": "SPY",
+            "side": "buy",
+            "type": "market",
+            "market_hours": "regular_hours",
+            "time_in_force": "gfd",
+            "dollar_amount": format(plan.requested_dollars, "f"),
+        }
+    ]
+
+
+@pytest.mark.parametrize("setting_approval", [False, True])
+@pytest.mark.parametrize("condition", ["checks", "approval"])
+def test_review_conditions_block_ready_and_sanitize_plan(
+    plan_builder, condition, setting_approval
+):
+    changes = (
+        {"order_checks": {"alert": SECRET}}
+        if condition == "checks"
+        else {
+            "customer_approval_required": True,
+            "customer_approval_required_reason": SECRET,
+        }
+    )
+    plan, transport = plan_builder(
+        "2026-11-02T17:00:00+00:00",
+        review_changes=changes,
+        setting_approval=setting_approval,
+    )
+    assert plan.state is not LivePlanState.READY
+    assert not plan.review.clean
+    assert plan.provider_warning_summary == (
+        (
+            "ROBINHOOD_ORDER_CHECKS_PRESENT"
+            if condition == "checks"
+            else "ROBINHOOD_CUSTOMER_APPROVAL_REQUIRED"
+        ),
+    )
+    assert SECRET not in json.dumps(plan.sanitized())
+    assert "SYNTHETIC" not in repr(plan)
+    assert transport.placed == transport.canceled == 0
+
+
+def test_separate_approval_setting_blocks_even_when_review_reports_false(plan_builder):
+    plan, _ = plan_builder(
+        "2026-11-02T17:00:00+00:00",
+        setting_approval=True,
+        review_changes={"customer_approval_required": False},
+    )
+    assert plan.state is LivePlanState.OPERATOR_ACTION_REQUIRED
+    assert plan.trade_approval_enabled
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"dollar_amount": "9.99"},
+        {"symbol": "QQQ"},
+        {"side": "sell"},
+        {"type": "limit"},
+        {"order_checks": None},
+        {"order_checks": []},
+        {"customer_approval_required": "false"},
+    ],
+)
+def test_review_drift_and_malformed_conditions_block_sanitized_preflight(
+    preflight_environment, plan_builder, changes
+):
+    result, transport = plan_builder(
+        "2026-11-02T17:00:00+00:00", through_preflight=True, review_changes=changes
+    )
+    assert result["status"] == "BLOCKED"
+    assert result["diagnostic"] == "P6_PLAN_BUILD_BLOCKED"
+    assert result["order_review_count"] == 1
+    assert result["order_placement_count"] == result["order_cancel_count"] == 0
+    assert transport.placed == transport.canceled == 0
+    assert result["production_state_unchanged"]

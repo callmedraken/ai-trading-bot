@@ -288,15 +288,9 @@ def build_live_plan(
             approved_quantity=risk.approved_quantity,
             requested_dollars=risk.requested_dollars,
         )
+    review_arguments = review_order_arguments(risk.requested_dollars, account_number)
     review = parse_order_review(
-        transport.review_equity_order(
-            _order_arguments(
-                observation,
-                risk.requested_dollars,
-                account_number,
-                None,
-            )
-        )
+        transport.review_equity_order(dict(review_arguments)), expected=review_arguments
     )
     if approval.enabled:
         state = LivePlanState.OPERATOR_ACTION_REQUIRED
@@ -485,13 +479,15 @@ def resolve_target_session(now: datetime) -> tuple[str, bool]:
     return schedule.session_date.isoformat(), regular_open
 
 
-def _order_arguments(
-    observation: RobinhoodReconciliationSnapshot,
-    amount: object,
-    account_number: str,
-    idempotency_key: str | None,
-) -> dict[str, object]:
-    args: dict[str, object] = {
+def review_order_arguments(amount: Decimal, account_number: str) -> dict[str, object]:
+    """Construct only the source-owned dollar-sized P6 review contract."""
+    if (
+        type(amount) is not Decimal
+        or not amount.is_finite()
+        or not Decimal("0") < amount <= Decimal("10.00")
+    ):
+        raise ValueError("P6 review amount is invalid")
+    return {
         "account_number": account_number,
         "symbol": "SPY",
         "side": "buy",
@@ -500,10 +496,6 @@ def _order_arguments(
         "time_in_force": "gfd",
         "dollar_amount": format(amount, "f"),
     }
-    if idempotency_key is not None:
-        args["client_order_id"] = idempotency_key
-    del observation
-    return args
 
 
 def _blocked_plan(

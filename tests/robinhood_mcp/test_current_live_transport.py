@@ -47,13 +47,20 @@ def _schemas(include_dollar=True):
                     "type": {},
                     "market_hours": {},
                     "time_in_force": {},
+                    "quantity": {},
+                    "limit_price": {},
+                    "stop_price": {},
+                    "tax_lots": {},
                 }
             )
             if include_dollar:
                 properties["dollar_amount"] = {}
-                required.append("dollar_amount")
+            required = ["account_number", "symbol", "side", "type"]
+        if name == "place_equity_order":
+            properties["ref_id"] = {}
         if name == "cancel_equity_order":
             properties["order_id"] = {}
+            required = ["account_number", "order_id"]
         entries.append(
             SimpleNamespace(
                 name=name,
@@ -140,4 +147,67 @@ def test_failure_before_tool_invocation_keeps_all_counts_zero(name, failure):
         method = getattr(transport, name)
         method() if name == "get_accounts" else method({})
     assert calls == []
+    assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+
+def test_current_alternative_sizing_schema_does_not_require_dollar_globally():
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(_schemas()))
+    schemas = {item.name: item for item in transport.discover_required_capabilities()}
+    for name in ("review_equity_order", "place_equity_order"):
+        assert {"dollar_amount", "quantity"} <= schemas[name].properties
+        assert schemas[name].required == {"account_number", "symbol", "side", "type"}
+    assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+
+@pytest.mark.parametrize(
+    "name,field",
+    [
+        (name, field)
+        for name in ("review_equity_order", "place_equity_order")
+        for field in (
+            "account_number",
+            "symbol",
+            "side",
+            "type",
+            "market_hours",
+            "time_in_force",
+            "dollar_amount",
+        )
+    ]
+    + [
+        ("place_equity_order", "ref_id"),
+        ("cancel_equity_order", "account_number"),
+        ("cancel_equity_order", "order_id"),
+    ],
+)
+def test_missing_p6_sent_property_blocks_before_any_invocation(name, field):
+    schemas = _schemas()
+    schema = next(item.inputSchema for item in schemas if item.name == name)
+    del schema["properties"][field]
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(schemas))
+    with pytest.raises(
+        CurrentLiveTransportError, match="LIVE_DOLLAR_ORDER_SCHEMA_MISSING"
+    ):
+        transport.get_accounts()
+    assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+
+@pytest.mark.parametrize(
+    "name,field",
+    [
+        (name, field)
+        for name in ("review_equity_order", "place_equity_order")
+        for field in ("account_number", "symbol", "side", "type")
+    ]
+    + [("cancel_equity_order", "account_number"), ("cancel_equity_order", "order_id")],
+)
+def test_stable_unconditional_required_fields_fail_closed(name, field):
+    schemas = _schemas()
+    schema = next(item.inputSchema for item in schemas if item.name == name)
+    schema["required"].remove(field)
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(schemas))
+    with pytest.raises(
+        CurrentLiveTransportError, match="LIVE_DOLLAR_ORDER_SCHEMA_MISSING"
+    ):
+        transport.discover_required_capabilities()
     assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)

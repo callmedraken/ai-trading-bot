@@ -1,5 +1,17 @@
 # AI Trading Bot — Project Status
 
+## Current source correction — provider contract; review pending
+
+The P6 provider-contract correction preserves the SPY 35/50, dollar-only $10
+trial and consumed/no-retry policy. It separates review and placement arguments,
+uses deterministic provider UUID `ref_id`, sanitizes review conditions and binds
+only `data.order.id`. Details and preserved blocked-attempt chronology belong in
+the [P6 contract](architecture/147-p6-tiny-live.md); the active source boundary
+and next review are in the [handoff](AI_TRADING_BOT_HANDOFF.md).
+
+No real provider, OAuth, preflight, review/place/cancel or live effect occurs in
+this source checkpoint. Earlier no-attempt statements below are historical.
+
 ## Current checkpoint - P6 kill-operator accepted/integrated
 
 The accepted P5B Robinhood read/reconciliation baseline is the exact source
@@ -46,12 +58,11 @@ production-state or FINAL_HOLDOUT effect has occurred.
 
 ## Immediate next step
 
-The immediate next milestone is one P6 read-only preflight from the final
-integrated closeout source, after ChatGPT exact docs review and fast-forward
-integration of this docs-only closeout. A source or preflight PASS grants no
-provider, credential, broker or live execution authority. After a READY plan
-review, one explicitly armed `<= $10` live trial and post-trade reconciliation
-remain required before P7 production maturity.
+ChatGPT exact-source review of the provider-contract correction is next, after
+terminal feature certification. Follow the current correction section above for
+integration, certification reuse and the later single fresh read-only preflight.
+One explicitly armed `<= $10` live trial and post-trade reconciliation remain
+separate requirements before P7 production maturity.
 
 ## Roadmap
 

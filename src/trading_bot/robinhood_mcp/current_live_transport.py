@@ -251,6 +251,8 @@ class RobinhoodCurrentLiveTransport:
         self._observed = LIVE_TOOL_SURFACE
 
     def _validate_mutation_schemas(self) -> None:
+        # P6 requires the dollar-order capability surface, not unconditional
+        # provider requiredness of an alternative sizing field.
         review = self._schemas.get("review_equity_order")
         place = self._schemas.get("place_equity_order")
         cancel = self._schemas.get("cancel_equity_order")
@@ -271,9 +273,13 @@ class RobinhoodCurrentLiveTransport:
             or cancel is None
             or not required_order <= review.properties
             or not required_order <= place.properties
-            or "dollar_amount" not in review.required
-            or "dollar_amount" not in place.required
+            or "ref_id" not in place.properties
+            or not frozenset({"account_number", "symbol", "side", "type"})
+            <= review.required
+            or not frozenset({"account_number", "symbol", "side", "type"})
+            <= place.required
             or not frozenset({"account_number", "order_id"}) <= cancel.properties
+            or not frozenset({"account_number", "order_id"}) <= cancel.required
         ):
             raise CurrentLiveTransportError("LIVE_DOLLAR_ORDER_SCHEMA_MISSING")
 

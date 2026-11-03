@@ -1,5 +1,25 @@
 # AI Trading Bot — Current Handoff
 
+## Current source correction — provider contract; review pending
+
+The P6 provider-contract correction starts from integrated
+`c8eba0fd7fe8f629820b28db40aa5a4e8de7c5e0`, tree
+`bdeddc8e1c2a2d5f7475e42c91f0dccc800974e0`, on
+`feature/robinhood-p6-tiny-live-current`. The
+[P6 contract](architecture/147-p6-tiny-live.md) owns the corrected schemas,
+request/response handling and preserved blocked-attempt chronology. Neither
+preserved preflight attempt may be rerun or edited; the two subsequent schema
+observations are diagnostics, not additional preflight attempts. Earlier
+no-attempt statements below describe their historical source checkpoint.
+
+Immediate next step: ChatGPT exact-source review after one feature publication
+and terminal mapped GitHub FULL. If independently accepted, exact ff-only
+integration and terminal develop certification reuse precede exactly one fresh
+read-only P6 preflight through the non-terminating guarded wrapper, with no
+intervening docs-only publication. Implementation/certification must not run
+preflight or access real OAuth/provider/live state. Source PASS does not
+authorize live placement; that remains a separate protected boundary.
+
 ## Current boundary - P6 kill-operator accepted/integrated
 
 Accepted P5B baseline source:
@@ -95,8 +115,7 @@ Details and synthetic verification belong in the
 [contract](architecture/147-p6-tiny-live.md) and
 [validation](validation/arch147-p6-tiny-live.md).
 
-Next step: ChatGPT exact review of this docs-only closeout and fast-forward
-integration, then one P6 read-only preflight from the final integrated source.
-P6 preflight, execute and the real kill operator must not run during this
-closeout. Source PASS or preflight PASS grants no live execution authority;
-live placement remains a later separate protected boundary.
+Next step: ChatGPT exact-source review of the provider-contract correction after
+terminal feature certification, following the current correction section above.
+No preflight, execute or real kill operator invocation occurs during this source
+correction. Live placement remains a later separate protected boundary.

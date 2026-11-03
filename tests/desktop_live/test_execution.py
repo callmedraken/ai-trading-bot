@@ -1,8 +1,10 @@
+import hashlib
 import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import UUID, uuid5
 
 import pytest
 
@@ -25,7 +27,9 @@ from trading_bot.desktop_live.ownership import (
     OWNERSHIP_SCHEMA,
     OwnedOrderBinding,
     load_binding,
+    local_order_id,
 )
+from trading_bot.desktop_live.preflight import review_order_arguments
 from trading_bot.desktop_paper.robinhood_read import parse_order, resolve_account
 
 
@@ -33,17 +37,14 @@ def _plan() -> LiveExecutionPlan:
     review = parse_order_review(
         {
             "data": {
-                "result": {
-                    "symbol": "SPY",
-                    "side": "buy",
-                    "type": "market",
-                    "dollar_amount": "0.50",
-                    "market_hours": "regular_hours",
-                    "time_in_force": "gfd",
-                    "warnings": [],
-                }
+                "symbol": "SPY",
+                "side": "buy",
+                "type": "market",
+                "dollar_amount": "0.50",
+                "order_checks": {},
             }
-        }
+        },
+        expected=review_order_arguments(Decimal("0.50"), "SYNTHETIC"),
     )
     return LiveExecutionPlan.create(
         source_head="a" * 40,
@@ -74,6 +75,8 @@ class _FakeTransport:
     def __init__(self):
         self.placed = 0
         self.canceled = 0
+        self.review_arguments = []
+        self.placement_arguments = []
 
     def get_accounts(self):
         return {
@@ -83,25 +86,21 @@ class _FakeTransport:
         }
 
     def review_equity_order(self, arguments):
-        del arguments
+        self.review_arguments.append(dict(arguments))
         return {
             "data": {
-                "result": {
-                    "symbol": "SPY",
-                    "side": "buy",
-                    "type": "market",
-                    "dollar_amount": "0.50",
-                    "market_hours": "regular_hours",
-                    "time_in_force": "gfd",
-                    "warnings": [],
-                }
+                "symbol": "SPY",
+                "side": "buy",
+                "type": "market",
+                "dollar_amount": "0.50",
+                "order_checks": {},
             }
         }
 
     def place_equity_order(self, arguments):
-        del arguments
+        self.placement_arguments.append(dict(arguments))
         self.placed += 1
-        return {"data": {"id": "provider-order-1"}}
+        return {"data": {"approval": {}, "order": {"id": "provider-order-1"}}}
 
     def cancel_equity_order(self, arguments):
         self.canceled += 1
@@ -1286,3 +1285,143 @@ def test_same_premarket_plan_can_execute_later_without_consumed_authority(
     assert load_binding(store.ownership_path, plan).plan_sha256 == digest
     assert plan.plan_sha256 == digest
     _assert_consumed_retry(transport, store)
+
+
+def test_separate_requests_and_durable_consumption_precede_exact_nested_binding(
+    ready_execution, monkeypatch
+):
+    plan, transport, store = ready_execution
+    place = transport.place_equity_order
+
+    def checked_place(arguments):
+        assert store.marker.is_file()
+        assert (
+            json.loads(store.lifecycle.read_text().splitlines()[-1])["status"]
+            == "LIVE_MUTATION_ATTEMPT_STARTED"
+        )
+        return place(arguments)
+
+    monkeypatch.setattr(transport, "place_equity_order", checked_place)
+    result = execution.execute()
+    review = review_order_arguments(plan.requested_dollars, "SYNTHETIC")
+    assert transport.review_arguments == [review]
+    assert transport.placement_arguments == [
+        {**review, "ref_id": execution.provider_ref_id(plan)}
+    ]
+    assert set(review) == {
+        "account_number",
+        "symbol",
+        "side",
+        "type",
+        "dollar_amount",
+        "market_hours",
+        "time_in_force",
+    }
+    assert result["status"] == "PASS"
+    assert result["receipt"]["provider_order_id"] == "provider-order-1"
+    binding = load_binding(store.ownership_path, plan)
+    assert binding.provider_order_id == "provider-order-1"
+    assert binding.provider_order_id != execution.provider_ref_id(plan)
+
+
+def test_provider_uuid_is_deterministic_and_separate_from_unchanged_local_sha():
+    plan = _plan()
+    ref = execution.provider_ref_id(plan)
+    assert str(UUID(ref)) == ref
+    assert UUID(ref).version == 5
+    assert ref == str(uuid5(execution.P6_PROVIDER_REF_NAMESPACE, plan.plan_sha256))
+    assert ref == execution.provider_ref_id(
+        execution.plan_from_sanitized(plan.sanitized())
+    )
+    material = {
+        name: getattr(plan, name)
+        for name in plan.__dataclass_fields__
+        if name != "plan_sha256"
+    }
+    other = LiveExecutionPlan.create(**(material | {"target_session": "2026-11-03"}))
+    assert execution.provider_ref_id(other) != ref
+    local = local_order_id(plan)
+    assert (
+        local
+        == hashlib.sha256(
+            ("p6-local-order/v1:" + plan.plan_sha256).encode("ascii")
+        ).hexdigest()
+    )
+    assert len(local) == 64
+    assert set(local) <= set("0123456789abcdef")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        None,
+        [],
+        {},
+        {"data": None},
+        {"data": []},
+        {"data": {}},
+        {"data": {"order": None}},
+        {"data": {"order": []}},
+        {"data": {"order": {}}},
+        *[
+            {"data": {"order": {"id": value}}}
+            for value in (None, "", 42, "bad id", "x" * 129)
+        ],
+        {"data": {"id": "provider-order-1"}},
+        {"data": {"order_id": "provider-order-1"}},
+        {"data": {"order": {"ref_id": "provider-order-1"}}},
+        {"data": {"ref_id": "provider-order-1"}},
+    ],
+)
+def test_unusable_nested_provider_id_preserves_consumption_and_no_retry(
+    ready_execution, monkeypatch, response
+):
+    _, transport, store = ready_execution
+
+    def place(arguments):
+        transport.placed += 1
+        return response
+
+    monkeypatch.setattr(transport, "place_equity_order", place)
+    result = execution.execute()
+    assert result["reason"] == result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+    assert result["place_call_count"] == transport.placed == 1
+    assert result["attempt_consumed"]
+    assert result["receipt"] is None
+    assert not store.ownership_path.exists()
+    _assert_consumed_retry(transport, store)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"order_checks": {"raw": "SECRET_PROVIDER_ALERT"}},
+        {
+            "customer_approval_required": True,
+            "customer_approval_required_reason": "SECRET_PROVIDER_ALERT",
+        },
+        {"dollar_amount": "0.51"},
+        {"symbol": "QQQ"},
+        {"side": "sell"},
+        {"type": "limit"},
+    ],
+)
+def test_execution_review_drift_or_conditions_never_consume_or_place(
+    ready_execution, monkeypatch, changes
+):
+    _, transport, store = ready_execution
+    review = transport.review_equity_order
+
+    def changed(arguments):
+        payload = review(arguments)
+        payload["data"].update(changes)
+        return payload
+
+    monkeypatch.setattr(transport, "review_equity_order", changed)
+    result = execution.execute()
+    assert result["status"] == "BLOCKED"
+    assert result["effect_disposition"] == "NO_MUTATION"
+    assert not result["attempt_consumed"]
+    assert result["place_call_count"] == transport.placed == 0
+    assert not store.marker.exists()
+    assert "SECRET_PROVIDER_ALERT" not in json.dumps(result)

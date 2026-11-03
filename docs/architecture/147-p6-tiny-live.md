@@ -23,8 +23,37 @@ P6 is not a promotion of that binding.
 ## Boundaries
 
 The P6 transport discovers the complete advertised tool surface and validates
-the review/place schemas before any call. `dollar_amount` is required; a
-missing dollar capability blocks the trial and cannot fall back to shares.
+the review/place/cancel schemas before any call. Review and placement must
+advertise `account_number`, `symbol`, `side`, `type`, `market_hours`,
+`time_in_force` and `dollar_amount`; placement must also advertise `ref_id`.
+The stable base fields `account_number`, `symbol`, `side`, `type` must be in
+both provider unconditional required sets; cancel must advertise and require
+`account_number` and `order_id`. P6 itself requires dollar sizing. The provider
+may expose `quantity` as an alternative and need not include `dollar_amount`
+in JSON Schema `required`. P6 never sends quantity or falls back to shares.
+`LIVE_DOLLAR_ORDER_SCHEMA_MISSING` means this P6 dollar-order capability surface
+is absent, not that the provider must unconditionally require dollar sizing.
+
+Review receives exactly those seven order fields, with SPY/buy/market,
+regular_hours/gfd and the bounded dollar amount. Placement receives the same
+order contract plus `ref_id`; review receives no placement idempotency field.
+Neither sends `client_order_id`, `idempotency_key`, limit/stop/tax-lot fields
+or quantity. Provider `ref_id` is the canonical UUID5 of immutable
+`plan.plan_sha256` under fixed P6 namespace
+`5c888a69-0b50-5ff8-90c0-b98d4b0d04fb`. It is deterministic, account-independent
+and separate from the unchanged 64-character local ownership SHA256 and durable
+attempt marker; it never grants retry authority.
+
+Review parsing explicitly receives that exact request contract. Provider echoes
+must confirm SPY, buy, market and the exact dollar amount. Regular hours and GFD
+are bound request facts; missing echoes are allowed, contradictory echoes block.
+`data.order_checks` must be an object: `{}` is clean and any nonempty object
+blocks READY with only `ROBINHOOD_ORDER_CHECKS_PRESENT` in sanitized evidence.
+Optional `customer_approval_required` must be boolean; true blocks autonomous
+READY with `ROBINHOOD_CUSTOMER_APPROVAL_REQUIRED`. The separate fetched approval
+setting still blocks independently. Raw alerts and approval reasons are never
+copied into evidence. The review digest binds the exact order contract and
+sanitized alert/approval state, without accounts or provider text.
 There is no generic public tool dispatcher. The mutation methods are explicit
 `review_equity_order`, `place_equity_order`, and `cancel_equity_order`, and the
 cancel path accepts only one exact owned order identifier.
@@ -93,9 +122,12 @@ occurred. The GUI remains presentation-only, with no arm, place or cancel
 controls. P6 read-only preflight is next; live placement remains a later,
 separate protected boundary.
 
-Placement strictly parses the returned provider order token (1-128 ASCII
-letters, digits, hyphens or underscores; conflicting `id`/`order_id` values
-are rejected). Before any subsequent broker observation, it creates and fsyncs
+Placement requires a root object, `data` object, `data.order` object and a
+usable `data.order.id`, passed through the existing provider-order validator
+(1-128 ASCII letters, digits, hyphens or underscores). Flat `data.id` and
+`data.order_id` are rejected. `ref_id` is never a provider order ID substitute.
+Missing or malformed nested IDs retain one place call, consumed authority,
+`MAY_HAVE_OCCURRED` and no retry. Before any subsequent broker observation, it creates and fsyncs
 `owned-order.json` alongside the existing P6 placement marker under
 `F:\AI\desktop-bot-state\p6`. Its schema is `arch147-p6-owned-order/v1` and
 binds the immutable plan SHA256, deterministic `p6-local-order/v1` SHA256 and
@@ -170,3 +202,30 @@ returned effect/count/consumption facts and reports STOPPED. The typed kill
 result is separate from the placement `ExecutionResult` and receipt contract.
 No source test, admission or CI invocation runs this real CLI or creates
 production P6 state. No P6 preflight follows this publication automatically.
+
+
+## Current provider-contract correction and preserved observations
+
+This correction starts at integrated `c8eba0fd7fe8f629820b28db40aa5a4e8de7c5e0`,
+tree `bdeddc8e1c2a2d5f7475e42c91f0dccc800974e0`. It changes only current P6
+transport/order handling, synthetic regressions and directly related docs;
+shared runner, registry, workflow and historical authority are unchanged.
+Review requires the observed direct `data` object, not synthetic `data.result`.
+
+Preserve both external P6 read-only preflight attempts under
+`F:\AI\temp\ai-trading-bot-checkpoints` without editing or rerunning them:
+
+- `arch147-p6-readonly-preflight-ba74d5b258a54279916537e5cf7435d5` returned
+  historical opaque `P6_PREFLIGHT_BLOCKED` from pre-truthfulness source.
+- `arch147-p6-readonly-preflight-fa90be4add304d82a6bcc007a1af2ab4` returned
+  `P6_PLAN_BUILD_BLOCKED` / `LIVE_DOLLAR_ORDER_SCHEMA_MISSING`; all provider
+  invocation counts, including review/place/cancel, were zero, production state
+  was unchanged and source identity remained stable.
+
+The two subsequent schema-only observations invoked no Robinhood tools and are
+diagnostics, not P6 preflight attempts. Their observed input/output contract is
+the basis for this correction; implementation must not repeat those observations.
+After independent exact-source acceptance, exact ff-only integration and terminal
+develop certification reuse, the next protected step is exactly one fresh P6
+read-only preflight through the non-terminating guarded wrapper. Source success
+never authorizes live placement. Neither prior attempt is retried or repointed.

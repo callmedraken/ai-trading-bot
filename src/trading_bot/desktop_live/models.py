@@ -291,35 +291,70 @@ def parse_trade_approval(payload: Mapping[str, object]) -> TradeApprovalObservat
     )
 
 
-def parse_order_review(payload: Mapping[str, object]) -> OrderReviewObservation:
-    row = _one_row(payload, "order review")
-    warnings = row.get("warnings", row.get("warning", []))
-    if isinstance(warnings, str):
-        warnings = [warnings]
-    if not isinstance(warnings, list) or any(
-        not isinstance(item, str) for item in warnings
+def parse_order_review(
+    payload: Mapping[str, object], *, expected: Mapping[str, object]
+) -> OrderReviewObservation:
+    """Bind provider echoes and sanitized conditions to the exact P6 request."""
+    contract = {
+        "symbol": "SPY",
+        "side": "buy",
+        "type": "market",
+        "market_hours": "regular_hours",
+        "time_in_force": "gfd",
+    }
+    if (
+        not isinstance(expected, Mapping)
+        or set(expected) != {*contract, "account_number", "dollar_amount"}
+        or any(expected[key] != value for key, value in contract.items())
     ):
-        raise ValueError("review warnings are invalid")
+        raise ValueError("expected review contract is invalid")
+    text(expected["account_number"])
+    requested = decimal_value(expected["dollar_amount"])
+    if not requested.is_finite() or not Decimal("0") < requested <= MAX_ORDER_DOLLARS:
+        raise ValueError("expected review amount is invalid")
+    if not isinstance(payload, Mapping):
+        raise ValueError("order review data is invalid")
+    row = payload.get("data")
+    if not isinstance(row, Mapping):
+        raise ValueError("order review data is invalid")
     amount = decimal_value(row.get("dollar_amount"))
+    if amount != requested or any(
+        row.get(key) != contract[key] for key in ("symbol", "side", "type")
+    ):
+        raise ValueError("order review echoes differ from the request")
+    # These are explicit request facts; an optional contradictory echo blocks.
+    if any(
+        key in row and row[key] != contract[key]
+        for key in ("market_hours", "time_in_force")
+    ):
+        raise ValueError("order review echoes differ from the request")
+    checks = row.get("order_checks")
+    if not isinstance(checks, Mapping):
+        raise ValueError("order review checks are invalid")
+    approval = row.get("customer_approval_required")
+    if "customer_approval_required" in row and type(approval) is not bool:
+        raise ValueError("order review approval is invalid")
+    warnings = []
+    if checks:
+        warnings.append("ROBINHOOD_ORDER_CHECKS_PRESENT")
+    if approval is True:
+        warnings.append("ROBINHOOD_CUSTOMER_APPROVAL_REQUIRED")
     material = {
-        "symbol": _required_text(row.get("symbol")),
-        "side": _required_text(row.get("side")),
-        "type": _required_text(row.get("type", row.get("order_type"))),
-        "dollar_amount": format(amount, "f"),
-        "market_hours": _required_text(row.get("market_hours")),
-        "time_in_force": _required_text(row.get("time_in_force")),
+        **contract,
+        "dollar_amount": format(requested, "f"),
         "warnings": warnings,
+        "customer_approval_required": approval,
     }
     digest = hashlib.sha256(
         json.dumps(material, sort_keys=True, separators=(",", ":")).encode("ascii")
     ).hexdigest()
     return OrderReviewObservation(
-        material["symbol"],
-        material["side"],
-        material["type"],
-        amount,
-        material["market_hours"],
-        material["time_in_force"],
+        contract["symbol"],
+        contract["side"],
+        contract["type"],
+        requested,
+        contract["market_hours"],
+        contract["time_in_force"],
         tuple(warnings),
         digest,
     )

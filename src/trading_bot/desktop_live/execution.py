@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from uuid import UUID, uuid5
 
 from trading_bot.desktop_live.configuration import TinyLivePolicy
 from trading_bot.desktop_live.models import (
@@ -29,14 +31,17 @@ from trading_bot.desktop_live.ownership import (
     local_order_id as _local_order_id,
 )
 from trading_bot.desktop_live.preflight import (
-    _order_arguments,
     _source_identity,
     resolve_target_session,
+    review_order_arguments,
 )
 from trading_bot.desktop_paper.robinhood_read import resolve_account
 from trading_bot.desktop_paper.robinhood_reconciliation import (
     observe_robinhood_baseline,
 )
+
+# Fixed P6 provider-reference namespace, independent of account/credentials.
+P6_PROVIDER_REF_NAMESPACE = UUID("5c888a69-0b50-5ff8-90c0-b98d4b0d04fb")
 
 LIVE_ARM_ENV = "AI_TRADING_BOT_P6_LIVE_ARM"
 LIVE_ARM_VALUE = "LIVE_SPY_MAX_10_USD"
@@ -170,13 +175,10 @@ def execute_plan(
     if plan.requested_dollars > Decimal("10.00"):
         return _blocked("P6_DOLLAR_CEILING", 0, 0)
 
-    arguments = _order_arguments(
-        fresh,
-        plan.requested_dollars,
-        account_number,
-        _idempotency_key(plan, transport),
+    review_arguments = review_order_arguments(plan.requested_dollars, account_number)
+    review = parse_order_review(
+        transport.review_equity_order(dict(review_arguments)), expected=review_arguments
     )
-    review = parse_order_review(transport.review_equity_order(arguments))
     if (
         not review.clean
         or review.dollar_amount != plan.requested_dollars
@@ -188,6 +190,7 @@ def execute_plan(
     ):
         return _blocked("EXECUTION_REVIEW_DRIFT", 0, 0)
 
+    placement_arguments = placement_order_arguments(plan, account_number)
     # Resolve the callable before consuming authority; attribute lookup is not
     # a placement invocation.
     place = transport.place_equity_order
@@ -225,7 +228,7 @@ def execute_plan(
     except Exception:
         return ExecutionResult("STOPPED", None, "CONSUMED_BEFORE_PLACEMENT", 0, 0, True)
     try:
-        response = place(arguments)
+        response = place(placement_arguments)
         return _reconcile_placement(
             plan,
             response=response,
@@ -517,27 +520,32 @@ def create_live_transport() -> object:
     )
 
 
-def _idempotency_key(plan: LiveExecutionPlan, transport: object) -> str | None:
-    schemas = getattr(transport, "advertised_schemas", ())
-    place = next((item for item in schemas if item.name == "place_equity_order"), None)
-    if place is None:
-        return None
-    for field in ("client_order_id", "idempotency_key", "ref_id"):
-        if field in place.properties:
-            return _local_order_id(plan)
-    return None
+def provider_ref_id(plan: LiveExecutionPlan) -> str:
+    """Stable provider UUID; never replaces the local SHA256 or attempt marker."""
+    return str(uuid5(P6_PROVIDER_REF_NAMESPACE, plan.plan_sha256))
+
+
+def placement_order_arguments(
+    plan: LiveExecutionPlan, account_number: str
+) -> dict[str, object]:
+    """Use the same immutable dollar order plus the current provider ref_id."""
+    return {
+        **review_order_arguments(plan.requested_dollars, account_number),
+        "ref_id": provider_ref_id(plan),
+    }
 
 
 def _provider_order_id(response: object) -> str | None:
-    if not isinstance(response, dict):
+    if not isinstance(response, Mapping):
         return None
     data = response.get("data")
-    if not isinstance(data, dict):
+    if not isinstance(data, Mapping):
         return None
-    if "id" in data and "order_id" in data and data["id"] != data["order_id"]:
+    order = data.get("order")
+    if not isinstance(order, Mapping):
         return None
     try:
-        return provider_order_id(data.get("id", data.get("order_id")))
+        return provider_order_id(order.get("id"))
     except ValueError:
         return None
 

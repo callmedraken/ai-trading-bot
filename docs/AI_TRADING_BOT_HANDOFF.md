@@ -37,10 +37,27 @@ current `test_core.py` registry/topology expectations, reproduced on unchanged
 source. Admission omitted that module: `PREPUBLICATION_COVERAGE_DEFECT`. The red
 run/commit are never rerun or rewritten. A separately authorized bounded current
 runner/admission/test correction requires new certification and independent review;
-no prototype logic or effect changes.
-Require the new clean-candidate admission's `executed_tests` to contain
-`tests/runtime/checkpoint_runner/test_core.py` before its one ordinary push.
-Do not infer acceptance, integration or provider readiness from CI alone.
+no prototype logic or effect changes. This is preserved historical evidence, not
+the current next step.
+
+The bounded registry/admission correction was accepted at:
+
+    HEAD 1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac
+    TREE 87a4eb9e27ee1b5a209eda93ad198f650abbfed3
+    GitHub 41792913721 / attempt 1 / terminal SUCCESS
+
+The frozen-P01 contract correction was independently reviewed and accepted at:
+
+    HEAD 321893183a12862ef86486e7d5c4cfff49a7b4ff
+    TREE 96784106879285736ee412e887319b48f2c64281
+    PARENT 1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac
+    GitHub 41799106223 / attempt 1 / terminal SUCCESS
+    source-static PASS; active-tests PASS; broad-1 through broad-7 PASS
+
+The implementation/source semantics are accepted, but integration has not
+occurred. Remote `develop` remains the P6 baseline until the accepted feature
+source is integrated. Do not infer provider readiness, host UAT readiness or
+live authority from this source acceptance.
 
 The [prototype contract](architecture/147-live-prototype-current.md) owns the
 frozen interfaces, exact formulas/selection, lifecycle/effect ceiling and launcher.
@@ -58,13 +75,14 @@ Real broker controls remain outside the GUI and fail closed here.
 
 ## Next milestone and stop conditions
 
-Complete the bounded registry/admission correction, one new clean admission and
-terminal mapped FULL, then independent review. No further prototype delegation
-precedes that result/review. Only afterward continue toward native UAT and separately
-reviewed current-data, binding
-parity and complete owned entry/exit/recovery. No paper soak. Do not run a real
-campaign until its existing dataset identity is independently admitted. No new
-variants, provider acquisition or FINAL_HOLDOUT access to manufacture a result.
+Complete the short independent docs-diff review, then fast-forward `develop`
+exactly to `321893183a12862ef86486e7d5c4cfff49a7b4ff` and push, reusing the
+accepted feature FULL. After that develop run succeeds, fast-forward `develop`
+to the docs-only successor and push, then verify the final remote HEAD/tree and
+cleanliness. Continue afterward to native synthetic host UAT and admitted
+offline-comparison preparation. No paper soak. Do not run a real campaign until
+its existing dataset identity is independently admitted. No new variants,
+provider acquisition or FINAL_HOLDOUT access to manufacture a result.
 
 Protected official-close preflight remains a separate reviewed operator step
 on the exact accepted integrated P6 source, place=cancel=0. No fifth history-only

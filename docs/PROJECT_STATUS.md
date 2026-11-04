@@ -24,20 +24,29 @@ Volatility sizing and ambiguous skipped-month momentum are outside this campaign
 
 ## Immediate next step
 
-Correct the preserved prototype `PREPUBLICATION_COVERAGE_DEFECT`: publication
-`01adf7f` failed GitHub run `41788777182`, attempt 1, on two current registry/test-
-topology expectations omitted by admission. That red source/run remain immutable.
-The bounded runner/admission/test correction must pass focused verification,
-clean-candidate admission including `test_core.py`, and one new terminal mapped
-FULL before independent review. No further prototype work or integration follows
-until that boundary is complete. The source-only route has no preflight/execute.
-The task ledger and evidence matrix are in
-[prototype validation](validation/arch147-live-prototype.md).
+The rejected prototype publication remains immutable historical evidence:
+`01adf7f` failed GitHub run `41788777182`, attempt 1, on two current registry/
+test-topology expectations omitted by admission. The bounded registry/admission
+correction `1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac` (tree
+`87a4eb9e27ee1b5a209eda93ad198f650abbfed3`) passed GitHub run `41792913721`,
+attempt 1. The frozen-P01 contract correction then completed at
+`321893183a12862ef86486e7d5c4cfff49a7b4ff` (tree
+`96784106879285736ee412e887319b48f2c64281`) with GitHub run `41799106223`,
+attempt 1, successful across source-static, active-tests and broad-1 through
+broad-7. Independent review accepted the P01 implementation/source semantics.
 
-Native Windows UAT, an admitted offline comparison run, adjusted/raw input-basis
-parity, fresh current-data readiness, and the successor exact-owned exit/budget/
-recovery contract remain required. Missing fractional exit capabilities are a
-blocker, never authority to increase the $10 boundary or emulate unsupported orders.
+Integration has not occurred: remote `develop` remains the P6 baseline. The
+actual sequence is docs-closeout review, exact-SHA integration of the accepted
+implementation followed by the docs-only successor, then native synthetic host
+UAT and admitted offline-comparison preparation. The source-only route has no
+preflight/execute.
+
+Provider/current-data admission, adjusted/raw input-basis parity, fresh
+current-data readiness, and the successor exact-owned exit/budget/recovery
+contract remain separate later boundaries. Missing fractional exit capabilities
+are a blocker, never authority to increase the $10 boundary or emulate
+unsupported orders. The task ledger and evidence matrix are in
+[prototype validation](validation/arch147-live-prototype.md).
 
 ## Product and protected boundaries
 

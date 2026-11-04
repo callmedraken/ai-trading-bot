@@ -5,10 +5,18 @@ Exact starting HEAD 04e02042f0bd34b2fb7c603b4dfb1b68c23cf57f; tree
 feature/robinhood-live-prototype-current, canonical F: worktree named in contract.
 No real provider/order/credential/data/holdout effects, no paper soak.
 
+Current accepted feature source, not yet integrated:
+
+    HEAD 321893183a12862ef86486e7d5c4cfff49a7b4ff
+    TREE 96784106879285736ee412e887319b48f2c64281
+    PARENT 1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac
+    GitHub run 41799106223 / attempt 1 / terminal SUCCESS
+    independent P01 implementation/source review: ACCEPTED
+
 | Task | Dependencies | Owner / exclusive surface | Interface | Status / next |
 |---|---|---|---|---|
 | P00 | exact P6/CI | independent ChatGPT acceptance; Sol reverification | P6 59+1 | ACCEPTED; provider observation separate |
-| P01 | P00 | Sol contracts, docs, registry, composition | v1 | SOL_REVIEWED; publication gate next |
+| P01 | P00 | Sol contracts, docs, registry, composition | v1 | IMPLEMENTATION/SOURCE ACCEPTED; integration pending |
 | R09 | P01 | Luna external primary-source evidence | 3 fixed arms | SOL_REVIEWED |
 | R10 | P01 | Luna comparison_v2.py + exact tests | R10 v1 | SOL_REVIEWED; 14 focused tests |
 | R11 | R10 | Luna comparison_campaign_v2.py + exact tests | R11 v1 | SOL_REVIEWED; 49 focused tests |
@@ -19,7 +27,7 @@ No real provider/order/credential/data/holdout effects, no paper soak.
 | D30-D32 | selection/official data | Sol then Luna data/parity | not frozen | BLOCKED on reviewed actual input basis |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
-| Q60 | exact source | Sol admission/publication/FULL | registered source-only | RED PRESERVED; bounded registry/admission correction pending |
+| Q60 | exact source | Sol admission/publication/FULL | registered source-only | IMPLEMENTATION/SOURCE ACCEPTED; integration pending |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | PENDING |
@@ -31,10 +39,10 @@ No real provider/order/credential/data/holdout effects, no paper soak.
 | Research/runtime parity | BLOCKED | no runtime binding/data-basis acceptance yet |
 | Current valid inputs | BLOCKED | new official-close protected observation not run |
 | Entry and exact owned exit | BLOCKED | official fractional exit capability unproven |
-| Durable limits/no duplicate effects | PENDING | P6 remains untouched; successor not accepted |
+| Durable limits/no duplicate effects | PENDING | P6 remains untouched; P01 source is accepted but durable runtime/reconciliation evidence remains unaccepted |
 | Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | BLOCKED / CORRECTION PENDING | Rejected 01adf7f / run 41788777182; new certification required |
+| Exact source certified | PASS / INTEGRATION PENDING | Exact implementation FULL passed and was independently reviewed: 3218931 / run 41799106223; remote develop remains the P6 baseline |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
@@ -83,16 +91,18 @@ live implementation is delegated across it.
 
 ## Concrete next boundary
 
-Independent ChatGPT exact-source review after terminal mapped FULL, then the
-next selected source/data/host step. A real offline comparison needs separate
-admission of the existing dataset; it must not reacquire data, rerun the old
-30-arm campaign, expand variants or access FINAL_HOLDOUT. Native host commands
+Complete the short independent docs-diff review, then exact-SHA integrate the
+accepted implementation into `develop`, followed by the docs-only successor and
+final remote identity verification. Continue afterward to native synthetic host
+UAT and admitted offline-comparison preparation. A real offline comparison needs
+separate admission of the existing dataset; it must not reacquire data, rerun the
+old 30-arm campaign, expand variants or access FINAL_HOLDOUT. Native host commands
 are in docs/LIVE_PROTOTYPE_UAT.md and are used only after exact source acceptance.
-P00's prepared guarded read-only 59+1 command is an external review artifact;
-it has not been executed here. No placement, cancellation or live order is
-included in this checkpoint.
+P00's prepared guarded read-only 59+1 command is an external review artifact; it
+has not been executed here. No placement, cancellation or live order is included
+in this checkpoint.
 
-## Preserved rejected publication and bounded coverage correction
+## Preserved rejected publication and accepted corrections
 
 The first prototype publication is permanently preserved:
 
@@ -124,14 +134,10 @@ workflow/coordination documentation. Product/research/GUI/P6/provider/credential
 execution/ownership/kill/data/holdout semantics remain unchanged. No protected
 or operational action, paper soak, or further prototype delegation is included.
 
-Before publication, run the requested affected runner/authority/certification and
-two existing coherence modules, plus the prototype checkpoint test selection.
-Run whole-repository Ruff check/format and diff checks. On one new clean ordinary
-correction commit, `ops.ps1 admit` must prove FEATURE and PROSPECTIVE_DEVELOP PASS,
-stable identity, and recorded `executed_tests` containing `test_core.py`. Absence
-is STOP before push. One ordinary push owns one new terminal mapped GitHub FULL;
-no local canonical FULL or unchanged rerun. Independent exact-source review still
-precedes any integration or next prototype work.
+The prepublication plan required the affected runner/authority/certification and
+coherence coverage, whole-repository Ruff/diff checks, clean-candidate FEATURE and
+PROSPECTIVE_DEVELOP admission, one ordinary correction push and one mapped FULL;
+it prohibited a local canonical FULL and unchanged reruns.
 
 The correction's initial ten-module focused run passed 1435 tests and exposed
 one further assertion in the formerly short-circuited inventory test: the
@@ -144,7 +150,11 @@ The restored tuple was verified afterward; no source mutation was used for that
 probe. Final current authority, whole-repository Ruff check/format (1535 files)
 and whitespace checks passed before the ordinary correction candidate.
 
-The registered prototype verification and exact clean-candidate admission remain
-required after the candidate commit. The implementation handoff supplies that
-candidate's exact HEAD/tree/parent, report identities/selection and terminal CI;
-the rejected predecessor above must never be mistaken for the corrective source.
+The registry/admission correction completed at `1f2f42b` / tree
+`87a4eb9e27ee1b5a209eda93ad198f650abbfed3`, with GitHub run `41792913721`,
+attempt 1, terminal SUCCESS. The frozen-P01 semantic correction then completed
+at `3218931` / tree `96784106879285736ee412e887319b48f2c64281`, with GitHub run
+`41799106223`, attempt 1, terminal SUCCESS across source-static, active-tests and
+broad-1 through broad-7. Independent review accepted the implementation/source
+semantics. The rejected predecessor remains historical and must never be
+mistaken for the accepted source. Integration is still pending.

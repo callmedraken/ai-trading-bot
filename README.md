@@ -10,32 +10,30 @@ boundaries decide what may actually happen.
 
 ## Current status
 
-The current product is the Architecture-147 private single-user Windows
-desktop application, manually started/stopped and manually updated while
-stopped. Adjusted acquisition, filtered-trend research, the 35/50 SPY
-PAPER_EVALUATION binding and the no-network OPEN_REPLAY smoke are complete.
+The current product is the Architecture-147 private single-user Windows desktop,
+started/stopped by its owner and manually updated while stopped. P5A research,
+paper binding and deterministic replay are complete. P5B read/reconciliation
+and the P6 59+1 completed-close source are accepted/integrated; source certification
+does not grant provider or order authority.
 
-P5B-lite source adds a separate official Robinhood read/account/reconciliation
-baseline with zero order reviews, previews or mutations. Source is pending
-exact acceptance, terminal GitHub FULL and integration before one separately
-reviewed protected read-only preflight. No prolonged paper soak is planned.
-LIVE remains unavailable pending a separate explicitly armed restricted-live
-checkpoint. Historical Architecture-131 review-paper and Architecture-133
-release machinery retain their frozen semantics and are not current startup
-prerequisites.
+The additive research-to-live prototype now composes five desktop pages, frozen
+research comparison and isolated synthetic workers. Independent prototype source
+acceptance, native host UAT, current data/binding parity, and complete owned exit/
+recovery remain separate gates. No paper soak is required and no live order is
+authorized. FINAL_HOLDOUT remains sealed.
 
 See [project status](docs/PROJECT_STATUS.md), [current handoff](docs/AI_TRADING_BOT_HANDOFF.md)
-and the [P5B-lite contract](docs/architecture/147-p5b-robinhood-read-reconciliation.md).
+and [prototype contract](docs/architecture/147-live-prototype-current.md).
 
 ## Product direction
 
-The long-term progression is:
+The current prototype progression is:
 
-1. Complete P5B-lite source acceptance and one separately reviewed read-only broker baseline.
-2. Implement P6 as a separate source/effect checkpoint with explicit live arming, account verification, deterministic risk, reconciliation and hard tiny notional limits.
-3. Permit tiny restricted live only after all separate acceptance/effect gates pass.
-4. Mature monitoring, backup/recovery, restart, reconnect, credential rotation and long-running reliability.
-5. Deepen strategy capabilities and GUI presentation through the same reviewed risk and execution boundaries.
+1. Admit and independently accept the additive comparison/GUI source checkpoint.
+2. Inspect an admitted offline comparison; keep all results and no-qualifier outcomes.
+3. Prove selected-strategy data parity and complete owned entry/exit/recovery.
+4. Complete distinct native Windows UAT and fresh protected provider/data readiness.
+5. Deliver a bounded live-test package under separately reviewed effect interlocks.
 
 The GUI is a presentation and operator-control layer. It must use the same
 reviewed application/service boundaries as CLI, automation, and tests and may
@@ -85,46 +83,39 @@ On macOS or Linux:
 source .venv/bin/activate
 ```
 
-## GUI
+## Prototype GUI
 
-Install GUI dependencies with:
-
-```powershell
-python -m pip install -e ".[dev,gui]"
-```
-
-Launch with:
+Install GUI dependencies with `python -m pip install -e ".[dev,gui]"` in the
+approved environment. The current additive launcher binds imports to its own
+checkout. Help performs no GUI/state/provider construction:
 
 ```powershell
-python -m trading_bot.gui
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B scripts/run_live_prototype.py --help
 ```
 
-That entry point remains the local read-only artifact/evidence GUI.
-
-Architecture 147 P4 adds the current desktop Start/Stop controls in the same
-window. After P4 exact-source acceptance/integration, launch with:
+From the exact reviewed prototype checkout, launch isolated synthetic mode:
 
 ```powershell
-.\.venv\Scripts\python.exe -B scripts\run_desktop_bot.py
+$StateRoot = 'F:\AI\temp\live-prototype-uat-' + [guid]::NewGuid().ToString('N')
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B scripts/run_live_prototype.py --synthetic --state-root $StateRoot
 ```
 
-Start runs an inert trading worker and a separate offline research worker;
-Stop cancels research and reconciles/closes trading before reporting STOPPED.
-Closing the window requests the same normal Stop and waits for confirmed
-closure. External trading transport is NOT_CONNECTED, deferred to P5; LIVE
-remains disabled. P4 selects local P3 campaign bundles; the read-only entry
-point above also supports legacy compact reports. Research results never select
-a production strategy. No credentials, network, provider, broker, scheduler or
-ACL operation is involved.
+The five pages are Dashboard, Research, Strategy, Live Session and Activity/Health.
+Opening a comparison report loads it on a worker and cannot change the active
+binding. Start/Stop operate a synthetic worker; Close waits for all application
+threads. There is no live mode or GUI arm/place/cancel/exit authority. State roots
+must be fresh under F:\AI\temp; preserve an existing root and choose a new one.
+Optional `--comparison-report <absolute path>` opens explicit comparison evidence.
+Follow [native UAT](docs/LIVE_PROTOTYPE_UAT.md) after independent source acceptance.
+Offscreen source tests do not grant either readiness label.
 
-Ordinary lifecycle state is stored outside source at
-`F:\AI\desktop-bot-state\p4\lifecycle.jsonl`. Preserve unresolved journal/lock
-state for review; no automatic recovery or retry is implemented. Manual updates
-occur only while fully stopped. The application never updates itself.
-
-When using a shared virtual environment from another worktree, follow
-[`docs/AI_DEVELOPMENT_WORKFLOW.md`](docs/AI_DEVELOPMENT_WORKFLOW.md) so imports
-resolve from the intended worktree.
+The older `python -m trading_bot.gui` artifact viewer and
+`scripts/run_desktop_bot.py` P4 composition remain available for their existing
+contracts. Their state/evidence is separate; do not reuse production/P4 roots for
+prototype testing. This checkpoint does not modify those implementations.
+Manual updates occur only while stopped; the application never updates itself.
+When sharing an environment across worktrees, follow
+[the source-provenance workflow](docs/AI_DEVELOPMENT_WORKFLOW.md).
 
 ## Testing
 

@@ -38,6 +38,10 @@ HISTORICAL_CATALOG_SHA256 = (
 CURRENT_MUTABLE_CONSTANTS = frozenset(
     {
         "CURRENT_ACTIVE_CI_CHECKPOINTS",
+        "ARCH147_PROTOTYPE_NAME",
+        "ARCH147_PROTOTYPE_BRANCH",
+        "ARCH147_PROTOTYPE_TESTS",
+        "ARCH147_PROTOTYPE_RUFF",
         "CI_CERTIFICATION_PROFILES",
         "ARCH147_P5B_NAME",
         "ARCH147_P5B_BRANCH",
@@ -73,6 +77,7 @@ def current_owner(relative: str) -> str | None:
             "_arch147_batch_workflow_is_reviewed",
             "_arch147_current_batch_workflow_is_reviewed",
             "_arch147_filtered_trend_authority_check",
+            "_arch147_prototype_authority_check",
             "_arch147_p5b_authority_check",
             "_arch147_p5b_preflight_checkpoint",
             "current_authority_check",

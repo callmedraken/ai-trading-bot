@@ -506,6 +506,38 @@ ARCH147_P6_RUFF: Final = (
     "tests/runtime/checkpoint_runner/helpers.py",
     *ARCH147_P6_TESTS,
 )
+ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
+ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
+ARCH147_PROTOTYPE_TESTS: Final = (
+    "tests/live_prototype/test_configuration.py",
+    "tests/live_prototype/test_synthetic_service.py",
+    "tests/live_prototype/test_launcher.py",
+    "tests/live_prototype/test_application_acceptance.py",
+    "tests/experiments/test_filtered_trend_comparison_v2.py",
+    "tests/experiments/test_filtered_trend_comparison_campaign_v2.py",
+    "tests/experiments/test_filtered_trend_comparison_bundle_v2.py",
+    "tests/gui/test_research_comparison_service.py",
+    "tests/gui/test_prototype_dashboard.py",
+    "tests/gui/test_prototype_session_page.py",
+    "tests/gui/test_prototype_research_page.py",
+    "tests/gui/test_prototype_strategy_page.py",
+    "tests/gui/test_prototype_activity_page.py",
+    "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
+)
+ARCH147_PROTOTYPE_RUFF: Final = (
+    "src/trading_bot/live_prototype",
+    "src/trading_bot/experiments/filtered_trend_comparison_v2.py",
+    "src/trading_bot/experiments/filtered_trend_comparison_campaign_v2.py",
+    "src/trading_bot/experiments/filtered_trend_comparison_bundle_v2.py",
+    "src/trading_bot/gui/research_comparison_service.py",
+    "src/trading_bot/gui/prototype_dashboard.py",
+    "src/trading_bot/gui/prototype_session_page.py",
+    "src/trading_bot/gui/prototype_research_page.py",
+    "src/trading_bot/gui/prototype_strategy_page.py",
+    "src/trading_bot/gui/prototype_activity_page.py",
+    "scripts/run_live_prototype.py",
+    *ARCH147_PROTOTYPE_TESTS,
+)
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH147_P6_NAME,
     ARCH147_P5B_NAME,
@@ -513,6 +545,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH147_P5A_NAME,
     ARCH147_P4_NAME,
     ARCH147_NAME,
+    ARCH147_PROTOTYPE_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
     ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
@@ -523,6 +556,7 @@ CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
 # Canonical certification profiles that GitHub owns for exact active checkpoints.
 # Keep this mapping explicit; adding a checkpoint/profile is a reviewed workflow change.
 CI_CERTIFICATION_PROFILES: Final = {
+    ARCH147_PROTOTYPE_NAME: "full",
     ARCH147_P6_NAME: "full",
     ARCH147_P5B_NAME: "full",
     ARCH147_FILTERED_TREND_NAME: "full",
@@ -26538,6 +26572,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_P5B_BRANCH,
     )
+    values[ARCH147_PROTOTYPE_NAME] = CheckpointSpec(
+        ARCH147_PROTOTYPE_NAME,
+        "Additive prototype source only; no protected dispatch",
+        ARCH147_PROTOTYPE_TESTS,
+        ARCH147_PROTOTYPE_RUFF,
+        _arch147_prototype_authority_check,
+        preflight=None,
+        execute=None,
+        remote_branch=ARCH147_PROTOTYPE_BRANCH,
+    )
     values[ARCH147_P6_NAME] = CheckpointSpec(
         ARCH147_P6_NAME,
         "Architecture 147 tiny-live source boundary with explicit operator arm",
@@ -27110,6 +27154,7 @@ def _arch147_current_batch_workflow_is_reviewed(workflow: str) -> bool:
         return False
     translated = predecessor
     for name in (
+        ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
@@ -27145,6 +27190,7 @@ def _arch147_batch_workflow_is_reviewed(workflow: str) -> bool:
     if _arch147_current_batch_workflow_is_reviewed(workflow):
         return True
     current_names = (
+        ARCH147_PROTOTYPE_NAME,
         ARCH147_P6_NAME,
         ARCH147_P5B_NAME,
         ARCH147_FILTERED_TREND_NAME,
@@ -28953,6 +28999,39 @@ def _arch147_p6_execute_checkpoint(
 
 preflight_checkpoint = _arch147_p6_preflight_checkpoint
 execute_checkpoint = _arch147_p6_execute_checkpoint
+
+
+def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Current route owner; never invoke provider or protected dispatch."""
+    from scripts import run_test_certification as certification
+
+    spec = _checkpoint_specs()[ARCH147_PROTOTYPE_NAME]
+    failures = []
+    if (
+        spec.tests != ARCH147_PROTOTYPE_TESTS
+        or spec.ruff_paths != ARCH147_PROTOTYPE_RUFF
+        or spec.authority_check is not _arch147_prototype_authority_check
+        or spec.preflight is not None
+        or spec.execute is not None
+        or spec.remote_head_env is not None
+        or spec.remote_branch != ARCH147_PROTOTYPE_BRANCH
+        or CI_CERTIFICATION_PROFILES.get(spec.name) != "full"
+        or CURRENT_ACTIVE_CI_CHECKPOINTS.count(spec.name) != 1
+        or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
+        != spec.name
+    ):
+        failures.append("147 prototype source-only registration drift")
+    workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
+        encoding="utf-8"
+    )
+    if not _arch147_current_batch_workflow_is_reviewed(workflow):
+        failures.append("147 prototype workflow projection drift")
+    if "tests/live_prototype" not in certification.FULL_DIRECTORIES:
+        failures.append("147 prototype tests not FULL owned")
+    for relative in spec.tests:
+        if not (repo_root / relative).exists():
+            failures.append("147 prototype missing tests: " + relative)
+    return tuple(failures)
 
 
 if __name__ == "__main__":

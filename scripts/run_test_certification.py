@@ -575,6 +575,7 @@ ROBINHOOD_REQUIRED_MODULES = (
     "tests/test_robinhood_prepare_qualification_verifier.py",
 )
 FULL_DIRECTORIES = (
+    "tests/live_prototype",
     "tests/analytics",
     "tests/backtesting",
     "tests/domain",
@@ -596,6 +597,13 @@ FULL_DIRECTORIES = (
     "tests/desktop_live",
 )
 FULL_EXACT_MODULES = (
+    "tests/gui/test_research_comparison_service.py",
+    "tests/gui/test_prototype_dashboard.py",
+    "tests/gui/test_prototype_session_page.py",
+    "tests/gui/test_prototype_research_page.py",
+    "tests/gui/test_prototype_strategy_page.py",
+    "tests/gui/test_prototype_activity_page.py",
+    "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
     "tests/gui/test_live_state.py",
     "tests/runtime/checkpoint_runner/test_arch147_p6.py",
     "tests/desktop_paper/test_robinhood_read.py",

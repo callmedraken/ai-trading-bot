@@ -133,6 +133,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     specs = runner._checkpoint_specs()
 
     assert set(specs) == {
+        runner.ARCH147_PROTOTYPE_NAME,
         runner.ARCH147_P6_NAME,
         runner.ARCH147_P5B_NAME,
         runner.ARCH147_FILTERED_TREND_NAME,
@@ -446,6 +447,8 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH147_FILTERED_TREND_BRANCH
         if spec.name == runner.ARCH147_P5B_NAME:
             expected_branch = runner.ARCH147_P5B_BRANCH
+        if spec.name == runner.ARCH147_PROTOTYPE_NAME:
+            expected_branch = runner.ARCH147_PROTOTYPE_BRANCH
         if spec.name == runner.ARCH147_P6_NAME:
             expected_branch = runner.ARCH147_P6_BRANCH
         if spec.name == runner.ARCH147_P5A_NAME:
@@ -1538,6 +1541,11 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
                 "tests/runtime/checkpoint_runner/test_arch147_p5b.py",
                 "tests/runtime/checkpoint_runner/test_arch131.py",
                 "tests/runtime/checkpoint_runner/test_source_authority.py",
+            )
+        if name == runner.ARCH147_PROTOTYPE_NAME:
+            expected = (
+                *runner.COMMON_TESTS,
+                "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
             )
         if name == runner.ARCH147_P6_NAME:
             expected = tuple(

@@ -26,7 +26,20 @@ All four consumed history-only attempts and diagnostics remain immutable;
 Worktree: F:\AI\worktrees\ai-trading-bot-live-prototype-current.
 Branch: feature/robinhood-live-prototype-current.
 Checkpoint: arch147-live-prototype; GitHub-owned FULL; no preflight/execute.
-One convergence source publication precedes independent exact-source acceptance.
+Preserved rejected prototype publication:
+
+    HEAD 01adf7f0808970576b263f158d2dd121b216d733
+    TREE bd0fb74dacbd22aa832d991c0876fd14ad478789
+    GitHub 41788777182 / attempt 1 / terminal FAILURE
+
+Source-static and active tests passed; six FULL lanes passed. Broad-3 failed two
+current `test_core.py` registry/topology expectations, reproduced on unchanged
+source. Admission omitted that module: `PREPUBLICATION_COVERAGE_DEFECT`. The red
+run/commit are never rerun or rewritten. A separately authorized bounded current
+runner/admission/test correction requires new certification and independent review;
+no prototype logic or effect changes.
+Require the new clean-candidate admission's `executed_tests` to contain
+`tests/runtime/checkpoint_runner/test_core.py` before its one ordinary push.
 Do not infer acceptance, integration or provider readiness from CI alone.
 
 The [prototype contract](architecture/147-live-prototype-current.md) owns the
@@ -45,8 +58,10 @@ Real broker controls remain outside the GUI and fail closed here.
 
 ## Next milestone and stop conditions
 
-Complete exact-source admission/terminal mapped FULL, then independent review.
-Continue the plan toward native UAT and separately reviewed current-data, binding
+Complete the bounded registry/admission correction, one new clean admission and
+terminal mapped FULL, then independent review. No further prototype delegation
+precedes that result/review. Only afterward continue toward native UAT and separately
+reviewed current-data, binding
 parity and complete owned entry/exit/recovery. No paper soak. Do not run a real
 campaign until its existing dataset identity is independently admitted. No new
 variants, provider acquisition or FINAL_HOLDOUT access to manufacture a result.

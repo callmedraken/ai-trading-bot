@@ -1655,6 +1655,25 @@ def test_r3n_prepublication_admission_contract():
     )
 
 
+@pytest.mark.parametrize(
+    "changed_path",
+    (
+        "scripts/checkpoint_runner.py",
+        ".github/workflows/checkpoint-source-gates.yml",
+        "scripts/run_test_certification.py",
+        "scripts/source_authority.py",
+    ),
+)
+def test_prepublication_infrastructure_changes_require_core_registry_tests(
+    changed_path,
+):
+    core = "tests/runtime/checkpoint_runner/test_core.py"
+    assert core in runner.PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS
+    selected = runner._prepublication_admission_tests((changed_path,))
+    assert selected.count(core) == 1
+    assert core not in runner._prepublication_admission_tests(("src/example.py",))
+
+
 def test_prepublication_admission_selects_infrastructure_coherence_tests(
     monkeypatch, tmp_path
 ):

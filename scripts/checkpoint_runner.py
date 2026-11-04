@@ -509,6 +509,7 @@ ARCH147_P6_RUFF: Final = (
 ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_PROTOTYPE_TESTS: Final = (
+    *COMMON_TESTS,
     "tests/live_prototype/test_configuration.py",
     "tests/live_prototype/test_synthetic_service.py",
     "tests/live_prototype/test_launcher.py",
@@ -525,6 +526,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
 )
 ARCH147_PROTOTYPE_RUFF: Final = (
+    "scripts/checkpoint_runner.py",
     "src/trading_bot/live_prototype",
     "src/trading_bot/experiments/filtered_trend_comparison_v2.py",
     "src/trading_bot/experiments/filtered_trend_comparison_campaign_v2.py",
@@ -696,6 +698,7 @@ ARCH132_R3N_ADMISSION_RUFF_PATHS: Final = CANONICAL_RUFF_ROOTS
 # Current infrastructure changes add bounded cross-era/certification regressions
 # to the ordinary local admission bundle. Canonical FULL remains GitHub-owned.
 PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS: Final = (
+    "tests/runtime/checkpoint_runner/test_core.py",
     "tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py",
     "tests/experiments/test_research_strategy_production_compatibility.py",
     "tests/scripts/certification_runner/test_results.py",

@@ -94,13 +94,18 @@ Canonical mapped ROBINHOOD/FULL stays GitHub-owned and is not a local debug loop
 
 For candidates that change the source-gate workflow, checkpoint runner,
 certification runner, current source-authority owner, their current-owner tests,
-or the two historical/current regression modules below, `ops.ps1 admit` adds a
+or any coherence module below, `ops.ps1 admit` adds a
 bounded coherence bundle before publication:
 
+- `tests/runtime/checkpoint_runner/test_core.py`
 - `tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py`
 - `tests/experiments/test_research_strategy_production_compatibility.py`
+- `tests/scripts/certification_runner/test_results.py`
+- `tests/scripts/certification_runner/test_source.py`
 
-The bundle checks that historical workflow reconstruction removes later current
+The bundle checks exact current registry inventory and common/family runner-test
+selection before publication, alongside certification result/source provenance.
+It also checks that historical workflow reconstruction removes later current
 checkpoint registrations before applying the frozen predecessor predicate, and
 that frozen Architecture-143 pins are checked against historical authority while
 current test files remain under their current semantic owners. Ordinary

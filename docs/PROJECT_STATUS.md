@@ -22,9 +22,13 @@ Volatility sizing and ambiguous skipped-month momentum are outside this campaign
 
 ## Immediate next step
 
-Converge P01/R10/R11/R12/G20/G21/G22 and the synthetic service/launcher into one
-clean admitted source checkpoint, terminal GitHub-owned FULL, then independent
-exact-source review. Current source-only route has no preflight/execute dispatch.
+Correct the preserved prototype `PREPUBLICATION_COVERAGE_DEFECT`: publication
+`01adf7f` failed GitHub run `41788777182`, attempt 1, on two current registry/test-
+topology expectations omitted by admission. That red source/run remain immutable.
+The bounded runner/admission/test correction must pass focused verification,
+clean-candidate admission including `test_core.py`, and one new terminal mapped
+FULL before independent review. No further prototype work or integration follows
+until that boundary is complete. The source-only route has no preflight/execute.
 The task ledger and evidence matrix are in
 [prototype validation](validation/arch147-live-prototype.md).
 

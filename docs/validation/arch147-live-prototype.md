@@ -19,7 +19,7 @@ No real provider/order/credential/data/holdout effects, no paper soak.
 | D30-D32 | selection/official data | Sol then Luna data/parity | not frozen | BLOCKED on reviewed actual input basis |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
-| Q60 | exact source | Sol admission/publication/FULL | registered source-only | PENDING |
+| Q60 | exact source | Sol admission/publication/FULL | registered source-only | RED PRESERVED; bounded registry/admission correction pending |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | PENDING |
@@ -34,7 +34,7 @@ No real provider/order/credential/data/holdout effects, no paper soak.
 | Durable limits/no duplicate effects | PENDING | P6 remains untouched; successor not accepted |
 | Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | PENDING | prototype not published/certified |
+| Exact source certified | BLOCKED / CORRECTION PENDING | Rejected 01adf7f / run 41788777182; new certification required |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
@@ -86,3 +86,60 @@ are in docs/LIVE_PROTOTYPE_UAT.md and are used only after exact source acceptanc
 P00's prepared guarded read-only 59+1 command is an external review artifact;
 it has not been executed here. No placement, cancellation or live order is
 included in this checkpoint.
+
+## Preserved rejected publication and bounded coverage correction
+
+The first prototype publication is permanently preserved:
+
+    HEAD 01adf7f0808970576b263f158d2dd121b216d733
+    TREE bd0fb74dacbd22aa832d991c0876fd14ad478789
+    GitHub run 41788777182 / attempt 1 / terminal FAILURE
+
+Source-static and active-tests passed. FULL broad-1/2/4/5/6/7 passed; broad-3
+failed 2 of 2560 tests, with 2558 passed and no skips/errors. Both failures
+reproduced on that unchanged source in 0.44 seconds:
+
+- `test_core.py::test_registered_profiles_include_current_arch128_gates` omitted
+  `arch147-live-prototype` from the exact current registry inventory.
+- `test_core.py::test_r2b_common_and_family_requirements_are_independently_selectable`
+  lacked a prototype family expectation; the prototype selection omitted the
+  established `COMMON_TESTS` contract.
+
+The recorded general admission executed source-authority, CI, profile/lane,
+readonly-diagnostic, strategy-compatibility and certification result/source tests,
+but not `test_core.py`. Classification: `PREPUBLICATION_COVERAGE_DEFECT`. Work
+stopped for independent review; the user then explicitly authorized this bounded
+current runner/admission/test-topology correction. The red run is not retried and
+its commit is not amended, rebased or rewritten.
+
+Corrective scope is limited to prototype COMMON_TESTS membership, mandatory
+infrastructure coherence coverage of `test_core.py`, exact current inventory and
+family expectations, an independent literal coverage regression, and current
+workflow/coordination documentation. Product/research/GUI/P6/provider/credential/
+execution/ownership/kill/data/holdout semantics remain unchanged. No protected
+or operational action, paper soak, or further prototype delegation is included.
+
+Before publication, run the requested affected runner/authority/certification and
+two existing coherence modules, plus the prototype checkpoint test selection.
+Run whole-repository Ruff check/format and diff checks. On one new clean ordinary
+correction commit, `ops.ps1 admit` must prove FEATURE and PROSPECTIVE_DEVELOP PASS,
+stable identity, and recorded `executed_tests` containing `test_core.py`. Absence
+is STOP before push. One ordinary push owns one new terminal mapped GitHub FULL;
+no local canonical FULL or unchanged rerun. Independent exact-source review still
+precedes any integration or next prototype work.
+
+The correction's initial ten-module focused run passed 1435 tests and exposed
+one further assertion in the formerly short-circuited inventory test: the
+prototype Ruff tuple must contain `scripts/checkpoint_runner.py`. That same
+current inventory test also needs the explicit prototype branch expectation.
+Both were corrected within the runner/test contract; the exact failing test
+then passed (1 passed). No product source changed. The newly added regression
+also rejected a process-local removal of `test_core.py` from the coherence tuple.
+The restored tuple was verified afterward; no source mutation was used for that
+probe. Final current authority, whole-repository Ruff check/format (1535 files)
+and whitespace checks passed before the ordinary correction candidate.
+
+The registered prototype verification and exact clean-candidate admission remain
+required after the candidate commit. The implementation handoff supplies that
+candidate's exact HEAD/tree/parent, report identities/selection and terminal CI;
+the rejected predecessor above must never be mistaken for the corrective source.

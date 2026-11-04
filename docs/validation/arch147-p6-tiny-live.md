@@ -153,7 +153,7 @@ is added. The accepted feature and develop evidence above remains GitHub-owned;
 no protected effect occurred during implementation, certification or integration.
 
 
-## Current P6 daily-history successor validation
+## Historical P6 history-only successor validation
 
 Synthetic tests cover exactly 60 selected sessions (shared request long_window=59),
 latest-completed-session inclusion, current midnight labels, published-open
@@ -169,3 +169,26 @@ Architecture-134 historical source/qualification/pins and shared runner topology
 are unchanged. Prior consumed attempts/diagnostics remain untouched; their
 chronology is owned by the [P6 contract](../architecture/147-p6-tiny-live.md).
 No real provider/OAuth/preflight/history/order/live effect occurs during testing.
+
+
+## Completed-close composition verification
+
+The current successor uses synthetic fixtures only for the P6-local capture,
+strict 59-session prefix and typed official-close composition. Required coverage
+includes unchanged one-call quote delivery, accepted-quote equality, exact final
+session/source, missing/stale/future/nonpositive/interpolated/unknown official
+close rejection, and strict prefix count/order/gap rejection. Test-only bars prove
+BASE_MA equivalence; production creates no official-close OHLC bar. Existing
+provider contract, timing, invocation counts, execution/ownership/kill and no-retry
+regressions remain required. The plan basis advances and old-basis plans reject.
+
+Focused results and exact publication/certification identity are reported with
+the implementation handoff; this document does not claim an unperformed gate.
+No local canonical FULL, real preflight, provider operation or live effect occurs.
+The contract owns all four preserved attempt roots and the next protected gate.
+
+Final composed focused gate: 569 tests passed across tests/desktop_live,
+tests/runtime/checkpoint_runner/test_arch147_p6.py and
+tests/robinhood_mcp/test_current_live_transport.py. Whole-repository Ruff check
+and format check passed (1503 files); git diff --check and P6 source authority
+passed. These are synthetic source results, not protected host acceptance.

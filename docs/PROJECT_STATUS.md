@@ -1,20 +1,24 @@
 # AI Trading Bot — Project Status
 
-## Current source correction — P6 daily history; review pending
+## Current correction — completed-close composition; source review pending
 
-The current P6 correction starts from integrated `7af23442ef212a29d02b9f7645deebbfa826f668`
-(tree `550ae6a92deb38656f92ccac62b938603bba4a1b`). It requests exactly the
-latest 60 completed XNYS sessions and validates current provider midnight daily
-labels before mapping internally to published regular opens. Optional session/
-interpolation fields remain strictly constrained; stale/gapped evidence blocks.
-Architecture-134 history remains frozen. Strategy, provider order contract,
-execution/kill and consumed/no-retry semantics remain unchanged.
+The history-only design was abandoned after four consumed P6 preflights. The
+replacement starts at HEAD `bbffca862719c61c445952403877b543a80f3111`, tree
+`a267b8295d965b8d7d22a9072e27afde46eed45e`. P6 intentionally composes the exact
+60 selected completed XNYS sessions from 59 historical daily closes and one typed
+Robinhood official close for the final session. No synthetic OHLC bar is created.
+The existing baseline quote read supplies that official close: one quote call
+and one historical call remain the ceilings. Missing, stale, interpolated or
+mismatched official-close data blocks; no quote-price substitution or retry exists.
+The plan binds `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` and the new signal basis.
 
-The [P6 contract](architecture/147-p6-tiny-live.md) owns the response contract,
-third consumed blocked preflight's truthful counts, source-bound diagnostic and
-all preserved attempt chronology. No real provider/OAuth/preflight/history/
-review/place/cancel/live effect occurs during this correction. Earlier no-attempt
-statements below describe historical source checkpoints.
+All four consumed attempts and diagnostics remain untouched. Source work and
+synthetic tests perform no real OAuth/provider/preflight/order/live operation.
+After independent exact-source acceptance, exact fast-forward integration and
+terminal develop certification reuse, the next protected boundary is one fresh
+guarded read-only preflight of this new architecture. A failure to obtain the
+exact official close stops this path; a dedicated strategy market-data source
+would then require a new design. Live placement remains unauthorized.
 
 ## Current checkpoint - P6 kill-operator accepted/integrated
 
@@ -62,19 +66,19 @@ production-state or FINAL_HOLDOUT effect has occurred.
 
 ## Immediate next step
 
-ChatGPT independent exact-source review of the daily-history correction is next,
-after one atomic publication and terminal GitHub-owned FULL certification.
-Follow the current correction section above for integration, certification reuse
-and the later single fresh read-only preflight.
-One explicitly armed `<= $10` live trial and post-trade reconciliation remain
-separate requirements before P7 production maturity.
+Complete synthetic focused verification, FEATURE/PROSPECTIVE_DEVELOP admission,
+one atomic publication and terminal GitHub-owned FULL for the 59+1 correction.
+Independent exact-source review precedes integration and any fresh preflight.
+The parallel research next step is a bounded strategy/filter comparison contract
+using the existing platform, followed by explicit selection and a separately
+reviewed small-money live pilot. Paper soak is not the current priority.
 
 ## Roadmap
 
     P1-P4 accepted; real research and desktop lifecycle smoke complete
     P5A accepted; B1 35/50 SPY binding and B2 OPEN_REPLAY smoke complete
     P5B-lite accepted/integrated; reviewed read-only provider baseline PASS
-    P6 kill-operator accepted/integrated; daily-history source review next, then
+    P6 kill-operator accepted/integrated; 59+1 close-composition source review next, then
         integrated/certified read-only preflight, followed by one
         explicitly armed <= $10 live trial and post-trade reconciliation
     P7 production monitoring / backup / restart / reconnect / credential rotation

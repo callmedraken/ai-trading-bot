@@ -9,6 +9,7 @@ import pytest
 
 import trading_bot.desktop_live.preflight as preflight
 from trading_bot.desktop_live.models import LivePlanState
+from trading_bot.desktop_paper.robinhood_read import parse_spy_quote
 from trading_bot.market_calendar import NYSEMarketCalendar
 from trading_bot.market_data import XNYS_CALENDAR_DESCRIPTOR, BoundMarketCalendar
 from trading_bot.review_paper.nyse_published_regular_sessions import (
@@ -156,6 +157,31 @@ def test_target_session_uses_published_regular_hours(label, instant, target, is_
     )
 
 
+def _selected_sessions(now):
+    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
+    return RobinhoodDailyHistoryRequest(
+        preflight.LIVE_SYMBOL,
+        now,
+        preflight.MIN_COMPLETED_BARS - 1,
+        calendar,
+    ).sessions()
+
+
+def _history_prefix_request(now):
+    calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
+    selected = _selected_sessions(now)
+    latest_schedule = NYSEPublishedRegularSessionAuthority().schedule_for(
+        selected[-1].session_date
+    )
+    assert latest_schedule is not None
+    return RobinhoodDailyHistoryRequest(
+        preflight.LIVE_SYMBOL,
+        latest_schedule.opens_at,
+        preflight.MIN_COMPLETED_BARS - 2,
+        calendar,
+    )
+
+
 class _PlanTransport:
     """Synthetic bounded reads/review only; any mutation fails the test."""
 
@@ -169,6 +195,43 @@ class _PlanTransport:
         self.review_changes = {}
         self.setting_approval = False
         self.review_arguments = []
+        selected = _selected_sessions(now)
+        official_close = 159 if rising else 141
+        stamp = now.isoformat()
+        self.quote_payload = {
+            "data": {
+                "results": [
+                    {
+                        "quote": {
+                            "symbol": "SPY",
+                            "state": "active",
+                            "has_traded": True,
+                            "adjusted_previous_close": "500",
+                            "ask_price": "502",
+                            "bid_price": "501",
+                            "last_trade_price": "501.5",
+                            "last_non_reg_trade_price": None,
+                            "previous_close": "500",
+                            "previous_close_date": selected[
+                                -1
+                            ].session_date.isoformat(),
+                            "venue_ask_time": stamp,
+                            "venue_bid_time": stamp,
+                            "venue_last_trade_time": stamp,
+                            "venue_last_non_reg_trade_time": None,
+                        },
+                        "close": {
+                            "symbol": "SPY",
+                            "date": selected[-1].session_date.isoformat(),
+                            "interpolated": False,
+                            "price": str(official_close),
+                            "source": "synthetic_source_label",
+                        },
+                    }
+                ]
+            }
+        }
+        self.quote_payload_seen_by_baseline = None
 
     @property
     def call_counts(self):
@@ -189,15 +252,19 @@ class _PlanTransport:
         raise AssertionError("use the synthetic baseline observation seam")
 
     get_equity_positions = get_portfolio
-    get_equity_quotes = get_portfolio
     get_equity_orders = get_portfolio
+
+    def get_equity_quotes(self, arguments):
+        self._counts["get_equity_quotes"] += 1
+        assert arguments == {"symbols": ["SPY"]}
+        return self.quote_payload
 
     def get_equity_historicals(self, arguments):
         self._counts["get_equity_historicals"] += 1
         request = RobinhoodDailyHistoryRequest(
             preflight.LIVE_SYMBOL,
-            self.now,
-            preflight.MIN_COMPLETED_BARS - 1,
+            _history_prefix_request(self.now).requested_at,
+            preflight.MIN_COMPLETED_BARS - 2,
             BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
         )
         assert arguments == request.arguments()
@@ -270,19 +337,21 @@ class _PlanTransport:
 
 @pytest.fixture
 def plan_builder(monkeypatch):
-    observation = SimpleNamespace(
-        account_fingerprint="a" * 64,
-        positions=(),
-        orders=(),
-        portfolio=SimpleNamespace(cash=Decimal("100"), equity_value=Decimal("100")),
-        spy_quote=SimpleNamespace(
-            symbol=preflight.LIVE_SYMBOL,
-            current_trade_candidate=lambda: (Decimal("500"), None),
-        ),
-    )
-    monkeypatch.setattr(
-        preflight, "observe_robinhood_baseline", lambda *args, **kwargs: observation
-    )
+    baseline_payloads = []
+
+    def observe(read, *, observed_at):
+        read.get_accounts()
+        payload = read.get_equity_quotes({"symbols": ["SPY"]})
+        baseline_payloads.append(payload)
+        return SimpleNamespace(
+            account_fingerprint="a" * 64,
+            positions=(),
+            orders=(),
+            portfolio=SimpleNamespace(cash=Decimal("100"), equity_value=Decimal("100")),
+            spy_quote=parse_spy_quote(payload),
+        )
+
+    monkeypatch.setattr(preflight, "observe_robinhood_baseline", observe)
 
     def build(
         instant,
@@ -301,7 +370,9 @@ def plan_builder(monkeypatch):
             monkeypatch.setattr(
                 preflight, "datetime", SimpleNamespace(now=lambda _: now)
             )
-            return preflight.preflight(), transport
+            result = preflight.preflight()
+            transport.quote_payload_seen_by_baseline = baseline_payloads[-1]
+            return result, transport
         plan = preflight.build_live_plan(
             transport=transport,
             p5b=preflight.P5BBaselineEvidence(HEAD, TREE, "a" * 64, 0, 0),
@@ -309,6 +380,7 @@ def plan_builder(monkeypatch):
             source_tree="c" * 40,
             now=now,
         )
+        transport.quote_payload_seen_by_baseline = baseline_payloads[-1]
         assert transport.placed == transport.canceled == 0
         return plan, transport
 
@@ -534,7 +606,8 @@ def test_successful_preflight_retains_complete_counts(
     assert result["diagnostic"] == result["failure_code"] == "NONE"
     assert result["plan"]["plan_state"] == ("READY" if rising else "NO_ACTION")
     expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
-    expected["get_accounts"] = expected["get_equity_historicals"] = 1
+    expected["get_accounts"] = 2
+    expected["get_equity_quotes"] = expected["get_equity_historicals"] = 1
     for name in (
         "get_equity_tradability",
         "get_trade_approval_setting",
@@ -668,8 +741,8 @@ def current_history():
     now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
     request = RobinhoodDailyHistoryRequest(
         preflight.LIVE_SYMBOL,
-        now,
-        preflight.MIN_COMPLETED_BARS - 1,
+        _history_prefix_request(now).requested_at,
+        preflight.MIN_COMPLETED_BARS - 2,
         BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
     )
     payload = _PlanTransport(now).get_equity_historicals(request.arguments())
@@ -680,14 +753,18 @@ def test_p6_requests_exactly_latest_60_and_shared_request_still_adds_one(
     current_history, monkeypatch, plan_builder
 ):
     request, _ = current_history
-    assert request.long_window == preflight.MIN_COMPLETED_BARS - 1 == 59
-    assert len(request.sessions()) == preflight.MIN_COMPLETED_BARS == 60
-    assert request.sessions()[-1].session_date.isoformat() == "2026-11-02"
+    assert request.long_window == preflight.MIN_COMPLETED_BARS - 2 == 58
+    assert len(request.sessions()) == preflight.MIN_COMPLETED_BARS - 1 == 59
+    assert request.sessions()[-1].session_date.isoformat() == "2026-10-30"
+    selected = _selected_sessions(datetime(2026, 11, 3, 17, 0, tzinfo=UTC))
+    assert len(selected) == preflight.MIN_COMPLETED_BARS == 60
+    assert selected[-1].session_date.isoformat() == "2026-11-02"
+    assert request.sessions() == selected[:-1]
     older_contract = RobinhoodDailyHistoryRequest(
-        request.symbol, request.requested_at, 60, request.calendar
+        request.symbol, datetime(2026, 11, 3, 17, 0, tzinfo=UTC), 60, request.calendar
     )
     assert len(older_contract.sessions()) == 61
-    assert older_contract.sessions()[1:] == request.sessions()
+    assert older_contract.sessions()[-60:] == selected
     authority = NYSEPublishedRegularSessionAuthority()
     first = authority.schedule_for(request.sessions()[0].session_date)
     last = authority.schedule_for(request.sessions()[-1].session_date)
@@ -700,21 +777,174 @@ def test_p6_requests_exactly_latest_60_and_shared_request_still_adds_one(
         "adjustment_type": "none",
     }
     seen = []
-    original = preflight.decide_live_strategy
+    original = preflight.decide_live_strategy_from_closes
 
-    def strategy(history, position, policy):
-        assert history.request.long_window == 59
-        result = original(history, position, policy)
-        assert len(history.bars) == result.completed_bar_count == 60
+    def strategy(closes, position, policy, *, selected_sessions):
+        assert len(closes) == 60
+        assert all(isinstance(item, preflight.P6CompletedClose) for item in closes)
+        assert [item.source.value for item in closes] == (
+            ["HISTORICAL_DAILY"] * 59 + ["ROBINHOOD_OFFICIAL_CLOSE"]
+        )
+        result = original(
+            closes,
+            position,
+            policy,
+            selected_sessions=selected_sessions,
+        )
         assert result.previous_completed_session == "2026-11-02"
         seen.append(result)
         return result
 
-    monkeypatch.setattr(preflight, "decide_live_strategy", strategy)
+    monkeypatch.setattr(preflight, "decide_live_strategy_from_closes", strategy)
     plan, transport = plan_builder("2026-11-03T17:00:00+00:00")
     assert plan.state is LivePlanState.READY
     assert plan.signal_values_digest == seen[0].values_digest
     assert dict(transport.call_counts)["get_equity_historicals"] == 1
+    assert dict(transport.call_counts)["get_equity_quotes"] == 1
+    assert transport.quote_payload_seen_by_baseline is transport.quote_payload
+
+
+def test_quote_capture_delegates_only_baseline_reads_and_releases_once_after_success():
+    payload = {"data": {"results": []}}
+
+    class Reads:
+        def __init__(self):
+            self.quote_calls = 0
+
+        def get_accounts(self):
+            return "accounts"
+
+        def get_portfolio(self, arguments):
+            return arguments
+
+        def get_equity_positions(self, arguments):
+            return arguments
+
+        def get_equity_orders(self, arguments):
+            return arguments
+
+        def get_equity_quotes(self, arguments):
+            self.quote_calls += 1
+            return payload
+
+        def place_equity_order(self, arguments):
+            raise AssertionError("capture cannot delegate mutations")
+
+    reads = Reads()
+    capture = preflight._P6QuoteCapture(reads)
+    assert capture.get_accounts() == "accounts"
+    assert capture.get_portfolio({"x": 1}) == {"x": 1}
+    assert capture.get_equity_positions({"x": 2}) == {"x": 2}
+    assert capture.get_equity_orders({"x": 3}) == {"x": 3}
+    assert not hasattr(capture, "discover_required_capabilities")
+    assert not hasattr(capture, "review_equity_order")
+    assert not hasattr(capture, "place_equity_order")
+    assert not hasattr(capture, "cancel_equity_order")
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_OFFICIAL_CLOSE_INVALID$"
+    ):
+        capture.release_after_baseline()
+
+    observed_payload = capture.get_equity_quotes({"symbols": ["SPY"]})
+    assert observed_payload is payload
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_OFFICIAL_CLOSE_INVALID$"
+    ):
+        capture.release_after_baseline()
+    capture.mark_baseline_succeeded()
+    assert capture.release_after_baseline() is payload
+    assert reads.quote_calls == 1
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_OFFICIAL_CLOSE_INVALID$"
+    ):
+        capture.get_equity_quotes({"symbols": ["SPY"]})
+    assert reads.quote_calls == 1
+
+
+@pytest.fixture
+def accepted_quote_material():
+    now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
+    payload = _PlanTransport(now).quote_payload
+    latest_session = _selected_sessions(now)[-1].session_date
+    return payload, parse_spy_quote(payload), latest_session
+
+
+@pytest.mark.parametrize(
+    "defect",
+    (
+        "closes-error",
+        "no-results",
+        "null-result",
+        "multiple-results",
+        "missing-quote",
+        "quote-mismatch",
+        "missing-close",
+        "null-close",
+        "stale-date",
+        "future-date",
+        "wrong-symbol",
+        "missing-price",
+        "null-price",
+        "zero-price",
+        "negative-price",
+        "nonfinite-price",
+        "interpolated-true",
+        "interpolated-none",
+    ),
+)
+def test_official_close_composition_rejects_invalid_typed_material(
+    accepted_quote_material, defect
+):
+    payload, accepted_quote, latest_session = accepted_quote_material
+    payload = deepcopy(payload)
+    result = payload["data"]["results"][0]
+    close = result["close"]
+    if defect == "closes-error":
+        payload["data"]["closes_error"] = SECRET
+    elif defect == "no-results":
+        payload["data"]["results"] = []
+    elif defect == "null-result":
+        payload["data"]["results"] = [None]
+    elif defect == "multiple-results":
+        payload["data"]["results"].append(deepcopy(result))
+    elif defect == "missing-quote":
+        result["quote"] = None
+    elif defect == "quote-mismatch":
+        result["quote"]["last_trade_price"] = "502"
+    elif defect == "missing-close":
+        del result["close"]
+    elif defect == "null-close":
+        result["close"] = None
+    elif defect == "stale-date":
+        close["date"] = "2026-10-30"
+    elif defect == "future-date":
+        close["date"] = "2026-11-03"
+    elif defect == "wrong-symbol":
+        close["symbol"] = "QQQ"
+    elif defect == "missing-price":
+        del close["price"]
+    elif defect == "null-price":
+        close["price"] = None
+    elif defect == "zero-price":
+        close["price"] = "0"
+    elif defect == "negative-price":
+        close["price"] = "-1"
+    elif defect == "nonfinite-price":
+        close["price"] = "NaN"
+    elif defect == "interpolated-true":
+        close["interpolated"] = True
+    elif defect == "interpolated-none":
+        close["interpolated"] = None
+
+    with pytest.raises(
+        preflight.LivePreflightError, match="^P6_OFFICIAL_CLOSE_INVALID$"
+    ) as error:
+        preflight._parse_p6_official_close(
+            payload,
+            expected_quote=accepted_quote,
+            expected_session=latest_session,
+        )
+    assert SECRET not in str(error.value)
 
 
 @pytest.mark.parametrize("session_present", (True, False))
@@ -735,8 +965,8 @@ def test_current_history_maps_only_exact_dates_and_retains_unmodified_raw_bytes(
     before = deepcopy(payload)
     history = preflight.parse_p6_current_live_history(payload, request)
     assert payload == before
-    assert len(history.bars) == 60
-    assert history.bars[-1].session.session_date.isoformat() == "2026-11-02"
+    assert len(history.bars) == 59
+    assert history.bars[-1].session.session_date.isoformat() == "2026-10-30"
     authority = NYSEPublishedRegularSessionAuthority()
     for raw, item, session in zip(
         raw_bars, history.bars, request.sessions(), strict=True
@@ -877,8 +1107,8 @@ def test_current_history_retains_bar_ohlc_consistency(current_history, field, va
 @pytest.mark.parametrize(
     "defect",
     (
-        "59",
-        "61",
+        "58",
+        "60",
         "stale",
         "duplicate",
         "missing-middle",
@@ -898,20 +1128,20 @@ def test_current_history_rejects_count_gaps_order_staleness_and_non_midnight_lab
     request, payload = current_history
     result = payload["data"]["results"][0]
     bars = result["bars"]
-    if defect == "59":
+    if defect == "58":
         bars.pop()
-    elif defect == "61":
+    elif defect == "60":
         bars.append(deepcopy(bars[-1]))
     elif defect == "stale":
         stale_request = RobinhoodDailyHistoryRequest(
             request.symbol,
-            datetime(2026, 11, 2, 17, 0, tzinfo=UTC),
-            59,
+            datetime(2026, 10, 30, 17, 0, tzinfo=UTC),
+            58,
             request.calendar,
         )
         for bar, session in zip(bars, stale_request.sessions(), strict=True):
             bar["begins_at"] = f"{session.session_date.isoformat()}T00:00:00Z"
-        assert bars[-1]["begins_at"] == "2026-10-30T00:00:00Z"
+        assert bars[-1]["begins_at"] == "2026-10-29T00:00:00Z"
     elif defect == "duplicate":
         bars[30] = deepcopy(bars[29])
     elif defect == "missing-middle":
@@ -994,26 +1224,28 @@ def test_current_history_retention_has_explicit_byte_ceiling(current_history):
         preflight.parse_p6_current_live_history(payload, request)
 
 
-@pytest.mark.parametrize("failure", ("history-contract", "history-transport"))
+@pytest.mark.parametrize(
+    "failure", ("history-contract", "history-transport", "official-close")
+)
 def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
     monkeypatch, preflight_environment, plan_builder, failure
 ):
     # Use the real transport invocation boundary with an entirely fake SDK.
     now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
     payload = _PlanTransport(now).get_equity_historicals(
-        RobinhoodDailyHistoryRequest(
-            preflight.LIVE_SYMBOL,
-            now,
-            59,
-            BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
-        ).arguments()
+        _history_prefix_request(now).arguments()
     )
-    payload["guide"] = SECRET
-    payload["data"]["results"][0]["bars"][30]["close_price"] = SECRET
+    if failure == "history-contract":
+        payload["guide"] = SECRET
+        payload["data"]["results"][0]["bars"][30]["close_price"] = SECRET
 
     class Session(_PreflightSession):
         async def call_tool(self, name, arguments):
-            assert name in {"get_accounts", "get_equity_historicals"}
+            assert name in {
+                "get_accounts",
+                "get_equity_quotes",
+                "get_equity_historicals",
+            }
             self.calls.append(name)
             if name == "get_accounts":
                 response = {
@@ -1023,6 +1255,10 @@ def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
                         ]
                     }
                 }
+            elif name == "get_equity_quotes":
+                response = _PlanTransport(now).quote_payload
+                if failure == "official-close":
+                    response["data"]["closes_error"] = SECRET
             elif failure == "history-transport":
                 raise RuntimeError(SECRET)
             else:
@@ -1035,16 +1271,22 @@ def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
     monkeypatch.setattr(preflight, "datetime", SimpleNamespace(now=lambda _: now))
     result = preflight.preflight()
     expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
-    expected["get_accounts"] = expected["get_equity_historicals"] = 1
-    code = (
-        "P6_HISTORY_RESPONSE_INVALID"
-        if failure == "history-contract"
-        else "LIVE_REQUEST_FAILED"
-    )
+    expected["get_accounts"] = 2
+    expected["get_equity_quotes"] = expected["get_equity_historicals"] = 1
+    code = {
+        "history-contract": "P6_HISTORY_RESPONSE_INVALID",
+        "history-transport": "LIVE_REQUEST_FAILED",
+        "official-close": "P6_OFFICIAL_CLOSE_INVALID",
+    }[failure]
     _assert_blocked(
         result, "P6_PLAN_BUILD_BLOCKED", expected, preflight_environment, code=code
     )
-    assert session.calls == ["get_accounts", "get_equity_historicals"]
+    assert session.calls == [
+        "get_accounts",
+        "get_accounts",
+        "get_equity_quotes",
+        "get_equity_historicals",
+    ]
     assert dict(transport.call_counts) == expected
     assert "guide" not in json.dumps(result)
     assert "close_price" not in json.dumps(result)

@@ -1,37 +1,24 @@
 # AI Trading Bot — Current Handoff
 
-## Current source correction — P6 daily history; review pending
+## Current correction — completed-close composition; source review pending
 
-The current daily-history correction starts from integrated source:
+The history-only design was abandoned after four consumed P6 preflights. The
+replacement starts at HEAD `bbffca862719c61c445952403877b543a80f3111`, tree
+`a267b8295d965b8d7d22a9072e27afde46eed45e`. P6 intentionally composes the exact
+60 selected completed XNYS sessions from 59 historical daily closes and one typed
+Robinhood official close for the final session. No synthetic OHLC bar is created.
+The existing baseline quote read supplies that official close: one quote call
+and one historical call remain the ceilings. Missing, stale, interpolated or
+mismatched official-close data blocks; no quote-price substitution or retry exists.
+The plan binds `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` and the new signal basis.
 
-    HEAD 7af23442ef212a29d02b9f7645deebbfa826f668
-    TREE 550ae6a92deb38656f92ccac62b938603bba4a1b
-
-Worktree: `F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current`.
-Branch: `feature/robinhood-p6-tiny-live-current`.
-P6 selects exactly the latest 60 completed XNYS sessions with the shared request's
-unchanged `long_window + 1` semantics (P6 passes 59). Its additive current-live
-parser validates exact midnight UTC session-date labels and maps only internal
-timestamps to published opens. Optional session/interpolation semantics, strict
-coverage/staleness checks, raw retention and the fixed sanitized history failure
-code are owned by the [P6 contract](architecture/147-p6-tiny-live.md).
-Architecture-134 history source/pins remain frozen and unchanged.
-
-All three consumed preflight attempts and diagnostics remain untouched. The
-contract records the third blocked attempt (one historical call; zero later
-tradability/approval/review/place/cancel), valid source-bound observation and
-invalid earlier import provenance. Implementation uses only synthetic providers;
-no real OAuth, preflight, diagnostic or live state is accessed. Earlier
-no-attempt statements below describe historical source checkpoints.
-
-Immediate next step: ChatGPT independent exact-source review after one atomic
-source/test/docs publication and terminal mapped GitHub FULL. If accepted,
-exact ff-only integration and terminal develop exact-feature certification reuse
-precede exactly one fresh guarded read-only P6 preflight bound to the integrated
-HEAD/tree, with no intervening docs-only publication. Inspect latest completed
-history, tradability, approval, review and READY/NO_ACTION; place/cancel remain
-zero. Source PASS never authorizes placement; separately reviewed/armed <= $10
-execution remains a later protected boundary.
+All four consumed attempts and diagnostics remain untouched. Source work and
+synthetic tests perform no real OAuth/provider/preflight/order/live operation.
+After independent exact-source acceptance, exact fast-forward integration and
+terminal develop certification reuse, the next protected boundary is one fresh
+guarded read-only preflight of this new architecture. A failure to obtain the
+exact official close stops this path; a dedicated strategy market-data source
+would then require a new design. Live placement remains unauthorized.
 
 ## Current boundary - P6 kill-operator accepted/integrated
 
@@ -128,7 +115,8 @@ Details and synthetic verification belong in the
 [contract](architecture/147-p6-tiny-live.md) and
 [validation](validation/arch147-p6-tiny-live.md).
 
-Next step: ChatGPT exact-source review of the daily-history correction after
-terminal feature certification, following the current correction section above.
-No preflight, execute or real kill operator invocation occurs during this source
-correction. Live placement remains a later separate protected boundary.
+Next step: independent exact-source review of the completed-close correction
+following terminal mapped FULL; then exact integration/certification reuse and
+one guarded read-only preflight of the new architecture. No placement is
+included. Research campaign design proceeds independently without changing the
+accepted P6 candidate or accessing FINAL_HOLDOUT.

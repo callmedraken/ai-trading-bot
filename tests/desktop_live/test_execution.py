@@ -50,7 +50,7 @@ def _plan() -> LiveExecutionPlan:
         source_head="a" * 40,
         source_tree="b" * 40,
         policy=TinyLivePolicy(),
-        observation_basis="ROBINHOOD_RAW_DAILY_REGULAR_V1",
+        observation_basis="ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1",
         target_session="2026-11-02",
         previous_completed_session="2026-10-30",
         signal_values_digest="c" * 64,

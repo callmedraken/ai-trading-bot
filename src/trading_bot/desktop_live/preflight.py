@@ -8,7 +8,7 @@ import re
 import subprocess
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -30,7 +30,9 @@ from trading_bot.desktop_live.risk import build_live_risk
 from trading_bot.desktop_live.strategy import (
     MIN_COMPLETED_BARS,
     LiveStrategyDecision,
-    decide_live_strategy,
+    P6CloseSource,
+    P6CompletedClose,
+    decide_live_strategy_from_closes,
 )
 from trading_bot.desktop_paper.robinhood_read import resolve_account, utc
 from trading_bot.desktop_paper.robinhood_reconciliation import (
@@ -55,6 +57,7 @@ from trading_bot.robinhood_mcp.historical import (
     RobinhoodDailyHistory,
     RobinhoodDailyHistoryRequest,
 )
+from trading_bot.robinhood_mcp.parsing import parse_equity_quotes_response
 
 P5B_EVIDENCE_ROOT = (
     Path(r"F:\AI\temp\ai-trading-bot-checkpoints")
@@ -69,6 +72,7 @@ P6_STATE_FILES = (
 NEW_YORK = ZoneInfo("America/New_York")
 _P6_HISTORY_MAX_BYTES = 4 * 1024 * 1024
 _P6_HISTORY_PRICE = re.compile(r"[0-9]+(?:\.[0-9]+)?\Z")
+_P6_HISTORY_PREFIX_COUNT = MIN_COMPLETED_BARS - 1
 
 
 class LivePreflightError(RuntimeError):
@@ -87,6 +91,7 @@ _FAILURE_CODES = {
             "UNEXPECTED_WORKING_ORDER",
             "PUBLISHED_SESSION_UNAVAILABLE",
             "P6_HISTORY_RESPONSE_INVALID",
+            "P6_OFFICIAL_CLOSE_INVALID",
         }
     ),
     CurrentLiveTransportError: frozenset(
@@ -121,6 +126,57 @@ class P5BBaselineEvidence:
     account_fingerprint: str
     position_count: int
     order_count: int
+
+
+class _P6QuoteCapture:
+    """One-shot P6 access to the exact quote payload accepted by P5B."""
+
+    def __init__(self, transport: object) -> None:
+        self._transport = transport
+        self._quote_calls = 0
+        self._payload: object = None
+        self._baseline_succeeded = False
+        self._released = False
+
+    def get_accounts(self) -> object:
+        return self._transport.get_accounts()
+
+    def get_portfolio(self, arguments: Mapping[str, object]) -> object:
+        return self._transport.get_portfolio(arguments)
+
+    def get_equity_positions(self, arguments: Mapping[str, object]) -> object:
+        return self._transport.get_equity_positions(arguments)
+
+    def get_equity_orders(self, arguments: Mapping[str, object]) -> object:
+        return self._transport.get_equity_orders(arguments)
+
+    def get_equity_quotes(self, arguments: Mapping[str, object]) -> object:
+        if self._quote_calls != 0:
+            raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID")
+        self._quote_calls += 1
+        self._payload = self._transport.get_equity_quotes(arguments)
+        return self._payload
+
+    def mark_baseline_succeeded(self) -> None:
+        if (
+            self._baseline_succeeded
+            or self._released
+            or self._quote_calls != 1
+            or not isinstance(self._payload, Mapping)
+        ):
+            raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID")
+        self._baseline_succeeded = True
+
+    def release_after_baseline(self) -> Mapping[str, object]:
+        if (
+            self._released
+            or not self._baseline_succeeded
+            or self._quote_calls != 1
+            or not isinstance(self._payload, Mapping)
+        ):
+            raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID")
+        self._released = True
+        return self._payload
 
 
 def load_p5b_baseline_evidence(
@@ -228,15 +284,56 @@ def build_live_plan(
     now = utc(now)
     transport.discover_required_capabilities()
     account_number = resolve_account(transport.get_accounts()).account_number
-    observation = observe_robinhood_baseline(transport, observed_at=now)
+    quote_capture = _P6QuoteCapture(transport)
+    observation = observe_robinhood_baseline(quote_capture, observed_at=now)
     _require_clean_first_baseline(observation, p5b)
+    quote_capture.mark_baseline_succeeded()
+    quote_payload = quote_capture.release_after_baseline()
     calendar = BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar())
-    history_request = RobinhoodDailyHistoryRequest(
+    selected_session_request = RobinhoodDailyHistoryRequest(
         LIVE_SYMBOL, now, MIN_COMPLETED_BARS - 1, calendar
     )
+    selected_sessions = selected_session_request.sessions()
+    published_authority = NYSEPublishedRegularSessionAuthority()
+    official_schedule = published_authority.schedule_for(
+        selected_sessions[-1].session_date
+    )
+    if official_schedule is None:
+        raise LivePreflightError("PUBLISHED_SESSION_UNAVAILABLE")
+    history_request = RobinhoodDailyHistoryRequest(
+        LIVE_SYMBOL,
+        official_schedule.opens_at,
+        _P6_HISTORY_PREFIX_COUNT - 1,
+        calendar,
+    )
+    history_sessions = history_request.sessions()
+    if (
+        len(selected_sessions) != MIN_COMPLETED_BARS
+        or len(history_sessions) != _P6_HISTORY_PREFIX_COUNT
+        or history_sessions != selected_sessions[:-1]
+    ):
+        raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
     history_response = transport.get_equity_historicals(history_request.arguments())
     history = parse_p6_current_live_history(history_response, history_request)
-    strategy = decide_live_strategy(history, None, policy)
+    official_close = _parse_p6_official_close(
+        quote_payload,
+        expected_quote=observation.spy_quote,
+        expected_session=selected_sessions[-1].session_date,
+    )
+    completed_closes = tuple(
+        P6CompletedClose(
+            item.session.session_date,
+            item.bar.close,
+            P6CloseSource.HISTORICAL_DAILY,
+        )
+        for item in history.bars
+    ) + (official_close,)
+    strategy = decide_live_strategy_from_closes(
+        completed_closes,
+        None,
+        policy,
+        selected_sessions=tuple(session.session_date for session in selected_sessions),
+    )
     target_session, _ = resolve_target_session(now)
     if strategy.decision is LiveStrategyDecision.NO_ACTION:
         return LiveExecutionPlan.create(
@@ -352,7 +449,7 @@ def parse_p6_current_live_history(
     if (
         type(request) is not RobinhoodDailyHistoryRequest
         or request.symbol != LIVE_SYMBOL
-        or request.long_window != MIN_COMPLETED_BARS - 1
+        or request.long_window != _P6_HISTORY_PREFIX_COUNT - 1
     ):
         raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
     root = _p6_history_object(payload, {"data", "guide"})
@@ -375,9 +472,9 @@ def parse_p6_current_live_history(
     sessions = request.sessions()
     raw_bars = result["bars"]
     if (
-        len(sessions) != MIN_COMPLETED_BARS
+        len(sessions) != _P6_HISTORY_PREFIX_COUNT
         or type(raw_bars) is not list
-        or len(raw_bars) != MIN_COMPLETED_BARS
+        or len(raw_bars) != _P6_HISTORY_PREFIX_COUNT
     ):
         raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
     authority = NYSEPublishedRegularSessionAuthority()
@@ -443,6 +540,41 @@ def parse_p6_current_live_history(
     if len(response_bytes) > _P6_HISTORY_MAX_BYTES:
         raise LivePreflightError("P6_HISTORY_RESPONSE_INVALID")
     return RobinhoodDailyHistory(request, tuple(bars), response_bytes)
+
+
+def _parse_p6_official_close(
+    payload: Mapping[str, object], *, expected_quote: object, expected_session: date
+) -> P6CompletedClose:
+    """Require the typed official close from the baseline's exact quote payload."""
+    try:
+        response = parse_equity_quotes_response(payload)
+    except Exception:
+        raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID") from None
+    if (
+        response.closes_error is not None
+        or len(response.results) != 1
+        or response.results[0] is None
+    ):
+        raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID")
+    result = response.results[0]
+    if (
+        result.quote is None
+        or result.close is None
+        or result.quote != expected_quote
+        or str(result.quote.symbol) != str(LIVE_SYMBOL)
+        or str(result.close.symbol) != str(LIVE_SYMBOL)
+        or result.close.date != expected_session.isoformat()
+        or type(result.close.price) is not Decimal
+        or not result.close.price.is_finite()
+        or result.close.price <= 0
+        or result.close.interpolated is not False
+    ):
+        raise LivePreflightError("P6_OFFICIAL_CLOSE_INVALID")
+    return P6CompletedClose(
+        expected_session,
+        result.close.price,
+        P6CloseSource.ROBINHOOD_OFFICIAL_CLOSE,
+    )
 
 
 def _p6_history_object(

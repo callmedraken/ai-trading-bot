@@ -65,8 +65,9 @@ directory is created. It then discovers exactly one matching PASS report under
 the stable external P5B checkpoint root, requiring the accepted P5B HEAD/tree,
 zero mutation/review/place/cancel effects and unchanged production state. It
 resolves the canonical Agentic account, compares the runtime fingerprint,
-confirms zero positions and working orders, acquires exactly the latest 60
-completed raw regular daily bars through the P6 current-live parser, composes the
+confirms zero positions and working orders, composes exactly 60 completed
+closes (59 strict raw historical daily closes plus the exact typed official
+close from the existing quote read) through P6-local boundaries, composes the
 existing `RiskManager`, and returns a sanitized immutable plan. Preflight never
 places or cancels.
 
@@ -231,7 +232,7 @@ read-only preflight through the non-terminating guarded wrapper. Source success
 never authorizes live placement. No prior attempt is retried or repointed; the third consumed attempt is recorded below.
 
 
-## Current daily-history boundary correction — source review pending
+## Historical history-only correction — superseded after four attempts
 
 Starting source is integrated HEAD `7af23442ef212a29d02b9f7645deebbfa826f668`,
 tree `550ae6a92deb38656f92ccac62b938603bba4a1b`. This additive P6 correction
@@ -316,7 +317,7 @@ invalid source evidence and supplies no behavioral authority. The preserved
 tools/list/schema observations are diagnostics, not preflight attempts.
 No provider/OAuth diagnostic or real preflight is repeated in this correction.
 
-### Review and next protected boundary
+### Historical review sequence for the history-only correction
 
 One atomic source/test/docs publication requires focused synthetic regressions,
 Ruff/diff, FEATURE and PROSPECTIVE_DEVELOP admission, then one GitHub-owned
@@ -329,3 +330,62 @@ no intervening docs-only commit. Preserve all three consumed attempts. Inspect
 latest completed history, tradability, approval, review and READY/NO_ACTION;
 place/cancel remain zero. Source acceptance never authorizes placement; a
 separately reviewed/armed <= $10 execution remains a later protected boundary.
+
+
+## Current correction — completed-close composition; source review pending
+
+The history-only design was abandoned after four consumed P6 preflights. The
+replacement starts at HEAD `bbffca862719c61c445952403877b543a80f3111`, tree
+`a267b8295d965b8d7d22a9072e27afde46eed45e`. P6 intentionally composes the exact
+60 selected completed XNYS sessions from 59 historical daily closes and one typed
+Robinhood official close for the final session. No synthetic OHLC bar is created.
+The existing baseline quote read supplies that official close: one quote call
+and one historical call remain the ceilings. Missing, stale, interpolated or
+mismatched official-close data blocks; no quote-price substitution or retry exists.
+The plan binds `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` and the new signal basis.
+
+All four consumed attempts and diagnostics remain untouched. Source work and
+synthetic tests perform no real OAuth/provider/preflight/order/live operation.
+After independent exact-source acceptance, exact fast-forward integration and
+terminal develop certification reuse, the next protected boundary is one fresh
+guarded read-only preflight of this new architecture. A failure to obtain the
+exact official close stops this path; a dedicated strategy market-data source
+would then require a new design. Live placement remains unauthorized.
+
+### Preserved fourth attempt and exact provider boundary
+
+The fourth root is `arch147-p6-readonly-preflight-fe198bbb92cb4f219f80e5f76a5d27f1`,
+bound to the starting source above. It returned `P6_PLAN_BUILD_BLOCKED` /
+`P6_HISTORY_RESPONSE_INVALID`: accounts=2, portfolio=1, positions=1, quotes=1,
+orders=1, historicals=1; tradability, approval, review, place and cancel=0.
+Production state was unchanged. Its exact selection covered 2026-08-10 through
+2026-11-02; the provider supplied 59 valid consecutive records through
+2026-10-30, with no middle gap, reorder or price/volume defect. This is treated
+as a provider publication-boundary limitation, not permission to relax freshness.
+The earlier preserved roots remain:
+
+- `arch147-p6-readonly-preflight-ba74d5b258a54279916537e5cf7435d5`
+- `arch147-p6-readonly-preflight-fa90be4add304d82a6bcc007a1af2ab4`
+- `arch147-p6-readonly-preflight-4481295e3a534bdab82f792f06868069`
+
+The P6-local capture adapter delegates explicit baseline reads, preserves the
+exact quote payload and rejects a second quote read. Only after successful
+baseline reconciliation does planning parse it with `parse_equity_quotes_response`.
+The typed quote must equal the accepted baseline quote. Exactly one SPY result,
+no closes_error, an exact final session date, a positive finite Decimal and
+interpolated=False are mandatory. No provider source label grants authority.
+Official-close rejection uses fixed `P6_OFFICIAL_CLOSE_INVALID`; strict historical
+prefix failures retain `P6_HISTORY_RESPONSE_INVALID`. Transport errors retain
+their existing codes.
+
+The one historical request covers precisely selected_sessions[:-1], from its
+first published regular open to its last published regular close. Strict provider
+envelope, exact midnight labels/order, OHLC relationships, positive volume,
+optional reg/false fields and bounded unmodified canonical bytes remain required.
+No sorting, trimming, expanded range, shifted boundaries or second history call
+is allowed. Immutable close inputs contain session, price and source: exactly
+59 HISTORICAL_DAILY followed by one ROBINHOOD_OFFICIAL_CLOSE. BASE_MA 35/50
+and position projection remain identical to accepted research semantics. The
+signal digest advances to distinguish this composition and binds count, final
+session, averages, raw signal and invested state. Shared historical authority,
+P5B reconciliation, execution, ownership, kill, runner and workflow stay unchanged.

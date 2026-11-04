@@ -19,7 +19,7 @@ def _no_action() -> LiveExecutionPlan:
         source_head="a" * 40,
         source_tree="b" * 40,
         policy=TinyLivePolicy(),
-        observation_basis="ROBINHOOD_RAW_DAILY_REGULAR_V1",
+        observation_basis="ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1",
         target_session="2026-11-02",
         previous_completed_session="2026-10-30",
         signal_values_digest="c" * 64,
@@ -208,3 +208,10 @@ def test_current_review_requires_direct_data_object(payload):
         parse_order_review(
             payload, expected=review_order_arguments(Decimal("0.50"), "SYNTHETIC")
         )
+
+
+def test_history_only_plan_basis_cannot_be_reused_for_completed_close_plan():
+    from dataclasses import replace
+
+    with pytest.raises(ValueError, match="observation basis"):
+        replace(_no_action(), observation_basis="ROBINHOOD_RAW_DAILY_REGULAR_V1")

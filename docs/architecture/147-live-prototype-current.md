@@ -133,23 +133,28 @@ R10 API in experiments/filtered_trend_comparison_v2.py:
 Candidate StrEnum with members BASE_MA35_50_V1, PRICE_SMA200_V1,
 PRICE_MOM_252_V1. CANDIDATES tuple in that order. signal(candidate, bars,
 *, invested: bool) -> str (BUY/SELL/HOLD); signal_series(candidate, bars) ->
-tuple[str | None, ...] (None before warmup); required_closes(candidate) -> int.
+tuple[str, ...] (HOLD before warmup); required_closes(candidate) -> int.
 Bars are same-symbol, strictly increasing genuine completed bars; no imputation.
 The caller passes only completed data through information session i. BASE_MA
 uses accepted signal semantics and warmup 50; > bullish, < bearish, = HOLD.
-SMA: at i, close[i] > mean(close[i-199:i+1]) gives bullish; <= bearish, warmup 200.
-Momentum: at i, close[i] > close[i-252] bullish; <= bearish, warmup 253.
+SMA: at i, close[i] > mean(close[i-199:i+1]) gives bullish, < gives bearish,
+and equality is HOLD; warmup 200. Momentum: at i, close[i] > close[i-252]
+gives bullish, < gives bearish, and equality is HOLD; warmup 253.
 Bullish yields BUY if flat, HOLD if invested; bearish SELL if invested, HOLD if
-flat. Series uses BUY/SELL as state intentions regardless of investment.
-signal raises ValueError on insufficient warmup; series None cannot reach a
-trading regime. Fixed Decimal Context(prec=50), no ambient dependency.
+flat. Series uses BUY/SELL/HOLD as state intentions regardless of investment;
+signal and series return HOLD before sufficient warmup. Fixed Decimal
+Context(prec=50), no ambient dependency.
 
 R11 API in experiments/filtered_trend_comparison_campaign_v2.py:
-ComparisonSummary(candidate: Candidate, candidate_id: str, base: AggregateSummary,
-stress: AggregateSummary); select_candidate(summaries) -> str (challenger value
-or NONE_QUALIFIES); frozen_context(source_head,source_tree,dataset_id,
+ComparisonSummary(candidate, candidate_id, base, stress, status, failure_code)
+is the minimal typed candidate evidence representation. COMPLETE candidates own
+exactly their 48 ordered cells and validated BASE/STRESS aggregates. A
+FAILED_INCOMPLETE challenger owns no cells or aggregates and carries only the
+fixed sanitized code CANDIDATE_EVALUATION_INCOMPLETE; it remains visible but is
+ineligible. select_candidate(summaries) -> str (challenger value or
+NONE_QUALIFIES); frozen_context(source_head,source_tree,dataset_id,
 price_basis,dataset_provenance) -> dict; run_campaign(dataset,source_head,
-source_tree) -> (context dict, tuple[CellEvidence,...], tuple[ComparisonSummary,...]).
+source_tree) -> (context dict, complete cells, three typed candidate evidences).
 UUID5 semantic identities include explicit comparison-v2 namespace/version;
 semantic_identity(kind,value) -> str. No artifact bytes/path/clocks in identity.
 Use immutable v1 Regime/Costs/CellEvidence/Metrics/AggregateSummary and accounting
@@ -157,20 +162,25 @@ helpers where compatible. _evaluate_cell may be adapted with the accepted
 BASE_MA StrategyConfig as its validation carrier and explicit prepared_states;
 financial replay is unchanged and v2 context/candidate identities distinguish
 signals. No monkeypatching globals, no alteration to v1. Every candidate/symbol/
-regime has evidence even if it fails qualification. Invalid input fails the
-whole campaign; do not drop cells. Fixed $100000 virtual cash, 95% allocation,
+regime has evidence when complete; a bounded explicit candidate-evaluation
+incompleteness records the typed failed state without dropping other candidates.
+Invalid global input and unexpected programming errors fail the whole campaign;
+do not fabricate cells or metrics. Fixed $100000 virtual cash, 95% allocation,
 whole shares, 5% reserve; $1+5bps base/$2+10bps stress are research assumptions,
 not broker fee claims. Prior-completed signals fill next open, no forced end
 liquidation. Existing market/session/provenance validation must apply.
 
-Qualification policy comparison-v2/qualification-v1 compares every field of
-AggregateSummary against control for BOTH base and stress. Higher is better for
-positive_regime_cells, minimum_regime_return, median_regime_return,
-positive_continuous_symbols, minimum_continuous_return, median_continuous_return.
-Lower is better for negative_regime_cells, worst_regime_drawdown,
-median_regime_drawdown, median_turnover, worst_continuous_drawdown. All weakly
-better in both cases AND strictly better in >=1 stress field qualifies.
-Stable fixed challenger order SMA200 then MOM252 breaks multiple qualifiers.
+Qualification policy comparison-v2/qualification-v1 compares challengers to the
+control in BOTH base and stress using only higher-is-better
+positive_continuous_symbols, minimum_continuous_return,
+median_continuous_return and lower-is-better worst_continuous_drawdown,
+median_turnover. All five must be weakly no worse in both contexts and at least
+one must be strictly better in STRESS. Annual-regime metrics remain evidence but
+do not qualify or disqualify. Multiple qualifiers are ordered by STRESS
+positive_continuous_symbols descending, minimum_continuous_return descending,
+worst_continuous_drawdown ascending, median_continuous_return descending,
+median_turnover ascending, then the same five BASE metrics in that order, then
+canonical candidate ID ascending.
 No threshold/variant expansion after results. NONE_QUALIFIES retains control
 for research selection only; neither control nor challenger becomes live eligible.
 
@@ -195,7 +205,7 @@ R11 review. No permissive fallback or speculative live_eligible field.
 Context is the v1 frozen_context output with schema changed to
 filtered-trend-comparison-campaign/v2; grid is the three Candidate values;
 qualification_policy comparison-v2/qualification-v1; shortlist_policy
-qualified-fixed-order-sma200-mom252/v1; neighbor_policy null. Add
+qualified-metric-order-v2/v1; neighbor_policy null. Add
 prior_configurations=30, comparison_configurations=3,
 prior_campaign_id=48ae05d5-ede1-5461-9da9-b5d7744cefad, reused_history=true.
 All other v1 context fields unchanged, including paper_binding=null and
@@ -208,10 +218,16 @@ already includes the v2 candidate ID; unchanged replay validator reconstructs th
 
 The strict report envelope has exactly schema=filtered-trend-comparison-bundle/v2,
 campaign_id,bundle_id,context,cells,summaries,selected_candidate,live_eligible=false.
+Each summary has exactly candidate, candidate_id, status, base, stress and
+failure_code. Cells contain only complete candidate evidence in frozen candidate
+order; every complete candidate owns exactly 48 ordered cells, so a successful
+three-candidate campaign still contains 144 cells while a failed challenger is
+represented without synthetic cells or aggregate metrics.
 bundle_id uses R11 semantic_identity('bundle',(context,asdict cells,asdict summaries,
 selected_candidate)); identity aliases bundle_id; digest is SHA256 of canonical
 report bytes, separate from semantic UUID5 identity. All typed metrics/provenance/
-calendar/economic validation remains required. Re-serialization must match bytes.
+calendar/economic validation remains required, including all AggregateSummary
+fields for type/range/canonical correctness. Re-serialization must match bytes.
 Unavailable view is ResearchView(selected='UNAVAILABLE',candidates=(),
 assumptions=('Comparison report unavailable',),live_eligible=False); no raw error
 or provider text. Display base/stress median continuous return, stress worst

@@ -56,22 +56,24 @@ _PROVENANCE = [
         "last_bar": "2016-01-04T05:00:00+00:00",
     }
 ]
-_HIGHER_FIELDS = (
-    "positive_regime_cells",
-    "minimum_regime_return",
-    "median_regime_return",
+_QUALIFICATION_HIGHER_FIELDS = (
     "positive_continuous_symbols",
     "minimum_continuous_return",
     "median_continuous_return",
 )
-_LOWER_FIELDS = (
-    "negative_regime_cells",
-    "worst_regime_drawdown",
-    "median_regime_drawdown",
+_QUALIFICATION_LOWER_FIELDS = (
     "median_turnover",
     "worst_continuous_drawdown",
 )
-_ALL_METRIC_FIELDS = _HIGHER_FIELDS + _LOWER_FIELDS
+_QUALIFICATION_FIELDS = _QUALIFICATION_HIGHER_FIELDS + _QUALIFICATION_LOWER_FIELDS
+_ANNUAL_FIELDS = (
+    "positive_regime_cells",
+    "negative_regime_cells",
+    "minimum_regime_return",
+    "median_regime_return",
+    "worst_regime_drawdown",
+    "median_regime_drawdown",
+)
 _QUALIFICATION_CAMPAIGN_ID = campaign.semantic_identity(
     "campaign", ("synthetic-selection-fixture", 1)
 )
@@ -98,12 +100,29 @@ def _candidate_summary(
     *,
     base: AggregateSummary | None = None,
     stress: AggregateSummary | None = None,
+    status: campaign.CandidateEvidenceStatus = (
+        campaign.CandidateEvidenceStatus.COMPLETE
+    ),
+    failure_code: str | None = None,
 ) -> campaign.ComparisonSummary:
+    if status is campaign.CandidateEvidenceStatus.FAILED_INCOMPLETE:
+        base = stress = None
+        failure_code = failure_code or campaign.CANDIDATE_EVALUATION_INCOMPLETE
     return campaign.ComparisonSummary(
         candidate,
         campaign.candidate_identity(_QUALIFICATION_CAMPAIGN_ID, candidate),
-        base or _aggregate(),
-        stress or _aggregate(),
+        base
+        if base is not None
+        else _aggregate()
+        if status is campaign.CandidateEvidenceStatus.COMPLETE
+        else None,
+        stress
+        if stress is not None
+        else _aggregate()
+        if status is campaign.CandidateEvidenceStatus.COMPLETE
+        else None,
+        status,
+        failure_code,
     )
 
 
@@ -125,7 +144,7 @@ def _worse(summary: AggregateSummary, field: str) -> AggregateSummary:
         summary,
         **{
             field: value - (1 if type(value) is int else Decimal("0.01"))
-            if field in _HIGHER_FIELDS
+            if field in _QUALIFICATION_HIGHER_FIELDS
             else value + (1 if type(value) is int else Decimal("0.01"))
         },
     )
@@ -137,7 +156,7 @@ def _better(summary: AggregateSummary, field: str) -> AggregateSummary:
         summary,
         **{
             field: value + (1 if type(value) is int else Decimal("0.01"))
-            if field in _HIGHER_FIELDS
+            if field in _QUALIFICATION_HIGHER_FIELDS
             else value - (1 if type(value) is int else Decimal("0.01"))
         },
     )
@@ -166,7 +185,7 @@ def test_frozen_context_changes_only_the_v2_declared_fields() -> None:
     assert current["schema"] == "filtered-trend-comparison-campaign/v2"
     assert current["grid"] == [candidate.value for candidate in CANDIDATES]
     assert current["qualification_policy"] == "comparison-v2/qualification-v1"
-    assert current["shortlist_policy"] == "qualified-fixed-order-sma200-mom252/v1"
+    assert current["shortlist_policy"] == "qualified-metric-order-v2/v1"
     assert current["neighbor_policy"] is None
     assert current["prior_configurations"] == 30
     assert current["comparison_configurations"] == 3
@@ -199,7 +218,7 @@ def test_v2_identity_uses_v1_typed_framing_with_distinct_kind_prefix() -> None:
         campaign.candidate_identity(campaign_id.upper(), Candidate.PRICE_SMA200_V1)
 
 
-@pytest.mark.parametrize("field", _ALL_METRIC_FIELDS)
+@pytest.mark.parametrize("field", _QUALIFICATION_FIELDS)
 def test_each_metric_can_supply_a_strict_stress_improvement(field: str) -> None:
     baseline = _aggregate()
     control = _candidate_summary(Candidate.BASE_MA35_50_V1)
@@ -216,13 +235,15 @@ def test_each_metric_can_supply_a_strict_stress_improvement(field: str) -> None:
     )
 
 
-@pytest.mark.parametrize("field", _ALL_METRIC_FIELDS)
+@pytest.mark.parametrize("field", _QUALIFICATION_FIELDS)
 @pytest.mark.parametrize("scope", ("base", "stress"))
 def test_any_worse_field_blocks_qualification_in_either_context(
     field: str, scope: str
 ) -> None:
     baseline = _aggregate()
-    other_stress_gain = next(name for name in _HIGHER_FIELDS if name != field)
+    other_stress_gain = next(
+        name for name in _QUALIFICATION_HIGHER_FIELDS if name != field
+    )
     stress = _better(baseline, other_stress_gain)
     base = baseline
     if scope == "base":
@@ -240,11 +261,35 @@ def test_any_worse_field_blocks_qualification_in_either_context(
     )
 
 
-def test_policy_requires_stress_improvement_and_uses_fixed_tie_order() -> None:
+@pytest.mark.parametrize("field", _ANNUAL_FIELDS)
+@pytest.mark.parametrize("scope", ("base", "stress"))
+def test_annual_regime_metric_does_not_participate_in_qualification(
+    field: str, scope: str
+) -> None:
+    baseline = _aggregate()
+    better = _better(baseline, "median_continuous_return")
+    base = better
+    stress = better
+    if scope == "base":
+        base = _worse(base, field)
+    else:
+        stress = _worse(stress, field)
+
+    challenger = _candidate_summary(
+        Candidate.PRICE_SMA200_V1,
+        base=base,
+        stress=stress,
+    )
+    assert campaign.qualifies_candidate(
+        challenger, _candidate_summary(Candidate.BASE_MA35_50_V1)
+    )
+
+
+def test_policy_requires_stress_improvement_and_uses_frozen_metric_tie_break() -> None:
     baseline = _aggregate()
     base_only = _candidate_summary(
         Candidate.PRICE_SMA200_V1,
-        base=_better(baseline, "positive_regime_cells"),
+        base=_better(baseline, "positive_continuous_symbols"),
         stress=baseline,
     )
     assert not campaign.qualifies_candidate(
@@ -254,15 +299,29 @@ def test_policy_requires_stress_improvement_and_uses_fixed_tie_order() -> None:
 
     sma = _candidate_summary(
         Candidate.PRICE_SMA200_V1,
-        stress=_better(baseline, "minimum_regime_return"),
+        stress=_better(baseline, "minimum_continuous_return"),
     )
     momentum = _candidate_summary(
         Candidate.PRICE_MOM_252_V1,
-        stress=_better(baseline, "median_turnover"),
+        stress=_better(
+            _better(baseline, "minimum_continuous_return"),
+            "positive_continuous_symbols",
+        ),
     )
     assert campaign.select_candidate(_summary_set(sma=sma, momentum=momentum)) == (
-        Candidate.PRICE_SMA200_V1.value
+        Candidate.PRICE_MOM_252_V1.value
     )
+
+
+def test_failed_challenger_is_visible_ineligible_and_cannot_win() -> None:
+    failed = _candidate_summary(
+        Candidate.PRICE_SMA200_V1,
+        status=campaign.CandidateEvidenceStatus.FAILED_INCOMPLETE,
+    )
+    assert not campaign.qualifies_candidate(
+        failed, _candidate_summary(Candidate.BASE_MA35_50_V1)
+    )
+    assert campaign.select_candidate(_summary_set(sma=failed)) == "NONE_QUALIFIES"
 
 
 def test_equal_candidates_emit_none_qualifies_and_inputs_fail_closed() -> None:
@@ -436,33 +495,56 @@ def test_run_campaign_emits_exact_144_cell_topology_without_real_replay(
     assert campaign.select_candidate(summaries) == "NONE_QUALIFIES"
 
 
-def test_run_campaign_rejects_none_at_any_prior_close_used_for_execution(
+def test_run_campaign_preserves_one_failed_challenger_without_cells_or_metrics(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dataset = _synthetic_dataset()
-    original_signal_series = campaign.signal_series
+    original_evaluate_candidate = campaign._evaluate_candidate
+
+    def fail_sma(
+        candidate_dataset: MultiAssetDataset,
+        candidate: Candidate,
+        candidate_id: str,
+        regimes,
+    ):
+        if candidate is Candidate.PRICE_SMA200_V1:
+            raise campaign.CandidateEvaluationIncomplete
+        return original_evaluate_candidate(
+            candidate_dataset, candidate, candidate_id, regimes
+        )
+
+    monkeypatch.setattr(campaign, "_evaluate_candidate", fail_sma)
+    context, cells, summaries = campaign.run_campaign(
+        dataset, _SOURCE_HEAD, _SOURCE_TREE
+    )
+
+    assert context["comparison_configurations"] == 3
+    assert len(cells) == 96
+    assert tuple(item.candidate for item in summaries) == CANDIDATES
+    failed = summaries[1]
+    assert failed.status is campaign.CandidateEvidenceStatus.FAILED_INCOMPLETE
+    assert failed.base is None
+    assert failed.stress is None
+    assert failed.failure_code == campaign.CANDIDATE_EVALUATION_INCOMPLETE
+    assert all(cell.candidate_id != failed.candidate_id for cell in cells)
+    assert campaign.select_candidate(summaries) == "NONE_QUALIFIES"
+
+
+def test_run_campaign_rejects_execution_before_candidate_warmup(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    dataset = _synthetic_dataset()
     evaluate_called = False
 
-    def missing_prior_state(candidate: Candidate, bars: tuple[Bar, ...]):
-        states = list(original_signal_series(candidate, bars))
-        first_execution_index = next(
-            index
-            for index, bar in enumerate(bars)
-            if campaign.regime_plan()[0].start
-            <= bar.timestamp.astimezone(_NEW_YORK).date()
-            < campaign.regime_plan()[0].end
-        )
-        states[first_execution_index - 1] = None
-        return tuple(states)
+    monkeypatch.setattr(campaign, "_regime_indices", lambda bars, regime: (1,))
 
     def should_not_evaluate(*args, **kwargs):
         nonlocal evaluate_called
         evaluate_called = True
-        raise AssertionError("campaign must not replace missing states with HOLD")
+        raise AssertionError("campaign must validate warmup before cell evaluation")
 
-    monkeypatch.setattr(campaign, "signal_series", missing_prior_state)
     monkeypatch.setattr(campaign, "_evaluate_cell", should_not_evaluate)
-    with pytest.raises(ValueError, match="warmup"):
+    with pytest.raises(campaign.CandidateEvaluationIncomplete):
         campaign.run_campaign(dataset, _SOURCE_HEAD, _SOURCE_TREE)
     assert not evaluate_called
 

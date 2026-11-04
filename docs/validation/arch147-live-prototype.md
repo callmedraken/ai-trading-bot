@@ -43,9 +43,14 @@ Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
 
 All changes remain one source-only checkpoint. R10/R11/R12 and all five GUI
 pages were reviewed at their actual source interfaces. Qualification has one
-canonical owner; the GUI adapter imports it. Turnover is the stress annual
-median, return the continuous median and drawdown the continuous worst case.
-Research data identity is not mislabeled as an artifact SHA256.
+canonical owner; the GUI adapter imports it. The five qualification metrics are
+the continuous-symbol count, minimum/median continuous return, worst continuous
+drawdown and median turnover; annual-regime metrics remain evidence only.
+Turnover is the stress annual median, return the continuous median and drawdown
+the continuous worst case. Research data identity is not mislabeled as an
+artifact SHA256. Complete campaigns still contain 144 cells; an explicit
+bounded failed/incomplete challenger remains visible without fabricated cells
+or metrics and carries only its fixed sanitized status code.
 
 | Focused set | Result |
 |---|---|

@@ -10,6 +10,7 @@ from trading_bot.experiments.filtered_trend_comparison_bundle_v2 import (
     _read_comparison_bundle,
 )
 from trading_bot.experiments.filtered_trend_comparison_campaign_v2 import (
+    CandidateEvidenceStatus,
     ComparisonSummary,
     qualifies_candidate,
 )
@@ -63,6 +64,13 @@ def _candidate_view(
     summary: ComparisonSummary,
     control: ComparisonSummary,
 ) -> CandidateView:
+    if summary.status is CandidateEvidenceStatus.FAILED_INCOMPLETE:
+        assert summary.failure_code is not None
+        return CandidateView(
+            candidate=summary.candidate.value,
+            qualified=False,
+            reasons=(summary.failure_code,),
+        )
     is_control = summary.candidate.value == "BASE_MA35_50_V1"
     qualified = not is_control and qualifies_candidate(summary, control)
     if is_control:
@@ -71,6 +79,8 @@ def _candidate_view(
         reasons = ()
     else:
         reasons = ("QUALIFICATION_FAILED",)
+    assert summary.base is not None
+    assert summary.stress is not None
     return CandidateView(
         candidate=summary.candidate.value,
         base_return=decimal_text(summary.base.median_continuous_return),

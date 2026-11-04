@@ -62,30 +62,29 @@ def test_candidate_order_and_exact_warmups() -> None:
         (Candidate.PRICE_MOM_252_V1, 253),
     ),
 )
-def test_signal_series_is_none_before_exact_first_valid_index(
+def test_signal_series_is_hold_before_exact_first_valid_index(
     candidate: Candidate, warmup: int
 ) -> None:
     bars = _bars([Decimal("100")] * (warmup - 1))
     states = signal_series(candidate, bars)
 
     assert len(states) == warmup - 1
-    assert states == (None,) * (warmup - 1)
-    with pytest.raises(ValueError, match="insufficient"):
-        signal(candidate, bars, invested=False)
+    assert states == ("HOLD",) * (warmup - 1)
+    assert signal(candidate, bars, invested=False) == "HOLD"
 
     first_valid = signal_series(
         candidate, _bars([Decimal("100")] * (warmup - 1) + [Decimal("101")])
     )
     assert len(first_valid) == warmup
-    assert first_valid[-1] is not None
+    assert first_valid[-1] in ("BUY", "SELL", "HOLD")
 
 
-def test_sma200_uses_200_closes_and_equality_exits() -> None:
+def test_sma200_uses_200_closes_and_holds_on_equality() -> None:
     equal = _bars([Decimal("100")] * 200)
 
-    assert signal_series(Candidate.PRICE_SMA200_V1, equal)[198] is None
-    assert signal_series(Candidate.PRICE_SMA200_V1, equal)[199] == "SELL"
-    assert signal(Candidate.PRICE_SMA200_V1, equal, invested=True) == "SELL"
+    assert signal_series(Candidate.PRICE_SMA200_V1, equal)[198] == "HOLD"
+    assert signal_series(Candidate.PRICE_SMA200_V1, equal)[199] == "HOLD"
+    assert signal(Candidate.PRICE_SMA200_V1, equal, invested=True) == "HOLD"
     assert signal(Candidate.PRICE_SMA200_V1, equal, invested=False) == "HOLD"
 
     bullish = _bars([Decimal("100")] * 199 + [Decimal("101")])
@@ -97,9 +96,9 @@ def test_sma200_uses_200_closes_and_equality_exits() -> None:
 def test_momentum_compares_current_close_with_exact_252_session_lag() -> None:
     equal = _bars([Decimal("100")] * 253)
 
-    assert signal_series(Candidate.PRICE_MOM_252_V1, equal)[251] is None
-    assert signal_series(Candidate.PRICE_MOM_252_V1, equal)[252] == "SELL"
-    assert signal(Candidate.PRICE_MOM_252_V1, equal, invested=True) == "SELL"
+    assert signal_series(Candidate.PRICE_MOM_252_V1, equal)[251] == "HOLD"
+    assert signal_series(Candidate.PRICE_MOM_252_V1, equal)[252] == "HOLD"
+    assert signal(Candidate.PRICE_MOM_252_V1, equal, invested=True) == "HOLD"
     assert signal(Candidate.PRICE_MOM_252_V1, equal, invested=False) == "HOLD"
 
     bullish = _bars([Decimal("100")] * 252 + [Decimal("101")])
@@ -122,7 +121,9 @@ def test_signal_position_mapping_for_both_directional_candidates() -> None:
         assert signal(candidate, bullish, invested=False) == "BUY"
         assert signal(candidate, bullish, invested=True) == "HOLD"
 
-        bearish = _bars([Decimal("100")] * required_closes(candidate))
+        bearish = _bars(
+            [Decimal("100")] * (required_closes(candidate) - 1) + [Decimal("99")]
+        )
         assert signal(candidate, bearish, invested=True) == "SELL"
         assert signal(candidate, bearish, invested=False) == "HOLD"
 
@@ -133,7 +134,7 @@ def test_base_candidate_matches_v1_signal_and_equality_semantics() -> None:
     equal_states = signal_series(Candidate.BASE_MA35_50_V1, equal)
     expected_equal = v1_signal_series(config, equal)
 
-    assert equal_states[:49] == (None,) * 49
+    assert equal_states[:49] == ("HOLD",) * 49
     assert equal_states[49:] == expected_equal[49:]
     assert equal_states[49] == "HOLD"
     assert (

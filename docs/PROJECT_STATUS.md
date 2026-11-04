@@ -15,9 +15,11 @@ Research opening/ranking cannot select a runtime binding or grant live authority
 No paper soak is on the critical path.
 
 The comparison is frozen before results: accepted BASE_MA35/50 control,
-PRICE_SMA200_V1 and PRICE_MOM_252_V1; eight existing ETFs and six regimes,
-144 candidate/regime/symbol cells. Prior 30-configuration research and reused
-2016-2023 adjusted history remain disclosed. No optimizer or FINAL_HOLDOUT access.
+PRICE_SMA200_V1 and PRICE_MOM_252_V1; eight existing ETFs and six regimes. A
+complete three-candidate campaign has the expected 144 candidate/regime/symbol
+cells; a bounded incomplete challenger remains visible without fabricated cells
+or metrics. Prior 30-configuration research and reused 2016-2023 adjusted
+history remain disclosed. No optimizer or FINAL_HOLDOUT access.
 Volatility sizing and ambiguous skipped-month momentum are outside this campaign.
 
 ## Immediate next step

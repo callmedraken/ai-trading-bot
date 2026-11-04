@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import date, datetime, time
 from decimal import Decimal
 from hashlib import sha256
@@ -20,7 +21,9 @@ from trading_bot.experiments.filtered_trend_comparison_bundle_v2 import (
     build_bundle,
 )
 from trading_bot.experiments.filtered_trend_comparison_campaign_v2 import (
+    CANDIDATE_EVALUATION_INCOMPLETE,
     CANDIDATES,
+    CandidateEvidenceStatus,
     qualifies_candidate,
     run_campaign,
     select_candidate,
@@ -37,7 +40,7 @@ from trading_bot.gui.research_comparison_service import (
     read_comparison_report,
     to_research_view,
 )
-from trading_bot.live_prototype.contracts import ResearchView
+from trading_bot.live_prototype.contracts import PrototypeSnapshot, ResearchView
 
 _NEW_YORK = ZoneInfo("America/New_York")
 _SOURCE_HEAD = "a" * 40
@@ -101,6 +104,48 @@ def test_round_trip_is_canonical_bounded_and_research_only(
     assert bundle.to_dict()["bundle_id"] == bundle.identity
     assert bundle.selected_candidate == select_candidate(bundle.summaries)
     assert bundle.to_dict()["live_eligible"] is False
+
+
+def test_failed_challenger_bundle_is_canonical_visible_and_effect_free(
+    synthetic_bundle: ResearchComparisonBundle,
+    tmp_path: Path,
+) -> None:
+    bundle = synthetic_bundle
+    failed_summary = replace(
+        bundle.summaries[1],
+        base=None,
+        stress=None,
+        status=CandidateEvidenceStatus.FAILED_INCOMPLETE,
+        failure_code=CANDIDATE_EVALUATION_INCOMPLETE,
+    )
+    failed_bundle = build_bundle(
+        bundle.context,
+        bundle.cells[:48] + bundle.cells[96:],
+        (bundle.summaries[0], failed_summary, bundle.summaries[2]),
+    )
+
+    assert len(failed_bundle.cells) == 96
+    assert failed_bundle.summaries[1].base is None
+    assert failed_bundle.summaries[1].stress is None
+    assert failed_bundle.selected_candidate == "NONE_QUALIFIES"
+    view = to_research_view(failed_bundle)
+    failed_view = view.candidates[1]
+    assert failed_view.qualified is False
+    assert failed_view.base_return is None
+    assert failed_view.stress_return is None
+    assert failed_view.reasons == (CANDIDATE_EVALUATION_INCOMPLETE,)
+
+    active = PrototypeSnapshot(
+        strategy="ACTIVE_PAPER_STRATEGY", binding_digest="active-binding"
+    )
+    report = tmp_path / "failed-challenger.json"
+    report.write_bytes(failed_bundle.to_bytes())
+    assert read_comparison_report(report) == view
+    assert active.strategy == "ACTIVE_PAPER_STRATEGY"
+    assert active.binding_digest == "active-binding"
+    assert (
+        ResearchComparisonBundle.from_bytes(failed_bundle.to_bytes()) == failed_bundle
+    )
 
 
 def test_rejects_duplicate_unknown_noncanonical_and_live_enabled_fields(

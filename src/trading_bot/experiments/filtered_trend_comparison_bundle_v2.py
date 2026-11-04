@@ -38,6 +38,8 @@ from trading_bot.experiments.filtered_trend_campaign import (
     semantic_identity as _v1_semantic_identity,
 )
 from trading_bot.experiments.filtered_trend_comparison_campaign_v2 import (
+    CANDIDATE_EVALUATION_INCOMPLETE,
+    CandidateEvidenceStatus,
     ComparisonSummary,
 )
 from trading_bot.experiments.filtered_trend_comparison_v2 import CANDIDATES, Candidate
@@ -206,18 +208,32 @@ def _validate_cell(
 
 
 def _decode_summary(raw: object) -> ComparisonSummary:
-    row = _exact(raw, {"candidate", "candidate_id", "base", "stress"})
-    if type(row["candidate"]) is not str or type(row["candidate_id"]) is not str:
+    row = _exact(
+        raw,
+        {"candidate", "candidate_id", "status", "base", "stress", "failure_code"},
+    )
+    if (
+        type(row["candidate"]) is not str
+        or type(row["candidate_id"]) is not str
+        or type(row["status"]) is not str
+        or (row["failure_code"] is not None and type(row["failure_code"]) is not str)
+    ):
         raise ValueError("invalid comparison summary identity")
     try:
         candidate = Candidate(row["candidate"])
     except ValueError as error:
         raise ValueError("unknown comparison candidate") from error
+    try:
+        status = CandidateEvidenceStatus(row["status"])
+    except ValueError as error:
+        raise ValueError("unknown candidate evidence status") from error
     return ComparisonSummary(
         candidate,
         row["candidate_id"],
-        _decode(AggregateSummary, row["base"]),
-        _decode(AggregateSummary, row["stress"]),
+        None if row["base"] is None else _decode(AggregateSummary, row["base"]),
+        None if row["stress"] is None else _decode(AggregateSummary, row["stress"]),
+        status,
+        row["failure_code"],
     )
 
 
@@ -243,16 +259,23 @@ class ResearchComparisonBundle:
 
         candidate_ids = _candidate_ids(campaign_id)
         regimes = regime_plan()
+        if tuple(summary.candidate for summary in self.summaries) != CANDIDATES:
+            raise ValueError("summaries must use the frozen candidate order")
+        for summary, candidate_id in zip(self.summaries, candidate_ids, strict=True):
+            if summary.candidate_id != candidate_id:
+                raise ValueError("candidate identity mismatch")
+            _r11._validate_summary(summary)
         expected_keys = tuple(
-            (candidate_id, symbol, regime)
-            for candidate_id in candidate_ids
+            (summary.candidate_id, symbol, regime)
+            for summary in self.summaries
+            if summary.status is CandidateEvidenceStatus.COMPLETE
             for symbol in UNIVERSE
             for regime in regimes
         )
         actual_keys = tuple(
             (cell.candidate_id, cell.symbol, cell.regime) for cell in self.cells
         )
-        if len(self.cells) != 144 or actual_keys != tuple(
+        if actual_keys != tuple(
             (candidate_id, symbol, regime.label)
             for candidate_id, symbol, regime in expected_keys
         ):
@@ -264,18 +287,32 @@ class ResearchComparisonBundle:
             ):
                 _validate_cell(cell, candidate_id, symbol, regime, sessions)
 
-            expected_summaries = tuple(
-                ComparisonSummary(
-                    candidate,
-                    candidate_id,
-                    summarize(self.cells[index * 48 : (index + 1) * 48]),
-                    summarize(self.cells[index * 48 : (index + 1) * 48], stress=True),
-                )
-                for index, (candidate, candidate_id) in enumerate(
-                    zip(CANDIDATES, candidate_ids, strict=True)
-                )
-            )
-            if self.summaries != expected_summaries:
+            expected_summaries = []
+            cell_offset = 0
+            for summary in self.summaries:
+                if summary.status is CandidateEvidenceStatus.COMPLETE:
+                    owned_cells = self.cells[cell_offset : cell_offset + 48]
+                    cell_offset += 48
+                    expected_summaries.append(
+                        ComparisonSummary(
+                            summary.candidate,
+                            summary.candidate_id,
+                            summarize(owned_cells),
+                            summarize(owned_cells, stress=True),
+                        )
+                    )
+                else:
+                    expected_summaries.append(
+                        ComparisonSummary(
+                            summary.candidate,
+                            summary.candidate_id,
+                            None,
+                            None,
+                            CandidateEvidenceStatus.FAILED_INCOMPLETE,
+                            CANDIDATE_EVALUATION_INCOMPLETE,
+                        )
+                    )
+            if self.summaries != tuple(expected_summaries):
                 raise ValueError("comparison aggregate mismatch")
 
         body = self.to_bytes()

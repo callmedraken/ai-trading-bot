@@ -85,13 +85,11 @@ def signal(
     if type(invested) is not bool:
         raise TypeError("invested must be a bool")
     if len(bars) < required_closes(candidate):
-        raise ValueError("insufficient completed bars for candidate warmup")
+        return "HOLD"
 
     if candidate is Candidate.BASE_MA35_50_V1:
         return _base_signal(_BASE_CONFIG, bars, invested)
     state = _signal_series_validated(candidate, bars)[-1]
-    if state is None:
-        raise ValueError("candidate signal is unavailable")
     if state == "HOLD":
         return "HOLD"
     if state == "BUY":
@@ -102,12 +100,12 @@ def signal(
 def signal_series(
     candidate: Candidate,
     bars: tuple[Bar, ...],
-) -> tuple[str | None, ...]:
+) -> tuple[str, ...]:
     """Return raw candidate intentions aligned to each completed-bar prefix.
 
-    Entries before the candidate's exact warmup window are None. Later entries
-    are BUY or SELL for the independent price rules; the accepted BASE_MA rule
-    retains its existing HOLD-at-equality behavior.
+    Entries before the candidate's exact warmup window are HOLD. Later entries
+    are BUY, SELL, or HOLD for the independent price rules; the accepted
+    BASE_MA rule retains its existing HOLD-at-equality behavior.
     """
 
     _require_candidate(candidate)
@@ -118,15 +116,16 @@ def signal_series(
 def _signal_series_validated(
     candidate: Candidate,
     bars: tuple[Bar, ...],
-) -> tuple[str | None, ...]:
+) -> tuple[str, ...]:
     warmup = required_closes(candidate)
     if candidate is Candidate.BASE_MA35_50_V1:
         states = _base_signal_series(_BASE_CONFIG, bars)
         return tuple(
-            None if index < warmup - 1 else state for index, state in enumerate(states)
+            "HOLD" if index < warmup - 1 else state
+            for index, state in enumerate(states)
         )
 
-    result: list[str | None] = [None] * len(bars)
+    result: list[str] = ["HOLD"] * len(bars)
     if candidate is Candidate.PRICE_SMA200_V1:
         with localcontext(_ARITHMETIC_CONTEXT):
             rolling_total = _ZERO
@@ -136,7 +135,13 @@ def _signal_series_validated(
                     rolling_total -= bars[index - _SMA_WINDOW].close
                 if index >= _SMA_WINDOW - 1:
                     average = rolling_total / Decimal(_SMA_WINDOW)
-                    result[index] = "BUY" if bar.close > average else "SELL"
+                    result[index] = (
+                        "BUY"
+                        if bar.close > average
+                        else "SELL"
+                        if bar.close < average
+                        else "HOLD"
+                    )
         return tuple(result)
 
     if candidate is Candidate.PRICE_MOM_252_V1:
@@ -145,6 +150,8 @@ def _signal_series_validated(
                 "BUY"
                 if bars[index].close > bars[index - _MOMENTUM_LAG].close
                 else "SELL"
+                if bars[index].close < bars[index - _MOMENTUM_LAG].close
+                else "HOLD"
             )
         return tuple(result)
 

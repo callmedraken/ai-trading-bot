@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, fields
 from decimal import Decimal
+from enum import StrEnum
 from typing import cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -31,6 +32,7 @@ from trading_bot.experiments.filtered_trend_campaign import (
 from trading_bot.experiments.filtered_trend_comparison_v2 import (
     CANDIDATES,
     Candidate,
+    required_closes,
     signal_series,
 )
 from trading_bot.experiments.filtered_trend_data import (
@@ -39,26 +41,21 @@ from trading_bot.experiments.filtered_trend_data import (
 from trading_bot.experiments.filtered_trend_strategies import StrategyConfig
 
 QUALIFICATION_POLICY = "comparison-v2/qualification-v1"
-_SHORTLIST_POLICY = "qualified-fixed-order-sma200-mom252/v1"
+_SHORTLIST_POLICY = "qualified-metric-order-v2/v1"
 _PRIOR_CAMPAIGN_ID = "48ae05d5-ede1-5461-9da9-b5d7744cefad"
 _BASE_CONFIG = StrategyConfig("BASE_MA", 35, 50, "none")
 _NEW_YORK = ZoneInfo("America/New_York")
 
-_HIGHER_IS_BETTER = (
-    "positive_regime_cells",
-    "minimum_regime_return",
-    "median_regime_return",
+_QUALIFICATION_HIGHER_IS_BETTER = (
     "positive_continuous_symbols",
     "minimum_continuous_return",
     "median_continuous_return",
 )
-_LOWER_IS_BETTER = (
-    "negative_regime_cells",
-    "worst_regime_drawdown",
-    "median_regime_drawdown",
-    "median_turnover",
+_QUALIFICATION_LOWER_IS_BETTER = (
     "worst_continuous_drawdown",
+    "median_turnover",
 )
+_ALL_METRIC_FIELDS = frozenset(item.name for item in fields(AggregateSummary))
 _COUNT_FIELDS = frozenset(
     {
         "positive_regime_cells",
@@ -74,20 +71,47 @@ _NONNEGATIVE_DECIMAL_FIELDS = frozenset(
         "worst_continuous_drawdown",
     }
 )
-if set(_HIGHER_IS_BETTER) | set(_LOWER_IS_BETTER) != {
-    item.name for item in fields(AggregateSummary)
-}:
-    raise RuntimeError("comparison v2 qualification policy must cover every metric")
+_QUALIFICATION_FIELDS = frozenset(
+    _QUALIFICATION_HIGHER_IS_BETTER + _QUALIFICATION_LOWER_IS_BETTER
+)
+if (
+    _QUALIFICATION_FIELDS
+    != {
+        "positive_continuous_symbols",
+        "minimum_continuous_return",
+        "median_continuous_return",
+        "worst_continuous_drawdown",
+        "median_turnover",
+    }
+    or not _QUALIFICATION_FIELDS < _ALL_METRIC_FIELDS
+):
+    raise RuntimeError("annual-regime metrics must remain outside qualification")
+
+
+class CandidateEvidenceStatus(StrEnum):
+    """The only two representable states for one frozen candidate."""
+
+    COMPLETE = "COMPLETE"
+    FAILED_INCOMPLETE = "FAILED_INCOMPLETE"
+
+
+CANDIDATE_EVALUATION_INCOMPLETE = "CANDIDATE_EVALUATION_INCOMPLETE"
+
+
+class CandidateEvaluationIncomplete(Exception):
+    """Explicit bounded incompleteness of one candidate's evaluation."""
 
 
 @dataclass(frozen=True, slots=True)
 class ComparisonSummary:
-    """One frozen candidate's base and stress aggregate evidence."""
+    """One candidate's complete or explicitly incomplete typed evidence."""
 
     candidate: Candidate
     candidate_id: str
-    base: AggregateSummary
-    stress: AggregateSummary
+    base: AggregateSummary | None
+    stress: AggregateSummary | None
+    status: CandidateEvidenceStatus = CandidateEvidenceStatus.COMPLETE
+    failure_code: str | None = None
 
 
 def semantic_identity(kind: str, value: object) -> str:
@@ -156,7 +180,7 @@ def campaign_identity(context: dict) -> str:
 
 
 def select_candidate(summaries: tuple[ComparisonSummary, ...]) -> str:
-    """Apply the frozen all-metrics base/stress qualification policy."""
+    """Apply the frozen five-metric base/stress policy and tie-break."""
 
     if type(summaries) is not tuple or len(summaries) != len(CANDIDATES):
         raise ValueError("all three ordered comparison summaries are required")
@@ -169,15 +193,18 @@ def select_candidate(summaries: tuple[ComparisonSummary, ...]) -> str:
     if len({item.candidate_id for item in summaries}) != len(CANDIDATES):
         raise ValueError("candidate identities must be distinct")
     for item in summaries:
-        _require_canonical_uuid5(item.candidate_id, "candidate_id")
-        _validate_aggregate(item.base)
-        _validate_aggregate(item.stress)
+        _validate_summary(item)
 
     control = summaries[0]
-    for candidate in summaries[1:]:
-        if qualifies_candidate(candidate, control):
-            return candidate.candidate.value
-    return "NONE_QUALIFIES"
+    qualifying = [
+        candidate
+        for candidate in summaries[1:]
+        if qualifies_candidate(candidate, control)
+    ]
+    if not qualifying:
+        return "NONE_QUALIFIES"
+    with_context = sorted(qualifying, key=_selection_key)
+    return with_context[0].candidate.value
 
 
 def qualifies_candidate(
@@ -198,14 +225,19 @@ def qualifies_candidate(
         or challenger.candidate not in CANDIDATES[1:]
     ):
         raise ValueError("qualification challenger is not a frozen comparison arm")
-    _require_canonical_uuid5(challenger.candidate_id, "candidate_id")
-    _require_canonical_uuid5(control.candidate_id, "candidate_id")
+    _validate_summary(challenger)
+    _validate_summary(control)
     if challenger.candidate_id == control.candidate_id:
         raise ValueError("candidate identities must be distinct")
-    _validate_aggregate(challenger.base)
-    _validate_aggregate(challenger.stress)
-    _validate_aggregate(control.base)
-    _validate_aggregate(control.stress)
+    if (
+        challenger.status is not CandidateEvidenceStatus.COMPLETE
+        or control.status is not CandidateEvidenceStatus.COMPLETE
+    ):
+        return False
+    assert challenger.base is not None
+    assert challenger.stress is not None
+    assert control.base is not None
+    assert control.stress is not None
     return (
         _no_worse(challenger.base, control.base)
         and _no_worse(challenger.stress, control.stress)
@@ -237,33 +269,22 @@ def run_campaign(
     regimes = regime_plan()
     for candidate in CANDIDATES:
         candidate_id = candidate_identity(campaign_id, candidate)
-        candidate_cells: list[CellEvidence] = []
-        for item in dataset.datasets:
-            states = signal_series(candidate, item.bars)
-            if type(states) is not tuple or len(states) != len(item.bars):
-                raise ValueError("candidate signal series is incomplete")
-            if any(state not in (None, "BUY", "SELL", "HOLD") for state in states):
-                raise ValueError("candidate signal series contains an invalid state")
-            for regime in regimes:
-                execution_indices = _regime_indices(item.bars, regime)
-                if not execution_indices:
-                    raise ValueError("candidate regime contains no sessions")
-                if execution_indices[0] == 0 or any(
-                    states[index - 1] is None for index in execution_indices
-                ):
-                    raise ValueError(
-                        "candidate warmup does not cover every prior-close signal"
-                    )
-                candidate_cells.append(
-                    _evaluate_cell(
-                        item.bars,
-                        _BASE_CONFIG,
-                        regime,
-                        candidate_id,
-                        prepared_states=cast(tuple[str, ...], states),
-                    )
+        try:
+            owned_cells = _evaluate_candidate(dataset, candidate, candidate_id, regimes)
+        except CandidateEvaluationIncomplete:
+            if candidate is Candidate.BASE_MA35_50_V1:
+                raise
+            summaries.append(
+                ComparisonSummary(
+                    candidate,
+                    candidate_id,
+                    None,
+                    None,
+                    CandidateEvidenceStatus.FAILED_INCOMPLETE,
+                    CANDIDATE_EVALUATION_INCOMPLETE,
                 )
-        owned_cells = tuple(candidate_cells)
+            )
+            continue
         all_cells.extend(owned_cells)
         summaries.append(
             ComparisonSummary(
@@ -274,6 +295,50 @@ def run_campaign(
             )
         )
     return context, tuple(all_cells), tuple(summaries)
+
+
+def _evaluate_candidate(
+    dataset: MultiAssetDataset,
+    candidate: Candidate,
+    candidate_id: str,
+    regimes: tuple[Regime, ...],
+) -> tuple[CellEvidence, ...]:
+    candidate_cells: list[CellEvidence] = []
+    for item in dataset.datasets:
+        states = signal_series(candidate, item.bars)
+        if type(states) is not tuple or len(states) != len(item.bars):
+            raise CandidateEvaluationIncomplete
+        if any(state not in ("BUY", "SELL", "HOLD") for state in states):
+            raise CandidateEvaluationIncomplete
+        for regime in regimes:
+            execution_indices = _regime_indices(item.bars, regime)
+            if not execution_indices:
+                raise ValueError("candidate regime contains no sessions")
+            required = _required_information_index(candidate)
+            if execution_indices[0] - 1 < required:
+                raise CandidateEvaluationIncomplete
+            candidate_cells.append(
+                _evaluate_cell(
+                    item.bars,
+                    _BASE_CONFIG,
+                    regime,
+                    candidate_id,
+                    prepared_states=cast(tuple[str, ...], states),
+                )
+            )
+    return tuple(candidate_cells)
+
+
+def _required_information_index(candidate: Candidate) -> int:
+    """Return the first information-session index valid for execution."""
+
+    return candidate_required_closes(candidate) - 1
+
+
+def candidate_required_closes(candidate: Candidate) -> int:
+    """Expose the candidate warmup boundary to the campaign validator."""
+
+    return required_closes(candidate)
 
 
 def _regime_indices(bars: tuple[Bar, ...], regime: Regime) -> tuple[int, ...]:
@@ -316,6 +381,50 @@ def _validate_aggregate(summary: AggregateSummary) -> None:
         raise ValueError("annual regime result counts cannot exceed forty")
 
 
+def _validate_summary(summary: ComparisonSummary) -> None:
+    if type(summary) is not ComparisonSummary:
+        raise TypeError("candidate evidence must be a ComparisonSummary")
+    if type(summary.candidate) is not Candidate:
+        raise ValueError("candidate evidence has an invalid candidate")
+    _require_canonical_uuid5(summary.candidate_id, "candidate_id")
+    if type(summary.status) is not CandidateEvidenceStatus:
+        raise ValueError("candidate evidence has an invalid status")
+    if summary.status is CandidateEvidenceStatus.COMPLETE:
+        if summary.failure_code is not None:
+            raise ValueError("complete candidate cannot carry a failure code")
+        if summary.base is None or summary.stress is None:
+            raise ValueError("complete candidate requires both aggregates")
+        _validate_aggregate(summary.base)
+        _validate_aggregate(summary.stress)
+    else:
+        if (
+            summary.base is not None
+            or summary.stress is not None
+            or summary.failure_code != CANDIDATE_EVALUATION_INCOMPLETE
+        ):
+            raise ValueError(
+                "failed candidate evidence must be sanitized and metric-free"
+            )
+
+
+def _selection_key(summary: ComparisonSummary) -> tuple:
+    if summary.base is None or summary.stress is None:
+        raise ValueError("incomplete candidate cannot be selected")
+    return (
+        -summary.stress.positive_continuous_symbols,
+        -summary.stress.minimum_continuous_return,
+        summary.stress.worst_continuous_drawdown,
+        -summary.stress.median_continuous_return,
+        summary.stress.median_turnover,
+        -summary.base.positive_continuous_symbols,
+        -summary.base.minimum_continuous_return,
+        summary.base.worst_continuous_drawdown,
+        -summary.base.median_continuous_return,
+        summary.base.median_turnover,
+        summary.candidate_id,
+    )
+
+
 def _require_canonical_uuid5(value: str, label: str) -> None:
     if type(value) is not str:
         raise ValueError(f"{label} must be a canonical UUID5 identity")
@@ -329,15 +438,19 @@ def _require_canonical_uuid5(value: str, label: str) -> None:
 
 def _no_worse(candidate: AggregateSummary, control: AggregateSummary) -> bool:
     return all(
-        getattr(candidate, name) >= getattr(control, name) for name in _HIGHER_IS_BETTER
+        getattr(candidate, name) >= getattr(control, name)
+        for name in _QUALIFICATION_HIGHER_IS_BETTER
     ) and all(
-        getattr(candidate, name) <= getattr(control, name) for name in _LOWER_IS_BETTER
+        getattr(candidate, name) <= getattr(control, name)
+        for name in _QUALIFICATION_LOWER_IS_BETTER
     )
 
 
 def _strictly_better(candidate: AggregateSummary, control: AggregateSummary) -> bool:
     return any(
-        getattr(candidate, name) > getattr(control, name) for name in _HIGHER_IS_BETTER
+        getattr(candidate, name) > getattr(control, name)
+        for name in _QUALIFICATION_HIGHER_IS_BETTER
     ) or any(
-        getattr(candidate, name) < getattr(control, name) for name in _LOWER_IS_BETTER
+        getattr(candidate, name) < getattr(control, name)
+        for name in _QUALIFICATION_LOWER_IS_BETTER
     )

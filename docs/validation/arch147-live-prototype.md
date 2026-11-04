@@ -1,11 +1,11 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-Exact D33 starting HEAD b7d42863d24958d1ce0fcf9f51eff67397f94240; tree
-31f2d5016f27b08c6f475c36b655523cd888726c. Branch
-feature/robinhood-live-prototype-current, canonical F: worktree named in contract.
-No real provider/order/credential/data/holdout effects, no paper soak. The P01
-implementation, corrections, and docs closeout are integrated through
-`b7d42863d24958d1ce0fcf9f51eff67397f94240`; develop remains there.
+Exact accepted D33 source HEAD `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824`;
+tree `9981cca7cc1f01fae778cbe9e5d189126d3a885c`. Branch
+`feature/robinhood-live-prototype-current`, canonical F: worktree named in
+contract. Feature FULL `41903739374`, attempt 1, and develop integration
+`41905183980`, attempt 1, both succeeded. No real provider/order/credential/
+data/holdout effects or paper soak; D33 provider observation remains NOT_RUN.
 
 D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, basis
@@ -29,14 +29,23 @@ integration:
     GitHub run 41822221848 / attempt 1 / terminal SUCCESS
     classification EXACT_SOURCE_REVIEW_REJECTED
 
-Current child scope: exact feature/develop admission before provider authority,
-source-owned current clock, same-day completed-session cutoff semantics,
-invalid-clock sanitization, focused regressions, and coordination truth only.
+Current corrective child scope: exact feature/develop admission before provider
+authority, with live origin branch heads resolved read-only through the existing
+source-owned `_remote_branch_head` helper rather than local remote-tracking
+refs. The source-owned current clock, same-day completed-session cutoff,
+invalid-clock sanitization, focused regressions, and coordination truth remain
+unchanged.
+
+Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
+and ref-lock failures; none entered credentials or the provider, so none
+consumed a D33 observation. Local stale develop/tracking-ref state is separate
+host hygiene and is not provider authority. The cause of local Git write
+failures remains unresolved; no ACL or sandbox-cause claim is made.
 
 | Task | Dependencies | Owner / exclusive surface | Interface | Status / next |
 |---|---|---|---|---|
 | P00 | exact P6/CI | independent ChatGPT acceptance; Sol reverification | P6 59+1 | ACCEPTED; provider observation separate |
-| P01 | P00 | Sol contracts, docs, registry, composition | v1 | IMPLEMENTATION/SOURCE ACCEPTED; integrated through b7d4286 |
+| P01 | P00 | Sol contracts, docs, registry, composition | v1 | IMPLEMENTATION/SOURCE ACCEPTED; integrated through 543dc6b4 |
 | R09 | P01 | Luna external primary-source evidence | 3 fixed arms | SOL_REVIEWED |
 | R10 | P01 | Luna comparison_v2.py + exact tests | R10 v1 | SOL_REVIEWED; 14 focused tests |
 | R11 | R10 | Luna comparison_campaign_v2.py + exact tests | R11 v1 | SOL_REVIEWED; 49 focused tests |
@@ -47,10 +56,10 @@ invalid-clock sanitization, focused regressions, and coordination truth only.
 | D30 | selection/official data | Sol then Luna data/parity | accepted dataset identity | ACCEPTED; exact dataset and all-adjusted price basis frozen |
 | D31 | selection/official data | Sol then Luna data/parity | exact research bundle | ACCEPTED; `NONE_QUALIFIES`, control retained, non-live |
 | D32 | selection/official data | Sol then Luna data/parity | parity evidence | PARTIAL_PASS; math/binding PASS, live basis BLOCKED by `DATA_BASIS_MISMATCH` |
-| D33 | current signal-data successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs | PREDECESSOR TERMINAL GREEN / EXACT-SOURCE-REJECTED; corrective child in progress; no provider observation |
+| D33 | current signal-data successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs | ACCEPTED SOURCE / CORRECTIVE CHILD IN PROGRESS; live-read-only authority correction; no provider observation |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
-| Q60 | exact source | Sol admission/publication/FULL | registered source-only | P01 implementation/corrections/docs integrated through b7d4286; D33 predecessor review rejected |
+| Q60 | exact source | Sol admission/publication/FULL | registered source-only | P01 implementation/corrections/docs integrated through 543dc6b4; corrective child pending |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | PENDING |
@@ -93,7 +102,7 @@ or metrics and carries only its fixed sanitized status code.
 | Whole-repository Ruff check and format check | PASS; 1535 files formatted |
 | Current authority and source-only prototype authority | PASS, zero failures |
 | Git diff whitespace | PASS |
-| D33 corrective focused tests/checks | PASS locally | 39 targeted tests passed/2 host-evidence skipped; all live_prototype 51 passed/2 skipped; authority 86 passed; P6 preservation 30 passed |
+| D33 source-admission correction focused tests/checks | PASS locally | D33 45 passed/2 host-evidence skipped; `_remote_branch_head` helper 2 passed; current source-authority 59 passed; no P6 source changed |
 
 Precommit current/historical batch evaluation reported only task files that were
 still being written; all now exist. Clean-candidate admission must independently
@@ -118,7 +127,8 @@ live implementation is delegated across it.
 Complete exact-source review of this bounded corrective child, stage only the
 intended files, create one normal atomic commit, push once, and wait for its
 single mapped `arch147-live-prototype` FULL run. Do not integrate the child
-before independent acceptance. Develop remains at b7d4286 while pending.
+before independent acceptance. The accepted integrated source is
+`543dc6b4`; no local tracking-ref refresh is a D33 prerequisite.
 
 After acceptance, exact ff-only integrate with certification reuse, verify
 feature/develop identities, and run one fresh source-admitted D33 read-only

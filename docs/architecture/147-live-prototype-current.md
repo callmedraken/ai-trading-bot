@@ -44,23 +44,33 @@ unresolved for official fractional exit capability, exact owned-position exit
 semantics, and durable budget/recovery/capability work. No paper soak is
 inserted between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
 
-P01 implementation, corrections, and docs closeout are integrated through
-`b7d42863d24958d1ce0fcf9f51eff67397f94240`. The published D33 predecessor
+The accepted D33 source `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824` / tree
+`9981cca7cc1f01fae778cbe9e5d189126d3a885c` was integrated into develop after
+feature FULL run `41903739374`, attempt 1, and develop integration run
+`41905183980`, attempt 1; both succeeded. The published D33 predecessor
 `2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
 `f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
 `41822221848`, attempt 1, but exact-source review rejected it before
-integration. The current child is limited to exact integration-required source
-admission, source-owned current clock, completed-session cutoff semantics,
-invalid-clock sanitization, tests, and documentation. Develop remains at the
-parent until this child is accepted.
+integration. The current corrective child removes D33's dependency on local
+remote-tracking refs by resolving both origin branch heads read-only through
+the source-owned `_remote_branch_head` helper. The provider observation remains
+NOT_RUN.
+
+Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
+and ref-lock failures while preparing D33; they consumed no provider attempt.
+Those local Git write failures are separate host hygiene and are not provider
+authority. Their cause remains unresolved here; no ACL or sandbox-cause claim
+is made.
 
 The protected operator has no caller-selected observation timestamp. Its
 production path obtains one UTC timestamp from its source-owned clock, uses
 that same value for session selection, request construction, evidence, and
 `CompletedSignalInputs.as_of`, and requires the exact final published regular
-close as the completion cutoff. The operator is blocked until origin feature,
-origin develop, local HEAD/tree, FEATURE authority, and PROSPECTIVE_DEVELOP
-authority all identify the same integrated source.
+close as the completion cutoff. The operator is blocked until the reviewed
+origin URL, live read-only origin feature/develop heads, local HEAD/tree,
+FEATURE authority, and PROSPECTIVE_DEVELOP authority all identify the same
+integrated source. It does not require fresh or writable local remote-tracking
+refs.
 
 ## Source and acceptance boundary
 

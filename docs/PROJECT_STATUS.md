@@ -2,9 +2,12 @@
 
 ## Current milestone - Architecture 147 D33 corrective child
 
-P01 implementation, corrections, and docs closeout are integrated through
-`b7d42863d24958d1ce0fcf9f51eff67397f94240`; `develop` remains at that exact
-source. The first D33 source predecessor
+P01 implementation, corrections, and docs closeout plus the accepted D33 source
+are integrated through
+`543dc6b45b4a20f53ae28646a0c82b9b1cd7b824` / tree
+`9981cca7cc1f01fae778cbe9e5d189126d3a885c`; feature FULL
+`41903739374` and develop integration `41905183980`, attempt 1, both
+succeeded. The first D33 source predecessor
 `2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
 `f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
 `41822221848`, attempt 1, but was rejected by exact-source review. It remains
@@ -37,14 +40,22 @@ effect. The older P6 `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` 59+1 source
 and all consumed evidence remain preserved predecessor behavior; it is not
 relabeled as Alpaca-based and is not rewritten by D33.
 
+Operational review found that the earlier D33 source admission depended on
+local remote-tracking refs while preparing a protected observation. Repeated
+pre-dispatch stale-tracking, `FETCH_HEAD`, and ref-lock failures consumed no
+provider attempt. The corrective child resolves live origin branch heads
+read-only through the existing source-owned helper. Local stale Git state is
+separate host hygiene, not provider authority; the cause of local write
+failures remains unresolved and no ACL/sandbox cause is claimed.
+
 ## Immediate next step
 
 The corrective child addresses only protected admission requiring exact
-feature/develop identity, source-owned current clock, same-day completed-session
-cutoff semantics, invalid-clock sanitization, focused tests, and coordination
-truth. Complete exact-source review, then publish exactly one child commit and
-one mapped `arch147-live-prototype` FULL route. Develop remains at the P01
-source until the child is independently accepted.
+feature/develop identity through live read-only origin resolution, source-owned
+current clock, same-day completed-session cutoff semantics, invalid-clock
+sanitization, focused tests, and coordination truth. Complete exact-source
+review, then publish exactly one child commit and one mapped
+`arch147-live-prototype` FULL route. Do not run D33 during implementation.
 
 After acceptance, fast-forward `develop` exactly to the child with
 certification reuse, verify identities, and perform one fresh source-admitted

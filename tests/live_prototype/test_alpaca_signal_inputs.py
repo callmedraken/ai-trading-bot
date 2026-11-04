@@ -470,12 +470,20 @@ def _make_test_evidence(path: Path) -> Path:
     return path
 
 
-def _patch_source_topology(monkeypatch, *, develop: str) -> None:  # type: ignore[no-untyped-def]
+def _patch_source_topology(
+    monkeypatch,
+    *,
+    develop: str,
+    feature: str | None = None,
+    origin: str = "https://github.com/callmedraken/ai-trading-bot.git",
+) -> list[str]:  # type: ignore[no-untyped-def]
     import scripts.checkpoint_runner as runner
     import scripts.current_source_authority as authority
 
     candidate = "a" * 40
     tree = "b" * 40
+    remote_feature = candidate if feature is None else feature
+    remote_calls: list[str] = []
 
     def state(root):  # type: ignore[no-untyped-def]
         return {
@@ -487,22 +495,110 @@ def _patch_source_topology(monkeypatch, *, develop: str) -> None:  # type: ignor
 
     def output(root, *args: str) -> str:  # type: ignore[no-untyped-def]
         if args == ("remote", "get-url", "origin"):
-            return "https://github.com/callmedraken/ai-trading-bot.git"
-        if args == ("rev-parse", "origin/develop"):
-            return develop
-        if args == ("rev-parse", f"origin/{operator.D33_FEATURE_BRANCH}"):
-            return candidate
+            return origin
         if args == ("show", "-s", "--format=%T", "HEAD"):
             return tree
         raise AssertionError(args)
 
+    def remote_branch_head(root, branch: str) -> str:  # type: ignore[no-untyped-def]
+        remote_calls.append(branch)
+        if branch == "develop":
+            return develop
+        if branch == operator.D33_FEATURE_BRANCH:
+            return remote_feature
+        raise AssertionError(branch)
+
     monkeypatch.setattr(runner, "_git_state", state)
     monkeypatch.setattr(runner, "_git_output", output)
+    monkeypatch.setattr(runner, "_remote_branch_head", remote_branch_head)
     monkeypatch.setattr(
         authority,
         "evaluate_source_authority",
         lambda *args, **kwargs: SimpleNamespace(failures=()),
     )
+    return remote_calls
+
+
+def test_d33_source_admission_uses_live_remote_heads_when_tracking_ref_is_stale(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    calls = _patch_source_topology(monkeypatch, develop="a" * 40)
+    admission = operator.admit_current_source(Path(__file__).resolve().parents[2])
+    assert admission.origin_develop == "a" * 40
+    assert admission.origin_feature == "a" * 40
+    assert calls == ["develop", operator.D33_FEATURE_BRANCH]
+
+
+def test_d33_source_admission_does_not_read_absent_tracking_refs(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    calls = _patch_source_topology(monkeypatch, develop="a" * 40)
+    admission = operator.admit_current_source(Path(__file__).resolve().parents[2])
+    assert admission.head == "a" * 40
+    assert calls == ["develop", operator.D33_FEATURE_BRANCH]
+
+
+@pytest.mark.parametrize(
+    ("develop", "feature", "expected"),
+    [
+        ("c" * 40, "a" * 40, "develop"),
+        ("a" * 40, "c" * 40, operator.D33_FEATURE_BRANCH),
+    ],
+)
+def test_d33_source_admission_blocks_live_remote_mismatch(
+    monkeypatch, develop: str, feature: str, expected: str
+) -> None:  # type: ignore[no-untyped-def]
+    calls = _patch_source_topology(
+        monkeypatch,
+        develop=develop,
+        feature=feature,
+    )
+    with pytest.raises(RuntimeError):
+        operator.admit_current_source(Path(__file__).resolve().parents[2])
+    assert calls == ["develop", operator.D33_FEATURE_BRANCH]
+    assert expected in calls
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        RuntimeError("live remote query failed"),
+        "not-a-commit",
+        "",
+    ],
+)
+def test_d33_source_admission_blocks_unavailable_or_malformed_live_identity(
+    monkeypatch, failure: object
+) -> None:  # type: ignore[no-untyped-def]
+    calls = _patch_source_topology(monkeypatch, develop="a" * 40)
+    import scripts.checkpoint_runner as runner
+
+    def unavailable(root, branch: str) -> str:  # type: ignore[no-untyped-def]
+        calls.append(branch)
+        if isinstance(failure, Exception):
+            raise failure
+        return failure
+
+    monkeypatch.setattr(runner, "_remote_branch_head", unavailable)
+    with pytest.raises(RuntimeError):
+        operator.admit_current_source(Path(__file__).resolve().parents[2])
+    expected_calls = (
+        ["develop"]
+        if isinstance(failure, Exception)
+        else ["develop", operator.D33_FEATURE_BRANCH]
+    )
+    assert calls == expected_calls
+
+
+def test_d33_source_admission_rejects_wrong_origin_before_remote_authority(
+    monkeypatch,
+) -> None:  # type: ignore[no-untyped-def]
+    calls = _patch_source_topology(
+        monkeypatch,
+        develop="a" * 40,
+        origin="https://github.com/other/repository.git",
+    )
+    with pytest.raises(RuntimeError):
+        operator.admit_current_source(Path(__file__).resolve().parents[2])
+    assert calls == []
 
 
 def test_feature_only_topology_blocks_before_credential_or_provider(

@@ -31,7 +31,11 @@ _EVIDENCE_PARENT = Path(r"F:\AI\temp")
 
 @dataclass(frozen=True, slots=True)
 class SourceAdmission:
-    """Read-only source identities proved before any provider construction."""
+    """Read-only source identities proved before any provider construction.
+
+    ``origin_develop`` and ``origin_feature`` are live origin branch heads
+    resolved read-only, not local remote-tracking references.
+    """
 
     branch: str
     head: str
@@ -77,10 +81,8 @@ def admit_current_source(repo_root: Path | None = None) -> SourceAdmission:
     origin = runner._git_output(root, "remote", "get-url", "origin")
     if origin != _EXPECTED_ORIGIN:
         raise RuntimeError("D33 origin is not the reviewed repository")
-    origin_develop = runner._git_output(root, "rev-parse", "origin/develop")
-    origin_feature = runner._git_output(
-        root, "rev-parse", f"origin/{D33_FEATURE_BRANCH}"
-    )
+    origin_develop = runner._remote_branch_head(root, "develop")
+    origin_feature = runner._remote_branch_head(root, D33_FEATURE_BRANCH)
     if origin_feature != state["head"]:
         raise RuntimeError("D33 feature source is not the exact remote source")
     if origin_develop != state["head"]:

@@ -6,20 +6,21 @@ Worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
 
 Branch: `feature/robinhood-live-prototype-current`
 
-Parent source HEAD: `b7d42863d24958d1ce0fcf9f51eff67397f94240`
+Parent source HEAD: `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824`
 
-Parent source tree: `31f2d5016f27b08c6f475c36b655523cd888726c`
+Parent source tree: `9981cca7cc1f01fae778cbe9e5d189126d3a885c`
 
-P01 implementation, corrections, and docs closeout are integrated through the
-parent `develop` source above. D33 predecessor
+P01 implementation, corrections, docs closeout, and the accepted D33 source
+are integrated through the parent `develop` source above. Feature FULL
+`41903739374`, attempt 1, and develop integration `41905183980`, attempt 1,
+both succeeded. D33 predecessor
 `2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
 `f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
 `41822221848`, attempt 1, but was rejected by ChatGPT exact-source review before
 integration. It is preserved immutable terminal-green evidence.
 
-The current checkpoint is one corrective child of that predecessor. Its
-worktree is clean before editing, and `develop` remains at the parent
-`b7d42863d24958d1ce0fcf9f51eff67397f94240` pending child acceptance.
+The current checkpoint is one corrective child of the accepted D33 source. Its
+worktree is clean before editing, and the provider observation remains NOT_RUN.
 
 D30 is ACCEPTED with dataset ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA
@@ -49,11 +50,18 @@ not relabel or rewrite them. No provider observation has occurred, and source
 publication grants no provider, paper, broker, runtime-binding, campaign,
 production, or live authority.
 
+Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
+and ref-lock failures. They consumed no provider attempt. This child removes
+D33's local remote-tracking-ref dependency by using the existing source-owned
+live read-only remote-head helper. Local stale Git state is separate host
+hygiene and not provider authority; the cause of local write failures remains
+unresolved, with no ACL or sandbox-cause claim.
+
 ## Next milestone and stop conditions
 
-The child addresses only exact integration-required source admission,
-source-owned current clock, completed-session cutoff semantics,
-invalid-clock sanitization, tests, and documentation. After exact-source
+The child addresses only exact integration-required source admission using live
+read-only origin heads, source-owned current clock, completed-session cutoff
+semantics, invalid-clock sanitization, tests, and documentation. After exact-source
 review, publish one normal atomic child commit and one mapped
 `arch147-live-prototype` FULL run. Do not integrate the child until independent
 acceptance. Develop remains at the parent while this review is pending.

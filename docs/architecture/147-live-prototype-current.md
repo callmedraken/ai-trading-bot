@@ -1,5 +1,49 @@
 # Architecture 147 research-to-live prototype contract v1
 
+## Current D33 signal-data boundary
+
+D30 is ACCEPTED with dataset semantic ID
+`d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
+`ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, and
+price basis `ALPACA_ALL_ADJUSTED_PRICE_V1`. D31's exact bundle is ACCEPTED:
+campaign `9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
+`f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, bundle SHA-256
+`94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
+`NONE_QUALIFIES`, retained control `BASE_MA35_50_V1`, and control candidate ID
+`21158358-75be-5597-b940-5bccdda1429c`. NONE_QUALIFIES retains the control
+because neither challenger qualified; it is not a winning challenger,
+promotion, profitability proof, or live eligibility.
+
+D32 is PARTIAL_PASS: strategy math parity and research-binding integrity passed
+with 2,516 comparisons and zero mismatches, while live data-basis parity was
+blocked by `DATA_BASIS_MISMATCH`. D33 is the additive successor for the current
+signal-data leg. Alpaca Market Data supplies exactly 60 completed daily SPY
+bars using the accepted all-adjusted research semantics; Robinhood MCP remains
+the broker/account/execution/custody provider. There is no fallback between
+providers and no synthetic quote/close conversion.
+
+`live_prototype/alpaca_signal_inputs.py` owns deterministic XNYS published
+session selection, the one-request `/v2/stocks/bars` target, strict response
+validation, `CompletedSignalInputs` construction, response/input digests, and
+the pure BASE_MA35_50 decision. `live_prototype/alpaca_signal_operator.py`
+owns the later one-shot read-only observation: source admission precedes
+credential/provider construction, evidence is fresh and external under
+`F:\\AI\\temp`, at most one Alpaca request is made, Robinhood is never called,
+and only sanitized evidence is written. Construction, import, and help paths
+are effect-free.
+
+The D33 source checkpoint itself performs no provider observation and grants no
+provider, paper, broker, campaign, runtime-binding, production, or live
+authority. The P6 `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` 59+1 source,
+evidence, ownership/kill semantics, execution markers, and historical
+Architecture-134/146 pins remain preserved predecessor behavior and are not
+rewritten or relabeled as Alpaca-based.
+
+Q61 remains NOT RUN and no live-readiness label is granted. L40-L43 remain
+unresolved for official fractional exit capability, exact owned-position exit
+semantics, and durable budget/recovery/capability work. No paper soak is
+inserted between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
+
 ## Source and acceptance boundary
 
 Baseline: P6 04e02042f0bd34b2fb7c603b4dfb1b68c23cf57f, tree

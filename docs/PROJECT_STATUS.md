@@ -1,60 +1,57 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - research-to-live prototype
+## Current milestone - Architecture 147 D33
 
-P6's 59 historical closes plus one typed official close source is independently
-accepted and integrated. Exact-source feature FULL and develop certification
-reuse passed. The four consumed history-only attempts remain preserved; the
-new official-close protected observation is a separate boundary and has not
-been performed in this prototype implementation.
+D30 is ACCEPTED with dataset semantic ID
+`d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
+`ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, and
+price basis `ALPACA_ALL_ADJUSTED_PRICE_V1`.
 
-The additive prototype uses five cached desktop pages, an explicit isolated
-synthetic launcher, frozen strategy comparison and effect-disabled application
-services. It retains P6 as the existing operator-controlled effect boundary.
-Research opening/ranking cannot select a runtime binding or grant live authority.
-No paper soak is on the critical path.
+D31's exact research bundle is ACCEPTED: campaign
+`9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
+`f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, bundle SHA-256
+`94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, and
+selection `NONE_QUALIFIES`. The retained control is `BASE_MA35_50_V1` with
+candidate ID `21158358-75be-5597-b940-5bccdda1429c`. NONE_QUALIFIES means that
+neither challenger qualified; it is not a winning challenger, promotion,
+profitability proof, or live eligibility.
 
-The comparison is frozen before results: accepted BASE_MA35/50 control,
-PRICE_SMA200_V1 and PRICE_MOM_252_V1; eight existing ETFs and six regimes. A
-complete three-candidate campaign has the expected 144 candidate/regime/symbol
-cells; a bounded incomplete challenger remains visible without fabricated cells
-or metrics. Prior 30-configuration research and reused 2016-2023 adjusted
-history remain disclosed. No optimizer or FINAL_HOLDOUT access.
-Volatility sizing and ambiguous skipped-month momentum are outside this campaign.
+D32 is PARTIAL_PASS: strategy math parity and research-binding integrity passed
+with 2,516 comparisons and zero mismatches; live data-basis parity was blocked
+by `DATA_BASIS_MISMATCH`. D33 is the additive current-signal-data successor:
+Alpaca Market Data supplies completed daily SPY inputs using
+`ALPACA_ALL_ADJUSTED_PRICE_V1`, while Robinhood MCP remains the broker,
+account, execution, and custody provider. There is no provider fallback.
+
+The D33 source checkpoint performs no provider observation, credential read,
+campaign, paper, broker, production, runtime-binding, FINAL_HOLDOUT, or live
+effect. The older P6 `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` 59+1 source
+and all consumed evidence remain preserved predecessor behavior; it is not
+relabeled as Alpaca-based and is not rewritten by D33.
 
 ## Immediate next step
 
-The rejected prototype publication remains immutable historical evidence:
-`01adf7f` failed GitHub run `41788777182`, attempt 1, on two current registry/
-test-topology expectations omitted by admission. The bounded registry/admission
-correction `1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac` (tree
-`87a4eb9e27ee1b5a209eda93ad198f650abbfed3`) passed GitHub run `41792913721`,
-attempt 1. The frozen-P01 contract correction then completed at
-`321893183a12862ef86486e7d5c4cfff49a7b4ff` (tree
-`96784106879285736ee412e887319b48f2c64281`) with GitHub run `41799106223`,
-attempt 1, successful across source-static, active-tests and broad-1 through
-broad-7. Independent review accepted the P01 implementation/source semantics.
+Complete exact-source review of the D33 candidate, then publish exactly one
+atomic feature commit and one mapped `arch147-live-prototype` FULL route. If
+that terminal CI result is green and the source is accepted, fast-forward
+`develop` with certification reuse and perform one fresh, source-admitted,
+read-only D33 observation. That observation will make one Alpaca request only,
+will never call Robinhood, and will not authorize an order.
 
-Integration has not occurred: remote `develop` remains the P6 baseline. The
-actual sequence is docs-closeout review, exact-SHA integration of the accepted
-implementation followed by the docs-only successor, then native synthetic host
-UAT and admitted offline-comparison preparation. The source-only route has no
-preflight/execute.
-
-Provider/current-data admission, adjusted/raw input-basis parity, fresh
-current-data readiness, and the successor exact-owned exit/budget/recovery
-contract remain separate later boundaries. Missing fractional exit capabilities
-are a blocker, never authority to increase the $10 boundary or emulate
-unsupported orders. The task ledger and evidence matrix are in
-[prototype validation](validation/arch147-live-prototype.md).
+Q61 remains NOT RUN. No live-readiness label is granted. L40-L43 remain
+unresolved: official fractional exit capability, exact owned-position exit
+semantics, and durable budget/recovery/capability work are still required.
+There is no paper-soak milestone between D33 and L40-L43. FINAL_HOLDOUT remains
+sealed.
 
 ## Product and protected boundaries
 
-Private single-user Windows desktop: explicit Start/Stop; workers may run
-unattended after Start; updates are manual while stopped. Credentials and durable
-state remain outside source. No self-updater, release promotion or scheduler
-project is added. Existing historical evidence and accepted P5A/P5B/P6 contracts
-remain intact. P5A's binding remains PAPER_EVALUATION/live_eligible=False.
+The product remains a private single-user Windows desktop application with
+explicit Start/Stop and manual stopped-state updates. Credentials and durable
+state remain outside disposable source files. Live trading is disabled; no real
+order is authorized. Readiness labels are not granted by source publication,
+source admission, or provider-data parity alone.
 
-READY_FOR_HOST_UAT and READY_FOR_BOUNDED_LIVE_TEST are not granted by implementation.
-LIVE remains disabled. No real order is authorized. FINAL_HOLDOUT remains sealed.
+Historical P6, P5A/P5B, and earlier architecture evidence remains available in
+its owning documents. The current handoff and D33 validation ledger record the
+bounded continuation identity and acceptance state.

@@ -1,9 +1,23 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-Exact starting HEAD 04e02042f0bd34b2fb7c603b4dfb1b68c23cf57f; tree
-7269c857f86e2b0bec352ff04ecca9788d571e2f. Branch
+Exact D33 starting HEAD b7d42863d24958d1ce0fcf9f51eff67397f94240; tree
+31f2d5016f27b08c6f475c36b655523cd888726c. Branch
 feature/robinhood-live-prototype-current, canonical F: worktree named in contract.
-No real provider/order/credential/data/holdout effects, no paper soak.
+No real provider/order/credential/data/holdout effects, no paper soak. D33 is
+source-only and pending exact-source review/publication.
+
+D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
+`ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, basis
+`ALPACA_ALL_ADJUSTED_PRICE_V1`. D31 exact bundle ACCEPTED: campaign
+`9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
+`f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, SHA
+`94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
+`NONE_QUALIFIES`, retained control `BASE_MA35_50_V1`, ID
+`21158358-75be-5597-b940-5bccdda1429c`. D32 PARTIAL_PASS: strategy math and
+research binding PASS; live data-basis parity BLOCKED by
+`DATA_BASIS_MISMATCH`; 2,516 comparisons had zero mismatches. D33 chooses
+Alpaca all-adjusted current signal data and Robinhood execution/custody, with
+no fallback and no provider observation yet.
 
 Current accepted feature source, not yet integrated:
 
@@ -24,7 +38,10 @@ Current accepted feature source, not yet integrated:
 | G20 | P01 | Luna prototype_dashboard/session_page.py + tests | cached DTO v1 | SOL_REVIEWED; 4 focused tests |
 | G21 | P01/R12 | Luna prototype_research/strategy_page.py + tests | cached DTO v1 | SOL_REVIEWED; 5 focused tests |
 | G22 | P01 | Luna prototype_activity_page.py + tests | cached DTO v1 | SOL_REVIEWED; 3 focused tests |
-| D30-D32 | selection/official data | Sol then Luna data/parity | not frozen | BLOCKED on reviewed actual input basis |
+| D30 | selection/official data | Sol then Luna data/parity | accepted dataset identity | ACCEPTED; exact dataset and all-adjusted price basis frozen |
+| D31 | selection/official data | Sol then Luna data/parity | exact research bundle | ACCEPTED; `NONE_QUALIFIES`, control retained, non-live |
+| D32 | selection/official data | Sol then Luna data/parity | parity evidence | PARTIAL_PASS; math/binding PASS, live basis BLOCKED by `DATA_BASIS_MISMATCH` |
+| D33 | current signal-data successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs | SOURCE CHECKPOINT; no provider observation; next is exact review, one mapped FULL, then one-shot read-only observation |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | IMPLEMENTATION/SOURCE ACCEPTED; integration pending |
@@ -36,13 +53,13 @@ Current accepted feature source, not yet integrated:
 |---|---|---|
 | Usable launcher and GUI | SOURCE PASS / HOST NOT RUN | Actual five-page service/GUI tests; native UAT separate |
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
-| Research/runtime parity | BLOCKED | no runtime binding/data-basis acceptance yet |
-| Current valid inputs | BLOCKED | new official-close protected observation not run |
+| Research/runtime parity | D32 PARTIAL_PASS | strategy math and research binding PASS; current data-basis observation remains pending |
+| Current valid inputs | BLOCKED | D33 source exists; no Alpaca provider observation has been performed |
 | Entry and exact owned exit | BLOCKED | official fractional exit capability unproven |
 | Durable limits/no duplicate effects | PENDING | P6 remains untouched; P01 source is accepted but durable runtime/reconciliation evidence remains unaccepted |
 | Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | PASS / INTEGRATION PENDING | Exact implementation FULL passed and was independently reviewed: 3218931 / run 41799106223; remote develop remains the P6 baseline |
+| Exact source certified | D33 PENDING | D33 requires one atomic publication and the registered `arch147-live-prototype` mapped FULL route |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
@@ -70,6 +87,7 @@ or metrics and carries only its fixed sanitized status code.
 | Whole-repository Ruff check and format check | PASS; 1535 files formatted |
 | Current authority and source-only prototype authority | PASS, zero failures |
 | Git diff whitespace | PASS |
+| D33 focused tests/checks | PASS locally | 23 D33 tests passed, 2 host-evidence tests skipped because the sandbox cannot write `F:\\AI\\temp`; live_prototype 37 passed/2 skipped; Alpaca/credential 182 passed |
 
 Precommit current/historical batch evaluation reported only task files that were
 still being written; all now exist. Clean-candidate admission must independently
@@ -91,16 +109,16 @@ live implementation is delegated across it.
 
 ## Concrete next boundary
 
-Complete the short independent docs-diff review, then exact-SHA integrate the
-accepted implementation into `develop`, followed by the docs-only successor and
-final remote identity verification. Continue afterward to native synthetic host
-UAT and admitted offline-comparison preparation. A real offline comparison needs
-separate admission of the existing dataset; it must not reacquire data, rerun the
-old 30-arm campaign, expand variants or access FINAL_HOLDOUT. Native host commands
-are in docs/LIVE_PROTOTYPE_UAT.md and are used only after exact source acceptance.
-P00's prepared guarded read-only 59+1 command is an external review artifact; it
-has not been executed here. No placement, cancellation or live order is included
-in this checkpoint.
+Complete exact D33 source review, stage only the intended files, create one
+normal atomic commit, push once, and wait for the registered
+`arch147-live-prototype` mapped FULL run to terminal. If accepted and green,
+fast-forward `develop` with certification reuse, verify identities, and run one
+fresh source-admitted D33 read-only observation. That observation uses one
+Alpaca request, no Robinhood call, no runtime binding, no campaign, no
+FINAL_HOLDOUT access, and no paper/broker/live effect. It can close the
+data-basis blocker but cannot authorize a live order. Q61 remains NOT RUN;
+L40-L43 remain unresolved. Do not insert a paper soak between D33 and L40-L43.
+The old P6 guarded 59+1 path remains preserved predecessor evidence.
 
 ## Preserved rejected publication and accepted corrections
 

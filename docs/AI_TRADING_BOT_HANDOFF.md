@@ -1,92 +1,63 @@
 # AI Trading Bot - Current Handoff
 
-## Verified P00 and current source boundary
+## D33 continuation identity
 
-Independently accepted P6 completed-close source, integrated remote develop:
+Worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
 
-    HEAD 04e02042f0bd34b2fb7c603b4dfb1b68c23cf57f
-    TREE 7269c857f86e2b0bec352ff04ecca9788d571e2f
-    feature FULL 41759329337 / attempt 1 / SUCCESS / seven lanes
-    develop 41778371132 / attempt 1 / SUCCESS / exact_feature_certification
+Branch: `feature/robinhood-live-prototype-current`
 
-Independent acceptance and user-run integration were recovered from connected
-ChatGPT "Review Workflow Handoff"; remote identities and terminal jobs were
-reverified for prototype execution. Codex did not perform integration.
+Parent source HEAD: `b7d42863d24958d1ce0fcf9f51eff67397f94240`
 
-P6 worktree: F:\AI\worktrees\ai-trading-bot-p6-tiny-live-current.
-Branch: feature/robinhood-p6-tiny-live-current. P6 intentionally uses one captured
-baseline quote response for the typed official close plus one exact 59-session
-history request. No synthetic OHLCV, second quote/history call, shifted retry or
-fallback is permitted. Failure to obtain the official close stops that path.
-All four consumed history-only attempts and diagnostics remain immutable;
-[the P6 contract](architecture/147-p6-tiny-live.md) owns their exact records.
+Parent source tree: `31f2d5016f27b08c6f475c36b655523cd888726c`
 
-## Prototype implementation continuation
+The feature is based exactly on remote `develop`, with a clean candidate
+worktree and no unpublished divergence at handoff. The current checkpoint is
+Architecture 147 D33, source-only and pending exact-source review/publication.
 
-Worktree: F:\AI\worktrees\ai-trading-bot-live-prototype-current.
-Branch: feature/robinhood-live-prototype-current.
-Checkpoint: arch147-live-prototype; GitHub-owned FULL; no preflight/execute.
-Preserved rejected prototype publication:
+D30 is ACCEPTED with dataset ID
+`d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA
+`ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, and
+`ALPACA_ALL_ADJUSTED_PRICE_V1`. D31's exact bundle is ACCEPTED with campaign
+`9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
+`f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, bundle SHA
+`94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
+`NONE_QUALIFIES`, and retained control `BASE_MA35_50_V1` / candidate
+`21158358-75be-5597-b940-5bccdda1429c`. D32 is PARTIAL_PASS: strategy math and
+research binding passed; live data-basis parity is blocked by
+`DATA_BASIS_MISMATCH`.
 
-    HEAD 01adf7f0808970576b263f158d2dd121b216d733
-    TREE bd0fb74dacbd22aa832d991c0876fd14ad478789
-    GitHub 41788777182 / attempt 1 / terminal FAILURE
+## D33 source boundary
 
-Source-static and active tests passed; six FULL lanes passed. Broad-3 failed two
-current `test_core.py` registry/topology expectations, reproduced on unchanged
-source. Admission omitted that module: `PREPUBLICATION_COVERAGE_DEFECT`. The red
-run/commit are never rerun or rewritten. A separately authorized bounded current
-runner/admission/test correction requires new certification and independent review;
-no prototype logic or effect changes. This is preserved historical evidence, not
-the current next step.
+The additive live-prototype source uses Alpaca's completed daily SPY bars with
+adjustment `all`, SIP feed, USD, 1Day, ascending order, and exactly the latest
+60 published completed XNYS sessions. It constructs `CompletedSignalInputs`
+from genuine Alpaca closes and binds the exact response digest, observation,
+and cutoff. The pure BASE_MA35_50 decision helper preserves the D32-proven
+Decimal formula. Robinhood MCP remains broker/account/execution/custody; no
+provider fallback exists.
 
-The bounded registry/admission correction was accepted at:
-
-    HEAD 1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac
-    TREE 87a4eb9e27ee1b5a209eda93ad198f650abbfed3
-    GitHub 41792913721 / attempt 1 / terminal SUCCESS
-
-The frozen-P01 contract correction was independently reviewed and accepted at:
-
-    HEAD 321893183a12862ef86486e7d5c4cfff49a7b4ff
-    TREE 96784106879285736ee412e887319b48f2c64281
-    PARENT 1f2f42bf2ff87cdcd9cce8e8567270af2be5d2ac
-    GitHub 41799106223 / attempt 1 / terminal SUCCESS
-    source-static PASS; active-tests PASS; broad-1 through broad-7 PASS
-
-The implementation/source semantics are accepted, but integration has not
-occurred. Remote `develop` remains the P6 baseline until the accepted feature
-source is integrated. Do not infer provider readiness, host UAT readiness or
-live authority from this source acceptance.
-
-The [prototype contract](architecture/147-live-prototype-current.md) owns the
-frozen interfaces, exact formulas/selection, lifecycle/effect ceiling and launcher.
-The [ledger](validation/arch147-live-prototype.md) owns task status and acceptance
-rows. Luna owns disjoint research/widget files; Sol owns shared composition,
-registry/workflow/coordination docs and publication. All outputs are on F:.
-
-Explicit synthetic launch uses scripts/run_live_prototype.py --synthetic
---state-root <fresh F:\AI\temp subdirectory>. Optional --comparison-report
-<absolute report path> loads bounded evidence on a worker. Help is effect-free.
-Synthetic construction/navigation cannot connect, arm or trade. Start only starts
-a fake worker; Stop/Close confirm all workers terminated, without cancellation
-or liquidation. Research artifact opening leaves the active binding unchanged.
-Real broker controls remain outside the GUI and fail closed here.
+The frozen P6 raw Robinhood 59+1 source, evidence, ownership/kill semantics,
+execution markers, and historical architecture pins are preserved. D33 does
+not relabel or rewrite them. No provider observation has occurred, and source
+publication grants no provider, paper, broker, runtime-binding, campaign,
+production, or live authority.
 
 ## Next milestone and stop conditions
 
-Complete the short independent docs-diff review, then fast-forward `develop`
-exactly to `321893183a12862ef86486e7d5c4cfff49a7b4ff` and push, reusing the
-accepted feature FULL. After that develop run succeeds, fast-forward `develop`
-to the docs-only successor and push, then verify the final remote HEAD/tree and
-cleanliness. Continue afterward to native synthetic host UAT and admitted
-offline-comparison preparation. No paper soak. Do not run a real campaign until
-its existing dataset identity is independently admitted. No new variants,
-provider acquisition or FINAL_HOLDOUT access to manufacture a result.
+After exact-source review, publish one normal atomic commit and one mapped
+`arch147-live-prototype` FULL run. On terminal green and independent source
+acceptance, fast-forward `develop` with certification reuse, then run one fresh
+absolute `F:\AI\temp` D33 read-only observation using the accepted v3 Alpaca
+credential boundary. The operator admits source before credential/provider
+construction, makes at most one request, never calls Robinhood, and writes only
+sanitized evidence. An uncertain or failed provider request is consumed with
+no retry.
 
-Protected official-close preflight remains a separate reviewed operator step
-on the exact accepted integrated P6 source, place=cancel=0. No fifth history-only
-attempt. No live order is authorized by the prototype task. Live readiness is
-blocked until exact input-basis, fractional owned exit, durable cumulative budgets
-and restart/reconciliation requirements have independent accepted evidence.
-Never reset consumed markers or repair ambiguous state through retry.
+That observation can close the current data-basis blocker but cannot authorize
+a live order. Q61 remains NOT RUN; no readiness label is granted. L40-L43
+remain unresolved, including official fractional exit capability, exact owned
+exit semantics, and durable cumulative budget/recovery/capability work. Do not
+insert a paper soak between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
+
+The old P6 protected read-only preflight remains a separate historical/current
+predecessor boundary and is not the D33 signal-data path.

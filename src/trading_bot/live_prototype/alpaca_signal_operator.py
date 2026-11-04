@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import stat
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -22,6 +23,7 @@ from trading_bot.review_paper.alpaca_windows_credentials import (
 
 D33_FEATURE_BRANCH = "feature/robinhood-live-prototype-current"
 D33_SOURCE_ADMISSION_FAILURE = "D33_SOURCE_ADMISSION_BLOCKED"
+D33_CLOCK_INVALID = "D33_CLOCK_INVALID"
 D33_EVIDENCE_SCHEMA = "arch147-d33-alpaca-signal-observation/v1"
 _EXPECTED_ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 _EVIDENCE_PARENT = Path(r"F:\AI\temp")
@@ -81,15 +83,24 @@ def admit_current_source(repo_root: Path | None = None) -> SourceAdmission:
     )
     if origin_feature != state["head"]:
         raise RuntimeError("D33 feature source is not the exact remote source")
-    runner._git_output(root, "merge-base", "--is-ancestor", origin_develop, "HEAD")
+    if origin_develop != state["head"]:
+        raise RuntimeError("D33 source is not exactly integrated into develop")
+    local_tree = runner._git_output(root, "show", "-s", "--format=%T", "HEAD")
+    if local_tree != state["tree"]:
+        raise RuntimeError("D33 local HEAD tree is not clean and exact")
     specs = runner._checkpoint_specs()
     spec = specs[runner.ARCH147_PROTOTYPE_NAME]
-    authority = evaluate_source_authority(
+    feature_authority = evaluate_source_authority(
         root,
         publication_context=PublicationContext.FEATURE,
         checkpoints=(spec,),
     )
-    if authority.failures:
+    prospective_authority = evaluate_source_authority(
+        root,
+        publication_context=PublicationContext.PROSPECTIVE_DEVELOP,
+        checkpoints=(spec,),
+    )
+    if feature_authority.failures or prospective_authority.failures:
         raise RuntimeError("D33 current source authority is unavailable")
     return SourceAdmission(
         branch=str(state["branch"]),
@@ -102,12 +113,12 @@ def admit_current_source(repo_root: Path | None = None) -> SourceAdmission:
 
 def run_d33_read_only_observation(
     *,
-    observation_as_of: datetime,
     evidence_dir: Path | None = None,
     repo_root: Path | None = None,
     source_admitter: Callable[[Path], SourceAdmission] | None = None,
     credential_reader: Callable[[], object] | None = None,
     transport_factory: Callable[[], AlpacaHistoricalBarsTransport] | None = None,
+    clock: Callable[[], datetime] | None = None,
 ) -> D33ObservationResult:
     """Run one source-admitted, one-request, non-broker observation.
 
@@ -128,6 +139,19 @@ def run_d33_read_only_observation(
             "BLOCKED", "D33_EVIDENCE_PATH_INVALID", None, None, None
         )
 
+    try:
+        observation = _clock_observation(_utc_now if clock is None else clock)
+    except Exception:
+        result = D33ObservationResult("BLOCKED", D33_CLOCK_INVALID, None, None, None)
+        evidence_path = _write_evidence(output_dir, result, None)
+        return D33ObservationResult(
+            result.status,
+            result.reason,
+            evidence_path,
+            result.source,
+            result.signal_inputs,
+        )
+
     admit = admit_current_source if source_admitter is None else source_admitter
     try:
         source = admit(root)
@@ -135,7 +159,7 @@ def run_d33_read_only_observation(
         result = D33ObservationResult(
             "BLOCKED", D33_SOURCE_ADMISSION_FAILURE, None, None, None
         )
-        evidence_path = _write_evidence(output_dir, result, observation_as_of)
+        evidence_path = _write_evidence(output_dir, result, observation)
         return D33ObservationResult(
             result.status,
             result.reason,
@@ -152,7 +176,7 @@ def run_d33_read_only_observation(
         ),
         transport_factory=transport_factory,
     )
-    signal_result = service.observe(observation_as_of)
+    signal_result = service.observe(observation)
     result = D33ObservationResult(
         signal_result.status,
         signal_result.reason,
@@ -160,7 +184,7 @@ def run_d33_read_only_observation(
         source,
         signal_result,
     )
-    evidence_path = _write_evidence(output_dir, result, observation_as_of)
+    evidence_path = _write_evidence(output_dir, result, observation)
     return D33ObservationResult(
         result.status,
         result.reason,
@@ -208,7 +232,7 @@ def _has_reparse_point(path: Path) -> bool:
 def _write_evidence(
     output_dir: Path,
     result: D33ObservationResult,
-    observation_as_of: datetime,
+    observation_as_of: datetime | None,
 ) -> Path:
     signal = result.signal_inputs
     body: dict[str, object] = {
@@ -285,12 +309,23 @@ def _write_evidence(
     return path
 
 
-def _safe_timestamp(value: datetime) -> str | None:
+def _safe_timestamp(value: datetime | None) -> str | None:
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         return None
     return (
         value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
     )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _clock_observation(clock: Callable[[], datetime]) -> datetime:
+    value = clock()
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("D33 clock must return an aware datetime")
+    return value.astimezone(UTC)
 
 
 def _decimal_text(value: object) -> str | None:
@@ -301,9 +336,44 @@ def _decimal_text(value: object) -> str | None:
 
 __all__ = [
     "D33ObservationResult",
+    "D33_CLOCK_INVALID",
     "D33_FEATURE_BRANCH",
     "D33_SOURCE_ADMISSION_FAILURE",
     "SourceAdmission",
     "admit_current_source",
+    "main",
     "run_d33_read_only_observation",
 ]
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run one source-owned-clock observation with only an evidence destination."""
+
+    parser = argparse.ArgumentParser(
+        description="Run the Architecture 147 D33 Alpaca read-only observation."
+    )
+    parser.add_argument(
+        "--evidence-dir",
+        type=Path,
+        metavar="PATH",
+        help="fresh absolute external F: evidence directory",
+    )
+    args = parser.parse_args(argv)
+    result = run_d33_read_only_observation(evidence_dir=args.evidence_dir)
+    print(
+        json.dumps(
+            {
+                "status": result.status,
+                "reason": result.reason,
+                "evidence_path": (
+                    None if result.evidence_path is None else str(result.evidence_path)
+                ),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if result.status == "READY" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

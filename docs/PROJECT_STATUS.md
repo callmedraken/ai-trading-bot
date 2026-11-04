@@ -1,6 +1,14 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 147 D33
+## Current milestone - Architecture 147 D33 corrective child
+
+P01 implementation, corrections, and docs closeout are integrated through
+`b7d42863d24958d1ce0fcf9f51eff67397f94240`; `develop` remains at that exact
+source. The first D33 source predecessor
+`2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
+`f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
+`41822221848`, attempt 1, but was rejected by exact-source review. It remains
+immutable terminal-green evidence and was not integrated.
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
@@ -31,10 +39,15 @@ relabeled as Alpaca-based and is not rewritten by D33.
 
 ## Immediate next step
 
-Complete exact-source review of the D33 candidate, then publish exactly one
-atomic feature commit and one mapped `arch147-live-prototype` FULL route. If
-that terminal CI result is green and the source is accepted, fast-forward
-`develop` with certification reuse and perform one fresh, source-admitted,
+The corrective child addresses only protected admission requiring exact
+feature/develop identity, source-owned current clock, same-day completed-session
+cutoff semantics, invalid-clock sanitization, focused tests, and coordination
+truth. Complete exact-source review, then publish exactly one child commit and
+one mapped `arch147-live-prototype` FULL route. Develop remains at the P01
+source until the child is independently accepted.
+
+After acceptance, fast-forward `develop` exactly to the child with
+certification reuse, verify identities, and perform one fresh source-admitted
 read-only D33 observation. That observation will make one Alpaca request only,
 will never call Robinhood, and will not authorize an order.
 

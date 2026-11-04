@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, localcontext
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import parse_qsl, urlsplit
 from uuid import uuid4
 
 import pytest
 
 from trading_bot.live_prototype import alpaca_signal_inputs as subject
+from trading_bot.live_prototype import alpaca_signal_operator as operator
 from trading_bot.live_prototype.alpaca_signal_operator import (
     SourceAdmission,
     run_d33_read_only_observation,
@@ -229,6 +232,47 @@ def test_service_constructs_no_credentials_or_provider_and_binds_digest() -> Non
 
 
 @pytest.mark.parametrize(
+    "observation",
+    (
+        datetime(2026, 11, 3, 20, 59, 59, tzinfo=UTC),
+        datetime(2026, 11, 3, 21, tzinfo=UTC),
+        datetime(2026, 11, 3, 23, tzinfo=UTC),
+        datetime(2026, 11, 4, 5, tzinfo=UTC),
+        datetime(2026, 11, 2, 21, tzinfo=UTC),
+        datetime(2026, 11, 27, 18, tzinfo=UTC),
+        datetime(2026, 11, 28, 5, tzinfo=UTC),
+    ),
+)
+def test_service_accepts_exact_published_close_and_post_close_sessions(
+    observation: datetime,
+) -> None:
+    selected = _selected(observation)
+    service, _ = _service(_response(_body(selected)))
+    result = service.observe(observation)
+    assert result.status == "READY"
+    assert result.inputs is not None
+    assert result.inputs.sessions == selected
+    assert result.inputs.as_of == observation
+    assert result.inputs.cutoff <= observation
+    if observation == datetime(2026, 11, 3, 20, 59, 59, tzinfo=UTC):
+        assert selected[-1] == date(2026, 11, 2)
+    if observation == datetime(2026, 11, 27, 18, tzinfo=UTC):
+        assert selected[-1] == date(2026, 11, 27)
+        assert result.inputs.cutoff == observation
+
+
+def test_invalid_service_observation_is_sanitized_without_effects() -> None:
+    service, transport = _service(_response(_body(_selected())))
+    result = service.observe("not-a-datetime")  # type: ignore[arg-type]
+    assert result.status == "BLOCKED"
+    assert result.reason == subject.SignalInputFailureReason.OBSERVATION_INVALID
+    assert result.observation_as_of == datetime(1970, 1, 1, tzinfo=UTC)
+    assert result.credential_read_count == 0
+    assert result.provider_call_count == 0
+    assert transport.calls == []
+
+
+@pytest.mark.parametrize(
     "mutation",
     (
         lambda body, sessions: b"{",
@@ -361,14 +405,14 @@ def test_operator_admission_precedes_provider_and_sanitizes_evidence() -> None:
     transport = _Transport(_response(_body(_selected())))
     try:
         result = run_d33_read_only_observation(
-            observation_as_of=OBSERVATION,
             evidence_dir=evidence,
             source_admitter=lambda root: (events.append("source"), _source())[1],
             credential_reader=lambda: (events.append("credentials"), _Scope(events))[1],
             transport_factory=lambda: (events.append("transport"), transport)[1],
+            clock=lambda: OBSERVATION,
         )
         assert result.status == "READY"
-        assert events[:3] == ["source", "credentials", "transport"]
+        assert events[:4] == ["source", "credentials", "enter", "transport"]
         assert result.evidence_path is not None
         evidence_body = result.evidence_path.read_text(encoding="utf-8")
         assert "key" not in evidence_body
@@ -377,6 +421,13 @@ def test_operator_admission_precedes_provider_and_sanitizes_evidence() -> None:
         assert "response_body_sha256" in evidence_body
         assert "campaign_runs" in evidence_body
         assert "final_holdout_accesses" in evidence_body
+        evidence_json = json.loads(evidence_body)
+        assert evidence_json["observation_as_of"] == "2026-11-04T15:00:00.000000Z"
+        assert result.signal_inputs is not None
+        assert result.signal_inputs.inputs is not None
+        assert result.signal_inputs.inputs.as_of == datetime(
+            2026, 11, 4, 15, tzinfo=UTC
+        )
         assert len(transport.calls) == 1
     finally:
         if evidence.exists():
@@ -392,7 +443,6 @@ def test_operator_source_failure_prevents_credential_and_transport_construction(
     evidence = _fresh_operator_evidence()
     try:
         result = run_d33_read_only_observation(
-            observation_as_of=OBSERVATION,
             evidence_dir=evidence,
             source_admitter=lambda root: (_ for _ in ()).throw(
                 RuntimeError("source detail")
@@ -402,6 +452,7 @@ def test_operator_source_failure_prevents_credential_and_transport_construction(
                 events.append("transport"),
                 _Transport(RuntimeError("provider")),
             )[1],
+            clock=lambda: OBSERVATION,
         )
         assert result.status == "BLOCKED"
         assert result.reason == "D33_SOURCE_ADMISSION_BLOCKED"
@@ -412,3 +463,133 @@ def test_operator_source_failure_prevents_credential_and_transport_construction(
             for child in evidence.iterdir():
                 child.unlink()
             evidence.rmdir()
+
+
+def _make_test_evidence(path: Path) -> Path:
+    path.mkdir()
+    return path
+
+
+def _patch_source_topology(monkeypatch, *, develop: str) -> None:  # type: ignore[no-untyped-def]
+    import scripts.checkpoint_runner as runner
+    import scripts.current_source_authority as authority
+
+    candidate = "a" * 40
+    tree = "b" * 40
+
+    def state(root):  # type: ignore[no-untyped-def]
+        return {
+            "branch": operator.D33_FEATURE_BRANCH,
+            "porcelain": "",
+            "head": candidate,
+            "tree": tree,
+        }
+
+    def output(root, *args: str) -> str:  # type: ignore[no-untyped-def]
+        if args == ("remote", "get-url", "origin"):
+            return "https://github.com/callmedraken/ai-trading-bot.git"
+        if args == ("rev-parse", "origin/develop"):
+            return develop
+        if args == ("rev-parse", f"origin/{operator.D33_FEATURE_BRANCH}"):
+            return candidate
+        if args == ("show", "-s", "--format=%T", "HEAD"):
+            return tree
+        raise AssertionError(args)
+
+    monkeypatch.setattr(runner, "_git_state", state)
+    monkeypatch.setattr(runner, "_git_output", output)
+    monkeypatch.setattr(
+        authority,
+        "evaluate_source_authority",
+        lambda *args, **kwargs: SimpleNamespace(failures=()),
+    )
+
+
+def test_feature_only_topology_blocks_before_credential_or_provider(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(operator, "_fresh_evidence_dir", _make_test_evidence)
+    _patch_source_topology(monkeypatch, develop="c" * 40)
+    evidence = tmp_path / "preintegration"
+    events: list[str] = []
+    result = run_d33_read_only_observation(
+        evidence_dir=evidence,
+        repo_root=Path(__file__).resolve().parents[2],
+        source_admitter=operator.admit_current_source,
+        credential_reader=lambda: (events.append("credentials"), _Scope(events))[1],
+        transport_factory=lambda: (
+            events.append("transport"),
+            _Transport(RuntimeError("must not call")),
+        )[1],
+        clock=lambda: OBSERVATION,
+    )
+    assert result.status == "BLOCKED"
+    assert result.reason == operator.D33_SOURCE_ADMISSION_FAILURE
+    assert events == []
+
+
+def test_integrated_topology_reaches_injected_credential_and_provider(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(operator, "_fresh_evidence_dir", _make_test_evidence)
+    _patch_source_topology(monkeypatch, develop="a" * 40)
+    evidence = tmp_path / "integrated"
+    events: list[str] = []
+    transport = _Transport(_response(_body(_selected())))
+    result = run_d33_read_only_observation(
+        evidence_dir=evidence,
+        repo_root=Path(__file__).resolve().parents[2],
+        source_admitter=operator.admit_current_source,
+        credential_reader=lambda: (events.append("credentials"), _Scope(events))[1],
+        transport_factory=lambda: (events.append("transport"), transport)[1],
+        clock=lambda: OBSERVATION,
+    )
+    assert result.status == "READY"
+    assert events[:3] == ["credentials", "enter", "transport"]
+    assert len(transport.calls) == 1
+
+
+def test_operator_uses_source_owned_clock_and_invalid_clock_is_sanitized(
+    monkeypatch, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(operator, "_fresh_evidence_dir", _make_test_evidence)
+    assert (
+        "observation_as_of"
+        not in inspect.signature(operator.run_d33_read_only_observation).parameters
+    )
+    events: list[str] = []
+    evidence = tmp_path / "invalid-clock"
+    result = run_d33_read_only_observation(
+        evidence_dir=evidence,
+        source_admitter=lambda root: (events.append("source"), _source())[1],
+        credential_reader=lambda: (events.append("credentials"), _Scope(events))[1],
+        transport_factory=lambda: (
+            events.append("transport"),
+            _Transport(RuntimeError()),
+        )[1],
+        clock=lambda: datetime(2026, 1, 1),
+    )
+    assert result.status == "BLOCKED"
+    assert result.reason == operator.D33_CLOCK_INVALID
+    assert events == []
+    assert result.evidence_path is not None
+    assert (
+        json.loads(result.evidence_path.read_text(encoding="utf-8"))[
+            "observation_as_of"
+        ]
+        is None
+    )
+
+
+def test_operator_help_is_effect_free(monkeypatch, capsys) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        operator,
+        "run_d33_read_only_observation",
+        lambda **kwargs: pytest.fail("help invoked observation"),
+    )
+    with pytest.raises(SystemExit) as error:
+        operator.main(["--help"])
+    assert error.value.code == 0
+    help_text = capsys.readouterr().out
+    assert "--evidence-dir" in help_text
+    assert "--observation-as-of" not in help_text

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -117,9 +117,13 @@ class CompletedSignalInputs:
             or self.as_of.utcoffset() != timedelta(0)
             or self.cutoff.utcoffset() != timedelta(0)
             or self.cutoff > self.as_of
-            or self.sessions[-1] >= self.cutoff.date()
+            or self.sessions[-1] > self.cutoff.date()
+            or (
+                self.sessions[-1] == self.cutoff.date()
+                and self.cutoff.time() == time.min
+            )
         ):
-            raise ValueError("completed inputs require an explicit later cutoff")
+            raise ValueError("completed inputs require an explicit completion cutoff")
 
     @property
     def digest(self) -> str:

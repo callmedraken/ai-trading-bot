@@ -10,9 +10,16 @@ Parent source HEAD: `b7d42863d24958d1ce0fcf9f51eff67397f94240`
 
 Parent source tree: `31f2d5016f27b08c6f475c36b655523cd888726c`
 
-The feature is based exactly on remote `develop`, with a clean candidate
-worktree and no unpublished divergence at handoff. The current checkpoint is
-Architecture 147 D33, source-only and pending exact-source review/publication.
+P01 implementation, corrections, and docs closeout are integrated through the
+parent `develop` source above. D33 predecessor
+`2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
+`f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
+`41822221848`, attempt 1, but was rejected by ChatGPT exact-source review before
+integration. It is preserved immutable terminal-green evidence.
+
+The current checkpoint is one corrective child of that predecessor. Its
+worktree is clean before editing, and `develop` remains at the parent
+`b7d42863d24958d1ce0fcf9f51eff67397f94240` pending child acceptance.
 
 D30 is ACCEPTED with dataset ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA
@@ -44,14 +51,20 @@ production, or live authority.
 
 ## Next milestone and stop conditions
 
-After exact-source review, publish one normal atomic commit and one mapped
-`arch147-live-prototype` FULL run. On terminal green and independent source
-acceptance, fast-forward `develop` with certification reuse, then run one fresh
-absolute `F:\AI\temp` D33 read-only observation using the accepted v3 Alpaca
-credential boundary. The operator admits source before credential/provider
-construction, makes at most one request, never calls Robinhood, and writes only
-sanitized evidence. An uncertain or failed provider request is consumed with
-no retry.
+The child addresses only exact integration-required source admission,
+source-owned current clock, completed-session cutoff semantics,
+invalid-clock sanitization, tests, and documentation. After exact-source
+review, publish one normal atomic child commit and one mapped
+`arch147-live-prototype` FULL run. Do not integrate the child until independent
+acceptance. Develop remains at the parent while this review is pending.
+
+After acceptance, fast-forward `develop` exactly to the child with certification
+reuse, verify local/remote identities, then run one fresh absolute
+`F:\AI\temp` D33 read-only observation using the accepted v3 Alpaca credential
+boundary. The operator admits exact feature/develop identity before
+credential/provider construction, uses its current UTC clock, makes at most
+one request, never calls Robinhood, and writes only sanitized evidence. An
+uncertain or failed provider request is consumed with no retry.
 
 That observation can close the current data-basis blocker but cannot authorize
 a live order. Q61 remains NOT RUN; no readiness label is granted. L40-L43

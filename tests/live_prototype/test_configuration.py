@@ -46,6 +46,13 @@ def test_completed_input_identity_is_ambient_independent_and_basis_bound():
         with pytest.raises(ValueError):
             replace(original, **updates)
 
+    same_date_completion = replace(
+        original,
+        as_of=datetime(2026, 1, 2, 16, tzinfo=UTC),
+        cutoff=datetime(2026, 1, 2, 16, tzinfo=UTC),
+    )
+    assert same_date_completion.cutoff == same_date_completion.as_of
+
 
 def test_research_binding_and_configuration_never_promote_live():
     assert ResearchCampaignSpec().comparison_configurations == 3

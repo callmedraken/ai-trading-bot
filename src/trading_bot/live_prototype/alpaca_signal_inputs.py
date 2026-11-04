@@ -68,6 +68,7 @@ RESEARCH_CONTROL_CANDIDATE_ID = "21158358-75be-5597-b940-5bccdda1429c"
 
 _NEW_YORK = ZoneInfo("America/New_York")
 _ARITHMETIC_CONTEXT = Context(prec=50)
+_SANITIZED_OBSERVATION = datetime(1970, 1, 1, tzinfo=UTC)
 _PUBLIC_HEADERS = (
     ("Accept", "application/json"),
     ("Accept-Encoding", "identity"),
@@ -347,7 +348,7 @@ class AlpacaSignalInputService:
         except (TypeError, ValueError):
             return _blocked(
                 SignalInputFailureReason.OBSERVATION_INVALID,
-                observation_as_of,
+                _SANITIZED_OBSERVATION,
                 (),
                 None,
                 credential_reads=0,
@@ -432,7 +433,12 @@ class AlpacaSignalInputService:
             )
 
         try:
-            inputs = _inputs_from_response(response, selected, observation)
+            inputs = _inputs_from_response(
+                response,
+                selected,
+                observation,
+                session_authority=self._session_authority,
+            )
             fast, slow = moving_averages_35_50(inputs)
             flat = decide_35_50(inputs, invested=False)
             invested = decide_35_50(inputs, invested=True)
@@ -480,6 +486,8 @@ def _inputs_from_response(
     response: AlpacaHttpResponse,
     selected_sessions: tuple[date, ...],
     observation: datetime,
+    *,
+    session_authority: _PublishedSessionAuthority | None,
 ) -> CompletedSignalInputs:
     candidates, pagination_complete = parse_alpaca_historical_bars_response(
         response.body
@@ -507,9 +515,9 @@ def _inputs_from_response(
 
     if tuple(sessions) != selected_sessions:
         raise ValueError("D33 response sessions do not match selected sessions")
-    cutoff = datetime.combine(
-        selected_sessions[-1] + timedelta(days=1), time.min, tzinfo=_NEW_YORK
-    ).astimezone(UTC)
+    cutoff = _completion_cutoff(
+        selected_sessions[-1], observation, authority=session_authority
+    )
     try:
         return CompletedSignalInputs(
             symbol=SIGNAL_SYMBOL,
@@ -523,6 +531,34 @@ def _inputs_from_response(
         )
     except ValueError as error:
         raise ValueError("D33 completed signal inputs are not admissible") from error
+
+
+def _completion_cutoff(
+    session_date: date,
+    observation: datetime,
+    *,
+    authority: _PublishedSessionAuthority | None,
+) -> datetime:
+    session_authority = (
+        NYSEPublishedRegularSessionAuthority() if authority is None else authority
+    )
+    try:
+        schedule = session_authority.schedule_for(session_date)
+    except (TypeError, ValueError, UnsupportedNYSEPublishedSessionYearError):
+        raise ValueError("D33 final session has no published close") from None
+    closes_at = getattr(schedule, "closes_at", None)
+    if (
+        schedule is None
+        or getattr(schedule, "session_date", None) != session_date
+        or type(closes_at) is not datetime
+        or closes_at.tzinfo is None
+        or closes_at.utcoffset() is None
+    ):
+        raise ValueError("D33 final session has an invalid published close")
+    cutoff = closes_at.astimezone(UTC)
+    if observation < cutoff:
+        raise ValueError("D33 final session is not complete")
+    return cutoff
 
 
 def _require_signal_inputs(inputs: CompletedSignalInputs) -> None:

@@ -44,6 +44,24 @@ unresolved for official fractional exit capability, exact owned-position exit
 semantics, and durable budget/recovery/capability work. No paper soak is
 inserted between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
 
+P01 implementation, corrections, and docs closeout are integrated through
+`b7d42863d24958d1ce0fcf9f51eff67397f94240`. The published D33 predecessor
+`2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
+`f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
+`41822221848`, attempt 1, but exact-source review rejected it before
+integration. The current child is limited to exact integration-required source
+admission, source-owned current clock, completed-session cutoff semantics,
+invalid-clock sanitization, tests, and documentation. Develop remains at the
+parent until this child is accepted.
+
+The protected operator has no caller-selected observation timestamp. Its
+production path obtains one UTC timestamp from its source-owned clock, uses
+that same value for session selection, request construction, evidence, and
+`CompletedSignalInputs.as_of`, and requires the exact final published regular
+close as the completion cutoff. The operator is blocked until origin feature,
+origin develop, local HEAD/tree, FEATURE authority, and PROSPECTIVE_DEVELOP
+authority all identify the same integrated source.
+
 ## Source and acceptance boundary
 
 Baseline: P6 04e02042f0bd34b2fb7c603b4dfb1b68c23cf57f, tree

@@ -16,6 +16,15 @@ attempt 1, both succeeded; develop reused exact feature certification. This
 worktree was clean at the exact parent before editing. D33 is now a consumed
 predecessor incident, not an available observation boundary.
 
+The preserved D34 predecessor is
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree
+`a8d2b4fb4a40039b74768b44fd0198dc87bc55f3`. Its mapped run `41950572892`,
+attempt 1, was terminal SUCCESS, but exact-source review rejected it before
+develop integration because blocked-result attempt counts were not bound to
+their failure phase and the operator fallback could write false `0/0`
+credential/provider counts after an escaped failure. No D34 real observation
+occurred; the candidate remains immutable evidence.
+
 D30 is ACCEPTED with dataset ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA
 `ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, and
@@ -44,9 +53,10 @@ cause. D33's exact request target is preserved in the validation ledger.
 
 ## D34 next milestone and stop conditions
 
-The additive D34 source derives one exact published regular close after
-selecting the 60 completed XNYS sessions and before credential/provider
-construction. That same cutoff is used for the request and
+The corrective D34 child changes only attempt-accounting/evidence truthfulness
+and focused tests/docs. The additive D34 source derives one exact published
+regular close after selecting the 60 completed XNYS sessions and before
+credential/provider construction. That same cutoff is used for the request and
 `CompletedSignalInputs`; it never uses next midnight, end-of-calendar-day,
 observation-as-substitute, silent subtraction, provider fallback, or a changed
 session set. D34's separately named entry point is
@@ -61,13 +71,13 @@ provider operation, credential read, network, Robinhood, broker, order,
 runtime-binding, campaign, paper, live, or FINAL_HOLDOUT effect. A future D34
 observation is separately reviewed and remains one-attempt/no-retry.
 
-After exact-source review, publish one normal atomic commit and one mapped
-`arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this source
-checkpoint. Only after acceptance and exact integration may the separately
-labeled D34 observation be considered. It may close the D32 data-basis blocker
-but cannot authorize a live order. Q61 remains NOT RUN; no readiness label is
-granted. L40-L43 remain pending. Do not insert a paper soak. FINAL_HOLDOUT
-remains sealed.
+After exact-source review, publish one normal corrective child commit and one
+mapped `arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this
+source checkpoint. Only after acceptance and exact integration may the
+separately labeled D34 observation be considered. It may close the D32
+data-basis blocker but cannot authorize a live order. Q61 remains NOT RUN; no
+readiness label is granted. L40-L43 remain pending. Do not insert a paper soak.
+FINAL_HOLDOUT remains sealed.
 
 The old P6 protected read-only preflight remains a separate historical/current
 predecessor boundary and is not the D33 signal-data path.

@@ -102,6 +102,23 @@ class D34SignalInputFailureReason(StrEnum):
     OBSERVATION_CONSUMED = "D34_OBSERVATION_CONSUMED"
 
 
+_PRE_CREDENTIAL_REASONS = frozenset(
+    {
+        D34SignalInputFailureReason.OBSERVATION_INVALID,
+        D34SignalInputFailureReason.SESSION_AUTHORITY_UNAVAILABLE,
+        D34SignalInputFailureReason.OBSERVATION_CONSUMED,
+    }
+)
+_PROVIDER_FAILURE_KINDS = {
+    D34SignalInputFailureReason.TRANSPORT_FAILED: D34FailureKind.TRANSPORT_FAILED,
+    D34SignalInputFailureReason.HTTP_FAILED: D34FailureKind.HTTP_FAILED,
+    D34SignalInputFailureReason.RESPONSE_INVALID: D34FailureKind.RESPONSE_INVALID,
+    D34SignalInputFailureReason.RESPONSE_SESSION_MISMATCH: (
+        D34FailureKind.RESPONSE_SESSION_MISMATCH
+    ),
+}
+
+
 class _PublishedSessionAuthority(Protocol):
     def schedule_for(self, session_date: date) -> object | None: ...
 
@@ -156,6 +173,59 @@ class D34SignalInputResult:
             1,
         ):
             raise ValueError("D34 attempt counts are bounded")
+        if self.status == "READY":
+            if self.reason != D34_SIGNAL_READY:
+                raise ValueError("ready D34 result has an invalid reason")
+        else:
+            try:
+                failure_reason = D34SignalInputFailureReason(self.reason)
+            except (TypeError, ValueError):
+                raise ValueError("blocked D34 reason is not closed") from None
+            if failure_reason in _PRE_CREDENTIAL_REASONS:
+                if (
+                    self.request is not None
+                    or self.credential_read_count != 0
+                    or self.provider_call_count != 0
+                    or self.failure_kind is not D34FailureKind.INTERNAL_FAILED
+                ):
+                    raise ValueError(
+                        "pre-credential D34 result has invalid attempt phase"
+                    )
+            elif failure_reason is D34SignalInputFailureReason.CREDENTIALS_UNAVAILABLE:
+                if (
+                    self.request is None
+                    or self.credential_read_count != 1
+                    or self.provider_call_count != 0
+                    or self.failure_kind is not D34FailureKind.CREDENTIALS_UNAVAILABLE
+                ):
+                    raise ValueError("credential failure has invalid attempt phase")
+            elif failure_reason in _PROVIDER_FAILURE_KINDS:
+                if (
+                    self.request is None
+                    or self.credential_read_count != 1
+                    or self.provider_call_count != 1
+                    or self.failure_kind is not _PROVIDER_FAILURE_KINDS[failure_reason]
+                ):
+                    raise ValueError(
+                        "provider-entered D34 failure has invalid attempt phase"
+                    )
+            elif failure_reason is D34SignalInputFailureReason.INTERNAL_FAILED:
+                if self.failure_kind is not D34FailureKind.INTERNAL_FAILED:
+                    raise ValueError("internal D34 failure has an invalid failure kind")
+                if self.request is None:
+                    if self.credential_read_count != 0 or self.provider_call_count != 0:
+                        raise ValueError(
+                            "pre-credential internal failure has invalid counts"
+                        )
+                elif (
+                    self.credential_read_count != 1
+                    or self.provider_call_count
+                    not in (
+                        0,
+                        1,
+                    )
+                ):
+                    raise ValueError("internal D34 failure has invalid attempt phase")
         if self.response_body_sha256 is not None and (
             type(self.response_body_sha256) is not str
             or _SHA256_PATTERN.fullmatch(self.response_body_sha256) is None

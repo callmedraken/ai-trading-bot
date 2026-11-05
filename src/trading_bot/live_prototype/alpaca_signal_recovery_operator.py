@@ -175,21 +175,7 @@ def run_d34_read_only_observation(
         ),
         transport_factory=transport_factory,
     )
-    try:
-        signal_result = service.observe(observation)
-    except Exception:
-        signal_result = None
-        result = D34ObservationResult(
-            "BLOCKED", "D34_INTERNAL_FAILED", None, source, signal_result
-        )
-        evidence_path = _write_evidence(output_dir, result, observation)
-        return D34ObservationResult(
-            result.status,
-            result.reason,
-            evidence_path,
-            result.source,
-            result.signal_inputs,
-        )
+    signal_result = service.observe(observation)
     result = D34ObservationResult(
         signal_result.status,
         signal_result.reason,

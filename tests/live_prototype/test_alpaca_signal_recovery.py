@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import inspect
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from types import SimpleNamespace
@@ -96,6 +97,33 @@ class _Scope:
     def use(self, consumer):  # type: ignore[no-untyped-def]
         self.calls.append("use")
         return consumer("key", "secret")
+
+
+class _EnterFailureScope:
+    def __enter__(self):  # type: ignore[no-untyped-def]
+        raise RuntimeError("scope enter failure")
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def use(self, consumer):  # type: ignore[no-untyped-def]
+        raise AssertionError("scope use must not run")
+
+
+class _UseFailureScope:
+    def __enter__(self):  # type: ignore[no-untyped-def]
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def use(self, consumer):  # type: ignore[no-untyped-def]
+        raise RuntimeError("scope use failure")
+
+
+class _CleanupFailureScope(_Scope):
+    def __exit__(self, *args: object) -> None:
+        raise RuntimeError("scope cleanup failure")
 
 
 class _Transport:
@@ -238,6 +266,39 @@ def test_no_request_when_cutoff_authority_fails_before_credentials() -> None:
     assert transport.calls == []
 
 
+def test_result_rejects_impossible_attempt_phase_counts() -> None:
+    http = _service(AlpacaHttpStatusError(403))[0].observe(OBSERVATION)
+    transport = _service(AlpacaTransportError(AlpacaTransportFailureStage.REQUEST))[
+        0
+    ].observe(OBSERVATION)
+    response_invalid = _service(object())[0].observe(OBSERVATION)
+
+    def fail_credentials():  # type: ignore[no-untyped-def]
+        raise RuntimeError("credential construction failure")
+
+    credentials = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=fail_credentials
+    ).observe(OBSERVATION)
+    pre_credential = subject.AlpacaSignalRecoveryInputService().observe(object())
+    ready = _service(_response(_body(_selected())))[0].observe(OBSERVATION)
+
+    invalid_cases = [
+        (http, {"provider_call_count": 0}),
+        (transport, {"credential_read_count": 0}),
+        (response_invalid, {"provider_call_count": 0}),
+        (credentials, {"provider_call_count": 1}),
+        (
+            pre_credential,
+            {"credential_read_count": 1, "provider_call_count": 1},
+        ),
+        (ready, {"credential_read_count": 0}),
+        (ready, {"provider_call_count": 0}),
+    ]
+    for result, changes in invalid_cases:
+        with pytest.raises(ValueError):
+            replace(result, **changes)
+
+
 @pytest.mark.parametrize(
     "error",
     [
@@ -258,6 +319,62 @@ def test_transport_failures_preserve_only_closed_stage(error: Exception) -> None
     assert result.provider_code is None
     assert result.credential_read_count == 1
     assert result.provider_call_count == 1
+
+
+def test_credential_reader_failure_preserves_one_read_and_no_provider_call() -> None:
+    def fail_credentials():  # type: ignore[no-untyped-def]
+        raise RuntimeError("SECRET_PROVIDER_TEXT")
+
+    result = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=fail_credentials
+    ).observe(OBSERVATION)
+
+    assert result.reason == "D34_CREDENTIALS_UNAVAILABLE"
+    assert result.failure_kind is subject.D34FailureKind.CREDENTIALS_UNAVAILABLE
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 0
+    assert "SECRET_PROVIDER_TEXT" not in repr(result)
+
+
+def test_credential_scope_enter_failure_preserves_one_read_and_no_provider_call() -> (
+    None
+):
+    result = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=lambda: _EnterFailureScope()
+    ).observe(OBSERVATION)
+
+    assert result.reason == "D34_INTERNAL_FAILED"
+    assert result.failure_kind is subject.D34FailureKind.INTERNAL_FAILED
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 0
+
+
+def test_transport_factory_failure_preserves_one_read_and_no_provider_call() -> None:
+    def fail_transport():  # type: ignore[no-untyped-def]
+        raise RuntimeError("transport construction failure")
+
+    result = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=lambda: _Scope([]), transport_factory=fail_transport
+    ).observe(OBSERVATION)
+
+    assert result.reason == "D34_INTERNAL_FAILED"
+    assert result.failure_kind is subject.D34FailureKind.INTERNAL_FAILED
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 0
+
+
+def test_scope_use_failure_preserves_pre_provider_counts() -> None:
+    transport = _Transport(_response(_body(_selected())))
+    result = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=lambda: _UseFailureScope(),
+        transport_factory=lambda: transport,
+    ).observe(OBSERVATION)
+
+    assert result.reason == "D34_INTERNAL_FAILED"
+    assert result.failure_kind is subject.D34FailureKind.INTERNAL_FAILED
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 0
+    assert transport.calls == []
 
 
 @pytest.mark.parametrize("reason", list(AlpacaResponseMetadataFailureReason))
@@ -289,6 +406,8 @@ def test_http_failure_status_code_and_request_id_are_sanitized() -> None:
     result = service.observe(OBSERVATION)
 
     assert result.failure_kind is subject.D34FailureKind.HTTP_FAILED
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 1
     assert result.http_status == 403
     assert result.provider_code == 42210000
     assert (
@@ -326,7 +445,29 @@ def test_unexpected_provider_exception_is_fixed_internal_failure() -> None:
     result = service.observe(OBSERVATION)
     assert result.failure_kind is subject.D34FailureKind.INTERNAL_FAILED
     assert result.reason == "D34_INTERNAL_FAILED"
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 1
     assert "SECRET_PROVIDER_TEXT" not in repr(result)
+
+
+def test_scope_cleanup_failure_preserves_attempt_and_consumes_no_retry() -> None:
+    transport = _Transport(_response(_body(_selected())))
+    service = subject.AlpacaSignalRecoveryInputService(
+        credential_reader=lambda: _CleanupFailureScope([]),
+        transport_factory=lambda: transport,
+    )
+
+    result = service.observe(OBSERVATION)
+    retry = service.observe(OBSERVATION)
+
+    assert result.reason == "D34_INTERNAL_FAILED"
+    assert result.failure_kind is subject.D34FailureKind.INTERNAL_FAILED
+    assert result.credential_read_count == 1
+    assert result.provider_call_count == 1
+    assert retry.reason == "D34_OBSERVATION_CONSUMED"
+    assert retry.credential_read_count == 0
+    assert retry.provider_call_count == 0
+    assert len(transport.calls) == 1
 
 
 def test_response_invalid_and_session_mismatch_are_distinct() -> None:
@@ -335,11 +476,15 @@ def test_response_invalid_and_session_mismatch_are_distinct() -> None:
     service, _, _ = _service(malformed)
     invalid = service.observe(OBSERVATION)
     assert invalid.failure_kind is subject.D34FailureKind.RESPONSE_INVALID
+    assert invalid.credential_read_count == 1
+    assert invalid.provider_call_count == 1
 
     mismatch_sessions = (*sessions[:-1], date(2026, 11, 5))
     service, _, _ = _service(_response(_body(mismatch_sessions)))
     mismatch = service.observe(OBSERVATION)
     assert mismatch.failure_kind is subject.D34FailureKind.RESPONSE_SESSION_MISMATCH
+    assert mismatch.credential_read_count == 1
+    assert mismatch.provider_call_count == 1
 
 
 def test_d34_result_rejects_inconsistent_diagnostic_combinations() -> None:
@@ -467,6 +612,13 @@ def test_d34_admission_precedes_credentials_provider_and_writes_provenance(
     assert evidence_json["predecessor_evidence_byte_count"] == 1999
     assert evidence_json["failure_kind"] is None
     assert (
+        evidence_json["credential_read_count"]
+        == result.signal_inputs.credential_read_count
+    )
+    assert (
+        evidence_json["provider_call_count"] == result.signal_inputs.provider_call_count
+    )
+    assert (
         evidence_json["request_id_digest"]
         == hashlib.sha256(b"d34-test-request").hexdigest()
     )
@@ -498,10 +650,14 @@ def test_d34_provider_failure_evidence_is_sanitized(
     assert result.status == "BLOCKED"
     assert result.signal_inputs is not None
     assert result.signal_inputs.failure_kind is subject.D34FailureKind.HTTP_FAILED
+    assert result.signal_inputs.credential_read_count == 1
+    assert result.signal_inputs.provider_call_count == 1
     assert result.evidence_path is not None
     evidence_text = result.evidence_path.read_text(encoding="utf-8")
     evidence_json = json.loads(evidence_text)
     assert evidence_json["failure_kind"] == "HTTP_FAILED"
+    assert evidence_json["credential_read_count"] == 1
+    assert evidence_json["provider_call_count"] == 1
     assert evidence_json["http_status"] == 422
     assert evidence_json["provider_code"] == 42210000
     assert (
@@ -509,6 +665,71 @@ def test_d34_provider_failure_evidence_is_sanitized(
         == hashlib.sha256(b"SECRET_PROVIDER_TEXT").hexdigest()
     )
     assert "SECRET_PROVIDER_TEXT" not in evidence_text
+
+
+def test_d34_operator_evidence_preserves_credential_failure_counts(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        operator,
+        "_fresh_evidence_dir",
+        lambda candidate: (candidate.mkdir(), candidate)[1],
+    )
+
+    def fail_credentials():  # type: ignore[no-untyped-def]
+        raise RuntimeError("SECRET_PROVIDER_TEXT")
+
+    evidence = tmp_path / "d34-credentials"
+    result = operator.run_d34_read_only_observation(
+        evidence_dir=evidence,
+        source_admitter=lambda root: _source(),
+        credential_reader=fail_credentials,
+        transport_factory=lambda: pytest.fail("transport must not be constructed"),
+        clock=lambda: OBSERVATION,
+    )
+
+    assert result.status == "BLOCKED"
+    assert result.signal_inputs is not None
+    assert result.signal_inputs.credential_read_count == 1
+    assert result.signal_inputs.provider_call_count == 0
+    assert result.evidence_path is not None
+    evidence_json = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+    assert evidence_json["credential_read_count"] == 1
+    assert evidence_json["provider_call_count"] == 0
+    assert "SECRET_PROVIDER_TEXT" not in result.evidence_path.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_d34_operator_does_not_write_false_zero_evidence_on_escaped_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        operator,
+        "_fresh_evidence_dir",
+        lambda candidate: (candidate.mkdir(), candidate)[1],
+    )
+
+    class ExplodingService:
+        def __init__(self, **kwargs: object) -> None:
+            pass
+
+        def observe(self, observation: datetime) -> object:
+            raise RuntimeError("SECRET_PROVIDER_TEXT")
+
+    monkeypatch.setattr(operator, "AlpacaSignalRecoveryInputService", ExplodingService)
+    evidence = tmp_path / "d34-escaped"
+
+    with pytest.raises(RuntimeError):
+        operator.run_d34_read_only_observation(
+            evidence_dir=evidence,
+            source_admitter=lambda root: _source(),
+            credential_reader=lambda: _Scope([]),
+            transport_factory=lambda: pytest.fail("transport must not be constructed"),
+            clock=lambda: OBSERVATION,
+        )
+
+    assert not (evidence / "evidence.json").exists()
 
 
 def _patch_source_topology(

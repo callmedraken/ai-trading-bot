@@ -37,21 +37,31 @@ rejection subtype is unavailable. Its request end exceeded observation through
 end-of-calendar-day semantics; that is a source defect, not a proven provider
 rejection cause.
 
+The first D34 publication is preserved at
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree
+`a8d2b4fb4a40039b74768b44fd0198dc87bc55f3`; mapped run `41950572892`, attempt
+1, was terminal SUCCESS, but exact-source review rejected it before develop
+integration. The review found incomplete blocked-result attempt-count
+invariants and an operator-level escaped-failure fallback that could fabricate
+zero credential/provider counts. No D34 real provider observation occurred.
+
 ## Immediate next step
 
-D34 is an additive source-only recovery successor. It derives the exact
-published regular close once before credential/provider construction and uses
+The D34 corrective child is source-only and changes only attempt-accounting and
+evidence truthfulness plus focused tests/docs. The preserved implementation
+still derives the exact published regular close once before credential/provider
+construction and uses
 that same cutoff in the request and `CompletedSignalInputs`. Its separate entry
 point is `trading_bot.live_prototype.alpaca_signal_recovery_operator`; the D33
 CLI is retired before credential/provider access. D34 evidence uses
 `arch147-d34-alpaca-signal-observation/v1` and digest-only/closed diagnostics.
 
-Complete exact-source review, then publish one atomic D34 commit and one mapped
-`arch147-live-prototype` FULL route. Do not invoke D33 or D34 during source
-implementation. After acceptance, integrate exact source with certification
-reuse before any separately reviewed D34 successor observation. That future
-attempt is one Alpaca request only, never Robinhood, with no order or other
-protected effect.
+Complete exact-source review, then publish one corrective child commit and one
+mapped `arch147-live-prototype` FULL route. Do not invoke D33 or D34 during
+source implementation. After acceptance, integrate exact source with
+certification reuse before any separately reviewed D34 successor observation.
+That future attempt is one Alpaca request only, never Robinhood, with no order
+or other protected effect.
 
 Q61 remains NOT RUN. No live-readiness label is granted. L40-L43 remain
 pending behind this recovery: official fractional exit capability, exact
@@ -68,5 +78,5 @@ order is authorized. Readiness labels are not granted by source publication,
 source admission, or provider-data parity alone.
 
 Historical P6, P5A/P5B, and earlier architecture evidence remains available in
-its owning documents. The current handoff and D33 validation ledger record the
+its owning documents. The current handoff and D34 validation ledger record the
 bounded continuation identity and acceptance state.

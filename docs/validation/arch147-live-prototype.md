@@ -39,6 +39,16 @@ for the request and `CompletedSignalInputs`. The D33 CLI is retired; D34 uses
 source-only and perform no credentials, network, Alpaca, Robinhood, broker,
 paper, live, campaign, runtime-binding, or FINAL_HOLDOUT effect.
 
+The preserved D34 predecessor is
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree
+`a8d2b4fb4a40039b74768b44fd0198dc87bc55f3`; mapped run `41950572892`, attempt
+1, was terminal SUCCESS, but exact-source review rejected it before develop
+integration. Review found incomplete blocked-result attempt-count invariants
+and an operator-level fallback that could fabricate zero credential/provider
+counts after an escaped failure. No D34 real observation occurred. The current
+corrective child changes only those accounting/evidence semantics and focused
+tests/docs; the consumed D33 incident remains unchanged.
+
 Published D33 predecessor, preserved but rejected by exact-source review before
 integration:
 
@@ -48,11 +58,13 @@ integration:
     GitHub run 41822221848 / attempt 1 / terminal SUCCESS
     classification EXACT_SOURCE_REVIEW_REJECTED
 
-Current D34 scope: additive recovery source with exact feature/develop admission
+Current D34 corrective-child scope: attempt-accounting and evidence truthfulness
+at the existing additive recovery source, with exact feature/develop admission
 before provider authority, live origin branch heads resolved read-only through
 the existing source-owned `_remote_branch_head` helper, one source-owned UTC
 clock, exact published-close cutoff, and sanitized failure diagnostics. The
-consumed D33 evidence remains immutable and is not replayed or relabeled.
+consumed D33 evidence and preserved D34 predecessor remain immutable and are
+not replayed or relabeled.
 
 The D34 implementation uses no credential, provider, network, Robinhood, broker,
 paper, live, campaign, runtime-binding, or FINAL_HOLDOUT effect. Any future
@@ -74,7 +86,7 @@ integration, mapped FULL, and exact-source acceptance.
 | D31 | selection/official data | Sol then Luna data/parity | exact research bundle | ACCEPTED; `NONE_QUALIFIES`, control retained, non-live |
 | D32 | selection/official data | Sol then Luna data/parity | parity evidence | PARTIAL_PASS; math/binding PASS, live basis BLOCKED by `DATA_BASIS_MISMATCH` |
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
-| D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | SOURCE-ONLY IN PROGRESS; future observation separately reviewed |
+| D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | CORRECTIVE CHILD IN PROGRESS; future observation separately reviewed |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | P01 implementation/corrections/docs integrated through 543dc6b4; corrective child pending |
@@ -120,7 +132,7 @@ or metrics and carries only its fixed sanitized status code.
 | Whole-repository Ruff check and format check | PASS; 1535 files formatted |
 | Current authority and source-only prototype authority | PASS, zero failures |
 | Git diff whitespace | PASS |
-| D33/D34 live-prototype focused tests/checks | PASS locally | D33/D34 input/operator tests passed; two existing external-evidence tests skipped; no P6 source changed |
+| D34 corrective-child focused tests/checks | PASS locally | 62 D34 input/operator tests; no real observation; no P6 source changed |
 
 Precommit current/historical batch evaluation reported only task files that were
 still being written; all now exist. Clean-candidate admission must independently

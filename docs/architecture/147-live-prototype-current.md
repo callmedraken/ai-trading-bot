@@ -59,6 +59,16 @@ PROSPECTIVE_DEVELOP authority. D34 source implementation and tests perform no
 provider, credential, network, Robinhood, broker, order, runtime-binding,
 campaign, paper, live, or FINAL_HOLDOUT effect.
 
+The first D34 publication is preserved at
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree
+`a8d2b4fb4a40039b74768b44fd0198dc87bc55f3`; mapped run `41950572892`, attempt
+1, was terminal SUCCESS, but exact-source review rejected it before develop
+integration. The rejected source did not perform a D34 real observation. The
+bounded corrective child tightens blocked-result reason/phase/count invariants
+and removes the operator fallback that could fabricate zero credential/provider
+counts after an escaped failure; the published-close, source-admission,
+diagnostic, and no-effect boundaries remain unchanged.
+
 Q61 remains NOT RUN and no live-readiness label is granted. L40-L43 remain
 pending behind this recovery. No paper soak is inserted. FINAL_HOLDOUT remains
 sealed.

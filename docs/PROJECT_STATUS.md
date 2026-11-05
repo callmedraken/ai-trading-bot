@@ -1,14 +1,27 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L40 source contract; acceptance pending
+## Current milestone - L40 accepted/integrated; remaining prototype implementation next
 
-L40 now has an effect-disabled mechanical contract and focused tests for exact
-ownership, nonresetting acquisition budget, reducing exits and uncertainty.
-See [the L40 contract](architecture/147-restricted-live-contract.md).
-Its implementation base is the integrated D34 canonical closeout
-`f7f13f805ad6a0eea7041cb6d13c561149a13f6e`; publication/certification do not
-constitute independent acceptance or integration. Real fractional-exit facts,
-durable controller/application composition and host/effect evidence remain open.
+L40 is ACCEPTED / INTEGRATED at
+`14e1b628c0c51c27b23deabee56eb91859818529` / tree
+`48b588cbb37818b0d1edfcbb895cfb715a2bf2d3`. Feature mapped FULL
+`41995282653`, attempt 1, was SUCCESS. Develop gate `41997418576`, attempt 1,
+was SUCCESS and reused the exact feature certification without duplicate FULL.
+
+The accepted [L40 contract](architecture/147-restricted-live-contract.md)
+freezes effect-disabled exact ownership, nonresetting <=$10 requested
+new-acquisition budget, truthful reducing-exit notional/fill semantics,
+partial-fill ownership, residual preservation, identity binding and
+UNKNOWN/no-retry behavior. It grants no provider/order authority and does not
+authenticate caller-supplied evidence references.
+
+The remaining critical path starts with the L41 read-only Robinhood
+fractional-exit capability observer/source boundary, then durable
+ownership/budget/controller and runtime Alpaca signal service, real desktop
+application composition, native Windows acceptance, fresh readiness/recovery,
+and the separately reviewed bounded real live qualification. Q61/Q62/L43/Q63
+remain NOT RUN. No live-readiness label or paper-soak milestone is granted and
+FINAL_HOLDOUT remains sealed.
 
 Accepted/integrated D34 source:
 `b86defebf9ccbf1efb91397de8f2e66db24a6665` / tree
@@ -78,19 +91,21 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Independent ChatGPT exact-source review of L40 and its terminal mapped FULL
-is next, followed by integration only if accepted. L41 must then establish
-account/instrument fractional eligibility and official quantity/minimum/residual
-rules. Metadata and synthetic tests are distinct from provider/account evidence;
-unknown exit rules block readiness. A minimal L41 collector source child is
-deferred until a truthful read-only observation contract can be frozen.
+Run one coordinated remaining-prototype source mission under a Sol High
+orchestrator. Sol owns decomposition, contracts, review and sequencing only;
+Luna Extra High subagents perform all coding and focused tests. The mission
+starts with the L41 read-only capability observer, then implements the durable
+L42 controller, reusable runtime Alpaca inputs, I53 real application composition
+and Q62/Q63 readiness/recovery source support with the fewest meaningful
+publication boundaries.
 
-Then consolidate L42 durable ownership/budget/controller, runtime Alpaca inputs,
-I53 real application composition and Q62/Q63 source support into one broad
-source checkpoint. Q61 native UAT, Q62 fresh read-only readiness, a canonical
-readiness closeout, L43 bounded genuine entry/owned exit and Q63 delivery remain
-separate required boundaries. No live-readiness label, broker mutation or paper
-soak is granted. FINAL_HOLDOUT remains sealed.
+Protected observations and broker mutations remain separately reviewed
+boundaries: the orchestration may prepare their source/operators and exact local
+commands but must not invoke real credentials/provider/order effects without
+ChatGPT acceptance and the required operator boundary. Q61 native UAT, Q62
+fresh readiness and L43 bounded live qualification remain factual host evidence,
+not synthetic source claims. No paper soak is inserted and FINAL_HOLDOUT remains
+sealed.
 
 ## Product and protected boundaries
 

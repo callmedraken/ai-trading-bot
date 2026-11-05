@@ -1,32 +1,44 @@
 # AI Trading Bot - Current Handoff
 
-## L40 source checkpoint awaiting independent acceptance
+## L40 accepted/integrated checkpoint
 
 Canonical worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`;
-branch: `feature/robinhood-live-prototype-current`. Verified implementation base
-HEAD `f7f13f805ad6a0eea7041cb6d13c561149a13f6e`, tree
-`4cf5d8fd19a8089103e9f119e4d8d338a08819d0`; live feature/develop matched that
-closeout before edits. Develop gate `41987821711`, attempt 1, was SUCCESS.
-The L40 publication identity is resolved from Git and the source-gate evidence;
-this document does not self-certify its containing commit or acceptance.
+branch: `feature/robinhood-live-prototype-current`.
 
-L40 adds the pure `live_prototype/live_contract.py` owner and focused tests.
-The [L40 contract](architecture/147-restricted-live-contract.md) owns mechanical
-exit/budget/ownership/no-retry semantics and remaining L41 facts. The source-only
-`arch147-live-prototype` registration remains mapped to GitHub-owned FULL;
-preflight/execute remain absent. No local FULL or manual dispatch is required.
-P6 effect code, consumed evidence, D34 observation and synthetic launcher are
-unchanged. The new snapshot/reservation contract is not a durable live runtime.
+Accepted L40 source HEAD:
+`14e1b628c0c51c27b23deabee56eb91859818529`
 
-Next: ChatGPT independently reviews the exact published L40 diff and terminal
-CI, accepts/rejects it and assesses integration. After accepted integration,
-freeze the L41 read-only observation/collector for actual eligibility and
-minimum/residual facts; do not invoke a provider from this handoff. The collector
-was deferred because current metadata does not expose all required capability
-facts and a truthful sell review may require the first exact-owned position.
-Effect-free unpublished L42 analysis can continue; L42 finalization waits for
-accepted L41 facts. Q61/Q62/L43/Q63 remain unrun; no readiness label is granted.
-D33 and D34 must never be replayed; FINAL_HOLDOUT remains sealed.
+Accepted L40 source tree:
+`48b588cbb37818b0d1edfcbb895cfb715a2bf2d3`
+
+Direct parent:
+`f7f13f805ad6a0eea7041cb6d13c561149a13f6e`
+
+Feature mapped FULL `41995282653`, attempt 1, was SUCCESS with all seven
+canonical broad lanes, active tests, hygiene/evidence and aggregate source gate
+green. The exact source was independently accepted. Ordinary fast-forward
+integration then moved `develop` to the accepted L40 source; develop gate
+`41997418576`, attempt 1, was SUCCESS and reused feature certification
+`41995282653` without another FULL. Remote feature and develop were both
+verified at the accepted L40 HEAD/tree before this coordination closeout.
+
+The accepted [L40 contract](architecture/147-restricted-live-contract.md) is an
+effect-disabled pure policy owner. It freezes exact-owned full-remainder exits,
+the <=$10 requested/cumulative new-acquisition budget, reducing exits without a
+universal $10 exit-notional ceiling, partial-fill ownership, residual
+preservation, exact identity matching and UNKNOWN/MAY_HAVE_OCCURRED no-retry
+semantics. Evidence-reference flags are necessary-only prerequisites and
+authenticate nothing by themselves. L40 does not establish actual Robinhood
+account fractional-sell eligibility, numeric quantity/minimum/notional rules,
+durable controller persistence or live-order authority.
+
+Next: one coordinated remaining-prototype implementation sequence begins with
+the L41 read-only capability observer source, followed by the durable
+controller/runtime-signal/application wiring and guarded readiness/recovery
+surfaces needed for Q61-Q63/L43. Protected provider/broker effects remain
+separate reviewed boundaries; source work must not invoke them. D33 and D34
+remain consumed/no-retry and FINAL_HOLDOUT remains sealed. No paper soak is
+inserted.
 
 ## D34 accepted/integrated closeout identity
 

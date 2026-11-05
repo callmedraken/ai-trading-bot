@@ -7,9 +7,10 @@ Accepted/integrated D34 source:
 `9fa2360dfe7afdd902fd539e94f888063439785d`. Feature mapped FULL
 `41969407894`, attempt 1, and develop source-gate `41973853073`, attempt 1,
 succeeded; develop reused the exact feature certification. D34's accepted
-source is the corrective child of the integrated D33 source
+source descends from the integrated D33 source
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
-`beab205abcc045fad38625ff73bb48affea9a0e9`.
+`beab205abcc045fad38625ff73bb48affea9a0e9` through the preserved first D34
+publication `9981bf47072d35381a2e5b6f187c9497e9dbed5a`.
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256

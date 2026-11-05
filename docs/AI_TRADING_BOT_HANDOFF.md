@@ -13,10 +13,13 @@ Integrated source tree: `9fa2360dfe7afdd902fd539e94f888063439785d`
 Feature mapped FULL `41969407894`, attempt 1, and develop source-gate
 `41973853073`, attempt 1, both succeeded; develop reused the exact feature
 certification. Develop and the feature branch both point to the integrated D34
-HEAD. The accepted D33 source remains the direct parent
+HEAD. The accepted/integrated D33 source remains the D34 lineage ancestor
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
-`beab205abcc045fad38625ff73bb48affea9a0e9`; D33 is a consumed predecessor
-incident, not an available observation boundary.
+`beab205abcc045fad38625ff73bb48affea9a0e9`. The first D34 publication
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a` is its direct child, and accepted
+D34 corrective source `b86defebf9ccbf1efb91397de8f2e66db24a6665` is the direct
+child of `9981bf47072d35381a2e5b6f187c9497e9dbed5a`. D33 is a consumed
+predecessor incident, not an available observation boundary.
 
 The preserved D34 predecessor is
 `9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree

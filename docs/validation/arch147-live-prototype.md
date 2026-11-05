@@ -6,10 +6,13 @@ Accepted/integrated D34 source is HEAD
 `feature/robinhood-live-prototype-current`, canonical worktree
 `F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`. Feature mapped FULL
 `41969407894`, attempt 1, and develop source-gate `41973853073`, attempt 1,
-succeeded; develop reused the exact feature certification. D34 is the
-corrective child of accepted/integrated D33 source
+succeeded; develop reused the exact feature certification. The first D34
+publication `9981bf47072d35381a2e5b6f187c9497e9dbed5a` is the direct child of
+accepted/integrated D33 source
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
-`beab205abcc045fad38625ff73bb48affea9a0e9`.
+`beab205abcc045fad38625ff73bb48affea9a0e9`. Accepted D34 corrective source
+`b86defebf9ccbf1efb91397de8f2e66db24a6665` is the direct child of
+`9981bf47072d35381a2e5b6f187c9497e9dbed5a`.
 
 D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, basis

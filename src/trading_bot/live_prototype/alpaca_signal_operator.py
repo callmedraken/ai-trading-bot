@@ -24,6 +24,7 @@ from trading_bot.review_paper.alpaca_windows_credentials import (
 D33_FEATURE_BRANCH = "feature/robinhood-live-prototype-current"
 D33_SOURCE_ADMISSION_FAILURE = "D33_SOURCE_ADMISSION_BLOCKED"
 D33_CLOCK_INVALID = "D33_CLOCK_INVALID"
+D33_CONSUMED_RETIRED = "D33_CONSUMED_RETIRED"
 D33_EVIDENCE_SCHEMA = "arch147-d33-alpaca-signal-observation/v1"
 _EXPECTED_ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
 _EVIDENCE_PARENT = Path(r"F:\AI\temp")
@@ -349,7 +350,7 @@ __all__ = [
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one source-owned-clock observation with only an evidence destination."""
+    """Report the consumed D33 attempt; never dispatch provider operations."""
 
     parser = argparse.ArgumentParser(
         description="Run the Architecture 147 D33 Alpaca read-only observation."
@@ -361,20 +362,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="fresh absolute external F: evidence directory",
     )
     args = parser.parse_args(argv)
-    result = run_d33_read_only_observation(evidence_dir=args.evidence_dir)
+    del args
     print(
         json.dumps(
             {
-                "status": result.status,
-                "reason": result.reason,
-                "evidence_path": (
-                    None if result.evidence_path is None else str(result.evidence_path)
-                ),
+                "status": "BLOCKED",
+                "reason": D33_CONSUMED_RETIRED,
+                "evidence_path": None,
             },
             sort_keys=True,
         )
     )
-    return 0 if result.status == "READY" else 1
+    return 1
 
 
 if __name__ == "__main__":

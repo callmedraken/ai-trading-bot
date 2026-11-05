@@ -1,11 +1,12 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-Exact accepted D33 source HEAD `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824`;
-tree `9981cca7cc1f01fae778cbe9e5d189126d3a885c`. Branch
-`feature/robinhood-live-prototype-current`, canonical F: worktree named in
-contract. Feature FULL `41903739374`, attempt 1, and develop integration
-`41905183980`, attempt 1, both succeeded. No real provider/order/credential/
-data/holdout effects or paper soak; D33 provider observation remains NOT_RUN.
+Current D34 source-only successor starts from accepted/integrated D33 source
+HEAD `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a`; tree
+`beab205abcc045fad38625ff73bb48affea9a0e9`. Branch
+`feature/robinhood-live-prototype-current`, canonical worktree
+`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`. Feature FULL
+`41924058186`, attempt 1, and develop source-gate `41936617801`, attempt 1,
+succeeded; develop reused the exact feature certification.
 
 D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, basis
@@ -15,10 +16,28 @@ D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
 `NONE_QUALIFIES`, retained control `BASE_MA35_50_V1`, ID
 `21158358-75be-5597-b940-5bccdda1429c`. D32 PARTIAL_PASS: strategy math and
-research binding PASS; live data-basis parity BLOCKED by
-`DATA_BASIS_MISMATCH`; 2,516 comparisons had zero mismatches. D33 chooses
-Alpaca all-adjusted current signal data and Robinhood execution/custody, with
-no fallback and no provider observation yet.
+research binding PASS; live data-basis parity remains BLOCKED by
+`DATA_BASIS_MISMATCH`; 2,516 comparisons had zero mismatches. Alpaca
+all-adjusted current signal data and Robinhood execution/custody remain
+separate providers with no fallback.
+
+D33's real read-only attempt is CONSUMED / BLOCKED / NO RETRY. Evidence is
+`F:\\AI\\temp\\arch147-d33-alpaca-observation-576b4b5c8f7b41548df7b822c44c74de\\evidence.json`,
+SHA-256 `b767727712e4634950be8a6ba8f43522910d037987824ad33cb7c20c8eab95ec`,
+1,999 bytes, observation `2026-11-04T23:59:08.218729Z`, credentials `1`,
+provider requests `1`, selected sessions `60`, and zero prohibited-effect
+counters. The exact provider rejection subtype is unavailable because D33
+discarded it. The request end exceeded observation through end-of-calendar-day
+semantics; this is a source-contract defect, not proof of the provider's exact
+rejection cause.
+
+D34 is an additive successor, not a D33 retry. It derives one exact published
+regular close before credential/provider construction and uses that same cutoff
+for the request and `CompletedSignalInputs`. The D33 CLI is retired; D34 uses
+`trading_bot.live_prototype.alpaca_signal_recovery_operator` and evidence schema
+`arch147-d34-alpaca-signal-observation/v1`. Implementation and tests are
+source-only and perform no credentials, network, Alpaca, Robinhood, broker,
+paper, live, campaign, runtime-binding, or FINAL_HOLDOUT effect.
 
 Published D33 predecessor, preserved but rejected by exact-source review before
 integration:
@@ -29,18 +48,16 @@ integration:
     GitHub run 41822221848 / attempt 1 / terminal SUCCESS
     classification EXACT_SOURCE_REVIEW_REJECTED
 
-Current corrective child scope: exact feature/develop admission before provider
-authority, with live origin branch heads resolved read-only through the existing
-source-owned `_remote_branch_head` helper rather than local remote-tracking
-refs. The source-owned current clock, same-day completed-session cutoff,
-invalid-clock sanitization, focused regressions, and coordination truth remain
-unchanged.
+Current D34 scope: additive recovery source with exact feature/develop admission
+before provider authority, live origin branch heads resolved read-only through
+the existing source-owned `_remote_branch_head` helper, one source-owned UTC
+clock, exact published-close cutoff, and sanitized failure diagnostics. The
+consumed D33 evidence remains immutable and is not replayed or relabeled.
 
-Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
-and ref-lock failures; none entered credentials or the provider, so none
-consumed a D33 observation. Local stale develop/tracking-ref state is separate
-host hygiene and is not provider authority. The cause of local Git write
-failures remains unresolved; no ACL or sandbox-cause claim is made.
+The D34 implementation uses no credential, provider, network, Robinhood, broker,
+paper, live, campaign, runtime-binding, or FINAL_HOLDOUT effect. Any future
+provider observation is a separate reviewed boundary after publication,
+integration, mapped FULL, and exact-source acceptance.
 
 | Task | Dependencies | Owner / exclusive surface | Interface | Status / next |
 |---|---|---|---|---|
@@ -56,7 +73,8 @@ failures remains unresolved; no ACL or sandbox-cause claim is made.
 | D30 | selection/official data | Sol then Luna data/parity | accepted dataset identity | ACCEPTED; exact dataset and all-adjusted price basis frozen |
 | D31 | selection/official data | Sol then Luna data/parity | exact research bundle | ACCEPTED; `NONE_QUALIFIES`, control retained, non-live |
 | D32 | selection/official data | Sol then Luna data/parity | parity evidence | PARTIAL_PASS; math/binding PASS, live basis BLOCKED by `DATA_BASIS_MISMATCH` |
-| D33 | current signal-data successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs | ACCEPTED SOURCE / CORRECTIVE CHILD IN PROGRESS; live-read-only authority correction; no provider observation |
+| D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
+| D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | SOURCE-ONLY IN PROGRESS; future observation separately reviewed |
 | L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | P01 implementation/corrections/docs integrated through 543dc6b4; corrective child pending |
@@ -69,12 +87,12 @@ failures remains unresolved; no ACL or sandbox-cause claim is made.
 | Usable launcher and GUI | SOURCE PASS / HOST NOT RUN | Actual five-page service/GUI tests; native UAT separate |
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 PARTIAL_PASS | strategy math and research binding PASS; current data-basis observation remains pending |
-| Current valid inputs | BLOCKED | D33 source exists; no Alpaca provider observation has been performed |
+| Current valid inputs | BLOCKED | D33 is consumed/blocked; D34 source correction is not yet observed |
 | Entry and exact owned exit | BLOCKED | official fractional exit capability unproven |
 | Durable limits/no duplicate effects | PENDING | P6 remains untouched; P01 source is accepted but durable runtime/reconciliation evidence remains unaccepted |
 | Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | CORRECTIVE CHILD PENDING | D33 predecessor run 41822221848 was terminal green but exact-source rejected; child requires fresh admission and mapped FULL |
+| Exact source certified | D34 CANDIDATE PENDING | D33 source is accepted/integrated; D34 requires exact-source review, admission, and mapped FULL |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
@@ -102,7 +120,7 @@ or metrics and carries only its fixed sanitized status code.
 | Whole-repository Ruff check and format check | PASS; 1535 files formatted |
 | Current authority and source-only prototype authority | PASS, zero failures |
 | Git diff whitespace | PASS |
-| D33 source-admission correction focused tests/checks | PASS locally | D33 45 passed/2 host-evidence skipped; `_remote_branch_head` helper 2 passed; current source-authority 59 passed; no P6 source changed |
+| D33/D34 live-prototype focused tests/checks | PASS locally | D33/D34 input/operator tests passed; two existing external-evidence tests skipped; no P6 source changed |
 
 Precommit current/historical batch evaluation reported only task files that were
 still being written; all now exist. Clean-candidate admission must independently
@@ -124,20 +142,15 @@ live implementation is delegated across it.
 
 ## Concrete next boundary
 
-Complete exact-source review of this bounded corrective child, stage only the
-intended files, create one normal atomic commit, push once, and wait for its
-single mapped `arch147-live-prototype` FULL run. Do not integrate the child
-before independent acceptance. The accepted integrated source is
-`543dc6b4`; no local tracking-ref refresh is a D33 prerequisite.
-
-After acceptance, exact ff-only integrate with certification reuse, verify
-feature/develop identities, and run one fresh source-admitted D33 read-only
-observation using the source-owned current UTC clock. That observation uses one
-Alpaca request, no Robinhood call, no runtime binding, no campaign, no
-FINAL_HOLDOUT access, and no paper/broker/live effect. It can close the
-data-basis blocker but cannot authorize a live order. Q61 remains NOT RUN;
-L40-L43 remain unresolved. Do not insert a paper soak between D33 and L40-L43.
-The old P6 guarded 59+1 path remains preserved predecessor evidence.
+Complete exact-source review of the D34 candidate, stage only intended files,
+create one normal atomic commit, push once, and wait for its single mapped
+`arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this source
+checkpoint. After acceptance, exact ff-only integration and certification reuse
+come before one separately labeled, source-admitted D34 successor observation.
+That future observation has one Alpaca request, no Robinhood call, no runtime
+binding, no campaign, no FINAL_HOLDOUT access, and no paper/broker/live effect.
+It may close the D32 data-basis blocker but cannot authorize a live order.
+Q61 remains NOT RUN; L40-L43 remain pending. Do not insert a paper soak.
 
 ## Preserved rejected publication and accepted corrections
 

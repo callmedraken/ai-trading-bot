@@ -1,26 +1,20 @@
 # AI Trading Bot - Current Handoff
 
-## D33 continuation identity
+## D34 continuation identity
 
 Worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
 
 Branch: `feature/robinhood-live-prototype-current`
 
-Parent source HEAD: `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824`
+Parent source HEAD: `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a`
 
-Parent source tree: `9981cca7cc1f01fae778cbe9e5d189126d3a885c`
+Parent source tree: `beab205abcc045fad38625ff73bb48affea9a0e9`
 
-P01 implementation, corrections, docs closeout, and the accepted D33 source
-are integrated through the parent `develop` source above. Feature FULL
-`41903739374`, attempt 1, and develop integration `41905183980`, attempt 1,
-both succeeded. D33 predecessor
-`2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
-`f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
-`41822221848`, attempt 1, but was rejected by ChatGPT exact-source review before
-integration. It is preserved immutable terminal-green evidence.
-
-The current checkpoint is one corrective child of the accepted D33 source. Its
-worktree is clean before editing, and the provider observation remains NOT_RUN.
+The accepted D33 source is integrated through the parent `develop` source above.
+Feature FULL `41924058186`, attempt 1, and develop source-gate `41936617801`,
+attempt 1, both succeeded; develop reused exact feature certification. This
+worktree was clean at the exact parent before editing. D33 is now a consumed
+predecessor incident, not an available observation boundary.
 
 D30 is ACCEPTED with dataset ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA
@@ -34,51 +28,46 @@ D30 is ACCEPTED with dataset ID
 research binding passed; live data-basis parity is blocked by
 `DATA_BASIS_MISMATCH`.
 
-## D33 source boundary
+## Consumed D33 incident
 
-The additive live-prototype source uses Alpaca's completed daily SPY bars with
-adjustment `all`, SIP feed, USD, 1Day, ascending order, and exactly the latest
-60 published completed XNYS sessions. It constructs `CompletedSignalInputs`
-from genuine Alpaca closes and binds the exact response digest, observation,
-and cutoff. The pure BASE_MA35_50 decision helper preserves the D32-proven
-Decimal formula. Robinhood MCP remains broker/account/execution/custody; no
-provider fallback exists.
+D33's one real read-only attempt is CONSUMED / BLOCKED / NO RETRY. Preserved
+evidence:
+`F:\\AI\\temp\\arch147-d33-alpaca-observation-576b4b5c8f7b41548df7b822c44c74de\\evidence.json`;
+SHA-256 `b767727712e4634950be8a6ba8f43522910d037987824ad33cb7c20c8eab95ec`,
+1,999 bytes; observation `2026-11-04T23:59:08.218729Z`; credentials `1`;
+provider requests `1`; selected sessions `60`; production, broker,
+runtime-binding, campaign, and FINAL_HOLDOUT mutation counts are all `0`.
+The exact provider rejection subtype is unavailable because D33 discarded it.
+The request end exceeded observation through end-of-calendar-day semantics;
+this is a source-contract defect, not proof of the provider's exact rejection
+cause. D33's exact request target is preserved in the validation ledger.
 
-The frozen P6 raw Robinhood 59+1 source, evidence, ownership/kill semantics,
-execution markers, and historical architecture pins are preserved. D33 does
-not relabel or rewrite them. No provider observation has occurred, and source
-publication grants no provider, paper, broker, runtime-binding, campaign,
-production, or live authority.
+## D34 next milestone and stop conditions
 
-Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
-and ref-lock failures. They consumed no provider attempt. This child removes
-D33's local remote-tracking-ref dependency by using the existing source-owned
-live read-only remote-head helper. Local stale Git state is separate host
-hygiene and not provider authority; the cause of local write failures remains
-unresolved, with no ACL or sandbox-cause claim.
+The additive D34 source derives one exact published regular close after
+selecting the 60 completed XNYS sessions and before credential/provider
+construction. That same cutoff is used for the request and
+`CompletedSignalInputs`; it never uses next midnight, end-of-calendar-day,
+observation-as-substitute, silent subtraction, provider fallback, or a changed
+session set. D34's separately named entry point is
+`trading_bot.live_prototype.alpaca_signal_recovery_operator`, with evidence
+schema `arch147-d34-alpaca-signal-observation/v1`. The old D33 CLI is retired
+before credentials/provider access; `--help` remains effect-free.
 
-## Next milestone and stop conditions
+D34 source admission proves the reviewed origin URL, live read-only feature and
+develop heads, local exact tree, FEATURE authority, and PROSPECTIVE_DEVELOP
+authority before any credential/provider construction. It performs no real
+provider operation, credential read, network, Robinhood, broker, order,
+runtime-binding, campaign, paper, live, or FINAL_HOLDOUT effect. A future D34
+observation is separately reviewed and remains one-attempt/no-retry.
 
-The child addresses only exact integration-required source admission using live
-read-only origin heads, source-owned current clock, completed-session cutoff
-semantics, invalid-clock sanitization, tests, and documentation. After exact-source
-review, publish one normal atomic child commit and one mapped
-`arch147-live-prototype` FULL run. Do not integrate the child until independent
-acceptance. Develop remains at the parent while this review is pending.
-
-After acceptance, fast-forward `develop` exactly to the child with certification
-reuse, verify local/remote identities, then run one fresh absolute
-`F:\AI\temp` D33 read-only observation using the accepted v3 Alpaca credential
-boundary. The operator admits exact feature/develop identity before
-credential/provider construction, uses its current UTC clock, makes at most
-one request, never calls Robinhood, and writes only sanitized evidence. An
-uncertain or failed provider request is consumed with no retry.
-
-That observation can close the current data-basis blocker but cannot authorize
-a live order. Q61 remains NOT RUN; no readiness label is granted. L40-L43
-remain unresolved, including official fractional exit capability, exact owned
-exit semantics, and durable cumulative budget/recovery/capability work. Do not
-insert a paper soak between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
+After exact-source review, publish one normal atomic commit and one mapped
+`arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this source
+checkpoint. Only after acceptance and exact integration may the separately
+labeled D34 observation be considered. It may close the D32 data-basis blocker
+but cannot authorize a live order. Q61 remains NOT RUN; no readiness label is
+granted. L40-L43 remain pending. Do not insert a paper soak. FINAL_HOLDOUT
+remains sealed.
 
 The old P6 protected read-only preflight remains a separate historical/current
 predecessor boundary and is not the D33 signal-data path.

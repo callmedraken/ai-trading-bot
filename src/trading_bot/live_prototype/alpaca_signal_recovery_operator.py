@@ -1,0 +1,414 @@
+"""D34 one-shot source-admitted recovery operator for Alpaca signal inputs."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import stat
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from decimal import Decimal
+from pathlib import Path
+from uuid import uuid4
+
+from trading_bot.live_prototype.alpaca_signal_recovery_inputs import (
+    AlpacaSignalRecoveryInputService,
+    D34SignalInputResult,
+)
+from trading_bot.market_data.alpaca_http import AlpacaHistoricalBarsTransport
+from trading_bot.review_paper.alpaca_windows_credentials import (
+    read_current_product_alpaca_secrets,
+)
+
+D34_FEATURE_BRANCH = "feature/robinhood-live-prototype-current"
+D34_SOURCE_ADMISSION_FAILURE = "D34_SOURCE_ADMISSION_BLOCKED"
+D34_CLOCK_INVALID = "D34_CLOCK_INVALID"
+D34_EVIDENCE_SCHEMA = "arch147-d34-alpaca-signal-observation/v1"
+D34_RETIRED_PREDECESSOR = "D33"
+D34_PREDECESSOR_SOURCE_HEAD = "fad65c9f4eab5bc1de4e154fdf0f59e397bc943a"
+D34_PREDECESSOR_SOURCE_TREE = "beab205abcc045fad38625ff73bb48affea9a0e9"
+D34_PREDECESSOR_EVIDENCE_SHA256 = (
+    "b767727712e4634950be8a6ba8f43522910d037987824ad33cb7c20c8eab95ec"
+)
+D34_PREDECESSOR_EVIDENCE_BYTE_COUNT = 1999
+D34_PREDECESSOR_RESULT = "BLOCKED"
+D34_PREDECESSOR_REASON = "D33_PROVIDER_REQUEST_FAILED"
+D34_PREDECESSOR_PROVIDER_CALL_COUNT = 1
+D34_PREDECESSOR_CREDENTIAL_READ_COUNT = 1
+_EXPECTED_ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
+_EVIDENCE_PARENT = Path(r"F:\AI\temp")
+
+
+@dataclass(frozen=True, slots=True)
+class SourceAdmission:
+    """Read-only source identities proved before provider construction."""
+
+    branch: str
+    head: str
+    tree: str
+    origin_develop: str
+    origin_feature: str
+
+
+@dataclass(frozen=True, slots=True)
+class D34ObservationResult:
+    """Sanitized operator outcome and external evidence location."""
+
+    status: str
+    reason: str
+    evidence_path: Path | None
+    source: SourceAdmission | None
+    signal_inputs: D34SignalInputResult | None
+
+
+def admit_current_source(repo_root: Path | None = None) -> SourceAdmission:
+    """Require the clean exact feature source and its live integrated origin."""
+
+    root = (
+        Path(__file__).resolve().parents[3]
+        if repo_root is None
+        else Path(repo_root).resolve(strict=True)
+    )
+    from scripts.current_source_authority import (
+        PublicationContext,
+        evaluate_source_authority,
+    )
+
+    from scripts import checkpoint_runner as runner
+
+    state = runner._git_state(root)
+    if state["branch"] != D34_FEATURE_BRANCH or state["porcelain"]:
+        raise RuntimeError("D34 source is not clean on its reviewed feature branch")
+    origin = runner._git_output(root, "remote", "get-url", "origin")
+    if origin != _EXPECTED_ORIGIN:
+        raise RuntimeError("D34 origin is not the reviewed repository")
+    origin_develop = runner._remote_branch_head(root, "develop")
+    origin_feature = runner._remote_branch_head(root, D34_FEATURE_BRANCH)
+    if origin_feature != state["head"]:
+        raise RuntimeError("D34 feature source is not the exact remote source")
+    if origin_develop != state["head"]:
+        raise RuntimeError("D34 source is not exactly integrated into develop")
+    local_tree = runner._git_output(root, "show", "-s", "--format=%T", "HEAD")
+    if local_tree != state["tree"]:
+        raise RuntimeError("D34 local HEAD tree is not clean and exact")
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH147_PROTOTYPE_NAME]
+    feature_authority = evaluate_source_authority(
+        root,
+        publication_context=PublicationContext.FEATURE,
+        checkpoints=(spec,),
+    )
+    prospective_authority = evaluate_source_authority(
+        root,
+        publication_context=PublicationContext.PROSPECTIVE_DEVELOP,
+        checkpoints=(spec,),
+    )
+    if feature_authority.failures or prospective_authority.failures:
+        raise RuntimeError("D34 current source authority is unavailable")
+    return SourceAdmission(
+        branch=str(state["branch"]),
+        head=str(state["head"]),
+        tree=str(state["tree"]),
+        origin_develop=origin_develop,
+        origin_feature=origin_feature,
+    )
+
+
+def run_d34_read_only_observation(
+    *,
+    evidence_dir: Path | None = None,
+    repo_root: Path | None = None,
+    source_admitter: Callable[[Path], SourceAdmission] | None = None,
+    credential_reader: Callable[[], object] | None = None,
+    transport_factory: Callable[[], AlpacaHistoricalBarsTransport] | None = None,
+    clock: Callable[[], datetime] | None = None,
+) -> D34ObservationResult:
+    """Run one source-admitted read-only attempt with no retry or fallback."""
+
+    root = (
+        Path(__file__).resolve().parents[3]
+        if repo_root is None
+        else Path(repo_root).resolve(strict=True)
+    )
+    try:
+        output_dir = _fresh_evidence_dir(evidence_dir)
+    except (OSError, ValueError):
+        return D34ObservationResult(
+            "BLOCKED", "D34_EVIDENCE_PATH_INVALID", None, None, None
+        )
+
+    try:
+        observation = _clock_observation(_utc_now if clock is None else clock)
+    except Exception:
+        result = D34ObservationResult("BLOCKED", D34_CLOCK_INVALID, None, None, None)
+        evidence_path = _write_evidence(output_dir, result, None)
+        return D34ObservationResult(
+            result.status,
+            result.reason,
+            evidence_path,
+            result.source,
+            result.signal_inputs,
+        )
+
+    admit = admit_current_source if source_admitter is None else source_admitter
+    try:
+        source = admit(root)
+    except Exception:
+        result = D34ObservationResult(
+            "BLOCKED", D34_SOURCE_ADMISSION_FAILURE, None, None, None
+        )
+        evidence_path = _write_evidence(output_dir, result, observation)
+        return D34ObservationResult(
+            result.status,
+            result.reason,
+            evidence_path,
+            result.source,
+            result.signal_inputs,
+        )
+
+    service = AlpacaSignalRecoveryInputService(
+        credential_reader=(
+            read_current_product_alpaca_secrets
+            if credential_reader is None
+            else credential_reader
+        ),
+        transport_factory=transport_factory,
+    )
+    try:
+        signal_result = service.observe(observation)
+    except Exception:
+        signal_result = None
+        result = D34ObservationResult(
+            "BLOCKED", "D34_INTERNAL_FAILED", None, source, signal_result
+        )
+        evidence_path = _write_evidence(output_dir, result, observation)
+        return D34ObservationResult(
+            result.status,
+            result.reason,
+            evidence_path,
+            result.source,
+            result.signal_inputs,
+        )
+    result = D34ObservationResult(
+        signal_result.status,
+        signal_result.reason,
+        None,
+        source,
+        signal_result,
+    )
+    evidence_path = _write_evidence(output_dir, result, observation)
+    return D34ObservationResult(
+        result.status, result.reason, evidence_path, result.source, result.signal_inputs
+    )
+
+
+def _fresh_evidence_dir(candidate: Path | None) -> Path:
+    if candidate is None:
+        candidate = _EVIDENCE_PARENT / ("arch147-d34-" + uuid4().hex)
+    path = Path(candidate)
+    parent = _EVIDENCE_PARENT.resolve(strict=True)
+    if not path.is_absolute() or path.drive.casefold() != "f:":
+        raise ValueError("D34 evidence path must be an absolute F: path")
+    if path.exists() or path.is_symlink():
+        raise ValueError("D34 evidence output already exists")
+    if not path.parent.exists() or path.parent.resolve(strict=True) != path.parent:
+        raise ValueError("D34 evidence parent must not be an alias")
+    if not path.parent.resolve(strict=True).is_relative_to(parent):
+        raise ValueError("D34 evidence path is outside F:\\AI\\temp")
+    current = path.parent
+    while True:
+        if current.resolve(strict=True) != current:
+            raise ValueError("D34 evidence ancestor must not be an alias")
+        if _has_reparse_point(current):
+            raise ValueError("D34 evidence ancestor is a reparse point")
+        if current == parent:
+            break
+        if current.parent == current:
+            raise ValueError("D34 evidence path escaped allowed parent")
+        current = current.parent
+    path.mkdir()
+    return path
+
+
+def _has_reparse_point(path: Path) -> bool:
+    if path.is_symlink():
+        return True
+    attributes = getattr(path.stat(), "st_file_attributes", 0)
+    return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+
+
+def _write_evidence(
+    output_dir: Path,
+    result: D34ObservationResult,
+    observation_as_of: datetime | None,
+) -> Path:
+    signal = result.signal_inputs
+    body: dict[str, object] = {
+        "schema": D34_EVIDENCE_SCHEMA,
+        "status": result.status,
+        "reason": result.reason,
+        "observation_as_of": _safe_timestamp(observation_as_of),
+        "predecessor": D34_RETIRED_PREDECESSOR,
+        "predecessor_source_head": D34_PREDECESSOR_SOURCE_HEAD,
+        "predecessor_source_tree": D34_PREDECESSOR_SOURCE_TREE,
+        "predecessor_evidence_sha256": D34_PREDECESSOR_EVIDENCE_SHA256,
+        "predecessor_evidence_byte_count": D34_PREDECESSOR_EVIDENCE_BYTE_COUNT,
+        "predecessor_result": D34_PREDECESSOR_RESULT,
+        "predecessor_reason": D34_PREDECESSOR_REASON,
+        "predecessor_provider_call_count": D34_PREDECESSOR_PROVIDER_CALL_COUNT,
+        "predecessor_credential_read_count": D34_PREDECESSOR_CREDENTIAL_READ_COUNT,
+        "source": None
+        if result.source is None
+        else {
+            "branch": result.source.branch,
+            "head": result.source.head,
+            "tree": result.source.tree,
+            "origin_develop": result.source.origin_develop,
+            "origin_feature": result.source.origin_feature,
+        },
+        "request": None,
+        "selected_sessions": [],
+        "response_body_sha256": None,
+        "response_body_byte_length": None,
+        "request_id_digest": None,
+        "completed_signal_inputs_digest": None,
+        "fast_average": None,
+        "slow_average": None,
+        "flat_signal": None,
+        "invested_signal": None,
+        "failure_kind": None,
+        "transport_stage": None,
+        "metadata_reason": None,
+        "http_status": None,
+        "provider_code": None,
+        "provider_call_count": 0,
+        "credential_read_count": 0,
+        "production_mutations": 0,
+        "broker_mutations": 0,
+        "runtime_binding_mutations": 0,
+        "campaign_runs": 0,
+        "final_holdout_accesses": 0,
+    }
+    if signal is not None:
+        body.update(
+            {
+                "request": None
+                if signal.request is None
+                else {
+                    "method": signal.request.method,
+                    "host": signal.request.host,
+                    "target": signal.request.target,
+                    "public_headers": list(signal.request.public_headers),
+                },
+                "selected_sessions": [
+                    item.isoformat() for item in signal.selected_sessions
+                ],
+                "response_body_sha256": signal.response_body_sha256,
+                "response_body_byte_length": signal.response_body_byte_length,
+                "request_id_digest": signal.request_id_digest,
+                "completed_signal_inputs_digest": None
+                if signal.inputs is None
+                else signal.inputs.digest,
+                "fast_average": _decimal_text(signal.fast_average),
+                "slow_average": _decimal_text(signal.slow_average),
+                "flat_signal": None
+                if signal.flat_signal is None
+                else signal.flat_signal.value,
+                "invested_signal": None
+                if signal.invested_signal is None
+                else signal.invested_signal.value,
+                "failure_kind": None
+                if signal.failure_kind is None
+                else signal.failure_kind.value,
+                "transport_stage": None
+                if signal.transport_stage is None
+                else signal.transport_stage.value,
+                "metadata_reason": None
+                if signal.metadata_reason is None
+                else signal.metadata_reason.value,
+                "http_status": signal.http_status,
+                "provider_code": signal.provider_code,
+                "provider_call_count": signal.provider_call_count,
+                "credential_read_count": signal.credential_read_count,
+            }
+        )
+    path = output_dir / "evidence.json"
+    if path.exists() or path.is_symlink():
+        raise ValueError("D34 evidence output already exists")
+    path.write_text(
+        json.dumps(body, sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    return path
+
+
+def _safe_timestamp(value: datetime | None) -> str | None:
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        return None
+    return (
+        value.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _clock_observation(clock: Callable[[], datetime]) -> datetime:
+    value = clock()
+    if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("D34 clock must return an aware datetime")
+    return value.astimezone(UTC)
+
+
+def _decimal_text(value: object) -> str | None:
+    if type(value) is not Decimal:
+        return None
+    return format(value, "f")
+
+
+__all__ = [
+    "D34ObservationResult",
+    "D34_CLOCK_INVALID",
+    "D34_EVIDENCE_SCHEMA",
+    "D34_FEATURE_BRANCH",
+    "D34_SOURCE_ADMISSION_FAILURE",
+    "SourceAdmission",
+    "admit_current_source",
+    "main",
+    "run_d34_read_only_observation",
+]
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run one source-owned-clock D34 observation."""
+
+    parser = argparse.ArgumentParser(
+        description="Run the Architecture 147 D34 Alpaca recovery observation."
+    )
+    parser.add_argument(
+        "--evidence-dir",
+        type=Path,
+        metavar="PATH",
+        help="fresh absolute external F: evidence directory",
+    )
+    args = parser.parse_args(argv)
+    result = run_d34_read_only_observation(evidence_dir=args.evidence_dir)
+    print(
+        json.dumps(
+            {
+                "status": result.status,
+                "reason": result.reason,
+                "evidence_path": (
+                    None if result.evidence_path is None else str(result.evidence_path)
+                ),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if result.status == "READY" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

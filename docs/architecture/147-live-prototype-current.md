@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current D33 signal-data boundary
+## Current D34 recovery boundary
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
@@ -15,62 +15,53 @@ because neither challenger qualified; it is not a winning challenger,
 promotion, profitability proof, or live eligibility.
 
 D32 is PARTIAL_PASS: strategy math parity and research-binding integrity passed
-with 2,516 comparisons and zero mismatches, while live data-basis parity was
-blocked by `DATA_BASIS_MISMATCH`. D33 is the additive successor for the current
-signal-data leg. Alpaca Market Data supplies exactly 60 completed daily SPY
-bars using the accepted all-adjusted research semantics; Robinhood MCP remains
-the broker/account/execution/custody provider. There is no fallback between
-providers and no synthetic quote/close conversion.
+with 2,516 comparisons and zero mismatches, while live data-basis parity remains
+blocked by `DATA_BASIS_MISMATCH`. D33 was the additive current-signal successor
+and is now a consumed predecessor incident. Its accepted/integrated source is
+`fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
+`beab205abcc045fad38625ff73bb48affea9a0e9`; feature FULL
+`41924058186`, attempt 1, and develop source-gate
+`41936617801`, attempt 1, both succeeded, with exact feature certification
+reuse on develop.
 
-`live_prototype/alpaca_signal_inputs.py` owns deterministic XNYS published
-session selection, the one-request `/v2/stocks/bars` target, strict response
-validation, `CompletedSignalInputs` construction, response/input digests, and
-the pure BASE_MA35_50 decision. `live_prototype/alpaca_signal_operator.py`
-owns the later one-shot read-only observation: source admission precedes
-credential/provider construction, evidence is fresh and external under
-`F:\\AI\\temp`, at most one Alpaca request is made, Robinhood is never called,
-and only sanitized evidence is written. Construction, import, and help paths
-are effect-free.
+D33's one real read-only attempt is permanently CONSUMED / BLOCKED / NO RETRY.
+The preserved evidence is
+`F:\\AI\\temp\\arch147-d33-alpaca-observation-576b4b5c8f7b41548df7b822c44c74de\\evidence.json`,
+SHA-256
+`b767727712e4634950be8a6ba8f43522910d037987824ad33cb7c20c8eab95ec`,
+1,999 bytes. It records `2026-11-04T23:59:08.218729Z`, credentials `1`,
+provider requests `1`, selected sessions `60`, and zero production, broker,
+runtime-binding, campaign, and FINAL_HOLDOUT mutations. The exact rejected
+subtype is unavailable because D33 discarded it.
 
-The D33 source checkpoint itself performs no provider observation and grants no
-provider, paper, broker, campaign, runtime-binding, production, or live
-authority. The P6 `ROBINHOOD_HISTORY59_PLUS_OFFICIAL_CLOSE_V1` 59+1 source,
-evidence, ownership/kill semantics, execution markers, and historical
-Architecture-134/146 pins remain preserved predecessor behavior and are not
-rewritten or relabeled as Alpaca-based.
+The consumed request was exactly:
+
+`GET data.alpaca.markets/v2/stocks/bars?symbols=SPY&timeframe=1Day&start=2026-08-12T04%3A00%3A00.000000Z&end=2026-11-05T04%3A59%3A59.999999Z&limit=60&adjustment=all&asof=-&feed=sip&currency=USD&sort=asc`
+
+Independent source review identifies a contract defect: its end extended past
+the source-owned observation because it used end-of-calendar-day semantics.
+This is not proof that the defect was the provider's exact rejection cause.
+
+D34 is the additive recovery successor. `alpaca_signal_recovery_inputs.py`
+selects exactly 60 completed published XNYS sessions, derives the final
+published regular close once before credentials/provider construction, requires
+that cutoff to be no later than the source-owned observation, and uses that same
+value in the one Alpaca request and `CompletedSignalInputs`. It preserves
+holiday, weekend, DST, and early-close authority. Its separately named operator
+is `alpaca_signal_recovery_operator.py`; the consumed D33 CLI is retired before
+credential/provider access and remains effect-free for `--help`.
+
+D34 evidence uses `arch147-d34-alpaca-signal-observation/v1` and records only
+closed transport/HTTP diagnostics, bounded provider codes/statuses, and a
+digest-only request ID. Source admission precedes credentials/provider
+construction, with exact live origin feature/develop identity and FEATURE /
+PROSPECTIVE_DEVELOP authority. D34 source implementation and tests perform no
+provider, credential, network, Robinhood, broker, order, runtime-binding,
+campaign, paper, live, or FINAL_HOLDOUT effect.
 
 Q61 remains NOT RUN and no live-readiness label is granted. L40-L43 remain
-unresolved for official fractional exit capability, exact owned-position exit
-semantics, and durable budget/recovery/capability work. No paper soak is
-inserted between D33 and L40-L43. FINAL_HOLDOUT remains sealed.
-
-The accepted D33 source `543dc6b45b4a20f53ae28646a0c82b9b1cd7b824` / tree
-`9981cca7cc1f01fae778cbe9e5d189126d3a885c` was integrated into develop after
-feature FULL run `41903739374`, attempt 1, and develop integration run
-`41905183980`, attempt 1; both succeeded. The published D33 predecessor
-`2fd6d764e56226d7ef54c458f6f40b14af3b5b20` / tree
-`f44c9e3455b712572f8c6c022883eadb3ebd9c56` passed mapped FULL run
-`41822221848`, attempt 1, but exact-source review rejected it before
-integration. The current corrective child removes D33's dependency on local
-remote-tracking refs by resolving both origin branch heads read-only through
-the source-owned `_remote_branch_head` helper. The provider observation remains
-NOT_RUN.
-
-Operational review found repeated pre-dispatch stale-tracking, `FETCH_HEAD`,
-and ref-lock failures while preparing D33; they consumed no provider attempt.
-Those local Git write failures are separate host hygiene and are not provider
-authority. Their cause remains unresolved here; no ACL or sandbox-cause claim
-is made.
-
-The protected operator has no caller-selected observation timestamp. Its
-production path obtains one UTC timestamp from its source-owned clock, uses
-that same value for session selection, request construction, evidence, and
-`CompletedSignalInputs.as_of`, and requires the exact final published regular
-close as the completion cutoff. The operator is blocked until the reviewed
-origin URL, live read-only origin feature/develop heads, local HEAD/tree,
-FEATURE authority, and PROSPECTIVE_DEVELOP authority all identify the same
-integrated source. It does not require fresh or writable local remote-tracking
-refs.
+pending behind this recovery. No paper soak is inserted. FINAL_HOLDOUT remains
+sealed.
 
 ## Source and acceptance boundary
 

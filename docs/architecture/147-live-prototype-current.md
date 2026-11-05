@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current D34 recovery boundary
+## Current D34 accepted boundary and L40 transition
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
@@ -14,10 +14,12 @@ campaign `9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
 because neither challenger qualified; it is not a winning challenger,
 promotion, profitability proof, or live eligibility.
 
-D32 is PARTIAL_PASS: strategy math parity and research-binding integrity passed
-with 2,516 comparisons and zero mismatches, while live data-basis parity remains
-blocked by `DATA_BASIS_MISMATCH`. D33 was the additive current-signal successor
-and is now a consumed predecessor incident. Its accepted/integrated source is
+D32 is ACCEPTED / CLOSED: strategy math parity, research-binding integrity, and
+live data-basis parity all passed; the 2,516 comparisons had zero mismatches.
+The accepted D34 observation uses the same `ALPACA_ALL_ADJUSTED_PRICE_V1`
+basis as D30/D31, so the former `DATA_BASIS_MISMATCH` blocker is closed. D33
+was the additive current-signal predecessor and is now a consumed incident. Its
+accepted/integrated source is
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
 `beab205abcc045fad38625ff73bb48affea9a0e9`; feature FULL
 `41924058186`, attempt 1, and develop source-gate
@@ -69,9 +71,33 @@ and removes the operator fallback that could fabricate zero credential/provider
 counts after an escaped failure; the published-close, source-admission,
 diagnostic, and no-effect boundaries remain unchanged.
 
-Q61 remains NOT RUN and no live-readiness label is granted. L40-L43 remain
-pending behind this recovery. No paper soak is inserted. FINAL_HOLDOUT remains
-sealed.
+The corrective D34 source is accepted and integrated at
+`b86defebf9ccbf1efb91397de8f2e66db24a6665` / tree
+`9fa2360dfe7afdd902fd539e94f888063439785d`; feature mapped FULL
+`41969407894`, attempt 1, and develop source-gate `41973853073`, attempt 1,
+succeeded with exact feature-certification reuse. Its separately reviewed
+read-only observation is consumed successfully and is not replayable:
+`F:\\AI\\temp\\arch147-d34-alpaca-observation-84d32fb2af5045e7a661a77259b690fb\\evidence.json`,
+2800 bytes, SHA-256
+`7c6f2d391cbb3141405e3252efcfcd94db18b8e81083d947d778310bfe49464b`, schema
+`arch147-d34-alpaca-signal-observation/v1`, observed at
+`2026-11-05T05:28:41.664723Z`. It made one SPY daily request on the
+`ALPACA_ALL_ADJUSTED_PRICE_V1` basis, ending at the exact published XNYS
+regular close `2026-11-04T21:00:00.000000Z`, with response SHA-256
+`296c9e89dd2f48d47b1ca3b071411d6e8509ca769fc92e433be19696bbf68c94` and
+`CompletedSignalInputs` digest
+`8b6d4f88012da820890cb5070de975c1d02504aeb432939a2e954d9bf9dfecb0`.
+
+The current provider architecture is therefore Alpaca all-adjusted SIP/USD
+daily data for signal inputs, with Robinhood remaining the separate
+execution/custody/reconciliation provider. There is no provider fallback.
+Corrected published-session cutoff semantics are part of the accepted D34
+boundary. The observation validates current signal-input parity only; it does
+not change D31's `NONE_QUALIFIES` result or authorize an order, live eligibility,
+or L40-L43 effects. L40-L43 now own the remaining live-production path.
+
+Q61 remains NOT RUN and no live-readiness label is granted. No paper soak is
+inserted. FINAL_HOLDOUT remains sealed.
 
 ## Source and acceptance boundary
 
@@ -311,7 +337,14 @@ on a tracked background worker, never import/construction/Qt refresh. Opening
 an artifact cannot change runtime binding. Close joins all report/worker threads
 before confirmation; malformed reports yield fixed unavailable text.
 
-### L40 unresolved capability/budget boundary
+### L40 immediate next milestone: unresolved capability/budget boundary
+
+L40 is the immediate next milestone. L40 must freeze official Robinhood
+fractional-position exit capability, exact owned-position exit semantics,
+the distinction between entry/gross budget and safety-exit notional, honest
+market-order fill/loss semantics, and no-retry / `MAY_HAVE_OCCURRED` /
+`UNKNOWN` recovery. L40 remains effect-disabled and does not grant live-order
+authority; L41-L43 depend on its accepted contract.
 
 The above successor lifecycle is an effect-disabled design constraint, not an
 accepted live implementation contract. Tool metadata advertises fractional

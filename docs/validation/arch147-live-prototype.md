@@ -1,12 +1,15 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-Current D34 source-only successor starts from accepted/integrated D33 source
-HEAD `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a`; tree
-`beab205abcc045fad38625ff73bb48affea9a0e9`. Branch
+Accepted/integrated D34 source is HEAD
+`b86defebf9ccbf1efb91397de8f2e66db24a6665`; tree
+`9fa2360dfe7afdd902fd539e94f888063439785d`. Branch
 `feature/robinhood-live-prototype-current`, canonical worktree
-`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`. Feature FULL
-`41924058186`, attempt 1, and develop source-gate `41936617801`, attempt 1,
-succeeded; develop reused the exact feature certification.
+`F:\\AI\\worktrees\\ai-trading-bot-live-prototype-current`. Feature mapped FULL
+`41969407894`, attempt 1, and develop source-gate `41973853073`, attempt 1,
+succeeded; develop reused the exact feature certification. D34 is the
+corrective child of accepted/integrated D33 source
+`fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
+`beab205abcc045fad38625ff73bb48affea9a0e9`.
 
 D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `ebe1839d510db0f24f58f9ebe02b7efb09221d4b8c06c23122f84912c3225214`, basis
@@ -15,11 +18,11 @@ D30 ACCEPTED: dataset `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, SHA
 `f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, SHA
 `94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
 `NONE_QUALIFIES`, retained control `BASE_MA35_50_V1`, ID
-`21158358-75be-5597-b940-5bccdda1429c`. D32 PARTIAL_PASS: strategy math and
-research binding PASS; live data-basis parity remains BLOCKED by
-`DATA_BASIS_MISMATCH`; 2,516 comparisons had zero mismatches. Alpaca
-all-adjusted current signal data and Robinhood execution/custody remain
-separate providers with no fallback.
+`21158358-75be-5597-b940-5bccdda1429c`. D32 is ACCEPTED / CLOSED: strategy
+math parity, research-binding integrity, and live data-basis parity PASS; the
+2,516 comparisons had zero mismatches. The former `DATA_BASIS_MISMATCH` blocker
+is closed. Alpaca all-adjusted current signal data and Robinhood
+execution/custody remain separate providers with no fallback.
 
 D33's real read-only attempt is CONSUMED / BLOCKED / NO RETRY. Evidence is
 `F:\\AI\\temp\\arch147-d33-alpaca-observation-576b4b5c8f7b41548df7b822c44c74de\\evidence.json`,
@@ -66,10 +69,30 @@ clock, exact published-close cutoff, and sanitized failure diagnostics. The
 consumed D33 evidence and preserved D34 predecessor remain immutable and are
 not replayed or relabeled.
 
-The D34 implementation uses no credential, provider, network, Robinhood, broker,
-paper, live, campaign, runtime-binding, or FINAL_HOLDOUT effect. Any future
-provider observation is a separate reviewed boundary after publication,
-integration, mapped FULL, and exact-source acceptance.
+The D34 implementation and tests used no credential, provider, network,
+Robinhood, broker, paper, live, campaign, runtime-binding, or FINAL_HOLDOUT
+effect. The accepted provider observation was a separate reviewed boundary
+after publication, integration, mapped FULL, and exact-source acceptance; its
+effect counters remained zero.
+
+The accepted D34 observation is consumed successfully and is not replayable.
+Evidence is
+`F:\\AI\\temp\\arch147-d34-alpaca-observation-84d32fb2af5045e7a661a77259b690fb\\evidence.json`,
+2800 bytes, SHA-256
+`7c6f2d391cbb3141405e3252efcfcd94db18b8e81083d947d778310bfe49464b`, schema
+`arch147-d34-alpaca-signal-observation/v1`, status READY, reason
+`D34_ALPACA_SIGNAL_INPUTS_READY`, and observation timestamp
+`2026-11-05T05:28:41.664723Z`. It recorded one credential read, one provider
+call, and automatic retry FORBIDDEN. The one request ended at
+`2026-11-04T21:00:00.000000Z`, the exact published XNYS regular close for the
+last selected session. Response-body SHA-256 is
+`296c9e89dd2f48d47b1ca3b071411d6e8509ca769fc92e433be19696bbf68c94`;
+provider request-ID digest is
+`6384000426f7d007ed9391b81bef6beb2ba40a5193cf94dd30a2a58fb63ae15f`; and
+`CompletedSignalInputs` digest is
+`8b6d4f88012da820890cb5070de975c1d02504aeb432939a2e954d9bf9dfecb0`.
+All production, broker, runtime-binding, campaign, paper, live, and
+`FINAL_HOLDOUT` effect counters are zero.
 
 | Task | Dependencies | Owner / exclusive surface | Interface | Status / next |
 |---|---|---|---|---|
@@ -84,12 +107,12 @@ integration, mapped FULL, and exact-source acceptance.
 | G22 | P01 | Luna prototype_activity_page.py + tests | cached DTO v1 | SOL_REVIEWED; 3 focused tests |
 | D30 | selection/official data | Sol then Luna data/parity | accepted dataset identity | ACCEPTED; exact dataset and all-adjusted price basis frozen |
 | D31 | selection/official data | Sol then Luna data/parity | exact research bundle | ACCEPTED; `NONE_QUALIFIES`, control retained, non-live |
-| D32 | selection/official data | Sol then Luna data/parity | parity evidence | PARTIAL_PASS; math/binding PASS, live basis BLOCKED by `DATA_BASIS_MISMATCH` |
+| D32 | selection/official data | Sol then Luna data/parity | parity evidence | ACCEPTED / CLOSED; math, binding, and live data-basis parity PASS |
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
-| D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | CORRECTIVE CHILD IN PROGRESS; future observation separately reviewed |
-| L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | BLOCKED on actual fractional exit capabilities |
+| D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
+| L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | L40 immediate next milestone; blocked on accepted fractional exit capabilities |
 | I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
-| Q60 | exact source | Sol admission/publication/FULL | registered source-only | P01 implementation/corrections/docs integrated through 543dc6b4; corrective child pending |
+| Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | PENDING |
@@ -98,20 +121,20 @@ integration, mapped FULL, and exact-source acceptance.
 |---|---|---|
 | Usable launcher and GUI | SOURCE PASS / HOST NOT RUN | Actual five-page service/GUI tests; native UAT separate |
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
-| Research/runtime parity | D32 PARTIAL_PASS | strategy math and research binding PASS; current data-basis observation remains pending |
-| Current valid inputs | BLOCKED | D33 is consumed/blocked; D34 source correction is not yet observed |
+| Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
+| Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
 | Entry and exact owned exit | BLOCKED | official fractional exit capability unproven |
 | Durable limits/no duplicate effects | PENDING | P6 remains untouched; P01 source is accepted but durable runtime/reconciliation evidence remains unaccepted |
 | Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | D34 CANDIDATE PENDING | D33 source is accepted/integrated; D34 requires exact-source review, admission, and mapped FULL |
+| Exact source certified | D34 ACCEPTED / INTEGRATED | HEAD `b86defe`; feature mapped FULL and develop exact-certification reuse both passed |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
 
 ## Focused verification and review record
 
-All changes remain one source-only checkpoint. R10/R11/R12 and all five GUI
+The D34 implementation was one source-only checkpoint. R10/R11/R12 and all five GUI
 pages were reviewed at their actual source interfaces. Qualification has one
 canonical owner; the GUI adapter imports it. The five qualification metrics are
 the continuous-symbol count, minimum/median continuous return, worst continuous
@@ -132,13 +155,19 @@ or metrics and carries only its fixed sanitized status code.
 | Whole-repository Ruff check and format check | PASS; 1535 files formatted |
 | Current authority and source-only prototype authority | PASS, zero failures |
 | Git diff whitespace | PASS |
-| D34 corrective-child focused tests/checks | PASS locally | 62 D34 input/operator tests; no real observation; no P6 source changed |
+| D34 corrective-child focused tests/checks | PASS locally | 62 D34 input/operator tests; no P6 source changed |
+
+The accepted D34 observation closes the D32 live data-basis leg without changing
+the retained `BASE_MA35_50_V1` control or D31's `NONE_QUALIFIES` result. The
+observed BUY/HOLD outputs are signal outputs only and grant no live eligibility,
+order authority, exit capability, or durable budget readiness. Q61 remains NOT
+RUN as a separate native Windows UAT boundary if still current; no paper soak
+is inserted and `FINAL_HOLDOUT` remains sealed.
 
 Precommit current/historical batch evaluation reported only task files that were
-still being written; all now exist. Clean-candidate admission must independently
-prove FEATURE and PROSPECTIVE_DEVELOP after the one candidate commit. Publication
-is not complete until one terminal mapped GitHub FULL result; independent source
-acceptance remains outside Codex. No local FULL/LEGACY/EXHAUSTIVE was run.
+still being written; all now exist. The D34 candidate then passed clean-candidate
+FEATURE and PROSPECTIVE_DEVELOP admission, one ordinary publication push, and
+one terminal mapped GitHub FULL result. No local FULL/LEGACY/EXHAUSTIVE was run.
 
 Offscreen layouts were rendered at 1366x768 and 1920x1080 under the external F:
 prototype-ui artifact directory. Headless Qt exposes no fonts by default, so
@@ -154,15 +183,14 @@ live implementation is delegated across it.
 
 ## Concrete next boundary
 
-Complete exact-source review of the D34 candidate, stage only intended files,
-create one normal atomic commit, push once, and wait for its single mapped
-`arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this source
-checkpoint. After acceptance, exact ff-only integration and certification reuse
-come before one separately labeled, source-admitted D34 successor observation.
-That future observation has one Alpaca request, no Robinhood call, no runtime
-binding, no campaign, no FINAL_HOLDOUT access, and no paper/broker/live effect.
-It may close the D32 data-basis blocker but cannot authorize a live order.
-Q61 remains NOT RUN; L40-L43 remain pending. Do not insert a paper soak.
+L40 is the immediate next milestone. Freeze and review official Robinhood
+fractional-position exit capability, exact owned-position exit semantics, the
+distinction between entry/gross budget and safety-exit notional, honest
+market-order fill/loss semantics, and no-retry / `MAY_HAVE_OCCURRED` /
+`UNKNOWN` recovery. L40-L43 remain effect-disabled and do not grant live-order
+authority; Q61 remains a separate native UAT boundary if still current. Do not
+invoke D33 or D34 again, do not insert a paper soak, and keep
+`FINAL_HOLDOUT` sealed.
 
 ## Preserved rejected publication and accepted corrections
 

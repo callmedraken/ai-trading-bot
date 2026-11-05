@@ -1,12 +1,15 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 147 D34 consumed-D33 recovery
+## Current milestone - Architecture 147 L40 live-production path
 
-Accepted/integrated D33 source:
+Accepted/integrated D34 source:
+`b86defebf9ccbf1efb91397de8f2e66db24a6665` / tree
+`9fa2360dfe7afdd902fd539e94f888063439785d`. Feature mapped FULL
+`41969407894`, attempt 1, and develop source-gate `41973853073`, attempt 1,
+succeeded; develop reused the exact feature certification. D34's accepted
+source is the corrective child of the integrated D33 source
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
-`beab205abcc045fad38625ff73bb48affea9a0e9`. Feature FULL
-`41924058186`, attempt 1, and develop source-gate `41936617801`, attempt 1,
-succeeded; develop reused exact feature certification.
+`beab205abcc045fad38625ff73bb48affea9a0e9`.
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
@@ -22,10 +25,13 @@ candidate ID `21158358-75be-5597-b940-5bccdda1429c`. NONE_QUALIFIES means that
 neither challenger qualified; it is not a winning challenger, promotion,
 profitability proof, or live eligibility.
 
-D32 is PARTIAL_PASS: strategy math parity and research-binding integrity passed
-with 2,516 comparisons and zero mismatches; live data-basis parity remains
-blocked by `DATA_BASIS_MISMATCH`. Alpaca all-adjusted signal data and Robinhood
-broker/account/execution/custody remain separate providers with no fallback.
+D32 is ACCEPTED / CLOSED: strategy math parity, research-binding integrity, and
+live data-basis parity all passed; the 2,516 strategy comparisons had zero
+mismatches, and the accepted D34 observation used the same
+`ALPACA_ALL_ADJUSTED_PRICE_V1` basis as D30/D31. The former
+`DATA_BASIS_MISMATCH` blocker is closed. Alpaca all-adjusted SIP/USD signal data
+and Robinhood broker/account/execution/custody remain separate providers with
+no fallback.
 
 D33's real read-only attempt is CONSUMED / BLOCKED / NO RETRY. Preserved
 evidence: `F:\\AI\\temp\\arch147-d33-alpaca-observation-576b4b5c8f7b41548df7b822c44c74de\\evidence.json`,
@@ -45,29 +51,35 @@ integration. The review found incomplete blocked-result attempt-count
 invariants and an operator-level escaped-failure fallback that could fabricate
 zero credential/provider counts. No D34 real provider observation occurred.
 
+D34 is now ACCEPTED, INTEGRATED, and CONSUMED SUCCESSFULLY. The accepted
+read-only observation is recorded at
+`F:\\AI\\temp\\arch147-d34-alpaca-observation-84d32fb2af5045e7a661a77259b690fb\\evidence.json`,
+2800 bytes, SHA-256
+`7c6f2d391cbb3141405e3252efcfcd94db18b8e81083d947d778310bfe49464b`,
+observation timestamp `2026-11-05T05:28:41.664723Z`. It consumed exactly one
+credential read and one provider call, with no retry. The one SPY daily request
+ended at the exact published XNYS regular close
+`2026-11-04T21:00:00.000000Z`; response-body SHA-256 is
+`296c9e89dd2f48d47b1ca3b071411d6e8509ca769fc92e433be19696bbf68c94`, and the
+`CompletedSignalInputs` digest is
+`8b6d4f88012da820890cb5070de975c1d02504aeb432939a2e954d9bf9dfecb0`.
+Production, broker, runtime-binding, campaign, paper, live, and
+`FINAL_HOLDOUT` counters remained zero. The observation validates the signal
+input basis only; it does not authorize an order or grant live eligibility.
+
 ## Immediate next step
 
-The D34 corrective child is source-only and changes only attempt-accounting and
-evidence truthfulness plus focused tests/docs. The preserved implementation
-still derives the exact published regular close once before credential/provider
-construction and uses
-that same cutoff in the request and `CompletedSignalInputs`. Its separate entry
-point is `trading_bot.live_prototype.alpaca_signal_recovery_operator`; the D33
-CLI is retired before credential/provider access. D34 evidence uses
-`arch147-d34-alpaca-signal-observation/v1` and digest-only/closed diagnostics.
+L40 is the immediate next milestone. L40-L43 still block any bounded live-order
+readiness: official Robinhood fractional-position exit capability, exact
+owned-position exit semantics, honest market-order fill/loss behavior, and
+durable budget/recovery/capability work remain to be frozen and accepted. Q61
+remains NOT RUN as a separate native Windows UAT boundary if still current; no
+paper-soak milestone is inserted.
 
-Complete exact-source review, then publish one corrective child commit and one
-mapped `arch147-live-prototype` FULL route. Do not invoke D33 or D34 during
-source implementation. After acceptance, integrate exact source with
-certification reuse before any separately reviewed D34 successor observation.
-That future attempt is one Alpaca request only, never Robinhood, with no order
-or other protected effect.
-
-Q61 remains NOT RUN. No live-readiness label is granted. L40-L43 remain
-pending behind this recovery: official fractional exit capability, exact
-owned-position exit semantics, and durable budget/recovery/capability work are
-still required. No paper-soak milestone is inserted. FINAL_HOLDOUT remains
-sealed.
+No live-readiness label is granted. L40-L43 remain effect-disabled and still
+require official fractional exit capability, exact owned-position exit
+semantics, and durable budget/recovery/capability work. No paper-soak milestone
+is inserted. FINAL_HOLDOUT remains sealed.
 
 ## Product and protected boundaries
 

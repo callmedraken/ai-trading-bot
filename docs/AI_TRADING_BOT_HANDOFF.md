@@ -1,20 +1,22 @@
 # AI Trading Bot - Current Handoff
 
-## D34 continuation identity
+## D34 accepted/integrated closeout identity
 
 Worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
 
 Branch: `feature/robinhood-live-prototype-current`
 
-Parent source HEAD: `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a`
+Integrated source HEAD: `b86defebf9ccbf1efb91397de8f2e66db24a6665`
 
-Parent source tree: `beab205abcc045fad38625ff73bb48affea9a0e9`
+Integrated source tree: `9fa2360dfe7afdd902fd539e94f888063439785d`
 
-The accepted D33 source is integrated through the parent `develop` source above.
-Feature FULL `41924058186`, attempt 1, and develop source-gate `41936617801`,
-attempt 1, both succeeded; develop reused exact feature certification. This
-worktree was clean at the exact parent before editing. D33 is now a consumed
-predecessor incident, not an available observation boundary.
+Feature mapped FULL `41969407894`, attempt 1, and develop source-gate
+`41973853073`, attempt 1, both succeeded; develop reused the exact feature
+certification. Develop and the feature branch both point to the integrated D34
+HEAD. The accepted D33 source remains the direct parent
+`fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
+`beab205abcc045fad38625ff73bb48affea9a0e9`; D33 is a consumed predecessor
+incident, not an available observation boundary.
 
 The preserved D34 predecessor is
 `9981bf47072d35381a2e5b6f187c9497e9dbed5a` / tree
@@ -33,9 +35,10 @@ D30 is ACCEPTED with dataset ID
 `f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, bundle SHA
 `94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, result
 `NONE_QUALIFIES`, and retained control `BASE_MA35_50_V1` / candidate
-`21158358-75be-5597-b940-5bccdda1429c`. D32 is PARTIAL_PASS: strategy math and
-research binding passed; live data-basis parity is blocked by
-`DATA_BASIS_MISMATCH`.
+`21158358-75be-5597-b940-5bccdda1429c`. D32 is ACCEPTED / CLOSED: strategy
+math parity, research-binding integrity, and live data-basis parity passed;
+the 2,516 comparisons had zero mismatches. The former
+`DATA_BASIS_MISMATCH` blocker is closed.
 
 ## Consumed D33 incident
 
@@ -51,7 +54,7 @@ The request end exceeded observation through end-of-calendar-day semantics;
 this is a source-contract defect, not proof of the provider's exact rejection
 cause. D33's exact request target is preserved in the validation ledger.
 
-## D34 next milestone and stop conditions
+## Accepted D34 observation and stop conditions
 
 The corrective D34 child changes only attempt-accounting/evidence truthfulness
 and focused tests/docs. The additive D34 source derives one exact published
@@ -64,19 +67,38 @@ session set. D34's separately named entry point is
 schema `arch147-d34-alpaca-signal-observation/v1`. The old D33 CLI is retired
 before credentials/provider access; `--help` remains effect-free.
 
-D34 source admission proves the reviewed origin URL, live read-only feature and
-develop heads, local exact tree, FEATURE authority, and PROSPECTIVE_DEVELOP
-authority before any credential/provider construction. It performs no real
-provider operation, credential read, network, Robinhood, broker, order,
-runtime-binding, campaign, paper, live, or FINAL_HOLDOUT effect. A future D34
-observation is separately reviewed and remains one-attempt/no-retry.
+D34 source admission and the mapped feature FULL completed before the
+separately labeled read-only observation. The accepted evidence is
+`F:\\AI\\temp\\arch147-d34-alpaca-observation-84d32fb2af5045e7a661a77259b690fb\\evidence.json`,
+2800 bytes, SHA-256
+`7c6f2d391cbb3141405e3252efcfcd94db18b8e81083d947d778310bfe49464b`.
+Schema: `arch147-d34-alpaca-signal-observation/v1`; status READY; reason
+`D34_ALPACA_SIGNAL_INPUTS_READY`; observation timestamp
+`2026-11-05T05:28:41.664723Z`.
 
-After exact-source review, publish one normal corrective child commit and one
-mapped `arch147-live-prototype` FULL run. Do not invoke D33 or D34 during this
-source checkpoint. Only after acceptance and exact integration may the
-separately labeled D34 observation be considered. It may close the D32
-data-basis blocker but cannot authorize a live order. Q61 remains NOT RUN; no
-readiness label is granted. L40-L43 remain pending. Do not insert a paper soak.
+The observation consumed exactly one credential read and one provider call, with
+automatic retry FORBIDDEN. The exact one-request target is
+`GET /v2/stocks/bars?symbols=SPY&timeframe=1Day&start=2026-08-12T04%3A00%3A00.000000Z&end=2026-11-04T21%3A00%3A00.000000Z&limit=60&adjustment=all&asof=-&feed=sip&currency=USD&sort=asc`.
+It selected 60 sessions from 2026-08-12 through 2026-11-04. Response-body
+bytes were 6702 with SHA-256
+`296c9e89dd2f48d47b1ca3b071411d6e8509ca769fc92e433be19696bbf68c94`;
+provider request-ID digest was
+`6384000426f7d007ed9391b81bef6beb2ba40a5193cf94dd30a2a58fb63ae15f`; and
+the `CompletedSignalInputs` digest was
+`8b6d4f88012da820890cb5070de975c1d02504aeb432939a2e954d9bf9dfecb0`.
+No raw request ID or credential material is retained.
+
+The D34 attempt is CONSUMED SUCCESSFULLY / NO RETRY. Production, broker,
+runtime-binding, campaign, order, paper, live, and `FINAL_HOLDOUT` effects are
+all zero. The observed BASE_MA35_50_V1 BUY/HOLD outputs are signal outputs only;
+they do not authorize an order or grant live eligibility.
+
+L40 is the immediate next milestone. L40-L43 remain required before any bounded
+live-order readiness, including official Robinhood fractional-position exit
+capability, exact owned-position exit semantics, honest market-order
+fill/loss and unknown-recovery semantics, and durable budget/capability work.
+Q61 remains NOT RUN as a separate native Windows UAT boundary if still current;
+no readiness label is granted and no paper soak is inserted.
 FINAL_HOLDOUT remains sealed.
 
 The old P6 protected read-only preflight remains a separate historical/current

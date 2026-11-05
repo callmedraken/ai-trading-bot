@@ -1,11 +1,65 @@
 """Current prototype source-only route and ownership regressions."""
 
+import ast
 from pathlib import Path
 
 from scripts.source_authority import current_owner
 
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
+
+_L41_IMPORT_ALLOWLIST = {
+    "src/trading_bot/live_prototype/capability_operator.py": {
+        ("import", "subprocess", None),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.windows_oauth",
+            "create_windows_robinhood_oauth_factory",
+        ),
+    },
+    "src/trading_bot/live_prototype/capability_transport.py": {
+        (
+            "from",
+            "trading_bot.robinhood_mcp.sdk_transport",
+            "ROBINHOOD_TRADING_MCP_URL",
+        ),
+        ("import", "httpx2", None),
+        ("from", "mcp", "Client"),
+        (
+            "from",
+            "mcp.client.streamable_http",
+            "streamable_http_client",
+        ),
+    },
+}
+_FORBIDDEN_PRODUCTION_IMPORTS = (
+    "robinhood_mcp",
+    "desktop_live.execution",
+    "windows_oauth",
+    "httpx",
+    "requests",
+    "sqlite3",
+    "subprocess",
+    "socket",
+)
+
+
+def _production_imports(path: str, tree: ast.AST) -> list[tuple[str, str, str | None]]:
+    records: list[tuple[str, str, str | None]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom):
+            records.extend(
+                ("from", node.module or "", alias.name) for alias in node.names
+            )
+        elif isinstance(node, ast.Import):
+            records.extend(("import", alias.name, alias.asname) for alias in node.names)
+    allowed = _L41_IMPORT_ALLOWLIST.get(path, set())
+    return [
+        record
+        for record in records
+        if any(token in record[1] for token in _FORBIDDEN_PRODUCTION_IMPORTS)
+        and record not in allowed
+    ]
 
 
 def test_prototype_has_no_protected_dispatch_and_maps_full():
@@ -44,34 +98,28 @@ def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):
 
 
 def test_new_application_has_no_production_transport_or_dynamic_dispatch():
-    import ast
-
     root = Path(runner.__file__).resolve().parents[1]
     paths = tuple((root / "src/trading_bot/live_prototype").glob("*.py")) + (
         root / "scripts/run_live_prototype.py",
     )
-    forbidden = (
-        "robinhood_mcp",
-        "desktop_live.execution",
-        "windows_oauth",
-        "httpx",
-        "requests",
-        "sqlite3",
-        "subprocess",
-        "socket",
-    )
     for path in paths:
         tree = ast.parse(path.read_text(encoding="utf-8"))
-        imported = [
-            n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
-        ]
-        imported += [
-            a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names
-        ]
-        assert not any(word in name for name in imported for word in forbidden), path
+        relative_path = path.relative_to(root).as_posix()
+        assert not _production_imports(relative_path, tree), path
         assert not any(
             isinstance(n, ast.Call)
             and isinstance(n.func, ast.Name)
             and n.func.id in {"eval", "exec", "__import__"}
             for n in ast.walk(tree)
         ), path
+
+
+def test_unrelated_prototype_module_still_rejects_production_import():
+    unrelated = ast.parse(
+        "from trading_bot.robinhood_mcp.current_live_transport import "
+        "RobinhoodCurrentLiveTransport"
+    )
+
+    assert _production_imports(
+        "src/trading_bot/live_prototype/unrelated_service.py", unrelated
+    )

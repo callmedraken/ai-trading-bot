@@ -134,7 +134,7 @@ was invoked. Keep the following evidence classes separate:
 | ADVERTISED | review/place accept side=sell and quantity; fractional market orders in regular hours for eligible accounts, up to six decimal places, no short sells | Six decimal places is an advertised interface bound, not an account/provider fill or residual guarantee |
 | SOURCE_SUPPORTED | lower transport passes generic argument mappings; read-only review adapter can express quantity | P6 generates/reviews/places BUY plus dollar_amount only; generic transport is not a guarded sell implementation |
 | SYNTHETICALLY_TESTED | local quantity-review and P6 buy/placement fakes exercise their own contracts | No real fractional sell, account eligibility or residual-close qualification |
-| PROVIDER/ACCOUNT_UNPROVEN | actual account eligibility, quantity increment/minimum, sell minimum notional, full residual handling and exact sell-review behavior | L41 evidence or explicit first-owned-position qualification is required |
+| PROVIDER/ACCOUNT_UNPROVEN | actual account eligibility, quantity increment/minimum, sell minimum notional, full residual handling and exact sell-review behavior | L41 can observe bounded account/instrument facts; official numeric and residual rules stay blocked until independently accepted |
 
 `review_equity_order` is advertised as simulation without placement; review PASS
 is not a fill guarantee, order authority or permission to place. L41 never
@@ -164,26 +164,54 @@ If an upper quantity rule is represented, record its finite supported bound or
 explicit evidence that the route has no maximum. An omitted/zero maximum does
 not mean unlimited capacity; conflicting bounded/unbounded claims block.
 
-L41 classifies each fact PROVEN, UNPROVEN_BUT_NOT_REQUIRED_BEFORE_ENTRY,
-BLOCKING_L42 or DEFER_TO_FIRST_OWNED_POSITION with evidence digest and rationale.
-Unresolved rules needed to enter and exit the bounded fraction block readiness;
-unknown facts are never silently classified nonblocking. L41 incompatibility
-stops L42 finalization for contract review, with no workaround.
+The L41 evidence inventory is exactly `INTENDED_AGENTIC_ACCOUNT`,
+`SPY_TRADABILITY`, `FRACTIONAL_ELIGIBILITY`, `SELL_QUANTITY_FIELD`,
+`DECIMAL_INTERFACE_PRECISION`, `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
+`MAXIMUM_QUANTITY_OR_ABSENCE`, `MINIMUM_SELL_NOTIONAL_OR_ABSENCE`,
+`BELOW_MINIMUM_FULL_CLOSE`, `RESIDUAL_FULL_OWNED_CLOSE`,
+`REVIEW_PREVIEW_ONLY`, and `INSTANCE_REVIEW_REQUIRES_POSITION`. Every fact is
+classified `PROVEN`, `BLOCKING_L42`, or
+`DEFER_TO_FIRST_OWNED_POSITION`. Only the position-specific review requirement
+may be deferred. The overall status is `READY_FOR_L42`, `BLOCKED`, or `NOT_RUN`;
+`READY_FOR_L42` is a factual readiness result and never grants trade authority.
 
-A live L41 collector is deliberately deferred to a minimal source child: current
-metadata exposes neither numeric minimum rules nor an account fractional-sell
-attestation, and truthful review may need the first owned position. L40 adds no
-provider dispatch or speculative collector claiming these facts. After L40
-acceptance/integration, first freeze an exact read-only observation plan from
-these remaining facts, source-review any required collector, then invoke only
-the independently reviewed observation. No consumed P6/D33/D34 retry.
+L41's source-owned collector performs at most one `get_accounts` read followed
+by one `get_equity_tradability` read bound to the resolved Agentic account and
+`symbols: ["SPY"]`. The transport permits exactly those two tool methods in one
+MCP session. All other tool calls, including positions, portfolio, orders,
+quotes, review, place and cancel, remain zero. No sell review, synthetic
+position, or order is created. The operator validates the fresh external F:
+evidence destination and exact source admission before constructing the
+existing Windows OAuth factory or restricted transport. A future real
+invocation requires exact clean integrated feature/develop/local HEAD and tree
+identity plus FEATURE and PROSPECTIVE_DEVELOP authority under the existing
+`arch147-live-prototype` owner.
+
+The source-only L41 implementation and fake tests make no real observation and
+read no credentials or provider data. One source-owned OAuth initialization
+scope and one MCP session are the permitted future composition. Existing
+Windows OAuth storage may perform multiple SDK-managed native credential-store
+reads; L41 records that native count as unknown and never claims a single native
+read. Import and CLI help are effect-free.
+
+Schema metadata can establish interface fields and semantics only; it cannot
+prove account eligibility or numeric, minimum, notional, maximum, or residual
+rules. Typed rule provenance records an official identifier, canonical URL or
+document ID, retrieval/acceptance date, content digest, and exact semantic claim
+IDs. Those caller-supplied metadata and the digest are references, not
+authentication. Without a separate source-owned accepted trust binding, every
+official-rule-dependent claim remains `BLOCKING_L42`, even when a rule value or
+digest is submitted. Unknown required facts block readiness. No L41 outcome
+authorizes entry, exit, review-to-place chaining, or a trade. No consumed
+P6/D33/D34 attempt may be retried.
 
 ## Dependency and publication plan
 
-L40 acceptance/integration -> L41 capability evidence -> consolidated L42 + I53
-source -> Q61 human native Windows UAT -> Q62 fresh protected read-only
-readiness -> canonical DOCS_ONLY readiness closeout -> L43 bounded genuine
-entry/recovery/exact-owned safety-exit qualification -> Q63 exact delivery.
+L40 acceptance/integration -> L41 source publication/acceptance/integration ->
+future L41 capability observation -> consolidated L42 + I53 source -> Q61 human
+native Windows UAT -> Q62 fresh protected read-only readiness -> canonical
+DOCS_ONLY readiness closeout -> L43 bounded genuine entry/recovery/exact-owned
+safety-exit qualification -> Q63 exact delivery.
 Labels define dependencies, not permission from numeric ordering.
 
 Use the existing `arch147-live-prototype` source-only checkpoint with mapped

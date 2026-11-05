@@ -113,8 +113,8 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | D32 | selection/official data | Sol then Luna data/parity | parity evidence | ACCEPTED / CLOSED; math, binding, and live data-basis parity PASS |
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
 | D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
-| L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | Source prepared; independent exact-source acceptance pending |
-| L41 | accepted/integrated L40 | reviewed read-only capability boundary | official/account evidence | NOT RUN; collector deferred; minimum/residual facts unproven |
+| L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
+| L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Local source prepared; no real observation; source publication and independent exact-source review pending; official rule facts remain blocked |
 | L42/I53 | accepted L41 capability contract | durable controller/runtime/live service | consolidated effect-disabled source | PENDING; no production controller or live composition |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
@@ -189,12 +189,13 @@ below resolves local mechanical semantics; actual exit capability remains open.
 
 ## Concrete next boundary
 
-L40 adds the [effect-disabled contract](../architecture/147-restricted-live-contract.md)
-and `tests/live_prototype/test_live_contract.py` under the existing source-only
-prototype checkpoint/mapped FULL. Independent ChatGPT exact-source acceptance
-and integration are next; source PASS does not accept itself. Required L41
-account/size/minimum/residual evidence remains unproven; a truthful collector is
-deferred to a minimal source child rather than inventing provider facts.
+L40's [effect-disabled contract](../architecture/147-restricted-live-contract.md)
+and `tests/live_prototype/test_live_contract.py` are ACCEPTED / INTEGRATED at
+`14e1b628c0c51c27b23deabee56eb91859818529`. The L41 source-only observer is
+prepared locally under the existing prototype checkpoint/mapped FULL; exact
+source publication and independent review are next. L41 does not itself
+produce account/provider evidence. Required account/size/minimum/residual facts
+remain unproven, and source PASS does not accept itself.
 
 L42/I53 will implement durable ownership/budget/recovery, runtime Alpaca signals,
 real application/worker composition and Q62/Q63 tooling in one broad source
@@ -232,9 +233,48 @@ clean-candidate admission, exact publication and mapped terminal FULL remain the
 subsequent source gates; this record does not claim them before they occur.
 No local FULL, manual workflow dispatch or provider/native UAT was run.
 
-The deliberate L41 collector deferral and downstream source/evidence ownership
-are in the L40 contract. Publication success must still be reviewed independently;
-no acceptance, integration or readiness is asserted by this record.
+L40 recorded the L41 collector deferral at that checkpoint. L41 now supplies the
+source-owned collector/operator while preserving downstream source/evidence
+ownership. This record does not accept or integrate L41 and does not claim a real
+observation or readiness result.
+
+## L41 source-only observer implementation
+
+L41 adds the typed 13-fact inventory (`INTENDED_AGENTIC_ACCOUNT`,
+`SPY_TRADABILITY`, `FRACTIONAL_ELIGIBILITY`, `SELL_QUANTITY_FIELD`,
+`DECIMAL_INTERFACE_PRECISION`, `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
+`MAXIMUM_QUANTITY_OR_ABSENCE`, `MINIMUM_SELL_NOTIONAL_OR_ABSENCE`,
+`BELOW_MINIMUM_FULL_CLOSE`, `RESIDUAL_FULL_OWNED_CLOSE`, `REVIEW_PREVIEW_ONLY`,
+`INSTANCE_REVIEW_REQUIRES_POSITION`), a pure fail-closed classifier,
+an injectable two-method collector, a restricted one-session MCP transport, and
+the source-owned `python -m trading_bot.live_prototype.capability_operator`
+command. The collector resolves the intended Agentic account, observes SPY
+tradability with an account-bound `get_equity_tradability` call, and never
+retains the raw account number in its report. Its interface is limited to one
+`get_accounts` call and one such SPY read. No other tool, review, position,
+portfolio, quote, order or cancellation call is exposed. Tests use fakes only;
+no real OAuth, credential-store or provider call occurred for this source.
+
+Before a future real invocation, the operator requires the exact clean canonical
+feature checkout, matching live feature and develop heads/trees, and both
+FEATURE and PROSPECTIVE_DEVELOP results from the existing evaluator under
+`arch147-live-prototype`. The operator opens one source-owned OAuth
+initialization scope and one MCP session only after that admission. Windows OAuth
+storage may make multiple SDK-managed native credential-store reads; their
+count is unknown and evidence reports `native_credential_read_count: null`.
+Evidence is fresh, external, create-only F: JSON with source identities, the
+13 fact classifications and truthful attempt counters. Account identifiers,
+secrets, provider text and raw exception text are excluded.
+
+`PROVEN`, `BLOCKING_L42`, and `DEFER_TO_FIRST_OWNED_POSITION` are the only fact
+classifications. Only the position-specific review requirement may be deferred.
+Schema fields establish interface shape, not official numeric rules or account
+eligibility. Rule metadata and a content digest are provenance references, not
+authentication; official-rule-dependent facts remain `BLOCKING_L42` without a
+separately accepted source-owned trust binding. Overall readiness is
+`READY_FOR_L42`, `BLOCKED`, or `NOT_RUN`; `READY_FOR_L42` would not authorize a
+trade. The current L41 source has not been independently accepted or integrated,
+and no real observation has been run.
 
 ## Preserved rejected publication and accepted corrections
 

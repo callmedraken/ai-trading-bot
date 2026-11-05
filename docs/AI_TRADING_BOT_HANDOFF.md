@@ -1,5 +1,33 @@
 # AI Trading Bot - Current Handoff
 
+## L40 source checkpoint awaiting independent acceptance
+
+Canonical worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`;
+branch: `feature/robinhood-live-prototype-current`. Verified implementation base
+HEAD `f7f13f805ad6a0eea7041cb6d13c561149a13f6e`, tree
+`4cf5d8fd19a8089103e9f119e4d8d338a08819d0`; live feature/develop matched that
+closeout before edits. Develop gate `41987821711`, attempt 1, was SUCCESS.
+The L40 publication identity is resolved from Git and the source-gate evidence;
+this document does not self-certify its containing commit or acceptance.
+
+L40 adds the pure `live_prototype/live_contract.py` owner and focused tests.
+The [L40 contract](architecture/147-restricted-live-contract.md) owns mechanical
+exit/budget/ownership/no-retry semantics and remaining L41 facts. The source-only
+`arch147-live-prototype` registration remains mapped to GitHub-owned FULL;
+preflight/execute remain absent. No local FULL or manual dispatch is required.
+P6 effect code, consumed evidence, D34 observation and synthetic launcher are
+unchanged. The new snapshot/reservation contract is not a durable live runtime.
+
+Next: ChatGPT independently reviews the exact published L40 diff and terminal
+CI, accepts/rejects it and assesses integration. After accepted integration,
+freeze the L41 read-only observation/collector for actual eligibility and
+minimum/residual facts; do not invoke a provider from this handoff. The collector
+was deferred because current metadata does not expose all required capability
+facts and a truthful sell review may require the first exact-owned position.
+Effect-free unpublished L42 analysis can continue; L42 finalization waits for
+accepted L41 facts. Q61/Q62/L43/Q63 remain unrun; no readiness label is granted.
+D33 and D34 must never be replayed; FINAL_HOLDOUT remains sealed.
+
 ## D34 accepted/integrated closeout identity
 
 Worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
@@ -12,8 +40,9 @@ Integrated source tree: `9fa2360dfe7afdd902fd539e94f888063439785d`
 
 Feature mapped FULL `41969407894`, attempt 1, and develop source-gate
 `41973853073`, attempt 1, both succeeded; develop reused the exact feature
-certification. Develop and the feature branch both point to the integrated D34
-HEAD. The accepted/integrated D33 source remains the D34 lineage ancestor
+certification. That is the accepted D34 implementation identity; the later
+canonical closeout and current L40 base are recorded above. The accepted/integrated
+D33 source remains the D34 lineage ancestor
 `fad65c9f4eab5bc1de4e154fdf0f59e397bc943a` / tree
 `beab205abcc045fad38625ff73bb48affea9a0e9`. The first D34 publication
 `9981bf47072d35381a2e5b6f187c9497e9dbed5a` is its direct child, and accepted
@@ -96,13 +125,9 @@ runtime-binding, campaign, order, paper, live, and `FINAL_HOLDOUT` effects are
 all zero. The observed BASE_MA35_50_V1 BUY/HOLD outputs are signal outputs only;
 they do not authorize an order or grant live eligibility.
 
-L40 is the immediate next milestone. L40-L43 remain required before any bounded
-live-order readiness, including official Robinhood fractional-position exit
-capability, exact owned-position exit semantics, honest market-order
-fill/loss and unknown-recovery semantics, and durable budget/capability work.
-Q61 remains NOT RUN as a separate native Windows UAT boundary if still current;
-no readiness label is granted and no paper soak is inserted.
-FINAL_HOLDOUT remains sealed.
+The current L40 source boundary and remaining L41-L43 dependencies are recorded
+above and in the L40 contract. Q61 remains NOT RUN; no readiness label or paper
+soak is inserted. FINAL_HOLDOUT remains sealed.
 
-The old P6 protected read-only preflight remains a separate historical/current
-predecessor boundary and is not the D33 signal-data path.
+The old P6 preflight is historical predecessor context, not the current next
+operator action and not the D33/D34 signal-data path. It grants no retry.

@@ -113,8 +113,10 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | D32 | selection/official data | Sol then Luna data/parity | parity evidence | ACCEPTED / CLOSED; math, binding, and live data-basis parity PASS |
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
 | D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
-| L40-L43 | official exit/budgets | Sol contract then Luna | effect-disabled design | L40 immediate next milestone; blocked on accepted fractional exit capabilities |
-| I50-I53 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
+| L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | Source prepared; independent exact-source acceptance pending |
+| L41 | accepted/integrated L40 | reviewed read-only capability boundary | official/account evidence | NOT RUN; collector deferred; minimum/residual facts unproven |
+| L42/I53 | accepted L41 capability contract | durable controller/runtime/live service | consolidated effect-disabled source | PENDING; no production controller or live composition |
+| I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
@@ -181,19 +183,58 @@ Both bounded current coordination documents and README were reviewed and updated
 Historical/P6 source and consumed evidence were not changed. Automatic review
 initially rejected shared registration; the user explicitly approved the exact
 review patch and focused fixes before it was applied. No gate bypass occurred.
-The L40 exit-notional/price-movement ambiguity is recorded in the contract; no
-live implementation is delegated across it.
+At that prototype publication, the L40 exit-notional/price-movement ambiguity
+was recorded without delegating live implementation. The current L40 proposal
+below resolves local mechanical semantics; actual exit capability remains open.
 
 ## Concrete next boundary
 
-L40 is the immediate next milestone. Freeze and review official Robinhood
-fractional-position exit capability, exact owned-position exit semantics, the
-distinction between entry/gross budget and safety-exit notional, honest
-market-order fill/loss semantics, and no-retry / `MAY_HAVE_OCCURRED` /
-`UNKNOWN` recovery. L40-L43 remain effect-disabled and do not grant live-order
-authority; Q61 remains a separate native UAT boundary if still current. Do not
-invoke D33 or D34 again, do not insert a paper soak, and keep
-`FINAL_HOLDOUT` sealed.
+L40 adds the [effect-disabled contract](../architecture/147-restricted-live-contract.md)
+and `tests/live_prototype/test_live_contract.py` under the existing source-only
+prototype checkpoint/mapped FULL. Independent ChatGPT exact-source acceptance
+and integration are next; source PASS does not accept itself. Required L41
+account/size/minimum/residual evidence remains unproven; a truthful collector is
+deferred to a minimal source child rather than inventing provider facts.
+
+L42/I53 will implement durable ownership/budget/recovery, runtime Alpaca signals,
+real application/worker composition and Q62/Q63 tooling in one broad source
+publication. Q61 native UAT, Q62 read-only readiness, mandatory canonical
+readiness closeout, L43 genuine bounded entry/owned exit and Q63 delivery remain
+unrun. No readiness label or broker authority is granted. Do not invoke D33 or
+D34 again, do not insert a paper soak, and keep FINAL_HOLDOUT sealed.
+
+## L40 focused implementation record
+
+Implementation base: canonical D34 closeout `f7f13f805ad6a0eea7041cb6d13c561149a13f6e`,
+tree `4cf5d8fd19a8089103e9f119e4d8d338a08819d0`. Seven Luna audit/design
+assignments mapped authority, capability, ownership, recovery, runtime/application,
+adversarial testing and Windows delivery. The orchestrator independently reviewed
+and composed the source/tests/docs; subagents did not stage, commit or publish.
+
+The pure L40 owner and tests add no credential, provider, broker, persistence,
+controller, live composition or protected dispatch. It rejects unknown capability,
+including an omitted maximum unless evidence explicitly records no maximum;
+zero/conflicting maximum rules block. Synthetic evidence references authenticate
+nothing and cannot grant external effect authority. Actual fill dollars above the
+reserved request remain truthful and do not by themselves prevent reducing exit.
+
+Combined affected verification passed: **179 tests**, using the exact command:
+
+```powershell
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -m pytest -q -p no:cacheprovider tests/live_prototype tests/runtime/checkpoint_runner/test_arch147_prototype.py --basetemp 'F:\AI\temp\arch147-l40-focused-4d51948040ba49fa8f2d7c31a84e7b93\pytest' --junitxml 'F:\AI\temp\arch147-l40-focused-4d51948040ba49fa8f2d7c31a84e7b93\junit.xml'
+```
+
+That command records the completed attempt, not a reusable evidence destination.
+Any justified later attempt requires a fresh unique external directory. Focused
+Ruff check/format covered both new Python files and checkpoint_runner.py; both
+passed. `git diff --check` and current authority returned zero failures. General
+clean-candidate admission, exact publication and mapped terminal FULL remain the
+subsequent source gates; this record does not claim them before they occur.
+No local FULL, manual workflow dispatch or provider/native UAT was run.
+
+The deliberate L41 collector deferral and downstream source/evidence ownership
+are in the L40 contract. Publication success must still be reviewed independently;
+no acceptance, integration or readiness is asserted by this record.
 
 ## Preserved rejected publication and accepted corrections
 

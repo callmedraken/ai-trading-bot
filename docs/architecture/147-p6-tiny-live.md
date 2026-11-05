@@ -1,5 +1,11 @@
 # Architecture 147 P6 — Tiny live production boundary
 
+> Historical P6 predecessor record. Later "next preflight" and "current
+> correction" wording below describes its original sequence, not current
+> operator authority. The D34 canonical closeout supersedes that sequence;
+> [L40](147-restricted-live-contract.md) is the current successor source boundary.
+> Preserve consumed attempts; do not run a P6 preflight from this document.
+
 P6 is the first narrowly bounded production-trial source boundary. It is an
 additive successor to the accepted P5B Robinhood read/reconciliation baseline;
 P5B remains independently read-only and its transport is not extended.

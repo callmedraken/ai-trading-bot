@@ -180,17 +180,16 @@ Disconnect blocks new effects; reconnect can observe, never replay mutation.
 Restart reconciles durable intent/order/fill/ownership/budget state before READY.
 No marker/database deletion, reset or uncertain partial-state repair.
 
-Initial successor scope is SPY long cash equities, no leverage/options/shorts/
-crypto, <=$10 entry/order/gross exposure, <=$10 cumulative entry dollars, maximum
-one entry and one owned exit; no automatic repeated session or budget reset.
-Fees/slippage do not confer a market-fill price guarantee. Exit may cover only
-verified owned fractional quantity if official broker size/minimum/order rules
-support it. Missing exit capability is EXIT_CAPABILITY_UNPROVEN, never permission
-to enlarge/emulate an order. A hard loss/fill-price promise cannot be implemented
-with an unbounded market order: live readiness remains blocked until the effect
-contract and official capabilities are independently accepted. Synthetic fixtures
-are not capability evidence. Repeated operation needs a separately accepted
-persistent-budget contract; P6 consumption cannot be bypassed.
+The additive [L40 restricted-live contract](147-restricted-live-contract.md)
+now owns the proposed successor mechanical policy, pending independent source
+acceptance. It retains SPY long cash equity, at most $10 requested/cumulative
+new acquisition, one entry and one exact-owned exit, no automatic budget/session
+reset and no leverage/options/shorts/crypto. A reducing exact-owned strategy or
+safety exit may exceed $10 current notional after appreciation. Safety exit may
+bypass strategy HOLD only, never ownership/risk/readiness gates. Market orders
+make no fill-price, value or loss guarantee. Official account/size/minimum/
+residual capability remains L41 evidence, not a synthetic assertion. P6 policy
+and consumed authority are unchanged; no live runtime or readiness is granted.
 
 ## Frozen launcher interface
 
@@ -337,27 +336,18 @@ on a tracked background worker, never import/construction/Qt refresh. Opening
 an artifact cannot change runtime binding. Close joins all report/worker threads
 before confirmation; malformed reports yield fixed unavailable text.
 
-### L40 immediate next milestone: unresolved capability/budget boundary
+### L40 source contract and remaining capability boundary
 
-L40 is the immediate next milestone. L40 must freeze official Robinhood
-fractional-position exit capability, exact owned-position exit semantics,
-the distinction between entry/gross budget and safety-exit notional, honest
-market-order fill/loss semantics, and no-retry / `MAY_HAVE_OCCURRED` /
-`UNKNOWN` recovery. L40 remains effect-disabled and does not grant live-order
-authority; L41-L43 depend on its accepted contract.
+The [L40 owner](147-restricted-live-contract.md) freezes effect-disabled local
+ownership, entry versus reducing-exit budgets, partial fills, no-retry and
+restart constraints. Its pure tests do not prove provider capability, durable
+persistence, real application wiring or readiness. Independent exact-source
+acceptance/integration is required before L41.
 
-The above successor lifecycle is an effect-disabled design constraint, not an
-accepted live implementation contract. Tool metadata advertises fractional
-quantity market orders in regular hours with at most six decimal places, but
-account eligibility, minimum sizes, exact residual exits and the source-owned
-adapter still require distinct admission. Metadata is not a provider observation.
-No tool/provider was invoked to inspect those descriptions.
-
-The $10 initial order/admission ceiling does not guarantee post-fill mark-to-market
-exposure under price movement. A full owned exit after appreciation could exceed
-an unqualified $10 order ceiling. Exit-notional admission, loss-budget semantics
-and any price constraint must therefore be frozen by the independent successor
-live-contract owner before L41/L42. No exception or broader sell authority is
-implemented here. This ambiguity blocks live readiness; it is not resolved by
-rounding up, selling unrelated holdings, guaranteeing a market fill, or silently
-increasing a budget. P6 remains untouched.
+Tool descriptions advertise quantity-based fractional market sells in regular
+hours up to six decimals; this is an interface bound, not an observed account
+eligibility, minimum or exact-residual guarantee. L41 must classify remaining
+facts and obtain official/account evidence; unknown required facts block.
+No provider call or collector is introduced by L40. Consolidated L42/I53 source
+and Q61/Q62/L43/Q63 evidence/delivery remain downstream. D33/D34 are consumed,
+no paper soak is inserted, and FINAL_HOLDOUT remains sealed.

@@ -1,6 +1,14 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Architecture 147 L40 live-production path
+## Current milestone - L40 source contract; acceptance pending
+
+L40 now has an effect-disabled mechanical contract and focused tests for exact
+ownership, nonresetting acquisition budget, reducing exits and uncertainty.
+See [the L40 contract](architecture/147-restricted-live-contract.md).
+Its implementation base is the integrated D34 canonical closeout
+`f7f13f805ad6a0eea7041cb6d13c561149a13f6e`; publication/certification do not
+constitute independent acceptance or integration. Real fractional-exit facts,
+durable controller/application composition and host/effect evidence remain open.
 
 Accepted/integrated D34 source:
 `b86defebf9ccbf1efb91397de8f2e66db24a6665` / tree
@@ -70,17 +78,19 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-L40 is the immediate next milestone. L40-L43 still block any bounded live-order
-readiness: official Robinhood fractional-position exit capability, exact
-owned-position exit semantics, honest market-order fill/loss behavior, and
-durable budget/recovery/capability work remain to be frozen and accepted. Q61
-remains NOT RUN as a separate native Windows UAT boundary if still current; no
-paper-soak milestone is inserted.
+Independent ChatGPT exact-source review of L40 and its terminal mapped FULL
+is next, followed by integration only if accepted. L41 must then establish
+account/instrument fractional eligibility and official quantity/minimum/residual
+rules. Metadata and synthetic tests are distinct from provider/account evidence;
+unknown exit rules block readiness. A minimal L41 collector source child is
+deferred until a truthful read-only observation contract can be frozen.
 
-No live-readiness label is granted. L40-L43 remain effect-disabled and still
-require official fractional exit capability, exact owned-position exit
-semantics, and durable budget/recovery/capability work. No paper-soak milestone
-is inserted. FINAL_HOLDOUT remains sealed.
+Then consolidate L42 durable ownership/budget/controller, runtime Alpaca inputs,
+I53 real application composition and Q62/Q63 source support into one broad
+source checkpoint. Q61 native UAT, Q62 fresh read-only readiness, a canonical
+readiness closeout, L43 bounded genuine entry/owned exit and Q63 delivery remain
+separate required boundaries. No live-readiness label, broker mutation or paper
+soak is granted. FINAL_HOLDOUT remains sealed.
 
 ## Product and protected boundaries
 

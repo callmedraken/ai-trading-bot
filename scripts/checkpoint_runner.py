@@ -511,6 +511,7 @@ ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_PROTOTYPE_TESTS: Final = (
     *COMMON_TESTS,
     "tests/live_prototype/test_configuration.py",
+    "tests/live_prototype/test_live_contract.py",
     "tests/live_prototype/test_synthetic_service.py",
     "tests/live_prototype/test_launcher.py",
     "tests/live_prototype/test_application_acceptance.py",

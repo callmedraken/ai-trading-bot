@@ -34,6 +34,12 @@ _TREE = "2" * 40
 _REAL_FRESH_EVIDENCE_DIR = operator._fresh_evidence_dir
 
 
+def _admit_from_test_checkout(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
+    """Use this test checkout only after the production root gate."""
+
+    monkeypatch.setattr(operator, "_CANONICAL_ROOT", root.resolve(strict=True))
+
+
 def _fake_fresh_evidence_dir(sandbox_root: Path):
     """Test-only create-once evidence admission under a pytest sandbox."""
 
@@ -482,6 +488,37 @@ def test_real_production_evidence_policy_remains_hard_f_and_fail_closed(
     assert events == []
 
 
+def test_real_production_canonical_root_rejects_noncanonical_checkout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    assert operator._EVIDENCE_ROOT == Path(r"F:\AI\temp")
+    assert operator._CANONICAL_ROOT == Path(
+        r"F:\AI\worktrees\ai-trading-bot-live-prototype-current"
+    )
+    assert tmp_path.resolve(strict=True) != operator._CANONICAL_ROOT
+
+    git_calls: list[tuple[str, ...]] = []
+    authority_calls: list[object] = []
+
+    def forbidden_git(_root: Path, *arguments: str) -> str:
+        git_calls.append(arguments)
+        raise AssertionError("Git must not run before the canonical-root gate")
+
+    def forbidden_authority(_root: Path, *, publication_context: object):
+        authority_calls.append(publication_context)
+        raise AssertionError("authority must not run before the canonical-root gate")
+
+    monkeypatch.setattr(operator, "_git_output", forbidden_git)
+    monkeypatch.setattr(operator, "evaluate_source_authority", forbidden_authority)
+
+    with pytest.raises(operator._SourceAdmissionBlocked) as error:
+        operator.admit_l41_source(tmp_path)
+
+    assert error.value.source is None
+    assert git_calls == []
+    assert authority_calls == []
+
+
 def test_malformed_source_identity_is_rejected_before_oauth(tmp_path: Path) -> None:
     events: list[str] = []
 
@@ -588,6 +625,7 @@ def test_live_source_admission_rejects_develop_mismatch_before_authority(
     monkeypatch,
 ) -> None:
     root = Path(__file__).resolve().parents[2]
+    _admit_from_test_checkout(monkeypatch, root)
     calls: list[tuple[str, ...]] = []
 
     def fake_git(_root: Path, *args: str) -> str:
@@ -630,6 +668,7 @@ def test_live_source_admission_rejects_develop_mismatch_before_authority(
 
 def test_live_source_admission_requires_both_authority_contexts(monkeypatch) -> None:
     root = Path(__file__).resolve().parents[2]
+    _admit_from_test_checkout(monkeypatch, root)
 
     def fake_git(_root: Path, *args: str) -> str:
         if args == ("branch", "--show-current"):

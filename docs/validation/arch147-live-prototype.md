@@ -293,6 +293,24 @@ modules. The red run is preserved and is not retry authority. L41 remains
 unaccepted and unintegrated, no real observer was run, and Phase 2 remains
 blocked behind corrected terminal-green mapped L41 CI.
 
+The first corrective L41 publication is preserved as a second immutable red
+record:
+
+    HEAD 934866d248d5ede8c8d4172583f649d5d6fc3360
+    TREE 842d12b2264c95471517ee568ea9e3ed7c8e1faf
+    GitHub run 42171503288 / attempt 1 / terminal FAILURE
+    classification PREPUBLICATION_COVERAGE_DEFECT
+
+Source-static passed, and active-tests executed all five L41 capability
+modules. Active-tests failed only three direct source-admission tests. FULL
+broad-1, broad-2, broad-4, broad-5 and broad-6 passed; broad-3 had two
+failures and broad-7 had one failure. The failures were the same hosted-
+Windows test seam: direct admission tests reached the unchanged production
+hard-F canonical-root gate before their intended fake Git and authority
+semantics. Both red runs remain preserved and are not retry authority. L41
+remains unaccepted and unintegrated, no real observer was run, and Phase 2
+remains blocked.
+
 ## Preserved rejected publication and accepted corrections
 
 The first prototype publication is permanently preserved:

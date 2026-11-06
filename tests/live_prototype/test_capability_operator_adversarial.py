@@ -31,6 +31,12 @@ _COLLECTOR_COUNT_FIELDS = (
 )
 
 
+def _admit_from_test_checkout(monkeypatch: pytest.MonkeyPatch, root: Path) -> None:
+    """Use this test checkout only after the production root gate."""
+
+    monkeypatch.setattr(operator, "_CANONICAL_ROOT", root.resolve(strict=True))
+
+
 def _fake_fresh_evidence_dir(sandbox_root: Path):
     """Test-only create-once evidence admission under a pytest sandbox."""
 
@@ -266,6 +272,7 @@ def _fake_git(
     develop_head: str = _HEAD,
     authority_passes: bool = True,
 ) -> tuple[list[tuple[str, ...]], list[PublicationContext]]:
+    _admit_from_test_checkout(monkeypatch, Path(__file__).resolve().parents[2])
     commands: list[tuple[str, ...]] = []
     contexts: list[PublicationContext] = []
 

@@ -510,6 +510,11 @@ ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_PROTOTYPE_TESTS: Final = (
     *COMMON_TESTS,
+    "tests/live_prototype/test_capability_collector.py",
+    "tests/live_prototype/test_capability_observer_adversarial.py",
+    "tests/live_prototype/test_capability_operator.py",
+    "tests/live_prototype/test_capability_operator_adversarial.py",
+    "tests/live_prototype/test_capability_transport.py",
     "tests/live_prototype/test_configuration.py",
     "tests/live_prototype/test_live_contract.py",
     "tests/live_prototype/test_synthetic_service.py",

@@ -114,7 +114,7 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
 | D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
-| L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Local source prepared; no real observation; source publication and independent exact-source review pending; official rule facts remain blocked |
+| L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | First publication preserved as terminal FAILURE; corrective source pending; no real observation; official rule facts remain blocked |
 | L42/I53 | accepted L41 capability contract | durable controller/runtime/live service | consolidated effect-disabled source | PENDING; no production controller or live composition |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
@@ -275,6 +275,23 @@ separately accepted source-owned trust binding. Overall readiness is
 `READY_FOR_L42`, `BLOCKED`, or `NOT_RUN`; `READY_FOR_L42` would not authorize a
 trade. The current L41 source has not been independently accepted or integrated,
 and no real observation has been run.
+
+The first L41 publication is preserved as immutable red evidence:
+
+    HEAD f9c56373aed845b901d1d623b1c22f83cff2d627
+    TREE f7f41a547ff29ef0bc4a63992243193d74b3a3ef
+    GitHub run 42113135495 / attempt 1 / terminal FAILURE
+    classification PREPUBLICATION_COVERAGE_DEFECT
+
+Source-static and active-tests passed. The mapped FULL failure was limited to
+hosted-Windows fake operator tests deriving evidence destinations from pytest
+`tmp_path`; the hosted runner's `D:` temporary root was correctly rejected by
+the unchanged production `F:\AI\temp` evidence policy before fake composition
+could execute. The same publication also exposed that the existing
+`ARCH147_PROTOTYPE_TESTS` inventory omitted the five L41 capability test
+modules. The red run is preserved and is not retry authority. L41 remains
+unaccepted and unintegrated, no real observer was run, and Phase 2 remains
+blocked behind corrected terminal-green mapped L41 CI.
 
 ## Preserved rejected publication and accepted corrections
 

@@ -81,6 +81,17 @@ def test_prototype_has_no_protected_dispatch_and_maps_full():
     assert all(m in full for m in runner.ARCH147_PROTOTYPE_TESTS if m.endswith(".py"))
 
 
+def test_l41_capability_family_is_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    capability_tests = {
+        path.relative_to(root).as_posix()
+        for path in (root / "tests/live_prototype").glob("test_capability_*.py")
+    }
+
+    assert capability_tests
+    assert capability_tests <= set(runner.ARCH147_PROTOTYPE_TESTS)
+
+
 def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):
     from dataclasses import replace
 

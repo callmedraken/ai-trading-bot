@@ -31,6 +31,46 @@ from trading_bot.live_prototype.capability_transport import (
 _ACCOUNT = "SECRET_ACCOUNT_NUMBER_4831"
 _HEAD = "1" * 40
 _TREE = "2" * 40
+_REAL_FRESH_EVIDENCE_DIR = operator._fresh_evidence_dir
+
+
+def _fake_fresh_evidence_dir(sandbox_root: Path):
+    """Test-only create-once evidence admission under a pytest sandbox."""
+
+    sandbox = sandbox_root.resolve(strict=True)
+
+    def admit(candidate: Path) -> Path:
+        path = Path(candidate)
+        if not path.is_absolute() or path.exists() or path.is_symlink():
+            raise ValueError("L41_EVIDENCE_PATH_INVALID")
+        try:
+            parent = path.parent.resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise ValueError("L41_EVIDENCE_PATH_INVALID") from None
+        if parent != path.parent or not parent.is_relative_to(sandbox):
+            raise ValueError("L41_EVIDENCE_PATH_INVALID")
+        current = parent
+        while True:
+            if current.resolve(strict=True) != current or current.is_symlink():
+                raise ValueError("L41_EVIDENCE_PATH_INVALID")
+            if current == sandbox:
+                break
+            if current.parent == current or not current.is_relative_to(sandbox):
+                raise ValueError("L41_EVIDENCE_PATH_INVALID")
+            current = current.parent
+        path.mkdir()
+        return path
+
+    return admit
+
+
+@pytest.fixture(autouse=True)
+def fake_evidence_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    sandbox = tmp_path / "fake-evidence-root"
+    sandbox.mkdir()
+    monkeypatch.setattr(
+        operator, "_fresh_evidence_dir", _fake_fresh_evidence_dir(sandbox)
+    )
 
 
 def _source() -> operator.SourceAdmission:
@@ -209,7 +249,7 @@ class _ReadyTransport:
 
 def _run_ready_collection(tmp_path: Path, counts: object):
     return operator._run_with_dependencies(
-        tmp_path / "ready-result",
+        tmp_path / "fake-evidence-root" / "ready-result",
         source_admitter=lambda _root: _source(),
         oauth_factory_builder=lambda: object(),
         transport_builder=lambda _oauth: _ReadyTransport(counts),
@@ -292,7 +332,7 @@ def test_source_rejection_happens_before_oauth_or_transport(tmp_path: Path) -> N
         raise operator._SourceAdmissionBlocked(_source())
 
     result = _run(
-        tmp_path / "rejected",
+        tmp_path / "fake-evidence-root" / "rejected",
         _FakeClient(),
         events,
         admitter=reject_source,
@@ -322,7 +362,7 @@ def test_success_collects_two_reads_once_in_one_scope_and_sanitizes_evidence(
         return collect_capabilities(boundary)
 
     result = _run(
-        tmp_path / "success",
+        tmp_path / "fake-evidence-root" / "success",
         client,
         events,
         collector=counted_collector,
@@ -377,7 +417,7 @@ def test_failed_account_read_keeps_attempt_count_and_sanitizes_provider_text(
     events: list[str] = []
     client = _FakeClient(RuntimeError(f"SECRET_PROVIDER_TEXT {_ACCOUNT}"))
 
-    result = _run(tmp_path / "failed-read", client, events)
+    result = _run(tmp_path / "fake-evidence-root" / "failed-read", client, events)
 
     assert result.status is OverallStatus.BLOCKED
     assert result.reason == "L41_ACCOUNTS_READ_FAILED"
@@ -411,6 +451,37 @@ def test_invalid_evidence_path_is_rejected_before_source_admission() -> None:
     assert events == []
 
 
+def test_real_production_evidence_policy_remains_hard_f_and_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(operator, "_fresh_evidence_dir", _REAL_FRESH_EVIDENCE_DIR)
+    assert operator._EVIDENCE_ROOT == Path(r"F:\AI\temp")
+    assert operator._CANONICAL_ROOT == Path(
+        r"F:\AI\worktrees\ai-trading-bot-live-prototype-current"
+    )
+
+    events: list[str] = []
+    source_admitter, oauth_builder, transport_builder = _dependencies(
+        _FakeClient(), events
+    )
+    for candidate in (
+        Path(r"C:\not-allowed\arch147-l41-evidence"),
+        Path(r"F:\AI\worktrees\outside-observation"),
+        operator._EVIDENCE_ROOT,
+    ):
+        result = operator._run_with_dependencies(
+            candidate,
+            source_admitter=source_admitter,
+            oauth_factory_builder=oauth_builder,
+            transport_builder=transport_builder,
+            collector=collect_capabilities,
+        )
+        assert result.reason == "L41_EVIDENCE_PATH_INVALID"
+        assert result.evidence_path is None
+
+    assert events == []
+
+
 def test_malformed_source_identity_is_rejected_before_oauth(tmp_path: Path) -> None:
     events: list[str] = []
 
@@ -423,7 +494,7 @@ def test_malformed_source_identity_is_rejected_before_oauth(tmp_path: Path) -> N
         return object()
 
     result = operator._run_with_dependencies(
-        tmp_path / "bad-source",
+        tmp_path / "fake-evidence-root" / "bad-source",
         source_admitter=lambda _root: SimpleNamespace(
             head=f"SECRET_PROVIDER_TEXT {_HEAD}"
         ),
@@ -459,7 +530,7 @@ def test_unavailable_counters_after_collector_failure_are_null_not_zero(
     tmp_path: Path,
 ) -> None:
     result = operator._run_with_dependencies(
-        tmp_path / "unknown-counts",
+        tmp_path / "fake-evidence-root" / "unknown-counts",
         source_admitter=lambda _root: _source(),
         oauth_factory_builder=lambda: object(),
         transport_builder=lambda _oauth: _UnknownCountsTransport(),

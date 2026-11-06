@@ -31,6 +31,45 @@ _COLLECTOR_COUNT_FIELDS = (
 )
 
 
+def _fake_fresh_evidence_dir(sandbox_root: Path):
+    """Test-only create-once evidence admission under a pytest sandbox."""
+
+    sandbox = sandbox_root.resolve(strict=True)
+
+    def admit(candidate: Path) -> Path:
+        path = Path(candidate)
+        if not path.is_absolute() or path.exists() or path.is_symlink():
+            raise ValueError("L41_EVIDENCE_PATH_INVALID")
+        try:
+            parent = path.parent.resolve(strict=True)
+        except (OSError, RuntimeError):
+            raise ValueError("L41_EVIDENCE_PATH_INVALID") from None
+        if parent != path.parent or not parent.is_relative_to(sandbox):
+            raise ValueError("L41_EVIDENCE_PATH_INVALID")
+        current = parent
+        while True:
+            if current.resolve(strict=True) != current or current.is_symlink():
+                raise ValueError("L41_EVIDENCE_PATH_INVALID")
+            if current == sandbox:
+                break
+            if current.parent == current or not current.is_relative_to(sandbox):
+                raise ValueError("L41_EVIDENCE_PATH_INVALID")
+            current = current.parent
+        path.mkdir()
+        return path
+
+    return admit
+
+
+@pytest.fixture(autouse=True)
+def fake_evidence_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    sandbox = tmp_path / "fake-evidence-root"
+    sandbox.mkdir()
+    monkeypatch.setattr(
+        operator, "_fresh_evidence_dir", _fake_fresh_evidence_dir(sandbox)
+    )
+
+
 def _source() -> operator.SourceAdmission:
     return operator.SourceAdmission(
         branch=operator.L41_FEATURE_BRANCH,
@@ -271,7 +310,7 @@ def _fake_git(
 
 @pytest.fixture
 def evidence_dir(tmp_path: Path) -> Path:
-    return tmp_path / "observation"
+    return tmp_path / "fake-evidence-root" / "observation"
 
 
 def test_admission_rejects_dirty_or_stale_source_before_authority_evaluation(
@@ -345,7 +384,7 @@ def test_invalid_or_reused_evidence_path_stops_before_source_or_oauth(
     events: list[str] = []
     _install_fake_runtime(monkeypatch, events)
 
-    existing = operator.run_l41_read_only_observation(evidence_dir=tmp_path)
+    existing = operator.run_l41_read_only_observation(evidence_dir=evidence_dir.parent)
     outside = operator.run_l41_read_only_observation(
         evidence_dir=Path(r"F:\AI\worktrees\outside-observation")
     )

@@ -24,7 +24,9 @@ from trading_bot.live_prototype.capability_observer import (
     OverallStatus,
 )
 from trading_bot.live_prototype.capability_transport import (
+    CapabilityTeardownStatus,
     CapabilityTransportCounts,
+    CapabilityTransportError,
     RobinhoodCapabilityTransport,
 )
 
@@ -237,8 +239,15 @@ def _otherwise_ready_collection() -> CapabilityCollection:
 
 
 class _ReadyTransport:
-    def __init__(self, counts: object) -> None:
+    def __init__(
+        self,
+        counts: object,
+        teardown_status: CapabilityTeardownStatus | None = None,
+    ) -> None:
         self._counts = counts
+        self._teardown_status = (
+            CapabilityTeardownStatus() if teardown_status is None else teardown_status
+        )
 
     @property
     def call_counts(self):
@@ -246,19 +255,30 @@ class _ReadyTransport:
             raise self._counts
         return self._counts
 
+    @property
+    def teardown_status(self) -> CapabilityTeardownStatus:
+        return self._teardown_status
+
     def __enter__(self):
         return self
 
     def __exit__(self, _exc_type, _exc, _traceback):
+        failure_reason = self._teardown_status.failure_reason
+        if failure_reason is not None and _exc is None:
+            raise CapabilityTransportError(failure_reason)
         return False
 
 
-def _run_ready_collection(tmp_path: Path, counts: object):
+def _run_ready_collection(
+    tmp_path: Path,
+    counts: object,
+    teardown_status: CapabilityTeardownStatus | None = None,
+):
     return operator._run_with_dependencies(
         tmp_path / "fake-evidence-root" / "ready-result",
         source_admitter=lambda _root: _source(),
         oauth_factory_builder=lambda: object(),
-        transport_builder=lambda _oauth: _ReadyTransport(counts),
+        transport_builder=lambda _oauth: _ReadyTransport(counts, teardown_status),
         collector=lambda _boundary: _otherwise_ready_collection(),
     )
 
@@ -286,6 +306,132 @@ def test_ready_requires_proven_exact_scope_session_reads_and_zero_other_calls(
     assert result.evidence.transport_counts.cancel_equity_order_attempts == 0
     assert result.evidence.collector_counts == CapabilityCallCounts(1, 1)
     assert result.evidence.collector_invocations == 1
+
+
+@pytest.mark.parametrize(
+    ("teardown_status", "expected_reason"),
+    [
+        (
+            CapabilityTeardownStatus("FAILED", "SUCCEEDED"),
+            "L41_MCP_SESSION_CLOSE_FAILED",
+        ),
+        (
+            CapabilityTeardownStatus("SUCCEEDED", "FAILED"),
+            "L41_LOOP_STOP_FAILED",
+        ),
+        (
+            CapabilityTeardownStatus("FAILED", "FAILED"),
+            "L41_SESSION_CLOSE_AND_LOOP_STOP_FAILED",
+        ),
+    ],
+)
+def test_completed_collection_is_retained_when_teardown_fails(
+    tmp_path: Path,
+    teardown_status: CapabilityTeardownStatus,
+    expected_reason: str,
+) -> None:
+    result = _run_ready_collection(
+        tmp_path,
+        CapabilityTransportCounts(1, 1, 1, 1),
+        teardown_status,
+    )
+
+    assert result.status is OverallStatus.BLOCKED
+    assert result.reason == expected_reason
+    assert result.evidence.report.status is OverallStatus.READY_FOR_L42
+    assert result.evidence.transport_counts == CapabilityTransportCounts(1, 1, 1, 1)
+    assert result.evidence.collector_counts == CapabilityCallCounts(1, 1)
+    assert result.evidence.collector_invocations == 1
+    evidence = json.loads(result.evidence_path.read_text(encoding="utf-8"))
+    assert evidence["reason"] == expected_reason
+    assert evidence["capability_report"]["status"] == OverallStatus.READY_FOR_L42.value
+    assert evidence["attempts"]["get_accounts_attempts"] == 1
+    assert evidence["attempts"]["get_equity_tradability_attempts"] == 1
+
+
+@pytest.mark.parametrize(
+    ("teardown_status", "expected_reason"),
+    [
+        (
+            CapabilityTeardownStatus("FAILED", "SUCCEEDED"),
+            "L41_OBSERVATION_AND_SESSION_CLOSE_FAILED",
+        ),
+        (
+            CapabilityTeardownStatus("SUCCEEDED", "FAILED"),
+            "L41_OBSERVATION_AND_LOOP_STOP_FAILED",
+        ),
+        (
+            CapabilityTeardownStatus("FAILED", "FAILED"),
+            "L41_OBSERVATION_AND_SESSION_TEARDOWN_FAILED",
+        ),
+    ],
+)
+def test_collection_failure_and_teardown_failure_remain_sanitized_and_counted(
+    tmp_path: Path,
+    teardown_status: CapabilityTeardownStatus,
+    expected_reason: str,
+) -> None:
+    counts = CapabilityTransportCounts(1, 1, 1, 0)
+
+    def fail_collection(_boundary):
+        raise RuntimeError(f"SECRET_PROVIDER_TEXT {_ACCOUNT} https://token.invalid/x")
+
+    result = operator._run_with_dependencies(
+        tmp_path / "fake-evidence-root" / "failed-collection-result",
+        source_admitter=lambda _root: _source(),
+        oauth_factory_builder=lambda: object(),
+        transport_builder=lambda _oauth: _ReadyTransport(counts, teardown_status),
+        collector=fail_collection,
+    )
+
+    assert result.status is OverallStatus.BLOCKED
+    assert result.reason == expected_reason
+    assert result.evidence.report.status is OverallStatus.NOT_RUN
+    assert result.evidence.transport_counts == counts
+    assert result.evidence.collector_counts is None
+    assert result.evidence.collector_invocations == 1
+    evidence_text = result.evidence_path.read_text(encoding="utf-8")
+    assert expected_reason in evidence_text
+    for secret in ("SECRET_PROVIDER_TEXT", _ACCOUNT, "token.invalid"):
+        assert secret not in evidence_text
+    evidence = json.loads(evidence_text)
+    assert evidence["attempts"]["get_accounts_attempts"] == 1
+    assert evidence["attempts"]["get_equity_tradability_attempts"] == 0
+    assert evidence["attempts"]["collector_get_accounts_attempts"] is None
+
+
+def test_evidence_write_failure_preserves_teardown_phase_report_and_counts(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    original_open = Path.open
+
+    def failing_open(path: Path, *args, **kwargs):
+        if path.name == "evidence.json":
+            raise OSError(f"SECRET_PROVIDER_TEXT {_ACCOUNT} https://token.invalid/x")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", failing_open)
+    result = _run_ready_collection(
+        tmp_path,
+        CapabilityTransportCounts(1, 1, 1, 1),
+        CapabilityTeardownStatus("FAILED", "SUCCEEDED"),
+    )
+
+    assert result.status is OverallStatus.BLOCKED
+    assert result.reason == "L41_EVIDENCE_WRITE_AND_MCP_SESSION_CLOSE_FAILED"
+    assert result.evidence_path is None
+    assert result.evidence.status is OverallStatus.BLOCKED
+    assert result.evidence.reason == result.reason
+    assert result.evidence.report.status is OverallStatus.READY_FOR_L42
+    assert result.evidence.transport_counts == CapabilityTransportCounts(1, 1, 1, 1)
+    assert result.evidence.collector_counts == CapabilityCallCounts(1, 1)
+    assert result.evidence.collector_invocations == 1
+    assert not (
+        tmp_path / "fake-evidence-root" / "ready-result" / "evidence.json"
+    ).exists()
+    for secret in ("SECRET_PROVIDER_TEXT", _ACCOUNT, "token.invalid"):
+        assert secret not in result.reason
 
 
 @pytest.mark.parametrize(

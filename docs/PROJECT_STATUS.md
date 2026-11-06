@@ -1,6 +1,40 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L40 accepted/integrated; remaining prototype implementation next
+## Current milestone - PROTOTYPE_READY_FOR_NATIVE_TESTING
+
+The current source-preparation milestone is `PROTOTYPE_READY_FOR_NATIVE_TESTING`.
+The current source checkpoint adds fake-tested read-only recovery and Q62
+prerequisite evaluation, Q63 delivery-plan assembly that leaves future evidence
+`NOT_RUN`, and an emergency-exit operator that remains disarmed. This milestone
+prepares the prototype for native testing; it grants no live readiness or trade
+authority. Exact-source review and acceptance remain pending.
+
+The L41 capability observation is CONSUMED / NO RETRY. It proved the selected
+Agentic account identity, SPY account tradability, and SPY fractional
+tradability for that observation. All production, broker, order, paper, live,
+and runtime-binding mutation counters were zero.
+Post-read teardown failed; its failure subtype is unavailable. Official and
+interface-rule facts remain unresolved pending accepted binding/schema
+discovery. L41R1, Q61, Q62, L43, and Q63 have NOT RUN. There is no live-readiness
+label, and the emergency exit remains DISARMED.
+
+Consumed L41 evidence record: `F:\\AI\\temp\\arch147-l41-capability-observation-c0f29dfb1fb544d8b330910ad41af1f6\\evidence.json`,
+SHA-256 `c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`,
+4114 bytes. Parsed schema was `arch147-l41-capability-observation/v1`, status
+`BLOCKED`, reason `L41_OBSERVATION_FAILED`, source feature/develop HEAD/tree
+`8ebbbcbf44fcba0e041601a332bc6029692ef396` /
+`eaf7ee6cd82ed895632725ac682123f3ab8e2ab2`, and both authority fields were
+`PASS`. Attempts were OAuth scope 1, MCP open 1, `get_accounts` 1,
+`get_equity_tradability` 1, collector 1 with one read of each, all other,
+review, place, and cancel attempts 0; native credential read was uncounted by
+the SDK. The 13-fact inventory retained the exact observed PROVEN account,
+SPY tradability, PROVEN fractional eligibility, nine unresolved BLOCKING_L42
+interface/rule facts, and `INSTANCE_REVIEW_REQUIRES_POSITION=DEFER_TO_FIRST_OWNED_POSITION`.
+`L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
+`L41_ACCOUNT_FACTS_CAPTURED=YES`, `L41_MUTATION_EFFECTS=0`, and
+`L41_POST_READ_TEARDOWN_FAILURE=YES`; the teardown subtype is unavailable.
+
+## L40 accepted/integrated baseline
 
 L40 is ACCEPTED / INTEGRATED at
 `14e1b628c0c51c27b23deabee56eb91859818529` / tree
@@ -15,13 +49,11 @@ partial-fill ownership, residual preservation, identity binding and
 UNKNOWN/no-retry behavior. It grants no provider/order authority and does not
 authenticate caller-supplied evidence references.
 
-The remaining critical path starts with the L41 read-only Robinhood
-fractional-exit capability observer/source boundary, then durable
-ownership/budget/controller and runtime Alpaca signal service, real desktop
-application composition, native Windows acceptance, fresh readiness/recovery,
-and the separately reviewed bounded real live qualification. Q61/Q62/L43/Q63
-remain NOT RUN. No live-readiness label or paper-soak milestone is granted and
-FINAL_HOLDOUT remains sealed.
+At L40 closeout, the remaining path started with the L41 read-only Robinhood
+fractional-exit capability observer, followed by durable ownership/budget,
+runtime signal, application, readiness/recovery, and live qualification work.
+That L40 plan is historical; the current source-preparation state and next step
+are recorded above. `FINAL_HOLDOUT` remains sealed.
 
 Accepted/integrated D34 source:
 `b86defebf9ccbf1efb91397de8f2e66db24a6665` / tree
@@ -91,21 +123,13 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Run one coordinated remaining-prototype source mission under a Sol High
-orchestrator. Sol owns decomposition, contracts, review and sequencing only;
-Luna Extra High subagents perform all coding and focused tests. The mission
-starts with the L41 read-only capability observer, then implements the durable
-L42 controller, reusable runtime Alpaca inputs, I53 real application composition
-and Q62/Q63 readiness/recovery source support with the fewest meaningful
-publication boundaries.
-
-Protected observations and broker mutations remain separately reviewed
-boundaries: the orchestration may prepare their source/operators and exact local
-commands but must not invoke real credentials/provider/order effects without
-ChatGPT acceptance and the required operator boundary. Q61 native UAT, Q62
-fresh readiness and L43 bounded live qualification remain factual host evidence,
-not synthetic source claims. No paper soak is inserted and FINAL_HOLDOUT remains
-sealed.
+Complete exact-source review and acceptance of the unpublished source
+checkpoint. After acceptance, run Q61 native Windows UAT in isolated synthetic
+mode and record its sanitized result. Q62 remains a separate fresh, read-only
+readiness boundary; L43 remains a separately reviewed genuine-position
+qualification boundary; Q63 remains a future delivery step. Fake tests and
+source publication do not establish those outcomes. No paper soak is inserted
+and `FINAL_HOLDOUT` remains sealed.
 
 ## Product and protected boundaries
 

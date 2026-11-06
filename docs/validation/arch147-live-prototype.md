@@ -114,13 +114,14 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | D33 | consumed predecessor incident | preserved immutable evidence | one Alpaca all-adjusted observation | CONSUMED / BLOCKED / NO RETRY |
 | D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
-| L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | First publication preserved as terminal FAILURE; corrective source pending; no real observation; official rule facts remain blocked |
-| L42/I53 | accepted L41 capability contract | durable controller/runtime/live service | consolidated effect-disabled source | PENDING; no production controller or live composition |
+| L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Observation CONSUMED / NO RETRY; selected account, SPY tradability and fractional tradability PROVEN; all mutation counters zero; post-read teardown failed with subtype unavailable; official/interface facts remain unresolved |
+| L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | NOT RUN; no retry of consumed L41 |
+| L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | SOURCE-PREPARED; native/protected evidence pending; no live readiness |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN |
-| Q63 | all required evidence | Sol exact delivery | guarded test package | PENDING |
+| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; fake-tested evaluator only; live readiness not granted |
+| Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
 |---|---|---|
@@ -128,9 +129,9 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
-| Entry and exact owned exit | BLOCKED | official fractional exit capability unproven |
-| Durable limits/no duplicate effects | PENDING | P6 remains untouched; P01 source is accepted but durable runtime/reconciliation evidence remains unaccepted |
-| Stop/kill/restart/reconnect | SYNTHETIC STOP PASS / LIVE BLOCKED | Delayed-reader/worker shutdown proven; successor live recovery not implemented |
+| Entry and exact owned exit | BLOCKED | L41 proved account identity, SPY tradability and fractional tradability for one observation; official/interface quantity, minimum, notional and residual-close rules remain unresolved pending accepted binding/schema discovery |
+| Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
+| Stop/kill/restart/reconnect | SOURCE-TESTED / NATIVE NOT RUN | Disarmed real composition has independent workers, cached snapshots, reconnect/recovery blockers, and confirmed shutdown; native UAT remains Q61 |
 | Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
 | Exact source certified | D34 ACCEPTED / INTEGRATED | HEAD `b86defe`; feature mapped FULL and develop exact-certification reuse both passed |
 | Bounded live test ready | BLOCKED | no live effect authorization |
@@ -187,22 +188,67 @@ At that prototype publication, the L40 exit-notional/price-movement ambiguity
 was recorded without delegating live implementation. The current L40 proposal
 below resolves local mechanical semantics; actual exit capability remains open.
 
-## Concrete next boundary
+## Current source-preparation boundary
 
-L40's [effect-disabled contract](../architecture/147-restricted-live-contract.md)
-and `tests/live_prototype/test_live_contract.py` are ACCEPTED / INTEGRATED at
-`14e1b628c0c51c27b23deabee56eb91859818529`. The L41 source-only observer is
-prepared locally under the existing prototype checkpoint/mapped FULL; exact
-source publication and independent review are next. L41 does not itself
-produce account/provider evidence. Required account/size/minimum/residual facts
-remain unproven, and source PASS does not accept itself.
+The current source-preparation milestone is
+`PROTOTYPE_READY_FOR_NATIVE_TESTING`. The new L42/I53 source and recovery/Q62 modules perform
+typed, fail-closed evaluation against exact source/config/account/session
+identity, fresh evidence windows, L41 capability, clean ownership and budget,
+all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied
+accepted identities while preserving L41R1/Q61/Q62/L43/Q63 as `NOT_RUN` until
+their separate evidence exists. The emergency-exit operator has no provider
+dispatch surface and remains `DISARMED`.
 
-L42/I53 will implement durable ownership/budget/recovery, runtime Alpaca signals,
-real application/worker composition and Q62/Q63 tooling in one broad source
-publication. Q61 native UAT, Q62 read-only readiness, mandatory canonical
-readiness closeout, L43 genuine bounded entry/owned exit and Q63 delivery remain
-unrun. No readiness label or broker authority is granted. Do not invoke D33 or
-D34 again, do not insert a paper soak, and keep FINAL_HOLDOUT sealed.
+The consumed L41 observation proved account identity and SPY account/fractional
+tradability. Production, broker, order, paper, live, and runtime-binding
+mutation counters were zero. Post-read teardown failed, but its subtype is
+unavailable. Official/interface facts remain unresolved pending accepted
+binding/schema discovery. Source tests do not repeat that observation or count
+as Q61/Q62/L43/Q63 evidence. No live-readiness label or broker authority is
+granted.
+
+The source-only implementation includes the strict consumed-evidence parser and
+official-rule binding, truthful L41 teardown accounting, additive tools/list-only
+L41R1 operator, `durable_state.py`/`live_controller.py`, the reusable runtime
+Alpaca signal provider, the explicit synthetic/REAL_DISARMED application service
+and five-page GUI composition, plus `readiness_contracts.py`,
+`readiness_operator.py`, `recovery_operator.py`, `emergency_operator.py`, and
+`delivery_operator.py`. Matching focused tests are fake-only; evidence
+envelopes validate typed identities and validity windows but do not authenticate
+caller-supplied references; no L41R1/Q61/Q62/L43/Q63 observation was executed.
+
+### Consumed L41 evidence record
+
+The preserved artifact was read once at startup and never replayed:
+`F:\\AI\\temp\\arch147-l41-capability-observation-c0f29dfb1fb544d8b330910ad41af1f6\\evidence.json`.
+SHA-256 is
+`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`; byte
+length is `4114`. Exact parsed envelope fields were schema
+`arch147-l41-capability-observation/v1`, root/report status `BLOCKED`, reason
+`L41_OBSERVATION_FAILED`; branch
+`feature/robinhood-live-prototype-current`; HEAD/tree and both origin
+feature/develop HEAD/tree `8ebbbcbf44fcba0e041601a332bc6029692ef396` /
+`eaf7ee6cd82ed895632725ac682123f3ab8e2ab2`; feature and prospective-develop
+authority `PASS`; account fingerprint
+`f377529245bd1682f382d17b22ac8d55362f7138a4f7fc307593c16847e551cf`, account
+type `individual`; OAuth scope 1, MCP open 1, `get_accounts` 1,
+`get_equity_tradability` 1, collector invocation 1 with one collector read of
+each; native credential read `null` with SDK-managed accounting; other,
+review, place and cancel attempts 0. The 13 facts were retained in source order:
+the first three PROVEN (`INTENDED_AGENTIC_ACCOUNT`, `SPY_TRADABILITY`,
+`FRACTIONAL_ELIGIBILITY`), nine `BLOCKING_L42` interface/rule facts, and
+`INSTANCE_REVIEW_REQUIRES_POSITION=DEFER_TO_FIRST_OWNED_POSITION`. The incident
+classification is `L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
+`L41_ACCOUNT_FACTS_CAPTURED=YES`, `L41_MUTATION_EFFECTS=0`,
+`L41_POST_READ_TEARDOWN_FAILURE=YES`; the exact teardown subtype is unavailable
+and is not inferred. Official/interface facts remain unresolved until trusted
+binding and future schema discovery.
+
+The next boundary is exact-source review and acceptance, followed by Q61 native
+Windows UAT in isolated synthetic mode. Q62 read-only readiness, L43 genuine
+bounded entry/owned-exit qualification, and Q63 delivery remain separate future
+boundaries. Do not invoke D33, D34, or consumed L41 again; no paper soak is
+inserted and `FINAL_HOLDOUT` remains sealed.
 
 ## L40 focused implementation record
 
@@ -273,8 +319,10 @@ eligibility. Rule metadata and a content digest are provenance references, not
 authentication; official-rule-dependent facts remain `BLOCKING_L42` without a
 separately accepted source-owned trust binding. Overall readiness is
 `READY_FOR_L42`, `BLOCKED`, or `NOT_RUN`; `READY_FOR_L42` would not authorize a
-trade. The current L41 source has not been independently accepted or integrated,
-and no real observation has been run.
+trade. At the time of this source-only implementation record, L41 had not been
+independently accepted or integrated and no real observation had been run. The
+later consumed observation is recorded in the current boundary above; its facts
+do not revise the immutable failed CI attempts that follow.
 
 The first L41 publication is preserved as immutable red evidence:
 

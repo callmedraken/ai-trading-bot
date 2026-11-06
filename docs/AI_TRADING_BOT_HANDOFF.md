@@ -1,5 +1,43 @@
 # AI Trading Bot - Current Handoff
 
+## Current source-preparation milestone: PROTOTYPE_READY_FOR_NATIVE_TESTING
+
+The current source-preparation milestone is
+`PROTOTYPE_READY_FOR_NATIVE_TESTING`. The current source checkpoint adds
+fake-tested read-only recovery and Q62 prerequisite evaluation, Q63 evidence
+slot assembly, and a permanently disarmed emergency-exit operator. These
+contracts prepare the prototype for native testing; they do not grant live
+readiness or trade authority. Exact-source review and acceptance remain
+pending.
+
+The L41 capability observation is CONSUMED / NO RETRY. It proved the selected
+Agentic account identity, SPY account tradability, and SPY fractional
+tradability for that observation, with zero production, broker, order, paper,
+live, and runtime-binding mutation counters.
+Post-read teardown failed and its exact subtype is unavailable. Official and
+interface-rule facts remain unresolved pending accepted binding/schema
+discovery. L41R1, Q61, Q62, L43, and Q63 are NOT RUN. The emergency exit stays
+DISARMED; no live-readiness label is granted.
+
+Consumed L41 evidence: `F:\\AI\\temp\\arch147-l41-capability-observation-c0f29dfb1fb544d8b330910ad41af1f6\\evidence.json`,
+SHA-256 `c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`,
+4114 bytes. It parsed as `arch147-l41-capability-observation/v1`,
+`BLOCKED/L41_OBSERVATION_FAILED`, with accepted feature/develop source
+`8ebbbcbf44fcba0e041601a332bc6029692ef396` /
+`eaf7ee6cd82ed895632725ac682123f3ab8e2ab2`, both authority fields `PASS`, one
+OAuth scope entry, one MCP session, one `get_accounts`, one
+`get_equity_tradability`, one collector invocation and one collector read of
+each, and zero other/review/place/cancel attempts. Account, SPY tradability and
+fractional facts are PROVEN; all remaining interface/rule facts are BLOCKING_L42
+except the exact-position review deferral. The observation is consumed with no
+retry; account facts were captured, mutation effects were zero, and the
+post-read teardown failed with unavailable subtype.
+
+Next: complete exact-source review and acceptance. Then perform Q61 native
+Windows UAT in isolated synthetic mode. Q62 remains a separate fresh
+read-only observation; L43 and Q63 remain later boundaries. No provider or
+broker effect is authorized by these source changes.
+
 ## L40 accepted/integrated checkpoint
 
 Canonical worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`;
@@ -32,13 +70,9 @@ authenticate nothing by themselves. L40 does not establish actual Robinhood
 account fractional-sell eligibility, numeric quantity/minimum/notional rules,
 durable controller persistence or live-order authority.
 
-Next: one coordinated remaining-prototype implementation sequence begins with
-the L41 read-only capability observer source, followed by the durable
-controller/runtime-signal/application wiring and guarded readiness/recovery
-surfaces needed for Q61-Q63/L43. Protected provider/broker effects remain
-separate reviewed boundaries; source work must not invoke them. D33 and D34
-remain consumed/no-retry and FINAL_HOLDOUT remains sealed. No paper soak is
-inserted.
+The next source step described at L40 was superseded by the current source
+preparation milestone above. D33 and D34 remain consumed/no-retry and
+`FINAL_HOLDOUT` remains sealed. No paper soak is inserted.
 
 ## D34 accepted/integrated closeout identity
 
@@ -137,9 +171,10 @@ runtime-binding, campaign, order, paper, live, and `FINAL_HOLDOUT` effects are
 all zero. The observed BASE_MA35_50_V1 BUY/HOLD outputs are signal outputs only;
 they do not authorize an order or grant live eligibility.
 
-The current L40 source boundary and remaining L41-L43 dependencies are recorded
-above and in the L40 contract. Q61 remains NOT RUN; no readiness label or paper
-soak is inserted. FINAL_HOLDOUT remains sealed.
+The L40 source boundary and its original L41-L43 dependency plan are the
+accepted baseline; the current L41 observation and remaining boundaries are
+recorded at the top of this handoff. Q61 remains NOT RUN; no live-readiness
+label or paper-soak milestone is granted and `FINAL_HOLDOUT` remains sealed.
 
 The old P6 preflight is historical predecessor context, not the current next
 operator action and not the D33/D34 signal-data path. It grants no retry.

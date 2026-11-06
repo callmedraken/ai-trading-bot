@@ -216,6 +216,74 @@ def test_transport_error_subclass_cannot_leak_provider_text() -> None:
     assert "SECRET_PROVIDER_TEXT" not in repr(error.value)
 
 
+def test_session_close_failure_is_sanitized_and_reported_separately() -> None:
+    events: list[str] = []
+    client = _FakeClient()
+
+    @asynccontextmanager
+    async def failing_close_session(oauth: object) -> AsyncIterator[_FakeClient]:
+        assert oauth is _OAUTH
+        events.append("session_open")
+        yield client
+        events.append("session_close")
+        raise RuntimeError(f"SECRET_PROVIDER_TEXT {_ACCOUNT} https://token.invalid/x")
+
+    transport = RobinhoodCapabilityTransport(
+        lambda: _OAUTH,
+        session_factory=failing_close_session,
+    )
+
+    with pytest.raises(CapabilityTransportError) as error:
+        with transport as boundary:
+            boundary.get_accounts()
+            boundary.get_equity_tradability(
+                {"account_number": _ACCOUNT, "symbols": ["SPY"]}
+            )
+
+    assert error.value.reason == "L41_MCP_SESSION_CLOSE_FAILED"
+    assert transport.teardown_status.session_close_status == "FAILED"
+    assert transport.teardown_status.loop_stop_status == "SUCCEEDED"
+    assert transport.call_counts.get_accounts_attempts == 1
+    assert transport.call_counts.get_equity_tradability_attempts == 1
+    assert events == ["session_open", "session_close"]
+    rendered = str(error.value) + repr(error.value)
+    for secret in ("SECRET_PROVIDER_TEXT", _ACCOUNT, "token.invalid"):
+        assert secret not in rendered
+    with pytest.raises(CapabilityTransportError) as retry:
+        transport.__enter__()
+    assert retry.value.reason == "L41_TRANSPORT_ALREADY_USED"
+
+
+def test_loop_stop_failure_is_sanitized_and_not_conflated_with_session_close(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    transport = _transport(_FakeClient(), events)
+    stop = transport._loop_thread.stop
+
+    def stop_then_fail() -> None:
+        stop()
+        raise RuntimeError("SECRET_PROVIDER_TEXT https://token.invalid/x")
+
+    monkeypatch.setattr(transport._loop_thread, "stop", stop_then_fail)
+
+    with pytest.raises(CapabilityTransportError) as error:
+        with transport as boundary:
+            boundary.get_accounts()
+            boundary.get_equity_tradability(
+                {"account_number": _ACCOUNT, "symbols": ["SPY"]}
+            )
+
+    assert error.value.reason == "L41_LOOP_STOP_FAILED"
+    assert transport.teardown_status.session_close_status == "SUCCEEDED"
+    assert transport.teardown_status.loop_stop_status == "FAILED"
+    assert transport.call_counts.get_accounts_attempts == 1
+    assert transport.call_counts.get_equity_tradability_attempts == 1
+    rendered = str(error.value) + repr(error.value)
+    assert "SECRET_PROVIDER_TEXT" not in rendered
+    assert "token.invalid" not in rendered
+
+
 def test_timeout_counts_one_attempt_and_blocks_same_read_retry(monkeypatch) -> None:
     monkeypatch.setattr(
         "trading_bot.live_prototype.capability_transport._OPERATION_TIMEOUT_SECONDS",

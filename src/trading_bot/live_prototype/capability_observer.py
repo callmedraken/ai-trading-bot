@@ -366,7 +366,9 @@ def _put(
     results[fact_id] = FactResult(
         fact_id,
         Classification.PROVEN if proven else Classification.BLOCKING_L42,
-        rationale if proven else rationale.replace("PROVEN", "UNPROVEN"),
+        rationale
+        if proven or not rationale.endswith("_PROVEN")
+        else f"{rationale[:-7]}_UNPROVEN",
         evidence.observation_sha256,
         provenance,
         submitted_rule_value,

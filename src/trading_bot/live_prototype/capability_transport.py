@@ -33,6 +33,7 @@ _REASON_CODES = frozenset(
         "L41_OAUTH_INITIALIZATION_FAILED",
         "L41_MCP_SESSION_OPEN_FAILED",
         "L41_MCP_SESSION_CLOSE_FAILED",
+        "L41_SESSION_CLOSE_AND_LOOP_STOP_FAILED",
         "L41_ACCOUNTS_RETRY_BLOCKED",
         "L41_ACCOUNT_IDENTITY_INVALID",
         "L41_ACCOUNT_READ_REQUIRED",
@@ -117,12 +118,17 @@ class _LoopThread:
     def stop(self) -> None:
         if not self.started:
             return
-        if self.thread.is_alive():
-            self.loop.call_soon_threadsafe(self.loop.stop)
-            self.thread.join(timeout=_OPERATION_TIMEOUT_SECONDS)
-        if self.thread.is_alive():
-            raise CapabilityTransportError("L41_LOOP_STOP_FAILED")
-        self.loop.close()
+        try:
+            if self.thread.is_alive():
+                self.loop.call_soon_threadsafe(self.loop.stop)
+                self.thread.join(timeout=_OPERATION_TIMEOUT_SECONDS)
+            if self.thread.is_alive():
+                raise CapabilityTransportError("L41_LOOP_STOP_FAILED")
+            self.loop.close()
+        except CapabilityTransportError:
+            raise
+        except Exception:
+            raise CapabilityTransportError("L41_LOOP_STOP_FAILED") from None
 
     def _run(self) -> None:
         asyncio.set_event_loop(self.loop)
@@ -167,6 +173,36 @@ class CapabilityTransportCounts:
         return "OAUTH_SCOPE_ONCE_NATIVE_READS_SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED"
 
 
+@dataclass(frozen=True, slots=True)
+class CapabilityTeardownStatus:
+    """Sanitized, independently observable MCP-close and loop-stop outcomes."""
+
+    session_close_status: str = "NOT_ATTEMPTED"
+    loop_stop_status: str = "NOT_ATTEMPTED"
+
+    def __post_init__(self) -> None:
+        allowed = {"NOT_ATTEMPTED", "SUCCEEDED", "FAILED"}
+        if (
+            type(self.session_close_status) is not str
+            or self.session_close_status not in allowed
+            or type(self.loop_stop_status) is not str
+            or self.loop_stop_status not in allowed
+        ):
+            raise ValueError("L41_TEARDOWN_STATUS_INVALID")
+
+    @property
+    def failure_reason(self) -> str | None:
+        close_failed = self.session_close_status == "FAILED"
+        stop_failed = self.loop_stop_status == "FAILED"
+        if close_failed and stop_failed:
+            return "L41_SESSION_CLOSE_AND_LOOP_STOP_FAILED"
+        if close_failed:
+            return "L41_MCP_SESSION_CLOSE_FAILED"
+        if stop_failed:
+            return "L41_LOOP_STOP_FAILED"
+        return None
+
+
 class RobinhoodCapabilityTransport:
     """A one-shot source boundary exposing only the two permitted read methods."""
 
@@ -183,6 +219,7 @@ class RobinhoodCapabilityTransport:
         "_account_number",
         "_entered",
         "_closed",
+        "_teardown_status",
     )
 
     def __init__(
@@ -210,6 +247,7 @@ class RobinhoodCapabilityTransport:
         self._account_number: str | None = None
         self._entered = False
         self._closed = False
+        self._teardown_status = CapabilityTeardownStatus()
 
     def __repr__(self) -> str:
         return "RobinhoodCapabilityTransport(<redacted>)"
@@ -222,6 +260,10 @@ class RobinhoodCapabilityTransport:
             self._accounts_attempts,
             self._tradability_attempts,
         )
+
+    @property
+    def teardown_status(self) -> CapabilityTeardownStatus:
+        return self._teardown_status
 
     def __enter__(self) -> RobinhoodCapabilityTransport:
         if self._entered or self._closed:
@@ -248,17 +290,29 @@ class RobinhoodCapabilityTransport:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> bool:
-        close_failed = False
+        session_close_status = "NOT_ATTEMPTED"
         try:
             if self._client is not None:
-                self._loop_thread.run(self._close_session(exc_type, exc, traceback))
-        except Exception:
-            close_failed = True
+                try:
+                    self._loop_thread.run(self._close_session(exc_type, exc, traceback))
+                except Exception:
+                    session_close_status = "FAILED"
+                else:
+                    session_close_status = "SUCCEEDED"
         finally:
             self._closed = True
+        loop_stop_status = "SUCCEEDED"
+        try:
             self._loop_thread.stop()
-        if close_failed and exc is None:
-            raise CapabilityTransportError("L41_MCP_SESSION_CLOSE_FAILED") from None
+        except Exception:
+            loop_stop_status = "FAILED"
+        self._teardown_status = CapabilityTeardownStatus(
+            session_close_status,
+            loop_stop_status,
+        )
+        failure_reason = self._teardown_status.failure_reason
+        if failure_reason is not None and exc is None:
+            raise CapabilityTransportError(failure_reason) from None
         return False
 
     def get_accounts(self) -> Mapping[str, object]:
@@ -323,9 +377,12 @@ class RobinhoodCapabilityTransport:
         traceback: TracebackType | None,
     ) -> None:
         context = self._session_context
-        if context is not None:
-            await context.__aexit__(exc_type, exc, traceback)
-        self._client = None
+        try:
+            if context is not None:
+                await context.__aexit__(exc_type, exc, traceback)
+        finally:
+            self._client = None
+            self._session_context = None
 
     async def _call_tool(self, name: str, arguments: Mapping[str, object]) -> object:
         client = self._client
@@ -345,13 +402,27 @@ class RobinhoodCapabilityTransport:
         return dict(payload)
 
     def _close_after_open_failure(self) -> None:
+        session_close_status = "NOT_ATTEMPTED"
         try:
             if self._session_context is not None:
-                self._loop_thread.run(self._close_session(None, None, None))
+                try:
+                    self._loop_thread.run(self._close_session(None, None, None))
+                except Exception:
+                    session_close_status = "FAILED"
+                else:
+                    session_close_status = "SUCCEEDED"
         except Exception:
-            pass
+            session_close_status = "FAILED"
         self._closed = True
-        self._loop_thread.stop()
+        loop_stop_status = "SUCCEEDED"
+        try:
+            self._loop_thread.stop()
+        except Exception:
+            loop_stop_status = "FAILED"
+        self._teardown_status = CapabilityTeardownStatus(
+            session_close_status,
+            loop_stop_status,
+        )
 
 
 async def _require_allowed_tools(client: _McpClient) -> None:

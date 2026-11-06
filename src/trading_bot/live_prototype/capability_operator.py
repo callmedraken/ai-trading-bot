@@ -29,6 +29,7 @@ from trading_bot.live_prototype.capability_observer import (
     classify_capabilities,
 )
 from trading_bot.live_prototype.capability_transport import (
+    CapabilityTeardownStatus,
     CapabilityTransportCounts,
     RobinhoodCapabilityTransport,
 )
@@ -114,6 +115,7 @@ class _SourceAdmissionBlocked(RuntimeError):
 
 class _OwnedTransport(ReadOnlyCapabilityBoundary, Protocol):
     call_counts: CapabilityTransportCounts
+    teardown_status: CapabilityTeardownStatus
 
     def __enter__(self) -> ReadOnlyCapabilityBoundary: ...
 
@@ -370,6 +372,16 @@ def _run_with_dependencies(
     ):
         reason = "L41_READY_EFFECT_ACCOUNTING_BLOCKED"
         status = OverallStatus.BLOCKED
+    teardown_status = _teardown_status(transport)
+    if teardown_status is not None and teardown_status.failure_reason is not None:
+        reason = (
+            teardown_status.failure_reason
+            if collection is not None
+            else _combine_observation_and_teardown_failure(
+                teardown_status.failure_reason
+            )
+        )
+        status = OverallStatus.BLOCKED
     return _write_result(
         output_dir,
         status,
@@ -380,6 +392,47 @@ def _run_with_dependencies(
         collector_counts,
         collection_invocations,
     )
+
+
+def _teardown_status(transport: object) -> CapabilityTeardownStatus | None:
+    try:
+        status = transport.teardown_status
+    except Exception:
+        return None
+    if type(status) is not CapabilityTeardownStatus:
+        return None
+    return status
+
+
+def _combine_observation_and_teardown_failure(teardown_reason: str) -> str:
+    return {
+        "L41_MCP_SESSION_CLOSE_FAILED": "L41_OBSERVATION_AND_SESSION_CLOSE_FAILED",
+        "L41_LOOP_STOP_FAILED": "L41_OBSERVATION_AND_LOOP_STOP_FAILED",
+        "L41_SESSION_CLOSE_AND_LOOP_STOP_FAILED": (
+            "L41_OBSERVATION_AND_SESSION_TEARDOWN_FAILED"
+        ),
+    }.get(teardown_reason, "L41_OBSERVATION_FAILED")
+
+
+def _evidence_write_failure_reason(reason: str) -> str:
+    return {
+        "L41_MCP_SESSION_CLOSE_FAILED": (
+            "L41_EVIDENCE_WRITE_AND_MCP_SESSION_CLOSE_FAILED"
+        ),
+        "L41_LOOP_STOP_FAILED": "L41_EVIDENCE_WRITE_AND_LOOP_STOP_FAILED",
+        "L41_SESSION_CLOSE_AND_LOOP_STOP_FAILED": (
+            "L41_EVIDENCE_WRITE_AND_SESSION_TEARDOWN_FAILED"
+        ),
+        "L41_OBSERVATION_AND_SESSION_CLOSE_FAILED": (
+            "L41_EVIDENCE_WRITE_AND_OBSERVATION_AND_SESSION_CLOSE_FAILED"
+        ),
+        "L41_OBSERVATION_AND_LOOP_STOP_FAILED": (
+            "L41_EVIDENCE_WRITE_AND_OBSERVATION_AND_LOOP_STOP_FAILED"
+        ),
+        "L41_OBSERVATION_AND_SESSION_TEARDOWN_FAILED": (
+            "L41_EVIDENCE_WRITE_AND_OBSERVATION_AND_SESSION_TEARDOWN_FAILED"
+        ),
+    }.get(reason, "L41_EVIDENCE_WRITE_FAILED")
 
 
 def _create_windows_oauth_factory() -> Callable[[], object]:
@@ -581,7 +634,7 @@ def _write_result(
     except Exception:
         return _result_without_file(
             OverallStatus.BLOCKED,
-            "L41_EVIDENCE_WRITE_FAILED",
+            _evidence_write_failure_reason(reason),
             source,
             report,
             transport_counts,

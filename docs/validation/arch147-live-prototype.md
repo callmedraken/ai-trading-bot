@@ -116,7 +116,7 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
 | L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Observation CONSUMED / NO RETRY; selected account, SPY tradability and fractional tradability PROVEN; all mutation counters zero; post-read teardown failed with subtype unavailable; official/interface facts remain unresolved |
 | L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | NOT RUN; no retry of consumed L41 |
-| L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | SOURCE-PREPARED; native/protected evidence pending; no live readiness |
+| L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | CORRECTIVE SOURCE CANDIDATE; mapped CI and independent review pending; no live readiness |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
@@ -191,7 +191,9 @@ below resolves local mechanical semantics; actual exit capability remains open.
 ## Current source-preparation boundary
 
 The current source-preparation milestone is
-`PROTOTYPE_READY_FOR_NATIVE_TESTING`. The new L42/I53 source and recovery/Q62 modules perform
+`L42_PREPUBLICATION_CORRECTIVE_CANDIDATE`.
+`PROTOTYPE_READY_FOR_NATIVE_TESTING=NO` until ChatGPT independently accepts a
+terminal-green corrective source. The new L42/I53 source and recovery/Q62 modules perform
 typed, fail-closed evaluation against exact source/config/account/session
 identity, fresh evidence windows, L41 capability, clean ownership and budget,
 all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied
@@ -216,6 +218,34 @@ and five-page GUI composition, plus `readiness_contracts.py`,
 `delivery_operator.py`. Matching focused tests are fake-only; evidence
 envelopes validate typed identities and validity windows but do not authenticate
 caller-supplied references; no L41R1/Q61/Q62/L43/Q63 observation was executed.
+
+### Preserved latest L42 publication red evidence
+
+The parent L42 source publication is preserved as immutable mapped FULL
+evidence:
+
+    HEAD 50ab0d6c98439021a0a1c6e1baf6397785208e39
+    TREE 22cbe250ff82923dfb924aa2816cc9782fbe12bd
+    GitHub run 42195430203 / attempt 1 / terminal FAILURE
+    classification PREPUBLICATION_COVERAGE_DEFECT
+    manifestations L41R1_TEST_ROOT_SEAM_DEFECT,
+                   FULL_PYTEST_MODULE_NAME_COLLISION
+    source-review defect L41R1_SCHEMA_FACT_MODEL_MISMATCH
+
+The exact job conclusions were: `source-static=SUCCESS`; `active-tests=FAILURE`
+with 17 L41R1 fake-path failures; `broad-1=SUCCESS`; `broad-2=SUCCESS`;
+`broad-3=FAILURE` from a pytest collection error; `broad-4=FAILURE` with the
+same 17 L41R1 failures; `broad-5=SUCCESS`; `broad-6=SUCCESS`;
+`broad-7=SUCCESS`; and `source-gates=FAILURE`. The broad-3 collection error
+paired `tests/desktop_live/test_configuration.py` with
+`tests/live_prototype/test_configuration.py`; independent inspection found
+the second same-lane collision between `tests/domain/test_proposals.py` and
+`tests/rebalancing/test_proposals.py`. Hosted Windows correctly exposed the
+fake-test root seam while the real production evidence policy remained hard-F
+and fail-closed. The red run is preserved and is not retry authority. No real
+L41R1 observation, provider call, credential read, or protected effect occurred;
+L41 remains unaccepted and unintegrated, and Phase 2 remains blocked behind
+corrected terminal-green mapped L41 CI.
 
 ### Consumed L41 evidence record
 

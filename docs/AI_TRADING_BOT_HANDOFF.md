@@ -1,14 +1,33 @@
 # AI Trading Bot - Current Handoff
 
-## Current source-preparation milestone: PROTOTYPE_READY_FOR_NATIVE_TESTING
+## Current source-preparation milestone: L42_PREPUBLICATION_CORRECTIVE_CANDIDATE
 
 The current source-preparation milestone is
-`PROTOTYPE_READY_FOR_NATIVE_TESTING`. The current source checkpoint adds
-fake-tested read-only recovery and Q62 prerequisite evaluation, Q63 evidence
-slot assembly, and a permanently disarmed emergency-exit operator. These
-contracts prepare the prototype for native testing; they do not grant live
-readiness or trade authority. Exact-source review and acceptance remain
-pending.
+`L42_PREPUBLICATION_CORRECTIVE_CANDIDATE`. The bounded corrective source
+updates the L41R1 fake evidence-root seam, captures advertised quantity schema
+types without inferring provider numeric rules, and separates the two observed
+FULL pytest basename collisions. `PROTOTYPE_READY_FOR_NATIVE_TESTING=NO`:
+these contracts do not grant live readiness or trade authority, and the
+candidate remains pending terminal-green mapped CI and independent ChatGPT
+exact-source review.
+
+The preserved mapped FULL publication for the parent source is
+`42195430203`, attempt 1, terminal `FAILURE`, classified
+`PREPUBLICATION_COVERAGE_DEFECT`. `source-static=SUCCESS`; `active-tests`
+failed with 17 L41R1 fake-path failures; `broad-1`, `broad-2`, `broad-5`,
+`broad-6`, and `broad-7` were `SUCCESS`; `broad-3` was `FAILURE` from pytest
+collection; `broad-4` was `FAILURE` with the same 17 L41R1 failures; and
+`source-gates=FAILURE`. The broad-3 error paired
+`tests/desktop_live/test_configuration.py` with
+`tests/live_prototype/test_configuration.py`; the independently found second
+collision paired `tests/domain/test_proposals.py` with
+`tests/rebalancing/test_proposals.py`. The manifestations are
+`L41R1_TEST_ROOT_SEAM_DEFECT` and `FULL_PYTEST_MODULE_NAME_COLLISION`, with
+source-review defect `L41R1_SCHEMA_FACT_MODEL_MISMATCH`. Parent source was
+`50ab0d6c98439021a0a1c6e1baf6397785208e39`, tree
+`22cbe250ff82923dfb924aa2816cc9782fbe12bd`. The red run is preserved and is
+not retry authority. No real L41R1 observation or protected effect occurred;
+L41 remains unaccepted and unintegrated, and Phase 2 remains blocked.
 
 The L41 capability observation is CONSUMED / NO RETRY. It proved the selected
 Agentic account identity, SPY account tradability, and SPY fractional
@@ -33,10 +52,11 @@ except the exact-position review deferral. The observation is consumed with no
 retry; account facts were captured, mutation effects were zero, and the
 post-read teardown failed with unavailable subtype.
 
-Next: complete exact-source review and acceptance. Then perform Q61 native
-Windows UAT in isolated synthetic mode. Q62 remains a separate fresh
-read-only observation; L43 and Q63 remain later boundaries. No provider or
-broker effect is authorized by these source changes.
+Next: complete the bounded corrective publication and terminal-green mapped
+FULL, then return the exact source and CI result to ChatGPT for independent
+review and acceptance. Q61 native Windows UAT remains blocked; Q62 remains a
+separate fresh read-only observation, and L43 and Q63 remain later boundaries.
+No provider or broker effect is authorized by these source changes.
 
 ## L40 accepted/integrated checkpoint
 

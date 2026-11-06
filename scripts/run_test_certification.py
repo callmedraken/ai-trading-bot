@@ -126,6 +126,14 @@ ROBINHOOD_F1R1_B_LANE_PINS = {
 # hygiene ceiling.
 ROBINHOOD_D1S3_LANE_PINS = {"tests/review_paper/test_d1_session_execution.py": 0}
 
+# Current FULL corrective checkpoint: keep pytest's basename-only module
+# imports disjoint within each child process without changing the frozen
+# timing evidence or any non-FULL profile.
+FULL_LANE_PINS = {
+    "tests/live_prototype/test_configuration.py": 0,
+    "tests/rebalancing/test_proposals.py": 0,
+}
+
 # Architecture 132-R3K: positive source-owned ROBINHOOD placement estimates
 # normalized from the complete R3J-D1 isolated local diagnostic evidence. The
 # raw evidence measured tests/domain/test_positions.py at 0 ms; Architecture
@@ -992,7 +1000,36 @@ def balance_full(inventory: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
         index = min(range(7), key=lambda lane: (totals[lane], lane))
         lanes[index].append(module)
         totals[index] += weights[module]
-    return tuple(tuple(lane) for lane in lanes)
+    if any(
+        type(lane) is not int or not 0 <= lane < 7 for lane in FULL_LANE_PINS.values()
+    ):
+        raise CertificationError("FULL lane pins must select lane 0 through 6")
+    selected_pins = {
+        module: lane for module, lane in FULL_LANE_PINS.items() if module in inventory
+    }
+    return apply_full_lane_pins(tuple(tuple(lane) for lane in lanes), selected_pins)
+
+
+def apply_full_lane_pins(
+    lanes: tuple[tuple[str, ...], ...], pins: dict[str, int]
+) -> tuple[tuple[str, ...], ...]:
+    """Apply reviewed zero-based FULL lane placement without changing coverage."""
+    if len(lanes) != 7:
+        raise CertificationError("FULL lane pins require seven lanes")
+    if any(type(lane) is not int or not 0 <= lane < 7 for lane in pins.values()):
+        raise CertificationError("FULL lane pins must select lane 0 through 6")
+    mutable = [list(lane) for lane in lanes]
+    assigned = {module for lane in lanes for module in lane}
+    unknown = sorted(set(pins) - assigned)
+    if unknown:
+        raise CertificationError(f"Unknown FULL lane pin target: {unknown}")
+    for module, target in sorted(pins.items()):
+        locations = [index for index, lane in enumerate(mutable) if module in lane]
+        if len(locations) != 1:
+            raise CertificationError(f"FULL lane pin target is not unique: {module}")
+        mutable[locations[0]].remove(module)
+        mutable[target].append(module)
+    return tuple(tuple(lane) for lane in mutable)
 
 
 def apply_lane_pins(

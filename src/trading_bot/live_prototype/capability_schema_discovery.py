@@ -105,7 +105,7 @@ class InterfaceSchemaFacts:
     interface_sha256: str
     quantity_field_present: bool | None
     quantity_field_required: bool | None
-    quantity_field_numeric: bool | None
+    quantity_field_type: str | None
     regular_hours_fractional_market_precision_decimal_places: int | None
     review_semantics: str | None
     placement_semantics: str | None
@@ -263,6 +263,7 @@ def run_l41r1_schema_discovery(
             oauth_factory,
             expected_schema_digests=expected_schema_digests,
         ),
+        repository_root_resolver=_repository_root,
         expected_schema_digests=expected_schema_digests,
     )
 
@@ -273,6 +274,7 @@ def _run_with_dependencies(
     source_admitter: Callable[[Path], SourceAdmission],
     oauth_factory_builder: Callable[[], object],
     transport_builder: Callable[[object], object],
+    repository_root_resolver: Callable[[], Path],
     expected_schema_digests: Mapping[str, str] | None = None,
 ) -> SchemaDiscoveryResult:
     """Injected seams are private to fake-only tests and never called by import."""
@@ -289,7 +291,7 @@ def _run_with_dependencies(
     source: SourceAdmission | None = None
     empty_counts = SchemaDiscoveryAttemptCounts()
     try:
-        candidate = source_admitter(_repository_root())
+        candidate = source_admitter(repository_root_resolver())
         if type(candidate) is not SourceAdmission or not _source_is_accepted(candidate):
             raise SchemaDiscoveryError("L41R1_SOURCE_ADMISSION_BLOCKED")
         source = candidate
@@ -487,7 +489,7 @@ def _schema_facts(
             interface_sha256=interface_digest,
             quantity_field_present=None,
             quantity_field_required=None,
-            quantity_field_numeric=None,
+            quantity_field_type=None,
             regular_hours_fractional_market_precision_decimal_places=None,
             review_semantics=None,
             placement_semantics=None,
@@ -497,7 +499,7 @@ def _schema_facts(
 
     quantity_present = "quantity" in properties
     quantity_required = "quantity" in required if quantity_present else False
-    quantity_numeric: bool | None = None
+    quantity_type_value: str | None = None
     advertised_descriptions = " ".join(
         (description_text, *_schema_descriptions(schema))
     )
@@ -507,15 +509,13 @@ def _schema_facts(
         if quantity_type is None:
             raise SchemaDiscoveryError("L41R1_SCHEMA_AMBIGUOUS")
         if type(quantity_type) is str:
-            quantity_numeric = quantity_type in {"number", "integer"}
+            quantity_type_value = quantity_type
         elif isinstance(quantity_type, list) and all(
             type(item) is str for item in quantity_type
         ):
-            quantity_numeric = bool({"number", "integer"} & set(quantity_type))
+            raise SchemaDiscoveryError("L41R1_SCHEMA_AMBIGUOUS")
         else:
             raise SchemaDiscoveryError("L41R1_SCHEMA_MALFORMED")
-        if not quantity_numeric:
-            raise SchemaDiscoveryError("L41R1_SCHEMA_AMBIGUOUS")
         precision = _advertised_fractional_precision(advertised_descriptions)
 
     review_semantics = _review_semantics(name, advertised_descriptions)
@@ -540,7 +540,7 @@ def _schema_facts(
         interface_sha256=interface_digest,
         quantity_field_present=quantity_present,
         quantity_field_required=quantity_required,
-        quantity_field_numeric=quantity_numeric,
+        quantity_field_type=quantity_type_value,
         regular_hours_fractional_market_precision_decimal_places=precision,
         review_semantics=review_semantics,
         placement_semantics=placement_semantics,
@@ -570,10 +570,10 @@ def _review_semantics(name: str, description: str) -> str | None:
     if name != "review_equity_order":
         return None
     lowered = description.casefold()
-    has_simulation = bool(re.search(r"\b(simulat(?:e|es|ed|ion))\b", lowered))
+    has_simulation = bool(re.search(r"\b(simulat(?:e|es|ed|ion|ing))\b", lowered))
     has_pretrade = bool(re.search(r"\bpre[- ]trade\b", lowered))
-    has_warning = bool(re.search(r"\bwarn(?:s|ing)?\b", lowered))
-    if has_simulation and has_pretrade and has_warning:
+    has_warning_or_alert = bool(re.search(r"\b(?:warnings?|alerts?)\b", lowered))
+    if has_simulation and has_pretrade and has_warning_or_alert:
         return "SIMULATION_PRETRADE_WARNING"
     return None
 
@@ -581,35 +581,36 @@ def _review_semantics(name: str, description: str) -> str | None:
 def _placement_semantics(name: str, description: str) -> str | None:
     if name != "place_equity_order":
         return None
-    lowered = description.casefold()
     if _explicitly_nonplacing(description):
         return None
-    if re.search(
-        r"\b(place|places|submit|submits|execute|executes)\b", lowered
-    ) and re.search(r"\border\b", lowered):
+    if _explicitly_placing(description):
         return "ORDER_SUBMISSION"
     return None
 
 
 def _explicitly_nonplacing(description: str) -> bool:
+    lowered = description.casefold()
     return bool(
-        re.search(
+        re.search(r"\bwithout\s+(?:placing|submitting|executing)\b", lowered)
+        or re.search(
             r"\b(?:does not|do not|will not|never)\s+(?:place|submit|execute)\b",
-            description.casefold(),
+            lowered,
         )
-        or re.search(r"\bno order is placed\b", description.casefold())
+        or re.search(r"\bno order (?:is|was) placed\b", lowered)
+        or re.search(r"\bnothing is (?:placed|submitted|executed)\b", lowered)
     )
 
 
 def _explicitly_placing(description: str) -> bool:
     if _explicitly_nonplacing(description):
         return False
+    lowered = description.casefold()
     return bool(
         re.search(
-            r"\b(place|places|submit|submits|execute|executes)\b",
-            description.casefold(),
+            r"\b(?:place|places|placing|placement|submit|submits|submitting|submission|execute|executes|executing)\b",
+            lowered,
         )
-        and re.search(r"\border\b", description.casefold())
+        and re.search(r"\border\b", lowered)
     )
 
 

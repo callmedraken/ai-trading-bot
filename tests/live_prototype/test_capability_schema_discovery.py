@@ -35,13 +35,15 @@ def _tool(
     name: str,
     description: str,
     *,
-    quantity_type: str | None = "number",
+    quantity_type: str | None = "string",
+    quantity_required: bool = False,
 ) -> SimpleNamespace:
     properties: dict[str, object] = {}
     required: list[str] = []
     if quantity_type is not None:
         properties["quantity"] = {"type": quantity_type}
-        required.append("quantity")
+        if quantity_required:
+            required.append("quantity")
     return SimpleNamespace(
         name=name,
         description=description,
@@ -140,9 +142,14 @@ def _run(
         local_events.append("oauth_scope_entry")
         return _OAUTH
 
+    def admit_test_source(root: Path) -> discovery.SourceAdmission:
+        assert root == tmp_path
+        local_events.append("source")
+        return source_value
+
     result = discovery._run_with_dependencies(
         evidence_dir=candidate_dir,
-        source_admitter=lambda _root: (local_events.append("source"), source_value)[1],
+        source_admitter=admit_test_source,
         oauth_factory_builder=lambda: (
             local_events.append("oauth_factory_builder"),
             oauth_factory,
@@ -151,6 +158,7 @@ def _run(
             local_events.append("transport_builder"),
             make_transport(oauth_factory),
         )[1],
+        repository_root_resolver=lambda: tmp_path,
         expected_schema_digests=expected_schema_digests,
     )
     return result, client, local_events
@@ -206,8 +214,8 @@ def test_metadata_is_sanitized_and_only_explicit_schema_facts_are_recorded(
         item for item in result.schemas if item.tool_name == "review_equity_order"
     )
     assert review.quantity_field_present is True
-    assert review.quantity_field_required is True
-    assert review.quantity_field_numeric is True
+    assert review.quantity_field_required is False
+    assert review.quantity_field_type == "string"
     assert review.regular_hours_fractional_market_precision_decimal_places == 6
     assert review.review_semantics == "SIMULATION_PRETRADE_WARNING"
     assert review.review_is_placement is False
@@ -223,6 +231,81 @@ def test_metadata_is_sanitized_and_only_explicit_schema_facts_are_recorded(
     assert payload["trusted_binding"] is False
     assert payload["provider_numeric_rules_derived"] is False
     assert payload["automatic_retry"] == "FORBIDDEN"
+
+
+def test_decimal_string_quantity_representation_is_recorded_verbatim(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    result, _client, _events = _run(monkeypatch, tmp_path)
+
+    review = next(
+        item for item in result.schemas if item.tool_name == "review_equity_order"
+    )
+    assert review.quantity_field_type == "string"
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "Simulation pre-trade warning without placing an order.",
+        "Simulation pre-trade alert; it does not place an order.",
+        "Simulation pre-trade warning; no order was placed.",
+        "Simulation pre-trade alert; nothing is placed.",
+    ],
+)
+def test_review_description_accepts_explicit_nonplacement_wording(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, description: str
+) -> None:
+    tools = _tools()
+    tools[0].description = description
+    result, _client, _events = _run(monkeypatch, tmp_path, pages=[(tools, None)])
+
+    review = next(
+        item for item in result.schemas if item.tool_name == "review_equity_order"
+    )
+    assert review.review_semantics == "SIMULATION_PRETRADE_WARNING"
+    assert review.review_is_placement is False
+
+
+def test_noncanonical_production_module_root_blocks_before_oauth_or_provider(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    candidate_dir = tmp_path / "fresh-evidence"
+    events: list[str] = []
+
+    def create_test_evidence_dir(path: Path) -> Path:
+        path.mkdir()
+        return path
+
+    def forbidden_source(_root: Path) -> discovery.SourceAdmission:
+        events.append("source")
+        raise AssertionError("source admission must follow the production root gate")
+
+    def forbidden_oauth() -> object:
+        events.append("oauth")
+        raise AssertionError("OAuth must follow source admission")
+
+    monkeypatch.setattr(discovery, "_fresh_evidence_dir", create_test_evidence_dir)
+    monkeypatch.setattr(
+        discovery,
+        "__file__",
+        str(
+            tmp_path
+            / "noncanonical"
+            / "src"
+            / "trading_bot"
+            / "live_prototype"
+            / "capability_schema_discovery.py"
+        ),
+    )
+    monkeypatch.setattr(discovery, "admit_l41_source", forbidden_source)
+    monkeypatch.setattr(discovery, "_create_windows_oauth_factory", forbidden_oauth)
+
+    result = discovery.run_l41r1_schema_discovery(evidence_dir=candidate_dir)
+
+    assert result.status == "BLOCKED"
+    assert result.reason == "L41R1_SOURCE_ADMISSION_BLOCKED"
+    assert events == []
 
 
 @pytest.mark.parametrize(

@@ -243,6 +243,10 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
         == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
     )
     lanes = runner.build_lanes(root, inventory, "full")
+    assert runner.FULL_LANE_PINS == {
+        "tests/live_prototype/test_configuration.py": 0,
+        "tests/rebalancing/test_proposals.py": 0,
+    }
     assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
     assert all(lanes.values()) and "serial" not in lanes
     repeated = runner.build_lanes(root, tuple(reversed(inventory)), "full")
@@ -251,6 +255,17 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     runner.validate_partitions(inventory, tuple(lanes.values()))
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
     assert max(totals) < 300000
+    assert "tests/live_prototype/test_configuration.py" in lanes["broad-1"]
+    assert "tests/rebalancing/test_proposals.py" in lanes["broad-1"]
+    for lane in lanes.values():
+        basenames = [Path(module).name for module in lane]
+        assert len(basenames) == len(set(basenames))
+
+
+def test_full_invalid_pin_target_fails_closed() -> None:
+    lanes = tuple((f"tests/a/test_{index}.py",) for index in range(7))
+    with pytest.raises(runner.CertificationError, match="Unknown FULL lane pin"):
+        runner.apply_full_lane_pins(lanes, {"tests/not_current/test_missing.py": 0})
 
 
 def test_c4_preserves_robinhood_legacy_and_exhaustive_placement(monkeypatch) -> None:
@@ -970,8 +985,10 @@ def test_supported_future_modules_grow_without_current_inventory_repins(
 
     # Start from the frozen timing evidence plus required classification baselines.
     original_table = runner.FULL_MODULE_TIMINGS_MS
-    baseline = set(module for module, _ in original_table) | set(
-        _profile_inventory(tmp_path, "exhaustive")
+    baseline = (
+        set(module for module, _ in original_table)
+        | set(_profile_inventory(tmp_path, "exhaustive"))
+        | set(runner.FULL_LANE_PINS)
     )
     for module in baseline:
         path = tmp_path / module

@@ -116,7 +116,7 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
 | L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Observation CONSUMED / NO RETRY; selected account, SPY tradability and fractional tradability PROVEN; all mutation counters zero; post-read teardown failed with subtype unavailable; official/interface facts remain unresolved |
 | L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | CONSUMED / BLOCKED / NO RETRY; exact session-open failure preserved; no retry |
-| L41R2 | consumed L41R1 observation | additive interactive schema-discovery successor | metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE PREPARATION; real observation NOT RUN |
+| L41R2 | consumed L41R1 observation | additive interactive schema-discovery successor | metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED at `235118f70b7c7039055e9fea45ccf27df46671a0` / `972004101036afe52642ed93c38fed21ea479956`; mapped FULL `42358983502` SUCCESS; real observation NOT RUN |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
@@ -177,7 +177,12 @@ The newly enlarged FULL inventory placed
 broad-5, yielding `40 != 39` unique basenames under the current top-level
 pytest import topology. The admission had no authority failure,
 `IDENTITY_STABLE=True`, and `PROTECTED_EFFECTS=0`; it was not a product-source
-failure, published red source, coverage defect, or GitHub CI failure. The
+failure, published red source, coverage defect, or GitHub CI failure. A fresh
+admission subsequently passed; the amended candidate was published as
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`, mapped FULL
+`42358983502` attempt 1 was terminal SUCCESS, and independent exact-source
+review accepted it. The
 corrected source remains unpublished pending a fresh terminal-PASS admission.
 
 Live-readiness labels are NOT GRANTED. This ledger records progress, not trade authority.
@@ -252,7 +257,7 @@ below resolves local mechanical semantics; actual exit capability remains open.
 
 ## Current source-preparation boundary
 
-The current source milestone is `Q61_NATIVE_WINDOWS_UAT_ACCEPTED`. The L42/I53 source is ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree `f13c2c169dbc5e24e709340b827016e493a041b2`; feature FULL `42201682850` and develop reuse run `42285116586` are terminal SUCCESS. `PROTOTYPE_READY_FOR_NATIVE_TESTING=YES` and Q61 is ACCEPTED. The new L42/I53 source and recovery/Q62 modules perform
+The current source milestone is `L41R2_SOURCE_ACCEPTED`. The L42/I53 source is ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree `f13c2c169dbc5e24e709340b827016e493a041b2`; feature FULL `42201682850` and develop reuse run `42285116586` are terminal SUCCESS. `PROTOTYPE_READY_FOR_NATIVE_TESTING=YES` and Q61 is ACCEPTED. The new L42/I53 source and recovery/Q62 modules perform
 typed, fail-closed evaluation against exact source/config/account/session
 identity, fresh evidence windows, L41 capability, clean ownership and budget,
 all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied

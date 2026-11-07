@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Q61_NATIVE_WINDOWS_UAT_ACCEPTED
+## Current milestone: L41R2_SOURCE_ACCEPTED
 
 The consolidated L42/I53 prototype source is ACCEPTED / INTEGRATED at
 `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree
@@ -28,11 +28,14 @@ remains CONSUMED / BLOCKED / NO RETRY. It proved the intended Agentic account,
 SPY tradability and fractional eligibility with all mutation/review/order
 attempts zero. Post-read teardown failed with subtype unavailable.
 Official/interface facts remain unresolved. L41R1 is CONSUMED / BLOCKED / NO
-RETRY, with its exact evidence and failure boundary recorded below. L41R2 is
-the additive interactive schema successor, source-only at this checkpoint, and
-has not been run. Q62 remains NOT RUN and blocked pending L41R2
-classification; L43 and Q63 have NOT RUN. No live-readiness label or trade
-authority is granted.
+RETRY, with its exact evidence and failure boundary recorded below. The additive
+L41R2 interactive-schema source is independently ACCEPTED at
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`; mapped FULL
+`42358983502`, attempt 1, was terminal SUCCESS across source-static,
+active-tests and broad-1 through broad-7. The real L41R2 observation has NOT
+RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
+have NOT RUN. No live-readiness label or trade authority is granted.
 
 The preserved parent red publication `42195430203`, attempt 1, remains
 immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence and was never rerun.
@@ -85,8 +88,13 @@ The enlarged FULL inventory placed `tests/portfolio/test_models.py` and
 `40 != 39` basename invariant failure under the current pytest topology. No
 authority failure occurred, `IDENTITY_STABLE=True`, and `PROTECTED_EFFECTS=0`.
 This was not a product-source failure, published red source, coverage defect,
-or GitHub CI failure. The candidate remains unpublished pending one fresh
-terminal-PASS admission.
+or GitHub CI failure. The corrected admission subsequently passed, the amended
+candidate was published as
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`, mapped FULL
+`42358983502` attempt 1 was terminal SUCCESS, and independent exact-source
+review accepted the L41R2 implementation. The real L41R2 observation remains
+unrun.
 
 ## L40 accepted/integrated checkpoint
 

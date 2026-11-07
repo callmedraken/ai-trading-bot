@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - Q61_NATIVE_WINDOWS_UAT_ACCEPTED
+## Current milestone - L41R2_SOURCE_ACCEPTED
 
 The consolidated L42/I53 prototype source is ACCEPTED / INTEGRATED at
 `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree
@@ -26,11 +26,14 @@ CONSUMED / BLOCKED / NO RETRY: intended Agentic account identity, SPY
 tradability and fractional eligibility were proven; mutation/review/order
 attempts were zero; post-read teardown failed with unavailable subtype.
 Official/interface facts remain unresolved. L41R1 is CONSUMED / BLOCKED / NO
-RETRY; its exact evidence and failure boundary are recorded below. L41R2 is
-the additive interactive schema successor, source-only at this checkpoint, and
-has not been run. Q62 remains NOT RUN and blocked pending L41R2
-classification; L43 and Q63 have NOT RUN. No live-readiness or trade
-authority is granted.
+RETRY; its exact evidence and failure boundary are recorded below. The additive
+L41R2 interactive-schema source is independently ACCEPTED at
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`; mapped FULL
+`42358983502`, attempt 1, was terminal SUCCESS across source-static,
+active-tests and broad-1 through broad-7. The real L41R2 observation has NOT
+RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
+have NOT RUN. No live-readiness or trade authority is granted.
 
 The preserved L42 parent red run `42195430203`, attempt 1, remains immutable
 `PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted corrective feature
@@ -174,13 +177,15 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Complete exact-source review and acceptance of the unpublished source
-checkpoint. After acceptance, run Q61 native Windows UAT in isolated synthetic
-mode and record its sanitized result. Q62 remains a separate fresh, read-only
-readiness boundary; L43 remains a separately reviewed genuine-position
-qualification boundary; Q63 remains a future delivery step. Fake tests and
-source publication do not establish those outcomes. No paper soak is inserted
-and `FINAL_HOLDOUT` remains sealed.
+Fast-forward the accepted L41R2 source/docs closeout to `develop`, verify
+feature/develop equality and develop-side source-gate success without duplicate
+FULL, then run exactly one separately reviewed real
+`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` observation. Preserve its first result
+without automatic retry. Q62 remains a separate fresh, read-only readiness
+boundary; L43 remains a separately reviewed genuine-position qualification
+boundary; Q63 remains a future delivery step. Fake tests and source publication
+do not establish those outcomes. No paper soak is inserted and
+`FINAL_HOLDOUT` remains sealed.
 
 ## Product and protected boundaries
 

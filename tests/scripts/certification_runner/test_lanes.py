@@ -1,5 +1,6 @@
 import hashlib
 import json
+from collections import Counter
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -52,6 +53,7 @@ def test_robinhood_timing_model_is_exact_and_repeatable() -> None:
     selected = tuple(module for module, _ in runner.ROBINHOOD_MODULE_TIMINGS_MS)
     assert set(selected) <= set(current)
     weights = runner.robinhood_module_weights(selected)
+    # This is the frozen timing-evidence sample cardinality, not discovery size.
     assert len(selected) == len(runner.ROBINHOOD_MODULE_TIMINGS_MS) == 109
     assert set(weights) == set(selected)
     assert runner.ROBINHOOD_FALLBACK_MS == 1000
@@ -220,11 +222,12 @@ def test_empty_lane_never_launches_pytest(
         runner.run_children(SimpleNamespace(), lanes, tmp_path)
 
 
-def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
+def test_full_seven_lane_current_model_is_valid_and_repeatable() -> None:
     root = Path(runner.__file__).resolve().parents[1]
     inventory = runner.select_inventory(runner.discover_inventory(root), "full")
     table = runner.FULL_MODULE_TIMINGS_MS
     paths = tuple(module for module, _ in table)
+    # This is the frozen timing-evidence sample cardinality, not discovery size.
     assert len(paths) == len(set(paths)) == 209
     assert len(inventory) == len(set(inventory))
     assert set(paths) <= set(inventory)
@@ -243,25 +246,81 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
         == "a3b23aab842af7bb042c848b58d8aa0f17704d40937b89d85a3e11c524935710"
     )
     lanes = runner.build_lanes(root, inventory, "full")
-    assert runner.FULL_LANE_PINS == {
-        "tests/live_prototype/test_configuration.py": 0,
-        "tests/rebalancing/test_proposals.py": 0,
-        "tests/rebalancing/test_models.py": 3,
-    }
     assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
     assert all(lanes.values()) and "serial" not in lanes
     repeated = runner.build_lanes(root, tuple(reversed(inventory)), "full")
     assert tuple(lanes.items()) == tuple(repeated.items())
     assert json.dumps(lanes).encode() == json.dumps(repeated).encode()
     runner.validate_partitions(inventory, tuple(lanes.values()))
+    assert sum(len(lane) for lane in lanes.values()) == len(inventory)
+    assert all(
+        max(Counter(Path(module).name.casefold() for module in lane).values()) == 1
+        for lane in lanes.values()
+    )
     totals = tuple(sum(weights[module] for module in lane) for lane in lanes.values())
     assert max(totals) < 300000
-    assert "tests/live_prototype/test_configuration.py" in lanes["broad-1"]
-    assert "tests/rebalancing/test_proposals.py" in lanes["broad-1"]
-    assert "tests/rebalancing/test_models.py" in lanes["broad-4"]
-    for lane in lanes.values():
-        basenames = [Path(module).name for module in lane]
+
+
+def test_full_lane_pin_registry_requires_semantic_classification() -> None:
+    assert set(runner.FULL_LANE_PINS) == set(runner.FULL_LANE_PIN_CLASSIFICATIONS)
+    assert set(runner.FULL_LANE_PIN_CLASSIFICATIONS.values()) <= {"SEMANTIC_PIN"}
+    assert runner.FULL_LANE_PINS == {}
+
+
+def test_full_unique_future_module_is_admitted_without_topology_pin() -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    current = runner.discover_inventory(root)
+    future = "tests/experiments/test_synthetic_future_unique.py"
+    inventory = tuple(sorted((*current, future)))
+    selected = runner.select_inventory(inventory, "full")
+    assert future in selected
+    assert future not in runner.FULL_LANE_PINS
+    lanes = runner.build_lanes(root, selected, "full")
+    repeated = runner.build_lanes(root, tuple(reversed(selected)), "full")
+    assert lanes == repeated
+    runner.validate_partitions(selected, tuple(lanes.values()))
+    assert all(lanes.values())
+    assert sum(future in lane for lane in lanes.values()) == 1
+
+
+def test_full_duplicate_basenames_are_separated_deterministically(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ())
+    pair = ("tests/a/test_shared.py", "tests/z/test_shared.py")
+    inventory = tuple(
+        sorted((*pair, *(f"tests/m{index}/test_module.py" for index in range(6))))
+    )
+    lanes = runner.balance_full(inventory)
+    assert lanes == runner.balance_full(tuple(reversed(inventory)))
+    assert lanes == runner.balance_full(inventory[::2] + inventory[1::2])
+    assert all(not (set(pair) <= set(lane)) for lane in lanes)
+    assert set(pair) <= {module for lane in lanes for module in lane}
+    assert not set(pair) & set(runner.FULL_LANE_PINS)
+
+
+def test_full_resolver_separates_multiple_basename_collisions(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ())
+    collisions = (
+        "tests/a/test_shared_alpha.py",
+        "tests/y/test_shared_alpha.py",
+        "tests/b/test_shared_beta.py",
+        "tests/z/test_shared_beta.py",
+    )
+    inventory = tuple(
+        sorted((*collisions, *(f"tests/m{index}/test_module.py" for index in range(5))))
+    )
+    lanes = runner.balance_full(inventory)
+    for lane in lanes:
+        basenames = [Path(module).name.casefold() for module in lane]
         assert len(basenames) == len(set(basenames))
+    assert runner.balance_full(tuple(reversed(inventory))) == lanes
+    runner.validate_partitions(inventory, lanes)
+
+
+def test_full_impossible_basename_placement_fails_closed(monkeypatch) -> None:
+    monkeypatch.setattr(runner, "FULL_MODULE_TIMINGS_MS", ())
+    inventory = tuple(f"tests/future_{index}/test_unplaceable.py" for index in range(8))
+    with pytest.raises(runner.CertificationError, match="FULL_LANE_DUPLICATE_BASENAME"):
+        runner.balance_full(inventory)
 
 
 def test_full_invalid_pin_target_fails_closed() -> None:
@@ -1036,6 +1095,7 @@ def test_supported_future_modules_grow_without_current_inventory_repins(
         max(sum(weights[module] for module in lane) for lane in lanes.values()) < 300000
     )
     assert runner.FULL_MODULE_TIMINGS_MS == original_table
+    # This is the frozen timing-evidence sample cardinality, not discovery size.
     assert len(original_table) == 209
     assert sum(ms for _, ms in original_table) == 1749660
     assert hashlib.sha256(

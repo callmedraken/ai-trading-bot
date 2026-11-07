@@ -37,16 +37,35 @@ active-tests and broad-1 through broad-7. The real L41R2 observation has NOT
 RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
 have NOT RUN. No live-readiness label or trade authority is granted.
 
+The accepted L41R2 source remains at
+235118f70b7c7039055e9fea45ccf27df46671a0 / tree
+972004101036afe52642ed93c38fed21ea479956; feature FULL 42358983502 attempt 1
+was SUCCESS. Its docs-only develop descendant at 068bd28036bfe3ab1252f484ad967eb0f9fca8f0
+/ tree 7bf0e3a9c1fd97db981f539510b716d2f212d7c1 produced develop run
+42359807677 attempt 1, terminal FAILURE. Route: CHANGE_MODE=FULL;
+DEVELOP_CERTIFICATION_REUSE=False / provenance_not_proven. Classification:
+POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
+CI_ROUTING_OVERCERTIFICATION /
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Fallback test execution
+passed on shards 0-2 and shard 3; shard 3 failed only hygiene at 347.721s
+against the 300s limit. Source-static succeeded. The run was not rerun. The
+additive workflow correction
+is pending and is not accepted or integrated. Q62 remains NOT RUN; no
+protected effect occurred. Detailed preserved evidence is in the
+[validation ledger](validation/arch147-live-prototype.md).
+
 The preserved parent red publication `42195430203`, attempt 1, remains
 immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence and was never rerun.
 
-Next: after exact source review/integration, run the separately reviewed L41R2
-metadata-only observation. It may open one OAuth/MCP session and, only when
-required, one interactive browser authorization, then use only MCP `tools/list`;
-it may invoke zero MCP tools and therefore zero account, tradability, position,
-order, review, placement or cancellation calls. Preserve the first real result
-exactly and do not rerun automatically. Q62 remains blocked until L41R2 is
-classified.
+Next: address the bounded docs-descendant reuse routing defect under the
+pending Architecture 132 proposal. Do not rerun develop run 42359807677. The
+workflow correction has not been accepted or integrated. After that separate
+workflow checkpoint is reviewed, the real L41R2 metadata-only tools/list
+observation remains a future separately reviewed boundary. Preserve its first
+result without automatic retry. Q62 remains NOT RUN and blocked pending L41R2
+classification; L43 and Q63 remain separate. No protected effect follows from
+the source or documentation state.
+
 
 ## L41R1 consumed observation and L41R2 source successor
 

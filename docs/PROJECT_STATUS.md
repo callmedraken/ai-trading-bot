@@ -35,14 +35,31 @@ active-tests and broad-1 through broad-7. The real L41R2 observation has NOT
 RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
 have NOT RUN. No live-readiness or trade authority is granted.
 
+The L41R2 source remains accepted. Its later docs-only develop descendant
+triggered run 42359807677, attempt 1, terminal FAILURE:
+CHANGE_MODE=FULL and DEVELOP_CERTIFICATION_REUSE=False /
+provenance_not_proven. The route defect is
+POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
+CI_ROUTING_OVERCERTIFICATION /
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Fallback test execution
+passed on shards 0-2 and on shard 3; shard 3 failed only its 300-second hygiene
+limit at 347.721 seconds. Source-static succeeded. The run is preserved and
+was not rerun. The proposed
+workflow correction is pending and is not accepted or integrated. Q62 remains
+NOT RUN; no protected effect occurred.
+
 The preserved L42 parent red run `42195430203`, attempt 1, remains immutable
 `PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted corrective feature
 FULL is `42201682850`; develop integration is `42285116586`.
 
-Next boundary: the separately reviewed additive L41R2 metadata-only `tools/list`
-observation. It permits at most one interactive OAuth browser launch, grants no
-broker/order authority, and must invoke zero MCP tools. The first real result is
-one-shot evidence and must be preserved without an automatic rerun.
+Next boundary: review and implement the separately scoped workflow
+correction for the accepted source's docs-descendant reuse gap. The additive
+semantics are proposed, not active; the workflow correction is not accepted or
+integrated. Preserve run 42359807677 without rerunning it. The later L41R2
+metadata-only tools/list observation remains separate and not run; Q62 remains
+NOT RUN, blocked pending L41R2 classification. L43 and Q63 remain separate
+future boundaries.
+
 
 ### L41R1 consumed observation and L41R2 successor
 
@@ -177,15 +194,13 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Fast-forward the accepted L41R2 source/docs closeout to `develop`, verify
-feature/develop equality and develop-side source-gate success without duplicate
-FULL, then run exactly one separately reviewed real
-`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` observation. Preserve its first result
-without automatic retry. Q62 remains a separate fresh, read-only readiness
-boundary; L43 remains a separately reviewed genuine-position qualification
-boundary; Q63 remains a future delivery step. Fake tests and source publication
-do not establish those outcomes. No paper soak is inserted and
-`FINAL_HOLDOUT` remains sealed.
+Continue with a bounded workflow correction for
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP, using the pending additive
+Architecture 132 contract. Run 42359807677 remains preserved and must not be
+rerun. This workflow correction is not accepted or integrated. Any later
+publication uses its normal single-candidate admission and CI gate. Keep the
+real L41R2 observation and Q62 separate; Q62 remains NOT RUN, and no protected
+effect is authorized by this documentation closeout.
 
 ## Product and protected boundaries
 

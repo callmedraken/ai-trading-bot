@@ -59,6 +59,27 @@ evidence, SECURITY_SEMANTIC contracts, exact effect-time HEAD/tree requirements
 and external protocol/schema constraints intact. Scope cleanup to the affected
 surface; this is not authorization for a repository-wide refactor.
 
+For current mutable test/inventory behavior, the default is:
+
+- Test invariants and behavior, not current filenames or counts. New legitimate
+  test modules must not require unrelated test edits merely because inventory
+  size or lane placement changes.
+- Do not add hardcoded module-name pins merely to make mutable lane topology
+  pass. A filename may be exact only when that identity is genuinely part of an
+  architectural, security, or historical contract.
+- Do not assert mutable cardinalities such as an exact number of current
+  test/modules unless the number itself is a frozen contract. Prefer partition,
+  set, inclusion, uniqueness, and other invariant properties.
+- Future-growth regression coverage is mandatory. Inject synthetic new modules,
+  including duplicate basenames, and prove deterministic adaptation without
+  modifying the test for each new module.
+- Audit all equivalent current-owner assertions when correcting brittle
+  filename/count coupling; fixing one lane test is not sufficient if another
+  current inventory or admission test remains coupled.
+- Historical tests stay exact. Frozen predecessor SHA, blob, AST, checkpoint,
+  and reviewed security/authority identities must not be generalized because
+  current mutable tests became property-based.
+
 The required preparation/publication order is:
 
 ```text
@@ -198,15 +219,17 @@ and exact operator boundary. Do not copy the same long chronology or every
 SHA/run paragraph into both. Historical detail belongs once in the relevant
 architecture, validation or history record.
 
-### Green over-certification classification
+### CI routing over-certification classification
 
-Classify `CI_ROUTING_OVERCERTIFICATION` only when local exact admission proves
-a cheaper route, GitHub unexpectedly executes a strictly stronger route, that
-route completes terminal green, exact source is unchanged and no required gate
-was skipped. This is not a source failure or `PREPUBLICATION_COVERAGE_DEFECT`,
-and requires neither a CI rerun nor a replacement source commit. Preserve the
-run, inspect/classify its routing defect, and correct workflow separately.
-Under-certification or skipped required evidence remains STOP.
+Classify CI_ROUTING_OVERCERTIFICATION when exact local admission proves a
+cheaper route, CI unexpectedly executes a strictly stronger route, the exact
+source is unchanged, and no required gate was skipped. This classification is
+about route selection; it does not require the unexpected run to finish green.
+Record the route defect separately from the run's terminal result and preserve
+all failed evidence. A hygiene or execution failure in redundant work does not
+turn the routing defect into a product-source failure or a
+PREPUBLICATION_COVERAGE_DEFECT. Under-certification or skipped required
+evidence remains STOP.
 
 Preserved #768 / run 40599615809 is green over-certification evidence: local
 admission was DOCS_ONLY but the new branch's zero-before push fell back FULL.
@@ -215,6 +238,36 @@ DOCS_ONLY. #766 / run 40595810212 was duplicate PR execution; #767 /
 run 40595839765 repeated broad execution because the merge SHA differed from
 the accepted feature SHA despite an identical tree. These runs are immutable;
 this correction does not rerun them or weaken exact-SHA reuse.
+
+### L41R2 develop docs-descendant routing incident
+
+The accepted L41R2 source boundary is 235118f70b7c7039055e9fea45ccf27df46671a0
+/ tree 972004101036afe52642ed93c38fed21ea479956; its mapped feature FULL run
+42358983502, attempt 1, succeeded. The strict docs-only develop descendant at
+068bd28036bfe3ab1252f484ad967eb0f9fca8f0 / tree
+7bf0e3a9c1fd97db981f539510b716d2f212d7c1 produced preserved develop run
+42359807677, attempt 1, terminal FAILURE. Its route was CHANGE_MODE=FULL with
+DEVELOP_CERTIFICATION_REUSE=False and reason provenance_not_proven. The exact
+classification is
+POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
+CI_ROUTING_OVERCERTIFICATION /
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP.
+
+Source-static succeeded. The four-shard fallback's full-test steps passed on
+shards 0, 1, and 2. Shard 3
+also passed test execution, then failed the 300-second hygiene threshold at
+347.721 seconds; source-gates consequently failed. The mapped canonical FULL
+and active-tests jobs were skipped. Full run and routing evidence are recorded
+in the [Architecture 147 validation ledger](validation/arch147-live-prototype.md).
+Run 42359807677 was not rerun, and no provider or protected effect occurred.
+Q62 remains NOT RUN.
+
+The additive docs-descendant reuse rule is pending, not active. Its proposed
+contract is recorded in the pending Architecture 132 section below and in
+[Architecture 132 certification policy](architecture/132-tiered-certification-profiles.md).
+The workflow correction is not accepted or integrated. Until then, the current
+exact-SHA reuse path remains in force and uncertain provenance falls back to
+FULL.
 
 ### Worktree discovery and guarded operator dispatch
 

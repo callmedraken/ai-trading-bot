@@ -1,5 +1,39 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## L41R2 accepted source boundary and develop routing incident
+
+The accepted L41R2 source boundary is
+235118f70b7c7039055e9fea45ccf27df46671a0 / tree
+972004101036afe52642ed93c38fed21ea479956. Feature mapped FULL run 42358983502,
+attempt 1, was terminal SUCCESS. The real L41R2 observation remains NOT RUN;
+Q62 remains NOT RUN and blocked pending L41R2 classification. No live-readiness,
+broker, or order authority follows from source acceptance.
+
+The docs-only develop descendant was HEAD
+068bd28036bfe3ab1252f484ad967eb0f9fca8f0 / tree
+7bf0e3a9c1fd97db981f539510b716d2f212d7c1. Develop run 42359807677, attempt 1,
+is preserved as terminal FAILURE. It reported CHANGE_MODE=FULL and
+DEVELOP_CERTIFICATION_REUSE=False / provenance_not_proven. Exact classification:
+
+    POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT
+    CI_ROUTING_OVERCERTIFICATION
+    DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP
+
+Source-static succeeded. The four-shard FULL fallback test execution passed
+on shards 0, 1, and 2.
+Shard 3's full-test verification also passed, but its hygiene enforcement
+rejected 347.721 seconds against the 300-second ceiling. Thus full-tests (0),
+(1), and (2) were SUCCESS; full-tests (3) was FAILURE solely at hygiene;
+source-gates was FAILURE. The mapped canonical FULL and active-tests jobs were
+skipped. The failed run is immutable and was not rerun. No provider or
+protected effect occurred.
+
+The pending additive docs-descendant reuse semantics are described in
+[Architecture 132](../architecture/132-tiered-certification-profiles.md) and
+the [development workflow](../AI_DEVELOPMENT_WORKFLOW.md). They are a proposal:
+the workflow correction is not accepted or integrated. Q62 remains NOT RUN.
+This routing incident does not change or retry the accepted L41R2 source.
+
 Accepted/integrated D34 source is HEAD
 `b86defebf9ccbf1efb91397de8f2e66db24a6665`; tree
 `9fa2360dfe7afdd902fd539e94f888063439785d`. Branch
@@ -182,8 +216,7 @@ admission subsequently passed; the amended candidate was published as
 `235118f70b7c7039055e9fea45ccf27df46671a0` / tree
 `972004101036afe52642ed93c38fed21ea479956`, mapped FULL
 `42358983502` attempt 1 was terminal SUCCESS, and independent exact-source
-review accepted it. The
-corrected source remains unpublished pending a fresh terminal-PASS admission.
+review accepted it. Its real L41R2 observation remains NOT RUN and does not advance Q62.
 
 Live-readiness labels are NOT GRANTED. This ledger records progress, not trade authority.
 
@@ -341,12 +374,14 @@ classification is `L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
 and is not inferred. Official/interface facts remain unresolved until trusted
 binding and future schema discovery.
 
-The next boundary is the separately reviewed additive L41R2 metadata-only
-`tools/list` observation. Q62 read-only readiness remains blocked until L41R2
-is classified; L43 genuine bounded entry/owned-exit qualification and Q63
-delivery remain separate future boundaries. Do not invoke D33, D34, consumed
-L41, or L41R1 again; no paper soak is inserted and `FINAL_HOLDOUT` remains
-sealed.
+The immediate documentation/workflow boundary is the pending additive
+develop docs-descendant reuse correction. Run 42359807677 remains preserved and
+was not rerun; the correction is not accepted or integrated. The separately
+reviewed additive L41R2 metadata-only tools/list observation remains a future
+boundary. Q62 read-only readiness remains NOT RUN and blocked until L41R2 is
+classified; L43 genuine bounded entry/owned-exit qualification and Q63 delivery
+remain separate future boundaries. Do not invoke D33, D34, consumed L41, or
+L41R1 again; no paper soak is inserted and FINAL_HOLDOUT remains sealed.
 
 ## L40 focused implementation record
 

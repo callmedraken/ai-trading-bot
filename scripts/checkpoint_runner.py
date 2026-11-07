@@ -28940,6 +28940,25 @@ def _distributed_find_reusable_ci_certification(specs, **kwargs):
 find_reusable_ci_certification = _distributed_find_reusable_ci_certification
 
 
+_PRE_CURRENT_DEVELOP_CI_REUSE = resolve_develop_ci_reuse
+
+
+def _current_develop_ci_reuse(repo_root: Path, mode: str) -> dict[str, object]:
+    from scripts.develop_reuse_successor import resolve_develop_ci_reuse
+
+    return resolve_develop_ci_reuse(
+        repo_root,
+        mode,
+        exact_resolver=_PRE_CURRENT_DEVELOP_CI_REUSE,
+    )
+
+
+# Current docs-descendant composition is an additive overlay. The predecessor
+# function above remains available through its captured exact resolver and its
+# frozen historical AST/blob declarations remain unchanged.
+resolve_develop_ci_reuse = _current_develop_ci_reuse
+
+
 def _arch147_p5b_authority_check(repo_root: Path) -> tuple[str, ...]:
     from scripts.arch147_p5b_source import authority_failures
 

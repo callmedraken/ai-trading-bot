@@ -110,6 +110,7 @@ def current_owner(relative: str) -> str | None:
     if relative in {
         "ops.ps1",
         "scripts/checkpoint_runner.py",
+        "scripts/develop_reuse_successor.py",
         "scripts/source_authority.py",
         "scripts/current_source_authority.py",
         "scripts/distributed_full.py",

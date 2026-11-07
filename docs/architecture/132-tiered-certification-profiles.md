@@ -36,6 +36,49 @@ FULL requires seven deterministic nonempty broad lanes, no serial lane and a
 modeled maximum <300000 ms. ROBINHOOD keeps four lanes; LEGACY/EXHAUSTIVE retain
 their complete/disjoint classification and reviewed serial policy.
 
+## Pending additive extension — develop docs-descendant certification reuse
+
+This is a proposed extension, not active workflow behavior. The current
+DEVELOP_CERTIFICATION_REUSE path remains exact-SHA based; the preserved
+L41R2 docs-descendant incident is classified
+POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
+CI_ROUTING_OVERCERTIFICATION /
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Develop run 42359807677,
+attempt 1, is terminal FAILURE and remains immutable. See the
+[Architecture 147 validation record](../validation/arch147-live-prototype.md)
+for its route and fallback shard outcomes. No rerun or protected effect
+occurred. The workflow correction has not been accepted or integrated.
+
+The proposed addition keeps every existing exact-SHA reuse rule unchanged and
+allows optional reuse for a develop candidate that is a strict descendant of
+one independently accepted and successfully certified source, even when
+documentation commits give the candidate a different Git SHA. Reuse would
+require all of the following:
+
+- The exact certified source SHA is an ancestor of the admitted current develop
+  HEAD, with live ref, branch, tree, and fast-forward identity checks passing.
+- The complete certified-source-to-candidate diff is confined to strict
+  docs/** paths, and the candidate's non-documentation tree is identical to
+  the certified source tree. Tests, workflows, configuration, source, unknown
+  paths, and mixed changes do not qualify.
+- Exactly one complete, terminal-success, first-attempt certification qualifies
+  for the same repository, workflow, admitted feature family, checkpoint and
+  profile. Existing route-specific job, step, hygiene, identity, and provenance
+  checks remain mandatory; run IDs or artifact names supplied by callers are
+  not proof.
+- Current develop source-static, authority, ancestry, and source-gate checks
+  still run on the exact candidate. Reuse evidence records the certified
+  ancestor SHA and its run/job identities alongside the candidate HEAD/tree and
+  the proven documentation-only delta. Only redundant functional/canonical
+  execution may be skipped.
+- Missing, multiple, malformed, unavailable, or ambiguous evidence, or any
+  failed non-documentation identity check, retains the ordinary FULL fallback.
+
+This proposal lets a docs-only descendant reuse the certification of identical
+executable and test content without weakening exact-source provenance. It does
+not grant Q62, provider, broker, or live authority. Implementation and
+independent acceptance are still required before this rule becomes current.
+
 ## Current canonical FULL execution — Architecture 146-B1-C5
 
 Canonical FULL executes the seven existing lanes on seven independent hosted

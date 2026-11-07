@@ -192,6 +192,22 @@ implementation instructions with exactly:
 ChatGPT's exact-diff review must verify that behavioral removals/replacements
 did not leave stale current-product tests or documentation behind.
 
+### Current mutable test/inventory topology
+
+Test invariants and behavior, not present-day filenames or counts. Legitimate
+future test modules must not require unrelated test edits because inventory size
+or lane placement changed. Do not add hardcoded module-name pins to make current
+lane topology pass; exact filenames are permitted only for genuine
+architectural, security, or historical contracts. Do not assert mutable current
+cardinalities unless the number itself is a frozen contract; prefer partition,
+set, inclusion, uniqueness, and other invariant properties. Future-growth
+regression coverage must inject synthetic new modules, including duplicate
+basenames, and prove deterministic adaptation without editing the test for each
+module. Audit equivalent current-owner assertions together when correcting
+filename/count coupling. Historical tests remain exact: frozen predecessor
+SHA/blob/AST/checkpoint and reviewed security/authority identities must not be
+generalized merely because current mutable tests become property-based.
+
 ## Tiered certification policy
 
 Architecture 132-R2 retains the R1 current/legacy ownership model while applying

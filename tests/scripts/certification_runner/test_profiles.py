@@ -27,6 +27,8 @@ def test_current_robinhood_baseline_and_arch131_registration_coverage() -> None:
     repository = runner.discover_inventory(root)
     selected = runner.select_inventory(repository, "robinhood")
     assert runner.ROBINHOOD_REQUIRED_MODULES == _EXPECTED_ROBINHOOD
+    # This is the frozen required Robinhood baseline cardinality, not discovery
+    # inventory cardinality.
     assert len(runner.ROBINHOOD_REQUIRED_MODULES) == 49
     assert len(selected) == len(set(selected))
     assert set(_EXPECTED_ROBINHOOD) <= set(selected)
@@ -49,6 +51,8 @@ def test_current_profile_discovery_supports_partition_and_serial_allowlist() -> 
     }
     assert runner.PROFILES == ("full", "robinhood", "legacy", "exhaustive")
     assert _EXPECTED_FULL == runner.FULL_REQUIRED_MODULES
+    # This is the frozen required FULL baseline cardinality, not discovery
+    # inventory cardinality.
     assert len(runner.FULL_REQUIRED_MODULES) == 122
     assert set(_EXPECTED_FULL) <= set(profiles["full"])
     assert all(len(modules) == len(set(modules)) for modules in profiles.values())

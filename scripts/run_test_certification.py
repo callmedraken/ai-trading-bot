@@ -126,15 +126,6 @@ ROBINHOOD_F1R1_B_LANE_PINS = {
 # hygiene ceiling.
 ROBINHOOD_D1S3_LANE_PINS = {"tests/review_paper/test_d1_session_execution.py": 0}
 
-# Current FULL corrective checkpoint: keep pytest's basename-only module
-# imports disjoint within each child process without changing the frozen
-# timing evidence or any non-FULL profile.
-FULL_LANE_PINS = {
-    "tests/live_prototype/test_configuration.py": 0,
-    "tests/rebalancing/test_proposals.py": 0,
-    "tests/rebalancing/test_models.py": 3,
-}
-
 # Architecture 132-R3K: positive source-owned ROBINHOOD placement estimates
 # normalized from the complete R3J-D1 isolated local diagnostic evidence. The
 # raw evidence measured tests/domain/test_positions.py at 0 ms; Architecture
@@ -274,6 +265,17 @@ ROBINHOOD_MODULE_TIMINGS_MS = (
 # The old R3L map is historical Git evidence, not a second current authority.
 # Tuple pairs expose duplicate paths; runtime never reads prior evidence.
 FULL_FALLBACK_MS = 1000  # Placement estimate only; never an ownership/exclusion rule.
+
+# Current FULL placement pins are reserved for independently reviewed semantic
+# contracts. The prior entries were collision workarounds and are intentionally
+# removed: ordinary basename collisions belong to the generic resolver below.
+# Keep the classification beside the registry so a future pin cannot be added
+# without explicitly documenting that exact placement as semantic.
+FULL_LANE_PINS: dict[str, int] = {}
+FULL_LANE_PIN_CLASSIFICATIONS: dict[str, str] = {}
+FULL_LANE_COUNT = 7
+FULL_LANE_MAX_MS = 300000
+
 FULL_MODULE_TIMINGS_MS = (
     ("tests/analytics/test_analyzer.py", 16),
     ("tests/backtesting/test_backtest_engine.py", 29),
@@ -613,6 +615,7 @@ FULL_EXACT_MODULES = (
     "tests/gui/test_prototype_strategy_page.py",
     "tests/gui/test_prototype_activity_page.py",
     "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
+    "tests/runtime/checkpoint_runner/test_develop_reuse_successor.py",
     "tests/gui/test_live_state.py",
     "tests/runtime/checkpoint_runner/test_arch147_p6.py",
     "tests/desktop_paper/test_robinhood_read.py",
@@ -993,32 +996,132 @@ def balance_robinhood(
 
 
 def balance_full(inventory: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
-    """Place whole FULL modules into seven frozen timing-aware lanes."""
+    """Place whole FULL modules into seven timing-aware collision-free lanes."""
     weights = full_module_weights(inventory)
-    lanes: list[list[str]] = [[] for _ in range(7)]
-    totals = [0] * 7
+    lanes: list[list[str]] = [[] for _ in range(FULL_LANE_COUNT)]
+    totals = [0] * FULL_LANE_COUNT
     for module in sorted(inventory, key=lambda name: (-weights[name], name)):
-        index = min(range(7), key=lambda lane: (totals[lane], lane))
+        index = min(range(FULL_LANE_COUNT), key=lambda lane: (totals[lane], lane))
         lanes[index].append(module)
         totals[index] += weights[module]
-    if any(
-        type(lane) is not int or not 0 <= lane < 7 for lane in FULL_LANE_PINS.values()
-    ):
-        raise CertificationError("FULL lane pins must select lane 0 through 6")
-    selected_pins = {
-        module: lane for module, lane in FULL_LANE_PINS.items() if module in inventory
-    }
-    return apply_full_lane_pins(tuple(tuple(lane) for lane in lanes), selected_pins)
+    pins = _validate_full_lane_pins(inventory)
+    balanced = apply_full_lane_pins(tuple(tuple(lane) for lane in lanes), pins)
+    return _resolve_full_basename_collisions(balanced, weights, pins, inventory)
+
+
+def _validate_full_lane_pins(inventory: tuple[str, ...]) -> dict[str, int]:
+    """Validate the current FULL pin registry and return only semantic pins."""
+    if set(FULL_LANE_PINS) != set(FULL_LANE_PIN_CLASSIFICATIONS):
+        raise CertificationError(
+            "FULL lane pins require one explicit classification per entry"
+        )
+    for module, classification in sorted(FULL_LANE_PIN_CLASSIFICATIONS.items()):
+        if classification != "SEMANTIC_PIN":
+            raise CertificationError(f"FULL lane pin is not semantic: {module}")
+    for module, lane in sorted(FULL_LANE_PINS.items()):
+        if module not in inventory:
+            raise CertificationError(f"Stale FULL lane pin: {module}")
+        if type(lane) is not int or not 0 <= lane < FULL_LANE_COUNT:
+            raise CertificationError(
+                f"FULL lane pin must select lane 0 through {FULL_LANE_COUNT - 1}"
+            )
+    return dict(FULL_LANE_PINS)
+
+
+def _full_basename(module: str) -> str:
+    """Return a case-insensitive basename key for current FULL topology."""
+    return Path(module).name.casefold()
+
+
+def _full_collision(
+    lanes: tuple[tuple[str, ...], ...],
+) -> tuple[int, str, tuple[str, ...]] | None:
+    """Return the first deterministic same-lane basename collision, if any."""
+    collisions: list[tuple[int, str, tuple[str, ...]]] = []
+    for lane_index, lane in enumerate(lanes):
+        by_basename: dict[str, list[str]] = {}
+        for module in sorted(lane):
+            by_basename.setdefault(_full_basename(module), []).append(module)
+        for basename, modules in sorted(by_basename.items()):
+            if len(modules) > 1:
+                collisions.append((lane_index, basename, tuple(modules)))
+    return (
+        min(collisions, key=lambda item: (item[1], item[2], item[0]))
+        if collisions
+        else None
+    )
+
+
+def _resolve_full_basename_collisions(
+    lanes: tuple[tuple[str, ...], ...],
+    weights: dict[str, int],
+    pins: dict[str, int],
+    inventory: tuple[str, ...],
+) -> tuple[tuple[str, ...], ...]:
+    """Relocate movable modules until each FULL lane has unique basenames."""
+    mutable = [list(lane) for lane in lanes]
+    totals = [sum(weights[module] for module in lane) for lane in mutable]
+    for _ in range(len(inventory) + 1):
+        current = tuple(tuple(lane) for lane in mutable)
+        collision = _full_collision(current)
+        if collision is None:
+            validate_partitions(inventory, current)
+            if any(not lane for lane in current):
+                raise CertificationError("FULL requires seven nonempty lanes")
+            if max(totals) >= FULL_LANE_MAX_MS:
+                raise CertificationError(
+                    "FULL predicted lane weight exceeds the 300000 ms ceiling"
+                )
+            return current
+
+        source, basename, modules = collision
+        fixed = tuple(module for module in modules if pins.get(module) == source)
+        movable = tuple(module for module in modules if module not in fixed)
+        if not movable:
+            raise CertificationError(
+                f"FULL_LANE_DUPLICATE_BASENAME: pinned collision for {basename}"
+            )
+        # Keep the canonical first module as the stable anchor unless a semantic
+        # pin already fixes another member of the collision.
+        module = movable[0] if fixed else movable[-1]
+        destinations = [
+            lane
+            for lane in range(FULL_LANE_COUNT)
+            if lane != source
+            and not any(
+                _full_basename(existing) == basename for existing in mutable[lane]
+            )
+        ]
+        if not destinations:
+            raise CertificationError(
+                f"FULL_LANE_DUPLICATE_BASENAME: no eligible lane for {module}"
+            )
+        destination = min(
+            destinations,
+            key=lambda lane: (totals[lane] + weights[module], lane),
+        )
+        mutable[source].remove(module)
+        mutable[destination].append(module)
+        totals[source] -= weights[module]
+        totals[destination] += weights[module]
+    raise CertificationError(
+        "FULL_LANE_DUPLICATE_BASENAME: collision resolution did not converge"
+    )
 
 
 def apply_full_lane_pins(
     lanes: tuple[tuple[str, ...], ...], pins: dict[str, int]
 ) -> tuple[tuple[str, ...], ...]:
     """Apply reviewed zero-based FULL lane placement without changing coverage."""
-    if len(lanes) != 7:
+    if len(lanes) != FULL_LANE_COUNT:
         raise CertificationError("FULL lane pins require seven lanes")
-    if any(type(lane) is not int or not 0 <= lane < 7 for lane in pins.values()):
-        raise CertificationError("FULL lane pins must select lane 0 through 6")
+    if any(
+        type(lane) is not int or not 0 <= lane < FULL_LANE_COUNT
+        for lane in pins.values()
+    ):
+        raise CertificationError(
+            f"FULL lane pins must select lane 0 through {FULL_LANE_COUNT - 1}"
+        )
     mutable = [list(lane) for lane in lanes]
     assigned = {module for lane in lanes for module in lane}
     unknown = sorted(set(pins) - assigned)

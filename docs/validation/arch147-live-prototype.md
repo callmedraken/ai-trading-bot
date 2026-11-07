@@ -116,27 +116,45 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
 | L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Observation CONSUMED / NO RETRY; selected account, SPY tradability and fractional tradability PROVEN; all mutation counters zero; post-read teardown failed with subtype unavailable; official/interface facts remain unresolved |
 | L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | NOT RUN; no retry of consumed L41 |
-| L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | CORRECTIVE SOURCE CANDIDATE; mapped CI and independent review pending; no live readiness |
+| L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
-| Q61 | Q60 | Human native Windows UAT | isolated synthetic | NOT RUN |
+| Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
 | Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; fake-tested evaluator only; live readiness not granted |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
 |---|---|---|
-| Usable launcher and GUI | SOURCE PASS / HOST NOT RUN | Actual five-page service/GUI tests; native UAT separate |
+| Usable launcher and GUI | PASS / Q61 ACCEPTED | Five native Windows pages opened successfully; resize/navigation and clean process exit verified |
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
 | Entry and exact owned exit | BLOCKED | L41 proved account identity, SPY tradability and fractional tradability for one observation; official/interface quantity, minimum, notional and residual-close rules remain unresolved pending accepted binding/schema discovery |
 | Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
-| Stop/kill/restart/reconnect | SOURCE-TESTED / NATIVE NOT RUN | Disarmed real composition has independent workers, cached snapshots, reconnect/recovery blockers, and confirmed shutdown; native UAT remains Q61 |
-| Credential/state isolation | SOURCE PASS / HOST NOT RUN | No production transport dependency; isolated fresh state; no credential construction |
-| Exact source certified | D34 ACCEPTED / INTEGRATED | HEAD `b86defe`; feature mapped FULL and develop exact-certification reuse both passed |
+| Stop/kill/restart/reconnect | SYNTHETIC NATIVE PASS / REAL DISARMED SOURCE-TESTED | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and a clean close; real/disarmed recovery remains source-tested |
+| Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
+| Exact source certified | L42/I53 ACCEPTED / INTEGRATED | HEAD `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850`; develop `42285116586` reused exact feature certification |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
-Readiness labels are NOT GRANTED. This ledger records progress, not acceptance.
+Live-readiness labels are NOT GRANTED. This ledger records progress, not trade authority.
+
+### Q61 native Windows UAT accepted evidence
+
+Q61 ran against exact accepted/integrated source
+`0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree
+`f13c2c169dbc5e24e709340b827016e493a041b2`. The initial fresh synthetic state
+root was
+`F:\AI\temp\arch147-q61-native-uat-4fb827c7f9eb4f5a959f2b1583149f84`;
+the native process exited 0 after the five pages, resize/navigation and
+synthetic safety boundary were inspected. The bounded lifecycle continuation
+used
+`F:\AI\temp\arch147-q61-native-lifecycle-3d927a618e20423e8bdfd89d6510c209`
+and also exited 0. Activity / Health recorded two complete
+`RUNNING -> STOPPING -> STOPPED` cycles, proving Start/Stop and restart; the
+requested final close sequence terminated cleanly. No live/provider/order
+control appeared, no credential or provider activity was observed, and
+`Q61_PROTECTED_EFFECTS=0`. Q61 establishes native prototype usability only;
+it does not establish L41R1, Q62, L43, Q63 or live readiness.
 
 ## Focused verification and review record
 
@@ -166,8 +184,7 @@ or metrics and carries only its fixed sanitized status code.
 The accepted D34 observation closes the D32 live data-basis leg without changing
 the retained `BASE_MA35_50_V1` control or D31's `NONE_QUALIFIES` result. The
 observed BUY/HOLD outputs are signal outputs only and grant no live eligibility,
-order authority, exit capability, or durable budget readiness. Q61 remains NOT
-RUN as a separate native Windows UAT boundary if still current; no paper soak
+order authority, exit capability, or durable budget readiness. Q61 native Windows synthetic UAT is now ACCEPTED; no paper soak
 is inserted and `FINAL_HOLDOUT` remains sealed.
 
 Precommit current/historical batch evaluation reported only task files that were
@@ -190,10 +207,7 @@ below resolves local mechanical semantics; actual exit capability remains open.
 
 ## Current source-preparation boundary
 
-The current source-preparation milestone is
-`L42_PREPUBLICATION_CORRECTIVE_CANDIDATE`.
-`PROTOTYPE_READY_FOR_NATIVE_TESTING=NO` until ChatGPT independently accepts a
-terminal-green corrective source. The new L42/I53 source and recovery/Q62 modules perform
+The current source milestone is `Q61_NATIVE_WINDOWS_UAT_ACCEPTED`. The L42/I53 source is ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree `f13c2c169dbc5e24e709340b827016e493a041b2`; feature FULL `42201682850` and develop reuse run `42285116586` are terminal SUCCESS. `PROTOTYPE_READY_FOR_NATIVE_TESTING=YES` and Q61 is ACCEPTED. The new L42/I53 source and recovery/Q62 modules perform
 typed, fail-closed evaluation against exact source/config/account/session
 identity, fresh evidence windows, L41 capability, clean ownership and budget,
 all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied
@@ -215,9 +229,7 @@ L41R1 operator, `durable_state.py`/`live_controller.py`, the reusable runtime
 Alpaca signal provider, the explicit synthetic/REAL_DISARMED application service
 and five-page GUI composition, plus `readiness_contracts.py`,
 `readiness_operator.py`, `recovery_operator.py`, `emergency_operator.py`, and
-`delivery_operator.py`. Matching focused tests are fake-only; evidence
-envelopes validate typed identities and validity windows but do not authenticate
-caller-supplied references; no L41R1/Q61/Q62/L43/Q63 observation was executed.
+`delivery_operator.py`. Matching focused tests remain fake-only; evidence envelopes validate typed identities and validity windows but do not authenticate caller-supplied references. Q61 native synthetic UAT was executed and accepted; no L41R1/Q62/L43/Q63 observation was executed.
 
 ### Preserved latest L42 publication red evidence
 
@@ -274,10 +286,7 @@ classification is `L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
 and is not inferred. Official/interface facts remain unresolved until trusted
 binding and future schema discovery.
 
-The next boundary is exact-source review and acceptance, followed by Q61 native
-Windows UAT in isolated synthetic mode. Q62 read-only readiness, L43 genuine
-bounded entry/owned-exit qualification, and Q63 delivery remain separate future
-boundaries. Do not invoke D33, D34, or consumed L41 again; no paper soak is
+The next boundary is the separately reviewed L41R1 metadata-only `tools/list` observation. Q62 read-only readiness remains blocked until L41R1 is classified; L43 genuine bounded entry/owned-exit qualification and Q63 delivery remain separate future boundaries. Do not invoke D33, D34, or consumed L41 again; no paper soak is
 inserted and `FINAL_HOLDOUT` remains sealed.
 
 ## L40 focused implementation record

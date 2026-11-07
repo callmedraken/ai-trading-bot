@@ -31,6 +31,13 @@ _L41_IMPORT_ALLOWLIST = {
             "streamable_http_client",
         ),
     },
+    "src/trading_bot/live_prototype/capability_schema_discovery_interactive.py": {
+        (
+            "from",
+            "trading_bot.robinhood_mcp.windows_oauth",
+            "create_windows_robinhood_oauth_factory",
+        ),
+    },
 }
 _FORBIDDEN_PRODUCTION_IMPORTS = (
     "robinhood_mcp",
@@ -90,6 +97,20 @@ def test_l41_capability_family_is_prepublication_owned():
 
     assert capability_tests
     assert capability_tests <= set(runner.ARCH147_PROTOTYPE_TESTS)
+
+
+def test_l41r2_interactive_schema_family_is_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    production = (
+        "src/trading_bot/live_prototype/capability_schema_discovery_interactive.py"
+    )
+    test = "tests/live_prototype/test_capability_schema_discovery_interactive.py"
+
+    assert (root / production).is_file()
+    assert (root / test).is_file()
+    assert "src/trading_bot/live_prototype" in runner.ARCH147_PROTOTYPE_RUFF
+    assert test in runner.ARCH147_PROTOTYPE_TESTS
+    assert runner._arch147_prototype_authority_check(root) == ()
 
 
 def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):

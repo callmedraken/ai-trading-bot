@@ -25,17 +25,65 @@ The L41 source is accepted/integrated. Its real capability observation remains
 CONSUMED / BLOCKED / NO RETRY: intended Agentic account identity, SPY
 tradability and fractional eligibility were proven; mutation/review/order
 attempts were zero; post-read teardown failed with unavailable subtype.
-Official/interface facts remain unresolved. L41R1 has NOT RUN. Q62, L43 and
-Q63 have NOT RUN. No live-readiness or trade authority is granted.
+Official/interface facts remain unresolved. L41R1 is CONSUMED / BLOCKED / NO
+RETRY; its exact evidence and failure boundary are recorded below. L41R2 is
+the additive interactive schema successor, source-only at this checkpoint, and
+has not been run. Q62 remains NOT RUN and blocked pending L41R2
+classification; L43 and Q63 have NOT RUN. No live-readiness or trade
+authority is granted.
 
 The preserved L42 parent red run `42195430203`, attempt 1, remains immutable
 `PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted corrective feature
 FULL is `42201682850`; develop integration is `42285116586`.
 
-Next boundary: the separately reviewed L41R1 metadata-only `tools/list`
-observation. It grants no broker/order authority and must invoke zero MCP tools.
-The first real result is one-shot evidence and must be preserved without an
-automatic rerun.
+Next boundary: the separately reviewed additive L41R2 metadata-only `tools/list`
+observation. It permits at most one interactive OAuth browser launch, grants no
+broker/order authority, and must invoke zero MCP tools. The first real result is
+one-shot evidence and must be preserved without an automatic rerun.
+
+### L41R1 consumed observation and L41R2 successor
+
+L41R1 is recorded exactly as
+`L41R1_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`. Its preserved evidence is
+`F:\\AI\\temp\\arch147-l41r1-schema-observation-f5b81e5f60dc40c280f53007d1db2b52\\evidence.json`,
+SHA-256
+`2b62f54076fdfd34aa3eb799ed563701f8eadafe8877b25590f88fe72147160f`,
+length `1130` bytes. It recorded source admission PASS, one OAuth scope-entry
+attempt, one MCP session-open attempt, zero `tools/list` attempts, empty
+schemas, reason `L41R1_MCP_SESSION_OPEN_FAILED`, and zero MCP tool, account,
+tradability, position, order, portfolio, quote, review, placement, cancellation
+and other-tool attempts.
+
+The exact source-contract cause was
+`_create_windows_oauth_factory()` installing `_forbid_interactive_oauth`; the
+MCP OAuth SDK required an authorization-code flow and invoked that blocker. The
+classification is `L41R1_INTERACTIVE_OAUTH_FORBIDDEN`, not a generic browser or
+environment failure. The attempt also exposed an upstream OAuth/MCP traceback
+output defect: sanitized evidence did not prevent provider/OAuth traceback text
+from reaching the terminal.
+
+`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` is a separately named additive successor
+with evidence schema `arch147-l41r2-interactive-interface-observation/v1`. It
+retains the corrected schema semantics, permits one reviewed interactive OAuth
+authorization when persisted state is insufficient, suppresses upstream
+provider/OAuth output, invokes only bounded `tools/list`, and records no raw
+URLs, callback values, tokens or provider text. Credential reads and writes are
+SDK-managed and individually uncounted (`null`/`null`). A successful result is
+`CAPTURED_FOR_REVIEW` only; it grants no live readiness, broker authority, Q62
+acceptance or order authority. Q62 remains NOT RUN and blocked pending the
+first real L41R2 classification.
+
+The first unpublished L41R2 prepublication admission is preserved at
+`F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
+`PREPUBLICATION_ADMISSION_TOPOLOGY_DEFECT` / `FULL_LANE_DUPLICATE_BASENAME`.
+Adding the interactive L41R2 test enlarged the deterministic FULL inventory and
+exposed `tests/portfolio/test_models.py` and
+`tests/rebalancing/test_models.py` together in broad-5 under the current
+top-level pytest import topology. The required invariant observed `40 != 39`
+unique basenames. No authority failure occurred, `IDENTITY_STABLE=True`, and
+`PROTECTED_EFFECTS=0`; this was not a product-source failure, published red
+source, coverage defect, or GitHub CI failure. The corrected source remains
+unpublished pending a fresh terminal-PASS admission.
 
 ## L40 accepted/integrated baseline
 

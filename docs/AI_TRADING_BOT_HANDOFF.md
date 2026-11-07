@@ -27,17 +27,66 @@ The L41 source is accepted/integrated, but its one real capability observation
 remains CONSUMED / BLOCKED / NO RETRY. It proved the intended Agentic account,
 SPY tradability and fractional eligibility with all mutation/review/order
 attempts zero. Post-read teardown failed with subtype unavailable.
-Official/interface facts remain unresolved. L41R1, Q62, L43 and Q63 have NOT
-RUN. No live-readiness label or trade authority is granted.
+Official/interface facts remain unresolved. L41R1 is CONSUMED / BLOCKED / NO
+RETRY, with its exact evidence and failure boundary recorded below. L41R2 is
+the additive interactive schema successor, source-only at this checkpoint, and
+has not been run. Q62 remains NOT RUN and blocked pending L41R2
+classification; L43 and Q63 have NOT RUN. No live-readiness label or trade
+authority is granted.
 
 The preserved parent red publication `42195430203`, attempt 1, remains
 immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence and was never rerun.
 
-Next: run the separately reviewed L41R1 metadata-only observation. It may open
-one OAuth/MCP session and use only MCP `tools/list`; it may invoke zero MCP
-tools and therefore zero account, tradability, position, order, review,
-placement or cancellation calls. Preserve the first real result exactly and do
-not rerun automatically. Q62 remains blocked until L41R1 is classified.
+Next: after exact source review/integration, run the separately reviewed L41R2
+metadata-only observation. It may open one OAuth/MCP session and, only when
+required, one interactive browser authorization, then use only MCP `tools/list`;
+it may invoke zero MCP tools and therefore zero account, tradability, position,
+order, review, placement or cancellation calls. Preserve the first real result
+exactly and do not rerun automatically. Q62 remains blocked until L41R2 is
+classified.
+
+## L41R1 consumed observation and L41R2 source successor
+
+The consumed predecessor is recorded exactly as
+`L41R1_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`. Its preserved evidence is
+`F:\\AI\\temp\\arch147-l41r1-schema-observation-f5b81e5f60dc40c280f53007d1db2b52\\evidence.json`,
+SHA-256
+`2b62f54076fdfd34aa3eb799ed563701f8eadafe8877b25590f88fe72147160f`,
+length `1130` bytes. It recorded source admission PASS, OAuth scope entry `1`,
+MCP session-open `1`, `tools/list=0`, empty schemas, reason
+`L41R1_MCP_SESSION_OPEN_FAILED`, and zero MCP tool, account, tradability,
+position, order, portfolio, quote, review, placement, cancellation and
+other-tool attempts.
+
+The exact cause was `_create_windows_oauth_factory()` installing
+`_forbid_interactive_oauth`; the MCP OAuth SDK required an authorization-code
+flow and invoked that blocker. The classification is
+`L41R1_INTERACTIVE_OAUTH_FORBIDDEN`, not a generic browser/environment failure.
+The attempt also exposed an upstream OAuth/MCP traceback-output defect because
+provider/OAuth traceback text reached the terminal despite sanitized evidence.
+
+`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` is the separately named additive successor
+with evidence schema `arch147-l41r2-interactive-interface-observation/v1`. It
+preserves the corrected schema facts, permits one reviewed interactive OAuth
+authorization when persisted state is insufficient, suppresses upstream
+provider/OAuth output, and invokes only bounded `tools/list`. Evidence records
+browser launches as `0` or `1`, native credential read/write counts as `null`,
+and `SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; raw URLs, callback values, tokens
+and provider text are never persisted. A successful result is
+`CAPTURED_FOR_REVIEW` only and grants no live readiness, broker authority, Q62
+acceptance or order authority. Q62 remains NOT RUN and blocked pending the
+first real L41R2 classification.
+
+The first unpublished L41R2 prepublication admission is preserved at
+`F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
+`PREPUBLICATION_ADMISSION_TOPOLOGY_DEFECT` / `FULL_LANE_DUPLICATE_BASENAME`.
+The enlarged FULL inventory placed `tests/portfolio/test_models.py` and
+`tests/rebalancing/test_models.py` together in broad-5, producing the required
+`40 != 39` basename invariant failure under the current pytest topology. No
+authority failure occurred, `IDENTITY_STABLE=True`, and `PROTECTED_EFFECTS=0`.
+This was not a product-source failure, published red source, coverage defect,
+or GitHub CI failure. The candidate remains unpublished pending one fresh
+terminal-PASS admission.
 
 ## L40 accepted/integrated checkpoint
 

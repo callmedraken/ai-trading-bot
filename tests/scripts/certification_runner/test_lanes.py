@@ -246,6 +246,7 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     assert runner.FULL_LANE_PINS == {
         "tests/live_prototype/test_configuration.py": 0,
         "tests/rebalancing/test_proposals.py": 0,
+        "tests/rebalancing/test_models.py": 3,
     }
     assert tuple(lanes) == tuple(f"broad-{index}" for index in range(1, 8))
     assert all(lanes.values()) and "serial" not in lanes
@@ -257,6 +258,7 @@ def test_full_seven_lane_current_model_is_exact_and_repeatable() -> None:
     assert max(totals) < 300000
     assert "tests/live_prototype/test_configuration.py" in lanes["broad-1"]
     assert "tests/rebalancing/test_proposals.py" in lanes["broad-1"]
+    assert "tests/rebalancing/test_models.py" in lanes["broad-4"]
     for lane in lanes.values():
         basenames = [Path(module).name for module in lane]
         assert len(basenames) == len(set(basenames))

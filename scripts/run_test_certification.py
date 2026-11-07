@@ -132,6 +132,7 @@ ROBINHOOD_D1S3_LANE_PINS = {"tests/review_paper/test_d1_session_execution.py": 0
 FULL_LANE_PINS = {
     "tests/live_prototype/test_configuration.py": 0,
     "tests/rebalancing/test_proposals.py": 0,
+    "tests/rebalancing/test_models.py": 3,
 }
 
 # Architecture 132-R3K: positive source-owned ROBINHOOD placement estimates

@@ -115,12 +115,13 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | D34 | consumed-D33 recovery successor | Sol source/operator, exact review | Alpaca all-adjusted 60-session inputs with published-close cutoff | ACCEPTED / INTEGRATED; READY observation CONSUMED SUCCESSFULLY / NO RETRY |
 | L40 | accepted D34 closeout | Sol contract/composition; Luna capability/ownership audit | pure effect-disabled contract | ACCEPTED / INTEGRATED at `14e1b628c0c51c27b23deabee56eb91859818529` |
 | L41 | accepted/integrated L40 | Luna source-owned observer and fake tests | exact two-read capability evidence | Observation CONSUMED / NO RETRY; selected account, SPY tradability and fractional tradability PROVEN; all mutation counters zero; post-read teardown failed with subtype unavailable; official/interface facts remain unresolved |
-| L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | NOT RUN; no retry of consumed L41 |
+| L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | CONSUMED / BLOCKED / NO RETRY; exact session-open failure preserved; no retry |
+| L41R2 | consumed L41R1 observation | additive interactive schema-discovery successor | metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE PREPARATION; real observation NOT RUN |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; fake-tested evaluator only; live readiness not granted |
+| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked pending L41R2 classification; live readiness not granted |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
@@ -135,6 +136,49 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
 | Exact source certified | L42/I53 ACCEPTED / INTEGRATED | HEAD `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850`; develop `42285116586` reused exact feature certification |
 | Bounded live test ready | BLOCKED | no live effect authorization |
+
+### L41R1 consumed record and L41R2 successor
+
+The consumed L41R1 result is immutable and recorded as
+`L41R1_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`. Its evidence path is
+`F:\\AI\\temp\\arch147-l41r1-schema-observation-f5b81e5f60dc40c280f53007d1db2b52\\evidence.json`;
+SHA-256 is
+`2b62f54076fdfd34aa3eb799ed563701f8eadafe8877b25590f88fe72147160f`,
+length `1130` bytes. Source admission passed. OAuth scope-entry attempts were
+`1`, MCP session-open attempts were `1`, `tools/list` attempts were `0`, and
+schemas were empty. MCP tool invocation, account, tradability, position, order,
+portfolio, quote, review, placement, cancellation and other-tool counters were
+all `0`. The fixed reason was `L41R1_MCP_SESSION_OPEN_FAILED`.
+
+The source-contract root cause was `_create_windows_oauth_factory()` installing
+`_forbid_interactive_oauth`; the MCP OAuth SDK required an authorization-code
+flow and invoked that blocker. The exact classification is
+`L41R1_INTERACTIVE_OAUTH_FORBIDDEN`, not a generic browser/environment failure.
+The consumed attempt also exposed an upstream OAuth/MCP traceback-output defect:
+sanitized evidence did not suppress traceback output reaching the terminal.
+
+`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` is the additive successor with evidence
+schema `arch147-l41r2-interactive-interface-observation/v1`. Its source-only
+boundary retains the corrected quantity/review/placement schema semantics,
+permits at most one reviewed interactive browser authorization, suppresses
+upstream provider/OAuth stdout, stderr, logging, warnings and native FD 1/2
+output, and invokes only bounded `tools/list`. Native credential reads and
+writes are SDK-managed and individually uncounted (`null`/`null`, marker
+`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`). A successful result is
+`CAPTURED_FOR_REVIEW` only. Q62 remains NOT RUN and blocked pending the first
+real L41R2 classification; no live readiness, broker authority or order
+authority is granted.
+
+The first unpublished L41R2 prepublication admission is preserved at
+`F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
+`PREPUBLICATION_ADMISSION_TOPOLOGY_DEFECT` / `FULL_LANE_DUPLICATE_BASENAME`.
+The newly enlarged FULL inventory placed
+`tests/portfolio/test_models.py` and `tests/rebalancing/test_models.py` in
+broad-5, yielding `40 != 39` unique basenames under the current top-level
+pytest import topology. The admission had no authority failure,
+`IDENTITY_STABLE=True`, and `PROTECTED_EFFECTS=0`; it was not a product-source
+failure, published red source, coverage defect, or GitHub CI failure. The
+corrected source remains unpublished pending a fresh terminal-PASS admission.
 
 Live-readiness labels are NOT GRANTED. This ledger records progress, not trade authority.
 
@@ -154,7 +198,8 @@ and also exited 0. Activity / Health recorded two complete
 requested final close sequence terminated cleanly. No live/provider/order
 control appeared, no credential or provider activity was observed, and
 `Q61_PROTECTED_EFFECTS=0`. Q61 establishes native prototype usability only;
-it does not establish L41R1, Q62, L43, Q63 or live readiness.
+it does not establish L41R2, Q62, L43, Q63 or live readiness. L41R1 is a
+consumed blocked predecessor and was not retried.
 
 ## Focused verification and review record
 
@@ -211,9 +256,10 @@ The current source milestone is `Q61_NATIVE_WINDOWS_UAT_ACCEPTED`. The L42/I53 s
 typed, fail-closed evaluation against exact source/config/account/session
 identity, fresh evidence windows, L41 capability, clean ownership and budget,
 all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied
-accepted identities while preserving L41R1/Q61/Q62/L43/Q63 as `NOT_RUN` until
-their separate evidence exists. The emergency-exit operator has no provider
-dispatch surface and remains `DISARMED`.
+accepted identities while preserving the consumed L41R1 result, the unrun
+L41R2/Q62/L43/Q63 boundaries, and Q61's native evidence as separately owned
+evidence. The emergency-exit operator has no provider dispatch surface and
+remains `DISARMED`.
 
 The consumed L41 observation proved account identity and SPY account/fractional
 tradability. Production, broker, order, paper, live, and runtime-binding
@@ -224,12 +270,16 @@ as Q61/Q62/L43/Q63 evidence. No live-readiness label or broker authority is
 granted.
 
 The source-only implementation includes the strict consumed-evidence parser and
-official-rule binding, truthful L41 teardown accounting, additive tools/list-only
-L41R1 operator, `durable_state.py`/`live_controller.py`, the reusable runtime
+official-rule binding, truthful L41 teardown accounting, the consumed L41R1
+operator and additive L41R2 interactive tools/list-only successor,
+`durable_state.py`/`live_controller.py`, the reusable runtime
 Alpaca signal provider, the explicit synthetic/REAL_DISARMED application service
 and five-page GUI composition, plus `readiness_contracts.py`,
 `readiness_operator.py`, `recovery_operator.py`, `emergency_operator.py`, and
-`delivery_operator.py`. Matching focused tests remain fake-only; evidence envelopes validate typed identities and validity windows but do not authenticate caller-supplied references. Q61 native synthetic UAT was executed and accepted; no L41R1/Q62/L43/Q63 observation was executed.
+`delivery_operator.py`. Matching focused tests remain fake-only; evidence
+envelopes validate typed identities and validity windows but do not authenticate
+caller-supplied references. Q61 native synthetic UAT was executed and accepted;
+no L41R2/Q62/L43/Q63 observation was executed, and L41R1 was not retried.
 
 ### Preserved latest L42 publication red evidence
 
@@ -286,8 +336,12 @@ classification is `L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
 and is not inferred. Official/interface facts remain unresolved until trusted
 binding and future schema discovery.
 
-The next boundary is the separately reviewed L41R1 metadata-only `tools/list` observation. Q62 read-only readiness remains blocked until L41R1 is classified; L43 genuine bounded entry/owned-exit qualification and Q63 delivery remain separate future boundaries. Do not invoke D33, D34, or consumed L41 again; no paper soak is
-inserted and `FINAL_HOLDOUT` remains sealed.
+The next boundary is the separately reviewed additive L41R2 metadata-only
+`tools/list` observation. Q62 read-only readiness remains blocked until L41R2
+is classified; L43 genuine bounded entry/owned-exit qualification and Q63
+delivery remain separate future boundaries. Do not invoke D33, D34, consumed
+L41, or L41R1 again; no paper soak is inserted and `FINAL_HOLDOUT` remains
+sealed.
 
 ## L40 focused implementation record
 

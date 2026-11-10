@@ -239,35 +239,49 @@ run 40595839765 repeated broad execution because the merge SHA differed from
 the accepted feature SHA despite an identical tree. These runs are immutable;
 this correction does not rerun them or weaken exact-SHA reuse.
 
-### L41R2 develop docs-descendant routing incident
+### Accepted L41R2 docs-descendant certification reuse
 
-The accepted L41R2 source boundary is 235118f70b7c7039055e9fea45ccf27df46671a0
-/ tree 972004101036afe52642ed93c38fed21ea479956; its mapped feature FULL run
-42358983502, attempt 1, succeeded. The strict docs-only develop descendant at
-068bd28036bfe3ab1252f484ad967eb0f9fca8f0 / tree
-7bf0e3a9c1fd97db981f539510b716d2f212d7c1 produced preserved develop run
-42359807677, attempt 1, terminal FAILURE. Its route was CHANGE_MODE=FULL with
-DEVELOP_CERTIFICATION_REUSE=False and reason provenance_not_proven. The exact
-classification is
-POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
-CI_ROUTING_OVERCERTIFICATION /
-DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP.
+The earlier L41R2 docs-only develop descendant run `42359807677`, attempt 1,
+remains immutable terminal FAILURE evidence and was not rerun. It exposed the
+`DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP`; its precise route and shard
+outcomes are preserved in the [Architecture 147 validation ledger](validation/arch147-live-prototype.md).
 
-Source-static succeeded. The four-shard fallback's full-test steps passed on
-shards 0, 1, and 2. Shard 3
-also passed test execution, then failed the 300-second hygiene threshold at
-347.721 seconds; source-gates consequently failed. The mapped canonical FULL
-and active-tests jobs were skipped. Full run and routing evidence are recorded
-in the [Architecture 147 validation ledger](validation/arch147-live-prototype.md).
-Run 42359807677 was not rerun, and no provider or protected effect occurred.
-Q62 remains NOT RUN.
+The correction is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`f8566c030889847e6632c3a9cc4955778e5da802` / tree
+`959f16bf383c63028a8a157dde93e285c9eeba8c`. Feature run `42734478859`, attempt
+1, passed source-static, active-tests, all seven distributed canonical FULL
+lanes, and source-gates. Develop run `42740143581`, attempt 1, succeeded with
+`DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and
+`DEVELOP_DUPLICATE_FULL=NO`. That develop run used exact-SHA reuse; it does not
+claim to exercise the docs-descendant route.
 
-The additive docs-descendant reuse rule is pending, not active. Its proposed
-contract is recorded in the pending Architecture 132 section below and in
-[Architecture 132 certification policy](architecture/132-tiered-certification-profiles.md).
-The workflow correction is not accepted or integrated. Until then, the current
-exact-SHA reuse path remains in force and uncertain provenance falls back to
-FULL.
+The additive docs-descendant rule is now active, with its exact bounded contract
+in [Architecture 132](architecture/132-tiered-certification-profiles.md):
+
+- Existing exact-SHA reuse runs first and remains unchanged.
+- The successor considers only one uniquely qualifying, first-attempt,
+  terminal-success push certification for an explicitly mapped `full` feature
+  checkpoint. Its exact source identity, repository/workflow/branch, active
+  tests, source-static, source-gates, all seven distributed FULL lane jobs and
+  skipped fallback/certification jobs must match the reviewed topology. It does
+  not reuse ROBINHOOD or generic broad-route evidence.
+- That certified source must be an ancestor within the admitted develop event's
+  base-to-HEAD range. Every commit in the nonempty suffix must have exactly one
+  parent and a nonempty strict
+  `docs/**`-only change. A merge or any non-documentation/unknown path rejects
+  reuse.
+- A unique successful attempt-1 docs-only feature run must exist for the exact
+  current candidate SHA and feature branch. It must prove source-static and
+  source-gates success with active-tests, broad fallback and canonical
+  certification jobs skipped under the reviewed docs-only topology.
+- Current develop source-static, authority, ancestry and source-gates still run
+  against the exact develop candidate. Missing, duplicate, malformed, stale or
+  otherwise ambiguous proof retains the ordinary FULL fallback. Evidence records
+  both the certified ancestor and the candidate's docs-only suffix identities.
+
+The docs-descendant proof is separately attempt-1-only; it does not change the
+current canonical same-SHA attempt policy. The incident involved no
+provider or protected effect, and no Q62 authority follows from the correction.
 
 ### Worktree discovery and guarded operator dispatch
 
@@ -657,11 +671,11 @@ immutable-release publisher is required. Task Scheduler/start-at-login remains
 an optional later convenience. The old Architecture 125/128/133/134 release,
 ACL and scheduler machinery is preserved as history/deferred hardening.
 
-## Architecture 147 source milestone and authority route
+## Architecture 147 P1 source milestone and authority route
 
-Architecture 147 controls the current product roadmap. P1 is the source-only
-desktop research simplification: ordinary create-only local storage, the
-OPEN-only research loader, and an explicit final-holdout loader requiring the
+Architecture 147 controls the current product roadmap. P1 established the
+source-only desktop research simplification: ordinary create-only local storage,
+the OPEN-only research loader, and an explicit final-holdout loader requiring the
 existing Architecture-145 admission. P1 has no provider, credential, Robinhood,
 paper, broker or live effect. The registered checkpoint is
 `arch147-desktop-research-profile`, with `preflight=None`, `execute=None`, and

@@ -36,48 +36,60 @@ FULL requires seven deterministic nonempty broad lanes, no serial lane and a
 modeled maximum <300000 ms. ROBINHOOD keeps four lanes; LEGACY/EXHAUSTIVE retain
 their complete/disjoint classification and reviewed serial policy.
 
-## Pending additive extension — develop docs-descendant certification reuse
+## Accepted additive extension - develop docs-descendant certification reuse
 
-This is a proposed extension, not active workflow behavior. The current
-DEVELOP_CERTIFICATION_REUSE path remains exact-SHA based; the preserved
-L41R2 docs-descendant incident is classified
+This extension is current behavior, integrated with the existing exact-SHA
+reuse path. The earlier L41R2 docs-descendant incident is classified
 POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
 CI_ROUTING_OVERCERTIFICATION /
-DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Develop run 42359807677,
-attempt 1, is terminal FAILURE and remains immutable. See the
-[Architecture 147 validation record](../validation/arch147-live-prototype.md)
-for its route and fallback shard outcomes. No rerun or protected effect
-occurred. The workflow correction has not been accepted or integrated.
+DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Develop run `42359807677`,
+attempt 1, remains immutable terminal FAILURE evidence and was not rerun. Its
+route and fallback shard outcomes are in the
+[Architecture 147 validation record](../validation/arch147-live-prototype.md).
 
-The proposed addition keeps every existing exact-SHA reuse rule unchanged and
-allows optional reuse for a develop candidate that is a strict descendant of
-one independently accepted and successfully certified source, even when
-documentation commits give the candidate a different Git SHA. Reuse would
-require all of the following:
+The accepted correction is integrated at
+`f8566c030889847e6632c3a9cc4955778e5da802` / tree
+`959f16bf383c63028a8a157dde93e285c9eeba8c`.
+Feature run `42734478859`, attempt 1, passed the mapped distributed seven-lane
+FULL topology. Develop run `42740143581`, attempt 1, succeeded with
+`exact_feature_certification` reuse and `DEVELOP_DUPLICATE_FULL=NO`.
+That develop run exercised the existing exact-SHA reuse path; it is not evidence of a docs-descendant reuse event.
 
-- The exact certified source SHA is an ancestor of the admitted current develop
-  HEAD, with live ref, branch, tree, and fast-forward identity checks passing.
-- The complete certified-source-to-candidate diff is confined to strict
-  docs/** paths, and the candidate's non-documentation tree is identical to
-  the certified source tree. Tests, workflows, configuration, source, unknown
-  paths, and mixed changes do not qualify.
-- Exactly one complete, terminal-success, first-attempt certification qualifies
-  for the same repository, workflow, admitted feature family, checkpoint and
-  profile. Existing route-specific job, step, hygiene, identity, and provenance
-  checks remain mandatory; run IDs or artifact names supplied by callers are
-  not proof.
-- Current develop source-static, authority, ancestry, and source-gate checks
-  still run on the exact candidate. Reuse evidence records the certified
-  ancestor SHA and its run/job identities alongside the candidate HEAD/tree and
-  the proven documentation-only delta. Only redundant functional/canonical
-  execution may be skipped.
-- Missing, multiple, malformed, unavailable, or ambiguous evidence, or any
-  failed non-documentation identity check, retains the ordinary FULL fallback.
+The current docs-descendant rule leaves existing exact-SHA resolution unchanged
+and is considered only when that resolver declines reuse:
 
-This proposal lets a docs-only descendant reuse the certification of identical
-executable and test content without weakening exact-source provenance. It does
-not grant Q62, provider, broker, or live authority. Implementation and
-independent acceptance are still required before this rule becomes current.
+- Exactly one qualifying feature source must belong to the admitted feature
+  family, and its registered checkpoint must explicitly map to `full`.
+  ROBINHOOD and generic broad-route evidence do not qualify.
+- Its push-triggered run must be terminal-success attempt 1 for the exact
+  repository, workflow, branch, checkpoint, profile, source SHA and tree.
+  Source-static, active-tests, all seven uniquely named distributed FULL jobs,
+  and source-gates must succeed with their required functional/hygiene steps.
+  The four-shard full-tests job and skipped certification job must be
+  completed/skipped with no steps. Run IDs and artifact names are not proof.
+- The certified source must be an ancestor within the admitted develop event's
+  base-to-HEAD range. Every commit in the nonempty ancestry-path suffix must
+  have exactly one parent and a nonempty changed-path set that classifies
+  `DOCS_ONLY` (strict `docs/**`). Merge commits, mixed changes,
+  tests/workflows/configuration/source changes, unknown paths, and uncertain
+  ranges are ineligible.
+- A unique successful push-triggered attempt-1 docs-only feature run must exist
+  for the exact current candidate SHA and certified feature branch. Its exact
+  job set must have source-static path classification and source-gates succeed,
+  with active-tests, full-tests, and both canonical-certification routes
+  completed/skipped under the reviewed docs-only topology.
+- Current develop source-static, authority, ancestry and source-gates still run
+  for the exact candidate. Reuse evidence records the certified ancestor SHA,
+  tree, run/job identities, candidate HEAD/tree and proven docs suffix. Only
+  redundant functional/canonical execution may be skipped.
+- Missing, duplicate, malformed, unavailable, stale or ambiguous evidence, or
+  any source identity/path check failure, retains ordinary FULL fallback.
+
+The docs-descendant proof is attempt-1-only. It does not alter the independently
+reviewed canonical same-SHA attempt-2 rule or broaden existing exact-SHA reuse.
+It grants no Q62, provider, broker, order or live authority. The accepted
+source/run identities and preserved incident details are in the
+[Architecture 147 validation ledger](../validation/arch147-live-prototype.md).
 
 ## Current canonical FULL execution — Architecture 146-B1-C5
 

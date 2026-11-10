@@ -1,5 +1,40 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## F856 accepted correction and integration closeout
+
+The docs-descendant certification-reuse correction is SOURCE/CERTIFICATION
+ACCEPTED and FAST-FORWARD INTEGRATED at
+`f8566c030889847e6632c3a9cc4955778e5da802` / tree
+`959f16bf383c63028a8a157dde93e285c9eeba8c`.
+
+Feature run `42734478859`, attempt 1, is terminal SUCCESS. Source-static,
+active-tests, distributed canonical FULL broad-1 through broad-7, and
+source-gates succeeded. Shared certification-tests and the four-shard
+full-tests fallback were skipped. Develop run `42740143581`, attempt 1, is
+terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`. This was
+exact-SHA feature-certification reuse; it does not claim the docs-descendant
+path was exercised. The active docs-descendant contract is owned by
+[Architecture 132](../architecture/132-tiered-certification-profiles.md) and
+[the development workflow](../AI_DEVELOPMENT_WORKFLOW.md).
+
+The prior develop run `42359807677`, attempt 1, remains immutable terminal
+FAILURE evidence and was not rerun. The routing correction does not alter the
+accepted L41R2 source or authorize a protected effect.
+
+Q61 native Windows synthetic UAT is ACCEPTED. It verified the five-page GUI,
+resize/navigation, synthetic safety boundary, Start/Stop, restart, and clean
+close; two lifecycle cycles were observed. `Q61_PROTECTED_EFFECTS=0`. The
+accepted L41R2 source is `235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`; its real observation remains
+NOT RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and
+Q63 remain NOT RUN. No live-readiness, broker, order, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
+
+After independent review and integration of the docs-only closeout, the next
+external boundary is exactly one `L41R2_INTERACTIVE_SCHEMA_DISCOVERY`. Preserve
+its first result; automatic retry is forbidden.
+
 ## L41R2 accepted source boundary and develop routing incident
 
 The accepted L41R2 source boundary is
@@ -28,22 +63,22 @@ source-gates was FAILURE. The mapped canonical FULL and active-tests jobs were
 skipped. The failed run is immutable and was not rerun. No provider or
 protected effect occurred.
 
-The pending additive docs-descendant reuse semantics are described in
-[Architecture 132](../architecture/132-tiered-certification-profiles.md) and
-the [development workflow](../AI_DEVELOPMENT_WORKFLOW.md). They are a proposal:
-the workflow correction is not accepted or integrated. Q62 remains NOT RUN.
-This routing incident does not change or retry the accepted L41R2 source.
+At the time of this preserved routing incident, the additive docs-descendant
+reuse semantics were still proposed and the workflow correction was not yet
+accepted or integrated. The later accepted disposition is recorded above. Q62
+remains NOT RUN. This routing incident does not change or retry the accepted
+L41R2 source.
 
-The later published branch correction is
+The next published branch correction at that time was
 `aa24ffd429ab94e5c7f7ff887dc9490ae308f315` / tree
 `aefb298f32f35875e87a66b92cefce30e4f8bcf5`; mapped feature CI
 `42730101493`, attempt 1, was terminal SUCCESS. Exact-source review accepted
 the generic FULL collision-resolution portion but withheld overall acceptance
 because the docs-descendant successor fixture asserted an obsolete monolithic
-FULL job. The current corrective checkpoint aligns that proof with the real
-distributed topology and adds future-growth regressions. The prior feature CI
-run is not rerun; no develop integration, protected effect, L41R2 observation,
-Q62, L43 or Q63 action occurs from this correction.
+FULL job. That review did not integrate the source or run a protected effect,
+L41R2 observation, Q62, L43 or Q63 action. Run `42730101493` was not rerun.
+The later f856 successor aligned the proof with the real distributed topology
+and was accepted/integrated as recorded above.
 
 Accepted/integrated D34 source is HEAD
 `b86defebf9ccbf1efb91397de8f2e66db24a6665`; tree
@@ -299,9 +334,13 @@ At that prototype publication, the L40 exit-notional/price-movement ambiguity
 was recorded without delegating live implementation. The current L40 proposal
 below resolves local mechanical semantics; actual exit capability remains open.
 
-## Current source-preparation boundary
+## L42/I53 accepted source and Q61 boundary at that checkpoint
 
-The current source milestone is `L41R2_SOURCE_ACCEPTED`. The L42/I53 source is ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree `f13c2c169dbc5e24e709340b827016e493a041b2`; feature FULL `42201682850` and develop reuse run `42285116586` are terminal SUCCESS. `PROTOTYPE_READY_FOR_NATIVE_TESTING=YES` and Q61 is ACCEPTED. The new L42/I53 source and recovery/Q62 modules perform
+The L42/I53 source is ACCEPTED / INTEGRATED at
+`0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree
+`f13c2c169dbc5e24e709340b827016e493a041b2`; feature FULL `42201682850` and
+develop reuse run `42285116586` are terminal SUCCESS. `PROTOTYPE_READY_FOR_NATIVE_TESTING=YES`
+and Q61 is ACCEPTED. The new L42/I53 source and recovery/Q62 modules perform
 typed, fail-closed evaluation against exact source/config/account/session
 identity, fresh evidence windows, L41 capability, clean ownership and budget,
 all-adjusted signal inputs, and read-only recovery. Q63 assembles supplied
@@ -354,9 +393,9 @@ the second same-lane collision between `tests/domain/test_proposals.py` and
 `tests/rebalancing/test_proposals.py`. Hosted Windows correctly exposed the
 fake-test root seam while the real production evidence policy remained hard-F
 and fail-closed. The red run is preserved and is not retry authority. No real
-L41R1 observation, provider call, credential read, or protected effect occurred;
-L41 remains unaccepted and unintegrated, and Phase 2 remains blocked behind
-corrected terminal-green mapped L41 CI.
+L41R1 observation, provider call, credential read, or protected effect occurred.
+At the time of that run, L41 remained unaccepted and unintegrated, and Phase 2
+was blocked behind corrected terminal-green mapped L41 CI.
 
 ### Consumed L41 evidence record
 
@@ -385,14 +424,12 @@ classification is `L41_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`,
 and is not inferred. Official/interface facts remain unresolved until trusted
 binding and future schema discovery.
 
-The immediate documentation/workflow boundary is the pending additive
-develop docs-descendant reuse correction. Run 42359807677 remains preserved and
-was not rerun; the correction is not accepted or integrated. The separately
-reviewed additive L41R2 metadata-only tools/list observation remains a future
-boundary. Q62 read-only readiness remains NOT RUN and blocked until L41R2 is
-classified; L43 genuine bounded entry/owned-exit qualification and Q63 delivery
-remain separate future boundaries. Do not invoke D33, D34, consumed L41, or
-L41R1 again; no paper soak is inserted and FINAL_HOLDOUT remains sealed.
+Run `42359807677` remains preserved and was not rerun. The docs-descendant
+correction's accepted disposition and the current next external boundary are
+recorded above. Q62 readiness remains NOT RUN and blocked until L41R2 is
+classified; L43 and Q63 remain separate future boundaries. Do not invoke D33,
+D34, consumed L41, or L41R1 again; no paper soak is inserted and FINAL_HOLDOUT
+remains sealed.
 
 ## L40 focused implementation record
 
@@ -481,9 +518,9 @@ hosted-Windows fake operator tests deriving evidence destinations from pytest
 the unchanged production `F:\AI\temp` evidence policy before fake composition
 could execute. The same publication also exposed that the existing
 `ARCH147_PROTOTYPE_TESTS` inventory omitted the five L41 capability test
-modules. The red run is preserved and is not retry authority. L41 remains
-unaccepted and unintegrated, no real observer was run, and Phase 2 remains
-blocked behind corrected terminal-green mapped L41 CI.
+modules. The red run is preserved and is not retry authority. At that point L41
+remained unaccepted and unintegrated, no real observer had been run, and Phase 2
+remained blocked behind corrected terminal-green mapped L41 CI.
 
 The first corrective L41 publication is preserved as a second immutable red
 record:

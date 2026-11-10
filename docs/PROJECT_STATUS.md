@@ -1,75 +1,36 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L41R2_SOURCE_ACCEPTED
+## Current milestone - F856_POST_INTEGRATION_DOCS_CLOSEOUT
 
-The consolidated L42/I53 prototype source is ACCEPTED / INTEGRATED at
-`0b9f3ac25158b11c5daa327ed8ca732c05adb78b` / tree
-`f13c2c169dbc5e24e709340b827016e493a041b2`. Feature mapped FULL
-`42201682850`, attempt 1, was terminal SUCCESS. Develop run
-`42285116586`, attempt 1, was terminal SUCCESS and reused the exact feature
-certification without duplicate FULL.
+The executable source and certification are ACCEPTED and FAST-FORWARD
+INTEGRATED at `f8566c030889847e6632c3a9cc4955778e5da802` / tree
+`959f16bf383c63028a8a157dde93e285c9eeba8c`.
 
-`PROTOTYPE_READY_FOR_NATIVE_TESTING=YES` and Q61 native Windows synthetic UAT
-is ACCEPTED. Both fresh synthetic launches exited 0. The five-page GUI,
-resize/navigation, synthetic/live-effects-unavailable boundary, Start/Stop,
-restart and clean requested close sequence were verified natively. Activity /
-Health recorded two complete `RUNNING -> STOPPING -> STOPPED` cycles.
-`Q61_PROTECTED_EFFECTS=0`.
+Feature run `42734478859`, attempt 1, is terminal SUCCESS: source-static,
+active-tests, distributed canonical FULL broad-1 through broad-7, and
+source-gates succeeded; shared certification-tests and the four-shard
+full-tests fallback were skipped. Develop run `42740143581`, attempt 1, is
+terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`.
 
-Q61 state roots:
+The earlier develop run `42359807677`, attempt 1, remains immutable terminal
+FAILURE evidence and was not rerun. The docs-descendant certification-reuse
+correction is now accepted and integrated; the exact policy and preserved
+incident record are in the Architecture 132 and Architecture 147 validation
+documents.
 
-- `F:\AI\temp\arch147-q61-native-uat-4fb827c7f9eb4f5a959f2b1583149f84`
-- `F:\AI\temp\arch147-q61-native-lifecycle-3d927a618e20423e8bdfd89d6510c209`
-
-The L41 source is accepted/integrated. Its real capability observation remains
-CONSUMED / BLOCKED / NO RETRY: intended Agentic account identity, SPY
-tradability and fractional eligibility were proven; mutation/review/order
-attempts were zero; post-read teardown failed with unavailable subtype.
-Official/interface facts remain unresolved. L41R1 is CONSUMED / BLOCKED / NO
-RETRY; its exact evidence and failure boundary are recorded below. The additive
-L41R2 interactive-schema source is independently ACCEPTED at
+`PROTOTYPE_READY_FOR_NATIVE_TESTING=YES`. Q61 native Windows synthetic UAT is
+ACCEPTED: the five-page GUI, resize/navigation, synthetic safety boundary,
+Start/Stop, restart, and clean close were verified; two lifecycle cycles were
+observed and `Q61_PROTECTED_EFFECTS=0`. The accepted L41R2 source remains at
 `235118f70b7c7039055e9fea45ccf27df46671a0` / tree
-`972004101036afe52642ed93c38fed21ea479956`; mapped FULL
-`42358983502`, attempt 1, was terminal SUCCESS across source-static,
-active-tests and broad-1 through broad-7. The real L41R2 observation has NOT
-RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
-have NOT RUN. No live-readiness or trade authority is granted.
-
-The L41R2 source remains accepted. Its later docs-only develop descendant
-triggered run 42359807677, attempt 1, terminal FAILURE:
-CHANGE_MODE=FULL and DEVELOP_CERTIFICATION_REUSE=False /
-provenance_not_proven. The route defect is
-POST_ACCEPTANCE_INTEGRATION_ROUTING_DEFECT /
-CI_ROUTING_OVERCERTIFICATION /
-DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Fallback test execution
-passed on shards 0-2 and on shard 3; shard 3 failed only its 300-second hygiene
-limit at 347.721 seconds. Source-static succeeded. The run is preserved and
-was not rerun. The published correction on this branch is
-`aa24ffd429ab94e5c7f7ff887dc9490ae308f315` / tree
-`aefb298f32f35875e87a66b92cefce30e4f8bcf5`; mapped feature CI run
-`42730101493`, attempt 1, was terminal SUCCESS. Exact-source review accepted
-the generic FULL collision-resolution correction, but withheld overall source
-acceptance because the docs-descendant successor proof still modeled an
-obsolete monolithic certification job instead of the distributed seven-lane
-FULL topology. This separately named corrective checkpoint fixes only that
-successor proof and its current-owner regression coverage. No develop
-integration, CI rerun of `42730101493`, or protected effect has occurred.
-Q62 remains NOT RUN; L43 and Q63 remain NOT RUN.
-
-The preserved L42 parent red run `42195430203`, attempt 1, remains immutable
-`PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted corrective feature
-FULL is `42201682850`; develop integration is `42285116586`.
-
-Next boundary: complete review of this separately named successor-topology
-correction, then run one fresh normal admission on its new source identity.
-Preserve run 42359807677 and mapped feature run `42730101493` without rerunning
-either. No develop integration or protected effect is authorized from this
-checkpoint. The later L41R2 metadata-only tools/list observation remains
-separate and not run; Q62 remains NOT RUN, blocked pending L41R2
-classification. L43 and Q63 remain separate future boundaries.
+`972004101036afe52642ed93c38fed21ea479956`; its real observation remains
+NOT RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and
+Q63 remain NOT RUN. No live-readiness, broker, order, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
 
 
-### L41R1 consumed observation and L41R2 successor
+## L41R1 consumed observation and L41R2 successor
 
 L41R1 is recorded exactly as
 `L41R1_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`. Its preserved evidence is
@@ -202,13 +163,12 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Continue with a bounded workflow correction for
-DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP, using the pending additive
-Architecture 132 contract. Run 42359807677 remains preserved and must not be
-rerun. This workflow correction is not accepted or integrated. Any later
-publication uses its normal single-candidate admission and CI gate. Keep the
-real L41R2 observation and Q62 separate; Q62 remains NOT RUN, and no protected
-effect is authorized by this documentation closeout.
+After independent review and integration of this docs-only closeout, the next
+external boundary is exactly one `L41R2_INTERACTIVE_SCHEMA_DISCOVERY`. Preserve
+its first result; automatic retry is forbidden. Q62 remains NOT RUN and blocked
+pending L41R2 classification; L43 and Q63 remain separate NOT RUN boundaries.
+This observation grants no live-readiness, broker, or order authority. No paper
+soak is inserted and `FINAL_HOLDOUT` remains sealed.
 
 ## Product and protected boundaries
 

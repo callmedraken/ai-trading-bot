@@ -1,6 +1,29 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current D34 accepted boundary and L40 transition
+## Current integrated boundary - F856
+
+The executable source and certification are SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at `f8566c030889847e6632c3a9cc4955778e5da802` / tree
+`959f16bf383c63028a8a157dde93e285c9eeba8c`. Feature run `42734478859`, attempt
+1, passed source-static, active-tests, distributed canonical FULL broad-1
+through broad-7, and source-gates; shared certification-tests and the four-shard
+full-tests fallback were skipped. Develop run `42740143581`, attempt 1, was
+terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
+`exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`. This records
+exact-SHA reuse, not a docs-descendant reuse event. The prior run `42359807677`
+remains immutable terminal-red incident evidence and was not rerun.
+
+Q61 native Windows synthetic UAT is ACCEPTED with `Q61_PROTECTED_EFFECTS=0`.
+The L41R2 source remains accepted, but `L41R2_REAL_OBSERVATION=NOT_RUN`;
+Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
+remain NOT RUN. No live-readiness, broker, order, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
+
+After independent review and integration of the docs-only closeout, the next
+external boundary is exactly one `L41R2_INTERACTIVE_SCHEMA_DISCOVERY`. Preserve
+its first result; automatic retry is forbidden. No protected effect is implied.
+
+## D34 accepted boundary - historical transition to L40
 
 D30 is ACCEPTED with dataset semantic ID
 `d5aa8ed7-b5cd-53a3-8671-5370f976e8e3`, dataset SHA-256
@@ -96,8 +119,9 @@ boundary. The observation validates current signal-input parity only; it does
 not change D31's `NONE_QUALIFIES` result or authorize an order, live eligibility,
 or L40-L43 effects. L40-L43 now own the remaining live-production path.
 
-Q61 remains NOT RUN and no live-readiness label is granted. No paper soak is
-inserted. FINAL_HOLDOUT remains sealed.
+At the earlier D34 closeout, Q61 had not yet run. Q61 was accepted later as
+recorded in the current integrated boundary above. No live-readiness label is
+granted. No paper soak is inserted. FINAL_HOLDOUT remains sealed.
 
 ## Source and acceptance boundary
 
@@ -348,6 +372,8 @@ Tool descriptions advertise quantity-based fractional market sells in regular
 hours up to six decimals; this is an interface bound, not an observed account
 eligibility, minimum or exact-residual guarantee. L41 must classify remaining
 facts and obtain official/account evidence; unknown required facts block.
-No provider call or collector is introduced by L40. Consolidated L42/I53 source
-and Q61/Q62/L43/Q63 evidence/delivery remain downstream. D33/D34 are consumed,
-no paper soak is inserted, and FINAL_HOLDOUT remains sealed.
+No provider call or collector is introduced by L40. At that L40 checkpoint,
+consolidated L42/I53 source and Q61/Q62/L43/Q63 evidence/delivery remained
+downstream. L42/I53 was later accepted/integrated and Q61 accepted; current
+Q62/L43/Q63 state is above. D33/D34 are consumed, no paper soak is inserted,
+and FINAL_HOLDOUT remains sealed.

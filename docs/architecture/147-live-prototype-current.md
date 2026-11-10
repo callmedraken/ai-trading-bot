@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current integrated boundary - L41R4 consumed; L41R5 next
+## Current boundary - L41R4 consumed; L41R5 source implemented
 
 L41R4 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
 `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
@@ -57,50 +57,119 @@ These are sanitized metadata facts, not accepted numeric-rule authority. L41R4
 intentionally clears logical type/nullability when a top-level unsupported
 constraint exists.
 
-The place semantic conflict is not yet trustworthy as a tool-level action fact.
-L41R4's description classifier concatenates the top-level tool description with
+The consumed L41R4 place semantic conflict was not trustworthy as a tool-level
+action fact. L41R4's description classifier concatenated the top-level tool description with
 every recursively found schema/property description before calculating
 placement/nonplacement booleans. A nested field can therefore contribute
 non-placement wording. The consumed evidence intentionally stores no raw
 provider prose and does not separately classify top-level versus nested
 descriptions, so it cannot localize that phrase after the fact.
 
-The public Robinhood tool catalogue currently describes
-`review_equity_order` as simulation with pre-trade warnings and
-`place_equity_order` as placement. That external description corroborates the
-intended semantic split but does not authenticate the exact live tool schema,
-account route, numeric rules, or residual-close behavior.
+L41R5 does not use public-site prose to establish live tool action semantics;
+only the exact top-level MCP tool descriptions in the inspected interface feed
+its action classification.
 
-### L41R5 successor requirements
+### L41R5 source implementation boundary
 
-The next additive source checkpoint is
-`L41R5_SCHEMA_SEMANTIC_RECOVERY`. Preserve predecessor source/evidence
-identities and the same one-shot transport/effect ceiling.
+The additive source implementation for
+`L41R5_SCHEMA_SEMANTIC_RECOVERY` is based on the integrated feature/develop
+source `a97b0abefca085e817ae04cf563e75e138232b40` / tree
+`a49990a8abc912ec3f9dae8c6037ee4964473ecd`. It remains pending independent
+exact-source review, mapped source CI, and integration. No final L41R5 commit
+or CI identity is asserted here. The distinct evidence schema is
+`arch147-l41r5-schema-semantic-recovery-observation/v1`; it does not expose an
+L41R4 observation entrypoint or permit predecessor replay. L41R5 reuses the
+public L41R3 transport/session seam with a separate bounded intake; L41R1-R4
+executable semantics remain unchanged.
 
-The successor may treat `additionalProperties` as orthogonal to the semantics
-of explicitly named `properties` and `required` fields only under a bounded,
-fail-closed rule. It should retain a sanitized fact describing the
-`additionalProperties` form (for example boolean versus schema-valued) and
-must not silently allow arbitrary new top-level keywords or references.
+Evidence records `l41r4_predecessor_evidence` with the immutable L41R4
+predecessor HEAD/tree and consumed evidence path, SHA-256, and byte length, and
+`l41r4_interface_baseline` with these exact observed interface SHA-256 values:
 
-Action semantics must be split by provenance:
+- `review_equity_order`:
+  `5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`
+- `place_equity_order`:
+  `46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`
+- `get_equity_tradability`:
+  `7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`
 
-- top-level tool-description facts determine review/place action semantics;
-- nested schema/property-description facts may be retained separately for
-  diagnostics or numeric-text extraction;
-- nested prose must not make `place_equity_order` nonplacing or make
-  `review_equity_order` placing;
-- raw descriptions remain unpersisted; hashes and bounded booleans remain the
-  evidence surface.
+The interface hashes are checked against the original live interface before
+schema projection. A changed baseline blocks with `L41R5_SCHEMA_CHANGED`;
+these incident digests bind L41R5 to consumed provider evidence and are not
+mutable Python source, AST, line, test-count, or current-infrastructure pins.
 
-Fractional-precision extraction may still inspect bounded schema descriptions,
-but action semantics and numeric semantics must remain distinct fields.
+L41R5 records sanitized `additional_properties_present`,
+`additional_properties_form` (`MISSING`, `BOOLEAN_TRUE`, `BOOLEAN_FALSE`,
+`SCHEMA_MAPPING`, or `INVALID`),
+`additional_properties_schema_sha256`,
+`additional_properties_schema_keyword_names`,
+`additional_properties_schema_keyword_inventory_sha256`,
+`additional_properties_schema_contains_reference`, and
+`additional_properties_schema_composition_names`. Missing and boolean
+(`true`/`false`) forms do not block interpretation of explicitly named fields,
+their requiredness, or the top-level `required` list. This does not authorize
+unknown arguments. With an unchanged interface and a missing/boolean form,
+L41R5 can retain its existing conservative named `quantity` and
+`dollar_amount` proofs; it does not broaden direct-type, nullability, or
+requiredness rules. Schema mappings fail closed as
+`L41R5_ADDITIONAL_PROPERTIES_SCHEMA_UNSUPPORTED`; invalid forms fail closed as
+`L41R5_ADDITIONAL_PROPERTIES_INVALID`. Other unsupported top-level validation
+keywords remain blocked as `L41R5_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`; root
+references and compositions remain blocked as
+`L41R5_TOP_LEVEL_UNRESOLVED_REF` and
+`L41R5_TOP_LEVEL_UNSUPPORTED_COMPOSITION`. L41R4 did not retain the raw
+keyword value, so its form must not be inferred from the consumed record.
+Schema-valued forms are not normalized or resolved; nested references and
+compositions are represented only by sanitized keyword inventories/digests,
+without raw schema text or `$ref` targets.
 
-A future real L41R5 observation remains NOT RUN until its source is
-independently reviewed/certified/integrated. L41R4 must never be replayed. Q62
-remains NOT RUN and blocked; L43 and Q63 remain NOT RUN. No live-readiness,
-broker, order, numeric-rule, paper-soak, or `FINAL_HOLDOUT` authority is
-granted.
+Description and numeric provenance are separate in sanitized evidence:
+
+- `tool_description_classification` derives tool action facts only from the
+  top-level MCP tool description, including simulation, pre-trade,
+  warning/alert, explicitly-placing, and explicitly-nonplacing facts. Review
+  text explicitly saying it places blocks as
+  `L41R5_REVIEW_PLACEMENT_SEMANTIC_CONFLICT`; place text explicitly saying it
+  does not place blocks as `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`;
+- `nested_description_classification` retains bounded diagnostic facts only;
+  nested wording cannot create review-placement or place-nonplacement action
+  conflicts; when top-level action semantics are insufficiently proven, they
+  remain UNKNOWN/missing rather than borrowing nested or external wording;
+- `tool_fractional_precision_decimal_places` and
+  `nested_fractional_precision_decimal_places` preserve numeric provenance;
+  the combined `fractional_precision_decimal_places` inventory and
+  `fractional_precision_conflict` are derived separately;
+- conflicting precision claims block as
+  `L41R5_FRACTIONAL_PRECISION_PROVENANCE_CONFLICT`.
+
+Matching precision values from tool and nested descriptions are compatible;
+conflicting values fail closed.
+
+Nested description prose is removed from the projection before the inherited
+named-field parser runs. Original input-schema, description, and interface
+hashes remain available in evidence, and the fixed production interface
+baseline cannot be disabled.
+
+Raw descriptions are not persisted. `trusted_binding=false` and
+`provider_numeric_rules_derived=false` remain fixed. A future real L41R5
+observation remains NOT RUN until exact source review, certification, and
+integration, followed by its separate reviewed observation boundary. That
+future boundary retains source admission before OAuth/provider construction,
+OAuth/MCP-session/browser attempts each at most `1`, `tools/list` at most
+`20`, and zero MCP tool, account, tradability, position, order, portfolio,
+quote, review, place, cancel, or other-tool attempts. It exposes no
+`call_tool`, suppresses provider/OAuth output, writes fresh evidence
+create-only under `F:\\AI\\temp` behind the production literal-F: guard, keeps
+credential accounting `null` / `null` as SDK-managed, and forbids automatic
+retry. A future session-teardown failure remains BLOCKED and preserves only
+truthful sanitized partial facts. Source implementation and certification have
+`PROTECTED_EFFECTS=0`. Q62 remains NOT RUN and blocked; L43 and Q63 remain NOT
+RUN. No live-readiness, broker, order, numeric-rule, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
+
+A future successful L41R5 observation is `CAPTURED_FOR_REVIEW` only. It does
+not grant Q62 acceptance, live readiness, broker/order authority, numeric-rule
+authority, trusted binding, or `FINAL_HOLDOUT`.
 
 ## D34 accepted boundary - historical transition to L40
 

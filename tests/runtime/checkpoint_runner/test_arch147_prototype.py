@@ -68,6 +68,21 @@ _L41_IMPORT_ALLOWLIST = {
         ("from", "mcp", "Client"),
         ("from", "mcp.client.streamable_http", "streamable_http_client"),
     },
+    "src/trading_bot/live_prototype/capability_schema_discovery_l41r5.py": {
+        (
+            "from",
+            "trading_bot.robinhood_mcp.windows_oauth",
+            "create_windows_robinhood_oauth_factory",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.sdk_transport",
+            "ROBINHOOD_TRADING_MCP_URL",
+        ),
+        ("import", "httpx2", None),
+        ("from", "mcp", "Client"),
+        ("from", "mcp.client.streamable_http", "streamable_http_client"),
+    },
 }
 _FORBIDDEN_PRODUCTION_IMPORTS = (
     "robinhood_mcp",
@@ -152,6 +167,18 @@ def test_l41r4_schema_classification_successor_is_prepublication_owned():
     assert (root / test).is_file()
     assert "src/trading_bot/live_prototype" in runner.ARCH147_PROTOTYPE_RUFF
     assert test in runner.ARCH147_PROTOTYPE_TESTS
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
+def test_l41r5_schema_semantic_recovery_successor_is_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    production = "src/trading_bot/live_prototype/capability_schema_discovery_l41r5.py"
+    test = "tests/live_prototype/test_capability_schema_discovery_l41r5.py"
+
+    assert (root / production).is_file()
+    assert (root / test).is_file()
+    assert "src/trading_bot/live_prototype" in runner.ARCH147_PROTOTYPE_RUFF
+    assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
     assert runner._arch147_prototype_authority_check(root) == ()
 
 

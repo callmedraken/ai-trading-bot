@@ -1,6 +1,6 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L41R4 accepted/integrated source and consumed observation
+## L41R4 accepted/integrated source, consumed observation, and L41R5 source
 
 L41R4 final source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
@@ -127,36 +127,82 @@ do not by themselves set `provider_numeric_rules_derived=true`.
 
 ### Place semantic-conflict limitation
 
-The place semantic conflict is not evidence that the provider advertises the
-placement tool as nonmutating. L41R4 creates its action-semantic booleans from a
+The consumed L41R4 place semantic conflict is not evidence that the provider
+advertises the placement tool as nonmutating. L41R4 created its action-semantic booleans from a
 single combined string containing the top-level tool description plus every
 recursively collected schema/property description. Because raw descriptions are
 not persisted and top-level versus nested description classifications were not
 separated, the consumed evidence cannot localize the phrase that triggered
 `explicitly_nonplacing=true`.
 
-Robinhood's current public tool catalogue independently describes
-`review_equity_order` as simulation/pre-trade warnings and
-`place_equity_order` as placement. That public description corroborates the
-expected action split, but it is not accepted trust binding for the exact live
-schema, account route, numeric limits, minimums, residual behavior, or Q62.
+L41R5 does not use public-site prose to establish live tool action semantics;
+only the exact top-level MCP tool descriptions in the inspected interface feed
+its action classification.
 
-### Next checkpoint
+### L41R5 source implementation checkpoint
 
-L41R4 is permanently consumed and must not be replayed.
+The additive `L41R5_SCHEMA_SEMANTIC_RECOVERY` source implementation in this
+checkpoint is based on integrated feature/develop HEAD/tree
+`a97b0abefca085e817ae04cf563e75e138232b40` /
+`a49990a8abc912ec3f9dae8c6037ee4964473ecd`. Exact-source review, mapped source
+CI, and develop integration remain pending. No final L41R5 commit
+or CI identity is recorded here. The new evidence schema is
+`arch147-l41r5-schema-semantic-recovery-observation/v1`; its separate
+observation identity is `L41R5_SCHEMA_SEMANTIC_RECOVERY`, and it does not expose
+an L41R4 observation entrypoint. L41R1-R4 executable semantics remain
+unchanged.
 
-The next additive source-only checkpoint is
-`L41R5_SCHEMA_SEMANTIC_RECOVERY`. It must preserve the source/evidence
-identities above and the same one-shot/no-tool-call transport ceiling. It should
-classify the specifically observed `additionalProperties` keyword separately
-from named-field semantics under a bounded fail-closed rule and separate
-top-level tool-description action semantics from nested schema-description
-diagnostics/numeric text.
+Evidence records `l41r4_predecessor_evidence` with the consumed L41R4
+observation's exact source HEAD/tree, evidence path, SHA-256, and byte length,
+and `l41r4_interface_baseline` with the original interface digests for
+`review_equity_order` (`5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`),
+`place_equity_order` (`46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`),
+and `get_equity_tradability` (`7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`).
+It verifies original interface hashes before projection and blocks a digest
+mismatch as `L41R5_SCHEMA_CHANGED`. These exact interface hashes identify the
+immutable consumed provider evidence; they are not mutable current-source or
+AST pins.
 
-A future real L41R5 observation remains NOT RUN until exact source acceptance,
-certification, and integration. Q62 remains NOT RUN and blocked; L43 and Q63
-remain NOT RUN. No live-readiness, broker, order, numeric-rule, paper-soak, or
-`FINAL_HOLDOUT` authority is granted.
+Sanitized L41R5 fingerprints add
+`additional_properties_present`, `additional_properties_form`,
+`additional_properties_schema_sha256`,
+`additional_properties_schema_keyword_names`, and
+`additional_properties_schema_keyword_inventory_sha256`,
+`additional_properties_schema_contains_reference`, and
+`additional_properties_schema_composition_names`. Missing and boolean
+forms (`BOOLEAN_TRUE` / `BOOLEAN_FALSE`) preserve reasoning about explicitly
+named properties and their requiredness. Unknown arguments are not authorized.
+Schema mappings block as
+`L41R5_ADDITIONAL_PROPERTIES_SCHEMA_UNSUPPORTED`, and invalid forms block as
+`L41R5_ADDITIONAL_PROPERTIES_INVALID`. Schema-valued forms are not normalized
+or resolved. Other unsupported top-level validation keywords remain blocked as
+`L41R5_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`; top-level references and compositions
+remain blocked as `L41R5_TOP_LEVEL_UNRESOLVED_REF` and
+`L41R5_TOP_LEVEL_UNSUPPORTED_COMPOSITION`. The raw L41R4
+`additionalProperties` value is unknown and is not inferred.
+
+Action and numeric description provenance remain separate. Only top-level MCP
+tool descriptions populate `tool_description_classification` and can trigger
+review/place action conflicts. `nested_description_classification` is a
+separate sanitized diagnostic; nested action-like text cannot trigger either
+action conflict. Numeric provenance is recorded as
+`tool_fractional_precision_decimal_places` and
+`nested_fractional_precision_decimal_places`, with the merged
+`fractional_precision_decimal_places` and `fractional_precision_conflict`.
+Conflicting source claims block as
+`L41R5_FRACTIONAL_PRECISION_PROVENANCE_CONFLICT`. Raw descriptions are not
+persisted.
+
+The L41R5 source preserves `trusted_binding=false` and
+`provider_numeric_rules_derived=false`. L41R4 is permanently CONSUMED / BLOCKED
+/ NO RETRY and must never be replayed. A future real L41R5 observation remains
+NOT RUN until exact-source review, certification, and integration, then requires
+its own separate reviewed boundary. A future successful result is
+`CAPTURED_FOR_REVIEW` only and grants no Q62 acceptance, live readiness,
+broker/order authority, numeric-rule authority, trusted binding, or
+`FINAL_HOLDOUT`. Q62 remains NOT RUN and blocked; L43 and Q63 remain NOT RUN.
+No live-readiness, broker, order, numeric-rule, paper-soak, or `FINAL_HOLDOUT`
+authority is granted.
 
 ## F856 accepted correction and integration closeout
 
@@ -358,12 +404,13 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L41R1 | consumed L41 observation | source correction and separately reviewed observation | teardown and rule-binding discovery | CONSUMED / BLOCKED / NO RETRY; exact session-open failure preserved; no retry |
 | L41R2 | consumed L41R1 observation | additive interactive schema-discovery successor | metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED at `235118f70b7c7039055e9fea45ccf27df46671a0` / `972004101036afe52642ed93c38fed21ea479956`; real observation CONSUMED / BLOCKED / NO RETRY as `L41R2_SCHEMA_MALFORMED` |
 | L41R3 | consumed L41R2 observation | additive MCP-v2 schema-discovery successor | normalized metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED / INTEGRATED at `4461ea7f09c396c3c49598debbc588754fa5096c` / `68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`; feature `42778436739` and develop `42780649228` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R3_SCHEMA_AMBIGUOUS` |
-| L41R4 | consumed L41R3 observation | additive schema-classification diagnostic successor | bounded sanitized structural diagnosis; metadata-only `tools/list`; no MCP tool invocation | Source checkpoint in progress from accepted L41R3 base; exact source not yet accepted/integrated; real observation NOT RUN pending ChatGPT source acceptance/integration and separate observation review |
+| L41R4 | consumed L41R3 observation | additive schema-classification diagnostic successor | bounded sanitized structural diagnosis; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT` |
+| L41R5 | consumed L41R4 observation | additive schema semantic-recovery successor | fixed L41R4 interface baseline; sanitized additionalProperties classification; separated tool/nested description and numeric provenance; metadata-only `tools/list`; no MCP tool invocation | Source implementation present in this checkpoint based on `a97b0abefca085e817ae04cf563e75e138232b40`; exact-source review/canonical certification/integration pending; real observation NOT RUN |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked pending L41R4 classification; live readiness not granted |
+| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked pending trusted schema/rule evidence and separate readiness review; live readiness not granted |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
@@ -372,11 +419,11 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
-| Entry and exact owned exit | BLOCKED | L41 proved account identity, SPY tradability and fractional tradability for one observation; official/interface quantity, minimum, notional and residual-close rules remain unresolved pending accepted binding/schema discovery |
+| Entry and exact owned exit | BLOCKED | L41 proved account identity, SPY tradability and fractional tradability for one observation; official/interface quantity, minimum, notional and residual-close rules remain unresolved; L41R5 source recovery is not real schema evidence or a trusted numeric-rule binding |
 | Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
 | Stop/kill/restart/reconnect | SYNTHETIC NATIVE PASS / REAL DISARMED SOURCE-TESTED | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and a clean close; real/disarmed recovery remains source-tested |
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
-| Exact source certified | L42/I53 baseline and L41R3 observer add-on ACCEPTED / INTEGRATED | Latest observer source HEAD `4461ea7f09c396c3c49598debbc588754fa5096c` / tree `68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`; feature `42778436739`, develop `42780649228` with exact feature certification reuse |
+| Exact source certified | L42/I53 baseline and L41R4 observer add-on ACCEPTED / INTEGRATED; L41R5 implementation pending | Last accepted/integrated observer HEAD `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` succeeded with exact feature-certification reuse; L41R5 source review/certification/integration remain pending |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 ### L41R1 consumed record and L41R2 successor

@@ -845,18 +845,34 @@ def test_browser_opener_is_one_shot() -> None:
 
 
 def test_evidence_directory_creation_never_overwrites_existing_evidence(
+    tmp_path: Path,
+) -> None:
+    parent_root = tmp_path.resolve(strict=True)
+    evidence_dir = parent_root / "fresh"
+    created = discovery._create_fresh_evidence_dir_under_root(evidence_dir, parent_root)
+    assert created.is_dir()
+    evidence_path = created / "evidence.json"
+    original_evidence = b"original evidence\n"
+    evidence_path.write_bytes(original_evidence)
+
+    with pytest.raises(ValueError, match="L41R4_EVIDENCE_PATH_INVALID"):
+        discovery._create_fresh_evidence_dir_under_root(evidence_dir, parent_root)
+
+    assert evidence_path.read_bytes() == original_evidence
+
+
+def test_fresh_evidence_dir_rejects_non_f_drive_with_monkeypatched_root(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(discovery, "_EVIDENCE_ROOT", tmp_path)
-    evidence_dir = tmp_path / "fresh"
-    created = discovery._fresh_evidence_dir(evidence_dir)
-    evidence_path = created / "evidence.json"
-    evidence_path.write_text("original evidence\n", encoding="utf-8")
+    parent_root = tmp_path.resolve(strict=True)
+    monkeypatch.setattr(discovery, "_EVIDENCE_ROOT", parent_root)
+    evidence_dir = parent_root / "non-f-drive"
+    assert evidence_dir.drive.casefold() != "f:"
 
     with pytest.raises(ValueError, match="L41R4_EVIDENCE_PATH_INVALID"):
         discovery._fresh_evidence_dir(evidence_dir)
 
-    assert evidence_path.read_text(encoding="utf-8") == "original evidence\n"
+    assert not evidence_dir.exists()
 
 
 def test_l41r4_identity_is_distinct_and_does_not_expose_r3_entrypoint() -> None:

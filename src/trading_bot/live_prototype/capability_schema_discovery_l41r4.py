@@ -1441,12 +1441,13 @@ def _repository_root() -> Path:
 def _fresh_evidence_dir(candidate: Path) -> Path:
     path = Path(candidate)
     parent_root = _EVIDENCE_ROOT.resolve(strict=True)
-    if (
-        not path.is_absolute()
-        or path.drive.casefold() != "f:"
-        or path.exists()
-        or path.is_symlink()
-    ):
+    if not path.is_absolute() or path.drive.casefold() != "f:":
+        raise ValueError("L41R4_EVIDENCE_PATH_INVALID")
+    return _create_fresh_evidence_dir_under_root(path, parent_root)
+
+
+def _create_fresh_evidence_dir_under_root(path: Path, parent_root: Path) -> Path:
+    if path.exists() or path.is_symlink():
         raise ValueError("L41R4_EVIDENCE_PATH_INVALID")
     parent = path.parent.resolve(strict=True)
     if path.parent != parent or not parent.is_relative_to(parent_root):

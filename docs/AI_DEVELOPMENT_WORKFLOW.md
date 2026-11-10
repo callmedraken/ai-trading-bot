@@ -832,6 +832,33 @@ Git operations and reports the local changes.
 Use the smallest model class that fits the *uncertainty and safety profile* of
 the task, not simply the number of files changed.
 
+### Current coordinated prototype-completion mission — delegation overlay
+
+For the current coordinated prototype-completion mission, this overlay
+supersedes the generic implementation-model routing below where they differ.
+It does not weaken ChatGPT's standing ability to directly handle tiny bounded
+fixes.
+
+- **ChatGPT Sol High** retains architecture, planning, exact GitHub review and
+  acceptance, certification, integration, protected-effect decisions, and
+  next-milestone authority. It may directly perform a small, tightly bounded,
+  fully understood docs, test, fixture, source, or workflow consistency
+  correction when that is safer or faster than a Codex handoff and the
+  available environment can satisfy the required repository gates.
+- **Codex Sol High** coordinates substantial delegated implementation: it
+  decomposes work, prepares detailed implementation plans, assigns Luna tasks,
+  reviews results, and coordinates bounded corrections. For this mission it
+  does not perform repository implementation or mutations, coding, tests,
+  staging, commit, push, merge, or protected effects.
+- **Luna Extra High** performs repository implementation and mutations assigned
+  by Codex Sol High, runs focused tests and checks appropriate to the changes,
+  and reports exact files and results to the coordinator.
+- Do not substitute Astra or another Sol implementation agent for Luna Extra
+  High implementation in this mission. Broader discovery may inform
+  coordination, but repository implementation remains Luna-owned.
+- For broad work, Codex Sol High splits the scope into smaller Luna Extra High
+  assignments instead of absorbing implementation itself.
+
 ### Luna Extra High — known contract, known surface
 
 Use **Luna Extra High** by default when:

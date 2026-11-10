@@ -71,8 +71,13 @@ exposed `tests/portfolio/test_models.py` and
 top-level pytest import topology. The required invariant observed `40 != 39`
 unique basenames. No authority failure occurred, `IDENTITY_STABLE=True`, and
 `PROTECTED_EFFECTS=0`; this was not a product-source failure, published red
-source, coverage defect, or GitHub CI failure. The corrected source remains
-unpublished pending a fresh terminal-PASS admission.
+source, coverage defect, or GitHub CI failure. That first admission remains a
+preserved failure. A later fresh admission passed, and the corrected candidate
+was published and independently accepted at
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`. Mapped FULL run `42358983502`,
+attempt 1, was terminal SUCCESS. The real
+`L41R2_INTERACTIVE_SCHEMA_DISCOVERY` observation remains NOT RUN.
 
 ## L40 accepted/integrated baseline
 

@@ -517,6 +517,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_capability_schema_discovery.py",
     "tests/live_prototype/test_capability_schema_discovery_interactive.py",
     "tests/live_prototype/test_capability_schema_discovery_l41r3.py",
+    "tests/live_prototype/test_capability_schema_discovery_l41r4.py",
     "tests/live_prototype/test_capability_transport.py",
     "tests/live_prototype/test_consumed_l41_evidence_and_rule_binding.py",
     "tests/live_prototype/test_alpaca_runtime_signal_provider.py",

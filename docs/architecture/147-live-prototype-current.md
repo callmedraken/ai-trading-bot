@@ -1,34 +1,99 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current integrated boundary - F856
+## Current integrated boundary - L41R3; L41R4 in progress
 
-The executable source and certification are SOURCE/CERTIFICATION ACCEPTED and
-FAST-FORWARD INTEGRATED at `f8566c030889847e6632c3a9cc4955778e5da802` / tree
-`959f16bf383c63028a8a157dde93e285c9eeba8c`. Feature run `42734478859`, attempt
-1, passed source-static, active-tests, distributed canonical FULL broad-1
-through broad-7, and source-gates; shared certification-tests and the four-shard
-full-tests fallback were skipped. Develop run `42740143581`, attempt 1, was
-terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason
-`exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`. This records
-exact-SHA reuse, not a docs-descendant reuse event. The prior run `42359807677`
-remains immutable terminal-red incident evidence and was not rerun.
+The accepted and fast-forward integrated L41R3 source base is
+`4461ea7f09c396c3c49598debbc588754fa5096c` / tree
+`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`. Feature run `42778436739`, attempt
+1, and develop run `42780649228`, attempt 1, are terminal SUCCESS. Develop
+reports `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`,
+and `DEVELOP_DUPLICATE_FULL=NO`.
 
-Q61 native Windows synthetic UAT is ACCEPTED with `Q61_PROTECTED_EFFECTS=0`.
-The accepted L41R2 source remains at
-`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
-`972004101036afe52642ed93c38fed21ea479956`, and its real observation is
-CONSUMED / BLOCKED / NO RETRY with reason `L41R2_SCHEMA_MALFORMED`. The source
-and MCP SDK v2 client-model comparison identifies an `input_schema` Python
-attribute compatibility defect; the preserved evidence does not expose a raw
-provider object type. L41R3 is the additive successor. Its real observation
-remains NOT RUN. Q62 remains NOT RUN and blocked pending L41R3 classification;
-L43 and Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule,
-paper-soak, or `FINAL_HOLDOUT` authority is granted.
+L41R3's real observation is CONSUMED / BLOCKED / NO RETRY with reason
+`L41R3_SCHEMA_AMBIGUOUS`. The immutable artifact identity and exact attempt
+accounting are owned by the [validation ledger](../validation/arch147-live-prototype.md).
+MCP-v2 object normalization and OAuth/session establishment succeeded; one
+real `tools/list` response reached the strict schema parser. The artifact
+retained `schemas=[]` because the first ambiguity was returned before the
+parser retained the tool, so the exact ambiguity subtype is UNKNOWN. No MCP
+tool or other prohibited call was made. Do not replay or relabel this consumed
+attempt.
 
-The next step is independent exact-source review of the additive L41R3 source
-checkpoint after mapped feature CI is terminal. Any future real L41R3
-observation remains a separate, reviewed one-shot boundary. No protected
-effect is implied by this source checkpoint.
+The current additive candidate is `L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC`,
+with distinct evidence schema
+`arch147-l41r4-schema-classification-observation/v1`. Source work is in
+progress and is not yet accepted or integrated; a real L41R4 observation is
+NOT RUN until ChatGPT independently accepts and integrates the exact source and
+separately reviews the one-shot observation boundary.
+
+### L41R4 candidate schema-classification contract
+
+The additive candidate retains the source and evidence semantics of L41R1,
+L41R2 and L41R3. Before inherited strict semantic classification, it records
+bounded, sanitized structural facts and hash identities for the input schema,
+description and interface. It may record bounded property/required inventories,
+the required-not-in-properties fact, safe description-semantic booleans,
+derived fractional-precision values/conflict state, and quantity/dollar-amount
+facts. Fingerprint fields include `input_schema_sha256`, `description_sha256`,
+`interface_sha256`, `top_level_type`, property and required counts/inventories/
+digests, `required_not_in_properties`, `description_classification`,
+`fractional_precision_decimal_places`, `fractional_precision_conflict`,
+`ambiguity_classes`, and `fields.quantity` / `fields.dollar_amount` facts for
+`present`, `required`, `direct_type`, `nullable`, `union_keyword`,
+`union_primitive_types`, `logical_non_null_type`, `default_present`,
+`default_is_null`, and `classification`. Root and per-field
+`schema_keyword_names` plus `schema_keyword_inventory_sha256` retain known
+keyword names while hashing unknown names; property and required inventories
+hash unknown names and include inventory digests. Raw provider descriptions,
+arbitrary default values and unknown strings, token/callback data and
+authorization material are never diagnostics.
+
+The candidate recognizes nullable logical strings only when the inspected
+field's complete representation proves one non-null primitive type: exactly
+`string` plus `null` in a two-element type list, or exactly two disjoint direct
+`string`/`null` branches in `anyOf` or `oneOf`, with safe annotation-only
+siblings. It reports `logical_non_null_type=string` and `nullable=true`.
+Requiredness remains independent and is derived from the top-level required
+list. Multi-non-null unions, unresolved references, unsupported compositions
+or constraints, invalid/missing types, and schema facts affected by unresolved
+root references/compositions/constraints fail closed; unproven logical type or
+nullability is cleared rather than inferred. No local or remote reference
+resolution is added.
+
+The exact candidate diagnostic reasons are `L41R4_SCHEMA_MALFORMED`,
+`L41R4_REQUIRED_NOT_IN_PROPERTIES`, `L41R4_SCHEMA_DESCRIPTION_MALFORMED`,
+`L41R4_FRACTIONAL_PRECISION_CONFLICT`,
+`L41R4_FRACTIONAL_PRECISION_INVALID`,
+`L41R4_REVIEW_PLACEMENT_SEMANTIC_CONFLICT`,
+`L41R4_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`,
+`L41R4_TOP_LEVEL_UNRESOLVED_REF`,
+`L41R4_TOP_LEVEL_UNSUPPORTED_COMPOSITION`, and
+`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. For each of quantity and
+dollar-amount fields, the candidate also classifies
+`DIRECT_TYPE_MISSING`, `NULL_ONLY_UNION`, `MULTI_NON_NULL_UNION`,
+`UNRESOLVED_REF`, `UNSUPPORTED_COMPOSITION`, `UNSUPPORTED_CONSTRAINT`, and
+`INVALID_TYPE` under that field's `L41R4_QUANTITY_` or
+`L41R4_DOLLAR_AMOUNT_` prefix. Safely supported nullable strings are classified
+`QUANTITY_NULLABLE_STRING` or `DOLLAR_AMOUNT_NULLABLE_STRING`, not as
+ambiguities. A fingerprint may block while preserving sanitized facts; root
+unknown validation keywords, including conditionals, block and clear unproven
+field logical-type/nullability claims. These are candidate-source boundaries
+pending exact-source review; they do not grant Q62 readiness, live eligibility,
+numeric-rule, broker, order, or `FINAL_HOLDOUT` authority.
+
+The candidate retains L41R3's effect ceiling: source admission precedes OAuth or
+provider construction; at most one OAuth scope-entry attempt, one MCP session
+open, and one browser launch; at most 20 `tools/list` attempts; zero MCP
+`call_tool` invocations and zero account/tradability/position/order/portfolio/
+quote/review/place/cancel/other-tool calls. Output remains suppressed, evidence
+is fresh, external, F:-rooted and create-only, SDK-managed credential
+read/write counts remain `null` / `null`, and automatic retry is forbidden.
+These limits describe the future reviewed observation boundary; they do not
+authorize an observation.
+
+Q62 remains NOT RUN and blocked pending L41R4 classification; L43 and Q63
+remain NOT RUN. No live-readiness, broker, order, numeric-rule, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
 
 ## D34 accepted boundary - historical transition to L40
 

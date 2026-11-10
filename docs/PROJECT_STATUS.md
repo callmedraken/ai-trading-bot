@@ -1,17 +1,18 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_L41R3_MCP_V2_SCHEMA_DISCOVERY
+## Current milestone - ARCH147_L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC
 
-The last integrated executable source and certification remain ACCEPTED and
-FAST-FORWARD INTEGRATED at `f8566c030889847e6632c3a9cc4955778e5da802` / tree
-`959f16bf383c63028a8a157dde93e285c9eeba8c`.
-
-Feature run `42734478859`, attempt 1, is terminal SUCCESS: source-static,
-active-tests, distributed canonical FULL broad-1 through broad-7, and
-source-gates succeeded; shared certification-tests and the four-shard
-full-tests fallback were skipped. Develop run `42740143581`, attempt 1, is
-terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
+The accepted and fast-forward integrated executable source base is L41R3 at
+`4461ea7f09c396c3c49598debbc588754fa5096c` / tree
+`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`. Feature run `42778436739`, attempt
+1, is terminal SUCCESS. Develop run `42780649228`, attempt 1, is terminal
+SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
 `REASON=exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`.
+
+The additive L41R4 schema-classification diagnostic source checkpoint is in
+progress from that accepted base. Its exact source has not yet been accepted or
+integrated, and its real observation remains NOT RUN pending ChatGPT's exact-
+source acceptance/integration and a separate observation review.
 
 The earlier develop run `42359807677`, attempt 1, remains immutable terminal
 FAILURE evidence and was not rerun. The docs-descendant certification-reuse
@@ -24,18 +25,19 @@ ACCEPTED: the five-page GUI, resize/navigation, synthetic safety boundary,
 Start/Stop, restart, and clean close were verified; two lifecycle cycles were
 observed and `Q61_PROTECTED_EFFECTS=0`.
 
-L41R2 is CONSUMED / BLOCKED / NO RETRY with reason
-`L41R2_SCHEMA_MALFORMED`; the exact immutable record is below. The root-cause
-classification is an MCP-v2 Python object schema-field compatibility defect
-identified by comparing source extraction with the SDK v2 object model; the
-preserved evidence does not record the raw provider object type. L41R3 is the
-additive MCP-v2 schema-discovery successor. Its real observation remains
-NOT RUN. Q62 remains NOT RUN and blocked pending L41R3 classification; L43 and
-Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule, or
-`FINAL_HOLDOUT` authority is granted.
+L41R3 is CONSUMED / BLOCKED / NO RETRY with reason
+`L41R3_SCHEMA_AMBIGUOUS`; its immutable evidence, exact attempt accounting, and
+classification limits are recorded in the [validation ledger](validation/arch147-live-prototype.md).
+The successful MCP-v2 normalization and OAuth/session establishment mean those
+are no longer the blocker: one `tools/list` response reached the existing strict
+schema parser. The evidence retained `schemas=[]`, so the exact ambiguity
+subtype remains UNKNOWN and must not be inferred. Q62 remains NOT RUN and
+blocked pending L41R4 classification; L43 and Q63 remain NOT RUN. No
+live-readiness, broker, order, numeric-rule, or `FINAL_HOLDOUT` authority is
+granted.
 
 
-## L41R1 and L41R2 consumed observations; L41R3 source successor
+## L41R1 and L41R2 historical observations; accepted L41R3 source
 
 L41R1 is recorded exactly as
 `L41R1_REAL_OBSERVATION=CONSUMED_BLOCKED_NO_RETRY`. Its preserved evidence is
@@ -64,8 +66,8 @@ provider/OAuth output, invokes only bounded `tools/list`, and records no raw
 URLs, callback values, tokens or provider text. Credential reads and writes are
 SDK-managed and individually uncounted (`null`/`null`). A successful result is
 `CAPTURED_FOR_REVIEW` only; it grants no live readiness, broker authority, Q62
-acceptance or order authority. Q62 remains NOT RUN and blocked pending L41R3
-classification.
+acceptance or order authority. At that historical checkpoint, Q62 was NOT RUN
+and blocked pending L41R3 classification; its current boundary is above.
 
 The L41R2 observation is CONSUMED / BLOCKED / NO RETRY. Its preserved evidence
 is
@@ -97,8 +99,9 @@ legacy object attribute `inputSchema`. It preserves one-shot OAuth/session and
 browser limits, bounded `tools/list`, zero tool invocations, output
 suppression, truthful SDK-managed credential accounting, and no-retry
 semantics. `CAPTURED_FOR_REVIEW` grants no Q62 readiness, broker/order or
-numeric-rule authority, live eligibility, or `FINAL_HOLDOUT` authority. The
-real L41R3 observation remains NOT RUN.
+numeric-rule authority, live eligibility, or `FINAL_HOLDOUT` authority. At the
+L41R2 source-acceptance checkpoint, the L41R3 observation had not yet been run;
+its later consumed result is recorded in the current boundary above.
 
 The first unpublished L41R2 prepublication admission is preserved at
 `F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
@@ -116,8 +119,9 @@ was published and independently accepted at
 `972004101036afe52642ed93c38fed21ea479956`. Mapped FULL run `42358983502`,
 attempt 1, was terminal SUCCESS. The real
 `L41R2_INTERACTIVE_SCHEMA_DISCOVERY` was later consumed as BLOCKED / NO RETRY;
-see the exact evidence record above. L41R3 is its additive successor and has
-not been run against Robinhood.
+see the exact evidence record above. At that source-acceptance checkpoint,
+L41R3 was its additive successor and had not yet been run against Robinhood;
+the later L41R3 observation is recorded in the current boundary above.
 
 ## L40 accepted/integrated baseline
 
@@ -208,10 +212,11 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-The immediate next step is independent exact-source review of the additive
-L41R3 source checkpoint after its mapped feature CI is terminal. Any future
-real L41R3 observation is a separately reviewed one-shot boundary and has not
-been authorized here. Q62 remains NOT RUN and blocked pending L41R3
+Complete the bounded additive L41R4 source checkpoint and its focused and
+prepublication verification, then route the single candidate through mapped
+CI and independent exact-source review. A real L41R4 observation remains NOT
+RUN until ChatGPT accepts and integrates the source and separately reviews the
+one-shot observation boundary. Q62 remains NOT RUN and blocked pending L41R4
 classification; L43 and Q63 remain separate NOT RUN boundaries. No live-
 readiness, broker, or order authority is granted. No paper soak is inserted and
 `FINAL_HOLDOUT` remains sealed.

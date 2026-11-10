@@ -49,22 +49,28 @@ CI_ROUTING_OVERCERTIFICATION /
 DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Fallback test execution
 passed on shards 0-2 and shard 3; shard 3 failed only hygiene at 347.721s
 against the 300s limit. Source-static succeeded. The run was not rerun. The
-additive workflow correction
-is pending and is not accepted or integrated. Q62 remains NOT RUN; no
-protected effect occurred. Detailed preserved evidence is in the
-[validation ledger](validation/arch147-live-prototype.md).
+published correction on this branch is
+`aa24ffd429ab94e5c7f7ff887dc9490ae308f315` / tree
+`aefb298f32f35875e87a66b92cefce30e4f8bcf5`; mapped feature CI
+`42730101493`, attempt 1, was terminal SUCCESS. Exact-source review accepted
+the generic FULL collision-resolution correction but withheld overall source
+acceptance because the successor proof still modeled an obsolete monolithic
+certification job rather than the distributed seven-lane FULL topology. This
+separately named corrective checkpoint changes only that successor proof and
+its current-owner regression coverage. No develop integration, rerun of
+`42730101493`, or protected effect occurred. Q62, L43 and Q63 remain NOT RUN.
+Detailed preserved evidence is in the [validation ledger](validation/arch147-live-prototype.md).
 
 The preserved parent red publication `42195430203`, attempt 1, remains
 immutable `PREPUBLICATION_COVERAGE_DEFECT` evidence and was never rerun.
 
-Next: address the bounded docs-descendant reuse routing defect under the
-pending Architecture 132 proposal. Do not rerun develop run 42359807677. The
-workflow correction has not been accepted or integrated. After that separate
-workflow checkpoint is reviewed, the real L41R2 metadata-only tools/list
-observation remains a future separately reviewed boundary. Preserve its first
-result without automatic retry. Q62 remains NOT RUN and blocked pending L41R2
-classification; L43 and Q63 remain separate. No protected effect follows from
-the source or documentation state.
+Next: review the separately named successor-topology correction and run one
+fresh normal admission on its new source identity. Do not rerun develop run
+42359807677 or mapped feature CI `42730101493`; no develop integration or
+protected effect follows from this checkpoint. After review, the real L41R2
+metadata-only tools/list observation remains a future separately reviewed
+boundary. Preserve its first result without automatic retry. Q62 remains NOT
+RUN and blocked pending L41R2 classification; L43 and Q63 remain separate.
 
 
 ## L41R1 consumed observation and L41R2 source successor

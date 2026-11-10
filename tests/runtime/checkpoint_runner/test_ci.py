@@ -11,6 +11,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from scripts.distributed_full import FULL_JOB_NAMES
 
 from scripts import checkpoint_runner as runner
 from scripts import source_authority as ownership
@@ -3127,10 +3128,10 @@ def _distributed_reuse_fixture():
     args, responses, run, jobs, runs_path, jobs_path = _reuse_fixture()
     canonical = jobs[2]
     lanes = []
-    for index in range(1, 8):
+    for index, name in enumerate(FULL_JOB_NAMES, start=1):
         job = deepcopy(canonical)
         job["id"] = 1000 + index
-        job["name"] = f"certification-full (broad-{index})"
+        job["name"] = name
         lanes.append(job)
     canonical["conclusion"] = "skipped"
     canonical["steps"] = []
@@ -3144,9 +3145,7 @@ def test_current_full_reuse_retains_all_seven_original_jobs():
     result = runner.find_reusable_ci_certification(runner._checkpoint_specs(), **args)
     assert result["reuse"] is True
     assert result["jobs"] == jobs
-    assert result["full_lane_jobs"] == [
-        f"certification-full (broad-{i})" for i in range(1, 8)
-    ]
+    assert result["full_lane_jobs"] == list(FULL_JOB_NAMES)
 
 
 @pytest.mark.parametrize(

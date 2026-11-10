@@ -3,7 +3,7 @@ from copy import deepcopy
 from pathlib import Path
 
 import pytest
-from scripts.distributed_full import SKIPPED_FULL_JOB
+from scripts.distributed_full import FULL_JOB_NAMES, SKIPPED_FULL_JOB
 
 from scripts import checkpoint_runner as runner
 from scripts import develop_reuse_successor as successor
@@ -84,15 +84,16 @@ def _feature_jobs() -> list[dict]:
             steps=[_step("Verify active checkpoint tests")],
         ),
         _job(
-            "certification-tests (arch147-live-prototype / full)",
+            runner.REVIEWED_SKIPPED_CERTIFICATION_JOB,
             head=CERTIFIED,
             run_id=FEATURE_RUN,
-            steps=[_step("Run canonical certification profile")],
+            steps=[],
+            conclusion="skipped",
         ),
     ]
     jobs.extend(
         _job(
-            f"certification-full (broad-{index})",
+            name,
             head=CERTIFIED,
             run_id=FEATURE_RUN,
             steps=[
@@ -100,7 +101,7 @@ def _feature_jobs() -> list[dict]:
                 _step("Enforce canonical certification hygiene budget"),
             ],
         )
-        for index in range(1, 8)
+        for name in FULL_JOB_NAMES
     )
     jobs.extend(
         [
@@ -120,6 +121,58 @@ def _feature_jobs() -> list[dict]:
         ]
     )
     return jobs
+
+
+def _mutate_feature_jobs(jobs: list[dict], mutation: str) -> list[dict]:
+    mutated = deepcopy(jobs)
+    if mutation == "missing_lane":
+        mutated = [job for job in mutated if job["name"] != FULL_JOB_NAMES[0]]
+    elif mutation == "failed_lane":
+        job = next(job for job in mutated if job["name"] == FULL_JOB_NAMES[0])
+        job["conclusion"] = "failure"
+    elif mutation == "missing_execution":
+        job = next(job for job in mutated if job["name"] == FULL_JOB_NAMES[0])
+        job["steps"] = [
+            step
+            for step in job["steps"]
+            if step["name"] != "Run canonical certification profile"
+        ]
+    elif mutation == "missing_hygiene":
+        job = next(job for job in mutated if job["name"] == FULL_JOB_NAMES[0])
+        job["steps"] = [
+            step
+            for step in job["steps"]
+            if step["name"] != "Enforce canonical certification hygiene budget"
+        ]
+    elif mutation == "certification_executes":
+        job = next(
+            job
+            for job in mutated
+            if job["name"] == runner.REVIEWED_SKIPPED_CERTIFICATION_JOB
+        )
+        job["conclusion"] = "success"
+        job["steps"] = [_step("Run canonical certification profile")]
+    elif mutation == "full_tests_executes":
+        job = next(job for job in mutated if job["name"] == "full-tests")
+        job["conclusion"] = "success"
+        job["steps"] = [_step("Run full test suite")]
+    elif mutation == "extra_certification":
+        mutated.append(
+            _job(
+                "certification-full (broad-8)",
+                head=CERTIFIED,
+                run_id=FEATURE_RUN,
+                steps=[
+                    _step("Run canonical certification profile"),
+                    _step("Enforce canonical certification hygiene budget"),
+                ],
+            )
+        )
+    elif mutation == "duplicate_job":
+        mutated.append(deepcopy(mutated[0]))
+    else:
+        raise AssertionError(mutation)
+    return mutated
 
 
 def _docs_jobs() -> list[dict]:
@@ -164,7 +217,14 @@ def _docs_jobs() -> list[dict]:
     return jobs
 
 
-def _context(tmp_path: Path, monkeypatch, *, changed_paths=None, run_mutation=None):
+def _context(
+    tmp_path: Path,
+    monkeypatch,
+    *,
+    changed_paths=None,
+    run_mutation=None,
+    job_mutation=None,
+):
     event_path = tmp_path / "event.json"
     event_path.write_text(
         json.dumps(
@@ -264,6 +324,9 @@ def _context(tmp_path: Path, monkeypatch, *, changed_paths=None, run_mutation=No
         feature_run["conclusion"] = "failure"
     if run_mutation == "docs_failed":
         docs_run["conclusion"] = "failure"
+    feature_jobs = _feature_jobs()
+    if job_mutation is not None:
+        feature_jobs = _mutate_feature_jobs(feature_jobs, job_mutation)
     responses = {
         f"repos/{REPOSITORY}": {"full_name": REPOSITORY, "id": 7},
         f"repos/{REPOSITORY}/actions/workflows/checkpoint-source-gates.yml": workflow,
@@ -283,8 +346,8 @@ def _context(tmp_path: Path, monkeypatch, *, changed_paths=None, run_mutation=No
             f"repos/{REPOSITORY}/actions/runs/{FEATURE_RUN}/attempts/1/"
             "jobs?per_page=100"
         ): {
-            "total_count": len(_feature_jobs()),
-            "jobs": _feature_jobs(),
+            "total_count": len(feature_jobs),
+            "jobs": feature_jobs,
         },
         (
             f"repos/{REPOSITORY}/actions/workflows/{WORKFLOW_ID}/runs?"
@@ -331,9 +394,10 @@ def test_exact_head_reuse_is_returned_unchanged(tmp_path, monkeypatch):
     }
 
 
-def test_incident_reuses_certified_source_with_docs_only_descendant(
+def test_run_42358983502_reuses_real_distributed_full_with_docs_only_descendant(
     tmp_path, monkeypatch
 ):
+    """Run 42358983502 uses seven concrete FULL lane jobs, not a monolith."""
     _context(tmp_path, monkeypatch)
     result = _resolve(tmp_path, monkeypatch)
     assert result["reuse"] is True, result
@@ -344,6 +408,26 @@ def test_incident_reuses_certified_source_with_docs_only_descendant(
     assert result["certified_feature_run_id"] == FEATURE_RUN
     assert result["current_docs_gate_run_id"] == DOCS_RUN
     assert result["docs_only_descendants"][0]["paths"] == ["docs/PROJECT_STATUS.md"]
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "missing_lane",
+        "failed_lane",
+        "missing_execution",
+        "missing_hygiene",
+        "certification_executes",
+        "full_tests_executes",
+        "extra_certification",
+        "duplicate_job",
+    ],
+)
+def test_real_distributed_full_topology_rejects_adversarial_mutations(
+    tmp_path, monkeypatch, mutation
+):
+    _context(tmp_path, monkeypatch, job_mutation=mutation)
+    assert _resolve(tmp_path, monkeypatch)["reuse"] is False
 
 
 @pytest.mark.parametrize(

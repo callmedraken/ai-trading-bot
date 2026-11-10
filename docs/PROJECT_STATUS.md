@@ -44,21 +44,29 @@ CI_ROUTING_OVERCERTIFICATION /
 DEVELOP_CERTIFICATION_REUSE_DOCS_DESCENDANT_GAP. Fallback test execution
 passed on shards 0-2 and on shard 3; shard 3 failed only its 300-second hygiene
 limit at 347.721 seconds. Source-static succeeded. The run is preserved and
-was not rerun. The proposed
-workflow correction is pending and is not accepted or integrated. Q62 remains
-NOT RUN; no protected effect occurred.
+was not rerun. The published correction on this branch is
+`aa24ffd429ab94e5c7f7ff887dc9490ae308f315` / tree
+`aefb298f32f35875e87a66b92cefce30e4f8bcf5`; mapped feature CI run
+`42730101493`, attempt 1, was terminal SUCCESS. Exact-source review accepted
+the generic FULL collision-resolution correction, but withheld overall source
+acceptance because the docs-descendant successor proof still modeled an
+obsolete monolithic certification job instead of the distributed seven-lane
+FULL topology. This separately named corrective checkpoint fixes only that
+successor proof and its current-owner regression coverage. No develop
+integration, CI rerun of `42730101493`, or protected effect has occurred.
+Q62 remains NOT RUN; L43 and Q63 remain NOT RUN.
 
 The preserved L42 parent red run `42195430203`, attempt 1, remains immutable
 `PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted corrective feature
 FULL is `42201682850`; develop integration is `42285116586`.
 
-Next boundary: review and implement the separately scoped workflow
-correction for the accepted source's docs-descendant reuse gap. The additive
-semantics are proposed, not active; the workflow correction is not accepted or
-integrated. Preserve run 42359807677 without rerunning it. The later L41R2
-metadata-only tools/list observation remains separate and not run; Q62 remains
-NOT RUN, blocked pending L41R2 classification. L43 and Q63 remain separate
-future boundaries.
+Next boundary: complete review of this separately named successor-topology
+correction, then run one fresh normal admission on its new source identity.
+Preserve run 42359807677 and mapped feature run `42730101493` without rerunning
+either. No develop integration or protected effect is authorized from this
+checkpoint. The later L41R2 metadata-only tools/list observation remains
+separate and not run; Q62 remains NOT RUN, blocked pending L41R2
+classification. L43 and Q63 remain separate future boundaries.
 
 
 ### L41R1 consumed observation and L41R2 successor

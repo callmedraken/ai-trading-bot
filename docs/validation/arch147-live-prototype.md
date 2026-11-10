@@ -34,6 +34,17 @@ the [development workflow](../AI_DEVELOPMENT_WORKFLOW.md). They are a proposal:
 the workflow correction is not accepted or integrated. Q62 remains NOT RUN.
 This routing incident does not change or retry the accepted L41R2 source.
 
+The later published branch correction is
+`aa24ffd429ab94e5c7f7ff887dc9490ae308f315` / tree
+`aefb298f32f35875e87a66b92cefce30e4f8bcf5`; mapped feature CI
+`42730101493`, attempt 1, was terminal SUCCESS. Exact-source review accepted
+the generic FULL collision-resolution portion but withheld overall acceptance
+because the docs-descendant successor fixture asserted an obsolete monolithic
+FULL job. The current corrective checkpoint aligns that proof with the real
+distributed topology and adds future-growth regressions. The prior feature CI
+run is not rerun; no develop integration, protected effect, L41R2 observation,
+Q62, L43 or Q63 action occurs from this correction.
+
 Accepted/integrated D34 source is HEAD
 `b86defebf9ccbf1efb91397de8f2e66db24a6665`; tree
 `9fa2360dfe7afdd902fd539e94f888063439785d`. Branch

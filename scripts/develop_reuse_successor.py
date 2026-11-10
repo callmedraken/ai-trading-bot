@@ -14,6 +14,8 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from scripts.distributed_full import FULL_JOB_NAMES
+
 REASON = "certified_feature_source_with_docs_only_descendant"
 FEATURE_PREFIXES = (
     "feature/robinhood-",
@@ -21,7 +23,6 @@ FEATURE_PREFIXES = (
     "feature/test-suite-",
 )
 WORKFLOW_PATH = ".github/workflows/checkpoint-source-gates.yml"
-FULL_LANE_NAMES = tuple(f"certification-full (broad-{index})" for index in range(1, 8))
 
 
 def _require(condition: object) -> None:
@@ -165,13 +166,12 @@ def _prove_feature_full(
         run_id=run_id,
     )
     jobs = _jobs_for_run(lookup, prefix=prefix, run_id=run_id, head=head)
-    certification = f"certification-tests ({checkpoint} / full)"
     expected = {
         "source-static",
         "active-tests",
-        certification,
-        *FULL_LANE_NAMES,
+        *FULL_JOB_NAMES,
         "full-tests",
+        runner.REVIEWED_SKIPPED_CERTIFICATION_JOB,
         "source-gates",
     }
     _require(set(jobs) == expected)
@@ -192,14 +192,7 @@ def _prove_feature_full(
         head=head,
         steps=("Verify active checkpoint tests",),
     )
-    _job_success(
-        jobs,
-        certification,
-        run_id=run_id,
-        head=head,
-        steps=("Run canonical certification profile",),
-    )
-    for lane in FULL_LANE_NAMES:
+    for lane in FULL_JOB_NAMES:
         _job_success(
             jobs,
             lane,
@@ -216,9 +209,11 @@ def _prove_feature_full(
         and skipped.get("conclusion") == "skipped"
         and skipped.get("steps") == []
     )
+    skipped_certification = jobs[runner.REVIEWED_SKIPPED_CERTIFICATION_JOB]
     _require(
-        jobs[certification].get("status") == "completed"
-        and jobs[certification].get("conclusion") == "success"
+        skipped_certification.get("status") == "completed"
+        and skipped_certification.get("conclusion") == "skipped"
+        and skipped_certification.get("steps") == []
     )
     _job_success(
         jobs,

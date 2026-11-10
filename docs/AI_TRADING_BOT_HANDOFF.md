@@ -1,79 +1,82 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC
+## Current milestone: ARCH147_L41R4_CONSUMED_SCHEMA_CLASSIFICATION
 
-Accepted and fast-forward integrated L41R3 source base:
-`4461ea7f09c396c3c49598debbc588754fa5096c` / tree
-`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`. Canonical worktree:
+Accepted/integrated L41R4 source:
+`c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
+`2411e867f00e11d92ad7cf208684d03518c17731`. Canonical worktree:
 `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
 `feature/robinhood-live-prototype-current`.
 
-Feature run `42778436739`, attempt 1, is terminal SUCCESS. Develop run
-`42780649228`, attempt 1, is terminal SUCCESS with
-`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`, and
-`DEVELOP_DUPLICATE_FULL=NO`.
+Feature run `42890601819`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, canonical FULL broad-1 through broad-7, and source-gates. Develop
+run `42892262771`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL.
 
-The additive L41R4 schema-classification diagnostic source checkpoint is in
-progress from this accepted base. The exact candidate is not yet accepted or
-integrated. The L41R3 observation is CONSUMED / BLOCKED / NO RETRY as
-`L41R3_SCHEMA_AMBIGUOUS`; its exact evidence identity and attempt accounting
-are recorded below and in the [validation ledger](validation/arch147-live-prototype.md).
-MCP-v2 normalization and OAuth/session establishment succeeded, and one
-`tools/list` response reached the strict parser. The evidence retained
-`schemas=[]`, so the exact schema ambiguity subtype is UNKNOWN and must not be
-guessed. The L41R4 candidate union-proof, safe fingerprint, and diagnostic
-contract is specified in [Architecture 147](architecture/147-live-prototype-current.md).
+The first L41R4 publication `a5702b2f65a4e6ccdf658ead0bb9ba5ab65ea223` /
+tree `6ea6376069b354477da15ba4375e0ff578283b4f` and CI
+`42840212733`, attempt 1, are preserved terminal-red
+`PREPUBLICATION_COVERAGE_DEFECT` evidence. The accepted child fixes only hosted
+Windows test portability while retaining the production literal F: evidence
+guard. The failed run was not rerun.
 
-`PROTOTYPE_READY_FOR_NATIVE_TESTING=YES`. Q61 native Windows synthetic UAT is
-ACCEPTED. It verified all five pages, resize/navigation, the synthetic safety
-boundary, Start/Stop, restart, and clean close; Activity / Health recorded two
-complete cycles. State roots:
+The real `L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC` observation is permanently
+CONSUMED / BLOCKED / NO RETRY. Exact evidence:
+`F:\\AI\\temp\\arch147-l41r4-schema-observation-7cc31ac681214030b64c8a64ba8679dd\\evidence.json`
+(8142 bytes), SHA-256
+`BB8A993179A0B8AF4C5F1343B8CFE170B578E413BCE0F95CB40A6F5FB9BA2B25`.
+Reason: `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`.
 
-- `F:\AI\temp\arch147-q61-native-uat-4fb827c7f9eb4f5a959f2b1583149f84`
-- `F:\AI\temp\arch147-q61-native-lifecycle-3d927a618e20423e8bdfd89d6510c209`
+Attempt accounting is exact: OAuth scope entry `1`, MCP session open `1`,
+browser launch `0`, and `tools/list=1`. Every MCP tool/account/tradability/
+position/order/portfolio/quote/review/place/cancel/other-tool invocation count
+is `0`. Native credential read/write counts are `null` / `null` with
+`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; `automatic_retry=FORBIDDEN`,
+`trusted_binding=false`, and `provider_numeric_rules_derived=false`.
 
-`Q61_PROTECTED_EFFECTS=0`. L41R4 is the separately named additive schema
-classification diagnostic successor, with evidence schema
-`arch147-l41r4-schema-classification-observation/v1`. Its real observation is
-NOT RUN and remains so until ChatGPT independently accepts and integrates the
-exact source and separately reviews that one-shot observation. Q62 remains NOT
-RUN and blocked pending L41R4 classification; L43 and Q63 remain NOT RUN. No
-live-readiness, broker, order, numeric-rule, or `FINAL_HOLDOUT` authority is
-granted.
+The structural fingerprints establish:
+
+- all three inspected schemas have top-level keyword inventory exactly
+  `additionalProperties`, `properties`, `required`, `type`; because
+  L41R4's top-level allowlist omitted `additionalProperties`, that keyword is
+  the exact first `TOP_LEVEL_UNSUPPORTED_CONSTRAINT` trigger;
+- `review_equity_order` has 11 properties and required
+  `account_number`, `side`, `symbol`, `type`; `quantity` and
+  `dollar_amount` are present, optional, direct `string`, with one
+  advertised fractional-precision value of `6`; its description classifier
+  reports simulation + pre-trade + warning/alert + explicitly nonplacing;
+- `place_equity_order` has 12 properties with the same four required fields;
+  `quantity` and `dollar_amount` are present, optional, direct `string`,
+  with one advertised precision value of `6`; it also records
+  `L41R4_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`;
+- `get_equity_tradability` has two required properties and the same top-level
+  `additionalProperties` blocker.
+
+The place semantic conflict is not localized to the top-level tool description:
+L41R4 intentionally combines the tool description with recursively gathered
+nested schema/property descriptions before deriving action-semantic booleans.
+The consumed sanitized evidence therefore cannot identify which description
+contributed the non-placement phrase. Do not interpret that flag as proof that
+the live provider says `place_equity_order` is nonmutating. Robinhood's public
+current tool catalogue separately identifies review as simulation/pre-trade
+warnings and place as placement, but no public prose or L41R4 fingerprint alone
+is an accepted route/account/numeric-rule trust binding.
 
 ## Next step
 
-The next step is to complete L41R4 focused and prepublication verification,
-publish the single candidate through its mapped feature gate, and then obtain
-ChatGPT's independent exact-source review. A real L41R4 observation is a later,
-separately reviewed one-shot boundary. Q62 remains NOT RUN and blocked pending
-L41R4 classification; L43 and Q63 remain separate NOT RUN boundaries. No live
-readiness, broker, order, or numeric-rule authority follows.
+Prepare additive source checkpoint `L41R5_SCHEMA_SEMANTIC_RECOVERY`. It must
+preserve L41R4 evidence and transport bounds, classify the specifically observed
+`additionalProperties` keyword without changing named-property semantics, and
+derive review/place action semantics from the top-level tool description
+separately from nested schema descriptions. Any nested-description diagnostics
+should remain sanitized and separately labelled rather than overriding the
+tool-level action classification.
 
-
-## L41R3 consumed observation and effect boundary
-
-The immutable evidence is
-`F:\\AI\\temp\\arch147-l41r3-schema-observation-8c9b3ae3eb394ce3aab836336f4a3052\\evidence.json`,
-SHA-256
-`1B96E7AF543148018BB2467F852D4752D18F0476B5C1A449056B88FB786F7AC6`, length
-`1376` bytes. It is `CONSUMED / BLOCKED / NO RETRY` with reason
-`L41R3_SCHEMA_AMBIGUOUS`, source HEAD/tree
-`4461ea7f09c396c3c49598debbc588754fa5096c` /
-`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`, and FEATURE plus
-PROSPECTIVE_DEVELOP admission PASS.
-
-Exact attempt counts: OAuth scope entry `1`, MCP session open `1`, browser
-launch `0`, and `tools/list` `1`. Every MCP tool, account, tradability,
-position, order, portfolio, quote, review, placement, cancellation, and
-other-tool invocation counter is `0`. Credential accounting is
-`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; native read/write counts are `null` /
-`null`. Persisted OAuth state was sufficient, so the zero-browser attempt is
-valid. The first ambiguity was returned before the parser retained a tool, so
-`schemas=[]` and the exact subtype remains UNKNOWN. L41R3 must not be replayed,
-overwritten, or relabeled successful. Separately, this L41R4 implementation
-checkpoint has `PROTECTED_EFFECTS=0`; that implementation effect boundary is
-not an additional counter from the consumed L41R3 observation.
+A real L41R5 observation is NOT RUN and is not authorized until exact-source
+review, certification, and integration. Q62 remains NOT RUN and blocked; L43
+and Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule, or
+`FINAL_HOLDOUT` authority follows.
 
 ## L41R1 consumed observation and L41R2 source successor
 

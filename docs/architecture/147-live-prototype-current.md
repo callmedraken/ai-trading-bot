@@ -1,99 +1,106 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current integrated boundary - L41R3; L41R4 in progress
+## Current integrated boundary - L41R4 consumed; L41R5 next
 
-The accepted and fast-forward integrated L41R3 source base is
-`4461ea7f09c396c3c49598debbc588754fa5096c` / tree
-`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`. Feature run `42778436739`, attempt
-1, and develop run `42780649228`, attempt 1, are terminal SUCCESS. Develop
-reports `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`,
-and `DEVELOP_DUPLICATE_FULL=NO`.
+L41R4 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
+`2411e867f00e11d92ad7cf208684d03518c17731`. Feature run
+`42890601819`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, canonical distributed FULL broad-1 through broad-7, and
+source-gates. Develop run `42892262771`, attempt 1, is terminal SUCCESS with
+exact feature-certification reuse and no duplicate FULL.
 
-L41R3's real observation is CONSUMED / BLOCKED / NO RETRY with reason
-`L41R3_SCHEMA_AMBIGUOUS`. The immutable artifact identity and exact attempt
-accounting are owned by the [validation ledger](../validation/arch147-live-prototype.md).
-MCP-v2 object normalization and OAuth/session establishment succeeded; one
-real `tools/list` response reached the strict schema parser. The artifact
-retained `schemas=[]` because the first ambiguity was returned before the
-parser retained the tool, so the exact ambiguity subtype is UNKNOWN. No MCP
-tool or other prohibited call was made. Do not replay or relabel this consumed
-attempt.
+The first L41R4 publication `a5702b2f65a4e6ccdf658ead0bb9ba5ab65ea223` and
+run `42840212733`, attempt 1, remain immutable
+`PREPUBLICATION_COVERAGE_DEFECT` evidence. Its only exposed failure was the
+hosted-Windows evidence-path preservation test incorrectly invoking the
+production literal-F: guard on a C:-rooted pytest temporary directory. The
+accepted child preserves that F: production guard and moves only
+drive-independent create-once/root-containment mechanics behind a private
+testable seam.
 
-The current additive candidate is `L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC`,
-with distinct evidence schema
-`arch147-l41r4-schema-classification-observation/v1`. Source work is in
-progress and is not yet accepted or integrated; a real L41R4 observation is
-NOT RUN until ChatGPT independently accepts and integrates the exact source and
-separately reviews the one-shot observation boundary.
+The one real L41R4 observation is CONSUMED / BLOCKED / NO RETRY:
+`F:\\AI\\temp\\arch147-l41r4-schema-observation-7cc31ac681214030b64c8a64ba8679dd\\evidence.json`,
+8142 bytes, SHA-256
+`BB8A993179A0B8AF4C5F1343B8CFE170B578E413BCE0F95CB40A6F5FB9BA2B25`,
+reason `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. It consumed one OAuth
+scope-entry attempt, one MCP session open, zero browser launches, and one
+`tools/list`; every MCP tool and broker/order-related invocation counter is
+zero. SDK native credential counts remain individually unknown
+(`null`/`null`). It has `trusted_binding=false`,
+`provider_numeric_rules_derived=false`, and automatic retry FORBIDDEN.
 
-### L41R4 candidate schema-classification contract
+### L41R4 exact structural classification
 
-The additive candidate retains the source and evidence semantics of L41R1,
-L41R2 and L41R3. Before inherited strict semantic classification, it records
-bounded, sanitized structural facts and hash identities for the input schema,
-description and interface. It may record bounded property/required inventories,
-the required-not-in-properties fact, safe description-semantic booleans,
-derived fractional-precision values/conflict state, and quantity/dollar-amount
-facts. Fingerprint fields include `input_schema_sha256`, `description_sha256`,
-`interface_sha256`, `top_level_type`, property and required counts/inventories/
-digests, `required_not_in_properties`, `description_classification`,
-`fractional_precision_decimal_places`, `fractional_precision_conflict`,
-`ambiguity_classes`, and `fields.quantity` / `fields.dollar_amount` facts for
-`present`, `required`, `direct_type`, `nullable`, `union_keyword`,
-`union_primitive_types`, `logical_non_null_type`, `default_present`,
-`default_is_null`, and `classification`. Root and per-field
-`schema_keyword_names` plus `schema_keyword_inventory_sha256` retain known
-keyword names while hashing unknown names; property and required inventories
-hash unknown names and include inventory digests. Raw provider descriptions,
-arbitrary default values and unknown strings, token/callback data and
-authorization material are never diagnostics.
+Every inspected live schema has exactly these top-level JSON-Schema keywords:
 
-The candidate recognizes nullable logical strings only when the inspected
-field's complete representation proves one non-null primitive type: exactly
-`string` plus `null` in a two-element type list, or exactly two disjoint direct
-`string`/`null` branches in `anyOf` or `oneOf`, with safe annotation-only
-siblings. It reports `logical_non_null_type=string` and `nullable=true`.
-Requiredness remains independent and is derived from the top-level required
-list. Multi-non-null unions, unresolved references, unsupported compositions
-or constraints, invalid/missing types, and schema facts affected by unresolved
-root references/compositions/constraints fail closed; unproven logical type or
-nullability is cleared rather than inferred. No local or remote reference
-resolution is added.
+`additionalProperties`, `properties`, `required`, `type`.
 
-The exact candidate diagnostic reasons are `L41R4_SCHEMA_MALFORMED`,
-`L41R4_REQUIRED_NOT_IN_PROPERTIES`, `L41R4_SCHEMA_DESCRIPTION_MALFORMED`,
-`L41R4_FRACTIONAL_PRECISION_CONFLICT`,
-`L41R4_FRACTIONAL_PRECISION_INVALID`,
-`L41R4_REVIEW_PLACEMENT_SEMANTIC_CONFLICT`,
-`L41R4_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`,
-`L41R4_TOP_LEVEL_UNRESOLVED_REF`,
-`L41R4_TOP_LEVEL_UNSUPPORTED_COMPOSITION`, and
-`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. For each of quantity and
-dollar-amount fields, the candidate also classifies
-`DIRECT_TYPE_MISSING`, `NULL_ONLY_UNION`, `MULTI_NON_NULL_UNION`,
-`UNRESOLVED_REF`, `UNSUPPORTED_COMPOSITION`, `UNSUPPORTED_CONSTRAINT`, and
-`INVALID_TYPE` under that field's `L41R4_QUANTITY_` or
-`L41R4_DOLLAR_AMOUNT_` prefix. Safely supported nullable strings are classified
-`QUANTITY_NULLABLE_STRING` or `DOLLAR_AMOUNT_NULLABLE_STRING`, not as
-ambiguities. A fingerprint may block while preserving sanitized facts; root
-unknown validation keywords, including conditionals, block and clear unproven
-field logical-type/nullability claims. These are candidate-source boundaries
-pending exact-source review; they do not grant Q62 readiness, live eligibility,
-numeric-rule, broker, order, or `FINAL_HOLDOUT` authority.
+L41R4 treats any top-level validation keyword outside annotations plus
+`type/properties/required` as `TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. Therefore
+the observed `additionalProperties` keyword is the exact first blocker; no
+other unknown top-level keyword is present in the sanitized inventory.
 
-The candidate retains L41R3's effect ceiling: source admission precedes OAuth or
-provider construction; at most one OAuth scope-entry attempt, one MCP session
-open, and one browser launch; at most 20 `tools/list` attempts; zero MCP
-`call_tool` invocations and zero account/tradability/position/order/portfolio/
-quote/review/place/cancel/other-tool calls. Output remains suppressed, evidence
-is fresh, external, F:-rooted and create-only, SDK-managed credential
-read/write counts remain `null` / `null`, and automatic retry is forbidden.
-These limits describe the future reviewed observation boundary; they do not
-authorize an observation.
+For the two order tools, the captured named-field structure is otherwise
+specific:
 
-Q62 remains NOT RUN and blocked pending L41R4 classification; L43 and Q63
-remain NOT RUN. No live-readiness, broker, order, numeric-rule, paper-soak, or
-`FINAL_HOLDOUT` authority is granted.
+- both expose optional `quantity` and `dollar_amount`;
+- both fields have direct schema type `string`;
+- the required set is `account_number`, `side`, `symbol`, `type`;
+- each combined advertised description set yields exactly one fractional
+  precision value, `6`;
+- review classifies as simulation + pre-trade + warning/alert and explicitly
+  nonplacing;
+- place additionally reports `PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`.
+
+These are sanitized metadata facts, not accepted numeric-rule authority. L41R4
+intentionally clears logical type/nullability when a top-level unsupported
+constraint exists.
+
+The place semantic conflict is not yet trustworthy as a tool-level action fact.
+L41R4's description classifier concatenates the top-level tool description with
+every recursively found schema/property description before calculating
+placement/nonplacement booleans. A nested field can therefore contribute
+non-placement wording. The consumed evidence intentionally stores no raw
+provider prose and does not separately classify top-level versus nested
+descriptions, so it cannot localize that phrase after the fact.
+
+The public Robinhood tool catalogue currently describes
+`review_equity_order` as simulation with pre-trade warnings and
+`place_equity_order` as placement. That external description corroborates the
+intended semantic split but does not authenticate the exact live tool schema,
+account route, numeric rules, or residual-close behavior.
+
+### L41R5 successor requirements
+
+The next additive source checkpoint is
+`L41R5_SCHEMA_SEMANTIC_RECOVERY`. Preserve predecessor source/evidence
+identities and the same one-shot transport/effect ceiling.
+
+The successor may treat `additionalProperties` as orthogonal to the semantics
+of explicitly named `properties` and `required` fields only under a bounded,
+fail-closed rule. It should retain a sanitized fact describing the
+`additionalProperties` form (for example boolean versus schema-valued) and
+must not silently allow arbitrary new top-level keywords or references.
+
+Action semantics must be split by provenance:
+
+- top-level tool-description facts determine review/place action semantics;
+- nested schema/property-description facts may be retained separately for
+  diagnostics or numeric-text extraction;
+- nested prose must not make `place_equity_order` nonplacing or make
+  `review_equity_order` placing;
+- raw descriptions remain unpersisted; hashes and bounded booleans remain the
+  evidence surface.
+
+Fractional-precision extraction may still inspect bounded schema descriptions,
+but action semantics and numeric semantics must remain distinct fields.
+
+A future real L41R5 observation remains NOT RUN until its source is
+independently reviewed/certified/integrated. L41R4 must never be replayed. Q62
+remains NOT RUN and blocked; L43 and Q63 remain NOT RUN. No live-readiness,
+broker, order, numeric-rule, paper-soak, or `FINAL_HOLDOUT` authority is
+granted.
 
 ## D34 accepted boundary - historical transition to L40
 

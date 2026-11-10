@@ -1,41 +1,69 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC
+## Current milestone - ARCH147_L41R4_CONSUMED_SCHEMA_CLASSIFICATION
 
-The accepted and fast-forward integrated executable source base is L41R3 at
-`4461ea7f09c396c3c49598debbc588754fa5096c` / tree
-`68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`. Feature run `42778436739`, attempt
-1, is terminal SUCCESS. Develop run `42780649228`, attempt 1, is terminal
-SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
-`REASON=exact_feature_certification`, and `DEVELOP_DUPLICATE_FULL=NO`.
+L41R4 source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
+`2411e867f00e11d92ad7cf208684d03518c17731`. Feature run
+`42890601819`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, distributed canonical FULL broad-1 through broad-7, and
+source-gates. Develop run `42892262771`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL.
 
-The additive L41R4 schema-classification diagnostic source checkpoint is in
-progress from that accepted base. Its exact source has not yet been accepted or
-integrated, and its real observation remains NOT RUN pending ChatGPT's exact-
-source acceptance/integration and a separate observation review.
+The first L41R4 publication `a5702b2f65a4e6ccdf658ead0bb9ba5ab65ea223` /
+tree `6ea6376069b354477da15ba4375e0ff578283b4f` and run
+`42840212733`, attempt 1, remain immutable terminal FAILURE evidence classified
+`PREPUBLICATION_COVERAGE_DEFECT`. Hosted Windows placed pytest temporary files
+on C:, while the preservation test invoked the intended production F:-only
+evidence-path guard. The accepted child `c343ad83...` extracted only the
+drive-independent create-once/root-containment mechanics for portable testing;
+the production literal F: guard remains intact. The red run was not rerun.
 
-The earlier develop run `42359807677`, attempt 1, remains immutable terminal
-FAILURE evidence and was not rerun. The docs-descendant certification-reuse
-correction is now accepted and integrated; the exact policy and preserved
-incident record are in the Architecture 132 and Architecture 147 validation
-documents.
+The real L41R4 observation is now CONSUMED / BLOCKED / NO RETRY with reason
+`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. Immutable evidence:
+`F:\\AI\\temp\\arch147-l41r4-schema-observation-7cc31ac681214030b64c8a64ba8679dd\\evidence.json`,
+SHA-256
+`BB8A993179A0B8AF4C5F1343B8CFE170B578E413BCE0F95CB40A6F5FB9BA2B25`,
+length `8142` bytes. Exact attempt counts are OAuth scope entry `1`, MCP
+session open `1`, browser launch `0`, and `tools/list=1`; every MCP tool,
+account, tradability, position, order, portfolio, quote, review, placement,
+cancellation, and other-tool invocation counter is `0`. Credential-store
+accounting remains `SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED` with native
+read/write counts `null` / `null`. Automatic retry is FORBIDDEN.
 
-`PROTOTYPE_READY_FOR_NATIVE_TESTING=YES`. Q61 native Windows synthetic UAT is
-ACCEPTED: the five-page GUI, resize/navigation, synthetic safety boundary,
-Start/Stop, restart, and clean close were verified; two lifecycle cycles were
-observed and `Q61_PROTECTED_EFFECTS=0`.
+The structural fingerprint makes the first blocker exact: every inspected live
+schema has top-level keywords exactly `additionalProperties`, `properties`,
+`required`, and `type`; L41R4's conservative top-level allowlist omitted
+`additionalProperties`, so that keyword alone produces
+`TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. The order schemas also expose optional
+`quantity` and `dollar_amount` properties with direct type `string`, and
+each advertises one fractional-precision value, `6`, but L41R4 correctly
+clears logical type/nullability while the top-level blocker remains.
 
-L41R3 is CONSUMED / BLOCKED / NO RETRY with reason
-`L41R3_SCHEMA_AMBIGUOUS`; its immutable evidence, exact attempt accounting, and
-classification limits are recorded in the [validation ledger](validation/arch147-live-prototype.md).
-The successful MCP-v2 normalization and OAuth/session establishment mean those
-are no longer the blocker: one `tools/list` response reached the existing strict
-schema parser. The evidence retained `schemas=[]`, so the exact ambiguity
-subtype remains UNKNOWN and must not be inferred. Q62 remains NOT RUN and
-blocked pending L41R4 classification; L43 and Q63 remain NOT RUN. No
+A second independent diagnostic remains unresolved for `place_equity_order`:
+the fingerprint also reports `L41R4_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`.
+L41R4 computes that semantic flag over the tool description plus recursively
+collected nested schema/property descriptions, so the consumed evidence cannot
+tell whether the non-placement phrase came from the tool description or a
+nested field. Do not infer that the provider advertises placement as
+non-mutating. The current public Robinhood tool catalogue independently
+describes `review_equity_order` as simulation/pre-trade warnings and
+`place_equity_order` as order placement, but that public page is not an
+accepted live-schema trust binding or numeric-rule proof.
+
+`trusted_binding=false` and `provider_numeric_rules_derived=false` remain
+authoritative. Q62 remains NOT RUN and blocked. L43 and Q63 remain NOT RUN. No
 live-readiness, broker, order, numeric-rule, or `FINAL_HOLDOUT` authority is
 granted.
 
+The next source checkpoint is a separately named additive L41R5 semantic
+recovery. It must treat the specifically understood `additionalProperties`
+keyword as orthogonal to named-property type/requiredness only under a bounded
+fail-closed rule, and it must separate top-level tool action semantics from
+nested schema-description semantics. L41R4 is consumed and must never be
+replayed. A future real L41R5 observation remains NOT RUN until its exact source
+is independently accepted and integrated.
 
 ## L41R1 and L41R2 historical observations; accepted L41R3 source
 
@@ -212,12 +240,17 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-Complete the bounded additive L41R4 source checkpoint and its focused and
-prepublication verification, then route the single candidate through mapped
-CI and independent exact-source review. A real L41R4 observation remains NOT
-RUN until ChatGPT accepts and integrates the source and separately reviews the
-one-shot observation boundary. Q62 remains NOT RUN and blocked pending L41R4
-classification; L43 and Q63 remain separate NOT RUN boundaries. No live-
+Prepare the additive L41R5 source-only semantic-recovery checkpoint from the
+accepted/integrated L41R4 source. The source must preserve the original
+interface digests and one-shot/no-tool-call boundary while (1) handling the
+captured `additionalProperties` keyword without treating it as an unknown
+named-field semantic constraint and (2) classifying review/place action
+semantics from the top-level tool description separately from nested schema
+descriptions. Do not run L41R4 again. Do not run a real L41R5 observation until
+that source is independently reviewed, certified, and integrated.
+
+Q62 remains NOT RUN and blocked pending an accepted schema/rule trust
+classification; L43 and Q63 remain separate NOT RUN boundaries. No live
 readiness, broker, or order authority is granted. No paper soak is inserted and
 `FINAL_HOLDOUT` remains sealed.
 

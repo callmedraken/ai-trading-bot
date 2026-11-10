@@ -34,7 +34,7 @@ class _Session:
         )
 
 
-def _schemas(include_dollar=True):
+def _schemas(include_dollar=True, *, style="v2_object"):
     entries = []
     for name in LIVE_TOOL_SURFACE:
         properties = {"account_number": {}}
@@ -61,13 +61,16 @@ def _schemas(include_dollar=True):
         if name == "cancel_equity_order":
             properties["order_id"] = {}
             required = ["account_number", "order_id"]
-        entries.append(
-            SimpleNamespace(
-                name=name,
-                inputSchema={"properties": properties, "required": required},
-            )
-        )
+        schema = {"properties": properties, "required": required}
+        if style == "legacy_object":
+            entries.append(SimpleNamespace(name=name, inputSchema=schema))
+        else:
+            entries.append(SimpleNamespace(name=name, input_schema=schema))
     return entries
+
+
+def _schema_for(entry):
+    return getattr(entry, "input_schema", getattr(entry, "inputSchema", None))
 
 
 def test_live_transport_discovers_exact_surface_without_generic_dispatch():
@@ -78,6 +81,25 @@ def test_live_transport_discovers_exact_surface_without_generic_dispatch():
     assert not hasattr(transport, "call_tool")
     assert transport.place_equity_order({"dollar_amount": "0.50"})["data"] == {}
     assert dict(transport.call_counts)["place_equity_order"] == 1
+
+
+def test_live_transport_accepts_mcp_v2_snake_case_tool_objects():
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(_schemas()))
+    schemas = transport.discover_required_capabilities()
+
+    assert {item.name for item in schemas} == set(LIVE_TOOL_SURFACE)
+    assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+
+def test_live_transport_retains_legacy_camel_case_object_compatibility():
+    transport = RobinhoodCurrentLiveTransport.for_test(
+        lambda: _Session(_schemas(style="legacy_object"))
+    )
+
+    assert {item.name for item in transport.discover_required_capabilities()} == set(
+        LIVE_TOOL_SURFACE
+    )
+    assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
 
 
 def test_live_transport_fails_closed_without_dollar_schema():
@@ -182,7 +204,7 @@ def test_current_alternative_sizing_schema_does_not_require_dollar_globally():
 )
 def test_missing_p6_sent_property_blocks_before_any_invocation(name, field):
     schemas = _schemas()
-    schema = next(item.inputSchema for item in schemas if item.name == name)
+    schema = _schema_for(next(item for item in schemas if item.name == name))
     del schema["properties"][field]
     transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(schemas))
     with pytest.raises(
@@ -203,7 +225,7 @@ def test_missing_p6_sent_property_blocks_before_any_invocation(name, field):
 )
 def test_stable_unconditional_required_fields_fail_closed(name, field):
     schemas = _schemas()
-    schema = next(item.inputSchema for item in schemas if item.name == name)
+    schema = _schema_for(next(item for item in schemas if item.name == name))
     schema["required"].remove(field)
     transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(schemas))
     with pytest.raises(

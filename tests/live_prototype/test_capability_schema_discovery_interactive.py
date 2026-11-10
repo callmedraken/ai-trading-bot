@@ -38,6 +38,8 @@ def _source(**overrides: object) -> discovery.SourceAdmission:
     return discovery.SourceAdmission(**values)  # type: ignore[arg-type]
 
 
+# L41R2 predecessor fixture: this intentionally preserves its historical
+# camelCase object shape; the current MCP-v2 fixture lives in the L41R3 tests.
 def _tool(
     name: str,
     description: str,

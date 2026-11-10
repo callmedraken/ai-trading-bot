@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: F856_POST_INTEGRATION_DOCS_CLOSEOUT
+## Current milestone: ARCH147_L41R3_MCP_V2_SCHEMA_DISCOVERY
 
 Accepted executable source and certification:
 `f8566c030889847e6632c3a9cc4955778e5da802` /
@@ -33,18 +33,22 @@ complete cycles. State roots:
 
 `Q61_PROTECTED_EFFECTS=0`. The accepted L41R2 source is
 `235118f70b7c7039055e9fea45ccf27df46671a0` / tree
-`972004101036afe52642ed93c38fed21ea479956`; its real observation remains
-NOT RUN. Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and
-Q63 remain NOT RUN. No live-readiness, broker, order, paper-soak, or
-`FINAL_HOLDOUT` authority is granted.
+`972004101036afe52642ed93c38fed21ea479956`. Its real observation is now
+CONSUMED / BLOCKED / NO RETRY with reason `L41R2_SCHEMA_MALFORMED`; the exact
+immutable record is below. L41R3 is the additive MCP-v2 schema-discovery
+successor, and its real observation remains NOT RUN. Q62 remains NOT RUN and
+blocked pending L41R3 classification; L43 and Q63 remain NOT RUN. No
+live-readiness, broker, order, numeric-rule, or `FINAL_HOLDOUT` authority is
+granted.
 
-## Next external boundary
+## Next step
 
-After independent review and integration of this docs-only closeout, the next
-external boundary is exactly one `L41R2_INTERACTIVE_SCHEMA_DISCOVERY`. Preserve
-its first result; automatic retry is forbidden. Q62 remains blocked pending
-L41R2 classification, with L43 and Q63 as separate later boundaries. No live
-readiness, broker or order authority follows.
+The next step is independent exact-source review of the additive L41R3 source
+checkpoint after mapped feature CI reaches a terminal state. Any future real
+L41R3 observation is a separate one-shot boundary and has not been authorized
+here. Q62 remains blocked pending L41R3 classification; L43 and Q63 remain
+separate NOT RUN boundaries. No live readiness, broker, order, or numeric-rule
+authority follows.
 
 
 ## L41R1 consumed observation and L41R2 source successor
@@ -76,8 +80,33 @@ browser launches as `0` or `1`, native credential read/write counts as `null`,
 and `SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; raw URLs, callback values, tokens
 and provider text are never persisted. A successful result is
 `CAPTURED_FOR_REVIEW` only and grants no live readiness, broker authority, Q62
-acceptance or order authority. Q62 remains NOT RUN and blocked pending the
-first real L41R2 classification.
+acceptance or order authority. Q62 remains NOT RUN and blocked pending L41R3
+classification.
+
+The L41R2 observation is CONSUMED / BLOCKED / NO RETRY. Its immutable evidence
+is
+`F:\\AI\\temp\\arch147-l41r2-schema-observation-9a504f5e26b9414998cea287ee13936a\\evidence.json`,
+SHA-256
+`66C3E5C32A0FD575490B3219AEA7DE2ECCEE65C4E5FDEFF6EB339B9B963FA751`, length
+`1386` bytes, reason `L41R2_SCHEMA_MALFORMED`. Source HEAD/tree were
+`d421562703d6bae92b14afdcc1b3defcc595dbc8` /
+`b0ca242360b1cfe17222c4b56e95198219eee4be`; FEATURE and
+PROSPECTIVE_DEVELOP admission both passed. It recorded one OAuth scope-entry
+attempt, one MCP session-open attempt, one browser launch, and one `tools/list`
+attempt. All prohibited MCP tool/account/tradability/position/order/portfolio/
+quote/review/place/cancel/other-tool counters were zero. Native credential
+read/write fields are `null` with accounting
+`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; automatic retry is FORBIDDEN.
+
+The failure is classified from source/client-model comparison: the source
+extracts the wire spelling `inputSchema`, while MCP SDK v2 Tool objects expose
+the Python attribute `input_schema`. The consumed evidence does not record the
+raw provider object type. L41R3 is the additive successor with evidence schema
+`arch147-l41r3-mcp-v2-interface-observation/v1`; it normalizes only name,
+description, schema and pagination cursor before using the existing fail-closed
+sanitized parser. Its success remains `CAPTURED_FOR_REVIEW` only, with zero
+tool calls and no Q62, live, broker, order, numeric-rule or `FINAL_HOLDOUT`
+authority. Real L41R3 remains NOT RUN.
 
 The first unpublished L41R2 prepublication admission is preserved at
 `F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
@@ -92,8 +121,9 @@ candidate was published as
 `235118f70b7c7039055e9fea45ccf27df46671a0` / tree
 `972004101036afe52642ed93c38fed21ea479956`, mapped FULL
 `42358983502` attempt 1 was terminal SUCCESS, and independent exact-source
-review accepted the L41R2 implementation. The real L41R2 observation remains
-unrun.
+review accepted the L41R2 implementation. At that source-acceptance checkpoint
+the real observation had not yet run; it was subsequently consumed as
+BLOCKED / NO RETRY in the L41R2 record above. It does not advance Q62.
 
 ## L40 accepted/integrated checkpoint
 

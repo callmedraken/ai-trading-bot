@@ -38,6 +38,21 @@ _L41_IMPORT_ALLOWLIST = {
             "create_windows_robinhood_oauth_factory",
         ),
     },
+    "src/trading_bot/live_prototype/capability_schema_discovery_l41r3.py": {
+        (
+            "from",
+            "trading_bot.robinhood_mcp.windows_oauth",
+            "create_windows_robinhood_oauth_factory",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.sdk_transport",
+            "ROBINHOOD_TRADING_MCP_URL",
+        ),
+        ("import", "httpx2", None),
+        ("from", "mcp", "Client"),
+        ("from", "mcp.client.streamable_http", "streamable_http_client"),
+    },
 }
 _FORBIDDEN_PRODUCTION_IMPORTS = (
     "robinhood_mcp",

@@ -14,14 +14,21 @@ exact-SHA reuse, not a docs-descendant reuse event. The prior run `42359807677`
 remains immutable terminal-red incident evidence and was not rerun.
 
 Q61 native Windows synthetic UAT is ACCEPTED with `Q61_PROTECTED_EFFECTS=0`.
-The L41R2 source remains accepted, but `L41R2_REAL_OBSERVATION=NOT_RUN`;
-Q62 remains NOT RUN and blocked pending L41R2 classification; L43 and Q63
-remain NOT RUN. No live-readiness, broker, order, paper-soak, or
-`FINAL_HOLDOUT` authority is granted.
+The accepted L41R2 source remains at
+`235118f70b7c7039055e9fea45ccf27df46671a0` / tree
+`972004101036afe52642ed93c38fed21ea479956`, and its real observation is
+CONSUMED / BLOCKED / NO RETRY with reason `L41R2_SCHEMA_MALFORMED`. The source
+and MCP SDK v2 client-model comparison identifies an `input_schema` Python
+attribute compatibility defect; the preserved evidence does not expose a raw
+provider object type. L41R3 is the additive successor. Its real observation
+remains NOT RUN. Q62 remains NOT RUN and blocked pending L41R3 classification;
+L43 and Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule,
+paper-soak, or `FINAL_HOLDOUT` authority is granted.
 
-After independent review and integration of the docs-only closeout, the next
-external boundary is exactly one `L41R2_INTERACTIVE_SCHEMA_DISCOVERY`. Preserve
-its first result; automatic retry is forbidden. No protected effect is implied.
+The next step is independent exact-source review of the additive L41R3 source
+checkpoint after mapped feature CI is terminal. Any future real L41R3
+observation remains a separate, reviewed one-shot boundary. No protected
+effect is implied by this source checkpoint.
 
 ## D34 accepted boundary - historical transition to L40
 

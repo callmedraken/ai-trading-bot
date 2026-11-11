@@ -1,37 +1,54 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_L41R5_SCHEMA_SEMANTIC_RECOVERY
+## Current milestone - ARCH147_L41R5_CONSUMED_SEMANTIC_CLASSIFICATION
 
-L41R4 source remains SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
-at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
-`2411e867f00e11d92ad7cf208684d03518c17731`. Its feature run
-`42890601819` and develop run `42892262771` are terminal SUCCESS, with the
-develop run reusing the exact feature certification. The first L41R4
-publication and red CI `42840212733` remain immutable
-`PREPUBLICATION_COVERAGE_DEFECT` evidence; the failure was not rerun.
+L41R5 source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`13a97b1f4c369243737cc0ac6646b5520327651a` / tree
+`81e58dd75656593ca0f960ecdcdf21c14d00d969`. Feature run
+`42905997160`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, canonical FULL broad-1 through broad-7, and source-gates. Develop
+run `42926313979`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL.
 
-The real L41R4 observation is permanently CONSUMED / BLOCKED / NO RETRY as
-`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. Its evidence identity, exact attempt
-accounting, and the two unresolved diagnostic limitations are recorded in the
-[current handoff](AI_TRADING_BOT_HANDOFF.md) and
-[Architecture 147 validation ledger](validation/arch147-live-prototype.md).
-L41R4 must never be replayed.
+The one real L41R5 observation is permanently CONSUMED / BLOCKED / NO RETRY.
+Evidence: `F:\\AI\\temp\\arch147-l41r5-schema-observation-6fcfcdf0cfd641fc95c7b5855292e8b4\\evidence.json`, 11128 bytes, SHA-256
+`FC95EB9FBDD2B7DBE064B7CAC84E8851996669AF96BE1273AE46309873A650FF`. Reason: `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`.
+The attempt consumed one OAuth scope entry, one MCP session open, zero browser
+launches, and one `tools/list`; every MCP tool/account/tradability/position/
+order/portfolio/quote/review/place/cancel/other-tool invocation count is zero.
+Native credential read/write counts remain `null` / `null` with
+`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`. Automatic retry is FORBIDDEN.
 
-The additive L41R5 source implementation in this checkpoint is based on
-integrated feature/develop `a97b0abefca085e817ae04cf563e75e138232b40`.
-It preserves named-field reasoning for bounded missing/boolean
-`additionalProperties` forms and blocks schema-valued or invalid forms. It
-separates top-level tool action semantics from nested schema-description
-diagnostics and keeps numeric-description provenance separate. Independent
-exact-source review, mapped source CI, and integration remain pending; no final
-L41R5 commit or CI identity is claimed here.
+The diagnostic successfully closes the L41R4 schema-shape ambiguity. All three
+interfaces exactly match the immutable L41R4 interface digests and all three
+schemas report `additionalProperties=false`. Both order tools expose optional
+direct-string `quantity` and `dollar_amount`; named-field requiredness and
+logical string type are therefore recoverable, and the captured fractional
+precision inventory is `[6]` without a precision-provenance conflict.
 
-The next step after terminal-green source CI is ChatGPT exact-source review.
-L41R5 real observation remains NOT RUN; it is a separate boundary after source
-acceptance and integration. Q62 remains NOT RUN and blocked. L43 and Q63 remain
-NOT RUN. `trusted_binding=false` and `provider_numeric_rules_derived=false`;
-no live-readiness, broker, order, numeric-rule, or `FINAL_HOLDOUT` authority is
-granted.
+The remaining blocker is action-description interpretation, not schema shape.
+After nested descriptions were separated, both order tools' top-level tool
+descriptions still classify as simultaneously placing and nonplacing; the
+review description also retains simulation/pre-trade/warning facts. Even
+`get_equity_tradability` receives a coarse placing classification. Therefore
+the document-wide lexical action classifier is not accepted authority for
+review/place semantics. L41R5 must never be replayed.
+
+The repository already contains the bounded source-owned
+`official_rule_binding.py` seam for the official Robinhood tool catalogue,
+fractional-shares help page, and customer agreement. That binding intentionally
+has no accepted content digests yet, and current capability classification
+deliberately treats submitted official rules as unaccepted. The next source
+checkpoint is `ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`: authenticate and
+freeze only the supported official claims, bind the consumed L41R5 interface
+facts without replaying any observation, and emit the exact remaining 13-fact
+blocker inventory. Do not add another broad prose-regex diagnostic.
+
+`trusted_binding=false` and `provider_numeric_rules_derived=false` remain
+authoritative for the consumed L41R5 evidence. Q62 remains NOT RUN and blocked;
+L43 and Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule,
+paper-soak, or `FINAL_HOLDOUT` authority is granted.
 
 ## L41R1, L41R2, and L41R3 historical observations
 
@@ -208,15 +225,19 @@ input basis only; it does not authorize an order or grant live eligibility.
 
 ## Immediate next step
 
-After this source checkpoint's mapped CI reaches terminal success, ChatGPT
-exact-source review is next. Do not integrate to develop as part of this
-checkpoint. A real L41R5 observation remains a separate future boundary after
-source acceptance and integration; L41R4 must not be replayed.
+Implement `ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING` as a source-only,
+effect-free successor. Preserve the consumed L41 and L41R5 evidence identities.
+Use the existing `official_rule_binding.py` / capability-classification seams
+rather than another provider observation. The checkpoint must attach accepted
+content digests and exact semantic claim IDs only to official Robinhood facts
+the source can actually support, bind L41R5's exact sell-quantity/interface
+facts, and produce a pure fail-closed 13-fact classification showing which
+requirements are proven versus still blocking.
 
-Q62 remains NOT RUN and blocked pending an accepted schema/rule trust
-classification; L43 and Q63 remain separate NOT RUN boundaries. No live
-readiness, broker, or order authority is granted. No paper soak is inserted and
-`FINAL_HOLDOUT` remains sealed.
+Do not infer provider maximum quantity, MCP residual-close behavior, or any
+other absent rule from silence in public documentation. Do not run L41R5 again.
+Do not run Q62 until the resulting exact blocker inventory has been independently
+accepted and integrated.
 
 ## Product and protected boundaries
 

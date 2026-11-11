@@ -1,132 +1,61 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_L41R5_SCHEMA_SEMANTIC_RECOVERY
+## Current milestone: ARCH147_L41R5_CONSUMED_SEMANTIC_CLASSIFICATION
 
-Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`;
-branch: `feature/robinhood-live-prototype-current`. The integrated L41R4 source
-is `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
-`2411e867f00e11d92ad7cf208684d03518c17731`; the L41R5 source checkpoint is
-based on feature/develop `a97b0abefca085e817ae04cf563e75e138232b40` / tree
-`a49990a8abc912ec3f9dae8c6037ee4964473ecd`.
+Canonical feature worktree:
+`F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
+`feature/robinhood-live-prototype-current`.
 
-L41R4 feature run `42890601819`, attempt 1, is terminal SUCCESS across
-source-static, active-tests, canonical FULL broad-1 through broad-7, and
-source-gates. Develop run `42892262771`, attempt 1, is terminal SUCCESS with
-exact feature-certification reuse, stable identity, and no duplicate FULL.
-The first publication `a5702b2f65a4e6ccdf658ead0bb9ba5ab65ea223` / tree
-`6ea6376069b354477da15ba4375e0ff578283b4f` and CI `42840212733`, attempt 1,
-remain immutable terminal-red `PREPUBLICATION_COVERAGE_DEFECT` evidence. The
-accepted portability correction preserves the production literal-F: evidence
-guard; the red run was not rerun.
+L41R5 source is independently accepted and integrated at
+`13a97b1f4c369243737cc0ac6646b5520327651a` / tree
+`81e58dd75656593ca0f960ecdcdf21c14d00d969`. Feature run
+`42905997160`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, all seven canonical FULL lanes, and source-gates. Develop run
+`42926313979`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse, stable identity, and no duplicate FULL.
 
-The real `L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC` observation is permanently
-CONSUMED / BLOCKED / NO RETRY with reason
-`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. Immutable evidence:
-`F:\\AI\\temp\\arch147-l41r4-schema-observation-7cc31ac681214030b64c8a64ba8679dd\\evidence.json`,
-8142 bytes, SHA-256
-`BB8A993179A0B8AF4C5F1343B8CFE170B578E413BCE0F95CB40A6F5FB9BA2B25`.
-Source HEAD/tree were `c343ad83fc86ad1635374b177b27ab52a2da1dde` /
-`2411e867f00e11d92ad7cf208684d03518c17731`.
+The real `L41R5_SCHEMA_SEMANTIC_RECOVERY` observation is permanently
+CONSUMED / BLOCKED / NO RETRY:
+`F:\\AI\\temp\\arch147-l41r5-schema-observation-6fcfcdf0cfd641fc95c7b5855292e8b4\\evidence.json`, 11128 bytes, SHA-256
+`FC95EB9FBDD2B7DBE064B7CAC84E8851996669AF96BE1273AE46309873A650FF`. It returned
+`L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`. Source authority was PASS for
+both feature and prospective develop. Attempt accounting is exact: OAuth scope
+entry 1, MCP session open 1, browser launch 0, `tools/list=1`; every MCP tool,
+account, tradability, position, order, portfolio, quote, review, place, cancel,
+and other-tool invocation count is 0. Native credential counts are null/null,
+SDK managed; automatic retry is FORBIDDEN.
 
-Exact attempt accounting: OAuth scope entry `1`, MCP session open `1`, browser
-launches `0`, and `tools/list=1`; MCP tool invocations, account, tradability,
-positions, orders, portfolio, quotes, review, place, cancel, and other-tool
-attempts are all `0`. Credential accounting is
-`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; native read/write counts are `null` /
-`null`; automatic retry is `FORBIDDEN`. The observation did not retain the raw
-`additionalProperties` value. It proves that the exact first top-level blocker
-was the `additionalProperties` keyword; the other observed root keywords were
-`properties`, `required`, and `type`. The order schemas each had optional
-direct-string `quantity` and `dollar_amount` fields and a captured fractional
-precision value `[6]`.
+L41R5 proves that the live interfaces are unchanged from L41R4:
+`review_equity_order=5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`,
+`place_equity_order=46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`,
+and
+`get_equity_tradability=7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`.
+All three report `additionalProperties=BOOLEAN_FALSE`. Review/place
+`quantity` and `dollar_amount` are optional direct strings and the captured
+fractional-precision inventory is `[6]`.
 
-Immutable interface SHA-256 values are `review_equity_order`:
-`5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`,
-`place_equity_order`:
-`46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`, and
-`get_equity_tradability`:
-`7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`.
-The L41R4 place nonplacement flag is not attributable to the top-level tool
-description because that classifier combined it with nested property text.
-Raw prose was not retained, so do not treat the flag as proof that the live
-provider describes placement as nonmutating.
+The failure is now localized to action prose. Top-level and nested description
+provenance are separated correctly, but both order tools' top-level descriptions
+still produce both placing and nonplacing booleans. Review separately reports
+simulation/pre-trade/warning semantics. The tradability tool also receives a
+coarse placing classification. These facts show that whole-description lexical
+matching is too broad; they do not show that Robinhood's review tool actually
+places orders or that its placement tool is nonmutating.
 
-The L41R5 source implementation in this checkpoint is based on integrated
-`a97b0abefca085e817ae04cf563e75e138232b40`. Its distinct observation identity
-is `L41R5_SCHEMA_SEMANTIC_RECOVERY`, with evidence schema
-`arch147-l41r5-schema-semantic-recovery-observation/v1`. Evidence records
-`l41r4_predecessor_evidence` with the immutable L41R4 source/evidence identity
-and `l41r4_interface_baseline` with all three original interface digests; the
-production baseline is fixed and non-disableable.
-Original input-schema, description, and interface hashes are retained and
-checked before projection. An interface change blocks as
-`L41R5_SCHEMA_CHANGED`. Sanitized additional-properties facts include
-`additional_properties_present`, `additional_properties_form`,
-`additional_properties_schema_sha256`,
-`additional_properties_schema_keyword_names`,
-`additional_properties_schema_keyword_inventory_sha256`,
-`additional_properties_schema_contains_reference`, and
-`additional_properties_schema_composition_names`. Forms are
-`MISSING`, `BOOLEAN_TRUE`, `BOOLEAN_FALSE`, `SCHEMA_MAPPING`, or `INVALID`.
-Missing and boolean forms preserve reasoning about explicitly named fields and
-their top-level requiredness only. Schema mappings block as
-`L41R5_ADDITIONAL_PROPERTIES_SCHEMA_UNSUPPORTED`, and invalid forms
-block as `L41R5_ADDITIONAL_PROPERTIES_INVALID`. Other unsupported root
-validation keywords, references, and compositions remain fail-closed. L41R5
-reuses the public L41R3 transport/session seam with a separate bounded intake;
-L41R1-R4 executable semantics remain unchanged. Nested descriptions are
-removed from the projection before the inherited named-field parser runs;
-tool-action and nested-diagnostic facts are derived separately. Schema-valued
-`additionalProperties` is not normalized or resolved; references and
-compositions are represented only through sanitized structural facts, without
-raw schema text or `$ref` targets.
+The existing source-owned `official_rule_binding.py` already enumerates the
+official Robinhood sources and bounded claims for review semantics, fractional
+share sells, the ordinary $1 fractional minimum, the documented app Sell All
+path below $1, and holding precision. It intentionally has
+`content_sha256=None` and current `classify_capabilities()` treats submitted
+rules as unaccepted. Therefore the next additive checkpoint is
+`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`, not another L41R5/L41R6 provider
+observation. It must authenticate only supported official claims, bind the
+consumed L41R5 interface evidence, and report the exact remaining L41/Q62 facts
+without inventing maximum-quantity or MCP residual-close guarantees.
 
-L41R5 evidence labels top-level action facts as
-`tool_description_classification` and nested action-like diagnostics as
-`nested_description_classification`; top-level simulation, pre-trade,
-warning/alert, explicitly-placing, and explicitly-nonplacing facts determine
-action conflicts. Top-level review text explicitly saying it places blocks as
-`L41R5_REVIEW_PLACEMENT_SEMANTIC_CONFLICT`; top-level place text explicitly
-saying it does not place blocks as
-`L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`. Nested facts cannot set those
-conflicts. If the top-level action meaning remains insufficiently proven, it
-stays UNKNOWN/missing; nested or public-site wording is not used to fill it in.
-Numeric precision extraction remains independent and is retained separately as
-`tool_fractional_precision_decimal_places` and
-`nested_fractional_precision_decimal_places`, with a merged inventory and
-`fractional_precision_conflict`; conflicting provenance blocks as
-`L41R5_FRACTIONAL_PRECISION_PROVENANCE_CONFLICT`, while identical values from
-both sources are compatible. Raw tool/nested description text is not persisted.
-Evidence keeps `trusted_binding=false` and
-`provider_numeric_rules_derived=false`; this source does not grant numeric-rule
-authority.
-
-The future real L41R5 discovery remains bounded: source admission precedes
-provider/OAuth construction; OAuth scope-entry, MCP session-open, and browser
-launch attempts are each at most `1`; `tools/list` is at most `20`; every MCP
-tool invocation and account, tradability, position, order, portfolio, quote,
-review, place, cancel, and other-tool attempt is exactly `0`. The discovery
-boundary exposes no `call_tool` method. Provider/OAuth stdout, stderr, warnings,
-logging, and native file descriptors remain suppressed. Evidence is fresh and
-create-only under `F:\\AI\\temp`; the production literal-F: guard remains
-enforced. Credential read/write counts remain `null` / `null` with
-`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; automatic retry is `FORBIDDEN`.
-`PROTECTED_EFFECTS=0` for implementation and certification.
-If a future session teardown fails, the observation remains BLOCKED and retains
-only truthful sanitized partial facts; it is not retried.
-
-Independent exact-source review, mapped source CI, and integration remain
-pending; no unverified final L41R5 commit or CI identity is claimed here. After
-mapped source CI reaches terminal success, the next step is ChatGPT exact-source
-review. No develop integration is included in this source checkpoint. L41R4
-must never be replayed. A real L41R5 observation remains NOT RUN and is a
-separate reviewed boundary after source acceptance and integration. Q62 remains
-NOT RUN and blocked; L43 and Q63 remain NOT RUN. No live-readiness, broker, order,
-numeric-rule, or `FINAL_HOLDOUT` authority follows.
-
-A future successful L41R5 observation is `CAPTURED_FOR_REVIEW` only; it grants
-no Q62 acceptance, live readiness, broker/order authority, numeric-rule
-authority, trusted binding, or `FINAL_HOLDOUT`.
+L41R5 must never be replayed. A future L41R6 implementation is source-only and
+must have PROTECTED_EFFECTS=0. Q62 remains NOT RUN and blocked; L43 and Q63
+remain NOT RUN. `FINAL_HOLDOUT` stays sealed.
 
 ## L41R1 consumed observation and L41R2 source successor
 

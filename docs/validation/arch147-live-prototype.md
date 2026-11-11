@@ -1,208 +1,72 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L41R4 accepted/integrated source, consumed observation, and L41R5 source
+## L41R5 accepted/integrated source and consumed semantic observation
 
-L41R4 final source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
-at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree
-`2411e867f00e11d92ad7cf208684d03518c17731`.
+L41R5 final source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
+at `13a97b1f4c369243737cc0ac6646b5520327651a` / tree
+`81e58dd75656593ca0f960ecdcdf21c14d00d969`.
 
-Feature run `42890601819`, attempt 1, is terminal SUCCESS. Source-static,
+Feature run `42905997160`, attempt 1, is terminal SUCCESS. Source-static,
 active-tests, canonical FULL broad-1 through broad-7, and source-gates all
-succeeded. Develop run `42892262771`, attempt 1, is terminal SUCCESS with
+succeeded. Develop run `42926313979`, attempt 1, is terminal SUCCESS with
 `DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
-`IDENTITY_STABLE=True`; active-tests and all FULL routes were skipped on
+and `IDENTITY_STABLE=True`; active-tests and all FULL routes were skipped on
 develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
-### Preserved first publication
+### Consumed L41R5 observation
 
-The first publication is
-`a5702b2f65a4e6ccdf658ead0bb9ba5ab65ea223` / tree
-`6ea6376069b354477da15ba4375e0ff578283b4f`. CI run
-`42840212733`, attempt 1, remains terminal FAILURE and was not rerun.
-Classification: `PREPUBLICATION_COVERAGE_DEFECT`.
+The one real observation is permanently CONSUMED / BLOCKED / NO RETRY:
 
-Source-static passed. Active tests reported 968 passed / 1 failed; broad-1
-through broad-6 passed; broad-7 reported 2514 passed / 1 failed. The single
-failure was
-`test_evidence_directory_creation_never_overwrites_existing_evidence`: the
-test monkeypatched the evidence root to pytest's hosted-Windows C: temporary
-directory, while the real production admission correctly requires drive F:.
-The accepted child extracted only the drive-independent create-once/root
-containment mechanics for the preservation test and added a direct regression
-that monkeypatching the root cannot bypass the production F: drive rule.
+- evidence: `F:\\AI\\temp\\arch147-l41r5-schema-observation-6fcfcdf0cfd641fc95c7b5855292e8b4\\evidence.json`
+- bytes: `11128`
+- SHA-256: `FC95EB9FBDD2B7DBE064B7CAC84E8851996669AF96BE1273AE46309873A650FF`
+- status/reason: `BLOCKED / L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`
+- source HEAD/tree:
+  `13a97b1f4c369243737cc0ac6646b5520327651a` /
+  `81e58dd75656593ca0f960ecdcdf21c14d00d969`
+- OAuth scope entry attempts: 1
+- MCP session open attempts: 1
+- browser launches: 0
+- `tools/list`: 1
+- every MCP tool/account/tradability/position/order/portfolio/quote/review/
+  place/cancel/other-tool invocation: 0
+- native credential read/write: null/null,
+  `SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`
+- `automatic_retry=FORBIDDEN`
+- `trusted_binding=false`
+- `provider_numeric_rules_derived=false`
 
-### L41R4 consumed observation
+The immutable L41R4 baseline digests all matched. All three schemas classify
+`additionalProperties` as `BOOLEAN_FALSE`. Review/place `quantity` and
+`dollar_amount` are optional direct strings, and both order tools carry one
+fractional-precision value, 6. Therefore the L41R4 schema-shape ambiguity is
+closed.
 
-`L41R4_SCHEMA_CLASSIFICATION_DIAGNOSTIC` is CONSUMED / BLOCKED / NO RETRY.
+The action classifier remains blocked for a different reason. The top-level
+place description is `CONFLICTING` (placing + nonplacing); the top-level review
+description is also `CONFLICTING` while separately recording simulation,
+pre-trade, and warning/alert semantics. Nested descriptions are now separate and
+do not create the action conflicts. The tradability tool is also coarsely
+classified as placing. This is evidence that the current whole-description
+lexical classifier is over-broad, not evidence that the provider's review tool
+mutates or that its place tool is nonmutating.
 
-Evidence:
-`F:\\AI\\temp\\arch147-l41r4-schema-observation-7cc31ac681214030b64c8a64ba8679dd\\evidence.json`
+No retry or prose-regex successor is authorized.
 
-Length: `8142` bytes
+### Next source boundary
 
-SHA-256:
-`BB8A993179A0B8AF4C5F1343B8CFE170B578E413BCE0F95CB40A6F5FB9BA2B25`
+The repository already contains a conservative source-owned
+`official_rule_binding.py` with bounded Robinhood source/claim inventories.
+Its provenance intentionally lacks accepted content hashes, and the current
+capability classifier deliberately leaves submitted official rule claims
+blocking. The next checkpoint is
+`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`: authenticate only those supported
+official claims, bind the exact consumed L41R5 interface evidence, and run a
+pure deterministic 13-fact classification to expose the exact remaining Q62
+blockers.
 
-Source HEAD/tree:
-`c343ad83fc86ad1635374b177b27ab52a2da1dde` /
-`2411e867f00e11d92ad7cf208684d03518c17731`
-
-FEATURE and PROSPECTIVE_DEVELOP authority: PASS.
-
-Status/reason:
-`BLOCKED / L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`.
-
-Attempt counts:
-
-- `oauth_scope_entry_attempts=1`
-- `mcp_session_open_attempts=1`
-- `browser_launches=0`
-- `tools_list_attempts=1`
-- every MCP tool/account/tradability/position/order/portfolio/quote/review/place/
-  cancel/other-tool invocation counter = `0`
-
-Credential accounting:
-`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`; native read/write counts =
-`null` / `null`.
-
-`automatic_retry=FORBIDDEN`; `trusted_binding=false`;
-`provider_numeric_rules_derived=false`.
-
-### Structural evidence and exact blocker
-
-All three structural fingerprints have top-level keyword inventory exactly:
-
-`additionalProperties`, `properties`, `required`, `type`.
-
-The accepted L41R4 source permits top-level annotations plus
-`type/properties/required`; therefore the observed `additionalProperties`
-keyword is the exact trigger for
-`L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`. The evidence contains no other
-unknown top-level keyword.
-
-`review_equity_order`:
-
-- interface SHA-256
-  `5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`
-- input-schema SHA-256
-  `20481bf97a157288f27c48d0345e306839a313668a070554665a2cf45940facc`
-- 11 properties; required names are `account_number`, `side`, `symbol`,
-  `type`
-- `quantity`: present, optional, direct type `string`
-- `dollar_amount`: present, optional, direct type `string`
-- one fractional precision value: `6`
-- description facts: simulation=true, pretrade=true, warning/alert=true,
-  explicitly_nonplacing=true, explicitly_placing=false
-- ambiguity class: `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`
-
-`place_equity_order`:
-
-- interface SHA-256
-  `46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`
-- input-schema SHA-256
-  `756344b9abc90f95851257dbaed5d44a73db30ac823908f3f49d805343fb5daa`
-- 12 properties; required names are `account_number`, `side`, `symbol`,
-  `type`
-- `quantity`: present, optional, direct type `string`
-- `dollar_amount`: present, optional, direct type `string`
-- one fractional precision value: `6`
-- description facts: warning/alert=true, explicitly_nonplacing=true,
-  explicitly_placing=false
-- ambiguity classes:
-  `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`,
-  `L41R4_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`
-
-`get_equity_tradability`:
-
-- interface SHA-256
-  `7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`
-- input-schema SHA-256
-  `70f5c63271909536136ce934a7e24ae21a9d8121f17e14802b91df562a88184a`
-- two properties, both required
-- ambiguity class: `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`
-
-The order-field logical type/nullability fields remain deliberately cleared
-because L41R4 treats the top-level constraint as unresolved. These fingerprints
-do not by themselves set `provider_numeric_rules_derived=true`.
-
-### Place semantic-conflict limitation
-
-The consumed L41R4 place semantic conflict is not evidence that the provider
-advertises the placement tool as nonmutating. L41R4 created its action-semantic booleans from a
-single combined string containing the top-level tool description plus every
-recursively collected schema/property description. Because raw descriptions are
-not persisted and top-level versus nested description classifications were not
-separated, the consumed evidence cannot localize the phrase that triggered
-`explicitly_nonplacing=true`.
-
-L41R5 does not use public-site prose to establish live tool action semantics;
-only the exact top-level MCP tool descriptions in the inspected interface feed
-its action classification.
-
-### L41R5 source implementation checkpoint
-
-The additive `L41R5_SCHEMA_SEMANTIC_RECOVERY` source implementation in this
-checkpoint is based on integrated feature/develop HEAD/tree
-`a97b0abefca085e817ae04cf563e75e138232b40` /
-`a49990a8abc912ec3f9dae8c6037ee4964473ecd`. Exact-source review, mapped source
-CI, and develop integration remain pending. No final L41R5 commit
-or CI identity is recorded here. The new evidence schema is
-`arch147-l41r5-schema-semantic-recovery-observation/v1`; its separate
-observation identity is `L41R5_SCHEMA_SEMANTIC_RECOVERY`, and it does not expose
-an L41R4 observation entrypoint. L41R1-R4 executable semantics remain
-unchanged.
-
-Evidence records `l41r4_predecessor_evidence` with the consumed L41R4
-observation's exact source HEAD/tree, evidence path, SHA-256, and byte length,
-and `l41r4_interface_baseline` with the original interface digests for
-`review_equity_order` (`5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`),
-`place_equity_order` (`46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`),
-and `get_equity_tradability` (`7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`).
-It verifies original interface hashes before projection and blocks a digest
-mismatch as `L41R5_SCHEMA_CHANGED`. These exact interface hashes identify the
-immutable consumed provider evidence; they are not mutable current-source or
-AST pins.
-
-Sanitized L41R5 fingerprints add
-`additional_properties_present`, `additional_properties_form`,
-`additional_properties_schema_sha256`,
-`additional_properties_schema_keyword_names`, and
-`additional_properties_schema_keyword_inventory_sha256`,
-`additional_properties_schema_contains_reference`, and
-`additional_properties_schema_composition_names`. Missing and boolean
-forms (`BOOLEAN_TRUE` / `BOOLEAN_FALSE`) preserve reasoning about explicitly
-named properties and their requiredness. Unknown arguments are not authorized.
-Schema mappings block as
-`L41R5_ADDITIONAL_PROPERTIES_SCHEMA_UNSUPPORTED`, and invalid forms block as
-`L41R5_ADDITIONAL_PROPERTIES_INVALID`. Schema-valued forms are not normalized
-or resolved. Other unsupported top-level validation keywords remain blocked as
-`L41R5_TOP_LEVEL_UNSUPPORTED_CONSTRAINT`; top-level references and compositions
-remain blocked as `L41R5_TOP_LEVEL_UNRESOLVED_REF` and
-`L41R5_TOP_LEVEL_UNSUPPORTED_COMPOSITION`. The raw L41R4
-`additionalProperties` value is unknown and is not inferred.
-
-Action and numeric description provenance remain separate. Only top-level MCP
-tool descriptions populate `tool_description_classification` and can trigger
-review/place action conflicts. `nested_description_classification` is a
-separate sanitized diagnostic; nested action-like text cannot trigger either
-action conflict. Numeric provenance is recorded as
-`tool_fractional_precision_decimal_places` and
-`nested_fractional_precision_decimal_places`, with the merged
-`fractional_precision_decimal_places` and `fractional_precision_conflict`.
-Conflicting source claims block as
-`L41R5_FRACTIONAL_PRECISION_PROVENANCE_CONFLICT`. Raw descriptions are not
-persisted.
-
-The L41R5 source preserves `trusted_binding=false` and
-`provider_numeric_rules_derived=false`. L41R4 is permanently CONSUMED / BLOCKED
-/ NO RETRY and must never be replayed. A future real L41R5 observation remains
-NOT RUN until exact-source review, certification, and integration, then requires
-its own separate reviewed boundary. A future successful result is
-`CAPTURED_FOR_REVIEW` only and grants no Q62 acceptance, live readiness,
-broker/order authority, numeric-rule authority, trusted binding, or
-`FINAL_HOLDOUT`. Q62 remains NOT RUN and blocked; L43 and Q63 remain NOT RUN.
-No live-readiness, broker, order, numeric-rule, paper-soak, or `FINAL_HOLDOUT`
-authority is granted.
+No provider/OAuth/MCP call is part of L41R6 implementation. L41R5 must never be
+replayed. Q62, L43, and Q63 remain NOT RUN and FINAL_HOLDOUT remains sealed.
 
 ## F856 accepted correction and integration closeout
 

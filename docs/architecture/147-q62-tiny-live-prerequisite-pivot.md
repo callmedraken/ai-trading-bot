@@ -313,4 +313,3 @@ After observer-source acceptance/integration, execute one fresh Q62 protected
 read-only observation. A result other than
 `READY_FOR_L43_PROTOTYPE_READ_ONLY` blocks L43 and is preserved; no automatic
 retry is authorized.
-

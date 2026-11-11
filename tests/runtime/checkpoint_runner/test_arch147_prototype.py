@@ -182,6 +182,23 @@ def test_l41r5_schema_semantic_recovery_successor_is_prepublication_owned():
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_l41r6_consumed_evidence_and_rule_binding_are_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    source_files = (
+        "src/trading_bot/live_prototype/consumed_l41r5_evidence.py",
+        "src/trading_bot/live_prototype/capability_rule_binding_l41r6.py",
+    )
+    test_files = (
+        "tests/live_prototype/test_consumed_l41r5_evidence.py",
+        "tests/live_prototype/test_capability_rule_binding_l41r6.py",
+    )
+
+    assert all((root / path).is_file() for path in source_files + test_files)
+    assert "src/trading_bot/live_prototype" in runner.ARCH147_PROTOTYPE_RUFF
+    assert all(runner.ARCH147_PROTOTYPE_TESTS.count(path) == 1 for path in test_files)
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):
     from dataclasses import replace
 

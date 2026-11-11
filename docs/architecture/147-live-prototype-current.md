@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L41R5 consumed; official trust binding next
+## Current boundary - L41R6 source candidate; Q62 remains blocked
 
 L41R5 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
 `13a97b1f4c369243737cc0ac6646b5520327651a` / tree
@@ -24,9 +24,9 @@ FORBIDDEN.
 The three live interface digests exactly equal the immutable L41R4 baseline.
 Every inspected schema has `additionalProperties=false`; no schema-valued or
 invalid form remains. Named review/place `quantity` and `dollar_amount`
-fields are optional direct strings. Their logical type survives normalization,
-and the precision inventory is exactly `[6]` with no tool-vs-nested precision
-conflict.
+fields are present, optional (not required), non-nullable JSON Schema
+`string`s. Their logical string type survives normalization, and the precision
+inventory is exactly `[6]` with no tool-vs-nested precision conflict.
 
 This closes the L41R4 top-level schema ambiguity. L41R5 must never be replayed.
 
@@ -42,40 +42,69 @@ whole-description lexical booleans are not accepted as review/place authority.
 
 The official Robinhood public tool catalogue separately describes
 `review_equity_order` as simulation with pre-trade warnings and
-`place_equity_order` as placement. That public statement remains corroborative
-until it is source-owned through the repository's accepted trust-binding
-mechanism.
+`place_equity_order` as placement. L41R6 now binds that claim to the selected
+raw public-source digest and exact consumed live tool identity. The consumed
+L41R5 lexical indicators remain non-authoritative.
 
-### L41R6 successor requirements
+### L41R6 official source binding
 
-The next source-only checkpoint is
-`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`.
+L41R6 is the source-only checkpoint
+`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`. The v2 binding keeps the legacy v1
+`content_sha256=None` snapshot and its unaccepted behavior unchanged. V2
+provenance uses the five existing official claim IDs and pins a selected raw
+anonymous HTTPS response body for each existing source. All sources were
+retrieved `2026-11-10`; their acceptance revision is
+`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`. SHA-256 covers the exact body bytes
+after HTTP transfer framing, retrieved without credentials or cookies,
+requested with `Accept-Encoding: identity`, and received with no
+`Content-Encoding`; HTML is not normalized. Source bodies are not stored.
+The HTML endpoints vary in raw body bytes between requests, so each digest
+identifies the selected retrieval and a later live fetch is not expected to
+reproduce it. No CI or runtime fetch is performed.
 
-Do not add another provider/schema observation and do not modify or replay
-L41R1-R5 executable attempts. Reuse the existing
-`official_rule_binding.py`, `capability_observer.py`, and consumed-evidence
-seams. The successor must:
+| Source ID | Canonical URL | Bytes / SHA-256 | Exact semantic claim IDs and locators |
+|---|---|---|---|
+| `TRADING_WITH_YOUR_AGENT` | `https://robinhood.com/us/en/support/articles/trading-with-your-agent/` | 271393 / `a7789ee596168e2605ce4fbca73346f9c75ef882995df187c303d7ae7c17d980` | `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS`: Agent tools > Equities tools table > `review_equity_order` and `place_equity_order` rows. |
+| `FRACTIONAL_SHARES` | `https://robinhood.com/us/en/support/articles/fractional-shares/` | 196743 / `6735222237350f2001da457b75872647c1d4afbe86911cd1759b55f8dc86a3a3` | `FRACTIONAL_SELL_BY_SHARE_AMOUNT`: Trading fractional shares > Trade in shares > Sell in Shares workflow; `ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1`: Trade in dollars/shares > ordinary $1 minimum; `APP_SELL_ALL_PATH_FOR_SUB_USD_1_FRACTIONAL_HOLDING`: Trade in dollars > sub-$1 Sell All option. |
+| `RHF_RHS_CUSTOMER_AGREEMENT` | `https://cdn.robinhood.com/assets/robinhood/legal/Robinhood-Customer-Agreement.pdf` | 498438 / `26dae42562b1ef0d50e9afbb33fa6c5f3acdbbd9dc9a814e3a8e88a5f7e2dcf2` | Revised November 2, 2026; `ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1` and `FRACTIONAL_HOLDING_PRECISION_FIFTH_OR_SIXTH_DECIMAL_BY_VENUE`: Section 22 > paragraph 2 (PDF printed page label 16). |
 
-- bind the exact consumed L41R5 evidence identity and its immutable interface
-  digests before importing interface facts;
-- authenticate only official source content actually used by accepted claims,
-  with deterministic source-owned content SHA-256 values and exact semantic
-  claim IDs;
-- accept review-preview semantics from the official tool catalogue only through
-  that trusted binding, not through prose regexes;
-- distinguish interface facts from official product/rule facts and from
-  account-specific facts;
-- preserve the existing fail-closed rule that caller-supplied provenance or
-  merely descriptive metadata grants no authority;
-- emit a pure, deterministic 13-fact L41 classification showing every proven,
-  deferred, and still-blocking fact;
-- never infer maximum quantity, exact MCP residual-close behavior, or other
-  absent provider guarantees from document silence.
+The official tool catalogue supports only `REVIEW_PREVIEW_ONLY` through
+`REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS` plus exact L41R5 review/place
+interface identity. The ordinary $1 claim requires matching digests from both
+the help page and agreement and supports only
+`MINIMUM_SELL_NOTIONAL_OR_ABSENCE`. `SELL_QUANTITY_FIELD` and
+`DECIMAL_INTERFACE_PRECISION` are L41R5 interface facts. The other three
+official claim records (share amount, app Sell All, and venue holding
+precision) are context only. The Learn page's one-millionth-share wording is
+not included because it does not establish MCP SELL quantity minimum or
+increment. Caller-supplied URL/date/claim text cannot manufacture a trusted
+claim; the source-owned resolver accepts only the exact source IDs and
+allowlisted digests required by each canonical claim.
 
-L41R6 implementation/certification has PROTECTED_EFFECTS=0. A green source
-checkpoint does not itself authorize Q62, L43, an order, or FINAL_HOLDOUT. Q62
-may proceed only if the accepted L41R6 output leaves no pre-Q62 blocker beyond
-the already allowed position-specific review deferral.
+### L41R6 deterministic fact result
+
+| Fact ID, in source order | Classification | Basis / limit |
+|---|---|---|
+| `INTENDED_AGENTIC_ACCOUNT` | `PROVEN` | Consumed L41 account evidence. |
+| `SPY_TRADABILITY` | `PROVEN` | Consumed L41 tradability evidence. |
+| `FRACTIONAL_ELIGIBILITY` | `PROVEN` | Consumed L41 fractional eligibility. |
+| `SELL_QUANTITY_FIELD` | `PROVEN` | Exact consumed L41R5 review/place optional quantity fields. |
+| `DECIMAL_INTERFACE_PRECISION` | `PROVEN` | L41R5 `[6]` interface precision only, not a fill or residual guarantee. |
+| `QUANTITY_INCREMENT` | `BLOCKING_L42` | No accepted source proves an MCP increment. |
+| `MINIMUM_QUANTITY` | `BLOCKING_L42` | No accepted source proves an MCP minimum quantity. |
+| `MAXIMUM_QUANTITY_OR_ABSENCE` | `BLOCKING_L42` | Silence proves neither a maximum nor its absence. |
+| `MINIMUM_SELL_NOTIONAL_OR_ABSENCE` | `PROVEN` | Ordinary fractional transaction minimum is $1; this does not prove an MCP below-$1 close. |
+| `BELOW_MINIMUM_FULL_CLOSE` | `BLOCKING_L42` | App Sell All does not prove an MCP close. |
+| `RESIDUAL_FULL_OWNED_CLOSE` | `BLOCKING_L42` | Share input and holding precision do not prove exact MCP residual close. |
+| `REVIEW_PREVIEW_ONLY` | `PROVEN` | Official tool catalogue plus exact consumed interface identity; lexical booleans are excluded. |
+| `INSTANCE_REVIEW_REQUIRES_POSITION` | `DEFER_TO_FIRST_OWNED_POSITION` | Existing position-specific deferral is unchanged. |
+
+The total is 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER, overall `BLOCKED`.
+`READY_FOR_L42` is impossible while any pre-Q62 fact blocks. No provider,
+OAuth, browser, MCP, account, quote, review, place, or cancel effect occurs in
+L41R6; `PROTECTED_EFFECTS=0`. The source candidate awaits terminal mapped CI
+and independent exact-source review. Q62 remains NOT RUN and blocked. L43 and
+Q63 remain NOT RUN; `FINAL_HOLDOUT` remains sealed.
 
 ## D34 accepted boundary - historical transition to L40
 

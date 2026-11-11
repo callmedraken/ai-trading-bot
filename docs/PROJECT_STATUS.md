@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_L41R5_CONSUMED_SEMANTIC_CLASSIFICATION
+## Current milestone - ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING
 
 L41R5 source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
 `13a97b1f4c369243737cc0ac6646b5520327651a` / tree
@@ -22,33 +22,46 @@ Native credential read/write counts remain `null` / `null` with
 
 The diagnostic successfully closes the L41R4 schema-shape ambiguity. All three
 interfaces exactly match the immutable L41R4 interface digests and all three
-schemas report `additionalProperties=false`. Both order tools expose optional
-direct-string `quantity` and `dollar_amount`; named-field requiredness and
-logical string type are therefore recoverable, and the captured fractional
-precision inventory is `[6]` without a precision-provenance conflict.
+schemas report `additionalProperties=BOOLEAN_FALSE`. Both order tools expose
+present, optional, non-nullable `quantity` and `dollar_amount` fields with
+direct and logical type `string`; the captured fractional precision inventory
+is `[6]` without a precision-provenance conflict. See the [validation
+ledger](validation/arch147-live-prototype.md) for exact R5 and R6 provenance.
 
-The remaining blocker is action-description interpretation, not schema shape.
-After nested descriptions were separated, both order tools' top-level tool
-descriptions still classify as simultaneously placing and nonplacing; the
-review description also retains simulation/pre-trade/warning facts. Even
-`get_equity_tradability` receives a coarse placing classification. Therefore
-the document-wide lexical action classifier is not accepted authority for
-review/place semantics. L41R5 must never be replayed.
+The top-level L41R5 descriptions retain conflicting action indicators, and the
+tradability tool receives a coarse placing classification. Those lexical
+booleans are not authority for review/place behavior. L41R5 must never be
+replayed.
 
-The repository already contains the bounded source-owned
-`official_rule_binding.py` seam for the official Robinhood tool catalogue,
-fractional-shares help page, and customer agreement. That binding intentionally
-has no accepted content digests yet, and current capability classification
-deliberately treats submitted official rules as unaccepted. The next source
-checkpoint is `ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`: authenticate and
-freeze only the supported official claims, bind the consumed L41R5 interface
-facts without replaying any observation, and emit the exact remaining 13-fact
-blocker inventory. Do not add another broad prose-regex diagnostic.
+The L41R6 implementation adds digest-backed v2 source provenance for the three
+existing official sources. Only the review-preview claim from the official
+tool catalogue and the ordinary $1 fractional transaction minimum supported
+by both the help page and customer agreement map to rule facts.
+`SELL_QUANTITY_FIELD` is proven by the consumed L41R5 interfaces; `[6]` proves
+interface precision only. The documented Sell in Shares flow, app Sell All
+path, and venue holding precision remain context and do not prove MCP quantity
+increments, below-$1 closure, or residual closure. The L41R6 source candidate
+is pending terminal mapped CI, independent exact-source review, and
+integration; no new provider observation was performed.
 
-`trusted_binding=false` and `provider_numeric_rules_derived=false` remain
-authoritative for the consumed L41R5 evidence. Q62 remains NOT RUN and blocked;
-L43 and Q63 remain NOT RUN. No live-readiness, broker, order, numeric-rule,
-paper-soak, or `FINAL_HOLDOUT` authority is granted.
+The deterministic 13-fact result is 7 PROVEN, 5 BLOCKING_L42, and 1
+DEFER_TO_FIRST_OWNED_POSITION, with overall status BLOCKED. The five blockers
+are `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
+`MAXIMUM_QUANTITY_OR_ABSENCE`, `BELOW_MINIMUM_FULL_CLOSE`, and
+`RESIDUAL_FULL_OWNED_CLOSE`. `trusted_binding=false` and
+`provider_numeric_rules_derived=false` remain the immutable values in the
+consumed L41R5 record; the L41R6 source-owned binding does not rewrite that
+artifact. Q62 remains NOT RUN and blocked; L43 and Q63 remain NOT RUN.
+`FINAL_HOLDOUT` stays sealed. No live-readiness, broker, order, paper-soak, or
+`FINAL_HOLDOUT` authority is granted.
+
+## Immediate next step
+
+After the mapped feature CI reaches a terminal result, ChatGPT independently
+reviews the exact published L41R6 source and its 13-fact classification. Stop
+on any source mismatch or unexpected effect. Q62 requires a separate review
+after all five blockers are resolved; it is not authorized by this source
+checkpoint.
 
 ## L41R1, L41R2, and L41R3 historical observations
 
@@ -222,22 +235,6 @@ ended at the exact published XNYS regular close
 Production, broker, runtime-binding, campaign, paper, live, and
 `FINAL_HOLDOUT` counters remained zero. The observation validates the signal
 input basis only; it does not authorize an order or grant live eligibility.
-
-## Immediate next step
-
-Implement `ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING` as a source-only,
-effect-free successor. Preserve the consumed L41 and L41R5 evidence identities.
-Use the existing `official_rule_binding.py` / capability-classification seams
-rather than another provider observation. The checkpoint must attach accepted
-content digests and exact semantic claim IDs only to official Robinhood facts
-the source can actually support, bind L41R5's exact sell-quantity/interface
-facts, and produce a pure fail-closed 13-fact classification showing which
-requirements are proven versus still blocking.
-
-Do not infer provider maximum quantity, MCP residual-close behavior, or any
-other absent rule from silence in public documentation. Do not run L41R5 again.
-Do not run Q62 until the resulting exact blocker inventory has been independently
-accepted and integrated.
 
 ## Product and protected boundaries
 

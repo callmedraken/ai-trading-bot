@@ -1,6 +1,6 @@
 """Fake-only tests for consumed L41 lineage and trusted public rule claims."""
 
-from dataclasses import FrozenInstanceError
+from dataclasses import FrozenInstanceError, replace
 
 import pytest
 
@@ -22,8 +22,11 @@ from trading_bot.live_prototype.consumed_l41_evidence import (
 )
 from trading_bot.live_prototype.official_rule_binding import (
     TRUSTED_OFFICIAL_RULE_BINDING,
+    TRUSTED_OFFICIAL_RULE_BINDING_V2,
     OfficialClaimId,
     OfficialSourceId,
+    accepted_official_rule_binding_v2,
+    resolve_trusted_official_claim_v2,
 )
 
 _OBSERVATION_DIGEST = "a" * 64
@@ -376,4 +379,161 @@ def test_source_owned_official_binding_contains_only_supported_claims():
             OfficialClaimId.APP_SELL_ALL_PATH_FOR_SUB_USD_1_FRACTIONAL_HOLDING,
             OfficialClaimId.FRACTIONAL_HOLDING_PRECISION_FIFTH_OR_SIXTH_DECIMAL_BY_VENUE,
         }
+    )
+
+
+def test_v2_binding_pins_raw_public_source_bodies_and_semantic_locators():
+    binding = accepted_official_rule_binding_v2()
+
+    assert binding is TRUSTED_OFFICIAL_RULE_BINDING_V2
+    assert binding.binding_id == "RH_L41_OFFICIAL_RULES_2026_11_10_V2"
+    assert binding.claims is TRUSTED_OFFICIAL_RULE_BINDING.claims
+    assert tuple(source.source_id for source in binding.sources) == tuple(
+        OfficialSourceId
+    )
+    sources = {source.source_id: source for source in binding.sources}
+    assert len(sources) == 3
+    expected_sources = {
+        OfficialSourceId.TRADING_WITH_YOUR_AGENT: (
+            "a7789ee596168e2605ce4fbca73346f9c75ef882995df187c303d7ae7c17d980",
+            271393,
+            "text/html",
+            None,
+        ),
+        OfficialSourceId.FRACTIONAL_SHARES: (
+            "6735222237350f2001da457b75872647c1d4afbe86911cd1759b55f8dc86a3a3",
+            196743,
+            "text/html",
+            None,
+        ),
+        OfficialSourceId.RHF_RHS_CUSTOMER_AGREEMENT: (
+            "26dae42562b1ef0d50e9afbb33fa6c5f3acdbbd9dc9a814e3a8e88a5f7e2dcf2",
+            498438,
+            "application/pdf",
+            "Revised November 2, 2026",
+        ),
+    }
+    for source_id, expected in expected_sources.items():
+        source = sources[source_id]
+        assert (
+            source.content_sha256,
+            source.content_byte_length,
+            source.content_type,
+            source.source_revision,
+        ) == expected
+        assert source.retrieved_on.isoformat() == "2026-11-10"
+        assert source.acceptance_revision == "ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING"
+        assert source.canonical_url.startswith("https://")
+        assert "?" not in source.canonical_url
+        assert len(source.content_sha256) == 64
+        assert source.claim_locators
+        assert all(
+            isinstance(claim_id, OfficialClaimId)
+            and type(locator) is str
+            and locator
+            and len(locator) <= 256
+            for claim_id, locator in source.claim_locators
+        )
+    agreement_locators = dict(
+        sources[OfficialSourceId.RHF_RHS_CUSTOMER_AGREEMENT].claim_locators
+    )
+    assert (
+        "Section 22"
+        in agreement_locators[
+            OfficialClaimId.FRACTIONAL_HOLDING_PRECISION_FIFTH_OR_SIXTH_DECIMAL_BY_VENUE
+        ]
+    )
+    assert (
+        "PDF printed page label 16"
+        in agreement_locators[
+            OfficialClaimId.ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1
+        ]
+    )
+    assert all(source.content_sha256 is not None for source in binding.sources)
+
+
+def _source_digests_for_claim(
+    claim_id: OfficialClaimId,
+) -> dict[OfficialSourceId, str]:
+    binding = accepted_official_rule_binding_v2()
+    claim = next(claim for claim in binding.claims if claim.claim_id is claim_id)
+    sources = {source.source_id: source for source in binding.sources}
+    return {source_id: sources[source_id].content_sha256 for source_id in claim.sources}
+
+
+def test_v2_review_claim_requires_exact_catalogue_source_digest():
+    claim_id = OfficialClaimId.REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS
+    claim = resolve_trusted_official_claim_v2(
+        claim_id, _source_digests_for_claim(claim_id)
+    )
+
+    assert claim is next(
+        item
+        for item in accepted_official_rule_binding_v2().claims
+        if item.claim_id is claim_id
+    )
+    assert claim.sources == (OfficialSourceId.TRADING_WITH_YOUR_AGENT,)
+    assert "place_equity_order" in claim.statement
+
+
+def test_v2_ordinary_minimum_claim_requires_both_exact_source_digests():
+    claim_id = OfficialClaimId.ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1
+    claim = resolve_trusted_official_claim_v2(
+        claim_id, _source_digests_for_claim(claim_id)
+    )
+
+    assert claim.sources == (
+        OfficialSourceId.FRACTIONAL_SHARES,
+        OfficialSourceId.RHF_RHS_CUSTOMER_AGREEMENT,
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["wrong_digest", "missing_source", "extra_source", "string_source_id"],
+)
+def test_v2_claim_resolution_rejects_unmatched_source_provenance(mutation: str):
+    claim_id = OfficialClaimId.ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1
+    source_digests = _source_digests_for_claim(claim_id)
+    if mutation == "wrong_digest":
+        source_digests[OfficialSourceId.FRACTIONAL_SHARES] = "0" * 64
+    elif mutation == "missing_source":
+        del source_digests[OfficialSourceId.RHF_RHS_CUSTOMER_AGREEMENT]
+    elif mutation == "extra_source":
+        source_digests[OfficialSourceId.TRADING_WITH_YOUR_AGENT] = "0" * 64
+    else:
+        source_digests = {
+            source_id.value: digest  # type: ignore[dict-item]
+            for source_id, digest in source_digests.items()
+        }
+
+    with pytest.raises(ValueError, match="L41R6_OFFICIAL_CLAIM_SOURCE_BINDING_INVALID"):
+        resolve_trusted_official_claim_v2(claim_id, source_digests)  # type: ignore[arg-type]
+
+
+def test_v2_claim_resolution_rejects_unknown_or_caller_supplied_claims():
+    with pytest.raises(ValueError, match="L41R6_OFFICIAL_CLAIM_ID_INVALID"):
+        resolve_trusted_official_claim_v2("UNKNOWN", {})  # type: ignore[arg-type]
+
+    caller_claim = TRUSTED_OFFICIAL_RULE_BINDING.claims[0]
+    with pytest.raises(ValueError, match="L41R6_OFFICIAL_CLAIM_ID_INVALID"):
+        resolve_trusted_official_claim_v2(caller_claim, {})  # type: ignore[arg-type]
+
+
+def test_v2_source_provenance_cannot_change_bound_digest_or_locator():
+    source = accepted_official_rule_binding_v2().sources[0]
+
+    with pytest.raises(ValueError, match="L41R6_TRUSTED_SOURCE_IDENTITY_INVALID"):
+        replace(source, content_sha256="0" * 64)
+    with pytest.raises(ValueError, match="L41R6_TRUSTED_SOURCE_LOCATOR_INVALID"):
+        replace(
+            source, claim_locators=((source.claim_locators[0][0], "caller locator"),)
+        )
+
+
+def test_v2_binding_keeps_legacy_v1_unaccepted_source_snapshot_unchanged():
+    assert all(
+        source.content_sha256 is None
+        and source.retrieved_on.isoformat() == "2026-11-06"
+        for source in TRUSTED_OFFICIAL_RULE_BINDING.sources
     )

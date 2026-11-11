@@ -1,6 +1,95 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L41R5 accepted/integrated source and consumed semantic observation
+## L41R6 source candidate and official-rule classification
+
+`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING` is a source-only, effect-free
+successor. The source candidate is pending terminal mapped CI and independent
+ChatGPT exact-source review; no L41R6 CI or commit identity is claimed here.
+`PROTECTED_EFFECTS=0`: no OAuth, browser, MCP, provider, account, quote, review,
+place, cancel, Q62, L43, or Q63 operation occurred. CI/runtime do not fetch the
+official source URLs. `FINAL_HOLDOUT` remains sealed.
+
+### Authenticated official source snapshots
+
+The source-owned v2 binding records retrieval date `2026-11-10` and acceptance
+revision `ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`. Each digest is SHA-256 of
+the exact anonymous HTTPS response body bytes after HTTP transfer framing,
+retrieved without credentials or cookies, requested with
+`Accept-Encoding: identity`, and received with no `Content-Encoding`
+transformation. HTML is not normalized. Full response
+bodies are not checked into the repository. The two HTML endpoints can vary in
+raw bytes across requests despite unchanged claim text, so these digests pin
+the selected raw retrievals and do not promise that a future live fetch will
+produce the same digest.
+
+| Source ID | Canonical official URL | Type | Bytes / SHA-256 | Revision / source-owned claim IDs and locators |
+|---|---|---|---|---|
+| `TRADING_WITH_YOUR_AGENT` | `https://robinhood.com/us/en/support/articles/trading-with-your-agent/` | `text/html` | 271393 / `a7789ee596168e2605ce4fbca73346f9c75ef882995df187c303d7ae7c17d980` | Retrieved `2026-11-10`; `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS`: Agent tools > Equities tools table > `review_equity_order` and `place_equity_order` rows. |
+| `FRACTIONAL_SHARES` | `https://robinhood.com/us/en/support/articles/fractional-shares/` | `text/html` | 196743 / `6735222237350f2001da457b75872647c1d4afbe86911cd1759b55f8dc86a3a3` | Retrieved `2026-11-10`; `FRACTIONAL_SELL_BY_SHARE_AMOUNT`: Trading fractional shares > Trade in shares > Sell in Shares workflow; `ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1`: Trade in dollars and Trade in shares > $1 ordinary fractional order minimum; `APP_SELL_ALL_PATH_FOR_SUB_USD_1_FRACTIONAL_HOLDING`: Trade in dollars > sub-$1 fractional holding Sell All option. |
+| `RHF_RHS_CUSTOMER_AGREEMENT` | `https://cdn.robinhood.com/assets/robinhood/legal/Robinhood-Customer-Agreement.pdf` | `application/pdf` | 498438 / `26dae42562b1ef0d50e9afbb33fa6c5f3acdbbd9dc9a814e3a8e88a5f7e2dcf2` | Revised November 2, 2026; retrieved `2026-11-10`; `ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1` and `FRACTIONAL_HOLDING_PRECISION_FIFTH_OR_SIXTH_DECIMAL_BY_VENUE`: Section 22, Fractional Shares; Not Held Orders > paragraph 2 (PDF printed page label 16). |
+
+The captured HTML text verifies the separate review simulation/pre-trade-warning
+row and place-equity-order row; the fractional page verifies dollar/share
+amount orders, the $1 ordinary fractional minimum, the below-$1 app Sell All
+exception, and the Sell in Shares flow. `pypdf` extracted the exact PDF body
+and confirmed its November 2, 2026 revision plus Section 22's fifth/sixth
+holding precision and under-$1 purchase/sale language on PDF printed page
+label 16. No source body was retained. The fourth Robinhood Learn source about
+one-millionth-share purchases is excluded because it does not prove MCP SELL
+minimum quantity or increment.
+
+### Claim authority mapping
+
+| Existing official claim ID | Accepted source IDs | Fact authority |
+|---|---|---|
+| `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS` | `TRADING_WITH_YOUR_AGENT` | `REVIEW_PREVIEW_ONLY`, combined with exact consumed L41R5 review/place interface identity. L41R5 lexical booleans do not contribute. |
+| `FRACTIONAL_SELL_BY_SHARE_AMOUNT` | `FRACTIONAL_SHARES` | Context only; does not prove MCP schema quantity semantics, minimum, or increment. |
+| `ORDINARY_FRACTIONAL_TRANSACTION_MINIMUM_USD_1` | `FRACTIONAL_SHARES`, `RHF_RHS_CUSTOMER_AGREEMENT` | `MINIMUM_SELL_NOTIONAL_OR_ABSENCE` only; ordinary $1 minimum does not grant a below-$1 MCP close. |
+| `APP_SELL_ALL_PATH_FOR_SUB_USD_1_FRACTIONAL_HOLDING` | `FRACTIONAL_SHARES` | Context only; app Sell All is not MCP closure evidence. |
+| `FRACTIONAL_HOLDING_PRECISION_FIFTH_OR_SIXTH_DECIMAL_BY_VENUE` | `RHF_RHS_CUSTOMER_AGREEMENT` | Context only; holding precision does not prove an MCP increment or residual-close guarantee. |
+
+The consumed L41R5 interface validator is the sole source for
+`SELL_QUANTITY_FIELD` and `DECIMAL_INTERFACE_PRECISION`. Its exact optional,
+non-nullable string fields and precision inventory `[6]` are interface facts;
+the precision value does not imply provider fill or residual precision. The
+immutable R5 record retains `trusted_binding=false` and
+`provider_numeric_rules_derived=false`; this v2 source binding does not rewrite
+those predecessor fields.
+
+### Deterministic 13-fact result
+
+| Fact ID, in source order | Classification | Source / exact limit |
+|---|---|---|
+| `INTENDED_AGENTIC_ACCOUNT` | `PROVEN` | Consumed L41 account evidence. |
+| `SPY_TRADABILITY` | `PROVEN` | Consumed L41 tradability evidence. |
+| `FRACTIONAL_ELIGIBILITY` | `PROVEN` | Consumed L41 fractional eligibility. |
+| `SELL_QUANTITY_FIELD` | `PROVEN` | Both exact L41R5 order interfaces expose an optional, non-nullable `string` quantity field. |
+| `DECIMAL_INTERFACE_PRECISION` | `PROVEN` | L41R5 precision inventory `[6]`; interface only. |
+| `QUANTITY_INCREMENT` | `BLOCKING_L42` | No accepted MCP increment source. |
+| `MINIMUM_QUANTITY` | `BLOCKING_L42` | No accepted MCP minimum quantity source. |
+| `MAXIMUM_QUANTITY_OR_ABSENCE` | `BLOCKING_L42` | Documentation silence proves neither maximum nor its absence. |
+| `MINIMUM_SELL_NOTIONAL_OR_ABSENCE` | `PROVEN` | Official ordinary $1 fractional minimum, supported by both help page and agreement. |
+| `BELOW_MINIMUM_FULL_CLOSE` | `BLOCKING_L42` | The app Sell All exception does not prove an MCP close. |
+| `RESIDUAL_FULL_OWNED_CLOSE` | `BLOCKING_L42` | Share amount and holding precision do not prove exact MCP residual close. |
+| `REVIEW_PREVIEW_ONLY` | `PROVEN` | Official review/place catalogue entries plus exact L41R5 tool identity. |
+| `INSTANCE_REVIEW_REQUIRES_POSITION` | `DEFER_TO_FIRST_OWNED_POSITION` | Existing position-specific review deferral is unchanged. |
+
+Totals are 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER, overall `BLOCKED`. The five
+pre-Q62 blockers are quantity increment, minimum quantity, maximum quantity or
+its absence, below-minimum full close, and residual full-owned close. Q62
+remains NOT RUN and blocked; L43 and Q63 remain NOT RUN. No live, broker, order,
+or readiness authority is granted.
+
+`classify_l41r6_composite` was evaluated offline against the immutable 4114-byte
+L41 artifact ([identity](#consumed-l41-evidence-record)) and 11128-byte L41R5
+artifact ([identity](#consumed-l41r5-observation)); no provider interface was
+accessed. Combined affected verification passed 96 tests, including the 43
+official-binding tests, 73 R5 predecessor tests, and 9 ownership tests; these
+test groups overlap within the combined run. Targeted Ruff check/format and
+`git diff --check` passed. This does not claim canonical certification or
+independent exact-source acceptance.
+
+## L41R5 accepted/integrated predecessor source and consumed semantic observation
 
 L41R5 final source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED
 at `13a97b1f4c369243737cc0ac6646b5520327651a` / tree
@@ -38,9 +127,9 @@ The one real observation is permanently CONSUMED / BLOCKED / NO RETRY:
 
 The immutable L41R4 baseline digests all matched. All three schemas classify
 `additionalProperties` as `BOOLEAN_FALSE`. Review/place `quantity` and
-`dollar_amount` are optional direct strings, and both order tools carry one
-fractional-precision value, 6. Therefore the L41R4 schema-shape ambiguity is
-closed.
+`dollar_amount` fields are present, optional (not required), non-nullable
+direct JSON Schema `string`s. Both order tools carry one fractional-precision
+value, 6. Therefore the L41R4 schema-shape ambiguity is closed.
 
 The action classifier remains blocked for a different reason. The top-level
 place description is `CONFLICTING` (placing + nonplacing); the top-level review
@@ -53,20 +142,13 @@ mutates or that its place tool is nonmutating.
 
 No retry or prose-regex successor is authorized.
 
-### Next source boundary
+### Predecessor handoff
 
-The repository already contains a conservative source-owned
-`official_rule_binding.py` with bounded Robinhood source/claim inventories.
-Its provenance intentionally lacks accepted content hashes, and the current
-capability classifier deliberately leaves submitted official rule claims
-blocking. The next checkpoint is
-`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING`: authenticate only those supported
-official claims, bind the exact consumed L41R5 interface evidence, and run a
-pure deterministic 13-fact classification to expose the exact remaining Q62
-blockers.
-
-No provider/OAuth/MCP call is part of L41R6 implementation. L41R5 must never be
-replayed. Q62, L43, and Q63 remain NOT RUN and FINAL_HOLDOUT remains sealed.
+The accepted L41R5 closeout handed off to the source-only L41R6 candidate
+recorded above. Its artifact remains permanently consumed and must never be
+replayed. The current fact classification and its remaining blockers are
+recorded above; no OAuth/MCP/provider call was made in L41R6. Q62, L43, and
+Q63 remain NOT RUN and `FINAL_HOLDOUT` remains sealed.
 
 ## F856 accepted correction and integration closeout
 
@@ -269,12 +351,13 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L41R2 | consumed L41R1 observation | additive interactive schema-discovery successor | metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED at `235118f70b7c7039055e9fea45ccf27df46671a0` / `972004101036afe52642ed93c38fed21ea479956`; real observation CONSUMED / BLOCKED / NO RETRY as `L41R2_SCHEMA_MALFORMED` |
 | L41R3 | consumed L41R2 observation | additive MCP-v2 schema-discovery successor | normalized metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED / INTEGRATED at `4461ea7f09c396c3c49598debbc588754fa5096c` / `68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`; feature `42778436739` and develop `42780649228` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R3_SCHEMA_AMBIGUOUS` |
 | L41R4 | consumed L41R3 observation | additive schema-classification diagnostic successor | bounded sanitized structural diagnosis; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT` |
-| L41R5 | consumed L41R4 observation | additive schema semantic-recovery successor | fixed L41R4 interface baseline; sanitized additionalProperties classification; separated tool/nested description and numeric provenance; metadata-only `tools/list`; no MCP tool invocation | Source implementation present in this checkpoint based on `a97b0abefca085e817ae04cf563e75e138232b40`; exact-source review/canonical certification/integration pending; real observation NOT RUN |
+| L41R5 | consumed L41R4 observation | additive schema semantic-recovery successor | fixed L41R4 interface baseline; sanitized additionalProperties classification; separated tool/nested description and numeric provenance; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `13a97b1f4c369243737cc0ac6646b5520327651a` / `81e58dd75656593ca0f960ecdcdf21c14d00d969`; feature `42905997160` and develop reuse `42926313979` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT` |
+| L41R6 | consumed L41R5 observation | digest-backed official-rule binding and pure 13-fact classification | source-only; anonymous public source preparation; no OAuth/MCP/provider observation | Local focused official-binding tests 43 passed; 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER; overall BLOCKED; mapped CI and independent exact-source review pending; `PROTECTED_EFFECTS=0` |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked pending trusted schema/rule evidence and separate readiness review; live readiness not granted |
+| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked by five remaining L41 facts and separate readiness review; live readiness not granted |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
@@ -283,11 +366,11 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
-| Entry and exact owned exit | BLOCKED | L41 proved account identity, SPY tradability and fractional tradability for one observation; official/interface quantity, minimum, notional and residual-close rules remain unresolved; L41R5 source recovery is not real schema evidence or a trusted numeric-rule binding |
+| Entry and exact owned exit | BLOCKED | L41 proves account identity, SPY tradability and fractional eligibility; consumed L41R5 proves quantity interface and six-decimal interface precision; L41R6 proves review-preview semantics and the ordinary $1 minimum notional. Quantity increment, minimum quantity, maximum/absence, below-minimum full close and exact residual close still block |
 | Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
 | Stop/kill/restart/reconnect | SYNTHETIC NATIVE PASS / REAL DISARMED SOURCE-TESTED | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and a clean close; real/disarmed recovery remains source-tested |
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
-| Exact source certified | L42/I53 baseline and L41R4 observer add-on ACCEPTED / INTEGRATED; L41R5 implementation pending | Last accepted/integrated observer HEAD `c343ad83fc86ad1635374b177b27ab52a2da1dde` / tree `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` succeeded with exact feature-certification reuse; L41R5 source review/certification/integration remain pending |
+| Exact source certified | L42/I53 baseline and L41R4/R5 observer additions ACCEPTED / INTEGRATED; L41R6 source candidate pending | L41R5 at `13a97b1f4c369243737cc0ac6646b5520327651a` / tree `81e58dd75656593ca0f960ecdcdf21c14d00d969`; feature `42905997160` and develop `42926313979` succeeded; L41R6 has no accepted/integrated identity or CI recorded yet |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 ### L41R1 consumed record and L41R2 successor

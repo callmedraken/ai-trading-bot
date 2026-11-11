@@ -1,67 +1,65 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING
+## Current milestone - ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT
 
-L41R5 source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`13a97b1f4c369243737cc0ac6646b5520327651a` / tree
-`81e58dd75656593ca0f960ecdcdf21c14d00d969`. Feature run
-`42905997160`, attempt 1, is terminal SUCCESS across source-static,
+L41R6 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`17faef900919cf400ce77877b328418e40787842` / tree
+`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. Feature run
+`42941127629`, attempt 1, is terminal SUCCESS across source-static,
 active-tests, canonical FULL broad-1 through broad-7, and source-gates. Develop
-run `42926313979`, attempt 1, is terminal SUCCESS with
+run `42947447216`, attempt 1, is terminal SUCCESS with
 `DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
 `IDENTITY_STABLE=True`, and no duplicate FULL.
 
-The one real L41R5 observation is permanently CONSUMED / BLOCKED / NO RETRY.
-Evidence: `F:\\AI\\temp\\arch147-l41r5-schema-observation-6fcfcdf0cfd641fc95c7b5855292e8b4\\evidence.json`, 11128 bytes, SHA-256
-`FC95EB9FBDD2B7DBE064B7CAC84E8851996669AF96BE1273AE46309873A650FF`. Reason: `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`.
-The attempt consumed one OAuth scope entry, one MCP session open, zero browser
-launches, and one `tools/list`; every MCP tool/account/tradability/position/
-order/portfolio/quote/review/place/cancel/other-tool invocation count is zero.
-Native credential read/write counts remain `null` / `null` with
-`SDK_MANAGED_NOT_INDIVIDUALLY_COUNTED`. Automatic retry is FORBIDDEN.
+Independent exact-source review accepted the L41R6 consumed-evidence validators,
+digest-backed official-source binding, pure composite, ownership registration,
+and preserved L41/L41R1-R5 executable blobs. Current official Robinhood material
+independently corroborates the two public claims L41R6 actually promotes:
+review is simulation/pre-trade warning rather than placement, and ordinary
+fractional purchases/sales have a $1 value minimum. The selected source bodies
+remain pinned historically by the repository's exact byte lengths/digests and
+bounded claim locators; runtime/CI never fetch them.
 
-The diagnostic successfully closes the L41R4 schema-shape ambiguity. All three
-interfaces exactly match the immutable L41R4 interface digests and all three
-schemas report `additionalProperties=BOOLEAN_FALSE`. Both order tools expose
-present, optional, non-nullable `quantity` and `dollar_amount` fields with
-direct and logical type `string`; the captured fractional precision inventory
-is `[6]` without a precision-provenance conflict. See the [validation
-ledger](validation/arch147-live-prototype.md) for exact R5 and R6 provenance.
-
-The top-level L41R5 descriptions retain conflicting action indicators, and the
-tradability tool receives a coarse placing classification. Those lexical
-booleans are not authority for review/place behavior. L41R5 must never be
-replayed.
-
-The L41R6 implementation adds digest-backed v2 source provenance for the three
-existing official sources. Only the review-preview claim from the official
-tool catalogue and the ordinary $1 fractional transaction minimum supported
-by both the help page and customer agreement map to rule facts.
-`SELL_QUANTITY_FIELD` is proven by the consumed L41R5 interfaces; `[6]` proves
-interface precision only. The documented Sell in Shares flow, app Sell All
-path, and venue holding precision remain context and do not prove MCP quantity
-increments, below-$1 closure, or residual closure. The L41R6 source candidate
-is pending terminal mapped CI, independent exact-source review, and
-integration; no new provider observation was performed.
-
-The deterministic 13-fact result is 7 PROVEN, 5 BLOCKING_L42, and 1
-DEFER_TO_FIRST_OWNED_POSITION, with overall status BLOCKED. The five blockers
+The accepted offline composite result is intentionally BLOCKED:
+7 PROVEN / 5 BLOCKING_L42 / 1 DEFER_TO_FIRST_OWNED_POSITION. The five blockers
 are `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
 `MAXIMUM_QUANTITY_OR_ABSENCE`, `BELOW_MINIMUM_FULL_CLOSE`, and
-`RESIDUAL_FULL_OWNED_CLOSE`. `trusted_binding=false` and
-`provider_numeric_rules_derived=false` remain the immutable values in the
-consumed L41R5 record; the L41R6 source-owned binding does not rewrite that
-artifact. Q62 remains NOT RUN and blocked; L43 and Q63 remain NOT RUN.
-`FINAL_HOLDOUT` stays sealed. No live-readiness, broker, order, paper-soak, or
-`FINAL_HOLDOUT` authority is granted.
+`RESIDUAL_FULL_OWNED_CLOSE`. These are genuine gaps in globally proven MCP
+rules, not L41R6 implementation defects.
+
+This crosses the current product's pivot threshold. No L41R7 static
+schema/prose/rule-evidence successor is authorized. Do not weaken or rewrite the
+five L41R6 classifications. Instead, the next prospective Architecture-147
+contract is `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`, which makes those
+global guarantees unnecessary for the single explicitly armed <=$10 prototype
+trial through exact proposal review, factual reconciliation, local exposure
+limits, and a manual-close escalation path.
+
+The pivot is additive. Historical L40/L41 capability semantics, consumed
+evidence, `CapabilityReport`, and the existing `evaluate_q62_readiness`
+remain unchanged for reconstruction. The successor must introduce a
+prototype-specific capability/admission adapter rather than relabeling
+BLOCKING_L42 facts as PROVEN.
+
+Q62 remains NOT RUN. L43 and Q63 remain NOT RUN. FINAL_HOLDOUT stays sealed.
+No broker/order/live effect follows from the pivot design.
 
 ## Immediate next step
 
-After the mapped feature CI reaches a terminal result, ChatGPT independently
-reviews the exact published L41R6 source and its 13-fact classification. Stop
-on any source mismatch or unexpected effect. Q62 requires a separate review
-after all five blockers are resolved; it is not authorized by this source
-checkpoint.
+Implement the source-only
+`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT` adapter and prototype-readiness
+evaluator. It must consume the exact accepted L41R6 result without modifying
+that result, admit only the exact known five-blocker set for the one <=$10
+prototype under the frozen mitigations in
+[147-q62-tiny-live-prerequisite-pivot.md](architecture/147-q62-tiny-live-prerequisite-pivot.md),
+and keep all provider/broker effects disabled.
+
+The new source checkpoint must leave historical `evaluate_q62_readiness`
+unchanged, add a separate prototype-specific evaluator/admission type, and
+remain BLOCKED on any extra/missing capability fact, account/source/config
+mismatch, stale evidence, non-flat baseline, unresolved order/effect, or absent
+manual-close escalation capability. No Q62 protected observation, order review,
+placement, L43, Q63, or FINAL_HOLDOUT access is part of implementation.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

@@ -1,73 +1,76 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING
+## Current milestone: ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT
 
 Canonical feature worktree:
 `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
 `feature/robinhood-live-prototype-current`.
 
-L41R5 source is independently accepted and integrated at
-`13a97b1f4c369243737cc0ac6646b5520327651a` / tree
-`81e58dd75656593ca0f960ecdcdf21c14d00d969`. Feature run
-`42905997160`, attempt 1, is terminal SUCCESS across source-static,
+L41R6 is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
+INTEGRATED at `17faef900919cf400ce77877b328418e40787842` / tree
+`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. Feature run
+`42941127629`, attempt 1, is terminal SUCCESS across source-static,
 active-tests, all seven canonical FULL lanes, and source-gates. Develop run
-`42926313979`, attempt 1, is terminal SUCCESS with exact feature-certification
+`42947447216`, attempt 1, is terminal SUCCESS with exact feature-certification
 reuse, stable identity, and no duplicate FULL.
 
-The real `L41R5_SCHEMA_SEMANTIC_RECOVERY` observation is permanently
-CONSUMED / BLOCKED / NO RETRY:
-`F:\\AI\\temp\\arch147-l41r5-schema-observation-6fcfcdf0cfd641fc95c7b5855292e8b4\\evidence.json`, 11128 bytes, SHA-256
-`FC95EB9FBDD2B7DBE064B7CAC84E8851996669AF96BE1273AE46309873A650FF`. It returned
-`L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT`. Source authority was PASS for
-both feature and prospective develop. Attempt accounting is exact: OAuth scope
-entry 1, MCP session open 1, browser launch 0, `tools/list=1`; every MCP tool,
-account, tradability, position, order, portfolio, quote, review, place, cancel,
-and other-tool invocation count is 0. Native credential counts are null/null,
-SDK managed; automatic retry is FORBIDDEN.
+L41R6 validates the exact immutable 4114-byte L41 artifact and the exact
+11128-byte L41R5 artifact, excludes L41R5's rejected lexical action classifier,
+and binds only source-owned authenticated official claims. Its deterministic
+result is:
 
-L41R5 proves that the live interfaces are unchanged from L41R4:
-`review_equity_order=5976f7dcf8936e0bb69f0ea2212be6d883654ccb56f4aa4b904c9951160a4069`,
-`place_equity_order=46176dd0342955481cfcfee9f2bc56d92b195110d2bb0168bb0a68a431dacf4a`,
-and
-`get_equity_tradability=7d72877df8976be629e9a508f73ef370cfdd7f62d49938456cd0d624a334f8cf`.
-All three report `additionalProperties=BOOLEAN_FALSE`. Review/place
-`quantity` and `dollar_amount` are present, optional, non-nullable direct
-`string` fields; the captured fractional-precision inventory is `[6]`.
+- PROVEN: intended Agentic account, SPY tradability, fractional eligibility,
+  sell quantity field, six-decimal advertised interface bound, ordinary $1
+  fractional sell minimum, and review-preview-only semantics;
+- BLOCKING_L42: quantity increment, minimum quantity, maximum quantity or its
+  absence, below-minimum full close, and residual full-owned close;
+- DEFER_TO_FIRST_OWNED_POSITION: instance-specific sell review.
 
-The failure is now localized to action prose. Top-level and nested description
-provenance are separated correctly, but both order tools' top-level descriptions
-still produce both placing and nonplacing booleans. Review separately reports
-simulation/pre-trade/warning semantics. The tradability tool also receives a
-coarse placing classification. These facts show that whole-description lexical
-matching is too broad; they do not show that Robinhood's review tool actually
-places orders or that its placement tool is nonmutating.
+That BLOCKED result is accepted truth, not an implementation failure. The five
+remaining facts cannot be promoted by documentation silence, the app Sell All
+path, holding precision, or another prose/schema classifier.
 
-L41R6 is a source-only, effect-free successor. Its digest-backed v2 binding
-uses the official agent-tool catalogue, fractional-shares help page, and
-customer agreement. Only the official review-preview claim and the ordinary
-$1 transaction minimum are used as official rule authority. The minimum binds
-both the help page and agreement. `SELL_QUANTITY_FIELD` and interface precision
-come only from the consumed L41R5 interface evidence; six decimal places are
-not a fill or residual-close guarantee. Sell in Shares, app Sell All, and
-venue holding precision remain context-only claims. The five source claim IDs
-and exact source hashes/locators are recorded in the architecture contract and
-validation ledger.
+The project therefore takes the documented pivot threshold now. There is no
+L41R7. The next milestone is the additive
+`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`. It preserves every L40/L41/L41R1-
+R6 historical and consumed contract and introduces a new prototype-specific
+admission layer for the single <=$10 explicitly armed live trial.
 
-The deterministic result is 7 PROVEN, 5 BLOCKING_L42, and 1
-DEFER_TO_FIRST_OWNED_POSITION; overall status is BLOCKED. Remaining blockers
-are quantity increment, minimum quantity, maximum quantity or its absence,
-below-minimum full close, and residual full owned close. Exact source
-provenance, claim mapping, consumed-evidence details, and the 13-fact result
-are in the [validation ledger](validation/arch147-live-prototype.md).
+The prospective prototype may proceed without proving those five global broker
+rules only if all of these mitigations are executable and fail closed:
 
-L41R5 remains permanently consumed; its `trusted_binding=false` and
-`provider_numeric_rules_derived=false` values are unchanged. L41R6 performs no
-OAuth, browser, MCP, provider, account, quote, review, place, or cancel call;
-`PROTECTED_EFFECTS=0`. Q62 remains NOT RUN and blocked, L43 and Q63 remain NOT
-RUN, and `FINAL_HOLDOUT` remains sealed. The L41R6 source candidate is pending
-terminal mapped CI and independent ChatGPT exact-source review. Next: review the
-exact published L41R6 source and classification after that mapped run reaches a
-terminal result; do not run the canonical FULL profile locally.
+1. exactly one SPY cash-long entry intent, BASE_MA35_50_V1, regular-hours market
+   operation, <=$10 requested acquisition, no replenishing budget and no second
+   entry;
+2. existing fresh Q62 source/config/account/session/signal/ownership/recovery
+   proofs remain required, including flat baseline and no unresolved order or
+   MAY_HAVE_OCCURRED effect before entry;
+3. entry remains dollar-based; no quantity rule is inferred for entry;
+4. after a confirmed entry fill, exact owned quantity and broker-sellable
+   quantity are factually reconciled before any automated exit;
+5. before an automated sell, Robinhood's nonplacing review must evaluate the
+   exact full-owned quantity with the same side/symbol/order type/session/time-
+   in-force arguments intended for placement;
+6. review rejection, malformed/unknown review, placement rejection, cancellation,
+   partial fill, residual, or any UNKNOWN outcome never creates an automatic
+   replacement order;
+7. any unsupported exact close transitions the prototype to
+   MANUAL_CLOSE_REQUIRED / trading disabled; the user may resolve the tiny
+   residual manually in Robinhood, after which read-only reconciliation is
+   required before any later live work;
+8. the documented app Sell All path is a manual fallback/context fact, not MCP
+   automated-close authority;
+9. a provider/global maximum need not be proven because the local <=$10 cap plus
+   exact proposal review bounds the one prototype proposal; provider rejection
+   is a safe blocked outcome;
+10. the pivot grants prototype qualification only. Repeated unattended
+    production trading must revisit automatic residual/recovery capability in P7.
+
+The historical `CapabilityReport` and `evaluate_q62_readiness` must not be
+relaxed. A new adapter/evaluator owns this prospective prototype policy.
+
+Q62 itself remains NOT RUN until that source checkpoint is accepted/integrated.
+L43 and Q63 remain NOT RUN. FINAL_HOLDOUT is sealed.
 
 ## L41R1 consumed observation and L41R2 source successor
 

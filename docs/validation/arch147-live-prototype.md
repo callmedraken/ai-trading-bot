@@ -1,76 +1,57 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L41R6 accepted/integrated and pivot decision
+## Tiny-live pivot source accepted/integrated
 
-`ARCH147_L41R6_OFFICIAL_RULE_TRUST_BINDING` is SOURCE/CERTIFICATION ACCEPTED
-and FAST-FORWARD INTEGRATED at
-`17faef900919cf400ce77877b328418e40787842` / tree
-`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`.
+`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is SOURCE/CERTIFICATION
+ACCEPTED and FAST-FORWARD INTEGRATED at
+`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
+`369c1e14f201541864c61cb66d718e8efd163940`.
 
-Feature run `42941127629`, attempt 1, is terminal SUCCESS. Source-static,
-active-tests, source-gates, and canonical FULL broad-1 through broad-7 all
-passed. The distributed FULL totals were 17003 cases: 16994 passed, 9 skipped,
-0 failed, 0 errors; every lane remained below 300 seconds. Develop run
-`42947447216`, attempt 1, is terminal SUCCESS with
+Feature run `42974104493`, attempt 1, is terminal SUCCESS. Source-static,
+active-tests, source-gates and distributed FULL broad-1 through broad-7 passed.
+The seven lanes executed 17,088 cases: 17,079 passed, 9 skipped, 0 failed,
+0 errors; the slowest lane was 232.91 seconds. Both fallback jobs were skipped.
+Develop run `42975743902`, attempt 1, is terminal SUCCESS with
 `DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
-and `IDENTITY_STABLE=True`; active-tests, canonical FULL and fallback/shared
-certification were skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
+`IDENTITY_STABLE=True`; active-tests and canonical/fallback FULL were skipped,
+so `DEVELOP_DUPLICATE_FULL=NO`.
 
-Independent review confirmed:
+Independent exact-source review confirmed:
 
-- the commit is one direct child of the prior develop closeout and changes only
-  the reported 12 paths;
-- L41 and L41R1-R5 executable observation blobs are unchanged;
-- the two new L41R6 test modules occur exactly once in
-  `ARCH147_PROTOTYPE_TESTS`;
-- the public composite accepts only the two preserved byte artifacts;
-- the L41R5 parser validates exact byte length and SHA-256 before JSON decode,
-  exact source/authority identities, effect counters, no-retry/trust flags,
-  immutable interface digests, BOOLEAN_FALSE additionalProperties, order-field
-  semantics and precision;
-- rejected L41R5 lexical action fields are validated only for shape and are not
-  returned as authority;
-- official v2 claims resolve only through exact source IDs/digests, and runtime/
-  CI perform no official-source fetch;
-- only review-preview semantics and the ordinary $1 minimum are promoted from
-  official sources; the other official claims remain context-only;
-- current official Robinhood material independently corroborates those two
-  promoted claims.
+- the feature commit is one direct child of the prior integrated design
+  checkpoint and changes only the reported 13 paths;
+- historical Q62 and L41/L41R1-R6 executable blobs are unchanged;
+- all three new tests are registered exactly once in ARCH147 prototype
+  prepublication ownership and FULL;
+- the new source has no provider/network/OAuth/MCP dispatch or FINAL_HOLDOUT
+  import;
+- capability admission reconstructs the exact L41R6 composite from both consumed
+  byte artifacts and requires the exact 13-fact order/classification/rationale/
+  evidence matrix, account identity, official V2 bindings and interface
+  provenance;
+- the historical BLOCKED CapabilityReport is not rewritten;
+- the prototype evaluator requires historical Q62 to be BLOCKED with exactly
+  `CAPABILITY_UNPROVEN` and independently binds one fresh capability proof to
+  the prototype admission digest;
+- `READY_FOR_L43_PROTOTYPE_READ_ONLY` has zero provider mutations and grants
+  neither live readiness nor trade authority;
+- exact-owned sell review requires terminal/reconciled ownership, exact full
+  quantity, identical review/placement arguments and <=6 effective decimal
+  places; validation itself grants no placement authority;
+- review rejection/malformed/warning/unknown and sell rejection/cancellation/
+  partial/unknown outcomes fail closed into sticky manual-close semantics with
+  no automatic replacement sell.
 
-The accepted deterministic classification remains:
-7 PROVEN / 5 BLOCKING_L42 / 1 DEFER_TO_FIRST_OWNED_POSITION, overall BLOCKED.
-The five blockers are `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
-`MAXIMUM_QUANTITY_OR_ABSENCE`, `BELOW_MINIMUM_FULL_CLOSE`, and
-`RESIDUAL_FULL_OWNED_CLOSE`.
+Policy SHA-256 is
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+The accepted offline exact-artifact admission SHA-256 is
+`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-### Pivot classification
-
-This is classified `L41R6_STATIC_EVIDENCE_PATH_EXHAUSTED`, not a source
-defect. Another L41R7 schema/prose/public-rule evidence successor is forbidden.
-The next milestone is
-`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`.
-
-The pivot does not mutate the five L41R6 blocker classifications. The current
-source candidate defines a distinct prototype policy for one <=$10 explicitly
-armed trial, using local one-entry exposure limits, exact account/source/config/
-session binding, flat pre-entry reconciliation, exact post-fill ownership,
-nonplacing review of an exact full-owned sell proposal, no automatic
-replacement after rejection/partial/unknown outcomes, and
-`MANUAL_CLOSE_REQUIRED` escalation for an unsupported or residual close.
-
-Historical `CapabilityReport`, `classify_capabilities`,
-`evaluate_q62_readiness`, consumed evidence, and old authority checks remain
-unchanged. The prototype source candidate is additive and is pending
-independent exact-source acceptance and mapped certification.
-
-The candidate's source-owned policy ID is
-`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1`; its policy and proof material are
-specified in the linked pivot contract. The historical Q62 report must remain
-BLOCKED with exactly `CAPABILITY_UNPROVEN`; the prototype evaluator requires a
-fresh `ProofKind.CAPABILITY` proof bound to the admission digest and returns
-only `READY_FOR_L43_PROTOTYPE_READ_ONLY` when all other historical gates pass.
-Q62 observation remains NOT RUN. L43 and Q63 remain NOT RUN.
-FINAL_HOLDOUT remains sealed. PROTECTED_EFFECTS=0 for the source candidate.
+Q62 protected observation remains NOT RUN. The remaining source gap is a
+source-owned Q62 evidence collector/runner; the pure evaluator alone does not
+authenticate caller-supplied FreshProof references. Next checkpoint:
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`. L43 and Q63 remain NOT RUN,
+and FINAL_HOLDOUT remains sealed.
 
 ## L41R5 accepted/integrated predecessor source and consumed semantic observation
 

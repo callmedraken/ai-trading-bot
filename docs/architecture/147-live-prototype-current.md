@@ -1,42 +1,32 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L41R6 accepted; Q62 prototype source candidate
+## Current boundary - tiny-live pivot accepted; Q62 observer source next
 
-L41R6 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`17faef900919cf400ce77877b328418e40787842` / tree
-`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. Feature run
-`42941127629`, attempt 1, is terminal SUCCESS across source-static,
-active-tests, canonical FULL broad-1 through broad-7, and source-gates. Develop
-run `42947447216`, attempt 1, is terminal SUCCESS with exact feature
-certification reuse and no duplicate FULL.
+`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
+`369c1e14f201541864c61cb66d718e8efd163940`.
 
-The accepted L41R6 result remains BLOCKED with seven proven facts, five global
-broker-rule blockers, and the existing position-specific review deferral. Its
-exact consumed artifact roots and 13-fact classification are retained in the
-[validation ledger](../validation/arch147-live-prototype.md). No L41R7
-evidence/debugging successor is authorized.
+Feature run `42974104493`, attempt 1, passed source-static, active-tests,
+source-gates and all seven canonical FULL lanes. Develop run `42975743902`,
+attempt 1, passed with exact feature-certification reuse, stable identity and no
+duplicate FULL.
 
-This result triggers the current product pivot threshold: the project has
-repeatedly demonstrated that the remaining boundary is not a schema parser,
-description parser, source-digest, or public-documentation bug. Building
-increasingly elaborate static proof around the same absent global MCP rules
-would repeat the retired recovery-loop pattern.
+The accepted source leaves the historical L41R6 BLOCKED result intact and adds
+only the prototype-specific admission/readiness policy described in
+[147-q62-tiny-live-prerequisite-pivot.md](147-q62-tiny-live-prerequisite-pivot.md).
+No provider, credential, OAuth, MCP, order, Q62, L43, Q63 or FINAL_HOLDOUT
+effect occurred in implementation/certification.
 
-The additive
-[Q62 tiny-live prerequisite pivot](147-q62-tiny-live-prerequisite-pivot.md)
-now has a source candidate: exact L41R6 capability admission, fixed
-`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1` policy, prototype Q62 composition, and
-typed future exact-owned sell/review and manual-close contracts. It does not
-change L40/L41 historical semantics or the five L41R6 blockers. The source
-candidate is pending mapped certification, followed by independent exact-source
-review.
+The pure Q62 prerequisite model is now complete. The next source checkpoint is
+a bounded protected-readiness evidence collector/runner that authenticates the
+existing FreshProof inventory from exact local/source state plus bounded
+read-only Robinhood/Alpaca observations, then supplies that bundle to
+`evaluate_q62_tiny_live_readiness`.
 
-The prototype evaluator accepts only the historical sole
-`CAPABILITY_UNPROVEN` blocker paired with a fresh capability proof bound to the
-prototype admission digest. Its ready result is only
-`READY_FOR_L43_PROTOTYPE_READ_ONLY`; it grants no live readiness, trade
-authority, or provider mutation. Q62 observation, L43, and Q63 remain NOT RUN.
-No order or protected effect is authorized by this source candidate.
+No order review, placement or cancellation belongs to Q62. Only after that
+observer source is separately accepted/integrated may one real protected
+read-only Q62 observation run.
 
 ## D34 accepted boundary - historical transition to L40
 

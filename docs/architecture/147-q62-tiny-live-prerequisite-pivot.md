@@ -287,22 +287,30 @@ bounded recovery authority, or a different position-sizing/execution model.
 The tiny-live pivot must not be cited as proof of generic fractional execution
 limits.
 
-## Current source candidate and next boundary
+## Current source and next boundary
 
-The additive candidate is in `tiny_live_capability_admission.py`,
-`tiny_live_policy.py`, and `tiny_live_readiness_operator.py`. It defines the
-admission digest, one-entry policy, future exact-owned sell/review semantics,
-manual-close state, and prototype Q62 composition without changing historical
-L41 or Q62 behavior. No provider, credential, browser, MCP, broker, order,
-review, Q62-observation, L43, Q63, or FINAL_HOLDOUT path is added. For this
-source candidate, `PROTECTED_EFFECTS=0`.
+The additive tiny-live source is SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at
+`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
+`369c1e14f201541864c61cb66d718e8efd163940`. Feature mapped FULL
+`42974104493`, attempt 1, and develop reuse `42975743902`, attempt 1, are
+terminal SUCCESS. No protected effect occurred.
 
-The candidate remains pending focused verification and mapped certification;
-independent exact-source review follows terminal green CI. The next protected boundary is a separately
-reviewed Q62 readiness observation after those gates; the source readiness
-label does not authorize entry or placement.
+The accepted implementation is in `tiny_live_capability_admission.py`,
+`tiny_live_policy.py`, and `tiny_live_readiness_operator.py`. Historical L41
+and Q62 behavior remains unchanged. The fixed policy digest is
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+The accepted exact-artifact admission digest is
+`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-No OAuth, browser, MCP session, tools/list, account read, order review, place,
-cancel, Q62 real observation, L43, Q63, or FINAL_HOLDOUT access is authorized by
-this source candidate. Mapped CI and independent exact-source review precede
-any Q62 protected readiness observation.
+The next boundary is `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`.
+It must authenticate and assemble the already-defined Q62 proofs through a
+source-owned independent runner. Implementation and tests remain effect-free.
+A later real Q62 observation may perform only reviewed bounded read-only
+Robinhood/Alpaca operations; it has no review/place/cancel route.
+
+After observer-source acceptance/integration, execute one fresh Q62 protected
+read-only observation. A result other than
+`READY_FOR_L43_PROTOTYPE_READ_ONLY` blocks L43 and is preserved; no automatic
+retry is authorized.
+

@@ -1,68 +1,65 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT
+## Current milestone - ARCH147_Q62_READINESS_OBSERVER_SOURCE
 
-L41R6 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`17faef900919cf400ce77877b328418e40787842` / tree
-`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. Feature run
-`42941127629`, attempt 1, is terminal SUCCESS across source-static,
-active-tests, canonical FULL broad-1 through broad-7, and source-gates. Develop
-run `42947447216`, attempt 1, is terminal SUCCESS with
-`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
-`IDENTITY_STABLE=True`, and no duplicate FULL.
+`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is SOURCE/CERTIFICATION
+ACCEPTED and FAST-FORWARD INTEGRATED at
+`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
+`369c1e14f201541864c61cb66d718e8efd163940`.
 
-Independent exact-source review accepted the L41R6 consumed-evidence validators,
-digest-backed official-source binding, pure composite, ownership registration,
-and preserved L41/L41R1-R5 executable blobs. Current official Robinhood material
-independently corroborates the two public claims L41R6 actually promotes:
-review is simulation/pre-trade warning rather than placement, and ordinary
-fractional purchases/sales have a $1 value minimum. The selected source bodies
-remain pinned historically by the repository's exact byte lengths/digests and
-bounded claim locators; runtime/CI never fetch them.
+Feature run `42974104493`, attempt 1, is terminal SUCCESS across source-static,
+active-tests, source-gates, and canonical FULL broad-1 through broad-7. FULL
+executed 17,088 cases: 17,079 passed, 9 skipped, 0 failed, 0 errors; the slowest
+lane was 232.91 seconds. Develop run `42975743902`, attempt 1, is terminal
+SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
+`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, and no duplicate
+FULL.
 
-The accepted offline composite result is intentionally BLOCKED. Its immutable
-inputs are the 4,114-byte L41 artifact (SHA-256
-`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`) and the
-11,128-byte L41R5 artifact (SHA-256
-`fc95eb9fbdd2b7dbe064b7cac84e8851996669af96be1273ae46309873a650ff`):
-7 PROVEN / 5 BLOCKING_L42 / 1 DEFER_TO_FIRST_OWNED_POSITION. The five blockers
-are `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
-`MAXIMUM_QUANTITY_OR_ABSENCE`, `BELOW_MINIMUM_FULL_CLOSE`, and
-`RESIDUAL_FULL_OWNED_CLOSE`. These are genuine gaps in globally proven MCP
-rules, not L41R6 implementation defects.
+Independent exact-source review accepted the additive capability admission,
+`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1` policy, prototype Q62 evaluator,
+prospective exact-owned sell/review contract, manual-close state, test ownership,
+and source-only routing. Historical `CapabilityReport`,
+`evaluate_q62_readiness`, L41/L41R1-R6 executable paths and the accepted
+7 PROVEN / 5 BLOCKING_L42 / 1 DEFER result remain unchanged. The new modules
+contain no provider/network/OAuth/MCP dispatch and grant no placement/trade
+authority.
 
-This crosses the current product's pivot threshold. No L41R7 static
-schema/prose/rule-evidence successor is authorized. Do not weaken or rewrite the
-five L41R6 classifications. Instead, the next prospective Architecture-147
-contract is `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`, which makes those
-global guarantees unnecessary for the single explicitly armed <=$10 prototype
-trial through exact proposal review, factual reconciliation, local exposure
-limits, and a manual-close escalation path.
+The frozen policy SHA-256 is
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+The exact-artifact prototype admission SHA-256 observed during the accepted
+offline evaluation is
+`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-The additive source candidate defines a prototype capability admission, fixed
-typed risk policy, prospective exact-owned sell/review contracts, and a
-separate Q62 readiness evaluator. Historical L40/L41 capability semantics,
-consumed evidence, `CapabilityReport`, and `evaluate_q62_readiness` remain
-unchanged. Historical Q62 still reports its exact capability-only blocker for
-the accepted L41R6 report; the prototype evaluator can proceed only when that
-is its sole historical blocker and a fresh capability proof binds the
-source-owned admission digest. Its only ready label is
-`READY_FOR_L43_PROTOTYPE_READ_ONLY`, with zero provider mutations and no
-live-readiness or trade authority.
+Q62 itself remains NOT RUN. The repository now has the pure evaluator needed to
+judge Q62, but it still has no source-owned protected Q62 evidence collector or
+independent runner that authenticates and constructs all nine FreshProof inputs
+from real/local state. The next checkpoint is therefore
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`: one bounded read-only
+collector/runner source checkpoint, followed—only after acceptance/integration—
+by the actual protected Q62 observation.
 
-The source candidate has not yet received mapped certification or independent
-exact-source acceptance. It grants no Q62 observation, order review, placement, cancellation,
-L43, Q63, or FINAL_HOLDOUT access. Q62, L43, and Q63 remain NOT RUN;
-FINAL_HOLDOUT stays sealed. See the
-[pivot contract](architecture/147-q62-tiny-live-prerequisite-pivot.md) for the
-exact evidence, digest inputs, and manual-close semantics.
+L43 and Q63 remain NOT RUN. FINAL_HOLDOUT remains sealed.
 
 ## Immediate next step
 
-Complete focused ownership and behavior checks, then obtain terminal mapped CI
-certification for the exact source candidate. After CI is green, conduct
-independent exact-source review. Keep the Q62 protected observation separate;
-L43, Q63, and FINAL_HOLDOUT remain unrun boundaries.
+Implement `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`.
+
+This source checkpoint must compose the already accepted prototype evaluator
+without changing its semantics. It must authenticate exact source/configuration,
+the intended Robinhood account, prototype capability admission, durable
+ownership/budget, target session, current Alpaca signal inputs and read-only
+recovery into exactly one Q62 evidence bundle. Tests and source certification
+perform no credentials/provider calls.
+
+The future protected observation may use only bounded read-only Robinhood and
+Alpaca operations required to build those proofs. It must have no review,
+placement, cancellation or other mutation route. Source admission and a fresh
+create-only evidence destination must precede provider construction. A BLOCKED
+or ambiguous observation is preserved and never automatically retried.
+
+After this observer source is independently accepted/integrated, run exactly one
+protected Q62 observation. Only `READY_FOR_L43_PROTOTYPE_READ_ONLY` may advance
+to L43; that label itself grants neither live nor trade authority.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

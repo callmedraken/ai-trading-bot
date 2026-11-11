@@ -1,91 +1,47 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT
+## Current milestone: ARCH147_Q62_READINESS_OBSERVER_SOURCE
 
 Canonical feature worktree:
 `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
 `feature/robinhood-live-prototype-current`.
 
-L41R6 is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD
-INTEGRATED at `17faef900919cf400ce77877b328418e40787842` / tree
-`dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. Feature run
-`42941127629`, attempt 1, is terminal SUCCESS across source-static,
-active-tests, all seven canonical FULL lanes, and source-gates. Develop run
-`42947447216`, attempt 1, is terminal SUCCESS with exact feature-certification
-reuse, stable identity, and no duplicate FULL.
+The tiny-live prerequisite pivot source is SOURCE/CERTIFICATION ACCEPTED and
+FAST-FORWARD INTEGRATED at
+`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
+`369c1e14f201541864c61cb66d718e8efd163940`. Feature FULL run
+`42974104493`, attempt 1, is terminal SUCCESS: 17,088 cases, 17,079 passed,
+9 skipped, 0 failures/errors, all seven lanes below 300 seconds. Develop run
+`42975743902`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse and no duplicate FULL.
 
-L41R6 validates the exact immutable 4114-byte L41 artifact and the exact
-11128-byte L41R5 artifact, excludes L41R5's rejected lexical action classifier,
-and binds only source-owned authenticated official claims. Its deterministic
-result is:
+Exact-source review accepted the additive source. It reconstructs L41R6 from the
+exact consumed L41/L41R5 artifacts, preserves its 7/5/1 classification, binds
+the fixed one-entry <=$10 SPY policy, and introduces a distinct prototype Q62
+result only when historical Q62's sole blocker is `CAPABILITY_UNPROVEN` and a
+fresh capability proof equals the prototype admission digest. It never fabricates
+a READY_FOR_L42 CapabilityReport.
 
-- PROVEN: intended Agentic account, SPY tradability, fractional eligibility,
-  sell quantity field, six-decimal advertised interface bound, ordinary $1
-  fractional sell minimum, and review-preview-only semantics;
-- BLOCKING_L42: quantity increment, minimum quantity, maximum quantity or its
-  absence, below-minimum full close, and residual full-owned close;
-- DEFER_TO_FIRST_OWNED_POSITION: instance-specific sell review.
+The accepted prospective sell contract requires exact reconciled ownership,
+identical full-owned review/placement arguments, affirmative nonplacing review
+evidence, and no warnings/unknown/rejection/placement ID. It grants no placement
+authority. Any unsupported residual, rejected/malformed/unknown review, rejected/
+canceled/partial/unknown sell enters `MANUAL_CLOSE_REQUIRED`; automatic entries,
+sells and replacement sells are disabled while read-only reconciliation remains
+allowed.
 
-That BLOCKED result is accepted truth, not an implementation failure. The five
-remaining facts cannot be promoted by documentation silence, the app Sell All
-path, holding precision, or another prose/schema classifier.
+Policy SHA-256:
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+Accepted exact-artifact admission SHA-256:
+`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-The immutable consumed evidence roots are L41, 4,114 bytes, SHA-256
-`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`, and
-L41R5, 11,128 bytes, SHA-256
-`fc95eb9fbdd2b7dbe064b7cac84e8851996669af96be1273ae46309873a650ff`.
+The next boundary is not another readiness redesign. The pure evaluator is done.
+The repository lacks a source-owned Q62 protected evidence collector/runner. The
+next source-only checkpoint is
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`, followed by one separately
+reviewed protected Q62 read-only observation.
 
-The project therefore takes the documented pivot threshold. There is no
-L41R7. The additive `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT` source candidate
-now defines a prototype-specific admission layer, typed one-entry risk policy,
-and effect-free Q62/sell-review contracts for the single <=$10 explicitly
-armed live trial. Historical L40/L41/L41R1-R6 contracts remain unchanged.
-
-The prospective prototype may proceed without proving those five global broker
-rules only if all of these mitigations are executable and fail closed:
-
-1. exactly one SPY cash-long entry intent, BASE_MA35_50_V1, regular-hours market
-   operation, <=$10 requested acquisition, no replenishing budget and no second
-   entry;
-2. existing fresh Q62 source/config/account/session/signal/ownership/recovery
-   proofs remain required, including flat baseline and no unresolved order or
-   MAY_HAVE_OCCURRED effect before entry;
-3. entry remains dollar-based; no quantity rule is inferred for entry;
-4. after a confirmed entry fill, exact owned quantity and broker-sellable
-   quantity are factually reconciled before any automated exit;
-5. before an automated sell, Robinhood's nonplacing review must evaluate the
-   exact full-owned quantity with the same side/symbol/order type/session/time-
-   in-force arguments intended for placement;
-6. review rejection, malformed/unknown review, placement rejection, cancellation,
-   partial fill, residual, or any UNKNOWN outcome never creates an automatic
-   replacement order;
-7. any unsupported exact close transitions the prototype to
-   MANUAL_CLOSE_REQUIRED / trading disabled; the user may resolve the tiny
-   residual manually in Robinhood, after which read-only reconciliation is
-   required before any later live work;
-8. the documented app Sell All path is a manual fallback/context fact, not MCP
-   automated-close authority;
-9. a provider/global maximum need not be proven because the local <=$10 cap plus
-   exact proposal review bounds the one prototype proposal; provider rejection
-   is a safe blocked outcome;
-10. the pivot grants prototype qualification only. Repeated unattended
-    production trading must revisit automatic residual/recovery capability in P7.
-
-The historical `CapabilityReport` and `evaluate_q62_readiness` remain
-unchanged. The prototype evaluator composes the original L41R6 BLOCKED report
-and admits only its exact sole `CAPABILITY_UNPROVEN` blocker, with a fresh
-`ProofKind.CAPABILITY` proof whose digest equals the prototype admission
-digest. Any additional historical blocker, identity mismatch, stale proof,
-non-flat baseline, pending effect, or budget drift remains BLOCKED. The
-prototype ready label is `READY_FOR_L43_PROTOTYPE_READ_ONLY`; it grants no live
-readiness, trade authority, or provider mutation.
-
-The source candidate remains pending mapped certification and subsequent
-independent exact-source acceptance; no result is recorded for its CI or
-integration. The candidate does not run Q62. Q62, L43, and Q63 remain NOT RUN;
-FINAL_HOLDOUT is sealed. The exact prototype policy, digest material, and
-manual-close/review contracts are in
-[147-q62-tiny-live-prerequisite-pivot.md](architecture/147-q62-tiny-live-prerequisite-pivot.md).
+Q62, L43 and Q63 remain NOT RUN. FINAL_HOLDOUT is sealed.
 
 ## Immediate next step
 

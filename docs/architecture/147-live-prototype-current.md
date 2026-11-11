@@ -1,36 +1,12 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - Q62 observer accepted; local state preparation next
+## Current boundary - Q62 read-only observation accepted; L43 independent review next
 
-`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently
-SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
-`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
+The Q62 observer executable source remains accepted/integrated at `4633eda723e1d755a642b4fa9e637dccdd68a944` / tree `77df8966ea19c8184d2c5aabfe980ecb51b24159`; canonical FULL feature `42993536859` and develop exact-source reuse `42995999577` passed. The docs-only observation-bound source is `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / tree `6e2ac40df6259ac046944fee3d01d946fefde13b`, with feature/develop docs CI `42996562430` / `42996694799` successful.
 
-The first publication `3547078cc7e4a0124409f45397c53410e20626f8` remains
-preserved with mapped run `42990525980` terminal red solely because one test
-resolved the local canonical F: worktree on GitHub's D: runner. The corrective
-child changed only that fixture. Feature run `42993536859`, attempt 1, is
-terminal SUCCESS across source-static, active-tests, source-gates and all seven
-FULL lanes; 17,110 cases ran with 17,101 passed and 9 skipped. Develop run
-`42995999577`, attempt 1, is terminal SUCCESS with exact feature-certification
-reuse and no duplicate FULL.
+On this identity, separate source-owned `prepare-state` created the fixed pristine state root `F:\AI\arch147-q62-live-state-v1` exactly once (806-byte journal, SHA-256 `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`; no provider/network calls). The real Q62 protected read-only observation then exited 0 and returned `READY_FOR_L43_PROTOTYPE_READ_ONLY`. Its preserved evidence is `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`, 11,663 bytes, SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`. Nine proofs were PROVEN; historical Q62 remains BLOCKED with exactly CAPABILITY_UNPROVEN; prototype Q62 has zero blockers. Robinhood accounts/positions/orders reads 1/1/1, Alpaca snapshot/provider calls 1/1, and zero review/place/cancel/other dispatch, provider/broker/live/paper mutations or FINAL_HOLDOUT access were reported. Both preparation and Q62 observation are CONSUMED / NO RETRY.
 
-Independent source review accepted the observer ordering and effect ceiling. It
-authenticates exact source and preserved capability artifacts before constructing
-providers, binds the canonical configuration and retained-control research
-provenance, requires the fixed existing durable journal, performs only
-accounts/positions/orders Robinhood reads plus one Alpaca runtime-signal
-snapshot, derives exactly the existing nine proofs, and calls the unchanged
-historical/prototype Q62 evaluators.
-
-The persistent live-state root is fixed at
-`F:\AI\arch147-q62-live-state-v1` and remains absent/unprovisioned at this
-closeout. The separate local-only `prepare-state` operation is the next
-boundary. It must not be combined with the real Q62 observation.
-
-Q62 observation, L43 and Q63 remain NOT RUN. No live/trade authority is granted
-and FINAL_HOLDOUT remains sealed.
+No real-money effect or live readiness follows. The bound persistent journal is tied to the exact observation HEAD/tree, which cannot be silently changed by a docs-only descendant. L43 requires a distinct source/effect/identity-continuity review and remains NOT RUN, as does Q63. L41R7 stays FORBIDDEN, FINAL_HOLDOUT SEALED, and no paper soak is inserted. The independent observation file is operator-local evidence; its reported digest is preserved without claiming independent file-byte retrieval.
 
 ## D34 accepted boundary - historical transition to L40
 

@@ -1,71 +1,16 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_Q62_LOCAL_STATE_PREPARATION
+## Current milestone - Q62 READ-ONLY OBSERVATION ACCEPTED; L43 REVIEW NEXT
 
-`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently
-SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
-`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
+The Q62 readiness observer source remains SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `4633eda723e1d755a642b4fa9e637dccdd68a944` / tree `77df8966ea19c8184d2c5aabfe980ecb51b24159`. Feature mapped FULL run `42993536859` passed (17,101 passed, 9 skipped, 0 failed/errors; slowest lane 185.8 seconds); develop run `42995999577` succeeded with exact feature-certification reuse and no duplicate FULL. The docs-only descendant `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / tree `6e2ac40df6259ac046944fee3d01d946fefde13b` passed feature docs CI `42996562430` and develop docs CI `42996694799`.
 
-The first publication `3547078cc7e4a0124409f45397c53410e20626f8`
-is preserved with mapped run `42990525980`, attempt 1, terminal FAILURE. The
-production observer source was not rejected: hosted Windows tests exposed a
-fixed-path portability defect because one source-admission test resolved the
-canonical local `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
-path on GitHub's `D:` runner. The corrective child `4633eda...` changed only
-that test fixture.
+The fixed local-only `prepare-state` operation was performed exactly once on that docs descendant, exited 0 and returned `PREPARED / Q62_LOCAL_STATE_PREPARED_CREATE_ONCE`. It created `F:\AI\arch147-q62-live-state-v1` with only the pristine zero-baseline `durable-state.jsonl` (806 bytes; SHA-256 `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`). No credentials, provider, network, broker or Q62 observation occurred during preparation. Do not rerun, replace, reset or repair this create-once root.
 
-Corrective feature run `42993536859`, attempt 1, is terminal SUCCESS across
-source-static, active-tests, source-gates and canonical FULL broad-1 through
-broad-7. FULL executed 17,110 cases: 17,101 passed, 9 skipped, 0 failed, 0
-errors. The slowest lane was broad-4 at 185.8 seconds. Develop run
-`42995999577`, attempt 1, is terminal SUCCESS with
-`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
-`IDENTITY_STABLE=True`, and no duplicate FULL.
-
-Independent exact-source review accepted the observer's source/evidence
-admission ordering, exact consumed-artifact reconstruction, canonical
-configuration/binding identities, create-once persistent state model, bounded
-Robinhood account/position/order reads, one bounded Alpaca runtime signal
-snapshot, exact nine-proof inventory, unchanged historical/prototype Q62
-evaluators, fixed sanitized evidence, and zero review/place/cancel/mutation
-surface. Previously accepted readiness, capability, policy, durable-state,
-Alpaca-runtime and Robinhood-read modules remain byte-identical to the integrated
-predecessor.
-
-Canonical identities remain:
-
-- configuration SHA-256
-  `d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`;
-- binding SHA-256
-  `003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`;
-- tiny-live policy SHA-256
-  `485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`;
-- Q62 observation schema
-  `arch147-q62-tiny-live-readiness-observation/v1`.
-
-The persistent state root remains
-`F:\AI\arch147-q62-live-state-v1`. It has NOT been touched or provisioned.
-The real Q62 observation has NOT run. L43 and Q63 remain NOT RUN; L41R7 remains
-FORBIDDEN; FINAL_HOLDOUT remains SEALED.
+The separate real Q62 protected read-only observation then exited 0 against exactly `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`. Preserved evidence: `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`, 11,663 bytes, SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`. It returned `READY_FOR_L43_PROTOTYPE_READ_ONLY / Q62_READ_ONLY_PREREQUISITES_PROVEN`: all nine source-derived proofs are PROVEN; historical Q62 remains `BLOCKED` with the sole `CAPABILITY_UNPROVEN` blocker; prototype Q62 has no blockers. Attempt accounting reports Robinhood accounts/positions/orders reads 1/1/1 and one Alpaca snapshot/provider call, with zero review/place/cancel/other-tool, broker/live/paper mutations or FINAL_HOLDOUT access. Provider mutation count is 0; live readiness and trade authority remain false. The observation is CONSUMED / NO AUTOMATIC RETRY.
 
 ## Immediate next step
 
-The next effect boundary is the separately reviewed local-only
-`prepare-state` operation, not Q62 itself.
-
-Before running it, prove the canonical feature/develop docs-closeout identity and
-review the exact command against the accepted source. `prepare-state` may only
-create the absent fixed root `F:\AI\arch147-q62-live-state-v1` and one
-pristine zero-baseline durable journal. It performs no OAuth, credential,
-provider, broker or network operation, never repairs or replaces an existing
-root, and preserves any partial failure for diagnosis.
-
-Do not run `observe` in the same step. After local state preparation is
-accepted, the actual Q62 protected read-only observation remains a distinct
-one-shot reviewed boundary. Only
-`READY_FOR_L43_PROTOTYPE_READ_ONLY` can advance to L43, and that label grants
-neither live readiness nor trade authority.
+Complete this one atomic docs-only Q62 closeout, then independently review the L43 prototype qualification source, current external state/identity continuity and exact protected effect contract. `READY_FOR_L43_PROTOTYPE_READ_ONLY` is a read-only prerequisite result, not an L43 live-readiness label, order-review/place/cancel authority or authorization to enter. L43 requires a distinct reviewed protected boundary; do not derive effect permission from the nine Q62 proofs, reuse consumed Q62 evidence as freshly valid proof in a later session, or manufacture a fresh durable identity. The Q62 state remains bound to `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`; this docs-only descendant must not silently repoint or reinitialize it. Q63 is NOT RUN; L41R7 is FORBIDDEN; FINAL_HOLDOUT remains SEALED. No paper soak is inserted.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

@@ -1,5 +1,15 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## Q62 local state preparation and protected read-only observation — ACCEPTED
+
+The accepted observer source is `4633eda723e1d755a642b4fa9e637dccdd68a944` / tree `77df8966ea19c8184d2c5aabfe980ecb51b24159`, terminal mapped FULL `42993536859` (17,101 passed, 9 skipped, no failed/errors; slowest lane 185.8s) and terminal develop exact-certification reuse `42995999577`. The observation-bound docs-only HEAD/tree is `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`, with feature/develop docs gates `42996562430` / `42996694799` SUCCESS.
+
+`prepare-state` succeeded once on that source, process exit 0, `PREPARED / Q62_LOCAL_STATE_PREPARED_CREATE_ONCE`, creating exactly `F:\AI\arch147-q62-live-state-v1\durable-state.jsonl` (806 bytes, SHA-256 `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`). It made no credential/provider/network/Q62 observation call, is consumed, and must never be rerun/reinitialized.
+
+The separately reviewed Q62 protected READ-ONLY observation succeeded once on the same source, exit 0, status `READY_FOR_L43_PROTOTYPE_READ_ONLY`, reason `Q62_READ_ONLY_PREREQUISITES_PROVEN`. Evidence path `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`, 11,663 bytes, SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9` (hash and byte length from operator output, not independently fetched F: bytes). Nine PROVEN proof kinds: SOURCE, CONFIGURATION, ACCOUNT, CAPABILITY, OWNERSHIP, BUDGET, SESSION, SIGNAL_INPUTS and RECOVERY. Historical status BLOCKED / sole CAPABILITY_UNPROVEN; prototype has no blockers. Robinhood get_accounts, get_equity_positions, get_equity_orders dispatches 1 each; one Alpaca snapshot/provider call. Review, placement, cancellation, other Robinhood calls, broker/live/paper mutation and FINAL_HOLDOUT access all 0. Provider mutations 0, live readiness false, trade authority false. Q62 is CONSUMED / NO AUTOMATIC RETRY.
+
+No source test/CI proof or Q62 freshness authorizes real orders. The original journal binds source `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b` and must not be silently rebound after this docs closeout. L43 is NOT RUN and requires independent effect/source/state continuity review; Q63 NOT RUN, L41R7 FORBIDDEN, FINAL_HOLDOUT SEALED. No paper soak.
+
 ## Q62 readiness observer source accepted/integrated
 
 `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently

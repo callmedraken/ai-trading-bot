@@ -1,14 +1,10 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype contract. L41R6, the additive Q62 tiny-live pivot,
-and `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` are accepted and
-integrated. The observer source is at
-`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
-`77df8966ea19c8184d2c5aabfe980ecb51b24159`; corrective feature FULL
-`42993536859` and develop reuse `42995999577` are terminal SUCCESS. Q62,
-L43 and Q63 remain NOT RUN. This document grants no provider mutation, broker
-order, review, placement, cancellation, live-readiness, trade, or FINAL_HOLDOUT
-authority.
+Status: CURRENT prototype contract. L41R6, the additive Q62 tiny-live pivot and Q62 readiness observer source are accepted/integrated. Observer executable source: `4633eda723e1d755a642b4fa9e637dccdd68a944` / `77df8966ea19c8184d2c5aabfe980ecb51b24159`; mapped feature FULL `42993536859` and develop reuse `42995999577` succeeded. The observation-bound docs-only descendant is `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`.
+
+Local `prepare-state` completed once, returning `PREPARED / Q62_LOCAL_STATE_PREPARED_CREATE_ONCE`: fixed pristine journal `F:\AI\arch147-q62-live-state-v1\durable-state.jsonl`, 806 bytes, SHA-256 `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`. The distinct real Q62 read-only observation also completed once with process exit 0, returning `READY_FOR_L43_PROTOTYPE_READ_ONLY / Q62_READ_ONLY_PREREQUISITES_PROVEN`. Evidence: `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`, 11,663 bytes, SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`. All nine fresh proofs were PROVEN; historical Q62 is still BLOCKED on exactly CAPABILITY_UNPROVEN, while the prototype result has no blockers. Read counters: Robinhood account/position/order 1/1/1, Alpaca snapshot/provider 1/1; no review/place/cancel, provider/broker/live/paper mutation, or FINAL_HOLDOUT access. Both local actions are CONSUMED / NO AUTOMATIC RETRY.
+
+L43 and Q63 remain NOT RUN. No broker order, review, placement, cancellation, live-readiness, trade, or FINAL_HOLDOUT authority follows. The live journal is still bound to the exact observation source; a later docs-only HEAD update does not migrate runtime identity. Review L43's distinct effect and state-continuity boundary before any protected action.
 
 ## Why the pivot is required
 

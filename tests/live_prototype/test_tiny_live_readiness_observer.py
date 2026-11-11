@@ -455,7 +455,7 @@ def test_live_remote_identity_mismatch_blocks(monkeypatch, remote_name):
     assert any(call[0] == "ls-remote" for call in calls)
 
 
-def test_source_authority_identity_must_remain_stable(monkeypatch):
+def test_source_authority_identity_must_remain_stable(monkeypatch, tmp_path):
     first = {
         "branch": observer.FEATURE_BRANCH,
         "head": "a" * 40,
@@ -467,6 +467,7 @@ def test_source_authority_identity_must_remain_stable(monkeypatch):
     }
     second = {**first, "head": "c" * 40}
     reads = iter((first, second))
+    monkeypatch.setattr(observer, "CANONICAL_ROOT", tmp_path)
     monkeypatch.setattr(observer, "_local_git_identity", lambda *_a, **_k: next(reads))
     monkeypatch.setattr(
         observer,
@@ -479,7 +480,7 @@ def test_source_authority_identity_must_remain_stable(monkeypatch):
         ),
     )
     with pytest.raises(observer._ObserverBlocked, match="Q62_SOURCE_IDENTITY_UNSTABLE"):
-        observer._source_admission(observer.CANONICAL_ROOT)
+        observer._source_admission()
 
 
 def test_evidence_destination_rejects_non_f_existing_and_reparse_paths(

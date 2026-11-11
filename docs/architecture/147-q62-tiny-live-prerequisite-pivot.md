@@ -1,10 +1,14 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype source contract. L41R6 and the additive Q62 pivot are
-accepted and integrated. The Q62 observer source candidate is implemented and
-pending exact-source admission, mapped CI, and independent review. Q62, L43,
-and Q63 remain NOT RUN. This document grants no provider, broker, review,
-placement, cancellation, or FINAL_HOLDOUT authority.
+Status: CURRENT prototype contract. L41R6, the additive Q62 tiny-live pivot,
+and `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` are accepted and
+integrated. The observer source is at
+`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
+`77df8966ea19c8184d2c5aabfe980ecb51b24159`; corrective feature FULL
+`42993536859` and develop reuse `42995999577` are terminal SUCCESS. Q62,
+L43 and Q63 remain NOT RUN. This document grants no provider mutation, broker
+order, review, placement, cancellation, live-readiness, trade, or FINAL_HOLDOUT
+authority.
 
 ## Why the pivot is required
 
@@ -303,7 +307,7 @@ and Q62 behavior remains unchanged. The fixed policy digest is
 The accepted exact-artifact admission digest is
 `576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-## Q62 observer source candidate
+## Q62 observer source accepted/integrated
 
 The additive source module is
 `src/trading_bot/live_prototype/tiny_live_readiness_observer.py`, with schema
@@ -355,8 +359,9 @@ closes at 1Day/all/SIP/USD and has no fallback.
 
 The durable state root is fixed at `F:\AI\arch147-q62-live-state-v1`, outside
 the checkout and evidence root. It was not touched or provisioned during this
-source checkpoint. `prepare-state` is separate, local-only, requires source and
-evidence admission, uses no credential/provider/network path, creates only an
+source checkpoint. `prepare-state` is separate, local-only, requires source, fixed-state-path,
+configuration, and consumed-evidence admission, uses no credential/provider/network
+path, creates only an
 absent root with an exclusive pristine zero-baseline journal, and refuses an
 existing root. Recovery never manufactures a Q62 snapshot: it opens the
 existing journal, derives ownership, and blocks on non-pristine or ambiguous

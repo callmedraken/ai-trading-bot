@@ -1,63 +1,71 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE
+## Current milestone - ARCH147_Q62_LOCAL_STATE_PREPARATION
 
-`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is SOURCE/CERTIFICATION
-ACCEPTED and FAST-FORWARD INTEGRATED at
-`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
-`369c1e14f201541864c61cb66d718e8efd163940`.
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
+`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
 
-Feature run `42974104493`, attempt 1, is terminal SUCCESS across source-static,
-active-tests, source-gates, and canonical FULL broad-1 through broad-7. FULL
-executed 17,088 cases: 17,079 passed, 9 skipped, 0 failed, 0 errors; the slowest
-lane was 232.91 seconds. Develop run `42975743902`, attempt 1, is terminal
-SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`,
-`REASON=exact_feature_certification`, `IDENTITY_STABLE=True`, and no duplicate
-FULL.
+The first publication `3547078cc7e4a0124409f45397c53410e20626f8`
+is preserved with mapped run `42990525980`, attempt 1, terminal FAILURE. The
+production observer source was not rejected: hosted Windows tests exposed a
+fixed-path portability defect because one source-admission test resolved the
+canonical local `F:\AI\worktrees\ai-trading-bot-live-prototype-current`
+path on GitHub's `D:` runner. The corrective child `4633eda...` changed only
+that test fixture.
 
-Independent exact-source review accepted the additive capability admission,
-`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1` policy, prototype Q62 evaluator,
-prospective exact-owned sell/review contract, manual-close state, test ownership,
-and source-only routing. Historical `CapabilityReport`,
-`evaluate_q62_readiness`, L41/L41R1-R6 executable paths and the accepted
-7 PROVEN / 5 BLOCKING_L42 / 1 DEFER result remain unchanged. The new modules
-contain no provider/network/OAuth/MCP dispatch and grant no placement/trade
-authority.
+Corrective feature run `42993536859`, attempt 1, is terminal SUCCESS across
+source-static, active-tests, source-gates and canonical FULL broad-1 through
+broad-7. FULL executed 17,110 cases: 17,101 passed, 9 skipped, 0 failed, 0
+errors. The slowest lane was broad-4 at 185.8 seconds. Develop run
+`42995999577`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`, and no duplicate FULL.
 
-The frozen policy SHA-256 is
-`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
-The exact-artifact prototype admission SHA-256 observed during the accepted
-offline evaluation is
-`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
+Independent exact-source review accepted the observer's source/evidence
+admission ordering, exact consumed-artifact reconstruction, canonical
+configuration/binding identities, create-once persistent state model, bounded
+Robinhood account/position/order reads, one bounded Alpaca runtime signal
+snapshot, exact nine-proof inventory, unchanged historical/prototype Q62
+evaluators, fixed sanitized evidence, and zero review/place/cancel/mutation
+surface. Previously accepted readiness, capability, policy, durable-state,
+Alpaca-runtime and Robinhood-read modules remain byte-identical to the integrated
+predecessor.
 
-Q62 remains NOT RUN. The additive observer candidate now authenticates and
-assembles the nine existing FreshProof kinds from exact source authority,
-consumed L41/L41R5 evidence, the source-owned binding/configuration, the
-existing durable journal, bounded Robinhood reads, and one Alpaca signal
-snapshot. Its focused fake-only family passed 113 tests; the candidate still
-requires exact-source admission, mapped CI, and independent source review.
-Implementation and certification perform no provider or broker call.
+Canonical identities remain:
 
-L43 and Q63 remain NOT RUN. FINAL_HOLDOUT remains sealed.
+- configuration SHA-256
+  `d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`;
+- binding SHA-256
+  `003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`;
+- tiny-live policy SHA-256
+  `485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`;
+- Q62 observation schema
+  `arch147-q62-tiny-live-readiness-observation/v1`.
+
+The persistent state root remains
+`F:\AI\arch147-q62-live-state-v1`. It has NOT been touched or provisioned.
+The real Q62 observation has NOT run. L43 and Q63 remain NOT RUN; L41R7 remains
+FORBIDDEN; FINAL_HOLDOUT remains SEALED.
 
 ## Immediate next step
 
-Complete the exact-file prepublication gate and publish the observer candidate
-once to the feature branch for its mapped CI run and independent exact-source
-review.
+The next effect boundary is the separately reviewed local-only
+`prepare-state` operation, not Q62 itself.
 
-The candidate composes the accepted prototype evaluator without changing its
-semantics. It exposes only `observe` and a separate local-only `prepare-state`
-CLI command. The future protected observation has three read-only Robinhood
-methods and one bounded Alpaca signal request; it has no review, placement,
-cancellation, or other mutation route. Source/evidence admission precedes
-provider construction. A BLOCKED or ambiguous observation is preserved and is
-never automatically retried. The state root is not provisioned by this source
-checkpoint.
+Before running it, prove the canonical feature/develop docs-closeout identity and
+review the exact command against the accepted source. `prepare-state` may only
+create the absent fixed root `F:\AI\arch147-q62-live-state-v1` and one
+pristine zero-baseline durable journal. It performs no OAuth, credential,
+provider, broker or network operation, never repairs or replaces an existing
+root, and preserves any partial failure for diagnosis.
 
-After independent source acceptance/integration, Q62 remains a separate
-protected boundary. Only `READY_FOR_L43_PROTOTYPE_READ_ONLY` may advance to L43;
-that label grants neither live readiness nor trade authority.
+Do not run `observe` in the same step. After local state preparation is
+accepted, the actual Q62 protected read-only observation remains a distinct
+one-shot reviewed boundary. Only
+`READY_FOR_L43_PROTOTYPE_READ_ONLY` can advance to L43, and that label grants
+neither live readiness nor trade authority.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

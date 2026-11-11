@@ -1,42 +1,36 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - Q62 observer source candidate pending publication review
+## Current boundary - Q62 observer accepted; local state preparation next
 
-`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is independently
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently
 SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
-`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
-`369c1e14f201541864c61cb66d718e8efd163940`.
+`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
+`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
 
-Feature run `42974104493`, attempt 1, passed source-static, active-tests,
-source-gates and all seven canonical FULL lanes. Develop run `42975743902`,
-attempt 1, passed with exact feature-certification reuse, stable identity and no
-duplicate FULL.
+The first publication `3547078cc7e4a0124409f45397c53410e20626f8` remains
+preserved with mapped run `42990525980` terminal red solely because one test
+resolved the local canonical F: worktree on GitHub's D: runner. The corrective
+child changed only that fixture. Feature run `42993536859`, attempt 1, is
+terminal SUCCESS across source-static, active-tests, source-gates and all seven
+FULL lanes; 17,110 cases ran with 17,101 passed and 9 skipped. Develop run
+`42995999577`, attempt 1, is terminal SUCCESS with exact feature-certification
+reuse and no duplicate FULL.
 
-The accepted source leaves the historical L41R6 BLOCKED result intact and adds
-only the prototype-specific admission/readiness policy described in
-[147-q62-tiny-live-prerequisite-pivot.md](147-q62-tiny-live-prerequisite-pivot.md).
-No provider, credential, OAuth, MCP, order, Q62, L43, Q63 or FINAL_HOLDOUT
-effect occurred in implementation/certification.
+Independent source review accepted the observer ordering and effect ceiling. It
+authenticates exact source and preserved capability artifacts before constructing
+providers, binds the canonical configuration and retained-control research
+provenance, requires the fixed existing durable journal, performs only
+accounts/positions/orders Robinhood reads plus one Alpaca runtime-signal
+snapshot, derives exactly the existing nine proofs, and calls the unchanged
+historical/prototype Q62 evaluators.
 
-The additive candidate implements that source-owned collector in
-`tiny_live_readiness_observer.py`. Its `observe` CLI admits the exact feature
-source and evidence before constructing either provider, reads only the three
-bounded Robinhood surfaces and one Alpaca signal snapshot, derives the existing
-nine proofs, and calls the unchanged historical and prototype evaluators. The
-focused fake-only family passed 113 tests; exact-source admission, mapped CI,
-and independent review remain pending. No observation was run.
+The persistent live-state root is fixed at
+`F:\AI\arch147-q62-live-state-v1` and remains absent/unprovisioned at this
+closeout. The separate local-only `prepare-state` operation is the next
+boundary. It must not be combined with the real Q62 observation.
 
-The canonical configuration digest is
-`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`; the
-runtime binding digest is
-`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`.
-The existing tiny-live policy digest remains
-`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
-
-No order review, placement, cancellation, or provider mutation belongs to Q62.
-Only after this observer source is separately accepted/integrated may one
-protected read-only Q62 observation run. The `READY_FOR_L43_PROTOTYPE_READ_ONLY`
-result grants neither live readiness nor trade authority.
+Q62 observation, L43 and Q63 remain NOT RUN. No live/trade authority is granted
+and FINAL_HOLDOUT remains sealed.
 
 ## D34 accepted boundary - historical transition to L40
 

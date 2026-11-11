@@ -1,47 +1,66 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## Q62 readiness observer source candidate
+## Q62 readiness observer source accepted/integrated
 
-`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` adds the independent
-source-owned Q62 collector/CLI in
-`src/trading_bot/live_prototype/tiny_live_readiness_observer.py`. The candidate
-is based on the verified feature/develop predecessor
-`7862e2b3b74e1912ee026e1bcf9ad9c4cbc598d7` / tree
-`2064fa3c7bdd786232b8d7803d243664d9440813`; it is pending exact-source
-admission, mapped CI, and independent exact-source review. The focused affected
-family passed 113 tests with a fresh external `F:\AI\temp` basetemp. Focused
-Ruff check, Ruff format check, and `git diff --check` passed. No full suite,
-provider construction, credential read, real observation, or protected effect
-was run.
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` is independently
+SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
+`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
+`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
 
-The observer authenticates exactly the existing nine `ProofKind` values from
-the source/local state described in
-[`147-q62-tiny-live-prerequisite-pivot.md`](../architecture/147-q62-tiny-live-prerequisite-pivot.md).
-The schema is `arch147-q62-tiny-live-readiness-observation/v1`; configuration
-SHA-256 is
-`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`, binding
-SHA-256 is
-`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`, and the
-frozen policy SHA-256 remains
-`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+The first publication `3547078cc7e4a0124409f45397c53410e20626f8` and mapped
+run `42990525980`, attempt 1, remain preserved terminal FAILURE. Source-static
+passed; active-tests and broad-2 exposed the same deterministic test-only
+portability defect: the hosted Windows runner has no canonical local F: worktree,
+but one source-admission test attempted to resolve it. No production source
+failure or provider/protected effect occurred. Corrective commit `4633eda...`
+changed only `tests/live_prototype/test_tiny_live_readiness_observer.py`.
 
-The exact predecessor source remains intact: no L41/L41R6, five blocker,
-historical Q62, `TinyLivePolicy`, or evaluator changes were made. The test is
-registered once in the ARCH147 prototype owner, and the source/test pair is in
-the owner’s static safety audit. The earlier docs-only red CI run
-`42976177525` (attempt 1) is preserved: `git diff --check` reported a new blank
-line at EOF in `docs/architecture/147-q62-tiny-live-prerequisite-pivot.md:316`.
-The correction is in the verified predecessor
-`7862e2b3b74e1912ee026e1bcf9ad9c4cbc598d7`.
+Corrective feature run `42993536859`, attempt 1, is terminal SUCCESS.
+Source-static, active-tests, source-gates and FULL broad-1 through broad-7 all
+passed. Distributed FULL totals are 17,110 cases: 17,101 passed, 9 skipped,
+0 failed, 0 errors. Lane walls were 92.009, 136.159, 110.407, 185.8, 138.996,
+148.392 and 106.989 seconds, all below 300 seconds. Both fallback jobs were
+skipped. Develop run `42995999577`, attempt 1, is terminal SUCCESS with
+`DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`,
+`IDENTITY_STABLE=True`; active-tests and canonical/fallback FULL were skipped,
+so `DEVELOP_DUPLICATE_FULL=NO`.
 
-`F:\AI\arch147-q62-live-state-v1` is the selected persistent local-state root,
-outside the checkout and `F:\AI\temp`; it was neither touched nor provisioned.
-The separate `prepare-state` command is not part of observation and was not
-run. It can create only an absent root and pristine journal after local source
-and consumed-evidence admission, without credentials, providers, or network.
-The observation command was not run, so `PROTECTED_EFFECTS=0` and
-`REAL_Q62_OBSERVATION=NOT_RUN`. L43 and Q63 remain NOT RUN; FINAL_HOLDOUT remains
-sealed.
+Independent review confirmed:
+
+- the corrective child changes only the failing hosted-path test fixture;
+- the observer is the only new executable module; historical readiness,
+  capability, tiny-live policy, durable-state, Alpaca runtime signal and
+  Robinhood read-transport blobs are unchanged;
+- source admission requires the canonical clean feature checkout, exact live
+  feature/develop equality, FEATURE and PROSPECTIVE_DEVELOP authority, and a
+  stable recheck;
+- a fresh create-only evidence directory is established before credential or
+  provider construction;
+- exact consumed L41/L41R5 bytes are length/SHA-256 admitted and the capability
+  admission is reconstructed internally;
+- configuration and binding SHA-256 values independently recompute to
+  `d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`
+  and
+  `003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`;
+- persistent state is fixed at `F:\AI\arch147-q62-live-state-v1`, is never
+  silently reset/repaired, and only a pristine create-once journal can qualify
+  initial readiness;
+- Robinhood dispatch is limited to get_accounts, get_equity_positions and
+  get_equity_orders; quote, portfolio, history, review, place, cancel and
+  arbitrary public dispatch are absent from the Q62 boundary;
+- one fresh Alpaca runtime snapshot must prove exactly 60 completed published
+  XNYS SPY sessions on 1Day/all/SIP/USD with no fallback;
+- exactly the existing nine ProofKinds are derived under one ReadinessIdentity;
+- historical Q62 must retain the sole CAPABILITY_UNPROVEN blocker before the
+  prototype may return READY_FOR_L43_PROTOTYPE_READ_ONLY;
+- serialized evidence excludes the raw account number/provider payloads and
+  records fixed sanitized outcomes and bounded attempt accounting;
+- provider mutation, live readiness and trade authority remain zero/false.
+
+The selected persistent state root was not touched during source implementation,
+tests, certification, review or integration. `prepare-state` is NOT RUN and
+the real Q62 observation is NOT RUN. L43/Q63 remain NOT RUN; L41R7 remains
+FORBIDDEN; FINAL_HOLDOUT remains SEALED.
 
 ## Tiny-live pivot source accepted/integrated
 

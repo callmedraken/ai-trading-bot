@@ -1,57 +1,66 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE
+## Current milestone: ARCH147_Q62_LOCAL_STATE_PREPARATION
 
 Canonical feature worktree:
 `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
 `feature/robinhood-live-prototype-current`.
 
-The tiny-live prerequisite pivot source is SOURCE/CERTIFICATION ACCEPTED and
+The Q62 readiness observer source is SOURCE/CERTIFICATION ACCEPTED and
 FAST-FORWARD INTEGRATED at
-`f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree
-`369c1e14f201541864c61cb66d718e8efd163940`. Feature FULL run
-`42974104493`, attempt 1, is terminal SUCCESS: 17,088 cases, 17,079 passed,
-9 skipped, 0 failures/errors, all seven lanes below 300 seconds. Develop run
-`42975743902`, attempt 1, is terminal SUCCESS with exact feature-certification
+`4633eda723e1d755a642b4fa9e637dccdd68a944` / tree
+`77df8966ea19c8184d2c5aabfe980ecb51b24159`.
+
+The first source publication `3547078cc7e4a0124409f45397c53410e20626f8`
+and mapped run `42990525980` remain preserved terminal-red evidence. The sole
+failure was a hosted fixed-path test portability defect: a test tried to resolve
+the canonical local F: worktree on GitHub's D: runner. Corrective commit
+`4633eda...` changed only that fixture. Corrective feature run
+`42993536859`, attempt 1, is terminal SUCCESS with all seven FULL lanes green:
+17,110 cases / 17,101 passed / 9 skipped / 0 failed/errors. Develop run
+`42995999577`, attempt 1, is terminal SUCCESS with exact feature-certification
 reuse and no duplicate FULL.
 
-Exact-source review accepted the additive source. It reconstructs L41R6 from the
-exact consumed L41/L41R5 artifacts, preserves its 7/5/1 classification, binds
-the fixed one-entry <=$10 SPY policy, and introduces a distinct prototype Q62
-result only when historical Q62's sole blocker is `CAPABILITY_UNPROVEN` and a
-fresh capability proof equals the prototype admission digest. It never fabricates
-a READY_FOR_L42 CapabilityReport.
+Independent review accepted the source. It authenticates the exact source and
+consumed L41/L41R5 artifacts before provider construction, reconstructs the
+prototype capability admission internally, binds the source-owned configuration
+and retained-control provenance, opens only the fixed persistent durable state,
+derives all nine existing FreshProof values, performs only bounded Robinhood
+account/positions/orders reads plus one current Alpaca signal snapshot, and
+composes the unchanged historical and prototype Q62 evaluators.
 
-The accepted prospective sell contract requires exact reconciled ownership,
-identical full-owned review/placement arguments, affirmative nonplacing review
-evidence, and no warnings/unknown/rejection/placement ID. It grants no placement
-authority. Any unsupported residual, rejected/malformed/unknown review, rejected/
-canceled/partial/unknown sell enters `MANUAL_CLOSE_REQUIRED`; automatic entries,
-sells and replacement sells are disabled while read-only reconciliation remains
-allowed.
+The Q62 observer has no order review, placement, cancellation, quote workaround,
+Robinhood history call, arbitrary public tool dispatch, FINAL_HOLDOUT access, or
+mutation authority. Historical Q62 remains BLOCKED on exactly
+`CAPABILITY_UNPROVEN` when every other prerequisite passes; the additive
+prototype result can then be only `READY_FOR_L43_PROTOTYPE_READ_ONLY`, which
+still grants neither live readiness nor trade authority.
+
+Configuration SHA-256:
+`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`.
+
+Binding SHA-256:
+`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`.
 
 Policy SHA-256:
 `485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
-Accepted exact-artifact admission SHA-256:
-`576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-The additive source candidate is implemented in
-`src/trading_bot/live_prototype/tiny_live_readiness_observer.py` with a fake-only
-focused test module. It computes the canonical source-owned configuration and
-binding identities and assembles exactly the existing nine proofs. The focused
-family passed 113 tests; exact-file admission, mapped CI, and independent
-source review are pending. This source checkpoint neither touched nor
-provisioned the selected live state root, and no provider or broker call
-occurred during implementation or tests.
+Persistent state root:
+`F:\AI\arch147-q62-live-state-v1`.
 
-Q62, L43 and Q63 remain NOT RUN. FINAL_HOLDOUT is sealed.
+That state root has NOT been provisioned. `prepare-state` and `observe` have
+both NOT RUN. Q62, L43 and Q63 remain NOT RUN. L41R7 is FORBIDDEN and
+FINAL_HOLDOUT is SEALED.
 
 ## Immediate next step
 
-Complete exact-file staging and `ops.ps1 admit`, create one atomic feature
-commit, ordinary-push once, and poll the mapped CI run to terminal. Then perform
-independent exact-source review. A Q62 protected readiness observation remains
-a separate later boundary; this source candidate does not authorize it.
+Review and execute only the source-owned local `prepare-state` boundary after
+this docs-only closeout is integrated. It must create the absent fixed state root
+and pristine journal once, without credentials, provider/network access, or
+broker effects. Do not combine state preparation with the Q62 observation.
+
+After preparation evidence/state is reviewed, perform the Q62 protected
+read-only observation as its own one-shot boundary.
 
 ## L41R1 consumed observation and L41R2 source successor
 

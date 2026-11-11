@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - ARCH147_Q62_READINESS_OBSERVER_SOURCE
+## Current milestone - ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE
 
 `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is SOURCE/CERTIFICATION
 ACCEPTED and FAST-FORWARD INTEGRATED at
@@ -30,36 +30,34 @@ The exact-artifact prototype admission SHA-256 observed during the accepted
 offline evaluation is
 `576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-Q62 itself remains NOT RUN. The repository now has the pure evaluator needed to
-judge Q62, but it still has no source-owned protected Q62 evidence collector or
-independent runner that authenticates and constructs all nine FreshProof inputs
-from real/local state. The next checkpoint is therefore
-`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`: one bounded read-only
-collector/runner source checkpoint, followed—only after acceptance/integration—
-by the actual protected Q62 observation.
+Q62 remains NOT RUN. The additive observer candidate now authenticates and
+assembles the nine existing FreshProof kinds from exact source authority,
+consumed L41/L41R5 evidence, the source-owned binding/configuration, the
+existing durable journal, bounded Robinhood reads, and one Alpaca signal
+snapshot. Its focused fake-only family passed 113 tests; the candidate still
+requires exact-source admission, mapped CI, and independent source review.
+Implementation and certification perform no provider or broker call.
 
 L43 and Q63 remain NOT RUN. FINAL_HOLDOUT remains sealed.
 
 ## Immediate next step
 
-Implement `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`.
+Complete the exact-file prepublication gate and publish the observer candidate
+once to the feature branch for its mapped CI run and independent exact-source
+review.
 
-This source checkpoint must compose the already accepted prototype evaluator
-without changing its semantics. It must authenticate exact source/configuration,
-the intended Robinhood account, prototype capability admission, durable
-ownership/budget, target session, current Alpaca signal inputs and read-only
-recovery into exactly one Q62 evidence bundle. Tests and source certification
-perform no credentials/provider calls.
+The candidate composes the accepted prototype evaluator without changing its
+semantics. It exposes only `observe` and a separate local-only `prepare-state`
+CLI command. The future protected observation has three read-only Robinhood
+methods and one bounded Alpaca signal request; it has no review, placement,
+cancellation, or other mutation route. Source/evidence admission precedes
+provider construction. A BLOCKED or ambiguous observation is preserved and is
+never automatically retried. The state root is not provisioned by this source
+checkpoint.
 
-The future protected observation may use only bounded read-only Robinhood and
-Alpaca operations required to build those proofs. It must have no review,
-placement, cancellation or other mutation route. Source admission and a fresh
-create-only evidence destination must precede provider construction. A BLOCKED
-or ambiguous observation is preserved and never automatically retried.
-
-After this observer source is independently accepted/integrated, run exactly one
-protected Q62 observation. Only `READY_FOR_L43_PROTOTYPE_READ_ONLY` may advance
-to L43; that label itself grants neither live nor trade authority.
+After independent source acceptance/integration, Q62 remains a separate
+protected boundary. Only `READY_FOR_L43_PROTOTYPE_READ_ONLY` may advance to L43;
+that label grants neither live readiness nor trade authority.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

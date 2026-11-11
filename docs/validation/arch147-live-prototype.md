@@ -1,5 +1,48 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## Q62 readiness observer source candidate
+
+`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE` adds the independent
+source-owned Q62 collector/CLI in
+`src/trading_bot/live_prototype/tiny_live_readiness_observer.py`. The candidate
+is based on the verified feature/develop predecessor
+`7862e2b3b74e1912ee026e1bcf9ad9c4cbc598d7` / tree
+`2064fa3c7bdd786232b8d7803d243664d9440813`; it is pending exact-source
+admission, mapped CI, and independent exact-source review. The focused affected
+family passed 113 tests with a fresh external `F:\AI\temp` basetemp. Focused
+Ruff check, Ruff format check, and `git diff --check` passed. No full suite,
+provider construction, credential read, real observation, or protected effect
+was run.
+
+The observer authenticates exactly the existing nine `ProofKind` values from
+the source/local state described in
+[`147-q62-tiny-live-prerequisite-pivot.md`](../architecture/147-q62-tiny-live-prerequisite-pivot.md).
+The schema is `arch147-q62-tiny-live-readiness-observation/v1`; configuration
+SHA-256 is
+`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`, binding
+SHA-256 is
+`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`, and the
+frozen policy SHA-256 remains
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+
+The exact predecessor source remains intact: no L41/L41R6, five blocker,
+historical Q62, `TinyLivePolicy`, or evaluator changes were made. The test is
+registered once in the ARCH147 prototype owner, and the source/test pair is in
+the owner’s static safety audit. The earlier docs-only red CI run
+`42976177525` (attempt 1) is preserved: `git diff --check` reported a new blank
+line at EOF in `docs/architecture/147-q62-tiny-live-prerequisite-pivot.md:316`.
+The correction is in the verified predecessor
+`7862e2b3b74e1912ee026e1bcf9ad9c4cbc598d7`.
+
+`F:\AI\arch147-q62-live-state-v1` is the selected persistent local-state root,
+outside the checkout and `F:\AI\temp`; it was neither touched nor provisioned.
+The separate `prepare-state` command is not part of observation and was not
+run. It can create only an absent root and pristine journal after local source
+and consumed-evidence admission, without credentials, providers, or network.
+The observation command was not run, so `PROTECTED_EFFECTS=0` and
+`REAL_Q62_OBSERVATION=NOT_RUN`. L43 and Q63 remain NOT RUN; FINAL_HOLDOUT remains
+sealed.
+
 ## Tiny-live pivot source accepted/integrated
 
 `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is SOURCE/CERTIFICATION

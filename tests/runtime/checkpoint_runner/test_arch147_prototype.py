@@ -17,6 +17,14 @@ _L41_IMPORT_ALLOWLIST = {
             "create_windows_robinhood_oauth_factory",
         ),
     },
+    "src/trading_bot/live_prototype/tiny_live_readiness_observer.py": {
+        ("import", "subprocess", None),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.current_read_transport",
+            "RobinhoodCurrentReadTransport",
+        ),
+    },
     "src/trading_bot/live_prototype/capability_transport.py": {
         (
             "from",
@@ -213,6 +221,10 @@ def test_tiny_live_pivot_source_test_pairs_are_prepublication_owned():
         (
             "src/trading_bot/live_prototype/tiny_live_readiness_operator.py",
             "tests/live_prototype/test_tiny_live_readiness_operator.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/tiny_live_readiness_observer.py",
+            "tests/live_prototype/test_tiny_live_readiness_observer.py",
         ),
     )
     registry = runner._checkpoint_specs()

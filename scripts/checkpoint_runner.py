@@ -539,6 +539,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_capability_tiny_live_admission.py",
     "tests/live_prototype/test_tiny_live_policy.py",
     "tests/live_prototype/test_tiny_live_readiness_operator.py",
+    "tests/live_prototype/test_tiny_live_readiness_observer.py",
     "tests/live_prototype/test_recovery_operator.py",
     "tests/live_prototype/test_delivery_operator.py",
     "tests/live_prototype/test_emergency_operator.py",

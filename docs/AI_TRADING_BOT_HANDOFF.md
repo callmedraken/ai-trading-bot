@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: ARCH147_Q62_READINESS_OBSERVER_SOURCE
+## Current milestone: ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE
 
 Canonical feature worktree:
 `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch:
@@ -35,18 +35,21 @@ Policy SHA-256:
 Accepted exact-artifact admission SHA-256:
 `576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-The next boundary is not another readiness redesign. The pure evaluator is done.
-The repository lacks a source-owned Q62 protected evidence collector/runner. The
-next source-only checkpoint is
-`ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`, followed by one separately
-reviewed protected Q62 read-only observation.
+The additive source candidate is implemented in
+`src/trading_bot/live_prototype/tiny_live_readiness_observer.py` with a fake-only
+focused test module. It computes the canonical source-owned configuration and
+binding identities and assembles exactly the existing nine proofs. The focused
+family passed 113 tests; exact-file admission, mapped CI, and independent
+source review are pending. This source checkpoint neither touched nor
+provisioned the selected live state root, and no provider or broker call
+occurred during implementation or tests.
 
 Q62, L43 and Q63 remain NOT RUN. FINAL_HOLDOUT is sealed.
 
 ## Immediate next step
 
-Complete the focused ownership and behavior checks, then obtain terminal mapped
-CI certification for the exact source candidate. After CI is green, perform
+Complete exact-file staging and `ops.ps1 admit`, create one atomic feature
+commit, ordinary-push once, and poll the mapped CI run to terminal. Then perform
 independent exact-source review. A Q62 protected readiness observation remains
 a separate later boundary; this source candidate does not authorize it.
 

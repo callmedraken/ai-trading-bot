@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - tiny-live pivot accepted; Q62 observer source next
+## Current boundary - Q62 observer source candidate pending publication review
 
 `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT_SOURCE` is independently
 SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
@@ -18,15 +18,25 @@ only the prototype-specific admission/readiness policy described in
 No provider, credential, OAuth, MCP, order, Q62, L43, Q63 or FINAL_HOLDOUT
 effect occurred in implementation/certification.
 
-The pure Q62 prerequisite model is now complete. The next source checkpoint is
-a bounded protected-readiness evidence collector/runner that authenticates the
-existing FreshProof inventory from exact local/source state plus bounded
-read-only Robinhood/Alpaca observations, then supplies that bundle to
-`evaluate_q62_tiny_live_readiness`.
+The additive candidate implements that source-owned collector in
+`tiny_live_readiness_observer.py`. Its `observe` CLI admits the exact feature
+source and evidence before constructing either provider, reads only the three
+bounded Robinhood surfaces and one Alpaca signal snapshot, derives the existing
+nine proofs, and calls the unchanged historical and prototype evaluators. The
+focused fake-only family passed 113 tests; exact-source admission, mapped CI,
+and independent review remain pending. No observation was run.
 
-No order review, placement or cancellation belongs to Q62. Only after that
-observer source is separately accepted/integrated may one real protected
-read-only Q62 observation run.
+The canonical configuration digest is
+`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`; the
+runtime binding digest is
+`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`.
+The existing tiny-live policy digest remains
+`485c6d93bd6413c5754c76437587f2cbda11db9bbf6394863ebe9f0991fdb287`.
+
+No order review, placement, cancellation, or provider mutation belongs to Q62.
+Only after this observer source is separately accepted/integrated may one
+protected read-only Q62 observation run. The `READY_FOR_L43_PROTOTYPE_READ_ONLY`
+result grants neither live readiness nor trade authority.
 
 ## D34 accepted boundary - historical transition to L40
 

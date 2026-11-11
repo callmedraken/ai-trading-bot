@@ -1,9 +1,9 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype source contract. L41R6 is accepted and integrated;
-the additive Q62 pivot source candidate is pending mapped certification and
-subsequent independent exact-source review. Q62,
-L43, and Q63 remain NOT RUN. This document grants no provider, broker, review,
+Status: CURRENT prototype source contract. L41R6 and the additive Q62 pivot are
+accepted and integrated. The Q62 observer source candidate is implemented and
+pending exact-source admission, mapped CI, and independent review. Q62, L43,
+and Q63 remain NOT RUN. This document grants no provider, broker, review,
 placement, cancellation, or FINAL_HOLDOUT authority.
 
 ## Why the pivot is required
@@ -303,13 +303,70 @@ and Q62 behavior remains unchanged. The fixed policy digest is
 The accepted exact-artifact admission digest is
 `576609ea84c59495bbaae21a37e166910c471404213af35ca12a8465abc1e127`.
 
-The next boundary is `ARCH147_Q62_TINY_LIVE_READINESS_OBSERVER_SOURCE`.
-It must authenticate and assemble the already-defined Q62 proofs through a
-source-owned independent runner. Implementation and tests remain effect-free.
-A later real Q62 observation may perform only reviewed bounded read-only
-Robinhood/Alpaca operations; it has no review/place/cancel route.
+## Q62 observer source candidate
 
-After observer-source acceptance/integration, execute one fresh Q62 protected
-read-only observation. A result other than
-`READY_FOR_L43_PROTOTYPE_READ_ONLY` blocks L43 and is preserved; no automatic
-retry is authorized.
+The additive source module is
+`src/trading_bot/live_prototype/tiny_live_readiness_observer.py`, with schema
+`arch147-q62-tiny-live-readiness-observation/v1`. It does not redesign this
+pivot, the frozen L41/L41R6 evidence, the five BLOCKING_L42 facts, the policy,
+or either evaluator. Its canonical configuration SHA-256 is
+`d7a087b9200e74fd4574d71fb7746d6b8c37eba42c7620af337450eff5d75076`; its
+runtime binding SHA-256 is
+`003ef41835d3a1b1d3da7b0731f9215d974a924be3db94cbc10abbba8cc8da1b`. The
+binding retains campaign `9b2a000e-3adc-50f4-ab47-2aa90665e3c9`, bundle
+`f01a39a7-0a65-55bb-9d38-608b1ce0bd21`, bundle SHA-256
+`94870e0e0e10de16f7e98e7cfea2e2c84458a15e6f1d2665cd8a5dc7e404fc11`, and
+`BASE_MA35_50_V1` candidate ID `21158358-75be-5597-b940-5bccdda1429c`, with
+`live_eligible=false` and no challenger promotion.
+
+The CLI accepts only `observe` and `prepare-state`; it accepts no caller-supplied
+identity, capability digest/status, path, provider, or transport. `observe`
+requires canonical-root/feature-branch/clean-worktree admission, equal local
+and remote feature/develop source identities, FEATURE and
+PROSPECTIVE_DEVELOP source authority, and a stable source recheck. It then
+creates one fresh create-only evidence attempt before configuration, consumed
+evidence, durable-state, or provider processing. The preserved L41 and L41R5
+artifacts are admitted only at their fixed paths and exact byte/SHA-256
+identities.
+
+The evidence contains exactly these nine source-derived proofs, all sharing one
+`ReadinessIdentity`:
+
+| Proof | Source-owned derivation | Validity |
+| --- | --- | --- |
+| SOURCE | stable local/remote HEAD/tree plus FEATURE and PROSPECTIVE_DEVELOP authority | target session close |
+| CONFIGURATION | canonical configuration, binding, and policy material digests | target session close |
+| ACCOUNT | resolved account fingerprint and eligible/observed account counts | 10 minutes from account read |
+| CAPABILITY | internal `admit_tiny_live_capabilities` result over exact consumed artifacts and matched account fingerprint | target session close |
+| OWNERSHIP | opened durable journal hash/sequence and derived ownership snapshot | 10 minutes from journal read |
+| BUDGET | source-owned $10 one-entry policy and durable remaining/reserved/used values | 10 minutes from journal read |
+| SESSION | target date/open/close from the published NYSE regular-session authority | target session close |
+| SIGNAL_INPUTS | `CompletedSignalInputs.digest` for the accepted current signal snapshot | target session close |
+| RECOVERY | `RecoveryObservation` derived from durable state and current read-only position/order facts | 10 minutes from recovery read |
+
+Robinhood is limited to one `get_accounts` call (at most 100 rows), up to three
+position pages (1,000 rows total), and up to three agentic SPY order pages (300
+rows total), filtered by the retained account, `placed_agent=agentic`, and
+`symbol=SPY`. Each read opens its own session; the maximum is seven sessions and
+20 `tools/list` pages per session (140 total). No retry occurs. Alpaca is
+limited to one provider snapshot, one credential scope, one provider call, and
+one transport construction; it requires 60 completed published XNYS SPY daily
+closes at 1Day/all/SIP/USD and has no fallback.
+
+The durable state root is fixed at `F:\AI\arch147-q62-live-state-v1`, outside
+the checkout and evidence root. It was not touched or provisioned during this
+source checkpoint. `prepare-state` is separate, local-only, requires source and
+evidence admission, uses no credential/provider/network path, creates only an
+absent root with an exclusive pristine zero-baseline journal, and refuses an
+existing root. Recovery never manufactures a Q62 snapshot: it opens the
+existing journal, derives ownership, and blocks on non-pristine or ambiguous
+state. Only the actual pristine initial journal maps to DISARMED/NO_EFFECT.
+
+The observer sanitizes failures to fixed reason codes, serializes only the
+account fingerprint, and emits no raw account number or order identifiers.
+Evidence writes are create-only and attempted once; BLOCKED or ambiguous
+results are preserved without retry. `PROTECTED_EFFECTS=0`,
+`REAL_Q62_OBSERVATION=NOT_RUN`, L43/Q63 remain NOT RUN, and FINAL_HOLDOUT remains
+sealed. Any later Q62 observation is separately reviewed and remains strictly
+read-only; `READY_FOR_L43_PROTOTYPE_READ_ONLY` grants neither live readiness nor
+trade authority.

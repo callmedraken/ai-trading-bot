@@ -50,22 +50,27 @@ defect. Another L41R7 schema/prose/public-rule evidence successor is forbidden.
 The next milestone is
 `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`.
 
-The pivot does not mutate the five L41R6 blocker classifications. Instead, a
-new prospective prototype policy may admit exactly that known blocker set for
-one <=$10 explicitly armed trial if source-owned executable mitigations make the
-global guarantees unnecessary: local one-entry exposure cap, exact account/
-source/config/session binding, flat pre-entry reconciliation, exact post-fill
-ownership, provider review of the exact intended full-owned sell before any
-sell placement, no automatic replacement after rejection/partial/unknown
-outcomes, and a MANUAL_CLOSE_REQUIRED terminal escalation for an unsupported or
-residual close.
+The pivot does not mutate the five L41R6 blocker classifications. The current
+source candidate defines a distinct prototype policy for one <=$10 explicitly
+armed trial, using local one-entry exposure limits, exact account/source/config/
+session binding, flat pre-entry reconciliation, exact post-fill ownership,
+nonplacing review of an exact full-owned sell proposal, no automatic
+replacement after rejection/partial/unknown outcomes, and
+`MANUAL_CLOSE_REQUIRED` escalation for an unsupported or residual close.
 
 Historical `CapabilityReport`, `classify_capabilities`,
 `evaluate_q62_readiness`, consumed evidence, and old authority checks remain
-unchanged. The future adapter/evaluator must be additive.
+unchanged. The prototype source candidate is additive and is pending
+independent exact-source acceptance and mapped certification.
 
-Q62 remains NOT RUN pending accepted pivot source. L43 and Q63 remain NOT RUN.
-FINAL_HOLDOUT remains sealed. PROTECTED_EFFECTS=0 for this design/closeout.
+The candidate's source-owned policy ID is
+`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1`; its policy and proof material are
+specified in the linked pivot contract. The historical Q62 report must remain
+BLOCKED with exactly `CAPABILITY_UNPROVEN`; the prototype evaluator requires a
+fresh `ProofKind.CAPABILITY` proof bound to the admission digest and returns
+only `READY_FOR_L43_PROTOTYPE_READ_ONLY` when all other historical gates pass.
+Q62 observation remains NOT RUN. L43 and Q63 remain NOT RUN.
+FINAL_HOLDOUT remains sealed. PROTECTED_EFFECTS=0 for the source candidate.
 
 ## L41R5 accepted/integrated predecessor source and consumed semantic observation
 
@@ -330,12 +335,13 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L41R3 | consumed L41R2 observation | additive MCP-v2 schema-discovery successor | normalized metadata-only `tools/list`; one reviewed browser authorization at most | SOURCE ACCEPTED / INTEGRATED at `4461ea7f09c396c3c49598debbc588754fa5096c` / `68cbfb70ea3eaa6f52a342e967d682ca5ab84bd2`; feature `42778436739` and develop `42780649228` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R3_SCHEMA_AMBIGUOUS` |
 | L41R4 | consumed L41R3 observation | additive schema-classification diagnostic successor | bounded sanitized structural diagnosis; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT` |
 | L41R5 | consumed L41R4 observation | additive schema semantic-recovery successor | fixed L41R4 interface baseline; sanitized additionalProperties classification; separated tool/nested description and numeric provenance; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `13a97b1f4c369243737cc0ac6646b5520327651a` / `81e58dd75656593ca0f960ecdcdf21c14d00d969`; feature `42905997160` and develop reuse `42926313979` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT` |
-| L41R6 | consumed L41R5 observation | digest-backed official-rule binding and pure 13-fact classification | source-only; anonymous public source preparation; no OAuth/MCP/provider observation | Local focused official-binding tests 43 passed; 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER; overall BLOCKED; mapped CI and independent exact-source review pending; `PROTECTED_EFFECTS=0` |
+| L41R6 | consumed L41R5 observation | digest-backed official-rule binding and pure 13-fact classification | source-only; anonymous public source preparation; no OAuth/MCP/provider observation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `17faef900919cf400ce77877b328418e40787842` / `dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`; feature FULL `42941127629` and develop reuse `42947447216` succeeded; 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER; overall BLOCKED |
+| Q62 tiny-live pivot source | accepted L41R6 evidence | additive admission, typed policy, prototype Q62 evaluator, exact-owned review/manual-close contracts | pure source/tests only; no OAuth/MCP/provider observation or order review | Source candidate pending mapped CI and subsequent independent exact-source review; historical Q62 exact sole capability blocker remains; Q62 observation NOT RUN; `PROTECTED_EFFECTS=0` |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; blocked by five remaining L41 facts and separate readiness review; live readiness not granted |
+| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; additive prototype source candidate is pending acceptance; historical Q62 remains BLOCKED on its exact capability-only blocker; no live readiness granted |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
@@ -344,11 +350,11 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
-| Entry and exact owned exit | BLOCKED | L41 proves account identity, SPY tradability and fractional eligibility; consumed L41R5 proves quantity interface and six-decimal interface precision; L41R6 proves review-preview semantics and the ordinary $1 minimum notional. Quantity increment, minimum quantity, maximum/absence, below-minimum full close and exact residual close still block |
+| Entry and exact owned exit | BLOCKED / SOURCE CONTRACT ONLY | L41R6's five global quantity/close blockers remain unchanged; the unaccepted source candidate defines a <=$10 single-entry policy and exact-owned full-close proposal/review contract, but no provider review, placement, or automated residual-close capability has been performed or qualified |
 | Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
 | Stop/kill/restart/reconnect | SYNTHETIC NATIVE PASS / REAL DISARMED SOURCE-TESTED | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and a clean close; real/disarmed recovery remains source-tested |
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
-| Exact source certified | L42/I53 baseline and L41R4/R5 observer additions ACCEPTED / INTEGRATED; L41R6 source candidate pending | L41R5 at `13a97b1f4c369243737cc0ac6646b5520327651a` / tree `81e58dd75656593ca0f960ecdcdf21c14d00d969`; feature `42905997160` and develop `42926313979` succeeded; L41R6 has no accepted/integrated identity or CI recorded yet |
+| Exact source certified | L42/I53 baseline and L41R4/R5 observer additions ACCEPTED / INTEGRATED; L41R6 ACCEPTED / INTEGRATED; pivot source candidate pending | L41R6 at `17faef900919cf400ce77877b328418e40787842` / tree `dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`; feature `42941127629` and develop reuse `42947447216` succeeded; no candidate commit or CI result is recorded for the tiny-live source |
 | Bounded live test ready | BLOCKED | no live effect authorization |
 
 ### L41R1 consumed record and L41R2 successor

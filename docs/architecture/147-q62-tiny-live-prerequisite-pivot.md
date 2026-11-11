@@ -1,8 +1,10 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prospective prototype design. L41R6 source is accepted and
-integrated; Q62, L43, and Q63 remain NOT RUN. This document grants no provider,
-broker, review, placement, cancellation, or FINAL_HOLDOUT authority.
+Status: CURRENT prototype source contract. L41R6 is accepted and integrated;
+the additive Q62 pivot source candidate is pending mapped certification and
+subsequent independent exact-source review. Q62,
+L43, and Q63 remain NOT RUN. This document grants no provider, broker, review,
+placement, cancellation, or FINAL_HOLDOUT authority.
 
 ## Why the pivot is required
 
@@ -18,6 +20,32 @@ The five blockers are:
 - MAXIMUM_QUANTITY_OR_ABSENCE;
 - BELOW_MINIMUM_FULL_CLOSE;
 - RESIDUAL_FULL_OWNED_CLOSE.
+
+The accepted source identity is `17faef900919cf400ce77877b328418e40787842` /
+tree `dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`. The 13-fact composite is
+reconstructed only from the immutable 4,114-byte L41 artifact
+(`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`) and
+11,128-byte L41R5 artifact
+(`fc95eb9fbdd2b7dbe064b7cac84e8851996669af96be1273ae46309873a650ff`). The
+prototype adapter requires these exact bytes, their accepted source identities,
+and the exact L41R6 source order, classifications, rationale codes, evidence
+digests, and official binding provenance.
+
+| Fact ID | Accepted class | Rationale |
+| --- | --- | --- |
+| INTENDED_AGENTIC_ACCOUNT | PROVEN | `ACCOUNT_IDENTITY_PROVEN` |
+| SPY_TRADABILITY | PROVEN | `SPY_TRADABILITY_PROVEN` |
+| FRACTIONAL_ELIGIBILITY | PROVEN | `SPY_FRACTIONAL_ELIGIBILITY_PROVEN` |
+| SELL_QUANTITY_FIELD | PROVEN | `L41R6_SELL_QUANTITY_INTERFACE_PROVEN` |
+| DECIMAL_INTERFACE_PRECISION | PROVEN | `L41R6_ADVERTISED_SIX_DECIMAL_BOUND_PROVEN` |
+| QUANTITY_INCREMENT | BLOCKING_L42 | `L41R6_QUANTITY_INCREMENT_UNSUPPORTED` |
+| MINIMUM_QUANTITY | BLOCKING_L42 | `L41R6_MINIMUM_QUANTITY_UNSUPPORTED` |
+| MAXIMUM_QUANTITY_OR_ABSENCE | BLOCKING_L42 | `L41R6_MAXIMUM_QUANTITY_UNSUPPORTED` |
+| MINIMUM_SELL_NOTIONAL_OR_ABSENCE | PROVEN | `L41R6_ORDINARY_MINIMUM_USD_1_PROVEN` |
+| BELOW_MINIMUM_FULL_CLOSE | BLOCKING_L42 | `L41R6_BELOW_MINIMUM_CLOSE_UNSUPPORTED` |
+| RESIDUAL_FULL_OWNED_CLOSE | BLOCKING_L42 | `L41R6_RESIDUAL_CLOSE_UNSUPPORTED` |
+| REVIEW_PREVIEW_ONLY | PROVEN | `L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN` |
+| INSTANCE_REVIEW_REQUIRES_POSITION | DEFER_TO_FIRST_OWNED_POSITION | `EXACT_OWNED_POSITION_REVIEW_DEFERRED` |
 
 They are not parser bugs. Robinhood's accepted public material does not establish
 global MCP values/guarantees for them, and documentation silence cannot establish
@@ -40,9 +68,10 @@ In particular, do not modify the meaning of:
 - historical evaluate_q62_readiness;
 - L40 exact ownership, budget, unknown-effect, and no-short constraints.
 
-The successor is additive. A new prospective prototype capability admission and
-Q62 evaluator own the relaxed prerequisite model. BLOCKING_L42 facts are not
-renamed, reclassified, or silently treated as PROVEN.
+The source candidate is additive. `admit_tiny_live_capabilities` and
+`evaluate_q62_tiny_live_readiness` own the prospective prototype prerequisite
+model. BLOCKING_L42 facts are not renamed, reclassified, or silently treated as
+PROVEN. The candidate is source-only and not independently accepted yet.
 
 ## Prototype scope
 
@@ -68,8 +97,9 @@ unattended live trading.
 
 ## Prototype capability adapter
 
-Add a new typed current-product adapter, conceptually
-TinyLivePrototypeCapabilityAdmission.
+The source candidate defines the typed
+`TinyLivePrototypeCapabilityAdmission` in
+`tiny_live_capability_admission.py`.
 
 It accepts the exact independently accepted L41R6 composite identity only when:
 
@@ -84,9 +114,31 @@ It accepts the exact independently accepted L41R6 composite identity only when:
    lineage;
 7. the account fingerprint matches the Q62 readiness identity.
 
-The adapter does not emit READY_FOR_L42 and does not mutate CapabilityReport.
-It emits a separate prototype status such as ELIGIBLE_FOR_TINY_LIVE_Q62 or
-BLOCKED.
+The adapter does not emit READY_FOR_L42 and does not mutate `CapabilityReport`.
+Its sole admitted status is `ELIGIBLE_FOR_TINY_LIVE_Q62`; invalid inputs fail
+closed. Account fingerprint and account type are part of the canonical
+admission material.
+
+Admission schema is `arch147-tiny-live-capability-admission/v1`. Its
+deterministic SHA-256 material includes the accepted L41R6 source HEAD/tree;
+the consumed L41/L41R5 artifact hashes, lengths, and source identities; the
+official binding ID `RH_L41_OFFICIAL_RULES_2026_11_10_V2`, exact official source
+digests, and bound claims; normalized interface provenance; the ordered 13-fact
+classification/rationale/evidence-digest matrix; account identity; and the
+fixed policy ID, policy hash, and complete canonical policy fields. The bound
+official source digests are:
+
+| Official source ID | SHA-256 |
+| --- | --- |
+| TRADING_WITH_YOUR_AGENT | `a7789ee596168e2605ce4fbca73346f9c75ef882995df187c303d7ae7c17d980` |
+| FRACTIONAL_SHARES | `6735222237350f2001da457b75872647c1d4afbe86911cd1759b55f8dc86a3a3` |
+| RHF_RHS_CUSTOMER_AGREEMENT | `26dae42562b1ef0d50e9afbb33fa6c5f3acdbbd9dc9a814e3a8e88a5f7e2dcf2` |
+
+Canonicalization is source-owned compact, sorted-key ASCII JSON followed by
+SHA-256. No clock, UUID4, Python hash, object identity, filesystem path, locale,
+or serialized artifact bytes contribute to identity. The immutable typed policy
+is `ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1`; its fixed-order canonical fields
+and canonical SHA-256 are included in the admission material.
 
 ## Why each global blocker is not a prototype prerequisite
 
@@ -155,9 +207,15 @@ Before automated exit placement:
 - placement may still reject; rejection does not restore entry or create retry
   authority.
 
-The source implementation must define the accepted review response shape before
-L43. Synthetic tests are not provider qualification; the first real exact-owned
-review remains an L43 protected boundary.
+The source candidate defines the closed normalized response contract
+`ARCH147_TINY_LIVE_EXACT_SELL_REVIEW_V1`. Its pure validator accepts only an
+`AFFIRMATIVE` `NONPLACING_PREVIEW` whose identity, proposal digest, and reviewed
+arguments exactly match the proposal; warnings, unknown fields, rejection
+codes, or provider order IDs block. Rejected, malformed, warning, and unknown
+review results carry typed manual-close triggers. This result is prospective
+source evidence only: it has zero provider mutations and grants no placement or
+trade authority. Synthetic tests are not provider qualification; the first real
+exact-owned review remains an L43 protected boundary.
 
 ## Partial/unknown outcomes
 
@@ -176,15 +234,22 @@ attempt. Factual read-only reconciliation is required.
 
 ## Prototype Q62 successor
 
-Do not weaken historical evaluate_q62_readiness.
+Do not weaken historical `evaluate_q62_readiness`.
 
-Add a separate prospective evaluator, conceptually
-evaluate_q62_tiny_live_readiness, which retains all existing fresh-proof,
-identity, ownership, budget, signal-input, recovery, flat-baseline and
-unresolved-effect checks.
+The source candidate defines the separate pure evaluator
+`evaluate_q62_tiny_live_readiness`. It calls the unchanged historical evaluator
+with the original `Q62EvidenceBundle`, retaining its fresh-proof, identity,
+ownership, budget, signal-input, recovery, flat-baseline and unresolved-effect
+checks. It accepts only a historical `BLOCKED` report whose sole blocker is
+`CAPABILITY_UNPROVEN` for the known L41R6 report, plus exact prototype admission
+and exactly one fresh `ProofKind.CAPABILITY` proof with evidence SHA-256 equal to
+the admission digest.
 
-Its capability input is the new prototype admission rather than a fabricated
-READY_FOR_L42 CapabilityReport.
+The original `CapabilityReport` is passed through unchanged; no
+`READY_FOR_L42 CapabilityReport` is fabricated. Every other historical blocker,
+unexpected classification, capability or account mismatch, stale/missing or
+duplicate proof, non-flat baseline, unresolved order/effect, or budget drift
+keeps the prototype result `BLOCKED`.
 
 A ready result means only READY_FOR_L43_PROTOTYPE_READ_ONLY. It grants no trade
 authority and performs no provider mutation.
@@ -222,14 +287,22 @@ bounded recovery authority, or a different position-sizing/execution model.
 The tiny-live pivot must not be cited as proof of generic fractional execution
 limits.
 
-## Next source checkpoint
+## Current source candidate and next boundary
 
-Implement the additive prototype capability adapter and prototype Q62 evaluator.
-PROTECTED_EFFECTS=0.
+The additive candidate is in `tiny_live_capability_admission.py`,
+`tiny_live_policy.py`, and `tiny_live_readiness_operator.py`. It defines the
+admission digest, one-entry policy, future exact-owned sell/review semantics,
+manual-close state, and prototype Q62 composition without changing historical
+L41 or Q62 behavior. No provider, credential, browser, MCP, broker, order,
+review, Q62-observation, L43, Q63, or FINAL_HOLDOUT path is added. For this
+source candidate, `PROTECTED_EFFECTS=0`.
+
+The candidate remains pending focused verification and mapped certification;
+independent exact-source review follows terminal green CI. The next protected boundary is a separately
+reviewed Q62 readiness observation after those gates; the source readiness
+label does not authorize entry or placement.
 
 No OAuth, browser, MCP session, tools/list, account read, order review, place,
 cancel, Q62 real observation, L43, Q63, or FINAL_HOLDOUT access is authorized by
-that implementation checkpoint.
-
-Mapped CI and independent exact-source review precede any Q62 protected
-readiness observation.
+this source candidate. Mapped CI and independent exact-source review precede
+any Q62 protected readiness observation.

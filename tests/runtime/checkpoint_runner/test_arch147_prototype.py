@@ -199,6 +199,78 @@ def test_l41r6_consumed_evidence_and_rule_binding_are_prepublication_owned():
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_tiny_live_pivot_source_test_pairs_are_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    pairs = (
+        (
+            "src/trading_bot/live_prototype/tiny_live_capability_admission.py",
+            "tests/live_prototype/test_capability_tiny_live_admission.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/tiny_live_policy.py",
+            "tests/live_prototype/test_tiny_live_policy.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/tiny_live_readiness_operator.py",
+            "tests/live_prototype/test_tiny_live_readiness_operator.py",
+        ),
+    )
+    registry = runner._checkpoint_specs()
+    spec = registry[runner.ARCH147_PROTOTYPE_NAME]
+    assert "src/trading_bot/live_prototype" in runner.ARCH147_PROTOTYPE_RUFF
+    assert spec.preflight is None and spec.execute is None
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
+    assert all("l41r7" not in name.casefold() for name in registry)
+    assert all(
+        "l41r7" not in path.casefold()
+        for path in runner.ARCH147_PROTOTYPE_TESTS + runner.ARCH147_PROTOTYPE_RUFF
+    )
+
+    inventory = certification.discover_inventory(root)
+    full = set(certification.select_inventory(inventory, "full"))
+    for source, test in pairs:
+        source_path = root / source
+        assert source_path.is_file()
+        assert (root / test).is_file()
+        assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+        assert test in spec.tests
+        assert test in full
+        source_text = source_path.read_text(encoding="utf-8")
+        assert "l41r7" not in source_text.casefold()
+        tree = ast.parse(source_text)
+        assert not _production_imports(source, tree)
+        imported_names = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported_names.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom):
+                imported_names.append(node.module or "")
+                imported_names.extend(alias.name for alias in node.names)
+        assert all("final_holdout" not in name.casefold() for name in imported_names)
+        assert not any(
+            (
+                isinstance(node, ast.Name)
+                and node.id in {"FINAL_HOLDOUT", "final_holdout"}
+            )
+            or (
+                isinstance(node, ast.Attribute)
+                and node.attr in {"FINAL_HOLDOUT", "final_holdout"}
+            )
+            or (
+                isinstance(node, ast.Constant)
+                and node.value in {"FINAL_HOLDOUT", "final_holdout"}
+            )
+            for node in ast.walk(tree)
+        )
+        assert not any(
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id in {"eval", "exec", "__import__"}
+            for node in ast.walk(tree)
+        )
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):
     from dataclasses import replace
 

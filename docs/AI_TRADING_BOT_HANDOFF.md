@@ -30,11 +30,16 @@ That BLOCKED result is accepted truth, not an implementation failure. The five
 remaining facts cannot be promoted by documentation silence, the app Sell All
 path, holding precision, or another prose/schema classifier.
 
-The project therefore takes the documented pivot threshold now. There is no
-L41R7. The next milestone is the additive
-`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT`. It preserves every L40/L41/L41R1-
-R6 historical and consumed contract and introduces a new prototype-specific
-admission layer for the single <=$10 explicitly armed live trial.
+The immutable consumed evidence roots are L41, 4,114 bytes, SHA-256
+`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`, and
+L41R5, 11,128 bytes, SHA-256
+`fc95eb9fbdd2b7dbe064b7cac84e8851996669af96be1273ae46309873a650ff`.
+
+The project therefore takes the documented pivot threshold. There is no
+L41R7. The additive `ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT` source candidate
+now defines a prototype-specific admission layer, typed one-entry risk policy,
+and effect-free Q62/sell-review contracts for the single <=$10 explicitly
+armed live trial. Historical L40/L41/L41R1-R6 contracts remain unchanged.
 
 The prospective prototype may proceed without proving those five global broker
 rules only if all of these mitigations are executable and fail closed:
@@ -66,11 +71,28 @@ rules only if all of these mitigations are executable and fail closed:
 10. the pivot grants prototype qualification only. Repeated unattended
     production trading must revisit automatic residual/recovery capability in P7.
 
-The historical `CapabilityReport` and `evaluate_q62_readiness` must not be
-relaxed. A new adapter/evaluator owns this prospective prototype policy.
+The historical `CapabilityReport` and `evaluate_q62_readiness` remain
+unchanged. The prototype evaluator composes the original L41R6 BLOCKED report
+and admits only its exact sole `CAPABILITY_UNPROVEN` blocker, with a fresh
+`ProofKind.CAPABILITY` proof whose digest equals the prototype admission
+digest. Any additional historical blocker, identity mismatch, stale proof,
+non-flat baseline, pending effect, or budget drift remains BLOCKED. The
+prototype ready label is `READY_FOR_L43_PROTOTYPE_READ_ONLY`; it grants no live
+readiness, trade authority, or provider mutation.
 
-Q62 itself remains NOT RUN until that source checkpoint is accepted/integrated.
-L43 and Q63 remain NOT RUN. FINAL_HOLDOUT is sealed.
+The source candidate remains pending mapped certification and subsequent
+independent exact-source acceptance; no result is recorded for its CI or
+integration. The candidate does not run Q62. Q62, L43, and Q63 remain NOT RUN;
+FINAL_HOLDOUT is sealed. The exact prototype policy, digest material, and
+manual-close/review contracts are in
+[147-q62-tiny-live-prerequisite-pivot.md](architecture/147-q62-tiny-live-prerequisite-pivot.md).
+
+## Immediate next step
+
+Complete the focused ownership and behavior checks, then obtain terminal mapped
+CI certification for the exact source candidate. After CI is green, perform
+independent exact-source review. A Q62 protected readiness observation remains
+a separate later boundary; this source candidate does not authorize it.
 
 ## L41R1 consumed observation and L41R2 source successor
 

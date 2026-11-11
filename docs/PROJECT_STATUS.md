@@ -20,7 +20,11 @@ fractional purchases/sales have a $1 value minimum. The selected source bodies
 remain pinned historically by the repository's exact byte lengths/digests and
 bounded claim locators; runtime/CI never fetch them.
 
-The accepted offline composite result is intentionally BLOCKED:
+The accepted offline composite result is intentionally BLOCKED. Its immutable
+inputs are the 4,114-byte L41 artifact (SHA-256
+`c85ba6d18bf1a3f234d7055dbe564fb7e2df4e1db8cc0f9f16c6b19e0d695c0c`) and the
+11,128-byte L41R5 artifact (SHA-256
+`fc95eb9fbdd2b7dbe064b7cac84e8851996669af96be1273ae46309873a650ff`):
 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER_TO_FIRST_OWNED_POSITION. The five blockers
 are `QUANTITY_INCREMENT`, `MINIMUM_QUANTITY`,
 `MAXIMUM_QUANTITY_OR_ABSENCE`, `BELOW_MINIMUM_FULL_CLOSE`, and
@@ -35,31 +39,30 @@ global guarantees unnecessary for the single explicitly armed <=$10 prototype
 trial through exact proposal review, factual reconciliation, local exposure
 limits, and a manual-close escalation path.
 
-The pivot is additive. Historical L40/L41 capability semantics, consumed
-evidence, `CapabilityReport`, and the existing `evaluate_q62_readiness`
-remain unchanged for reconstruction. The successor must introduce a
-prototype-specific capability/admission adapter rather than relabeling
-BLOCKING_L42 facts as PROVEN.
+The additive source candidate defines a prototype capability admission, fixed
+typed risk policy, prospective exact-owned sell/review contracts, and a
+separate Q62 readiness evaluator. Historical L40/L41 capability semantics,
+consumed evidence, `CapabilityReport`, and `evaluate_q62_readiness` remain
+unchanged. Historical Q62 still reports its exact capability-only blocker for
+the accepted L41R6 report; the prototype evaluator can proceed only when that
+is its sole historical blocker and a fresh capability proof binds the
+source-owned admission digest. Its only ready label is
+`READY_FOR_L43_PROTOTYPE_READ_ONLY`, with zero provider mutations and no
+live-readiness or trade authority.
 
-Q62 remains NOT RUN. L43 and Q63 remain NOT RUN. FINAL_HOLDOUT stays sealed.
-No broker/order/live effect follows from the pivot design.
+The source candidate has not yet received mapped certification or independent
+exact-source acceptance. It grants no Q62 observation, order review, placement, cancellation,
+L43, Q63, or FINAL_HOLDOUT access. Q62, L43, and Q63 remain NOT RUN;
+FINAL_HOLDOUT stays sealed. See the
+[pivot contract](architecture/147-q62-tiny-live-prerequisite-pivot.md) for the
+exact evidence, digest inputs, and manual-close semantics.
 
 ## Immediate next step
 
-Implement the source-only
-`ARCH147_Q62_TINY_LIVE_PREREQUISITE_PIVOT` adapter and prototype-readiness
-evaluator. It must consume the exact accepted L41R6 result without modifying
-that result, admit only the exact known five-blocker set for the one <=$10
-prototype under the frozen mitigations in
-[147-q62-tiny-live-prerequisite-pivot.md](architecture/147-q62-tiny-live-prerequisite-pivot.md),
-and keep all provider/broker effects disabled.
-
-The new source checkpoint must leave historical `evaluate_q62_readiness`
-unchanged, add a separate prototype-specific evaluator/admission type, and
-remain BLOCKED on any extra/missing capability fact, account/source/config
-mismatch, stale evidence, non-flat baseline, unresolved order/effect, or absent
-manual-close escalation capability. No Q62 protected observation, order review,
-placement, L43, Q63, or FINAL_HOLDOUT access is part of implementation.
+Complete focused ownership and behavior checks, then obtain terminal mapped CI
+certification for the exact source candidate. After CI is green, conduct
+independent exact-source review. Keep the Q62 protected observation separate;
+L43, Q63, and FINAL_HOLDOUT remain unrun boundaries.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

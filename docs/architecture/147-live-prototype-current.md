@@ -1,6 +1,6 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L41R6 accepted; Q62 prototype prerequisite pivot
+## Current boundary - L41R6 accepted; Q62 prototype source candidate
 
 L41R6 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at
 `17faef900919cf400ce77877b328418e40787842` / tree
@@ -11,9 +11,10 @@ run `42947447216`, attempt 1, is terminal SUCCESS with exact feature
 certification reuse and no duplicate FULL.
 
 The accepted L41R6 result remains BLOCKED with seven proven facts, five global
-broker-rule blockers, and the existing position-specific review deferral. Exact
-details remain in the validation ledger. No L41R7 evidence/debugging successor
-is authorized.
+broker-rule blockers, and the existing position-specific review deferral. Its
+exact consumed artifact roots and 13-fact classification are retained in the
+[validation ledger](../validation/arch147-live-prototype.md). No L41R7
+evidence/debugging successor is authorized.
 
 This result triggers the current product pivot threshold: the project has
 repeatedly demonstrated that the remaining boundary is not a schema parser,
@@ -21,16 +22,21 @@ description parser, source-digest, or public-documentation bug. Building
 increasingly elaborate static proof around the same absent global MCP rules
 would repeat the retired recovery-loop pattern.
 
-The forward path is the additive
-[Q62 tiny-live prerequisite pivot](147-q62-tiny-live-prerequisite-pivot.md).
-It leaves L40/L41 historical semantics unchanged and introduces a
-prototype-specific admission adapter for the single explicitly armed <=$10 live
-trial. The adapter may recognize only the exact accepted L41R6 five-blocker set
-and only under the pivot's proposal-specific review, local risk, reconciliation,
-and manual-close escalation invariants.
+The additive
+[Q62 tiny-live prerequisite pivot](147-q62-tiny-live-prerequisite-pivot.md)
+now has a source candidate: exact L41R6 capability admission, fixed
+`ARCH147_TINY_LIVE_SPY_SINGLE_ENTRY_V1` policy, prototype Q62 composition, and
+typed future exact-owned sell/review and manual-close contracts. It does not
+change L40/L41 historical semantics or the five L41R6 blockers. The source
+candidate is pending mapped certification, followed by independent exact-source
+review.
 
-Q62, L43, and Q63 remain NOT RUN. No order or protected effect is authorized by
-this design checkpoint.
+The prototype evaluator accepts only the historical sole
+`CAPABILITY_UNPROVEN` blocker paired with a fresh capability proof bound to the
+prototype admission digest. Its ready result is only
+`READY_FOR_L43_PROTOTYPE_READ_ONLY`; it grants no live readiness, trade
+authority, or provider mutation. Q62 observation, L43, and Q63 remain NOT RUN.
+No order or protected effect is authorized by this source candidate.
 
 ## D34 accepted boundary - historical transition to L40
 

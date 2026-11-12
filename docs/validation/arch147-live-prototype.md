@@ -1,28 +1,29 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L43 effect-disabled source continuity owner — ACCEPTED / INTEGRATED
+## L43 protected-boundary source — ACCEPTED / INTEGRATED
 
-Final accepted source: `7850c96d0300b14262d81db5ae0e7058b9446f74` / tree `50c5472eb414e9c454594ed43b9c72c26ad24d0c`. Feature mapped FULL `43163048112`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43167235156`, attempt 1, is terminal SUCCESS with the exact feature-certification reuse proof and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted source: `955993f6c5b10322816ec3cdc570864bc3d2cb3a` / tree `163a3c502218fbbead9fd12c2d9cb734845ffe79`. Feature mapped FULL `43193918308`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43195026703`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
-Review history is preserved. Initial candidate `2f72e1bfeba5aedc68503184a03a29944429f810` / run `43150177316` was rejected before integration because it defined weaker parallel exact-sell/review abstractions and under-bound fresh facts. Corrective `7a03990a3d6997cadc5f5e0ef8c69ad575f85df3` / run `43155343253` reused the accepted tiny-live policy and added fresh-fact evidence binding, but was rejected because its canonical production constructor still accepted caller-selected Q62 origin/journal authority. Both green runs are preserved. Final corrective `7850c96...` closes that trust-anchor defect.
+Preserved review history:
 
-Independent exact-source review confirmed:
+- `981425f3de0eb3eaf0d51ca8c7e2bf47e4a008ac` / run `43181095376`: terminal red. Source-static and broad-1 through broad-6 passed; active-tests and broad-7 exposed the existing production-import guard because new L43 source directly imported Robinhood MCP transport/models/parsing. Classified `PREPUBLICATION_COVERAGE_DEFECT`; run preserved and never rerun.
+- `64446714f8d49abdda1e5a97503a400e41eb53f1` / run `43189704383`: terminal green but exact-source review rejected before integration. It restored neutral provider contracts/adapters and made the canonical Architecture 147 guard part of relevant prepublication admission, but the new Robinhood read adapter treated an absent pagination `next` field as terminal exhaustion.
+- `955993f6c5b10322816ec3cdc570864bc3d2cb3a` / run `43193918308`: final accepted child. It requires explicit pagination metadata for both positions and orders; `None` remains valid exhaustion, valid strings remain continuation cursors, and missing/malformed cursors fail closed.
 
-- final source is three ordinary commits ahead of the prior integrated docs source and changes only `scripts/checkpoint_runner.py`, `src/trading_bot/live_prototype/l43_production_owner.py`, and `tests/live_prototype/test_l43_production_owner.py`;
-- the production factory takes only `repo_root`; caller-supplied Q62 origin and journal path are not accepted;
-- exact consumed Q62 source HEAD/tree, fixed journal path, 806-byte length, journal SHA-256 and consumed observation SHA-256 are source-owned;
-- the Q62 initialization record is parsed fail-closed, including duplicate-key rejection, exact schema/sequence/zero predecessor/INITIALIZED kind, flat baseline and exact SPY/BASE_MA35_50_V1 identity;
-- `DurableStateStore.open()` reconstructs and validates the journal hash chain and requires exact recovered runtime identity;
-- continuity proves strict Git ancestry plus current FEATURE and PROSPECTIVE_DEVELOP source authority;
-- the continuity path exposes no Q62 create, append, repair, reinitialize, copy, migration or rebind operation;
-- L43 exact-owned sell/review checks delegate to the already accepted `tiny_live_policy` contracts, preserving exact ownership, terminal effects, full reservation, no prior exit, exact normalized arguments, no dollar substitution and bounded fractional scale;
-- fresh future account/position/order/session/D34-signal/recovery material and final assessment are bound into `fresh_effect_facts_sha256`;
-- a new-entry review-ready outcome requires flat owned remainder, no unresolved effect, genuine BUY, unused one-shot entry authority and <=$10 requested risk;
-- the source owner has no provider/transport effect surface and cannot report entry/review/place/cancel/provider mutation activity or grant placement/trade/live authority.
+Accepted source behavior:
 
-No provider, OAuth, Robinhood, broker or protected effect occurred during implementation, certification, review or integration. Q62 journal/evidence were reported unchanged; FINAL_HOLDOUT was untouched. The stale develop run `43096933169` remains preserved as `INFRASTRUCTURE_STALLED_PRE_JOB` (queued / zero jobs), without rerun/cancel/delete.
+- preserves the immutable Q62 origin/journal trust anchor and adds separate origin-bound L43 durable state rather than migrating Q62 identity;
+- binds fresh source/config/binding/account/positions/orders/session/signal/recovery facts into sanitized pre-effect evidence;
+- uses provider-independent contracts inside `live_prototype`; Robinhood raw models/parsing remain behind `robinhood_mcp/l43_read_adapter.py`;
+- selects the Architecture 147 production-import guard exactly once during relevant prepublication admission;
+- freezes entry ordering as final fresh revalidation -> durable reservation -> persisted `MAY_HAVE_OCCURRED` -> exactly one invocation -> truthful provider-ID binding -> bounded factual reconciliation;
+- preserves one-lifetime <=$10 entry budget, UNKNOWN/no-retry, restart non-replenishment and sticky manual-close behavior;
+- reuses the accepted exact-owned sell proposal and normalized review contracts; review alone grants no placement and failed/partial/canceled/unknown exits do not authorize replacement sells;
+- keeps START/STOP worker-lifecycle semantics and does not make GUI KILL/EXIT trading controls.
 
-L43 protected effects are **NOT RUN / NOT AUTHORIZED**. The accepted source only establishes the continuity and source contract needed for a later separately reviewed protected operator. Q63 remains NOT RUN; L41R7 remains FORBIDDEN; FINAL_HOLDOUT remains SEALED.
+This remains **source-only**. Production account-wide all-agent SPY order-scope proof, production effect transport construction, production post-effect reconciliation, and affirmative real exact-owned review semantics remain unqualified. No provider/OAuth/Robinhood/Alpaca/broker/protected effect occurred during implementation, certification, review or integration. Q62 was not rerun. FINAL_HOLDOUT was not accessed.
+
+Immediate successor: one bounded source checkpoint for production **read-only** pre-effect composition and order-scope qualification only. Do not compose the effect operator or review/place/cancel tools. After that source is independently accepted, one separately authorized protected read-only L43 observation may be considered. A live entry remains a later boundary.
 
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 

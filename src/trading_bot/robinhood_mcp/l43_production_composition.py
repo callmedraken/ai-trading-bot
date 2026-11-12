@@ -8,7 +8,6 @@ state, or exposes a mutation/review transport.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -90,23 +89,11 @@ class L43ProductionPreEffectComposition:
         cls,
         *,
         repo_root: Path,
-        oauth_factory: Callable[[], object] | None = None,
-        alpaca_transport_factory: Callable[[], object] | None = None,
-        alpaca_credential_reader: Callable[[], object] | None = None,
-        clock: Callable[[], datetime] | None = None,
     ) -> L43ProductionPreEffectComposition:
         """Assemble lazy read-only dependencies without invoking any boundary."""
 
         if not isinstance(repo_root, Path):
             raise TypeError("production composition requires a concrete repo Path")
-        for callback, label in (
-            (oauth_factory, "OAuth factory"),
-            (alpaca_transport_factory, "Alpaca transport factory"),
-            (alpaca_credential_reader, "Alpaca credential reader"),
-            (clock, "clock"),
-        ):
-            if callback is not None and not callable(callback):
-                raise TypeError(f"{label} must be callable")
 
         origin = read_canonical_q62_origin()
         owner = L43ProductionOwner.for_production(repo_root=repo_root)
@@ -120,25 +107,20 @@ class L43ProductionPreEffectComposition:
             )
 
         def robinhood_builder() -> RobinhoodL43PreEffectReadAdapter:
-            factory = oauth_factory
-            if factory is None:
-                from trading_bot.robinhood_mcp.windows_oauth import (
-                    create_windows_robinhood_oauth_factory,
-                )
+            from trading_bot.robinhood_mcp.windows_oauth import (
+                create_windows_robinhood_oauth_factory,
+            )
 
-                factory = create_windows_robinhood_oauth_factory(
-                    redirect_uri=DEFAULT_ROBINHOOD_REDIRECT_URI
-                )
+            factory = create_windows_robinhood_oauth_factory(
+                redirect_uri=DEFAULT_ROBINHOOD_REDIRECT_URI
+            )
             return RobinhoodL43PreEffectReadAdapter(
                 RobinhoodCurrentReadTransport(factory)
             )
 
         def signal_provider_builder() -> AlpacaRuntimeSignalProvider:
             return AlpacaRuntimeSignalProvider(
-                transport_factory=alpaca_transport_factory,
-                credential_reader=alpaca_credential_reader,
                 session_authority=session_authority,
-                clock=clock,
             )
 
         dependencies = L43PreEffectDependencies(
@@ -148,7 +130,7 @@ class L43ProductionPreEffectComposition:
             state_snapshot_reader=read_production_l43_state_snapshot,
             robinhood_builder=robinhood_builder,
             signal_provider_builder=signal_provider_builder,
-            clock=(clock if clock is not None else lambda: datetime.now(UTC)),
+            clock=lambda: datetime.now(UTC),
             session_authority=session_authority,
             order_scope_verifier=scope_verifier,
         )

@@ -51,26 +51,13 @@ class _Journal:
 
 def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ):
     origin = _origin()
     owner = L43ProductionOwner(
         authority_verifier=_Authority(), journal_reader=_Journal()
     )
-    oauth_calls: list[str] = []
-    alpaca_transport_calls: list[str] = []
-    alpaca_credential_calls: list[str] = []
-
-    def oauth_factory() -> object:
-        oauth_calls.append("oauth")
-        return object()
-
-    def alpaca_transport_factory() -> object:
-        alpaca_transport_calls.append("transport")
-        return object()
-
-    def alpaca_credential_reader() -> object:
-        alpaca_credential_calls.append("credentials")
-        return object()
+    oauth_factory_calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(composition, "read_canonical_q62_origin", lambda: origin)
     monkeypatch.setattr(
@@ -78,12 +65,16 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
         "for_production",
         classmethod(lambda cls, *, repo_root: owner),
     )
+    from trading_bot.robinhood_mcp import windows_oauth
+
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: oauth_factory_calls.append(kwargs) or (lambda: object()),
+    )
 
     built = composition.L43ProductionPreEffectComposition.for_production(
-        repo_root=Path(r"F:\AI\worktrees\ai-trading-bot-live-prototype-current"),
-        oauth_factory=oauth_factory,
-        alpaca_transport_factory=alpaca_transport_factory,
-        alpaca_credential_reader=alpaca_credential_reader,
+        repo_root=tmp_path,
     )
 
     assert built.origin is origin
@@ -97,18 +88,16 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
         built.dependencies.order_scope_verifier,
         composition.RobinhoodL43AccountWideOrderScopeVerifier,
     )
-    assert oauth_calls == []
-    assert alpaca_transport_calls == []
-    assert alpaca_credential_calls == []
+    assert oauth_factory_calls == []
 
     read = built.dependencies.robinhood_builder()
     signal = built.dependencies.signal_provider_builder()
     assert isinstance(read, RobinhoodL43PreEffectReadAdapter)
     assert isinstance(read._read, RobinhoodCurrentReadTransport)
     assert hasattr(signal, "snapshot")
-    assert oauth_calls == []
-    assert alpaca_transport_calls == []
-    assert alpaca_credential_calls == []
+    assert oauth_factory_calls == [
+        {"redirect_uri": composition.DEFAULT_ROBINHOOD_REDIRECT_URI}
+    ]
 
     source_values = iter(("8" * 40, "9" * 40))
     monkeypatch.setattr(
@@ -120,6 +109,20 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
         source_head="8" * 40,
         source_tree="9" * 40,
     )
+
+
+def test_for_production_rejects_caller_selected_boundaries(tmp_path: Path):
+    for kwargs in (
+        {"clock": lambda: object()},
+        {"oauth_factory": lambda: object()},
+        {"alpaca_transport_factory": lambda: object()},
+        {"alpaca_credential_reader": lambda: object()},
+    ):
+        with pytest.raises(TypeError):
+            composition.L43ProductionPreEffectComposition.for_production(
+                repo_root=tmp_path,
+                **kwargs,
+            )
 
 
 def test_production_scope_verifier_cannot_be_caller_asserted():

@@ -1,29 +1,28 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L43 protected-boundary source — ACCEPTED / INTEGRATED
+## L43 production read-only pre-effect composition — ACCEPTED / INTEGRATED
 
-Final accepted source: `955993f6c5b10322816ec3cdc570864bc3d2cb3a` / tree `163a3c502218fbbead9fd12c2d9cb734845ffe79`. Feature mapped FULL `43193918308`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43195026703`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted source: `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / tree `fcde53aed2485b7c802b19b90eabe68be1353221`. Feature mapped FULL `43202673608`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43293115549`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
-Preserved review history:
+Review history:
 
-- `981425f3de0eb3eaf0d51ca8c7e2bf47e4a008ac` / run `43181095376`: terminal red. Source-static and broad-1 through broad-6 passed; active-tests and broad-7 exposed the existing production-import guard because new L43 source directly imported Robinhood MCP transport/models/parsing. Classified `PREPUBLICATION_COVERAGE_DEFECT`; run preserved and never rerun.
-- `64446714f8d49abdda1e5a97503a400e41eb53f1` / run `43189704383`: terminal green but exact-source review rejected before integration. It restored neutral provider contracts/adapters and made the canonical Architecture 147 guard part of relevant prepublication admission, but the new Robinhood read adapter treated an absent pagination `next` field as terminal exhaustion.
-- `955993f6c5b10322816ec3cdc570864bc3d2cb3a` / run `43193918308`: final accepted child. It requires explicit pagination metadata for both positions and orders; `None` remains valid exhaustion, valid strings remain continuation cursors, and missing/malformed cursors fail closed.
+- `0ef5fe8bfd4a24acc7781b5ab6b92213b7f1e68a` / run `43199229859`: terminal green but exact-source review rejected before integration. The canonical production factory accepted caller-selected Robinhood OAuth, Alpaca transport, Alpaca credential-reader and clock callbacks, and its focused test used a hard-coded F: worktree fixture.
+- `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / run `43202673608`: final accepted corrective. `for_production()` accepts only `repo_root`, source-owns production providers/clock, uses portable tests and leaves observation/order-scope semantics unchanged.
 
-Accepted source behavior:
+Accepted composition behavior:
 
-- preserves the immutable Q62 origin/journal trust anchor and adds separate origin-bound L43 durable state rather than migrating Q62 identity;
-- binds fresh source/config/binding/account/positions/orders/session/signal/recovery facts into sanitized pre-effect evidence;
-- uses provider-independent contracts inside `live_prototype`; Robinhood raw models/parsing remain behind `robinhood_mcp/l43_read_adapter.py`;
-- selects the Architecture 147 production-import guard exactly once during relevant prepublication admission;
-- freezes entry ordering as final fresh revalidation -> durable reservation -> persisted `MAY_HAVE_OCCURRED` -> exactly one invocation -> truthful provider-ID binding -> bounded factual reconciliation;
-- preserves one-lifetime <=$10 entry budget, UNKNOWN/no-retry, restart non-replenishment and sticky manual-close behavior;
-- reuses the accepted exact-owned sell proposal and normalized review contracts; review alone grants no placement and failed/partial/canceled/unknown exits do not authorize replacement sells;
-- keeps START/STOP worker-lifecycle semantics and does not make GUI KILL/EXIT trading controls.
+- provider-specific construction remains outside `live_prototype`;
+- canonical production composition performs no credential read, OAuth/browser operation, network/provider call, durable mutation, review/place/cancel action or FINAL_HOLDOUT access;
+- Robinhood and Alpaca providers remain lazy until the separately authorized observation invokes their read boundaries;
+- no `L43EffectOperator`, live mutation transport, review/place/cancel tool or post-effect reconciliation path is composed;
+- normalized provider-independent facts cross inward;
+- pagination remains explicit/fail-closed;
+- caller assertions cannot qualify order scope;
+- current production verifier truthfully returns no `ACCOUNT_WIDE_ALL_AGENTS` proof because accepted provider/interface evidence does not establish unfiltered order-query semantics.
 
-This remains **source-only**. Production account-wide all-agent SPY order-scope proof, production effect transport construction, production post-effect reconciliation, and affirmative real exact-owned review semantics remain unqualified. No provider/OAuth/Robinhood/Alpaca/broker/protected effect occurred during implementation, certification, review or integration. Q62 was not rerun. FINAL_HOLDOUT was not accessed.
+Therefore a protected L43 pre-effect observation on the current source would block on `ORDER_SCOPE_UNPROVEN`; it is not useful or authorized yet. No real provider/OAuth/Robinhood/Alpaca/broker/protected effect occurred during this source checkpoint or its integration. Q62 artifacts remain unchanged and consumed; FINAL_HOLDOUT was untouched.
 
-Immediate successor: one bounded source checkpoint for production **read-only** pre-effect composition and order-scope qualification only. Do not compose the effect operator or review/place/cancel tools. After that source is independently accepted, one separately authorized protected read-only L43 observation may be considered. A live entry remains a later boundary.
+Immediate successor: one bounded **order-scope authority qualification** source checkpoint. Reuse accepted immutable L41/L41R3-R5 schema evidence only if it explicitly proves the semantics of omitting `placed_agent`. Otherwise prepare a schema-only/read-only qualification boundary with zero tool invocation. Only after the scope fact is independently proven should a full protected L43 pre-effect observation be considered.
 
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 

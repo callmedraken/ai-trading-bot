@@ -188,6 +188,12 @@ def _read_canonical_q62_origin() -> Q62JournalOrigin:
     )
 
 
+def read_canonical_q62_origin() -> Q62JournalOrigin:
+    """Read the fixed consumed Q62 origin without exposing its journal writer."""
+
+    return _read_canonical_q62_origin()
+
+
 class ContinuityStatus(StrEnum):
     ACCEPTED = "ACCEPTED"
     BLOCKED = "BLOCKED"
@@ -1032,6 +1038,7 @@ __all__ = [
     "ProductionSourceAuthorityVerifier",
     "Q62ReadOnlyJournalReader",
     "Q62JournalOrigin",
+    "read_canonical_q62_origin",
     "RecoveryFacts",
     "SellReviewValidation",
     "SourceAuthorityEvidence",

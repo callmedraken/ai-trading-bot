@@ -15,9 +15,11 @@ from trading_bot.live_prototype.durable_state import (
     DurableState,
     DurableStateStore,
     IntentKind,
+    ManualCloseRequired,
     OrderState,
     ReconciliationSnapshot,
 )
+from trading_bot.live_prototype.tiny_live_policy import ManualCloseTrigger
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,6 +30,7 @@ class PreparedInvocation:
     kind: IntentKind
     requested_dollars: Decimal | None
     requested_quantity: Decimal | None
+    authority_sha256: str | None = None
 
 
 class LiveController:
@@ -48,9 +51,59 @@ class LiveController:
         with self._lock:
             return self._store.reserve_entry(requested_dollars)
 
-    def reserve_exit(self, requested_quantity: Decimal) -> str:
+    def reserve_exit(
+        self,
+        requested_quantity: Decimal,
+        *,
+        authority_sha256: str | None = None,
+    ) -> str:
         with self._lock:
-            return self._store.reserve_exit(requested_quantity)
+            return self._store.reserve_exit(
+                requested_quantity,
+                authority_sha256=authority_sha256,
+            )
+
+    def begin_sell_review(
+        self,
+        *,
+        proposal_sha256: str,
+        arguments_sha256: str,
+        session_token: object,
+    ) -> None:
+        with self._lock:
+            self._store.begin_sell_review(
+                proposal_sha256=proposal_sha256,
+                arguments_sha256=arguments_sha256,
+                session_token=session_token,
+            )
+
+    def accept_sell_review(
+        self,
+        *,
+        proposal_sha256: str,
+        arguments_sha256: str,
+        review_evidence_sha256: str,
+        session_token: object,
+    ) -> None:
+        with self._lock:
+            self._store.accept_sell_review(
+                proposal_sha256=proposal_sha256,
+                arguments_sha256=arguments_sha256,
+                review_evidence_sha256=review_evidence_sha256,
+                session_token=session_token,
+            )
+
+    def require_manual_close(
+        self,
+        *,
+        trigger: ManualCloseTrigger,
+        effect_evidence_sha256: str,
+    ) -> ManualCloseRequired:
+        with self._lock:
+            return self._store.require_manual_close(
+                trigger=trigger,
+                effect_evidence_sha256=effect_evidence_sha256,
+            )
 
     def prepare_invocation(self, intent_id: str) -> PreparedInvocation:
         """Persist MAY_HAVE_OCCURRED before a caller performs any effect."""
@@ -65,6 +118,7 @@ class LiveController:
                 kind=intent.kind,
                 requested_dollars=intent.requested_dollars,
                 requested_quantity=intent.requested_quantity,
+                authority_sha256=intent.authority_sha256,
             )
 
     def bind_provider_order(self, intent_id: str, provider_order_id: str) -> None:

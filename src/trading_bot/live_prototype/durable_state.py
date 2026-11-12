@@ -18,6 +18,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import BinaryIO
 
+from trading_bot.live_prototype.tiny_live_policy import (
+    ManualCloseBasis,
+    ManualCloseTrigger,
+)
+
 SCHEMA = "arch147-l42-durable-state/v1"
 ENTRY_LIMIT = Decimal("10.00")
 _ZERO = Decimal("0")
@@ -79,6 +84,124 @@ class BlockReason(StrEnum):
     FILL_REGRESSION = "FILL_REGRESSION"
     POSITION_MISMATCH = "POSITION_MISMATCH"
     UNCERTAIN_EFFECT = "UNCERTAIN_EFFECT"
+
+
+@dataclass(frozen=True, slots=True)
+class L43OriginAnchor:
+    """Immutable Q62 origin bound into a separate additive L43 journal."""
+
+    runtime_identity: RuntimeIdentity
+    journal_sha256: str
+    initialization_event_sha256: str
+    consumed_observation_sha256: str
+    journal_label: str = "arch147-q62-live-state-v1"
+
+    def __post_init__(self) -> None:
+        if type(self.runtime_identity) is not RuntimeIdentity:
+            raise TypeError("L43 origin requires the original RuntimeIdentity")
+        for value, label in (
+            (self.journal_sha256, "Q62 journal digest"),
+            (self.initialization_event_sha256, "Q62 initialization digest"),
+            (self.consumed_observation_sha256, "Q62 observation digest"),
+        ):
+            _require_pattern(value, _HEX64, label)
+        if self.journal_label != "arch147-q62-live-state-v1":
+            raise ValueError("L43 origin label differs from the accepted Q62 owner")
+
+    def to_record(self) -> dict[str, object]:
+        return {
+            "runtime_identity": self.runtime_identity.to_record(),
+            "journal_sha256": self.journal_sha256,
+            "initialization_event_sha256": self.initialization_event_sha256,
+            "consumed_observation_sha256": self.consumed_observation_sha256,
+            "journal_label": self.journal_label,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ManualCloseRequired:
+    """Sticky L43-only close state; no automated order authority is carried."""
+
+    trigger: ManualCloseTrigger
+    exact_residual_quantity: Decimal
+    basis: ManualCloseBasis
+    effect_evidence_sha256: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.trigger, ManualCloseTrigger):
+            raise TypeError("manual-close trigger must be a closed typed value")
+        if not isinstance(self.basis, ManualCloseBasis):
+            raise TypeError("manual-close basis must be typed")
+        _validate_decimal(
+            self.exact_residual_quantity, "manual-close residual", positive=True
+        )
+        _require_pattern(
+            self.effect_evidence_sha256, _HEX64, "manual-close evidence digest"
+        )
+        expected_basis = (
+            ManualCloseBasis.LAST_EXACT_RESIDUAL_BEFORE_UNKNOWN
+            if self.trigger is ManualCloseTrigger.SELL_UNKNOWN
+            else ManualCloseBasis.CONFIRMED_RECONCILED_RESIDUAL
+        )
+        if self.basis is not expected_basis:
+            raise ValueError("manual-close basis differs from trigger semantics")
+
+    @property
+    def automated_order_allowed(self) -> bool:
+        return False
+
+    @property
+    def automated_entry_allowed(self) -> bool:
+        return False
+
+    @property
+    def automated_sell_allowed(self) -> bool:
+        return False
+
+    @property
+    def automatic_replacement_sell_allowed(self) -> bool:
+        return False
+
+    @property
+    def read_only_reconciliation_allowed(self) -> bool:
+        return True
+
+    @property
+    def separate_accepted_reconciliation_required_to_resolve(self) -> bool:
+        return True
+
+
+class L43SellReviewStatus(StrEnum):
+    ATTEMPTED = "ATTEMPTED"
+    ACCEPTED = "ACCEPTED"
+
+
+@dataclass(frozen=True, slots=True)
+class L43SellReviewState:
+    """Durable review evidence; ACCEPTED alone is not sell authority."""
+
+    status: L43SellReviewStatus
+    proposal_sha256: str
+    arguments_sha256: str
+    started_at_sequence: int
+    review_evidence_sha256: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.status, L43SellReviewStatus):
+            raise TypeError("sell-review status must be typed")
+        _require_pattern(self.proposal_sha256, _HEX64, "sell proposal digest")
+        _require_pattern(self.arguments_sha256, _HEX64, "sell arguments digest")
+        if type(self.started_at_sequence) is not int or self.started_at_sequence < 0:
+            raise ValueError("sell-review sequence is invalid")
+        if self.status is L43SellReviewStatus.ATTEMPTED:
+            if self.review_evidence_sha256 is not None:
+                raise ValueError("unresolved review cannot carry accepted evidence")
+        else:
+            _require_pattern(
+                self.review_evidence_sha256,
+                _HEX64,
+                "accepted review evidence digest",
+            )
 
 
 def _validate_decimal(value: Decimal, label: str, *, positive: bool = False) -> None:
@@ -204,6 +327,7 @@ class OrderState:
     cumulative_quantity: Decimal = _ZERO
     cumulative_notional: Decimal = _ZERO
     working_remainder: Decimal = _ZERO
+    authority_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,6 +340,9 @@ class DurableState:
     blocked_reason: BlockReason | None = None
     last_sequence: int = -1
     journal_hash: str = _ZERO_HASH
+    l43_origin: L43OriginAnchor | None = None
+    sell_review: L43SellReviewState | None = None
+    manual_close: ManualCloseRequired | None = None
 
     @property
     def owned_quantity(self) -> Decimal:
@@ -244,6 +371,63 @@ class DurableState:
     @property
     def exits_used(self) -> int:
         return int(self.exit is not None)
+
+    @property
+    def sell_review_pending(self) -> bool:
+        return (
+            self.sell_review is not None
+            and self.sell_review.status is L43SellReviewStatus.ATTEMPTED
+        )
+
+    @property
+    def manual_close_required(self) -> bool:
+        if self.l43_origin is None:
+            return self.manual_close is not None
+        if self.manual_close is not None:
+            return True
+        return (
+            self.exit is not None
+            and self.owned_quantity > _ZERO
+            and self.exit.status
+            in {
+                IntentStatus.MAY_HAVE_OCCURRED,
+                IntentStatus.UNKNOWN,
+                IntentStatus.PARTIAL,
+                IntentStatus.CANCELED,
+                IntentStatus.REJECTED,
+            }
+        )
+
+    @property
+    def manual_follow_up_required(self) -> bool:
+        return self.manual_close_required or (
+            self.l43_origin is not None
+            and self.exit is not None
+            and self.owned_quantity > _ZERO
+            and self.exit.status
+            in {
+                IntentStatus.RESERVED,
+                IntentStatus.MAY_HAVE_OCCURRED,
+                IntentStatus.UNKNOWN,
+                IntentStatus.WORKING,
+                IntentStatus.PARTIAL,
+            }
+        )
+
+    @property
+    def automated_order_allowed(self) -> bool:
+        return not (
+            self.manual_close_required
+            or self.sell_review_pending
+            or self.blocked_reason is not None
+            or not self.reconciled
+            or _has_uncertain_intent(self)
+            or any(
+                order is not None
+                and order.status in {IntentStatus.WORKING, IntentStatus.PARTIAL}
+                for order in (self.entry, self.exit)
+            )
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,6 +513,48 @@ def _identity_from_record(record: object) -> RuntimeIdentity:
         raise JournalCorruption("identity record is invalid") from None
 
 
+def _origin_anchor_from_record(record: object) -> L43OriginAnchor:
+    fields = {
+        "runtime_identity",
+        "journal_sha256",
+        "initialization_event_sha256",
+        "consumed_observation_sha256",
+        "journal_label",
+    }
+    if not isinstance(record, dict) or set(record) != fields:
+        raise JournalCorruption("L43 origin anchor has an invalid schema")
+    try:
+        return L43OriginAnchor(
+            runtime_identity=_identity_from_record(record["runtime_identity"]),
+            journal_sha256=record["journal_sha256"],
+            initialization_event_sha256=record["initialization_event_sha256"],
+            consumed_observation_sha256=record["consumed_observation_sha256"],
+            journal_label=record["journal_label"],
+        )
+    except (TypeError, ValueError):
+        raise JournalCorruption("L43 origin anchor is invalid") from None
+
+
+def _manual_close_from_record(record: object) -> ManualCloseRequired:
+    fields = {
+        "trigger",
+        "exact_residual_quantity",
+        "basis",
+        "effect_evidence_sha256",
+    }
+    if not isinstance(record, dict) or set(record) != fields:
+        raise JournalCorruption("manual-close record has an invalid schema")
+    try:
+        return ManualCloseRequired(
+            trigger=ManualCloseTrigger(record["trigger"]),
+            exact_residual_quantity=_parse_decimal(record["exact_residual_quantity"]),
+            basis=ManualCloseBasis(record["basis"]),
+            effect_evidence_sha256=record["effect_evidence_sha256"],
+        )
+    except (TypeError, ValueError):
+        raise JournalCorruption("manual-close record is invalid") from None
+
+
 def _intent_id(identity: RuntimeIdentity, kind: IntentKind, amount: Decimal) -> str:
     seed = f"arch147-l42:{kind.value}:{_decimal_text(amount)}"
     return str(uuid.uuid5(uuid.UUID(identity.lifecycle_id), seed))
@@ -377,16 +603,30 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
     if kind == "INITIALIZED":
         if state is not None or sequence != 0:
             raise JournalCorruption("initialization event is out of order")
-        data = _event_payload(event, {"identity", "baseline_quantity"})
+        payload = event["payload"]
+        if not isinstance(payload, dict) or set(payload) not in (
+            {"identity", "baseline_quantity"},
+            {"identity", "baseline_quantity", "l43_origin"},
+        ):
+            raise JournalCorruption("initialization event has an invalid schema")
+        data = payload
         identity = _identity_from_record(data["identity"])
         baseline = _parse_decimal(data["baseline_quantity"])
         if baseline != _ZERO:
             raise JournalCorruption("nonflat initial baseline has no ownership proof")
+        origin = (
+            _origin_anchor_from_record(data["l43_origin"])
+            if "l43_origin" in data
+            else None
+        )
+        if origin is not None and origin.runtime_identity != identity:
+            raise JournalCorruption("L43 origin identity differs from journal identity")
         return DurableState(
             identity=identity,
             baseline_quantity=baseline,
             last_sequence=sequence,
             journal_hash=event_hash,
+            l43_origin=origin,
         )
 
     if state is None:
@@ -406,6 +646,8 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
             or amount <= _ZERO
             or amount > ENTRY_LIMIT
             or not _is_multiple(amount, Decimal("0.01"))
+            or state.manual_close is not None
+            or state.sell_review_pending
         ):
             raise JournalCorruption("entry reservation violates the L42 limit")
         updated = replace(
@@ -419,9 +661,25 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
             blocked_reason=None,
         )
     elif kind == "EXIT_RESERVED":
-        data = _event_payload(event, {"intent_id", "requested_quantity"})
+        payload = event["payload"]
+        legacy_fields = {"intent_id", "requested_quantity"}
+        l43_fields = {
+            "intent_id",
+            "requested_quantity",
+            "authority_sha256",
+            "review_proposal_sha256",
+            "review_arguments_sha256",
+            "review_evidence_sha256",
+        }
+        if not isinstance(payload, dict) or set(payload) not in (
+            legacy_fields,
+            l43_fields,
+        ):
+            raise JournalCorruption("exit reservation has an invalid schema")
+        data = payload
         quantity = _parse_decimal(data["requested_quantity"])
         intent_id = data["intent_id"]
+        authority_sha256 = data.get("authority_sha256")
         if (
             not isinstance(intent_id, str)
             or intent_id != _intent_id(state.identity, IntentKind.EXIT, quantity)
@@ -430,14 +688,37 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
             or state.owned_quantity <= _ZERO
             or quantity != state.owned_quantity
             or _decimal_places(quantity) > 6
+            or state.manual_close is not None
+            or state.sell_review_pending
         ):
             raise JournalCorruption("exit intent is not the exact owned remainder")
+        if state.l43_origin is not None:
+            review = state.sell_review
+            if (
+                set(data) != l43_fields
+                or authority_sha256 is None
+                or review is None
+                or review.status is not L43SellReviewStatus.ACCEPTED
+                or data["review_proposal_sha256"] != review.proposal_sha256
+                or data["review_arguments_sha256"] != review.arguments_sha256
+                or data["review_evidence_sha256"] != review.review_evidence_sha256
+            ):
+                raise JournalCorruption("L43 exit lacks its accepted review authority")
+            try:
+                _require_pattern(authority_sha256, _HEX64, "sell authority digest")
+            except ValueError:
+                raise JournalCorruption(
+                    "L43 sell authority digest is invalid"
+                ) from None
+        elif set(data) != legacy_fields:
+            raise JournalCorruption("legacy exit cannot carry L43 authority")
         updated = replace(
             state,
             exit=OrderState(
                 kind=IntentKind.EXIT,
                 intent_id=intent_id,
                 requested_quantity=quantity,
+                authority_sha256=authority_sha256,
             ),
             reconciled=state.reconciled,
             blocked_reason=None,
@@ -452,6 +733,19 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
         )
         if target is None or target.status not in allowed:
             raise JournalCorruption("uncertainty event has no eligible intent")
+        if (
+            target.kind is IntentKind.EXIT
+            and state.l43_origin is not None
+            and (
+                target.authority_sha256 is None
+                or state.sell_review is None
+                or state.sell_review.status is not L43SellReviewStatus.ACCEPTED
+                or state.manual_close is not None
+            )
+        ):
+            raise JournalCorruption(
+                "L43 exit invocation lacks separately bound authority"
+            )
         status = (
             IntentStatus.MAY_HAVE_OCCURRED
             if kind == "MAY_HAVE_OCCURRED"
@@ -549,6 +843,93 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
         if _has_uncertain_intent(state):
             raise JournalCorruption("uncertain intent cannot be cleared by a flag")
         updated = replace(state, reconciled=True, blocked_reason=None)
+    elif kind == "SELL_REVIEW_STARTED":
+        data = _event_payload(event, {"proposal_sha256", "arguments_sha256"})
+        if (
+            state.l43_origin is None
+            or state.sell_review is not None
+            or state.manual_close is not None
+            or state.entry is None
+            or state.entry.status
+            not in {
+                IntentStatus.FILLED,
+                IntentStatus.CANCELED,
+                IntentStatus.REJECTED,
+            }
+            or state.entry.provider_order_id is None
+            or state.owned_quantity <= _ZERO
+            or not state.reconciled
+            or state.exit is not None
+        ):
+            raise JournalCorruption("sell review is not eligible from durable state")
+        try:
+            review = L43SellReviewState(
+                status=L43SellReviewStatus.ATTEMPTED,
+                proposal_sha256=data["proposal_sha256"],
+                arguments_sha256=data["arguments_sha256"],
+                started_at_sequence=sequence,
+            )
+        except (TypeError, ValueError):
+            raise JournalCorruption("sell review binding is invalid") from None
+        updated = replace(state, sell_review=review)
+    elif kind == "SELL_REVIEW_ACCEPTED":
+        data = _event_payload(
+            event,
+            {
+                "proposal_sha256",
+                "arguments_sha256",
+                "review_evidence_sha256",
+            },
+        )
+        review = state.sell_review
+        if (
+            state.l43_origin is None
+            or state.manual_close is not None
+            or review is None
+            or review.status is not L43SellReviewStatus.ATTEMPTED
+            or state.last_sequence != review.started_at_sequence
+            or data["proposal_sha256"] != review.proposal_sha256
+            or data["arguments_sha256"] != review.arguments_sha256
+        ):
+            raise JournalCorruption(
+                "accepted review differs from its attempted proposal"
+            )
+        try:
+            updated_review = L43SellReviewState(
+                status=L43SellReviewStatus.ACCEPTED,
+                proposal_sha256=review.proposal_sha256,
+                arguments_sha256=review.arguments_sha256,
+                started_at_sequence=review.started_at_sequence,
+                review_evidence_sha256=data["review_evidence_sha256"],
+            )
+        except (TypeError, ValueError):
+            raise JournalCorruption("accepted review evidence is invalid") from None
+        updated = replace(state, sell_review=updated_review)
+    elif kind == "MANUAL_CLOSE_REQUIRED":
+        data = _event_payload(
+            event,
+            {
+                "trigger",
+                "exact_residual_quantity",
+                "basis",
+                "effect_evidence_sha256",
+            },
+        )
+        if state.l43_origin is None or state.manual_close is not None:
+            raise JournalCorruption(
+                "manual-close transition is not an L43 first-use event"
+            )
+        try:
+            requirement = _manual_close_from_record(data)
+        except JournalCorruption:
+            raise
+        if requirement.exact_residual_quantity != state.owned_quantity:
+            raise JournalCorruption(
+                "manual-close residual differs from durable ownership"
+            )
+        if not _manual_close_trigger_matches_state(requirement.trigger, state):
+            raise JournalCorruption("manual-close trigger differs from durable outcome")
+        updated = replace(state, manual_close=requirement)
     else:
         raise JournalCorruption("journal contains an unknown event kind")
     return replace(updated, last_sequence=sequence, journal_hash=event_hash)
@@ -637,6 +1018,38 @@ def _has_uncertain_intent(state: DurableState) -> bool:
     )
 
 
+def _manual_close_trigger_matches_state(
+    trigger: ManualCloseTrigger, state: DurableState
+) -> bool:
+    if state.l43_origin is None or state.owned_quantity <= _ZERO:
+        return False
+    if trigger in {
+        ManualCloseTrigger.SELL_REVIEW_REJECTED,
+        ManualCloseTrigger.SELL_REVIEW_MALFORMED,
+        ManualCloseTrigger.SELL_REVIEW_WARNING,
+        ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
+    }:
+        return (
+            state.sell_review is not None
+            and state.sell_review.status is L43SellReviewStatus.ATTEMPTED
+            and state.exit is None
+        )
+    if trigger is ManualCloseTrigger.UNSUPPORTED_EXACT_RESIDUAL:
+        return state.exit is None and not state.sell_review_pending
+    if state.exit is None:
+        return False
+    expected = {
+        ManualCloseTrigger.SELL_REJECTED: {IntentStatus.REJECTED},
+        ManualCloseTrigger.SELL_CANCELED: {IntentStatus.CANCELED},
+        ManualCloseTrigger.SELL_PARTIAL: {IntentStatus.PARTIAL},
+        ManualCloseTrigger.SELL_UNKNOWN: {
+            IntentStatus.MAY_HAVE_OCCURRED,
+            IntentStatus.UNKNOWN,
+        },
+    }.get(trigger)
+    return expected is not None and state.exit.status in expected
+
+
 class DurableStateStore:
     """Append-only journal with write/flush/fsync/close before returning."""
 
@@ -652,6 +1065,7 @@ class DurableStateStore:
         self._fsync = fsync
         self._state: DurableState | None = None
         self._poisoned = False
+        self._active_review_session_token: object | None = None
 
     @classmethod
     def create(
@@ -660,21 +1074,32 @@ class DurableStateStore:
         identity: RuntimeIdentity,
         *,
         initial_position: Decimal = _ZERO,
+        l43_origin: L43OriginAnchor | None = None,
         file_opener: Callable[[Path, str], BinaryIO] | None = None,
         fsync: Callable[[int], None] = os.fsync,
     ) -> DurableStateStore:
         _validate_decimal(initial_position, "initial position")
+        if l43_origin is not None:
+            if type(l43_origin) is not L43OriginAnchor:
+                raise TypeError("L43 initialization requires a typed Q62 origin")
+            if l43_origin.runtime_identity != identity:
+                raise DurableStateError(
+                    "L43 origin identity differs from state identity"
+                )
         if initial_position != _ZERO:
             raise DurableStateError(
                 "nonflat initial position requires exact prior ownership proof"
             )
         store = cls(path, file_opener=file_opener, fsync=fsync)
+        payload: dict[str, object] = {
+            "identity": identity.to_record(),
+            "baseline_quantity": _decimal_text(initial_position),
+        }
+        if l43_origin is not None:
+            payload["l43_origin"] = l43_origin.to_record()
         store._append(
             "INITIALIZED",
-            {
-                "identity": identity.to_record(),
-                "baseline_quantity": _decimal_text(initial_position),
-            },
+            payload,
             create=True,
             identity=identity,
         )
@@ -784,7 +1209,12 @@ class DurableStateStore:
         )
         return intent_id
 
-    def reserve_exit(self, requested_quantity: Decimal) -> str:
+    def reserve_exit(
+        self,
+        requested_quantity: Decimal,
+        *,
+        authority_sha256: str | None = None,
+    ) -> str:
         _validate_decimal(requested_quantity, "exit request", positive=True)
         self._require_ready()
         entry = self.state.entry
@@ -807,15 +1237,134 @@ class DurableStateStore:
             or _decimal_places(requested_quantity) > 6
         ):
             raise DurableStateError("exit must equal the exact supported remainder")
+        payload: dict[str, object] = {
+            "intent_id": _intent_id(
+                self.state.identity, IntentKind.EXIT, requested_quantity
+            ),
+            "requested_quantity": _decimal_text(requested_quantity),
+        }
+        if self.state.l43_origin is not None:
+            review = self.state.sell_review
+            if (
+                authority_sha256 is None
+                or review is None
+                or review.status is not L43SellReviewStatus.ACCEPTED
+            ):
+                raise DurableStateError("L43 exit lacks separate placement authority")
+            _require_pattern(authority_sha256, _HEX64, "sell authority digest")
+            payload.update(
+                {
+                    "authority_sha256": authority_sha256,
+                    "review_proposal_sha256": review.proposal_sha256,
+                    "review_arguments_sha256": review.arguments_sha256,
+                    "review_evidence_sha256": review.review_evidence_sha256,
+                }
+            )
+        elif authority_sha256 is not None:
+            raise DurableStateError("L43 authority is unavailable to legacy state")
         intent_id = _intent_id(self.state.identity, IntentKind.EXIT, requested_quantity)
+        payload["intent_id"] = intent_id
+        self._append("EXIT_RESERVED", payload)
+        return intent_id
+
+    def begin_sell_review(
+        self,
+        *,
+        proposal_sha256: str,
+        arguments_sha256: str,
+        session_token: object,
+    ) -> None:
+        self._require_ready()
+        if self.state.l43_origin is None:
+            raise DurableStateError("sell review is available only in L43 state")
+        if session_token is None:
+            raise DurableStateError("active L43 review session is required")
+        if self.state.sell_review is not None:
+            raise DurableStateError("L43 sell review attempt is already consumed")
         self._append(
-            "EXIT_RESERVED",
+            "SELL_REVIEW_STARTED",
             {
-                "intent_id": intent_id,
-                "requested_quantity": _decimal_text(requested_quantity),
+                "proposal_sha256": proposal_sha256,
+                "arguments_sha256": arguments_sha256,
             },
         )
-        return intent_id
+        self._active_review_session_token = session_token
+
+    def accept_sell_review(
+        self,
+        *,
+        proposal_sha256: str,
+        arguments_sha256: str,
+        review_evidence_sha256: str,
+        session_token: object,
+    ) -> None:
+        if self.state.l43_origin is None:
+            raise DurableStateError("sell review is available only in L43 state")
+        review = self.state.sell_review
+        if (
+            review is None
+            or review.status is not L43SellReviewStatus.ATTEMPTED
+            or session_token is None
+            or self._active_review_session_token is not session_token
+            or self.state.last_sequence != review.started_at_sequence
+            or proposal_sha256 != review.proposal_sha256
+            or arguments_sha256 != review.arguments_sha256
+        ):
+            raise DurableStateError("accepted review differs from the active proposal")
+        _require_pattern(review_evidence_sha256, _HEX64, "review evidence digest")
+        self._append(
+            "SELL_REVIEW_ACCEPTED",
+            {
+                "proposal_sha256": proposal_sha256,
+                "arguments_sha256": arguments_sha256,
+                "review_evidence_sha256": review_evidence_sha256,
+            },
+        )
+        self._active_review_session_token = None
+
+    def require_manual_close(
+        self,
+        *,
+        trigger: ManualCloseTrigger,
+        effect_evidence_sha256: str,
+    ) -> ManualCloseRequired:
+        if self.state.l43_origin is None:
+            raise DurableStateError("manual close is available only in L43 state")
+        if self.state.manual_close is not None:
+            if (
+                self.state.manual_close.trigger is trigger
+                and self.state.manual_close.effect_evidence_sha256
+                == effect_evidence_sha256
+            ):
+                return self.state.manual_close
+            raise DurableStateError("manual close is already sticky")
+        _require_pattern(effect_evidence_sha256, _HEX64, "manual-close evidence digest")
+        residual = self.state.owned_quantity
+        if not _manual_close_trigger_matches_state(trigger, self.state):
+            raise DurableStateError("manual-close trigger differs from durable state")
+        basis = (
+            ManualCloseBasis.LAST_EXACT_RESIDUAL_BEFORE_UNKNOWN
+            if trigger is ManualCloseTrigger.SELL_UNKNOWN
+            else ManualCloseBasis.CONFIRMED_RECONCILED_RESIDUAL
+        )
+        record = ManualCloseRequired(
+            trigger=trigger,
+            exact_residual_quantity=residual,
+            basis=basis,
+            effect_evidence_sha256=effect_evidence_sha256,
+        )
+        self._append(
+            "MANUAL_CLOSE_REQUIRED",
+            {
+                "trigger": record.trigger.value,
+                "exact_residual_quantity": _decimal_text(
+                    record.exact_residual_quantity
+                ),
+                "basis": record.basis.value,
+                "effect_evidence_sha256": record.effect_evidence_sha256,
+            },
+        )
+        return self.state.manual_close  # type: ignore[return-value]
 
     def mark_may_have_occurred(self, intent_id: str) -> None:
         self._require_ready()
@@ -946,6 +1495,8 @@ class DurableStateStore:
             raise DurableStateError("store is poisoned after a persistence failure")
         if state.blocked_reason is not None or not state.reconciled:
             raise DurableStateError("durable state is not reconciled or current")
+        if state.manual_close_required or state.sell_review_pending:
+            raise DurableStateError("L43 state is blocked for manual close/review")
         if _has_uncertain_intent(state):
             raise DurableStateError("an effect remains uncertain")
         if any(

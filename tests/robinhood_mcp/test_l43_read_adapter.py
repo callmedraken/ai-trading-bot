@@ -74,7 +74,7 @@ def test_paginated_response_accepts_exhaustion_or_cursor(
         ("orders", "get_equity_orders"),
     ),
 )
-@pytest.mark.parametrize("cursor", (False, 1, [], {}))
+@pytest.mark.parametrize("cursor", (False, 1, [], {}, "", "c" * 4097))
 def test_paginated_response_rejects_malformed_cursor(
     collection: str,
     read_method: str,

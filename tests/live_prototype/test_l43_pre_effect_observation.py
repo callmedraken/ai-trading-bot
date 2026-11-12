@@ -117,10 +117,12 @@ class _ReadBoundary:
         positions: list[dict[str, str]],
         orders: list[dict[str, object]],
         account_number: str = _ACCOUNT_NUMBER,
+        order_page_cursors: tuple[str | None, ...] | None = None,
     ) -> None:
         self.positions = positions
         self.orders = orders
         self.account_number = account_number
+        self.order_page_cursors = order_page_cursors
         self.calls: list[tuple[str, dict[str, object]]] = []
 
     def get_accounts(self):
@@ -142,7 +144,14 @@ class _ReadBoundary:
 
     def get_equity_orders(self, arguments):
         self.calls.append(("get_equity_orders", dict(arguments)))
-        return {"data": {"orders": self.orders, "next": None}}
+        if self.order_page_cursors is None:
+            cursor = None
+        else:
+            order_call_count = sum(
+                name == "get_equity_orders" for name, _ in self.calls
+            )
+            cursor = self.order_page_cursors[order_call_count - 1]
+        return {"data": {"orders": self.orders, "next": cursor}}
 
 
 class _SignalProvider:
@@ -341,6 +350,7 @@ def _dependencies(
     authority_passed: bool = True,
     signal_offset: timedelta = timedelta(0),
     clock_values: tuple[datetime, ...] | None = None,
+    order_page_cursors: tuple[str | None, ...] | None = None,
 ) -> tuple[
     observer.L43PreEffectDependencies, _ReadBoundary, _SignalProvider, _ScopeVerifier
 ]:
@@ -361,7 +371,10 @@ def _dependencies(
     if order_rows is not None:
         orders = order_rows
     read = _ReadBoundary(
-        positions=positions, orders=orders, account_number=account_number
+        positions=positions,
+        orders=orders,
+        account_number=account_number,
+        order_page_cursors=order_page_cursors,
     )
     normalized_read = RobinhoodL43PreEffectReadAdapter(read)
     signal = _SignalProvider(decision, observation_offset=signal_offset)
@@ -495,6 +508,86 @@ def test_unknown_all_agent_order_scope_cannot_prove_order_absence(tmp_path: Path
         {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
     )
     assert "placed_agent" not in read.calls[-1][1]
+
+
+@pytest.mark.parametrize("scope_proven", (False, True))
+def test_explicit_complete_order_pagination_needs_provider_scope_semantics(
+    tmp_path: Path, scope_proven: bool
+):
+    state_path, _ = _state_path(tmp_path)
+    dependencies, read, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.HOLD,
+        scope_proven=scope_proven,
+        order_page_cursors=("page-2", None),
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert result.robinhood_page_count == 3
+    assert read.calls[-2:] == [
+        (
+            "get_equity_orders",
+            {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+        ),
+        (
+            "get_equity_orders",
+            {
+                "account_number": _ACCOUNT_NUMBER,
+                "symbol": "SPY",
+                "cursor": "page-2",
+            },
+        ),
+    ]
+    if scope_proven:
+        assert result.outcome is observer.L43PreEffectOutcome.NO_ACTION_SIGNAL
+        assert result.blockers == ()
+    else:
+        assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
+        assert result.blockers == (observer.L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN,)
+
+
+@pytest.mark.parametrize(
+    ("cursors", "expected"),
+    (
+        (("",), observer.L43PreEffectBlocker.ORDER_INVALID),
+        (("c" * 4097,), observer.L43PreEffectBlocker.ORDER_INVALID),
+        (("repeat", "repeat"), observer.L43PreEffectBlocker.ORDER_INVALID),
+        (("page-2", "page-3"), observer.L43PreEffectBlocker.ORDER_COVERAGE_INCOMPLETE),
+    ),
+)
+def test_inward_order_pagination_rejects_invalid_or_incomplete_cursors(
+    cursors: tuple[str | None, ...], expected: observer.L43PreEffectBlocker
+):
+    requests: list[dict[str, object]] = []
+    pages = iter(cursors)
+
+    def reader(arguments):
+        requests.append(dict(arguments))
+        return observer.L43ReadPage(rows=(), next_cursor=next(pages))
+
+    with pytest.raises(observer._Blocked) as error:
+        observer._read_pages(
+            reader=reader,
+            arguments={"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+            max_pages=2,
+            max_rows=10,
+            counters=observer._Counters(),
+            read_failure=observer.L43PreEffectBlocker.ORDER_READ_FAILED,
+            invalid=observer.L43PreEffectBlocker.ORDER_INVALID,
+        )
+
+    assert error.value.blocker is expected
+    if cursors == ("page-2", "page-3"):
+        assert requests == [
+            {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+            {
+                "account_number": _ACCOUNT_NUMBER,
+                "symbol": "SPY",
+                "cursor": "page-2",
+            },
+        ]
 
 
 def test_review_tail_append_does_not_drift_exact_sell_proposal(tmp_path: Path):

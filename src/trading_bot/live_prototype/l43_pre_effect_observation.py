@@ -1304,7 +1304,7 @@ def _read_pages(
         if len(rows) + len(page_rows) > max_rows:
             raise _Blocked(L43PreEffectBlocker.ORDER_COVERAGE_INCOMPLETE)
         rows.extend(page_rows)
-        if cursor is None or cursor == "":
+        if cursor is None:
             return _PageRead(tuple(rows), local_pages, len(rows), True)
         seen.add(cursor)
         request = {**arguments, "cursor": cursor}

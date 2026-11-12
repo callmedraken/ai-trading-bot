@@ -1,5 +1,29 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## L43 effect-disabled source continuity owner — ACCEPTED / INTEGRATED
+
+Final accepted source: `7850c96d0300b14262d81db5ae0e7058b9446f74` / tree `50c5472eb414e9c454594ed43b9c72c26ad24d0c`. Feature mapped FULL `43163048112`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43167235156`, attempt 1, is terminal SUCCESS with the exact feature-certification reuse proof and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+
+Review history is preserved. Initial candidate `2f72e1bfeba5aedc68503184a03a29944429f810` / run `43150177316` was rejected before integration because it defined weaker parallel exact-sell/review abstractions and under-bound fresh facts. Corrective `7a03990a3d6997cadc5f5e0ef8c69ad575f85df3` / run `43155343253` reused the accepted tiny-live policy and added fresh-fact evidence binding, but was rejected because its canonical production constructor still accepted caller-selected Q62 origin/journal authority. Both green runs are preserved. Final corrective `7850c96...` closes that trust-anchor defect.
+
+Independent exact-source review confirmed:
+
+- final source is three ordinary commits ahead of the prior integrated docs source and changes only `scripts/checkpoint_runner.py`, `src/trading_bot/live_prototype/l43_production_owner.py`, and `tests/live_prototype/test_l43_production_owner.py`;
+- the production factory takes only `repo_root`; caller-supplied Q62 origin and journal path are not accepted;
+- exact consumed Q62 source HEAD/tree, fixed journal path, 806-byte length, journal SHA-256 and consumed observation SHA-256 are source-owned;
+- the Q62 initialization record is parsed fail-closed, including duplicate-key rejection, exact schema/sequence/zero predecessor/INITIALIZED kind, flat baseline and exact SPY/BASE_MA35_50_V1 identity;
+- `DurableStateStore.open()` reconstructs and validates the journal hash chain and requires exact recovered runtime identity;
+- continuity proves strict Git ancestry plus current FEATURE and PROSPECTIVE_DEVELOP source authority;
+- the continuity path exposes no Q62 create, append, repair, reinitialize, copy, migration or rebind operation;
+- L43 exact-owned sell/review checks delegate to the already accepted `tiny_live_policy` contracts, preserving exact ownership, terminal effects, full reservation, no prior exit, exact normalized arguments, no dollar substitution and bounded fractional scale;
+- fresh future account/position/order/session/D34-signal/recovery material and final assessment are bound into `fresh_effect_facts_sha256`;
+- a new-entry review-ready outcome requires flat owned remainder, no unresolved effect, genuine BUY, unused one-shot entry authority and <=$10 requested risk;
+- the source owner has no provider/transport effect surface and cannot report entry/review/place/cancel/provider mutation activity or grant placement/trade/live authority.
+
+No provider, OAuth, Robinhood, broker or protected effect occurred during implementation, certification, review or integration. Q62 journal/evidence were reported unchanged; FINAL_HOLDOUT was untouched. The stale develop run `43096933169` remains preserved as `INFRASTRUCTURE_STALLED_PRE_JOB` (queued / zero jobs), without rerun/cancel/delete.
+
+L43 protected effects are **NOT RUN / NOT AUTHORIZED**. The accepted source only establishes the continuity and source contract needed for a later separately reviewed protected operator. Q63 remains NOT RUN; L41R7 remains FORBIDDEN; FINAL_HOLDOUT remains SEALED.
+
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 
 The accepted observer source is `4633eda723e1d755a642b4fa9e637dccdd68a944` / tree `77df8966ea19c8184d2c5aabfe980ecb51b24159`, terminal mapped FULL `42993536859` (17,101 passed, 9 skipped, no failed/errors; slowest lane 185.8s) and terminal develop exact-certification reuse `42995999577`. The observation-bound docs-only HEAD/tree is `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`, with feature/develop docs gates `42996562430` / `42996694799` SUCCESS.
@@ -8,7 +32,7 @@ The accepted observer source is `4633eda723e1d755a642b4fa9e637dccdd68a944` / tre
 
 The separately reviewed Q62 protected READ-ONLY observation succeeded once on the same source, exit 0, status `READY_FOR_L43_PROTOTYPE_READ_ONLY`, reason `Q62_READ_ONLY_PREREQUISITES_PROVEN`. Evidence path `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`, 11,663 bytes, SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9` (hash and byte length from operator output, not independently fetched F: bytes). Nine PROVEN proof kinds: SOURCE, CONFIGURATION, ACCOUNT, CAPABILITY, OWNERSHIP, BUDGET, SESSION, SIGNAL_INPUTS and RECOVERY. Historical status BLOCKED / sole CAPABILITY_UNPROVEN; prototype has no blockers. Robinhood get_accounts, get_equity_positions, get_equity_orders dispatches 1 each; one Alpaca snapshot/provider call. Review, placement, cancellation, other Robinhood calls, broker/live/paper mutation and FINAL_HOLDOUT access all 0. Provider mutations 0, live readiness false, trade authority false. Q62 is CONSUMED / NO AUTOMATIC RETRY.
 
-No source test/CI proof or Q62 freshness authorizes real orders. The original journal binds source `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b` and must not be silently rebound after this docs closeout. L43 is NOT RUN and requires independent effect/source/state continuity review; Q63 NOT RUN, L41R7 FORBIDDEN, FINAL_HOLDOUT SEALED. No paper soak.
+No source test/CI proof or Q62 freshness authorizes real orders. The original journal binds source `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b` and must never be migrated or silently rebound. The L43 source-only continuity owner is now accepted/integrated as recorded above, but L43 protected effects are NOT RUN / NOT AUTHORIZED; Q63 NOT RUN, L41R7 FORBIDDEN, FINAL_HOLDOUT SEALED. No paper soak.
 
 ## Q62 readiness observer source accepted/integrated
 

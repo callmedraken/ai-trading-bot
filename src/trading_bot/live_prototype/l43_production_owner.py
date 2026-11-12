@@ -9,15 +9,28 @@ readiness-for-review or a fail-closed/no-action result.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
+from pathlib import Path
 from typing import Protocol
 
 from trading_bot.live_prototype.alpaca_signal_inputs import SignalDecision
-from trading_bot.live_prototype.durable_state import RuntimeIdentity
+from trading_bot.live_prototype.durable_state import DurableStateStore, RuntimeIdentity
+from trading_bot.live_prototype.tiny_live_policy import (
+    EXACT_SELL_REVIEW_CONTRACT_ID,
+    ExactOwnedSellProposal,
+    ExactSellEligibility,
+    ManualCloseTrigger,
+    NormalizedSellReview,
+    SellReviewValidation,
+    evaluate_exact_owned_sell_proposal,
+    validate_normalized_sell_review,
+)
 
 L43_SCHEMA = "arch147-l43-source-owner/v1"
 L43_REVIEW_LABEL = "READY_FOR_L43_PROTECTED_EFFECT_REVIEW"
@@ -27,6 +40,7 @@ _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _LABEL = re.compile(r"[A-Za-z0-9_.-]{1,96}\Z")
 _DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
 _CODE = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
+_ZERO = Decimal("0")
 
 
 def _sha256(value: object, label: str) -> None:
@@ -64,6 +78,13 @@ def _decimal_text(value: Decimal) -> str:
     return text.rstrip("0").rstrip(".") if "." in text else text
 
 
+def _canonical_sha256(material: tuple[object, ...]) -> str:
+    payload = json.dumps(material, ensure_ascii=True, separators=(",", ":")).encode(
+        "ascii"
+    )
+    return hashlib.sha256(payload).hexdigest()
+
+
 class ContinuityStatus(StrEnum):
     ACCEPTED = "ACCEPTED"
     BLOCKED = "BLOCKED"
@@ -93,29 +114,10 @@ class L43Blocker(StrEnum):
     RECOVERY_NOT_ACCEPTED = "RECOVERY_NOT_ACCEPTED"
     SESSION_NOT_PROVEN = "SESSION_NOT_PROVEN"
     SIGNAL_INPUTS_NOT_PROVEN = "SIGNAL_INPUTS_NOT_PROVEN"
+    OWNED_REMAINDER_NOT_FLAT = "OWNED_REMAINDER_NOT_FLAT"
     ENTRY_RISK_EXCEEDS_LIMIT = "ENTRY_RISK_EXCEEDS_LIMIT"
     ENTRY_ALREADY_CONSUMED = "ENTRY_ALREADY_CONSUMED"
     UNSANITIZED_EVIDENCE = "UNSANITIZED_EVIDENCE"
-
-
-class ReviewOutcome(StrEnum):
-    AFFIRMATIVE = "AFFIRMATIVE"
-    REJECTED = "REJECTED"
-    MALFORMED = "MALFORMED"
-    UNKNOWN = "UNKNOWN"
-
-
-class ReviewSemantics(StrEnum):
-    NONPLACING_PREVIEW = "NONPLACING_PREVIEW"
-    UNKNOWN = "UNKNOWN"
-
-
-class SellOutcome(StrEnum):
-    FILLED = "FILLED"
-    REJECTED = "REJECTED"
-    CANCELED = "CANCELED"
-    PARTIAL = "PARTIAL"
-    UNKNOWN = "UNKNOWN"
 
 
 @dataclass(frozen=True, slots=True)
@@ -279,6 +281,113 @@ class JournalReplayReader(Protocol):
     """Read-only journal replay seam; it has no create or append operation."""
 
     def replay(self, origin: Q62JournalOrigin) -> JournalReplayFacts: ...
+
+
+def _git_text(repo_root: Path, *arguments: str) -> str:
+    from scripts import checkpoint_runner as runner
+
+    value = runner._git_output(repo_root, *arguments)
+    if not value:
+        raise RuntimeError("source identity was empty")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionSourceAuthorityVerifier:
+    """Canonical read-only adapter to the current source-owned evaluator."""
+
+    repo_root: Path
+    current_source: L43SourceIdentity
+    expected_origin: Q62JournalOrigin
+
+    def verify(
+        self, origin: Q62JournalOrigin, current: L43SourceIdentity
+    ) -> SourceAuthorityEvidence:
+        if origin != self.expected_origin:
+            raise ValueError("Q62 origin differs from the canonical production origin")
+        if current != self.current_source:
+            raise ValueError("executing source differs from the canonical checkout")
+        if (
+            _git_text(self.repo_root, "rev-parse", "HEAD") != current.source_head
+            or _git_text(self.repo_root, "rev-parse", "HEAD^{tree}")
+            != current.source_tree
+        ):
+            raise ValueError("executing source identity changed")
+        from scripts.current_source_authority import (
+            PublicationContext,
+            evaluate_source_authority,
+        )
+
+        feature = evaluate_source_authority(
+            self.repo_root,
+            publication_context=PublicationContext.FEATURE,
+        )
+        prospective = evaluate_source_authority(
+            self.repo_root,
+            publication_context=PublicationContext.PROSPECTIVE_DEVELOP,
+        )
+        descendant = (
+            _git_text(
+                self.repo_root,
+                "merge-base",
+                origin.runtime_identity.source_head,
+                current.source_head,
+            )
+            == origin.runtime_identity.source_head
+            and current.source_head != origin.runtime_identity.source_head
+        )
+        evidence_sha256 = _canonical_sha256(
+            (
+                "ARCH147_L43_SOURCE_AUTHORITY_V1",
+                origin.runtime_identity.source_head,
+                origin.runtime_identity.source_tree,
+                current.source_head,
+                current.source_tree,
+                descendant,
+                feature.passed,
+                prospective.passed,
+                *feature.failures,
+                *prospective.failures,
+            )
+        )
+        return SourceAuthorityEvidence(
+            origin_head=origin.runtime_identity.source_head,
+            origin_tree=origin.runtime_identity.source_tree,
+            candidate_head=current.source_head,
+            candidate_tree=current.source_tree,
+            strict_descendant=descendant
+            and current.source_head != origin.runtime_identity.source_head,
+            feature_passed=feature.passed,
+            prospective_develop_passed=prospective.passed,
+            evidence_sha256=evidence_sha256,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class Q62ReadOnlyJournalReader:
+    """Concrete replay adapter with no create, append, or repair capability."""
+
+    journal_path: Path
+    expected_origin: Q62JournalOrigin
+
+    def replay(self, origin: Q62JournalOrigin) -> JournalReplayFacts:
+        if origin != self.expected_origin:
+            raise ValueError("Q62 origin differs from the canonical production origin")
+        store = DurableStateStore.open(self.journal_path, origin.runtime_identity)
+        raw = self.journal_path.read_bytes()
+        records = raw.splitlines()
+        first = json.loads(records[0].decode("ascii"))
+        if not isinstance(first, dict) or not isinstance(first.get("event_hash"), str):
+            raise ValueError("Q62 initialization event is malformed")
+        return JournalReplayFacts(
+            runtime_identity=store.state.identity,
+            journal_sha256=hashlib.sha256(raw).hexdigest(),
+            initialization_event_sha256=first["event_hash"],
+            consumed_observation_sha256=origin.consumed_observation_sha256,
+            initialization_sequence=0,
+            tail_sequence=store.state.last_sequence,
+            tail_sha256=store.state.journal_hash,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -451,6 +560,7 @@ class L43Assessment:
     outcome: L43Outcome
     blockers: tuple[L43Blocker, ...] = ()
     evidence: tuple[tuple[str, str], ...] = ()
+    fresh_effect_facts_sha256: str | None = None
     entry_intent_count: int = 0
     review_count: int = 0
     placement_count: int = 0
@@ -474,6 +584,8 @@ class L43Assessment:
             raise ValueError("L43 source owner cannot report provider activity")
         if self.placement_authority or self.trade_authority or self.live_ready:
             raise ValueError("L43 source owner cannot grant effect authority")
+        if self.fresh_effect_facts_sha256 is not None:
+            _sha256(self.fresh_effect_facts_sha256, "fresh effect facts digest")
 
 
 _EVIDENCE_KEYS = frozenset(
@@ -489,6 +601,7 @@ _EVIDENCE_KEYS = frozenset(
         "signal_inputs_digest",
         "positions_digest",
         "orders_digest",
+        "fresh_effect_facts_digest",
         "reason",
     }
 )
@@ -528,92 +641,20 @@ def sanitize_evidence(values: Mapping[str, str]) -> tuple[tuple[str, str], ...]:
     return tuple(sorted(clean))
 
 
-@dataclass(frozen=True, slots=True)
-class ExactOwnedSellFacts:
-    bot_owned_remainder: Decimal
-    proposed_quantity: Decimal
-    broker_position: Decimal
-    sellable_quantity: Decimal
-    entry_terminal: bool
-    review_arguments_digest: str
-    placement_arguments_digest: str
+def exact_owned_sell_qualified(proposal: ExactOwnedSellProposal) -> bool:
+    """Delegate exact-sell qualification to the accepted tiny-live contract."""
 
-    def __post_init__(self) -> None:
-        for label, value in (
-            ("bot-owned remainder", self.bot_owned_remainder),
-            ("proposed quantity", self.proposed_quantity),
-            ("broker position", self.broker_position),
-            ("sellable quantity", self.sellable_quantity),
-        ):
-            _decimal(value, label)
-        _sha256(self.review_arguments_digest, "review arguments digest")
-        _sha256(self.placement_arguments_digest, "placement arguments digest")
+    result = evaluate_exact_owned_sell_proposal(proposal)
+    return result.eligible_for_nonplacing_review
 
 
-def exact_owned_sell_qualified(facts: ExactOwnedSellFacts) -> bool:
-    """Pure exact-owned guard with no rounding or manual-share adoption."""
+def validate_l43_sell_review(
+    proposal: ExactOwnedSellProposal,
+    response: NormalizedSellReview,
+) -> SellReviewValidation:
+    """Delegate normalized review validation to the accepted tiny-live contract."""
 
-    return (
-        facts.entry_terminal
-        and facts.bot_owned_remainder > 0
-        and facts.proposed_quantity == facts.bot_owned_remainder
-        and facts.proposed_quantity <= facts.broker_position
-        and facts.proposed_quantity <= facts.sellable_quantity
-        and facts.review_arguments_digest == facts.placement_arguments_digest
-    )
-
-
-@dataclass(frozen=True, slots=True)
-class NormalizedReviewFacts:
-    outcome: ReviewOutcome
-    semantics: ReviewSemantics
-    review_arguments_digest: str
-    placement_arguments_digest: str
-    warnings: tuple[str, ...] = ()
-    unknown_fields: tuple[str, ...] = ()
-    provider_order_id_present: bool = False
-
-    def __post_init__(self) -> None:
-        _sha256(self.review_arguments_digest, "review arguments digest")
-        _sha256(self.placement_arguments_digest, "placement arguments digest")
-        for value in self.warnings + self.unknown_fields:
-            _code(value, "review warning/unknown field")
-
-
-@dataclass(frozen=True, slots=True)
-class ReviewValidation:
-    accepted_for_prospective_contract: bool
-    manual_close_required: bool
-    blockers: tuple[str, ...] = ()
-    placement_authority: bool = False
-
-
-def validate_l43_sell_review(facts: NormalizedReviewFacts) -> ReviewValidation:
-    blockers: list[str] = []
-    if facts.outcome is not ReviewOutcome.AFFIRMATIVE:
-        blockers.append("NON_AFFIRMATIVE_OUTCOME")
-    if facts.semantics is not ReviewSemantics.NONPLACING_PREVIEW:
-        blockers.append("NOT_NONPLACING_PREVIEW")
-    if facts.review_arguments_digest != facts.placement_arguments_digest:
-        blockers.append("REVIEW_ARGUMENTS_MISMATCH")
-    if facts.warnings:
-        blockers.append("WARNINGS_PRESENT")
-    if facts.unknown_fields:
-        blockers.append("UNKNOWN_FIELDS_PRESENT")
-    if facts.provider_order_id_present:
-        blockers.append("PROVIDER_ORDER_ID_PRESENT")
-    unique = tuple(dict.fromkeys(blockers))
-    return ReviewValidation(
-        accepted_for_prospective_contract=not unique,
-        manual_close_required=bool(unique),
-        blockers=unique,
-    )
-
-
-def sell_outcome_requires_manual_close(outcome: SellOutcome) -> bool:
-    if not isinstance(outcome, SellOutcome):
-        raise TypeError("sell outcome must be typed")
-    return outcome is not SellOutcome.FILLED
+    return validate_normalized_sell_review(proposal, response)
 
 
 @dataclass(frozen=True, slots=True)
@@ -624,7 +665,8 @@ class FutureInvocationOrdering:
     provider_call_requested: bool = False
 
     def __post_init__(self) -> None:
-        _code(self.durable_transition, "durable transition")
+        if self.durable_transition != "MAY_HAVE_OCCURRED":
+            raise ValueError("L43 requires MAY_HAVE_OCCURRED before any provider call")
         if self.provider_call_requested:
             raise ValueError("effect-disabled L43 cannot request a provider call")
 
@@ -633,10 +675,87 @@ class FutureInvocationOrdering:
         return False
 
 
+def _fresh_effect_facts_digest(
+    facts: L43FreshEffectFacts,
+    continuity: L43ContinuityResult,
+    outcome: L43Outcome,
+    blockers: tuple[L43Blocker, ...],
+) -> str:
+    """Bind every material fresh fact and final assessment to one digest."""
+
+    return _canonical_sha256(
+        (
+            "ARCH147_L43_FRESH_EFFECT_FACTS_V1",
+            continuity.origin.runtime_identity.source_head,
+            continuity.origin.runtime_identity.source_tree,
+            continuity.current.source_head,
+            continuity.current.source_tree,
+            facts.provenance.config_digest,
+            facts.provenance.binding_digest,
+            facts.provenance.account_fingerprint,
+            facts.provenance.strategy,
+            facts.provenance.symbol,
+            facts.retained_account_fingerprint,
+            facts.current_account_fingerprint,
+            continuity.origin.journal_sha256,
+            continuity.origin.initialization_event_sha256,
+            continuity.origin.consumed_observation_sha256,
+            facts.positions_digest,
+            facts.relevant_orders_digest,
+            facts.signal.inputs_digest,
+            facts.signal.decision.value,
+            facts.signal.completed_sessions,
+            facts.signal.price_basis,
+            facts.session.target_session,
+            facts.session.regular_hours,
+            facts.session.session_open,
+            facts.session.authority_digest,
+            facts.recovery.evidence_digest,
+            facts.recovery.reconciled,
+            facts.recovery.unresolved_effects,
+            facts.recovery.terminal_entry,
+            _decimal_text(facts.recovery.exact_owned_remainder),
+            _decimal_text(facts.requested_entry_risk),
+            facts.entry_consumed,
+            facts.fresh,
+            outcome.value,
+            tuple(blocker.value for blocker in blockers),
+        )
+    )
+
+
 class L43ProductionOwner:
     """Dedicated source owner with no provider, transport, or mutation surface."""
 
     __slots__ = ("_authority_verifier", "_journal_reader")
+
+    @classmethod
+    def for_production(
+        cls,
+        *,
+        repo_root: Path,
+        journal_path: Path,
+        origin: Q62JournalOrigin,
+    ) -> L43ProductionOwner:
+        """Build the only production composition; tests use the explicit seams."""
+
+        if not isinstance(repo_root, Path) or not isinstance(journal_path, Path):
+            raise TypeError("production composition requires concrete Paths")
+        current = L43SourceIdentity(
+            source_head=_git_text(repo_root, "rev-parse", "HEAD"),
+            source_tree=_git_text(repo_root, "rev-parse", "HEAD^{tree}"),
+        )
+        return cls(
+            authority_verifier=ProductionSourceAuthorityVerifier(
+                repo_root=repo_root,
+                current_source=current,
+                expected_origin=origin,
+            ),
+            journal_reader=Q62ReadOnlyJournalReader(
+                journal_path=journal_path,
+                expected_origin=origin,
+            ),
+        )
 
     def __init__(
         self,
@@ -679,6 +798,7 @@ class L43ProductionOwner:
                 L43Outcome.BLOCKED,
                 continuity.blockers,
                 continuity,
+                facts,
             )
         blockers: list[L43Blocker] = []
         if facts.continuity != continuity:
@@ -698,27 +818,39 @@ class L43ProductionOwner:
             blockers.append(L43Blocker.UNRESOLVED_EFFECT)
         if not facts.recovery.reconciled:
             blockers.append(L43Blocker.RECOVERY_NOT_ACCEPTED)
+        if facts.recovery.exact_owned_remainder != _ZERO:
+            blockers.append(L43Blocker.OWNED_REMAINDER_NOT_FLAT)
         if blockers:
             return self._assessment(
-                L43Outcome.BLOCKED, tuple(dict.fromkeys(blockers)), continuity
+                L43Outcome.BLOCKED,
+                tuple(dict.fromkeys(blockers)),
+                continuity,
+                facts,
             )
         if facts.signal.decision is not SignalDecision.BUY:
-            return self._assessment(L43Outcome.NO_ACTION_SIGNAL, (), continuity)
+            return self._assessment(L43Outcome.NO_ACTION_SIGNAL, (), continuity, facts)
         if (
             facts.requested_entry_risk <= 0
             or facts.requested_entry_risk > L43_ENTRY_LIMIT
         ):
             return self._assessment(
-                L43Outcome.BLOCKED, (L43Blocker.ENTRY_RISK_EXCEEDS_LIMIT,), continuity
+                L43Outcome.BLOCKED,
+                (L43Blocker.ENTRY_RISK_EXCEEDS_LIMIT,),
+                continuity,
+                facts,
             )
         if facts.entry_consumed:
             return self._assessment(
-                L43Outcome.BLOCKED, (L43Blocker.ENTRY_ALREADY_CONSUMED,), continuity
+                L43Outcome.BLOCKED,
+                (L43Blocker.ENTRY_ALREADY_CONSUMED,),
+                continuity,
+                facts,
             )
         return self._assessment(
             L43Outcome.READY_FOR_L43_PROTECTED_EFFECT_REVIEW,
             (),
             continuity,
+            facts,
         )
 
     @staticmethod
@@ -726,7 +858,11 @@ class L43ProductionOwner:
         outcome: L43Outcome,
         blockers: tuple[L43Blocker, ...],
         continuity: L43ContinuityResult,
+        facts: L43FreshEffectFacts,
     ) -> L43Assessment:
+        fresh_effect_facts_sha256 = _fresh_effect_facts_digest(
+            facts, continuity, outcome, blockers
+        )
         evidence = sanitize_evidence(
             {
                 "label": L43_REVIEW_LABEL,
@@ -737,17 +873,25 @@ class L43ProductionOwner:
                 "binding_digest": continuity.provenance.binding_digest,
                 "account_fingerprint_digest": continuity.provenance.account_fingerprint,
                 "journal_digest": continuity.origin.journal_sha256,
+                "fresh_effect_facts_digest": fresh_effect_facts_sha256,
                 "reason": (blockers[0].value if blockers else "SOURCE_ONLY"),
             }
         )
-        return L43Assessment(outcome=outcome, blockers=blockers, evidence=evidence)
+        return L43Assessment(
+            outcome=outcome,
+            blockers=blockers,
+            evidence=evidence,
+            fresh_effect_facts_sha256=fresh_effect_facts_sha256,
+        )
 
 
 __all__ = [
     "D34SignalFacts",
     "ContinuityStatus",
     "EntryConsumptionFacts",
-    "ExactOwnedSellFacts",
+    "EXACT_SELL_REVIEW_CONTRACT_ID",
+    "ExactOwnedSellProposal",
+    "ExactSellEligibility",
     "FutureInvocationOrdering",
     "JournalReplayFacts",
     "JournalReplayReader",
@@ -760,20 +904,20 @@ __all__ = [
     "L43Provenance",
     "L43SourceIdentity",
     "L43_REVIEW_LABEL",
-    "NormalizedReviewFacts",
+    "ManualCloseTrigger",
+    "NormalizedSellReview",
+    "ProductionSourceAuthorityVerifier",
+    "Q62ReadOnlyJournalReader",
     "Q62JournalOrigin",
     "RecoveryFacts",
-    "ReviewOutcome",
-    "ReviewSemantics",
-    "ReviewValidation",
-    "SellOutcome",
+    "SellReviewValidation",
     "SourceAuthorityEvidence",
     "SourceAuthorityVerifier",
     "XnysSessionFacts",
     "exact_owned_sell_qualified",
     "entry_consumption_valid",
     "sanitize_evidence",
-    "sell_outcome_requires_manual_close",
     "validate_l43_sell_review",
+    "validate_normalized_sell_review",
     "verify_l43_continuity",
 ]

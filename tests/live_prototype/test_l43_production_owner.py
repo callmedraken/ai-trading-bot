@@ -1,14 +1,20 @@
+import hashlib
+import inspect
 from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
 import pytest
 
+import trading_bot.live_prototype.l43_production_owner as l43_owner
 from trading_bot.live_prototype.alpaca_signal_inputs import SignalDecision
 from trading_bot.live_prototype.contracts import EffectDisposition, Lifecycle
-from trading_bot.live_prototype.durable_state import RuntimeIdentity
+from trading_bot.live_prototype.durable_state import DurableStateStore, RuntimeIdentity
 from trading_bot.live_prototype.l43_production_owner import (
     EXACT_SELL_REVIEW_CONTRACT_ID,
+    Q62_CANONICAL_OBSERVATION_SHA256,
+    Q62_CANONICAL_SOURCE_HEAD,
+    Q62_CANONICAL_SOURCE_TREE,
     ContinuityStatus,
     D34SignalFacts,
     EntryConsumptionFacts,
@@ -323,15 +329,130 @@ def test_exact_q62_origin_and_current_source_continuity_is_additive():
 
 def test_production_constructor_uses_concrete_authority_and_read_only_adapters(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ):
-    owner = L43ProductionOwner.for_production(
-        repo_root=Path(__file__).resolve().parents[2],
-        journal_path=tmp_path / "q62-origin.jsonl",
-        origin=_origin(),
+    identity = replace(
+        _identity(),
+        source_head=Q62_CANONICAL_SOURCE_HEAD,
+        source_tree=Q62_CANONICAL_SOURCE_TREE,
     )
+    journal = tmp_path / "durable-state.jsonl"
+    DurableStateStore.create(journal, identity)
+    raw = journal.read_bytes()
+    monkeypatch.setattr(l43_owner, "Q62_CANONICAL_JOURNAL_PATH", journal)
+    monkeypatch.setattr(l43_owner, "Q62_CANONICAL_JOURNAL_BYTES", len(raw))
+    monkeypatch.setattr(
+        l43_owner, "Q62_CANONICAL_JOURNAL_SHA256", hashlib.sha256(raw).hexdigest()
+    )
+    child_head, child_tree = _git("8"), _git("9")
+    monkeypatch.setattr(
+        l43_owner,
+        "_git_text",
+        lambda _root, *args: child_tree if args[-1] == "HEAD^{tree}" else child_head,
+    )
+
+    owner = L43ProductionOwner.for_production(repo_root=tmp_path)
 
     assert isinstance(owner._authority_verifier, ProductionSourceAuthorityVerifier)
     assert isinstance(owner._journal_reader, Q62ReadOnlyJournalReader)
+    origin = owner._journal_reader.expected_origin
+    assert origin.runtime_identity == identity
+    assert origin.consumed_observation_sha256 == Q62_CANONICAL_OBSERVATION_SHA256
+    assert journal.read_bytes() == raw
+
+
+def test_production_factory_rejects_caller_supplied_origin_or_path():
+    parameters = inspect.signature(L43ProductionOwner.for_production).parameters
+    assert tuple(parameters) == ("repo_root",)
+    assert parameters["repo_root"].kind is inspect.Parameter.KEYWORD_ONLY
+    with pytest.raises(TypeError):
+        L43ProductionOwner.for_production(repo_root=Path("unused"), origin=_origin())
+    with pytest.raises(TypeError):
+        L43ProductionOwner.for_production(
+            repo_root=Path("unused"), journal_path=Path("unused")
+        )
+
+
+def test_production_reader_rejects_alternate_ancestor_or_journal_origin():
+    expected = _origin()
+    reader = Q62ReadOnlyJournalReader(Path("unused"), expected)
+    alternate = replace(
+        expected,
+        runtime_identity=replace(expected.runtime_identity, source_head=_git("0")),
+    )
+    with pytest.raises(ValueError, match="canonical production origin"):
+        reader.replay(alternate)
+
+
+def _production_journal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    identity: RuntimeIdentity | None = None,
+) -> tuple[Path, bytes]:
+    if identity is None:
+        identity = replace(
+            _identity(),
+            source_head=Q62_CANONICAL_SOURCE_HEAD,
+            source_tree=Q62_CANONICAL_SOURCE_TREE,
+        )
+    journal = tmp_path / "durable-state.jsonl"
+    DurableStateStore.create(journal, identity)
+    raw = journal.read_bytes()
+    monkeypatch.setattr(l43_owner, "Q62_CANONICAL_JOURNAL_PATH", journal)
+    monkeypatch.setattr(l43_owner, "Q62_CANONICAL_JOURNAL_BYTES", len(raw))
+    monkeypatch.setattr(
+        l43_owner, "Q62_CANONICAL_JOURNAL_SHA256", hashlib.sha256(raw).hexdigest()
+    )
+    monkeypatch.setattr(
+        l43_owner,
+        "_git_text",
+        lambda _root, *args: _git("9") if args[-1] == "HEAD^{tree}" else _git("8"),
+    )
+    return journal, raw
+
+
+@pytest.mark.parametrize("corruption", ["digest", "length"])
+def test_production_factory_rejects_wrong_journal_digest_or_length(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, corruption: str
+):
+    journal, raw = _production_journal(tmp_path, monkeypatch)
+    if corruption == "digest":
+        journal.write_bytes(raw[:-1] + bytes([raw[-1] ^ 1]))
+    else:
+        journal.write_bytes(raw + b" ")
+    with pytest.raises(ValueError, match="length|digest"):
+        L43ProductionOwner.for_production(repo_root=tmp_path)
+
+
+@pytest.mark.parametrize("field", ["source_head", "source_tree"])
+def test_production_factory_rejects_persisted_source_identity_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, field: str
+):
+    identity = replace(_identity(), **{field: _git("0")})
+    _production_journal(tmp_path, monkeypatch, identity)
+    with pytest.raises(ValueError, match="runtime identity is not accepted"):
+        L43ProductionOwner.for_production(repo_root=tmp_path)
+
+
+def test_production_factory_is_read_only_and_replays_fixed_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    journal, raw = _production_journal(tmp_path, monkeypatch)
+    append_called = False
+
+    def reject_append(*_args, **_kwargs):
+        nonlocal append_called
+        append_called = True
+        raise AssertionError("production factory attempted journal mutation")
+
+    monkeypatch.setattr(DurableStateStore, "_append", reject_append)
+    owner = L43ProductionOwner.for_production(repo_root=tmp_path)
+    replay = owner._journal_reader.replay(owner._journal_reader.expected_origin)
+    assert replay.consumed_observation_sha256 == Q62_CANONICAL_OBSERVATION_SHA256
+    assert replay.initialization_sequence == replay.tail_sequence == 0
+    assert replay.tail_sha256 == replay.initialization_event_sha256
+    assert journal.read_bytes() == raw
+    assert not append_called
 
 
 @pytest.mark.parametrize(

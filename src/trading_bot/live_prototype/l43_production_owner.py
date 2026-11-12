@@ -20,7 +20,13 @@ from pathlib import Path
 from typing import Protocol
 
 from trading_bot.live_prototype.alpaca_signal_inputs import SignalDecision
-from trading_bot.live_prototype.durable_state import DurableStateStore, RuntimeIdentity
+from trading_bot.live_prototype.durable_state import (
+    SCHEMA as DURABLE_STATE_SCHEMA,
+)
+from trading_bot.live_prototype.durable_state import (
+    DurableStateStore,
+    RuntimeIdentity,
+)
 from trading_bot.live_prototype.tiny_live_policy import (
     EXACT_SELL_REVIEW_CONTRACT_ID,
     ExactOwnedSellProposal,
@@ -35,6 +41,19 @@ from trading_bot.live_prototype.tiny_live_policy import (
 L43_SCHEMA = "arch147-l43-source-owner/v1"
 L43_REVIEW_LABEL = "READY_FOR_L43_PROTECTED_EFFECT_REVIEW"
 L43_ENTRY_LIMIT = Decimal("10.00")
+Q62_CANONICAL_SOURCE_HEAD = "38153e015154f0e0f9d77b1ce1cfb62ed1472330"
+Q62_CANONICAL_SOURCE_TREE = "6e2ac40df6259ac046944fee3d01d946fefde13b"
+Q62_CANONICAL_JOURNAL_PATH = Path(
+    r"F:\AI\arch147-q62-live-state-v1\durable-state.jsonl"
+)
+Q62_CANONICAL_JOURNAL_BYTES = 806
+Q62_CANONICAL_JOURNAL_SHA256 = (
+    "21f6c07273226d467f85cc8b86ded104b58a94c456e81c67521f94d8cc7ca7d1"
+)
+Q62_CANONICAL_OBSERVATION_SHA256 = (
+    "4d08eb505651ceb551bf6d94bb87960f14940925263d3e682b62610a063fc9c9"
+)
+Q62_CANONICAL_JOURNAL_LABEL = "arch147-q62-live-state-v1"
 _HEX40 = re.compile(r"[0-9a-f]{40}\Z")
 _HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 _LABEL = re.compile(r"[A-Za-z0-9_.-]{1,96}\Z")
@@ -83,6 +102,90 @@ def _canonical_sha256(material: tuple[object, ...]) -> str:
         "ascii"
     )
     return hashlib.sha256(payload).hexdigest()
+
+
+def _reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Q62 journal contains duplicate keys")
+        result[key] = value
+    return result
+
+
+def _read_canonical_q62_origin() -> Q62JournalOrigin:
+    """Read and authenticate the fixed consumed Q62 initialization record."""
+
+    raw = Q62_CANONICAL_JOURNAL_PATH.read_bytes()
+    if len(raw) != Q62_CANONICAL_JOURNAL_BYTES:
+        raise ValueError("canonical Q62 journal length differs")
+    if hashlib.sha256(raw).hexdigest() != Q62_CANONICAL_JOURNAL_SHA256:
+        raise ValueError("canonical Q62 journal digest differs")
+    records = raw.splitlines()
+    if len(records) != 1 or not raw.endswith(b"\n"):
+        raise ValueError("canonical Q62 journal is not pristine initialization")
+    try:
+        event = json.loads(
+            records[0].decode("ascii"), object_pairs_hook=_reject_duplicate_keys
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        raise ValueError("canonical Q62 initialization record is malformed") from None
+    if not isinstance(event, dict) or set(event) != {
+        "schema",
+        "sequence",
+        "previous_hash",
+        "kind",
+        "payload",
+        "event_id",
+        "event_hash",
+    }:
+        raise ValueError("canonical Q62 initialization schema differs")
+    if (
+        event["schema"] != DURABLE_STATE_SCHEMA
+        or event["sequence"] != 0
+        or event["previous_hash"] != "0" * 64
+        or event["kind"] != "INITIALIZED"
+    ):
+        raise ValueError("canonical Q62 initialization lifecycle differs")
+    payload = event["payload"]
+    if not isinstance(payload, dict) or set(payload) != {
+        "identity",
+        "baseline_quantity",
+    }:
+        raise ValueError("canonical Q62 initialization payload differs")
+    identity_record = payload["identity"]
+    if not isinstance(identity_record, dict) or set(identity_record) != {
+        "account_fingerprint",
+        "source_head",
+        "source_tree",
+        "config_digest",
+        "binding_digest",
+        "lifecycle_id",
+        "symbol",
+        "strategy",
+    }:
+        raise ValueError("canonical Q62 runtime identity schema differs")
+    try:
+        identity = RuntimeIdentity(**identity_record)
+    except (TypeError, ValueError):
+        raise ValueError("canonical Q62 runtime identity is invalid") from None
+    if (
+        identity.source_head != Q62_CANONICAL_SOURCE_HEAD
+        or identity.source_tree != Q62_CANONICAL_SOURCE_TREE
+        or identity.symbol != "SPY"
+        or identity.strategy != "BASE_MA35_50_V1"
+        or payload["baseline_quantity"] != "0"
+    ):
+        raise ValueError("canonical Q62 runtime identity is not accepted")
+    event_hash = event["event_hash"]
+    _sha256(event_hash, "canonical Q62 initialization digest")
+    return Q62JournalOrigin(
+        runtime_identity=identity,
+        journal_label=Q62_CANONICAL_JOURNAL_LABEL,
+        journal_sha256=Q62_CANONICAL_JOURNAL_SHA256,
+        initialization_event_sha256=event_hash,
+        consumed_observation_sha256=Q62_CANONICAL_OBSERVATION_SHA256,
+    )
 
 
 class ContinuityStatus(StrEnum):
@@ -369,19 +472,26 @@ class Q62ReadOnlyJournalReader:
 
     journal_path: Path
     expected_origin: Q62JournalOrigin
+    expected_bytes: int | None = None
+    expected_sha256: str | None = None
 
     def replay(self, origin: Q62JournalOrigin) -> JournalReplayFacts:
         if origin != self.expected_origin:
             raise ValueError("Q62 origin differs from the canonical production origin")
-        store = DurableStateStore.open(self.journal_path, origin.runtime_identity)
         raw = self.journal_path.read_bytes()
+        if self.expected_bytes is not None and len(raw) != self.expected_bytes:
+            raise ValueError("Q62 journal length differs")
+        digest = hashlib.sha256(raw).hexdigest()
+        if self.expected_sha256 is not None and digest != self.expected_sha256:
+            raise ValueError("Q62 journal digest differs")
+        store = DurableStateStore.open(self.journal_path, origin.runtime_identity)
         records = raw.splitlines()
         first = json.loads(records[0].decode("ascii"))
         if not isinstance(first, dict) or not isinstance(first.get("event_hash"), str):
             raise ValueError("Q62 initialization event is malformed")
         return JournalReplayFacts(
             runtime_identity=store.state.identity,
-            journal_sha256=hashlib.sha256(raw).hexdigest(),
+            journal_sha256=digest,
             initialization_event_sha256=first["event_hash"],
             consumed_observation_sha256=origin.consumed_observation_sha256,
             initialization_sequence=0,
@@ -734,27 +844,40 @@ class L43ProductionOwner:
         cls,
         *,
         repo_root: Path,
-        journal_path: Path,
-        origin: Q62JournalOrigin,
     ) -> L43ProductionOwner:
-        """Build the only production composition; tests use the explicit seams."""
+        """Build the only production composition from the fixed Q62 anchor."""
 
-        if not isinstance(repo_root, Path) or not isinstance(journal_path, Path):
-            raise TypeError("production composition requires concrete Paths")
+        if not isinstance(repo_root, Path):
+            raise TypeError("production composition requires a concrete repo Path")
+        origin = _read_canonical_q62_origin()
         current = L43SourceIdentity(
             source_head=_git_text(repo_root, "rev-parse", "HEAD"),
             source_tree=_git_text(repo_root, "rev-parse", "HEAD^{tree}"),
         )
+        reader = Q62ReadOnlyJournalReader(
+            journal_path=Q62_CANONICAL_JOURNAL_PATH,
+            expected_origin=origin,
+            expected_bytes=Q62_CANONICAL_JOURNAL_BYTES,
+            expected_sha256=Q62_CANONICAL_JOURNAL_SHA256,
+        )
+        replay = reader.replay(origin)
+        if (
+            replay.runtime_identity != origin.runtime_identity
+            or replay.journal_sha256 != origin.journal_sha256
+            or replay.initialization_event_sha256 != origin.initialization_event_sha256
+            or replay.consumed_observation_sha256 != origin.consumed_observation_sha256
+            or replay.initialization_sequence != origin.initialization_sequence
+            or replay.tail_sequence != origin.initialization_sequence
+            or replay.tail_sha256 != origin.initialization_event_sha256
+        ):
+            raise ValueError("canonical Q62 journal replay differs")
         return cls(
             authority_verifier=ProductionSourceAuthorityVerifier(
                 repo_root=repo_root,
                 current_source=current,
                 expected_origin=origin,
             ),
-            journal_reader=Q62ReadOnlyJournalReader(
-                journal_path=journal_path,
-                expected_origin=origin,
-            ),
+            journal_reader=reader,
         )
 
     def __init__(

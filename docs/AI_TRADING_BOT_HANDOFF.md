@@ -1,26 +1,24 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 PRODUCTION READ-ONLY COMPOSITION ACCEPTED/INTEGRATED; ORDER-SCOPE AUTHORITY QUALIFICATION NEXT
+## Current milestone: L43 ORDER-SCOPE QUALIFIER ACCEPTED/INTEGRATED; SCHEMA-ONLY OBSERVER SOURCE NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Final accepted production read-only composition is `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / tree `fcde53aed2485b7c802b19b90eabe68be1353221`. Feature mapped FULL `43202673608`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven broad lanes green. Fast-forward integration moved `develop` to the exact source; develop run `43293115549`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted order-scope qualifier source is `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, is terminal SUCCESS across source-static, active-tests, source-gates and all seven broad lanes. Ordinary Git fast-forward integration moved `develop` to the same SHA; develop run `43313269662`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
-Review history is preserved. `0ef5fe8bfd4a24acc7781b5ab6b92213b7f1e68a` / run `43199229859` was terminal green but rejected before integration because the canonical production constructor still accepted caller-selected Robinhood OAuth, Alpaca transport/credential and clock callbacks, and its test used a hard-coded F: worktree fixture. Final corrective `3d1cac3c...` makes `L43ProductionPreEffectComposition.for_production(*, repo_root: Path)` source-owned and portable. The prior green run was preserved and not rerun.
+The local develop worktree had been stale at `7850c96d0300b14262d81db5ae0e7058b9446f74` because earlier ChatGPT remote-ref integrations had not updated the local branch. That historical workflow regression was reconciled by proving the stale local ref was an ancestor of remote `389a476f7a9cba5f4b0b56f92fbf78f5eb71db74`, guarded fast-forwarding local develop to that reviewed remote state, then ordinary fast-forward integrating `a48327c...` and ordinary-pushing `develop`. No reset, rebase, branch switch, worktree creation or force update occurred.
 
-The accepted composition constructs only the dependencies for a later read-only L43 observation: exact Q62/L43 continuity, origin-bound read-only L43 state snapshot, normalized Robinhood account/position/order reads, current D34-compatible Alpaca runtime signal provider, published XNYS session authority, sanitized evidence and an order-scope verifier. It does not import or construct `L43EffectOperator`, current live mutation transport, review/place/cancel tools, post-effect reconciliation or arbitrary dispatch.
+Review history is preserved. `a65a891e...` / run `43299610929` was green but rejected because positive scope could ignore contradictory `placed_agent` schema. Final `a48327c...` requires explicit omission semantics and compatible optional string-filter schema with no conflicting non-null default.
 
-Construction remains effect-free. The Windows Robinhood OAuth factory is lazy and performs no credential/authentication/MCP work when composed; the Alpaca runtime provider defaults do not read credentials or call the provider until `snapshot()`. Caller-selected production provider, credentials and clock seams are rejected.
+Existing consumed L41/L41R1-R5 artifacts do not prove account-wide all-agent `get_equity_orders` semantics. The accepted qualifier therefore does not make the production verifier positive and grants no provider authority. It has no production transport constructor and only classifies injected normalized `tools/list` pages.
 
-Production `ACCOUNT_WIDE_ALL_AGENTS` is **not** currently proven. The checked-in current read transport authenticates the required read-tool names but not provider semantics establishing that omission of `placed_agent` includes every relevant agent. The canonical production verifier therefore returns no scope proof and the observer must block with `ORDER_SCOPE_UNPROVEN`. Do not interpret exhaustive pagination as account-wide authority.
+The historical L41R3-R5 production schema observers are not the next executable boundary: their inspected-tool sets exclude `get_equity_orders`, and private session helpers must not be imported as a shortcut.
 
-No protected observation or provider effect occurred. Q62 remains immutable/consumed and must not be rerun, repaired, migrated or rebound. FINAL_HOLDOUT remains sealed.
+No protected schema observation, full L43 observation or live entry is authorized. Q62 remains immutable/consumed and FINAL_HOLDOUT remains sealed.
 
 ## Immediate next step
 
-Use one small source checkpoint for **order-scope authority qualification only**. First inspect and bind any immutable consumed L41/L41R3-R5 schema evidence that explicitly proves the semantics of unfiltered `get_equity_orders`. If no accepted evidence proves it, implement a narrowly bounded schema-only/read-only qualifier that observes only the relevant tool schema/description and emits a closed classification. It must not invoke `get_equity_orders`, account/position reads, review/place/cancel, the effect operator, or durable-state mutation.
-
-After that source is independently accepted, ChatGPT may separately authorize the schema-only qualification observation if one is still required. The full L43 pre-effect observation and any live entry remain later boundaries.
+One bounded source checkpoint must add a reviewed schema-only observation runner/composition for the accepted qualifier. It may compose the normal Windows Robinhood OAuth/MCP session and bounded `tools/list` only; it must normalize only the target tool metadata and never invoke provider tools. After exact source acceptance/integration, ChatGPT may separately authorize one protected schema-only observation.
 
 ## L41R1 consumed observation and L41R2 source successor
 

@@ -1,28 +1,28 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L43 production read-only pre-effect composition — ACCEPTED / INTEGRATED
+## L43 order-scope authority qualifier — ACCEPTED / INTEGRATED
 
-Final accepted source: `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / tree `fcde53aed2485b7c802b19b90eabe68be1353221`. Feature mapped FULL `43202673608`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Fast-forward integration moved `develop` to the exact source; develop run `43293115549`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL jobs skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted source: `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43313269662`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
-Review history:
+Preserved review history:
 
-- `0ef5fe8bfd4a24acc7781b5ab6b92213b7f1e68a` / run `43199229859`: terminal green but exact-source review rejected before integration. The canonical production factory accepted caller-selected Robinhood OAuth, Alpaca transport, Alpaca credential-reader and clock callbacks, and its focused test used a hard-coded F: worktree fixture.
-- `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / run `43202673608`: final accepted corrective. `for_production()` accepts only `repo_root`, source-owns production providers/clock, uses portable tests and leaves observation/order-scope semantics unchanged.
+- `a65a891e833208e63f864844af053e98da16d986` / run `43299610929`: terminal green but exact-source review rejected before integration because explicit provider description could qualify all-agent scope despite a contradictory `placed_agent` schema.
+- `a48327c0226847575443406ba39599fe751790f4` / run `43303883035`: accepted corrective. Positive scope requires explicit omission semantics plus present, optional, string-compatible `placed_agent` schema, no conflicting non-null default, valid structural schema and exhaustive tools-list pagination.
 
-Accepted composition behavior:
+Immutable evidence audit found no existing provider-authenticated all-agent omission semantics in consumed L41/L41R1-R5 artifacts. Production authority remains `ORDER_SCOPE_AUTHORITY_UNPROVEN`; the production L43 verifier remains negative.
 
-- provider-specific construction remains outside `live_prototype`;
-- canonical production composition performs no credential read, OAuth/browser operation, network/provider call, durable mutation, review/place/cancel action or FINAL_HOLDOUT access;
-- Robinhood and Alpaca providers remain lazy until the separately authorized observation invokes their read boundaries;
-- no `L43EffectOperator`, live mutation transport, review/place/cancel tool or post-effect reconciliation path is composed;
-- normalized provider-independent facts cross inward;
-- pagination remains explicit/fail-closed;
-- caller assertions cannot qualify order scope;
-- current production verifier truthfully returns no `ACCOUNT_WIDE_ALL_AGENTS` proof because accepted provider/interface evidence does not establish unfiltered order-query semantics.
+The accepted qualifier:
 
-Therefore a protected L43 pre-effect observation on the current source would block on `ORDER_SCOPE_UNPROVEN`; it is not useful or authorized yet. No real provider/OAuth/Robinhood/Alpaca/broker/protected effect occurred during this source checkpoint or its integration. Q62 artifacts remain unchanged and consumed; FINAL_HOLDOUT was untouched.
+- invokes no provider tool and has no production transport constructor;
+- accepts only normalized injected `tools/list` pages;
+- binds source HEAD/tree, sanitized tool-description/input-schema digests, placed-agent schema material and exhaustive tools-list pagination into deterministic evidence;
+- never stores raw provider descriptions/cursors or authorization material;
+- cannot derive positive scope from omission, rows, tool availability, historical evidence or caller assertion;
+- grants no full L43 observation or trading authority.
 
-Immediate successor: one bounded **order-scope authority qualification** source checkpoint. Reuse accepted immutable L41/L41R3-R5 schema evidence only if it explicitly proves the semantics of omitting `placed_agent`. Otherwise prepare a schema-only/read-only qualification boundary with zero tool invocation. Only after the scope fact is independently proven should a full protected L43 pre-effect observation be considered.
+Historical L41R3-R5 observers are not directly reusable for the next protected attempt because they inspect a fixed tool set excluding `get_equity_orders`; importing their private session helpers would violate the repository public-surface rule.
+
+Immediate successor: one small source-owned schema-only observation runner/composition using the accepted Windows OAuth/MCP patterns and bounded `tools/list` only. Real schema observation remains separately protected and NOT RUN until that source is accepted/integrated.
 
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 

@@ -1,14 +1,12 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype contract. L41R6, the Q62 tiny-live pivot/readiness observation, L43 protected-boundary source, and L43 production read-only pre-effect composition are accepted/integrated. Q62 observation-bound source remains `38153e015154f0e0f9d77b1ce1cfb62ed1472330` / `6e2ac40df6259ac046944fee3d01d946fefde13b`. The accepted production read-only L43 composition endpoint is `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / tree `fcde53aed2485b7c802b19b90eabe68be1353221`; feature mapped FULL `43202673608` and develop exact-certification reuse `43293115549` succeeded.
+Status: CURRENT prototype contract. L41R6, Q62 tiny-live readiness, L43 protected-boundary source, production read-only composition and the L43 order-scope qualifier are accepted/integrated. The current integrated endpoint is `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`; feature mapped FULL `43303883035` and develop exact-certification reuse `43313269662` succeeded.
 
-Q62 prepare-state and the protected Q62 observation remain consumed exactly once and immutable. The canonical journal remains 806 bytes / SHA-256 `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`; accepted Q62 evidence remains 11,663 bytes / SHA-256 `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`. Neither may be rerun, repaired, rebound or migrated.
+Q62 prepare-state and its protected readiness observation remain consumed exactly once and immutable. The journal hash remains `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`; Q62 evidence hash remains `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`.
 
-The accepted L43 production composition is read-only and source-owned. It binds the fixed continuity/state readers and normal Robinhood/Alpaca/session providers without performing a provider call during construction. It does not compose mutation/review authority.
+The current blocker is account-wide SPY order-query scope, not a reopening of L41R6 fractional-exit facts or Q62 readiness. Immutable L41/L41R1-R5 schema evidence does not prove that omitting `placed_agent` from `get_equity_orders` returns every relevant agent's orders. The accepted qualifier remains source-only and cannot itself authenticate provider metadata.
 
-The current blocker is separate from the Q62 pivot and from the five historical L41R6 fractional-exit global blockers: production account-wide SPY order scope is not established. The current read tool surface proves availability of `get_equity_orders`, but accepted checked-in evidence does not establish that an invocation omitting `placed_agent` covers every relevant agent. Production therefore remains fail closed at `ORDER_SCOPE_UNPROVEN`.
-
-L43 protected pre-effect observation, provider mutations and Q63 remain NOT RUN / NOT AUTHORIZED on this source. Next step is order-scope authority qualification only. L41R7 remains FORBIDDEN, FINAL_HOLDOUT remains SEALED, and no paper soak is inserted.
+Next source checkpoint: a dedicated schema-only `tools/list` observation runner/composition for the qualifier. No provider tool invocation, account/position/order read, L43 pre-effect observation, effect operation or Q62 mutation is authorized. L41R7 remains FORBIDDEN and FINAL_HOLDOUT remains SEALED.
 
 ## Why the pivot is required
 

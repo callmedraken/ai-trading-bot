@@ -1,18 +1,16 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L43 production read-only composition accepted/integrated; order-scope authority qualification next
+## Current boundary - L43 order-scope qualifier accepted/integrated; schema-only observation runner source next
 
-Architecture 147 L43 production read-only pre-effect composition is accepted/integrated at `3d1cac3c59b6dc3e6a8a134c532eddec64c7c4e9` / tree `fcde53aed2485b7c802b19b90eabe68be1353221`. Feature mapped FULL `43202673608`, attempt 1, passed source-static, active-tests, source-gates and all seven broad lanes. Develop run `43293115549`, attempt 1, passed exact feature-certification reuse with active/FULL skipped.
+Architecture 147 order-scope authority qualifier is accepted/integrated at `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, passed source-static, active-tests, source-gates and all seven broad lanes. Develop run `43313269662`, attempt 1, passed exact feature-certification reuse with active/FULL skipped.
 
-The predecessor composition `0ef5fe8bfd4a24acc7781b5ab6b92213b7f1e68a` / run `43199229859` remains preserved terminal green but was review-rejected because its canonical production factory accepted caller-selected provider/credential/clock seams and its test used a hard-coded worktree path. Final corrective `3d1cac3c...` removes those trust/portability defects without changing order-scope, pagination or observation semantics.
+The qualifier remains source-only. Positive `PROVEN_ACCOUNT_WIDE_ALL_AGENTS` requires explicit provider-advertised omission semantics plus a present optional string-compatible `placed_agent` schema with no conflicting non-null default and exhaustive valid tools-list pagination. Description alone, optionality alone, historical rows, tool availability, pagination or caller assertions cannot qualify scope.
 
-Provider-specific construction remains outside `live_prototype`. The accepted production factory takes only `repo_root` and source-owns the normal Windows Robinhood OAuth/read transport, normalized L43 read adapter, default Alpaca runtime signal provider, published XNYS authority and UTC clock. Composition itself performs no credentials, OAuth/browser activity, provider call, durable mutation or effect. No effect-operator/review/place/cancel transport is constructed.
+Consumed L41/L41R1-R5 evidence does not answer the all-agent omission question. The production verifier remains negative at `ORDER_SCOPE_AUTHORITY_UNPROVEN`.
 
-The production order-scope verifier deliberately produces no `ACCOUNT_WIDE_ALL_AGENTS` proof because accepted checked-in provider/schema evidence does not establish that omission of `placed_agent` includes every relevant agent. The observer therefore blocks with `ORDER_SCOPE_UNPROVEN`. Complete pagination is necessary but cannot substitute for provider-authenticated query-scope semantics.
+No production transport is owned by the qualifier. Existing L41R3-R5 schema observers inspect a fixed tool set that excludes `get_equity_orders`; do not import their private session helpers. The next source boundary is a small dedicated schema-only runner/composition using the reviewed OAuth/MCP patterns and zero provider-tool invocation.
 
-No L43 protected observation has run on this composition. Q62 remains consumed exactly once and immutable; FINAL_HOLDOUT remains SEALED; Q63 remains NOT RUN; L41R7 remains FORBIDDEN.
-
-The next source boundary is one narrow **order-scope authority qualification**. Reuse immutable consumed schema evidence if it explicitly answers the all-agent question; otherwise source-review a schema-only tool-description/input-schema observer before any real query observation.
+No protected schema observation, full L43 observation or live entry has run. Q62 remains consumed and immutable; FINAL_HOLDOUT remains SEALED.
 
 ## D34 accepted boundary - historical transition to L40
 

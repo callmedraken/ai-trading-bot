@@ -40,6 +40,9 @@ from trading_bot.live_prototype.tiny_live_policy import ManualCloseTrigger
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
+from trading_bot.robinhood_mcp.l43_read_adapter import (
+    RobinhoodL43PreEffectReadAdapter,
+)
 
 _ACCOUNT_NUMBER = "912345678901"
 _ACCOUNT = AgenticAccountIdentity(_ACCOUNT_NUMBER, 1)
@@ -360,6 +363,7 @@ def _dependencies(
     read = _ReadBoundary(
         positions=positions, orders=orders, account_number=account_number
     )
+    normalized_read = RobinhoodL43PreEffectReadAdapter(read)
     signal = _SignalProvider(decision, observation_offset=signal_offset)
     scope = _ScopeVerifier(AgenticAccountIdentity(account_number, 1).fingerprint)
     time_source = iter(clock_values or (as_of,))
@@ -378,7 +382,7 @@ def _dependencies(
         ),
         origin=q62,
         state_snapshot_reader=lambda: read_l43_state_snapshot(state_path, anchor),
-        robinhood_builder=lambda: read,
+        robinhood_builder=lambda: normalized_read,
         signal_provider_builder=lambda: signal,
         clock=clock,
         order_scope_verifier=scope if scope_proven else None,

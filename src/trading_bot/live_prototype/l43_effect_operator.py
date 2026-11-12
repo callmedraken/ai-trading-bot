@@ -29,6 +29,12 @@ from trading_bot.live_prototype.l43_pre_effect_observation import (
     L43PreEffectPlan,
     L43PreEffectResult,
 )
+from trading_bot.live_prototype.l43_provider_contracts import (
+    L43EffectTransport,
+    L43PlacementReceipt,
+    L43ReviewNormalization,
+    L43TransportError,
+)
 from trading_bot.live_prototype.l43_state import L43StateSession
 from trading_bot.live_prototype.live_controller import PreparedInvocation
 from trading_bot.live_prototype.tiny_live_policy import (
@@ -39,12 +45,6 @@ from trading_bot.live_prototype.tiny_live_policy import (
     SellReviewValidationStatus,
     evaluate_exact_owned_sell_proposal,
     validate_normalized_sell_review,
-)
-from trading_bot.robinhood_mcp.l43_transport import (
-    L43PlacementReceipt,
-    L43ReviewNormalization,
-    L43RobinhoodTransport,
-    L43TransportError,
 )
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -321,7 +321,7 @@ class L43EffectOperator:
         self,
         *,
         session_factory: Callable[[], L43StateSession],
-        transport: L43RobinhoodTransport,
+        transport: L43EffectTransport,
         authorizer: L43ExactPlanAuthorizer,
         reobserver: L43EffectReobserver,
         reconciler: L43PostEffectReconciler,
@@ -329,8 +329,15 @@ class L43EffectOperator:
     ) -> None:
         if not callable(session_factory):
             raise TypeError("state session factory must be injected")
-        if type(transport) is not L43RobinhoodTransport:
-            raise TypeError("L43 transport must be explicitly injected")
+        if not all(
+            callable(getattr(transport, name, None))
+            for name in (
+                "prepare_entry_order",
+                "prepare_sell_order",
+                "review_sell_order",
+            )
+        ):
+            raise TypeError("L43 transport must provide the neutral effect contract")
         if not callable(getattr(authorizer, "authorize", None)):
             raise TypeError("exact-plan authorizer must be injected")
         if not callable(reobserver):

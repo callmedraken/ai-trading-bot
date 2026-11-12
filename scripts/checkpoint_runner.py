@@ -767,12 +767,26 @@ def _prepublication_requires_infrastructure_coherence(
 
 
 def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, ...]:
-    if _prepublication_requires_infrastructure_coherence(changed_paths):
-        return (
+    tests = (
+        (
             *ARCH132_R3N_ADMISSION_TESTS,
             *PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS,
         )
-    return ARCH132_R3N_ADMISSION_TESTS
+        if _prepublication_requires_infrastructure_coherence(changed_paths)
+        else (*ARCH132_R3N_ADMISSION_TESTS,)
+    )
+    if any(
+        path.startswith(("src/trading_bot/live_prototype/", "tests/live_prototype/"))
+        or path
+        in {
+            "src/trading_bot/robinhood_mcp/l43_read_adapter.py",
+            "src/trading_bot/robinhood_mcp/l43_transport.py",
+            "tests/robinhood_mcp/test_l43_transport.py",
+        }
+        for path in changed_paths
+    ):
+        tests = (*tests, "tests/runtime/checkpoint_runner/test_arch147_prototype.py")
+    return tuple(dict.fromkeys(tests))
 
 
 def resolve_ci_checkpoint(

@@ -16,7 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Context, Decimal, localcontext
@@ -24,12 +24,6 @@ from enum import StrEnum
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
-from trading_bot.desktop_paper.robinhood_read import (
-    AgenticAccountIdentity,
-    EquityPositionObservation,
-    parse_position,
-    resolve_account,
-)
 from trading_bot.domain import OrderSide
 from trading_bot.live_prototype.alpaca_runtime_signal_provider import (
     RuntimeSignalSnapshot,
@@ -65,6 +59,13 @@ from trading_bot.live_prototype.l43_production_owner import (
     RecoveryFacts,
     XnysSessionFacts,
 )
+from trading_bot.live_prototype.l43_provider_contracts import (
+    L43AccountIdentity,
+    L43OrderFact,
+    L43PositionFact,
+    L43PreEffectReadBoundary,
+    L43ReadPage,
+)
 from trading_bot.live_prototype.l43_state import L43StateSnapshot
 from trading_bot.live_prototype.live_contract import OwnershipSnapshot
 from trading_bot.live_prototype.readiness_contracts import ReadinessIdentity
@@ -91,11 +92,6 @@ from trading_bot.live_prototype.tiny_live_readiness_observer import (
 from trading_bot.review_paper.nyse_published_regular_sessions import (
     NYSEPublishedRegularSessionAuthority,
 )
-from trading_bot.robinhood_mcp.models import (
-    RobinhoodEquityOrder,
-    RobinhoodEquityOrdersPage,
-)
-from trading_bot.robinhood_mcp.parsing import parse_equity_orders_response
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _ZERO = Decimal("0")
@@ -219,20 +215,6 @@ class L43OrderScopeProof:
             raise ValueError("order scope counts are invalid")
 
 
-class RobinhoodPreEffectReadBoundary(Protocol):
-    """Narrow account/position/order-only subset of the current read transport."""
-
-    def get_accounts(self) -> Mapping[str, object]: ...
-
-    def get_equity_positions(
-        self, arguments: Mapping[str, object]
-    ) -> Mapping[str, object]: ...
-
-    def get_equity_orders(
-        self, arguments: Mapping[str, object]
-    ) -> Mapping[str, object]: ...
-
-
 class L43StateSnapshotReader(Protocol):
     """Read one detached origin-bound durable-state snapshot."""
 
@@ -272,7 +254,7 @@ class L43PreEffectDependencies:
     continuity_owner: L43ProductionOwner
     origin: Q62JournalOrigin
     state_snapshot_reader: L43StateSnapshotReader
-    robinhood_builder: Callable[[], RobinhoodPreEffectReadBoundary]
+    robinhood_builder: Callable[[], L43PreEffectReadBoundary]
     signal_provider_builder: Callable[[], object]
     clock: Callable[[], datetime]
     session_authority: _PublishedSessionAuthority | None = None
@@ -537,11 +519,11 @@ class _StateView:
 
 @dataclass(frozen=True, slots=True)
 class _BrokerView:
-    account: AgenticAccountIdentity
-    positions: tuple[EquityPositionObservation, ...]
+    account: L43AccountIdentity
+    positions: tuple[L43PositionFact, ...]
     spy_position_quantity: Decimal
     spy_sellable_quantity: Decimal
-    spy_orders: tuple[RobinhoodEquityOrder, ...]
+    spy_orders: tuple[L43OrderFact, ...]
     all_order_count: int
     positions_digest: str
     orders_digest: str
@@ -1075,7 +1057,7 @@ def _signal_semantic_digest(
 
 
 def _read_broker(
-    robinhood: RobinhoodPreEffectReadBoundary,
+    robinhood: L43PreEffectReadBoundary,
     *,
     dependencies: L43PreEffectDependencies,
     origin: Q62JournalOrigin,
@@ -1093,9 +1075,8 @@ def _read_broker(
         raise _Blocked(L43PreEffectBlocker.ACCOUNT_READ_FAILED)
     try:
         counters.robinhood_reads += 1
-        account_payload = robinhood.get_accounts()
-        account = resolve_account(account_payload)
-        if type(account) is not AgenticAccountIdentity:
+        account = robinhood.get_accounts()
+        if type(account) is not L43AccountIdentity:
             raise ValueError
         account_at = _clock(dependencies.clock)
         counters.observed_times.append(("account", account_at))
@@ -1108,8 +1089,6 @@ def _read_broker(
     position_pages = _read_pages(
         reader=robinhood.get_equity_positions,
         arguments={"account_number": account.account_number},
-        collection_key="positions",
-        parser=_parse_position_page,
         max_pages=_MAX_POSITION_PAGES,
         max_rows=_MAX_POSITIONS,
         counters=counters,
@@ -1117,10 +1096,9 @@ def _read_broker(
         invalid=L43PreEffectBlocker.POSITION_INVALID,
     )
     positions_at = _clock(dependencies.clock)
-    try:
-        positions = tuple(parse_position(row) for row in position_pages.rows)
-    except Exception:
-        raise _Blocked(L43PreEffectBlocker.POSITION_INVALID) from None
+    positions = tuple(position_pages.rows)
+    if any(type(position) is not L43PositionFact for position in positions):
+        raise _Blocked(L43PreEffectBlocker.POSITION_INVALID)
     spy_positions = tuple(item for item in positions if item.symbol == "SPY")
     if len(spy_positions) > 1:
         raise _Blocked(L43PreEffectBlocker.POSITION_DUPLICATE)
@@ -1174,8 +1152,6 @@ def _read_broker(
     orders_page = _read_pages(
         reader=robinhood.get_equity_orders,
         arguments=order_arguments,
-        collection_key="orders",
-        parser=_parse_order_page,
         max_pages=_MAX_ORDER_PAGES,
         max_rows=_MAX_ORDERS,
         counters=counters,
@@ -1184,13 +1160,13 @@ def _read_broker(
     )
     orders_at = _clock(dependencies.clock)
     orders = tuple(orders_page.rows)
-    if any(type(order) is not RobinhoodEquityOrder for order in orders):
+    if any(type(order) is not L43OrderFact for order in orders):
         raise _Blocked(L43PreEffectBlocker.ORDER_INVALID)
     order_ids = tuple(order.order_id for order in orders)
     if len(order_ids) != len(set(order_ids)):
         raise _Blocked(L43PreEffectBlocker.ORDER_INVALID)
-    spy_orders = tuple(order for order in orders if str(order.symbol) == "SPY")
-    if any(str(order.symbol) != "SPY" for order in orders):
+    spy_orders = tuple(order for order in orders if order.symbol == "SPY")
+    if any(order.symbol != "SPY" for order in orders):
         # The read was requested for SPY; ignored symbol scope is not accepted.
         raise _Blocked(L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN)
     query_digest = _digest(
@@ -1292,10 +1268,8 @@ def _read_broker(
 
 def _read_pages(
     *,
-    reader: Callable[[Mapping[str, object]], Mapping[str, object]],
+    reader: Callable[[Mapping[str, object]], L43ReadPage],
     arguments: dict[str, object],
-    collection_key: str,
-    parser: Callable[[Mapping[str, object]], Sequence[object]],
     max_pages: int,
     max_rows: int,
     counters: _Counters,
@@ -1311,19 +1285,12 @@ def _read_pages(
         counters.robinhood_pages += 1
         local_pages += 1
         try:
-            response = reader(request)
+            page = reader(request)
         except Exception:
             raise _Blocked(read_failure) from None
-        if not isinstance(response, Mapping):
+        if type(page) is not L43ReadPage:
             raise _Blocked(invalid)
-        data = response.get("data")
-        if (
-            not isinstance(data, Mapping)
-            or collection_key not in data
-            or "next" not in data
-        ):
-            raise _Blocked(invalid)
-        cursor = data.get("next")
+        cursor = page.next_cursor
         if cursor is not None and (
             type(cursor) is not str
             or not cursor
@@ -1331,10 +1298,9 @@ def _read_pages(
             or cursor in seen
         ):
             raise _Blocked(invalid)
-        try:
-            page_rows = tuple(parser(response))
-        except Exception:
-            raise _Blocked(invalid) from None
+        page_rows = page.rows
+        if not isinstance(page_rows, tuple):
+            raise _Blocked(invalid)
         if len(rows) + len(page_rows) > max_rows:
             raise _Blocked(L43PreEffectBlocker.ORDER_COVERAGE_INCOMPLETE)
         rows.extend(page_rows)
@@ -1345,33 +1311,12 @@ def _read_pages(
     raise _Blocked(L43PreEffectBlocker.ORDER_COVERAGE_INCOMPLETE)
 
 
-def _parse_position_page(payload: Mapping[str, object]) -> tuple[object, ...]:
-    data = payload.get("data")
-    if not isinstance(data, Mapping) or not isinstance(data.get("positions"), list):
-        raise ValueError
-    return tuple(data["positions"])
-
-
-def _parse_order_page(payload: Mapping[str, object]) -> tuple[object, ...]:
-    data = payload.get("data")
-    if not isinstance(data, Mapping) or not isinstance(data.get("orders"), list):
-        raise ValueError
-    parsed = parse_equity_orders_response(payload)
-    if type(parsed) is not RobinhoodEquityOrdersPage:
-        raise ValueError
-    if len(parsed.orders) != len(data["orders"]):
-        raise ValueError
-    if any(order is None for order in parsed.orders):
-        raise ValueError
-    return tuple(parsed.orders)
-
-
 def _reconciliation_snapshot(
     *,
     state: DurableState,
     origin_identity: RuntimeIdentity,
     spy_position: Decimal,
-    spy_orders: tuple[RobinhoodEquityOrder, ...],
+    spy_orders: tuple[L43OrderFact, ...],
 ) -> ReconciliationSnapshot:
     if state.identity != origin_identity:
         raise _Blocked(L43PreEffectBlocker.STATE_IDENTITY_MISMATCH)
@@ -1442,7 +1387,7 @@ def _reconciliation_snapshot(
 
 
 def _order_matches_state(
-    order: RobinhoodEquityOrder,
+    order: L43OrderFact,
     state_order: OrderState,
 ) -> bool:
     try:
@@ -1450,7 +1395,7 @@ def _order_matches_state(
         state_status = state_order.status
         quantity = state_order.cumulative_quantity
         notional = state_order.cumulative_notional
-        if order.side is not OrderSide.BUY or order.symbol.value != "SPY":
+        if order.side is not OrderSide.BUY or order.symbol != "SPY":
             return False
         if order.order_type.casefold() != "market":
             return False
@@ -1485,7 +1430,7 @@ def _order_matches_state(
         return False
 
 
-def _order_terminal(order: RobinhoodEquityOrder) -> bool:
+def _order_terminal(order: L43OrderFact) -> bool:
     return order.state.casefold() in _PROVIDER_TERMINAL_TO_STATE
 
 
@@ -2042,10 +1987,10 @@ def _plan_digest(plan: L43PreEffectPlan) -> str:
     )
 
 
-def _order_material(order: RobinhoodEquityOrder) -> tuple[str, ...]:
+def _order_material(order: L43OrderFact) -> tuple[str, ...]:
     return (
         order.order_id,
-        str(order.symbol),
+        order.symbol,
         order.side.value,
         order.state.casefold(),
         order.placed_agent,
@@ -2188,6 +2133,6 @@ __all__ = [
     "L43PreEffectPlan",
     "L43PreEffectResult",
     "L43StateSnapshotReader",
-    "RobinhoodPreEffectReadBoundary",
+    "L43PreEffectReadBoundary",
     "observe_l43_pre_effect",
 ]

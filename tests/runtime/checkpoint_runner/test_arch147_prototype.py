@@ -141,6 +141,15 @@ def test_prototype_has_no_protected_dispatch_and_maps_full():
     assert all(m in full for m in runner.ARCH147_PROTOTYPE_TESTS if m.endswith(".py"))
 
 
+def test_arch147_guard_is_in_prepublication_admission_for_prototype_changes():
+    guard = "tests/runtime/checkpoint_runner/test_arch147_prototype.py"
+    selected = runner._prepublication_admission_tests(
+        ("src/trading_bot/live_prototype/l43_effect_operator.py",)
+    )
+
+    assert selected.count(guard) == 1
+
+
 def test_l41_capability_family_is_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     capability_tests = {

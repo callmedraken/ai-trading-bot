@@ -16,7 +16,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequenc
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from decimal import Decimal
-from enum import StrEnum
 from typing import Protocol
 
 from trading_bot.desktop_live.ownership import provider_order_id
@@ -24,6 +23,12 @@ from trading_bot.live_prototype.consumed_l41r5_evidence import (
     L41R5FieldSemantics,
 )
 from trading_bot.live_prototype.durable_state import IntentKind
+from trading_bot.live_prototype.l43_provider_contracts import (
+    L43PlacementReceipt,
+    L43ReviewNormalization,
+    L43ReviewStatus,
+    L43TransportError,
+)
 from trading_bot.live_prototype.live_controller import PreparedInvocation
 from trading_bot.live_prototype.tiny_live_policy import (
     EXACT_SELL_REVIEW_CONTRACT_ID,
@@ -46,7 +51,6 @@ MAX_CURSOR_LENGTH = 4096
 MAX_ORDER_SCHEMA_ROWS = 20
 MAX_RESPONSE_BYTES = 262_144
 MAX_RESPONSE_DEPTH = 16
-_SAFE_CODE = re.compile(r"[A-Z][A-Z0-9_]{0,63}\Z")
 _ACCOUNT_NUMBER = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _INTENT_ID = re.compile(
@@ -62,68 +66,6 @@ _L41R5_EXPECTED_ORDER_FIELD = L41R5FieldSemantics(
 _L41R5_FRACTIONAL_PRECISION = (6,)
 _ENTRY_LIMIT = Decimal("10.00")
 _ZERO = Decimal("0")
-
-
-class L43TransportError(RuntimeError):
-    """Fixed, sanitized error for L43 schema, dispatch, and result failures."""
-
-    def __init__(self, code: str) -> None:
-        self.code = code
-        super().__init__(code)
-
-
-class L43ReviewStatus(StrEnum):
-    NORMALIZED_UNKNOWN = "NORMALIZED_UNKNOWN"
-    BLOCKED = "BLOCKED"
-
-
-@dataclass(frozen=True, slots=True)
-class L43ReviewNormalization:
-    """A sanitized review result; this adapter never emits affirmative review."""
-
-    status: L43ReviewStatus
-    review: NormalizedSellReview | None
-    manual_close_trigger: ManualCloseTrigger | None
-    reason_code: str
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.status, L43ReviewStatus):
-            raise TypeError("review status must be closed")
-        if self.review is not None and type(self.review) is not NormalizedSellReview:
-            raise TypeError("normalized review must use the accepted contract")
-        if self.manual_close_trigger is not None and not isinstance(
-            self.manual_close_trigger, ManualCloseTrigger
-        ):
-            raise TypeError("manual-close trigger must be closed")
-        if (
-            not isinstance(self.reason_code, str)
-            or _SAFE_CODE.fullmatch(self.reason_code) is None
-        ):
-            raise ValueError("review reason must be sanitized ASCII")
-        if self.status is L43ReviewStatus.NORMALIZED_UNKNOWN:
-            if (
-                self.review is None
-                or self.manual_close_trigger
-                is not ManualCloseTrigger.SELL_REVIEW_UNKNOWN
-            ):
-                raise ValueError("unknown review must retain a manual-close trigger")
-            if self.review.outcome is not NormalizedReviewOutcome.UNKNOWN:
-                raise ValueError("raw provider output cannot assert review outcome")
-            if self.review.semantics is not NormalizedReviewSemantics.UNKNOWN:
-                raise ValueError("raw provider output cannot assert review semantics")
-        elif self.review is not None or self.manual_close_trigger is None:
-            raise ValueError("blocked review requires only a manual-close trigger")
-
-
-@dataclass(frozen=True, slots=True)
-class L43PlacementReceipt:
-    """The only placement fact extracted from a truthful repository envelope."""
-
-    provider_order_id: str
-
-    def __post_init__(self) -> None:
-        if provider_order_id(self.provider_order_id) != self.provider_order_id:
-            raise ValueError("provider order ID is not canonical")
 
 
 @dataclass(frozen=True, slots=True)

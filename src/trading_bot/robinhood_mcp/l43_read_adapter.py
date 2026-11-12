@@ -68,7 +68,9 @@ def _data(payload: object, collection: str) -> Mapping[str, object]:
 
 
 def _cursor(data: Mapping[str, object]) -> str | None:
-    cursor = data.get("next")
+    if "next" not in data:
+        raise ValueError("Robinhood pagination field is missing")
+    cursor = data["next"]
     if cursor is not None and type(cursor) is not str:
         raise ValueError("Robinhood cursor is invalid")
     return cursor

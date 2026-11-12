@@ -543,6 +543,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_recovery_operator.py",
     "tests/live_prototype/test_delivery_operator.py",
     "tests/live_prototype/test_emergency_operator.py",
+    "tests/live_prototype/test_l43_production_owner.py",
     "tests/experiments/test_filtered_trend_comparison_v2.py",
     "tests/experiments/test_filtered_trend_comparison_campaign_v2.py",
     "tests/experiments/test_filtered_trend_comparison_bundle_v2.py",

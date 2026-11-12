@@ -74,6 +74,37 @@ def test_only_explicit_provider_scope_statement_proves_all_agents() -> None:
     assert calls == [None]
 
 
+@pytest.mark.parametrize(
+    "schema",
+    [
+        {
+            "type": "object",
+            "properties": {"placed_agent": {"type": "string"}},
+            "required": ["placed_agent"],
+        },
+        {
+            "type": "object",
+            "properties": {"placed_agent": {"type": "string", "default": "agentic"}},
+            "required": [],
+        },
+        {
+            "type": "object",
+            "properties": {"placed_agent": {"type": "integer"}},
+            "required": [],
+        },
+        {"type": "object", "properties": {}, "required": []},
+    ],
+)
+def test_explicit_description_cannot_override_conflicting_scope_schema(
+    schema: dict[str, object],
+) -> None:
+    result, _ = _observe(
+        {None: _page([_tool(description=_EXPLICIT_SCOPE, schema=schema)])}
+    )
+
+    assert result.classification is Classification.UNPROVEN_PROVIDER_SEMANTICS
+
+
 def test_explicit_scope_in_relevant_schema_description_can_qualify() -> None:
     schema = {
         "type": "object",
@@ -85,6 +116,9 @@ def test_explicit_scope_in_relevant_schema_description_can_qualify() -> None:
     result, _ = _observe({None: _page([_tool(schema=schema)])})
 
     assert result.classification is Classification.PROVEN_ACCOUNT_WIDE_ALL_AGENTS
+    assert result.placed_agent is not None
+    assert not result.placed_agent.default_present
+    assert result.placed_agent.default_is_null is None
 
 
 @pytest.mark.parametrize(

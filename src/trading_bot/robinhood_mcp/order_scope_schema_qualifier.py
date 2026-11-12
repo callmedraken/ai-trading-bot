@@ -55,6 +55,8 @@ class PlacedAgentSchemaMaterial:
     schema_type: str | None
     description_sha256: str | None
     schema_sha256: str | None
+    default_present: bool
+    default_is_null: bool | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -200,7 +202,7 @@ class RobinhoodOrderScopeSchemaQualifier:
         return _result(
             (
                 OrderScopeClassification.PROVEN_ACCOUNT_WIDE_ALL_AGENTS
-                if explicit_scope
+                if explicit_scope and _scope_schema_compatible(placed_agent)
                 else OrderScopeClassification.UNPROVEN_PROVIDER_SEMANTICS
             ),
             source_head=source_head,
@@ -249,7 +251,7 @@ def _target_facts(
         raise ValueError("required fields do not resolve to properties")
     property_schema = properties.get("placed_agent")
     if property_schema is None:
-        placed = PlacedAgentSchemaMaterial(False, False, None, None, None)
+        placed = PlacedAgentSchemaMaterial(False, False, None, None, None, False, None)
     else:
         type_value = property_schema.get("type")
         if type_value is not None and type(type_value) is not str:
@@ -277,6 +279,10 @@ def _target_facts(
             schema_type,
             property_digest,
             hashlib.sha256(_canonical_json(property_schema)).hexdigest(),
+            "default" in property_schema,
+            None
+            if "default" not in property_schema
+            else property_schema["default"] is None,
         )
     explicit_scope = _explicit_scope(description) or (
         property_schema is not None
@@ -288,6 +294,20 @@ def _target_facts(
         hashlib.sha256(schema_bytes).hexdigest(),
         placed,
         explicit_scope,
+    )
+
+
+def _scope_schema_compatible(placed: PlacedAgentSchemaMaterial) -> bool:
+    if (
+        not placed.present
+        or placed.required
+        or placed.schema_type is None
+        or placed.default_present
+        and not placed.default_is_null
+    ):
+        return False
+    return set(placed.schema_type.split("|")) <= {"null", "string"} and (
+        "string" in placed.schema_type.split("|")
     )
 
 
@@ -389,6 +409,8 @@ def _result(
                 "schema_type": placed_agent.schema_type,
                 "description_sha256": placed_agent.description_sha256,
                 "schema_sha256": placed_agent.schema_sha256,
+                "default_present": placed_agent.default_present,
+                "default_is_null": placed_agent.default_is_null,
             }
         ),
         "source_head": source_head,

@@ -1,12 +1,12 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype contract. L41R6, Q62 tiny-live readiness, L43 protected-boundary source, production read-only composition, order-scope qualifier and the schema-only order-scope observer are accepted/integrated. The current accepted executable endpoint is `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`; feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` succeeded.
+Status: CURRENT prototype contract. Q62 remains consumed/immutable and L43 has now consumed one schema-only order-scope observation. The observation-bound exact source is `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`.
 
-Q62 prepare-state and its protected readiness observation remain consumed exactly once and immutable. The journal hash remains `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`; Q62 evidence hash remains `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`.
+The order-scope observation result is `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`, evidence `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. One tools/list page was exhaustive. OAuth scope entry/session were `1/1`; browser `0`; tools/list `1`; all provider-tool/account/position/order/review/place/cancel/other-tool calls were `0`.
 
-The current blocker remains account-wide SPY order-query scope. Existing immutable L41/L41R1-R5 artifacts did not prove omission semantics, so a dedicated metadata-only observer is now accepted. It may later perform only reviewed OAuth/MCP establishment and bounded `tools/list`; it exposes no provider-tool invocation and cannot itself authorize orders.
+The current blocker remains complete account-wide SPY order visibility. The accepted provider metadata does not prove that omitting `placed_agent` is all-agent. This observation is consumed and must not be retried or replaced.
 
-No protected schema observation has run yet. After docs closeout integration, one fresh create-only schema observation may be separately authorized with no automatic retry. Full L43 pre-effect observation, provider mutations and Q63 remain NOT RUN / NOT AUTHORIZED. L41R7 remains FORBIDDEN and FINAL_HOLDOUT remains SEALED.
+Next source work must use a different completeness strategy: prove a closed provider-authenticated enumeration of all relevant order-source/agent categories or an equivalent guarantee. If such a mechanism does not exist, preserve `ORDER_SCOPE_UNPROVEN` and redesign the L43 tiny-live safety boundary. No full L43 pre-effect observation, provider mutation or Q63 is authorized. L41R7 remains FORBIDDEN and FINAL_HOLDOUT remains SEALED.
 
 ## Why the pivot is required
 

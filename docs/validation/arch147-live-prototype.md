@@ -1,31 +1,29 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L43 schema-only order-scope observer — ACCEPTED / INTEGRATED
+## L43 schema-only order-scope observation — CONSUMED / UNPROVEN / NO RETRY
 
-Final accepted source: `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43364684407`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Accepted observer source remains `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` are terminal SUCCESS. Observation-bound docs source `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913` has feature/develop docs gates `43365064205` / `43365310403` terminal SUCCESS.
 
-Preserved review history:
+The separately authorized protected metadata attempt is consumed exactly once:
 
-- `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145`: terminal green but exact-source review rejected before integration because a failed `tools/list` transport could leave `SCHEMA_MALFORMED` qualifier evidence attached while the observer status was `OAUTH_SESSION_TOOLS_LIST_FAILURE`.
-- `826bca192a90c20738bb1dc1199b8d3373e083e7` / run `43346232426`: accepted corrective. Transport failure clears the qualification before evidence construction; classification becomes `NOT_CLASSIFIED` and qualifier/description/schema/placed-agent facts are absent. Successfully received malformed metadata still produces `SCHEMA_MALFORMED`.
+- status/reason: `PROVIDER_SEMANTICS_UNPROVEN`;
+- classification: `UNPROVEN_PROVIDER_SEMANTICS`;
+- evidence: `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`;
+- SHA-256: `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`;
+- tools/list pages: `1`, exhaustive `true`;
+- OAuth scope entry: `1`;
+- browser launches: `0`;
+- MCP session opens: `1`;
+- tools/list attempts/pages received: `1/1`;
+- MCP tool invocations, account reads, position reads, order reads, review, placement, cancellation and other tool calls: all `0`.
 
-Accepted observer behavior:
+The result is truthful negative semantic evidence. It does not prove account-wide all-agent scope, and the production `RobinhoodL43AccountWideOrderScopeVerifier` must remain negative. Full L43 pre-effect observation therefore remains blocked at `ORDER_SCOPE_UNPROVEN`.
 
-- construction is inert;
-- exact current source admission precedes OAuth/session construction;
-- live feature and develop must both equal the admitted source;
-- FEATURE and PROSPECTIVE_DEVELOP authority must pass and remain stable;
-- production access is limited to one reviewed OAuth/MCP session and bounded `tools/list`;
-- the metadata transport exposes no `call_tool` dispatch;
-- only target `get_equity_orders` metadata is retained; unrelated metadata is discarded;
-- raw provider/OAuth output is suppressed and not persisted;
-- evidence is fixed-root, fresh/create-only and sanitized;
-- all provider-tool/account/position/order/review/place/cancel/other-tool counters remain zero;
-- any positive scope result is review evidence only.
+Automatic retry is FORBIDDEN. Do not delete, reset, repair, recreate or replace the evidence directory.
 
-No real provider/OAuth/schema observation occurred during source implementation, certification, review or integration. Q62 artifacts remain unchanged and consumed; FINAL_HOLDOUT was untouched.
+Immediate successor is a source/design checkpoint for an alternative completeness proof. Positive order-scope authority requires a provider-authenticated closed enumeration of every relevant order-source/agent category or another equivalent completeness guarantee. An omitted-query superset of `placed_agent=agentic`, current rows containing multiple `placed_agent` values, documentation silence, or caller assertion cannot prove completeness.
 
-Immediate successor: after docs closeout integration, one separately authorized protected schema-only `tools/list` observation. Use one fresh evidence directory and do not automatically retry. Exact evidence review must occur before the production order-scope verifier, full L43 pre-effect observation or live entry can advance.
+If no such mechanism exists, preserve the blocker and redesign the tiny-live safety boundary instead of weakening `ACCOUNT_WIDE_ALL_AGENTS`. Q62 remains unchanged and FINAL_HOLDOUT remains sealed.
 
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 

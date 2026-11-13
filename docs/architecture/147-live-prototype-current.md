@@ -1,16 +1,16 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L43 schema-only observer accepted/integrated; protected tools/list observation next
+## Current boundary - L43 schema observation consumed / semantics unproven
 
-Architecture 147 order-scope schema observer is accepted/integrated at `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, passed source-static, active-tests, source-gates and all seven broad lanes. Develop run `43364684407`, attempt 1, passed exact feature-certification reuse with active/FULL skipped.
+The accepted metadata-only order-scope observer was executed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. The result is `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`.
 
-The predecessor `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145` remains preserved terminal green but was review-rejected because a failed `tools/list` transport could retain a stale `SCHEMA_MALFORMED` qualifier classification. Final corrective `826bca...` discards qualification evidence on transport failure and keeps genuine returned malformed metadata distinct.
+Evidence is fixed at `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. Pagination was exhaustive in one tools/list page. OAuth scope/session attempts were `1/1`, browser launches `0`, tools/list attempts `1`, and every MCP provider-tool/account/position/order/review/place/cancel/other-tool attempt remained `0`.
 
-The observer is source-owned, metadata-only and lazy. Source admission requires canonical feature checkout identity, clean source, exact live feature/develop equality, current FEATURE and PROSPECTIVE_DEVELOP authority, and stable recheck before OAuth/session construction. Production metadata access is limited to bounded MCP `tools/list`; no provider-tool dispatch surface exists.
+This is a consumed negative semantic result, not an operational failure. No automatic retry is allowed. It does not establish `ACCOUNT_WIDE_ALL_AGENTS`; production composition must continue to return no order-scope proof and full L43 pre-effect observation remains blocked.
 
-Evidence schema `arch147-robinhood-order-scope-observation/v1` stores only sanitized target digests/facts, source authority, pagination and attempt accounting. A positive scope classification remains review-only and grants neither order nor live authority.
+The next source boundary is an alternative completeness proof design, not another omission-semantics schema attempt. Positive authority requires a provider-authenticated closed enumeration of every relevant order-source/agent category or another equivalently strong completeness mechanism. Empirical superset comparisons, current-row observations and caller assertions are insufficient.
 
-No protected schema observation has run. The next boundary is exactly one guarded, no-automatic-retry `tools/list` observation after docs closeout integration. Full L43 pre-effect reads and all live effects remain later. Q62 remains immutable and FINAL_HOLDOUT remains SEALED.
+If no complete provider-authenticated mechanism exists, preserve the blocker and redesign the tiny-live safety boundary. Q62 remains immutable; FINAL_HOLDOUT remains SEALED.
 
 ## D34 accepted boundary - historical transition to L40
 

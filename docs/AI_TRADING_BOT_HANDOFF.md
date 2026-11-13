@@ -1,24 +1,32 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 SCHEMA-ONLY OBSERVER ACCEPTED/INTEGRATED; ONE PROTECTED TOOLS/LIST OBSERVATION NEXT
+## Current milestone: L43 SCHEMA OBSERVATION CONSUMED / UNPROVEN; ALTERNATIVE ORDER-SCOPE PROOF NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Final accepted observer source is `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, is terminal SUCCESS across source-static, active-tests, source-gates and all seven broad lanes. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43364684407`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+The protected schema-only observation is consumed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`.
 
-Preserved review history: `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145` was terminal green but rejected before integration because transport failure could serialize a stale qualifier `SCHEMA_MALFORMED` classification alongside `OAUTH_SESSION_TOOLS_LIST_FAILURE`. Corrective `826bca...` clears qualification material on transport failure, so failed metadata transport is `NOT_CLASSIFIED`; genuine returned malformed metadata remains `SCHEMA_MALFORMED`.
+Result:
 
-The production entry point is `RobinhoodOrderScopeSchemaObserver().observe(evidence_dir=...)`. Construction performs no credential, OAuth, browser, network or MCP work. A real call reserves a fixed-root create-once evidence directory, performs exact current-source admission before provider construction, then uses only the normal Windows OAuth factory, one MCP session and bounded `tools/list`. The metadata transport has no `call_tool` method.
+- status/reason: `PROVIDER_SEMANTICS_UNPROVEN`;
+- classification: `UNPROVEN_PROVIDER_SEMANTICS`;
+- evidence: `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`;
+- SHA-256: `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`;
+- one tools/list page, exhaustive;
+- OAuth scope entry `1`, browser `0`, MCP session `1`, tools/list `1`;
+- every provider-tool/account/position/order/review/place/cancel/other-tool counter `0`.
 
-Closed outcomes remain `SCOPE_PROVEN_FOR_REVIEW`, `PROVIDER_SEMANTICS_UNPROVEN`, `TARGET_TOOL_UNAVAILABLE`, `SCHEMA_MALFORMED`, `SOURCE_AUTHORITY_BLOCKED`, `OAUTH_SESSION_TOOLS_LIST_FAILURE` and `EVIDENCE_WRITE_FAILURE`. Provider/tool counters for account, positions, orders, review, placement, cancellation and arbitrary tools must remain zero.
+Automatic retry is FORBIDDEN. The evidence must remain unchanged.
 
-No protected schema observation has run. Q62 is unchanged/consumed, the full L43 pre-effect observation is not authorized, no live entry is authorized and FINAL_HOLDOUT remains sealed.
+The observation does not authenticate omission of `placed_agent` as account-wide all-agent order visibility. The production order-scope verifier remains deliberately negative, so full L43 pre-effect observation and all live effects remain NOT AUTHORIZED.
+
+The source lineage remains accepted: observer source `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`; feature FULL `43346232426`; develop reuse `43364684407`; observation-bound docs feature/develop `43365064205` / `43365310403`.
 
 ## Immediate next step
 
-After the docs descendant is fast-forwarded to both feature and `develop`, run exactly one separately authorized schema-only observation through a guarded operator block. Use one fresh `F:\AI\temp\arch147-order-scope-schema-<32 hex>` directory. Automatic retry is forbidden. Return the terminal status/reason, evidence path/hash and counters without modifying or deleting the evidence.
+Do not build a retry wrapper around the consumed metadata attempt. Design a bounded alternative proof checkpoint that can only become positive if it authenticates a complete closed order-source/agent universe or an equivalent provider-backed completeness guarantee. Comparing omitted results only to `agentic`, observing a current superset, or relying on caller/manual assertions is insufficient.
 
-A positive result is review evidence only. Do not run the full L43 pre-effect observation or any order effect until ChatGPT reviews the consumed schema evidence.
+If the provider exposes no such complete enumeration or guarantee, the checkpoint must return a source/design blocker and the next architecture step is to redesign L43's tiny-live safety boundary rather than weaken `ACCOUNT_WIDE_ALL_AGENTS`.
 
 ## L41R1 consumed observation and L41R2 source successor
 

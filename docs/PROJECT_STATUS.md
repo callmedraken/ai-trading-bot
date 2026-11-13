@@ -1,22 +1,34 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 SCHEMA-ONLY OBSERVER ACCEPTED/INTEGRATED; ONE PROTECTED TOOLS/LIST OBSERVATION NEXT
+## Current milestone - L43 SCHEMA OBSERVATION CONSUMED / UNPROVEN; ORDER-SCOPE PROOF STRATEGY MUST CHANGE
 
-Architecture 147 L43 order-scope schema-only observer is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL run `43346232426`, attempt 1, succeeded with source-static, active-tests, source-gates and broad-1 through broad-7 green. Develop run `43364684407`, attempt 1, succeeded with exact feature-certification reuse; active-tests and FULL were skipped, so no duplicate develop FULL was run.
+The separately authorized Architecture 147 L43 schema-only Robinhood observation is CONSUMED / NO AUTOMATIC RETRY. It ran against exact docs-bound source `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913` and returned `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`.
 
-The initial observer source `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145` remains preserved terminal green but review-rejected before integration because a failed `tools/list` transport could leave the qualifier's fallback `SCHEMA_MALFORMED` classification attached while the top-level observer status correctly reported `OAUTH_SESSION_TOOLS_LIST_FAILURE`. Corrective child `826bca...` discards qualification material on transport failure, producing truthful `NOT_CLASSIFIED` evidence while retaining genuine successfully received malformed metadata as `SCHEMA_MALFORMED`.
+Preserved evidence:
 
-The accepted observer is metadata-only. Construction is inert. A real invocation first requires the canonical feature checkout, exact live feature/develop equality, clean current source, FEATURE and PROSPECTIVE_DEVELOP authority, and a stable source recheck. Only then may it construct the reviewed Windows Robinhood OAuth/MCP session and bounded `tools/list` metadata transport. The transport exposes no `call_tool` path and the observer has zero account, position, order, review, placement, cancellation or other provider-tool authority.
+- path: `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`;
+- SHA-256: `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`;
+- tools/list pages: `1`;
+- exhaustive pagination: `true`;
+- OAuth scope-entry attempts: `1`;
+- browser launches: `0`;
+- MCP session-open attempts: `1`;
+- tools/list attempts/pages received: `1/1`;
+- MCP tool/account/position/order/review/place/cancel/other-tool calls: all `0`.
 
-The accepted evidence schema is `arch147-robinhood-order-scope-observation/v1`. Evidence is create-once under the fixed `F:\AI\temp` boundary and records only sanitized source identities, authority status, qualifier classification/digest, target metadata digests, sanitized `placed_agent` facts, pagination, truthful counters, status and reason. Raw provider descriptions/schemas, cursor values, OAuth URLs/callbacks/tokens/credentials and provider exception text are not persisted.
+The attempt proves that the provider's authenticated current metadata does not satisfy the accepted explicit omission-semantics predicate for `placed_agent`. It does not prove account-wide all-agent order visibility. The production `RobinhoodL43AccountWideOrderScopeVerifier` therefore remains negative and full L43 pre-effect observation remains blocked at `ORDER_SCOPE_UNPROVEN`.
 
-No real schema observation has run on the accepted source. No OAuth/browser/network/provider/tool call, durable mutation, L43 pre-effect observation, effect operation, Q62 mutation or FINAL_HOLDOUT access occurred during source implementation, certification, review or integration. Q62 remains consumed/immutable; Q63 remains NOT RUN; L41R7 remains FORBIDDEN.
+Do not rerun this schema observation, delete or replace its evidence, weaken the qualifier, infer all-agent scope from omission, or manufacture a positive verifier from the unproven result.
+
+The accepted schema-observer source remains `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`, with feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` terminal green. Observation-bound docs source `2d7a934d...` has feature/develop docs runs `43365064205` / `43365310403` terminal green.
+
+Q62 remains consumed/immutable; no L43 account/position/order read occurred in this schema attempt; no durable mutation, review, placement, cancellation or live effect occurred; Q63 remains NOT RUN; L41R7 remains FORBIDDEN; FINAL_HOLDOUT remains SEALED.
 
 ## Immediate next step
 
-After this docs-only closeout is integrated to the exact same feature/develop source, ChatGPT may authorize exactly one protected **schema-only `tools/list` observation** using `RobinhoodOrderScopeSchemaObserver().observe(...)`. It may establish one reviewed OAuth/MCP session and bounded metadata listing only. It must not invoke `get_equity_orders` or any other provider tool.
+Design one bounded **alternative order-scope proof source checkpoint** rather than another schema retry. The successor must not assume that omitted `placed_agent` is all-agent. It should determine whether complete order coverage can be proven from an independently reviewable source-owned composition, such as an explicit exhaustive enumeration of every provider-advertised order-source/agent category if the provider exposes such a closed set, or another equally strong provider-authenticated mechanism.
 
-The observation is one-shot operationally: use one fresh create-only evidence directory, do not automatically retry any BLOCKED/FAILED/UNPROVEN result, and preserve the produced evidence for exact review. A positive `SCOPE_PROVEN_FOR_REVIEW` result still grants no live/order authority by itself; ChatGPT must review the exact evidence before the production order-scope verifier or full L43 pre-effect observation can advance.
+A proof must establish completeness, not merely show that an omitted query is a superset of `placed_agent=agentic` or that current returned rows happen to contain multiple source values. If no closed provider-authenticated enumeration or equivalent completeness mechanism exists, preserve `ORDER_SCOPE_UNPROVEN` and redesign the tiny-live safety boundary instead of weakening it.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

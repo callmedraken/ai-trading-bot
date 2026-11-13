@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 A2 ACCEPTED / INTEGRATED; A3 RUNNER REGISTRATION NEXT
+## Current milestone: L43 A2 ACCEPTED / INTEGRATED; A3 FEATURE SOURCE REVIEW NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
@@ -16,7 +16,7 @@ Accepted/integrated A2 source:
 
 A2 preserves `EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1` unchanged and adds `AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1`. The new contract accepts the reviewed public-style `agent_initiated` metadata only as eligibility for a later runtime equality proof. Injected metadata remains unauthenticated. Even an authenticated hosted metadata match may produce only `AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW`; it must retain `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
 
-No A2 hosted observation has been run. The A2 observer class exists, but the current `arch147-live-prototype` checkpoint is still source-only with `preflight=None` and `execute=None`. Therefore there is currently no reviewed unified-runner operator surface for the A2 observation. Do not invent a temporary Python/PowerShell invocation.
+At A2 integration, the checkpoint had no runner surface for its observer. The current feature source now registers that existing A2 observer as a read-only unified-runner `preflight`; `execute=None` and `remote_head_env=None` remain. No A2 hosted observation has run and the A3 preflight has not been invoked. Registration, admission, and CI do not authorize an observation; wait for exact-source acceptance and integration, then treat any observation as a separate reviewed operator step.
 
 The earlier `placed_agent` schema observation remains consumed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. Its immutable evidence is `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`, result `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`. Automatic retry is FORBIDDEN.
 
@@ -24,17 +24,7 @@ Production remains `ORDER_SCOPE_UNPROVEN`; Q62 remains consumed/immutable; Q63 i
 
 ## Immediate next step
 
-A3 is a narrow source-only registration checkpoint:
-
-1. register a read-only unified-runner `preflight` for the A2 runtime-partition metadata observer;
-2. keep `execute=None` and no protected mutation authority;
-3. perform runner-owned exact source/worktree/remote admission before OAuth/MCP;
-4. dispatch only the existing one-use metadata-only observer and allow only bounded exhaustive `tools/list`;
-5. use a fresh create-only external evidence destination and preserve no-retry semantics;
-6. add fake-only adversarial tests for registration, admission-before-dispatch, one-use behavior, no `call_tool`, evidence truthfulness, and source ownership;
-7. update active Architecture-147 test/Ruff ownership in the same commit if required.
-
-A3 performs no real OAuth, MCP session, `tools/list`, account/order/position read, review/place/cancel, Q63, holdout, or live effect during implementation. After focused verification, fresh `ops.ps1 admit`, one atomic feature push, mapped CI, ChatGPT exact-source review, and exact fast-forward integration, the registered read-only preflight becomes the next operator action.
+After the A3 feature push, wait for its single mapped GitHub CI run to reach terminal status, then perform ChatGPT exact-source review. Inspect the active-tests artifact for the A3 runner guard and the A1/A2 observer tests, and confirm all seven mapped FULL lanes pass under 300 seconds with no duplicate FULL route. No local FULL or hosted A2 observation is part of this checkpoint. Stop at exact-source review; integration and any later operator observation remain separate boundaries.
 
 ## L41R1 consumed observation and L41R2 source successor
 

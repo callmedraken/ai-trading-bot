@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 A2 ACCEPTED / INTEGRATED; A3 REGISTERED READ-ONLY OBSERVER SURFACE NEXT
+## Current milestone - L43 A2 ACCEPTED / INTEGRATED; A3 FEATURE SOURCE REVIEW NEXT
 
 Architecture 147 L43 A2 is SOURCE ACCEPTED / FAST-FORWARD INTEGRATED at `c2e14d664b6e57f1a7a212c4240f29332a97af27` / tree `18270bd2de56b7d19ced8ece49b025114a882d00`.
 
@@ -10,19 +10,15 @@ Feature push run `43388450466`, attempt 1, passed source-static, active-tests, a
 
 A2 performed no provider or protected effect. The guarded runtime-partition schema observer remains metadata-only, one-use, bounded `tools/list`, and review-only. Positive evidence would still record `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
 
+The current feature source adds the A3 unified-runner registration for this existing observer as a read-only `preflight`. It keeps `execute=None` and `remote_head_env=None`, checks exact source admission before OAuth/MCP, and owns only the existing A2 metadata path. The A3 source is not accepted or integrated. Mapped GitHub CI and exact-source review must complete before any separate operator decision; no A2 hosted observation or A3 preflight has run.
+
 The earlier `placed_agent` schema observation remains CONSUMED / NO AUTOMATIC RETRY at `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`, evidence `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. That predecessor remains immutable and does not prove account-wide all-agent visibility.
 
 Production remains `ORDER_SCOPE_UNPROVEN`. Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 remains FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Implement one bounded **A3 registered read-only observer checkpoint** before any A2 hosted observation.
-
-A3 must register the A2 metadata observation through the unified checkpoint runner as a read-only `preflight` surface only. It must keep `execute=None`, expose no arbitrary provider/tool dispatch, perform exact source/worktree/remote admission before OAuth/MCP, allocate fresh external evidence through the runner, dispatch the existing A2 guarded observer exactly once, preserve sanitized one-shot/no-retry evidence, and grant no order/account/position read or live authority.
-
-Do not use an ad-hoc `python -c`, temporary PowerShell wrapper, guessed worktree path, or direct caller invocation of the observer. Architecture 129 requires routine read-only qualification to use the checked-in unified runner.
-
-After A3 source review, mapped certification, exact fast-forward integration, and terminal develop reuse, the registered A3 preflight may perform the one authenticated A2 metadata observation. Only reviewed positive evidence may unblock B1 strict-boolean normalized order propagation; B2 runtime four-read partition proof remains separate.
+Review the terminal mapped CI evidence and exact A3 feature source. The registered `preflight` does not grant authority to invoke OAuth/MCP; do not run it as part of source implementation, certification, or CI. After independent source acceptance and exact integration, any A2 observation remains a separate, bounded operator decision. Only reviewed positive evidence may unblock B1 strict-boolean normalized order propagation; B2 runtime four-read partition proof remains separate.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

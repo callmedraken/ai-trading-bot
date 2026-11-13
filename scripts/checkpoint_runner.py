@@ -560,6 +560,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
 )
 ARCH147_PROTOTYPE_RUFF: Final = (
     "scripts/checkpoint_runner.py",
+    "scripts/arch147_l43_a3_source.py",
     "src/trading_bot/live_prototype",
     "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_qualifier.py",
     "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_observer.py",
@@ -784,6 +785,8 @@ def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, 
         path.startswith(("src/trading_bot/live_prototype/", "tests/live_prototype/"))
         or path
         in {
+            "scripts/arch147_l43_a3_source.py",
+            "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
             "src/trading_bot/robinhood_mcp/l43_read_adapter.py",
             "src/trading_bot/robinhood_mcp/l43_transport.py",
             "tests/robinhood_mcp/test_l43_transport.py",
@@ -26626,11 +26629,11 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
     )
     values[ARCH147_PROTOTYPE_NAME] = CheckpointSpec(
         ARCH147_PROTOTYPE_NAME,
-        "Additive prototype source only; no protected dispatch",
+        "A2 runtime-partition metadata observer; read-only preflight only",
         ARCH147_PROTOTYPE_TESTS,
         ARCH147_PROTOTYPE_RUFF,
         _arch147_prototype_authority_check,
-        preflight=None,
+        preflight=_arch147_l43_a3_preflight,
         execute=None,
         remote_branch=ARCH147_PROTOTYPE_BRANCH,
     )
@@ -29073,7 +29076,7 @@ execute_checkpoint = _arch147_p6_execute_checkpoint
 
 
 def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
-    """Current route owner; never invoke provider or protected dispatch."""
+    """Current A3 route owner; never invoke provider or protected dispatch."""
     from scripts import run_test_certification as certification
 
     spec = _checkpoint_specs()[ARCH147_PROTOTYPE_NAME]
@@ -29082,7 +29085,7 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
         spec.tests != ARCH147_PROTOTYPE_TESTS
         or spec.ruff_paths != ARCH147_PROTOTYPE_RUFF
         or spec.authority_check is not _arch147_prototype_authority_check
-        or spec.preflight is not None
+        or spec.preflight is not _arch147_l43_a3_preflight
         or spec.execute is not None
         or spec.remote_head_env is not None
         or spec.remote_branch != ARCH147_PROTOTYPE_BRANCH
@@ -29091,7 +29094,7 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
         or resolve_ci_checkpoint(_checkpoint_specs(), spec.remote_branch, "push")
         != spec.name
     ):
-        failures.append("147 prototype source-only registration drift")
+        failures.append("147 prototype A3 registration drift")
     workflow = (repo_root / ".github/workflows/checkpoint-source-gates.yml").read_text(
         encoding="utf-8"
     )
@@ -29102,7 +29105,16 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
     for relative in spec.tests:
         if not (repo_root / relative).exists():
             failures.append("147 prototype missing tests: " + relative)
+    if not (repo_root / "scripts/arch147_l43_a3_source.py").is_file():
+        failures.append("147 prototype A3 source owner missing")
     return tuple(failures)
+
+
+def _arch147_l43_a3_preflight() -> dict[str, object]:
+    """Dispatch only the source-owned, read-only Architecture 147 A3 preflight."""
+    from scripts.arch147_l43_a3_source import run_preflight
+
+    return run_preflight()
 
 
 if __name__ == "__main__":

@@ -1,34 +1,28 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 SCHEMA OBSERVATION CONSUMED / UNPROVEN; ORDER-SCOPE PROOF STRATEGY MUST CHANGE
+## Current milestone - L43 A2 ACCEPTED / INTEGRATED; A3 REGISTERED READ-ONLY OBSERVER SURFACE NEXT
 
-The separately authorized Architecture 147 L43 schema-only Robinhood observation is CONSUMED / NO AUTOMATIC RETRY. It ran against exact docs-bound source `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913` and returned `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`.
+Architecture 147 L43 A2 is SOURCE ACCEPTED / FAST-FORWARD INTEGRATED at `c2e14d664b6e57f1a7a212c4240f29332a97af27` / tree `18270bd2de56b7d19ced8ece49b025114a882d00`.
 
-Preserved evidence:
+A2 adds the additive `AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1` metadata contract while preserving the earlier `EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1` contract unchanged. The public-style `agent_initiated` true/false/omit wording can qualify only as metadata eligibility for a later runtime proof. It never proves partition equality, account-wide order scope, or production order authority.
 
-- path: `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`;
-- SHA-256: `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`;
-- tools/list pages: `1`;
-- exhaustive pagination: `true`;
-- OAuth scope-entry attempts: `1`;
-- browser launches: `0`;
-- MCP session-open attempts: `1`;
-- tools/list attempts/pages received: `1/1`;
-- MCP tool/account/position/order/review/place/cancel/other-tool calls: all `0`.
+Feature push run `43388450466`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates on the exact A2 HEAD/tree. Active tests selected the A2 test module once and recorded all 45 A2 cases passing; the existing A1 qualifier/observer coverage remained active. Develop run `43389650423`, attempt 1, succeeded on the exact same HEAD/tree with `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`; active/FULL duplicate execution was skipped. Remote feature and `develop` are identical at the A2 commit.
 
-The attempt proves that the provider's authenticated current metadata does not satisfy the accepted explicit omission-semantics predicate for `placed_agent`. It does not prove account-wide all-agent order visibility. The production `RobinhoodL43AccountWideOrderScopeVerifier` therefore remains negative and full L43 pre-effect observation remains blocked at `ORDER_SCOPE_UNPROVEN`.
+A2 performed no provider or protected effect. The guarded runtime-partition schema observer remains metadata-only, one-use, bounded `tools/list`, and review-only. Positive evidence would still record `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
 
-Do not rerun this schema observation, delete or replace its evidence, weaken the qualifier, infer all-agent scope from omission, or manufacture a positive verifier from the unproven result.
+The earlier `placed_agent` schema observation remains CONSUMED / NO AUTOMATIC RETRY at `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`, evidence `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. That predecessor remains immutable and does not prove account-wide all-agent visibility.
 
-The accepted schema-observer source remains `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`, with feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` terminal green. Observation-bound docs source `2d7a934d...` has feature/develop docs runs `43365064205` / `43365310403` terminal green.
-
-Q62 remains consumed/immutable; no L43 account/position/order read occurred in this schema attempt; no durable mutation, review, placement, cancellation or live effect occurred; Q63 remains NOT RUN; L41R7 remains FORBIDDEN; FINAL_HOLDOUT remains SEALED.
+Production remains `ORDER_SCOPE_UNPROVEN`. Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 remains FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Design one bounded **alternative order-scope proof source checkpoint** rather than another schema retry. The successor must not assume that omitted `placed_agent` is all-agent. It should determine whether complete order coverage can be proven from an independently reviewable source-owned composition, such as an explicit exhaustive enumeration of every provider-advertised order-source/agent category if the provider exposes such a closed set, or another equally strong provider-authenticated mechanism.
+Implement one bounded **A3 registered read-only observer checkpoint** before any A2 hosted observation.
 
-A proof must establish completeness, not merely show that an omitted query is a superset of `placed_agent=agentic` or that current returned rows happen to contain multiple source values. If no closed provider-authenticated enumeration or equivalent completeness mechanism exists, preserve `ORDER_SCOPE_UNPROVEN` and redesign the tiny-live safety boundary instead of weakening it.
+A3 must register the A2 metadata observation through the unified checkpoint runner as a read-only `preflight` surface only. It must keep `execute=None`, expose no arbitrary provider/tool dispatch, perform exact source/worktree/remote admission before OAuth/MCP, allocate fresh external evidence through the runner, dispatch the existing A2 guarded observer exactly once, preserve sanitized one-shot/no-retry evidence, and grant no order/account/position read or live authority.
+
+Do not use an ad-hoc `python -c`, temporary PowerShell wrapper, guessed worktree path, or direct caller invocation of the observer. Architecture 129 requires routine read-only qualification to use the checked-in unified runner.
+
+After A3 source review, mapped certification, exact fast-forward integration, and terminal develop reuse, the registered A3 preflight may perform the one authenticated A2 metadata observation. Only reviewed positive evidence may unblock B1 strict-boolean normalized order propagation; B2 runtime four-read partition proof remains separate.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

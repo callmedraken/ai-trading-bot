@@ -1,32 +1,40 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 SCHEMA OBSERVATION CONSUMED / UNPROVEN; ALTERNATIVE ORDER-SCOPE PROOF NEXT
+## Current milestone: L43 A2 ACCEPTED / INTEGRATED; A3 RUNNER REGISTRATION NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-The protected schema-only observation is consumed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`.
+Accepted/integrated A2 source:
 
-Result:
+- HEAD: `c2e14d664b6e57f1a7a212c4240f29332a97af27`
+- tree: `18270bd2de56b7d19ced8ece49b025114a882d00`
+- feature mapped FULL: `43388450466`, attempt 1, SUCCESS
+- develop integration gate: `43389650423`, attempt 1, SUCCESS
+- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`
+- remote feature/develop relation: IDENTICAL
+- protected/provider effects during source work: `0`
 
-- status/reason: `PROVIDER_SEMANTICS_UNPROVEN`;
-- classification: `UNPROVEN_PROVIDER_SEMANTICS`;
-- evidence: `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`;
-- SHA-256: `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`;
-- one tools/list page, exhaustive;
-- OAuth scope entry `1`, browser `0`, MCP session `1`, tools/list `1`;
-- every provider-tool/account/position/order/review/place/cancel/other-tool counter `0`.
+A2 preserves `EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1` unchanged and adds `AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1`. The new contract accepts the reviewed public-style `agent_initiated` metadata only as eligibility for a later runtime equality proof. Injected metadata remains unauthenticated. Even an authenticated hosted metadata match may produce only `AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW`; it must retain `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
 
-Automatic retry is FORBIDDEN. The evidence must remain unchanged.
+No A2 hosted observation has been run. The A2 observer class exists, but the current `arch147-live-prototype` checkpoint is still source-only with `preflight=None` and `execute=None`. Therefore there is currently no reviewed unified-runner operator surface for the A2 observation. Do not invent a temporary Python/PowerShell invocation.
 
-The observation does not authenticate omission of `placed_agent` as account-wide all-agent order visibility. The production order-scope verifier remains deliberately negative, so full L43 pre-effect observation and all live effects remain NOT AUTHORIZED.
+The earlier `placed_agent` schema observation remains consumed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. Its immutable evidence is `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`, result `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`. Automatic retry is FORBIDDEN.
 
-The source lineage remains accepted: observer source `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`; feature FULL `43346232426`; develop reuse `43364684407`; observation-bound docs feature/develop `43365064205` / `43365310403`.
+Production remains `ORDER_SCOPE_UNPROVEN`; Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 is FORBIDDEN; `FINAL_HOLDOUT` is SEALED.
 
 ## Immediate next step
 
-Do not build a retry wrapper around the consumed metadata attempt. Design a bounded alternative proof checkpoint that can only become positive if it authenticates a complete closed order-source/agent universe or an equivalent provider-backed completeness guarantee. Comparing omitted results only to `agentic`, observing a current superset, or relying on caller/manual assertions is insufficient.
+A3 is a narrow source-only registration checkpoint:
 
-If the provider exposes no such complete enumeration or guarantee, the checkpoint must return a source/design blocker and the next architecture step is to redesign L43's tiny-live safety boundary rather than weaken `ACCOUNT_WIDE_ALL_AGENTS`.
+1. register a read-only unified-runner `preflight` for the A2 runtime-partition metadata observer;
+2. keep `execute=None` and no protected mutation authority;
+3. perform runner-owned exact source/worktree/remote admission before OAuth/MCP;
+4. dispatch only the existing one-use metadata-only observer and allow only bounded exhaustive `tools/list`;
+5. use a fresh create-only external evidence destination and preserve no-retry semantics;
+6. add fake-only adversarial tests for registration, admission-before-dispatch, one-use behavior, no `call_tool`, evidence truthfulness, and source ownership;
+7. update active Architecture-147 test/Ruff ownership in the same commit if required.
+
+A3 performs no real OAuth, MCP session, `tools/list`, account/order/position read, review/place/cancel, Q63, holdout, or live effect during implementation. After focused verification, fresh `ops.ps1 admit`, one atomic feature push, mapped CI, ChatGPT exact-source review, and exact fast-forward integration, the registered read-only preflight becomes the next operator action.
 
 ## L41R1 consumed observation and L41R2 source successor
 

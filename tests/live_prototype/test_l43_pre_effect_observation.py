@@ -296,6 +296,7 @@ def _order(owned: Decimal) -> dict[str, object]:
         "side": "buy",
         "state": "filled",
         "placed_agent": "agentic",
+        "agent_initiated": True,
         "created_at": stamp,
         "last_transaction_at": stamp,
         "market_hours": "regular_hours",

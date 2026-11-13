@@ -181,6 +181,7 @@ class L43OrderFact:
     side: OrderSide
     state: str
     placed_agent: str
+    agent_initiated: bool
     created_at: datetime
     market_hours: str
     time_in_force: str
@@ -189,6 +190,10 @@ class L43OrderFact:
     average_price: Decimal | None
     dollar_based_amount: L43DollarAmountFact | None
     executions: tuple[L43ExecutionFact, ...]
+
+    def __post_init__(self) -> None:
+        if type(self.agent_initiated) is not bool:
+            raise TypeError("agent_initiated must be a bool")
 
 
 @dataclass(frozen=True, slots=True)

@@ -260,6 +260,39 @@ def test_l43_agent_initiated_schema_source_test_pairs_are_prepublication_owned()
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_l43_read_normalization_source_test_pairs_are_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
+    pairs = (
+        (
+            "src/trading_bot/robinhood_mcp/l43_read_adapter.py",
+            "tests/robinhood_mcp/test_l43_read_adapter.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/l43_pre_effect_observation.py",
+            "tests/live_prototype/test_l43_pre_effect_observation.py",
+        ),
+    )
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+
+    assert spec.tests == runner.ARCH147_PROTOTYPE_TESTS
+    assert spec.ruff_paths == runner.ARCH147_PROTOTYPE_RUFF
+    assert (
+        runner.ARCH147_PROTOTYPE_RUFF.count(
+            "src/trading_bot/robinhood_mcp/l43_read_adapter.py"
+        )
+        == 1
+    )
+    for source, test in pairs:
+        assert (root / source).is_file()
+        assert (root / test).is_file()
+        assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+        assert spec.tests.count(test) == 1
+        assert full.count(test) == 1
+        assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_tiny_live_pivot_source_test_pairs_are_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     pairs = (

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 
 from trading_bot.robinhood_mcp.l43_read_adapter import (
@@ -26,6 +28,36 @@ class _Read:
         if self.collection != "orders":
             raise AssertionError("unexpected orders read")
         return {"data": self.data}
+
+
+def _order(**overrides: object) -> dict[str, object]:
+    order = {
+        "id": "order-147",
+        "symbol": "SPY",
+        "side": "buy",
+        "state": "filled",
+        "placed_agent": "agentic",
+        "agent_initiated": True,
+        "created_at": "2026-11-10T15:00:00+00:00",
+        "last_transaction_at": "2026-11-10T15:00:00+00:00",
+        "market_hours": "regular_hours",
+        "time_in_force": "day",
+        "type": "market",
+        "trigger": "immediate",
+        "quantity": None,
+        "cumulative_quantity": "0.5",
+        "average_price": "20",
+        "price": None,
+        "stop_price": None,
+        "fees": "0",
+        "ref_id": None,
+        "reject_reason": None,
+        "instrument_id": "instrument-147",
+        "dollar_based_amount": None,
+        "executions": [],
+    }
+    order.update(overrides)
+    return order
 
 
 @pytest.mark.parametrize(
@@ -86,3 +118,76 @@ def test_paginated_response_rejects_malformed_cursor(
 
     with pytest.raises(ValueError):
         getattr(adapter, read_method)({})
+
+
+@pytest.mark.parametrize(
+    ("placed_agent", "agent_initiated"),
+    (("agentic", True), ("user", True), ("agentic", False)),
+)
+def test_order_fact_preserves_strict_agent_initiated_independently(
+    placed_agent: str, agent_initiated: bool
+) -> None:
+    row = _order(placed_agent=placed_agent, agent_initiated=agent_initiated)
+    adapter = RobinhoodL43PreEffectReadAdapter(
+        _Read("orders", {"orders": [row], "next": None})
+    )
+
+    page = adapter.get_equity_orders({"account_number": "account-147", "symbol": "SPY"})
+
+    fact = page.rows[0]
+    assert fact.agent_initiated is agent_initiated
+    assert type(fact.agent_initiated) is bool
+    assert fact.placed_agent == placed_agent
+
+
+@pytest.mark.parametrize(
+    "agent_initiated",
+    (
+        None,
+        "true",
+        "false",
+        0,
+        1,
+        Decimal("0"),
+        Decimal("1"),
+        [],
+        {},
+        object(),
+    ),
+)
+def test_order_page_rejects_non_boolean_agent_initiated_without_coercion(
+    agent_initiated: object,
+) -> None:
+    row = _order(agent_initiated=agent_initiated)
+
+    with pytest.raises(ValueError, match="agent_initiated"):
+        RobinhoodL43PreEffectReadAdapter(
+            _Read("orders", {"orders": [row], "next": None})
+        ).get_equity_orders({})
+
+
+def test_order_page_rejects_missing_agent_initiated() -> None:
+    row = _order()
+    del row["agent_initiated"]
+
+    with pytest.raises(ValueError, match="agent_initiated"):
+        RobinhoodL43PreEffectReadAdapter(
+            _Read("orders", {"orders": [row], "next": None})
+        ).get_equity_orders({})
+
+
+def test_invalid_agent_initiated_row_rejects_whole_page() -> None:
+    rows = [_order(id="valid-147"), _order(id="invalid-147", agent_initiated=1)]
+
+    with pytest.raises(ValueError, match="agent_initiated"):
+        RobinhoodL43PreEffectReadAdapter(
+            _Read("orders", {"orders": rows, "next": "page-2"})
+        ).get_equity_orders({})
+
+
+def test_valid_order_page_preserves_pagination() -> None:
+    page = RobinhoodL43PreEffectReadAdapter(
+        _Read("orders", {"orders": [_order()], "next": "page-2"})
+    ).get_equity_orders({})
+
+    assert page.next_cursor == "page-2"

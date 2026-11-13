@@ -47,13 +47,17 @@ class RobinhoodL43PreEffectReadAdapter:
     def get_equity_orders(self, arguments: Mapping[str, object]) -> L43ReadPage:
         payload = self._read.get_equity_orders(dict(arguments))
         data = _data(payload, "orders")
+        agent_initiated = tuple(_strict_agent_initiated(row) for row in data["orders"])
         parsed = parse_equity_orders_response(payload)
         if len(parsed.orders) != len(data["orders"]) or any(
             order is None for order in parsed.orders
         ):
             raise ValueError("order page contains an invalid row")
         return L43ReadPage(
-            rows=tuple(_order_fact(order) for order in parsed.orders),
+            rows=tuple(
+                _order_fact(order, agent_initiated=agent_initiated[index])
+                for index, order in enumerate(parsed.orders)
+            ),
             next_cursor=_cursor(data),
         )
 
@@ -78,6 +82,15 @@ def _cursor(data: Mapping[str, object]) -> str | None:
     return cursor
 
 
+def _strict_agent_initiated(row: object) -> bool:
+    if not isinstance(row, Mapping) or "agent_initiated" not in row:
+        raise ValueError("order row agent_initiated is missing")
+    value = row["agent_initiated"]
+    if type(value) is not bool:
+        raise ValueError("order row agent_initiated must be a bool")
+    return value
+
+
 def _position_fact(position: object) -> L43PositionFact:
     return L43PositionFact(
         symbol=position.symbol,
@@ -87,13 +100,14 @@ def _position_fact(position: object) -> L43PositionFact:
     )
 
 
-def _order_fact(order: RobinhoodEquityOrder) -> L43OrderFact:
+def _order_fact(order: RobinhoodEquityOrder, *, agent_initiated: bool) -> L43OrderFact:
     return L43OrderFact(
         order_id=order.order_id,
         symbol=order.symbol.value,
         side=order.side,
         state=order.state,
         placed_agent=order.placed_agent,
+        agent_initiated=agent_initiated,
         created_at=order.created_at,
         market_hours=order.market_hours,
         time_in_force=order.time_in_force,

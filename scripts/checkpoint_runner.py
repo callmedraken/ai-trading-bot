@@ -546,6 +546,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_l43_production_owner.py",
     "tests/robinhood_mcp/test_agent_initiated_partition_schema_qualifier.py",
     "tests/robinhood_mcp/test_agent_initiated_partition_schema_observer.py",
+    "tests/robinhood_mcp/test_agent_initiated_runtime_partition_schema.py",
     "tests/experiments/test_filtered_trend_comparison_v2.py",
     "tests/experiments/test_filtered_trend_comparison_campaign_v2.py",
     "tests/experiments/test_filtered_trend_comparison_bundle_v2.py",

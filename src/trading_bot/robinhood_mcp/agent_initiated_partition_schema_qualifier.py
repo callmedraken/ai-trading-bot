@@ -21,6 +21,7 @@ from typing import Protocol
 
 _TOOL_NAME = "get_equity_orders"
 _CONTRACT_VERSION = "EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1"
+_RUNTIME_PROOF_CONTRACT_VERSION = "AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1"
 _MAX_PAGES = 25
 _MAX_TOOLS = 2000
 _MAX_CURSOR_LENGTH = 4096
@@ -109,6 +110,52 @@ class AgentInitiatedPartitionSchemaMatch:
         return False
 
 
+class AgentInitiatedRuntimePartitionSchemaClassification(StrEnum):
+    RUNTIME_PROOF_ELIGIBLE = "RUNTIME_PROOF_ELIGIBLE"
+    UNPROVEN_RUNTIME_PROOF_ELIGIBILITY = "UNPROVEN_RUNTIME_PROOF_ELIGIBILITY"
+    SCHEMA_MALFORMED = "SCHEMA_MALFORMED"
+    TOOL_UNAVAILABLE = "TOOL_UNAVAILABLE"
+    SOURCE_AUTHORITY_FAILED = "SOURCE_AUTHORITY_FAILED"
+
+
+_RuntimeClassification = AgentInitiatedRuntimePartitionSchemaClassification
+
+
+@dataclass(frozen=True, slots=True)
+class AgentInitiatedRuntimePartitionSchemaMatch:
+    """Unauthenticated metadata eligibility, never a closed partition proof."""
+
+    classification: AgentInitiatedRuntimePartitionSchemaClassification
+    contract_version: str
+    tool_name: str
+    description_sha256: str | None
+    input_schema_sha256: str | None
+    output_schema_sha256: str | None
+    agent_initiated_schema_sha256: str | None
+    source_head: str | None
+    source_tree: str | None
+    tools_list_pages: int
+    pagination_exhaustive: bool
+    evidence_sha256: str
+
+    @property
+    def runtime_proof_eligible(self) -> bool:
+        return (
+            self.classification
+            is AgentInitiatedRuntimePartitionSchemaClassification.RUNTIME_PROOF_ELIGIBLE
+        )
+
+    @property
+    def exhaustive_partition_proven(self) -> bool:
+        """Metadata never proves the runtime true/false partition equality."""
+        return False
+
+    @property
+    def authenticated(self) -> bool:
+        """This public parser can never authenticate supplied metadata."""
+        return False
+
+
 class _ToolsListSeam(Protocol):
     def __call__(self, *, cursor: str | None) -> object | Awaitable[object]: ...
 
@@ -142,44 +189,8 @@ class AgentInitiatedPartitionSchemaMatcher:
                 exhaustive=False,
             )
 
-        cursor: str | None = None
-        seen_cursors: set[str] = set()
-        seen_names: set[str] = set()
-        target: (
-            tuple[str | None, Mapping[str, object], Mapping[str, object] | None] | None
-        ) = None
-        pages = 0
-        tool_count = 0
-        try:
-            for _ in range(_MAX_PAGES):
-                page = tools_list(cursor=cursor)
-                if isinstance(page, Awaitable):
-                    page = await page
-                pages += 1
-                tools, next_cursor = _page_material(page)
-                for entry in tools:
-                    tool_count += 1
-                    if tool_count > _MAX_TOOLS:
-                        raise ValueError("tool inventory exceeds bounds")
-                    name, description, input_schema, output_schema = _tool_material(
-                        entry
-                    )
-                    if name in seen_names:
-                        raise ValueError("duplicate tool name")
-                    seen_names.add(name)
-                    if name == _TOOL_NAME:
-                        if description is None:
-                            raise ValueError("target description is missing")
-                        target = (description, input_schema, output_schema)
-                if next_cursor is None:
-                    break
-                if next_cursor in seen_cursors:
-                    raise ValueError("tools/list cursor repeated")
-                seen_cursors.add(next_cursor)
-                cursor = next_cursor
-            else:
-                raise ValueError("tools/list page limit reached")
-        except (Exception, asyncio.CancelledError):
+        target, pages, exhaustive = await _collect_target_tool(tools_list)
+        if not exhaustive:
             return _result(
                 AgentInitiatedPartitionSchemaClassification.SCHEMA_MALFORMED,
                 source_head=source_head,
@@ -210,6 +221,84 @@ class AgentInitiatedPartitionSchemaMatcher:
                 if description is None
                 else hashlib.sha256(description.encode("utf-8")).hexdigest()
             ),
+            input_schema_sha256=hashlib.sha256(
+                _canonical_json(input_schema)
+            ).hexdigest(),
+            output_schema_sha256=(
+                None
+                if output_schema is None
+                else hashlib.sha256(_canonical_json(output_schema)).hexdigest()
+            ),
+            agent_initiated_schema_sha256=(
+                None
+                if facts is None
+                else hashlib.sha256(_canonical_json(facts)).hexdigest()
+            ),
+        )
+
+
+class AgentInitiatedRuntimePartitionSchemaMatcher:
+    """Classify metadata as eligible for a separately executed runtime proof.
+
+    A positive result is only a structural/semantic eligibility signal. It
+    does not establish that filtered provider reads form a closed partition.
+    """
+
+    __slots__ = ("_repo_root",)
+
+    def __init__(self, *, repo_root: Path) -> None:
+        if not isinstance(repo_root, Path):
+            raise TypeError("repo_root must be a Path")
+        self._repo_root = repo_root
+
+    async def match(
+        self, *, tools_list: _ToolsListSeam
+    ) -> AgentInitiatedRuntimePartitionSchemaMatch:
+        if not callable(tools_list):
+            raise TypeError("an explicit tools/list seam is required")
+        source_head, source_tree = _source_identity(self._repo_root)
+        if source_head is None or source_tree is None:
+            return _runtime_result(
+                AgentInitiatedRuntimePartitionSchemaClassification.SOURCE_AUTHORITY_FAILED,
+                source_head=None,
+                source_tree=None,
+                pages=0,
+                exhaustive=False,
+            )
+
+        target, pages, exhaustive = await _collect_target_tool(tools_list)
+        if not exhaustive:
+            return _runtime_result(
+                AgentInitiatedRuntimePartitionSchemaClassification.SCHEMA_MALFORMED,
+                source_head=source_head,
+                source_tree=source_tree,
+                pages=pages,
+                exhaustive=False,
+            )
+
+        if target is None:
+            return _runtime_result(
+                AgentInitiatedRuntimePartitionSchemaClassification.TOOL_UNAVAILABLE,
+                source_head=source_head,
+                source_tree=source_tree,
+                pages=pages,
+                exhaustive=True,
+            )
+
+        description, input_schema, output_schema = target
+        facts = _runtime_proof_schema_facts(input_schema, output_schema)
+        classification = (
+            _RuntimeClassification.RUNTIME_PROOF_ELIGIBLE
+            if facts is not None
+            else _RuntimeClassification.UNPROVEN_RUNTIME_PROOF_ELIGIBILITY
+        )
+        return _runtime_result(
+            classification,
+            source_head=source_head,
+            source_tree=source_tree,
+            pages=pages,
+            exhaustive=True,
+            description_sha256=hashlib.sha256(description.encode("utf-8")).hexdigest(),
             input_schema_sha256=hashlib.sha256(
                 _canonical_json(input_schema)
             ).hexdigest(),
@@ -258,6 +347,8 @@ def _tool_material(
         and type(description) is not str
     ):
         raise ValueError("tool description is malformed")
+    if type(description) is str:
+        description.encode("utf-8", errors="strict")
     input_schema = _read_alias(entry, ("input_schema", "inputSchema"))
     output_schema = _read_alias(entry, ("output_schema", "outputSchema"))
     if not isinstance(input_schema, Mapping):
@@ -273,6 +364,52 @@ def _tool_material(
         input_schema,
         output_schema if isinstance(output_schema, Mapping) else None,
     )
+
+
+async def _collect_target_tool(
+    tools_list: _ToolsListSeam,
+) -> tuple[
+    tuple[str | None, Mapping[str, object], Mapping[str, object] | None] | None,
+    int,
+    bool,
+]:
+    """Share one bounded tools/list traversal across the v1 and A2 contracts."""
+    cursor: str | None = None
+    seen_cursors: set[str] = set()
+    seen_names: set[str] = set()
+    target: (
+        tuple[str | None, Mapping[str, object], Mapping[str, object] | None] | None
+    ) = None
+    pages = 0
+    tool_count = 0
+    try:
+        for _ in range(_MAX_PAGES):
+            page = tools_list(cursor=cursor)
+            if isinstance(page, Awaitable):
+                page = await page
+            pages += 1
+            tools, next_cursor = _page_material(page)
+            for entry in tools:
+                tool_count += 1
+                if tool_count > _MAX_TOOLS:
+                    raise ValueError("tool inventory exceeds bounds")
+                name, description, input_schema, output_schema = _tool_material(entry)
+                if name in seen_names:
+                    raise ValueError("duplicate tool name")
+                seen_names.add(name)
+                if name == _TOOL_NAME:
+                    if description is None:
+                        raise ValueError("target description is missing")
+                    target = (description, input_schema, output_schema)
+            if next_cursor is None:
+                return target, pages, True
+            if next_cursor in seen_cursors:
+                raise ValueError("tools/list cursor repeated")
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+    except (Exception, asyncio.CancelledError):
+        return None, pages, False
+    return None, pages, False
 
 
 def _schema_facts(
@@ -363,6 +500,222 @@ def _schema_facts(
         "output_type": "boolean",
         "output_required": True,
     }
+
+
+def _runtime_proof_schema_facts(
+    input_schema: Mapping[str, object],
+    output_schema: Mapping[str, object] | None,
+) -> dict[str, object] | None:
+    """Validate the schema foundation without claiming partition equality."""
+    input_properties = input_schema.get("properties")
+    input_required = input_schema.get("required", [])
+    if (
+        input_schema.get("type") != "object"
+        or not isinstance(input_properties, Mapping)
+        or type(input_required) is not list
+        or any(type(item) is not str for item in input_required)
+        or len(set(input_required)) != len(input_required)
+        or not set(input_required).issubset(input_properties)
+        or set(input_required) != {"account_number"}
+        or not set(input_schema).issubset(_INPUT_ROOT_KEYS)
+        or input_schema.get("additionalProperties", False) is not False
+    ):
+        return None
+
+    account = input_properties.get("account_number")
+    agent_field = input_properties.get("agent_initiated")
+    symbol = input_properties.get("symbol")
+    if (
+        not isinstance(account, Mapping)
+        or not isinstance(agent_field, Mapping)
+        or not isinstance(symbol, Mapping)
+        or "agent_initiated" in input_required
+        or "symbol" in input_required
+    ):
+        return None
+
+    account_types = _declared_types(account)
+    symbol_types = _declared_types(symbol)
+    if (
+        account_types != {"string"}
+        or symbol_types != {"string"}
+        or "default" in account
+        or "default" in symbol
+    ):
+        return None
+
+    field_types = _declared_types(agent_field)
+    if field_types not in ({"boolean"}, {"boolean", "null"}):
+        return None
+    if "default" in agent_field and (
+        agent_field["default"] is not None or "null" not in field_types
+    ):
+        return None
+    property_description = agent_field.get("description")
+    if type(
+        property_description
+    ) is not str or not _has_runtime_partition_eligibility_semantics(
+        property_description
+    ):
+        return None
+
+    for name, prop in input_properties.items():
+        if type(name) is not str or not isinstance(prop, Mapping):
+            return None
+        if name in {"account_number", "symbol"}:
+            allowed_keys = {"type", "description", "title", "nullable"}
+        elif name == "agent_initiated":
+            allowed_keys = _INPUT_FIELD_KEYS
+        elif name == "placed_agent":
+            allowed_keys = _INPUT_FIELD_KEYS
+            if name in input_required:
+                return None
+            placed_types = _declared_types(prop)
+            if placed_types not in ({"string"}, {"string", "null"}):
+                return None
+            if "default" in prop and (
+                prop["default"] is not None or "null" not in placed_types
+            ):
+                return None
+        else:
+            # Optional filters may be present, but schema keywords that could
+            # add a hidden filter or implicit value are not accepted.
+            allowed_keys = {"type", "description", "title", "nullable"}
+            if name in input_required or "default" in prop:
+                return None
+            if _declared_types(prop) is None:
+                return None
+        if not set(prop).issubset(allowed_keys):
+            return None
+        if "nullable" in prop and (
+            prop["nullable"] is not True
+            or "null" not in (_declared_types(prop) or set())
+        ):
+            return None
+        for text_key in ("description", "title"):
+            if text_key in prop and type(prop[text_key]) is not str:
+                return None
+
+    cursor = input_properties.get("cursor")
+    if cursor is not None and (
+        not isinstance(cursor, Mapping)
+        or _declared_types(cursor) != {"string"}
+        or "cursor" in input_required
+        or "default" in cursor
+    ):
+        return None
+
+    if output_schema is None:
+        return None
+    row = _order_row_schema(output_schema)
+    if row is None:
+        return None
+    row_properties, row_required = row
+    output_field = row_properties.get("agent_initiated")
+    order_id = row_properties.get("id")
+    order_symbol = row_properties.get("symbol")
+    if (
+        not isinstance(output_field, Mapping)
+        or output_field.get("type") != "boolean"
+        or "agent_initiated" not in row_required
+        or not set(output_field).issubset({"type", "description", "title"})
+        or not isinstance(order_id, Mapping)
+        or _declared_types(order_id) != {"string"}
+        or "id" not in row_required
+        or not isinstance(order_symbol, Mapping)
+        or _declared_types(order_symbol) != {"string"}
+        or "symbol" not in row_required
+    ):
+        return None
+    if any(
+        not set(field).issubset({"type", "description", "title"})
+        or any(
+            key in field and type(field[key]) is not str
+            for key in ("description", "title")
+        )
+        for field in (order_id, order_symbol)
+    ):
+        return None
+
+    return {
+        "contract_version": _RUNTIME_PROOF_CONTRACT_VERSION,
+        "input_type": "+".join(sorted(field_types)),
+        "input_optional": True,
+        "input_default": "null" if "default" in agent_field else "absent",
+        "output_type": "boolean",
+        "output_required": True,
+        "order_id_required_string": True,
+        "symbol_required_string": True,
+        "metadata_proves_partition_equality": False,
+    }
+
+
+def _declared_types(field: Mapping[str, object]) -> set[str] | None:
+    field_type = field.get("type")
+    if type(field_type) is str:
+        return {field_type}
+    if (
+        type(field_type) is list
+        and field_type
+        and all(type(item) is str for item in field_type)
+        and len(set(field_type)) == len(field_type)
+    ):
+        return set(field_type)
+    return None
+
+
+def _has_runtime_partition_eligibility_semantics(description: str) -> bool:
+    """Match three field-owned clauses; do not infer runtime completeness."""
+    text = " ".join(description.lower().replace("`", "").split())
+    clauses = re.fullmatch(
+        r"true\s*(?::|=>|returns?)\s*(?P<true>.+?)\s*[.;]\s*"
+        r"false\s*(?::|=>|returns?)\s*(?P<false>.+?)\s*[.;]\s*"
+        r"omit(?:ting|ted)?\s+(?P<omit>.+?)\.?",
+        text,
+    )
+    if clauses is None:
+        return False
+    true_clause = " ".join(clauses.group("true").split())
+    false_clause = " ".join(clauses.group("false").split())
+    omit_clause = " ".join(clauses.group("omit").split())
+
+    true_is_agent_subset = bool(
+        re.fullmatch(
+            r"only agent[- ]initiated orders?"
+            r"(?: \(any agent(?:, (?:incl\. customer-approved in the app|"
+            r"not just this one))?\))?"
+            r"(?:, whether an agent submitted them directly or the customer "
+            r"approved them in the robinhood app)?",
+            true_clause,
+        )
+        or re.fullmatch(
+            r"(?:only|all|every) agent[- ]initiated orders? "
+            r"from (?:any|all|every) agents?",
+            true_clause,
+        )
+        or re.fullmatch(
+            r"(?:only|all|every) orders? initiated by (?:any|all|every) agents?",
+            true_clause,
+        )
+    )
+    false_is_no_agent_subset = bool(
+        re.fullmatch(
+            r"(?:only|all|every) orders? with no agent (?:being )?involved",
+            false_clause,
+        )
+        or re.fullmatch(
+            r"only orders? the customer created with no agent involved",
+            false_clause,
+        )
+        or re.fullmatch(
+            r"(?:only|all|every) orders? without agent involvement", false_clause
+        )
+    )
+    omission_is_all = bool(
+        re.fullmatch(r"(?:the parameter )?(?:to return )?all(?: orders)?", omit_clause)
+        or re.fullmatch(r"for all(?: orders)?", omit_clause)
+    )
+    return true_is_agent_subset and false_is_no_agent_subset and omission_is_all
 
 
 def _order_row_schema(
@@ -628,6 +981,49 @@ def _result(
     )
 
 
+def _runtime_result(
+    classification: AgentInitiatedRuntimePartitionSchemaClassification,
+    *,
+    source_head: str | None,
+    source_tree: str | None,
+    pages: int,
+    exhaustive: bool,
+    description_sha256: str | None = None,
+    input_schema_sha256: str | None = None,
+    output_schema_sha256: str | None = None,
+    agent_initiated_schema_sha256: str | None = None,
+) -> AgentInitiatedRuntimePartitionSchemaMatch:
+    material = {
+        "classification": classification.value,
+        "contract_version": _RUNTIME_PROOF_CONTRACT_VERSION,
+        "tool_name": _TOOL_NAME,
+        "description_sha256": description_sha256,
+        "input_schema_sha256": input_schema_sha256,
+        "output_schema_sha256": output_schema_sha256,
+        "agent_initiated_schema_sha256": agent_initiated_schema_sha256,
+        "source_head": source_head,
+        "source_tree": source_tree,
+        "tools_list_pages": pages,
+        "pagination_exhaustive": exhaustive,
+        "authenticated": False,
+        "exhaustive_partition_proven": False,
+    }
+    return AgentInitiatedRuntimePartitionSchemaMatch(
+        classification=classification,
+        contract_version=_RUNTIME_PROOF_CONTRACT_VERSION,
+        tool_name=_TOOL_NAME,
+        description_sha256=description_sha256,
+        input_schema_sha256=input_schema_sha256,
+        output_schema_sha256=output_schema_sha256,
+        agent_initiated_schema_sha256=agent_initiated_schema_sha256,
+        source_head=source_head,
+        source_tree=source_tree,
+        tools_list_pages=pages,
+        pagination_exhaustive=exhaustive,
+        evidence_sha256=hashlib.sha256(_canonical_json(material)).hexdigest(),
+    )
+
+
 _MISSING = object()
 
 
@@ -635,4 +1031,7 @@ __all__ = [
     "AgentInitiatedPartitionSchemaClassification",
     "AgentInitiatedPartitionSchemaMatch",
     "AgentInitiatedPartitionSchemaMatcher",
+    "AgentInitiatedRuntimePartitionSchemaClassification",
+    "AgentInitiatedRuntimePartitionSchemaMatch",
+    "AgentInitiatedRuntimePartitionSchemaMatcher",
 ]

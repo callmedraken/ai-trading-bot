@@ -227,10 +227,18 @@ def test_l43_agent_initiated_schema_source_test_pairs_are_prepublication_owned()
             "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_observer.py",
             "tests/robinhood_mcp/test_agent_initiated_partition_schema_observer.py",
         ),
+        (
+            "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_qualifier.py",
+            "tests/robinhood_mcp/test_agent_initiated_runtime_partition_schema.py",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_observer.py",
+            "tests/robinhood_mcp/test_agent_initiated_runtime_partition_schema.py",
+        ),
     )
     spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
     inventory = certification.discover_inventory(root)
-    full = set(certification.select_inventory(inventory, "full"))
+    full = certification.select_inventory(inventory, "full")
 
     assert spec.tests == runner.ARCH147_PROTOTYPE_TESTS
     assert spec.ruff_paths == runner.ARCH147_PROTOTYPE_RUFF
@@ -239,7 +247,8 @@ def test_l43_agent_initiated_schema_source_test_pairs_are_prepublication_owned()
         assert (root / test).is_file()
         assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
         assert spec.tests.count(test) == 1
-        assert test in full
+        assert full.count(test) == 1
+        assert runner.ARCH147_PROTOTYPE_RUFF.count(source) == 1
         assert source in spec.ruff_paths
     assert runner._arch147_prototype_authority_check(root) == ()
 

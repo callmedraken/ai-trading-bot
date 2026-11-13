@@ -233,6 +233,7 @@ class RobinhoodOrderScopeSchemaObserver:
                     status = OrderScopeObservationStatus.SOURCE_AUTHORITY_BLOCKED
                     reason = "SOURCE_AUTHORITY_BLOCKED"
                 elif transport_failed:
+                    qualification = None
                     status = (
                         OrderScopeObservationStatus.OAUTH_SESSION_TOOLS_LIST_FAILURE
                     )

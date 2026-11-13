@@ -236,9 +236,16 @@ def test_provider_exception_is_sanitized_and_tool_counters_remain_zero(
         result.status
         is observer.OrderScopeObservationStatus.OAUTH_SESSION_TOOLS_LIST_FAILURE
     )
+    assert result.reason == "OAUTH_SESSION_TOOLS_LIST_FAILURE"
     raw = result.evidence_file.read_text(encoding="ascii")  # type: ignore[union-attr]
     assert "secret" not in raw and "private.invalid" not in raw
-    counters = _evidence(result)["attempt_counters"]
+    evidence = _evidence(result)
+    assert evidence["classification"] == "NOT_CLASSIFIED"
+    assert evidence["qualifier_evidence_sha256"] is None
+    assert evidence["description_sha256"] is None
+    assert evidence["input_schema_sha256"] is None
+    assert evidence["placed_agent_schema"] is None
+    counters = evidence["attempt_counters"]
     assert counters["tools_list_attempts"] == 1
     assert counters["mcp_tool_invocation_attempts"] == 0
     assert all(

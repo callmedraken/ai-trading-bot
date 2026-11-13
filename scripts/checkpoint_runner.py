@@ -544,6 +544,8 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_delivery_operator.py",
     "tests/live_prototype/test_emergency_operator.py",
     "tests/live_prototype/test_l43_production_owner.py",
+    "tests/robinhood_mcp/test_agent_initiated_partition_schema_qualifier.py",
+    "tests/robinhood_mcp/test_agent_initiated_partition_schema_observer.py",
     "tests/experiments/test_filtered_trend_comparison_v2.py",
     "tests/experiments/test_filtered_trend_comparison_campaign_v2.py",
     "tests/experiments/test_filtered_trend_comparison_bundle_v2.py",
@@ -558,6 +560,8 @@ ARCH147_PROTOTYPE_TESTS: Final = (
 ARCH147_PROTOTYPE_RUFF: Final = (
     "scripts/checkpoint_runner.py",
     "src/trading_bot/live_prototype",
+    "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_qualifier.py",
+    "src/trading_bot/robinhood_mcp/agent_initiated_partition_schema_observer.py",
     "src/trading_bot/experiments/filtered_trend_comparison_v2.py",
     "src/trading_bot/experiments/filtered_trend_comparison_campaign_v2.py",
     "src/trading_bot/experiments/filtered_trend_comparison_bundle_v2.py",

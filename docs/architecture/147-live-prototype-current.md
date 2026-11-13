@@ -1,16 +1,16 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L43 order-scope qualifier accepted/integrated; schema-only observation runner source next
+## Current boundary - L43 schema-only observer accepted/integrated; protected tools/list observation next
 
-Architecture 147 order-scope authority qualifier is accepted/integrated at `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, passed source-static, active-tests, source-gates and all seven broad lanes. Develop run `43313269662`, attempt 1, passed exact feature-certification reuse with active/FULL skipped.
+Architecture 147 order-scope schema observer is accepted/integrated at `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, passed source-static, active-tests, source-gates and all seven broad lanes. Develop run `43364684407`, attempt 1, passed exact feature-certification reuse with active/FULL skipped.
 
-The qualifier remains source-only. Positive `PROVEN_ACCOUNT_WIDE_ALL_AGENTS` requires explicit provider-advertised omission semantics plus a present optional string-compatible `placed_agent` schema with no conflicting non-null default and exhaustive valid tools-list pagination. Description alone, optionality alone, historical rows, tool availability, pagination or caller assertions cannot qualify scope.
+The predecessor `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145` remains preserved terminal green but was review-rejected because a failed `tools/list` transport could retain a stale `SCHEMA_MALFORMED` qualifier classification. Final corrective `826bca...` discards qualification evidence on transport failure and keeps genuine returned malformed metadata distinct.
 
-Consumed L41/L41R1-R5 evidence does not answer the all-agent omission question. The production verifier remains negative at `ORDER_SCOPE_AUTHORITY_UNPROVEN`.
+The observer is source-owned, metadata-only and lazy. Source admission requires canonical feature checkout identity, clean source, exact live feature/develop equality, current FEATURE and PROSPECTIVE_DEVELOP authority, and stable recheck before OAuth/session construction. Production metadata access is limited to bounded MCP `tools/list`; no provider-tool dispatch surface exists.
 
-No production transport is owned by the qualifier. Existing L41R3-R5 schema observers inspect a fixed tool set that excludes `get_equity_orders`; do not import their private session helpers. The next source boundary is a small dedicated schema-only runner/composition using the reviewed OAuth/MCP patterns and zero provider-tool invocation.
+Evidence schema `arch147-robinhood-order-scope-observation/v1` stores only sanitized target digests/facts, source authority, pagination and attempt accounting. A positive scope classification remains review-only and grants neither order nor live authority.
 
-No protected schema observation, full L43 observation or live entry has run. Q62 remains consumed and immutable; FINAL_HOLDOUT remains SEALED.
+No protected schema observation has run. The next boundary is exactly one guarded, no-automatic-retry `tools/list` observation after docs closeout integration. Full L43 pre-effect reads and all live effects remain later. Q62 remains immutable and FINAL_HOLDOUT remains SEALED.
 
 ## D34 accepted boundary - historical transition to L40
 

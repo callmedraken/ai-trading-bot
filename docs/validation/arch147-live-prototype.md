@@ -1,28 +1,31 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## L43 order-scope authority qualifier — ACCEPTED / INTEGRATED
+## L43 schema-only order-scope observer — ACCEPTED / INTEGRATED
 
-Final accepted source: `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43313269662`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted source: `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and broad-1 through broad-7 green. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43364684407`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
 Preserved review history:
 
-- `a65a891e833208e63f864844af053e98da16d986` / run `43299610929`: terminal green but exact-source review rejected before integration because explicit provider description could qualify all-agent scope despite a contradictory `placed_agent` schema.
-- `a48327c0226847575443406ba39599fe751790f4` / run `43303883035`: accepted corrective. Positive scope requires explicit omission semantics plus present, optional, string-compatible `placed_agent` schema, no conflicting non-null default, valid structural schema and exhaustive tools-list pagination.
+- `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145`: terminal green but exact-source review rejected before integration because a failed `tools/list` transport could leave `SCHEMA_MALFORMED` qualifier evidence attached while the observer status was `OAUTH_SESSION_TOOLS_LIST_FAILURE`.
+- `826bca192a90c20738bb1dc1199b8d3373e083e7` / run `43346232426`: accepted corrective. Transport failure clears the qualification before evidence construction; classification becomes `NOT_CLASSIFIED` and qualifier/description/schema/placed-agent facts are absent. Successfully received malformed metadata still produces `SCHEMA_MALFORMED`.
 
-Immutable evidence audit found no existing provider-authenticated all-agent omission semantics in consumed L41/L41R1-R5 artifacts. Production authority remains `ORDER_SCOPE_AUTHORITY_UNPROVEN`; the production L43 verifier remains negative.
+Accepted observer behavior:
 
-The accepted qualifier:
+- construction is inert;
+- exact current source admission precedes OAuth/session construction;
+- live feature and develop must both equal the admitted source;
+- FEATURE and PROSPECTIVE_DEVELOP authority must pass and remain stable;
+- production access is limited to one reviewed OAuth/MCP session and bounded `tools/list`;
+- the metadata transport exposes no `call_tool` dispatch;
+- only target `get_equity_orders` metadata is retained; unrelated metadata is discarded;
+- raw provider/OAuth output is suppressed and not persisted;
+- evidence is fixed-root, fresh/create-only and sanitized;
+- all provider-tool/account/position/order/review/place/cancel/other-tool counters remain zero;
+- any positive scope result is review evidence only.
 
-- invokes no provider tool and has no production transport constructor;
-- accepts only normalized injected `tools/list` pages;
-- binds source HEAD/tree, sanitized tool-description/input-schema digests, placed-agent schema material and exhaustive tools-list pagination into deterministic evidence;
-- never stores raw provider descriptions/cursors or authorization material;
-- cannot derive positive scope from omission, rows, tool availability, historical evidence or caller assertion;
-- grants no full L43 observation or trading authority.
+No real provider/OAuth/schema observation occurred during source implementation, certification, review or integration. Q62 artifacts remain unchanged and consumed; FINAL_HOLDOUT was untouched.
 
-Historical L41R3-R5 observers are not directly reusable for the next protected attempt because they inspect a fixed tool set excluding `get_equity_orders`; importing their private session helpers would violate the repository public-surface rule.
-
-Immediate successor: one small source-owned schema-only observation runner/composition using the accepted Windows OAuth/MCP patterns and bounded `tools/list` only. Real schema observation remains separately protected and NOT RUN until that source is accepted/integrated.
+Immediate successor: after docs closeout integration, one separately authorized protected schema-only `tools/list` observation. Use one fresh evidence directory and do not automatically retry. Exact evidence review must occur before the production order-scope verifier, full L43 pre-effect observation or live entry can advance.
 
 ## Q62 local state preparation and protected read-only observation — ACCEPTED
 

@@ -1,12 +1,12 @@
 # Architecture 147 — Q62 tiny-live prerequisite pivot
 
-Status: CURRENT prototype contract. L41R6, Q62 tiny-live readiness, L43 protected-boundary source, production read-only composition and the L43 order-scope qualifier are accepted/integrated. The current integrated endpoint is `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`; feature mapped FULL `43303883035` and develop exact-certification reuse `43313269662` succeeded.
+Status: CURRENT prototype contract. L41R6, Q62 tiny-live readiness, L43 protected-boundary source, production read-only composition, order-scope qualifier and the schema-only order-scope observer are accepted/integrated. The current accepted executable endpoint is `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`; feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` succeeded.
 
 Q62 prepare-state and its protected readiness observation remain consumed exactly once and immutable. The journal hash remains `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`; Q62 evidence hash remains `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`.
 
-The current blocker is account-wide SPY order-query scope, not a reopening of L41R6 fractional-exit facts or Q62 readiness. Immutable L41/L41R1-R5 schema evidence does not prove that omitting `placed_agent` from `get_equity_orders` returns every relevant agent's orders. The accepted qualifier remains source-only and cannot itself authenticate provider metadata.
+The current blocker remains account-wide SPY order-query scope. Existing immutable L41/L41R1-R5 artifacts did not prove omission semantics, so a dedicated metadata-only observer is now accepted. It may later perform only reviewed OAuth/MCP establishment and bounded `tools/list`; it exposes no provider-tool invocation and cannot itself authorize orders.
 
-Next source checkpoint: a dedicated schema-only `tools/list` observation runner/composition for the qualifier. No provider tool invocation, account/position/order read, L43 pre-effect observation, effect operation or Q62 mutation is authorized. L41R7 remains FORBIDDEN and FINAL_HOLDOUT remains SEALED.
+No protected schema observation has run yet. After docs closeout integration, one fresh create-only schema observation may be separately authorized with no automatic retry. Full L43 pre-effect observation, provider mutations and Q63 remain NOT RUN / NOT AUTHORIZED. L41R7 remains FORBIDDEN and FINAL_HOLDOUT remains SEALED.
 
 ## Why the pivot is required
 

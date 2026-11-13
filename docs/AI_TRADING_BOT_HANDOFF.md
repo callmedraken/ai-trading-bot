@@ -1,24 +1,24 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 ORDER-SCOPE QUALIFIER ACCEPTED/INTEGRATED; SCHEMA-ONLY OBSERVER SOURCE NEXT
+## Current milestone: L43 SCHEMA-ONLY OBSERVER ACCEPTED/INTEGRATED; ONE PROTECTED TOOLS/LIST OBSERVATION NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Final accepted order-scope qualifier source is `a48327c0226847575443406ba39599fe751790f4` / tree `5dc2396dd7f1fef5c75cfa6cffed078d8e891019`. Feature mapped FULL `43303883035`, attempt 1, is terminal SUCCESS across source-static, active-tests, source-gates and all seven broad lanes. Ordinary Git fast-forward integration moved `develop` to the same SHA; develop run `43313269662`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
+Final accepted observer source is `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426`, attempt 1, is terminal SUCCESS across source-static, active-tests, source-gates and all seven broad lanes. Ordinary Git fast-forward integration moved `develop` to the exact source; develop run `43364684407`, attempt 1, is terminal SUCCESS with exact feature-certification reuse and active/FULL skipped. `DEVELOP_DUPLICATE_FULL=NO`.
 
-The local develop worktree had been stale at `7850c96d0300b14262d81db5ae0e7058b9446f74` because earlier ChatGPT remote-ref integrations had not updated the local branch. That historical workflow regression was reconciled by proving the stale local ref was an ancestor of remote `389a476f7a9cba5f4b0b56f92fbf78f5eb71db74`, guarded fast-forwarding local develop to that reviewed remote state, then ordinary fast-forward integrating `a48327c...` and ordinary-pushing `develop`. No reset, rebase, branch switch, worktree creation or force update occurred.
+Preserved review history: `ae8501fd5a896e703f5d0f86ab582a1a25312836` / run `43333514145` was terminal green but rejected before integration because transport failure could serialize a stale qualifier `SCHEMA_MALFORMED` classification alongside `OAUTH_SESSION_TOOLS_LIST_FAILURE`. Corrective `826bca...` clears qualification material on transport failure, so failed metadata transport is `NOT_CLASSIFIED`; genuine returned malformed metadata remains `SCHEMA_MALFORMED`.
 
-Review history is preserved. `a65a891e...` / run `43299610929` was green but rejected because positive scope could ignore contradictory `placed_agent` schema. Final `a48327c...` requires explicit omission semantics and compatible optional string-filter schema with no conflicting non-null default.
+The production entry point is `RobinhoodOrderScopeSchemaObserver().observe(evidence_dir=...)`. Construction performs no credential, OAuth, browser, network or MCP work. A real call reserves a fixed-root create-once evidence directory, performs exact current-source admission before provider construction, then uses only the normal Windows OAuth factory, one MCP session and bounded `tools/list`. The metadata transport has no `call_tool` method.
 
-Existing consumed L41/L41R1-R5 artifacts do not prove account-wide all-agent `get_equity_orders` semantics. The accepted qualifier therefore does not make the production verifier positive and grants no provider authority. It has no production transport constructor and only classifies injected normalized `tools/list` pages.
+Closed outcomes remain `SCOPE_PROVEN_FOR_REVIEW`, `PROVIDER_SEMANTICS_UNPROVEN`, `TARGET_TOOL_UNAVAILABLE`, `SCHEMA_MALFORMED`, `SOURCE_AUTHORITY_BLOCKED`, `OAUTH_SESSION_TOOLS_LIST_FAILURE` and `EVIDENCE_WRITE_FAILURE`. Provider/tool counters for account, positions, orders, review, placement, cancellation and arbitrary tools must remain zero.
 
-The historical L41R3-R5 production schema observers are not the next executable boundary: their inspected-tool sets exclude `get_equity_orders`, and private session helpers must not be imported as a shortcut.
-
-No protected schema observation, full L43 observation or live entry is authorized. Q62 remains immutable/consumed and FINAL_HOLDOUT remains sealed.
+No protected schema observation has run. Q62 is unchanged/consumed, the full L43 pre-effect observation is not authorized, no live entry is authorized and FINAL_HOLDOUT remains sealed.
 
 ## Immediate next step
 
-One bounded source checkpoint must add a reviewed schema-only observation runner/composition for the accepted qualifier. It may compose the normal Windows Robinhood OAuth/MCP session and bounded `tools/list` only; it must normalize only the target tool metadata and never invoke provider tools. After exact source acceptance/integration, ChatGPT may separately authorize one protected schema-only observation.
+After the docs descendant is fast-forwarded to both feature and `develop`, run exactly one separately authorized schema-only observation through a guarded operator block. Use one fresh `F:\AI\temp\arch147-order-scope-schema-<32 hex>` directory. Automatic retry is forbidden. Return the terminal status/reason, evidence path/hash and counters without modifying or deleting the evidence.
+
+A positive result is review evidence only. Do not run the full L43 pre-effect observation or any order effect until ChatGPT reviews the consumed schema evidence.
 
 ## L41R1 consumed observation and L41R2 source successor
 

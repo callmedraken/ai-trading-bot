@@ -1,24 +1,26 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 A2 ACCEPTED / INTEGRATED; A3 FEATURE SOURCE REVIEW NEXT
+## Current milestone - L43 A3 ACCEPTED / INTEGRATED; A2 METADATA OBSERVATION ACCEPTED; B1 NEXT
 
-Architecture 147 L43 A2 is SOURCE ACCEPTED / FAST-FORWARD INTEGRATED at `c2e14d664b6e57f1a7a212c4240f29332a97af27` / tree `18270bd2de56b7d19ced8ece49b025114a882d00`.
+Architecture 147 L43 A3 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `5b571734222324b98786b150236b1dfd471d8b9d` / tree `7c8986d360851ebf07af74e37608f18185dd7d74`.
 
-A2 adds the additive `AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1` metadata contract while preserving the earlier `EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1` contract unchanged. The public-style `agent_initiated` true/false/omit wording can qualify only as metadata eligibility for a later runtime proof. It never proves partition equality, account-wide order scope, or production order authority.
+Feature push run `43411983474`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates on the exact A3 source. Active tests selected the A3 prototype runner plus A1/A2 qualifier/observer/runtime-schema coverage. Canonical lane wall times were `93.904 / 138.369 / 129.147 / 246.945 / 105.439 / 206.077 / 144.409` seconds, all below 300 seconds. Develop run `43503087853`, attempt 1, passed with `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`; active tests and all FULL lanes were skipped, so no duplicate canonical certification was consumed.
 
-Feature push run `43388450466`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates on the exact A2 HEAD/tree. Active tests selected the A2 test module once and recorded all 45 A2 cases passing; the existing A1 qualifier/observer coverage remained active. Develop run `43389650423`, attempt 1, succeeded on the exact same HEAD/tree with `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`; active/FULL duplicate execution was skipped. Remote feature and `develop` are identical at the A2 commit.
+A3 preserves the shared historical preflight dispatch chain and registers the accepted A2 runtime-partition metadata observer only as the `arch147-live-prototype` read-only `preflight`; `execute=None` and `remote_head_env=None` remain. The A2 qualifier/observer source remained unchanged by A3.
 
-A2 performed no provider or protected effect. The guarded runtime-partition schema observer remains metadata-only, one-use, bounded `tools/list`, and review-only. Positive evidence would still record `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
+The one reviewed A2 metadata observation is ACCEPTED / CONSUMED SUCCESSFULLY / NO RETRY. Runner evidence:
+`F:\AI\temp\ai-trading-bot-checkpoints\operator-33734b29c3f441ae88abe546e241d91f\arch147-live-prototype\preflight-20261113T205548.135877Z\report.json`.
+Observer evidence:
+`F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`;
+SHA-256 `34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`.
 
-The current feature source adds the A3 unified-runner registration for this existing observer as a read-only `preflight`. It keeps `execute=None` and `remote_head_env=None`, checks exact source admission before OAuth/MCP, and owns only the existing A2 metadata path. The A3 source is not accepted or integrated. Mapped GitHub CI and exact-source review must complete before any separate operator decision; no A2 hosted observation or A3 preflight has run.
+The observation was exact-source bound to the accepted A3 HEAD/tree before and after dispatch with `IDENTITY_STABLE=True`. It consumed one OAuth scope-entry attempt, one MCP session-open attempt, and one `tools/list` attempt/page. Browser launches, MCP tool invocation attempts, account/order/position reads, review/place/cancel calls, and other tool calls were all zero. Status was `AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW` / `SUCCESS_REVIEW_ONLY`.
 
-The earlier `placed_agent` schema observation remains CONSUMED / NO AUTOMATIC RETRY at `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`, evidence `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. That predecessor remains immutable and does not prove account-wide all-agent visibility.
-
-Production remains `ORDER_SCOPE_UNPROVEN`. Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 remains FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
+This evidence authenticates only that the provider metadata is eligible for the later runtime partition proof. It explicitly retains `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`. Production therefore remains `ORDER_SCOPE_UNPROVEN`. The earlier `placed_agent` observation remains separately consumed/immutable; Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 remains FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Review the terminal mapped CI evidence and exact A3 feature source. The registered `preflight` does not grant authority to invoke OAuth/MCP; do not run it as part of source implementation, certification, or CI. After independent source acceptance and exact integration, any A2 observation remains a separate, bounded operator decision. Only reviewed positive evidence may unblock B1 strict-boolean normalized order propagation; B2 runtime four-read partition proof remains separate.
+Implement B1 as the narrow source milestone that propagates strict boolean `agent_initiated` through the normalized L43 order model/read adapter. Accept only actual booleans; reject/null/fail closed on strings, numbers, missing or ambiguous values. Do not add account-wide order-scope authority, runtime partition equality, provider fallback, trading authority, or protected effects. B1 should use focused fake-only tests and one prepublication admission before its single feature push. The subsequent B2 milestone will perform the separate four-read runtime set-equality proof using ALL-before / TRUE / FALSE / ALL-after.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

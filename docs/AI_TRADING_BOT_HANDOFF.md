@@ -1,30 +1,59 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 A2 ACCEPTED / INTEGRATED; A3 FEATURE SOURCE REVIEW NEXT
+## Current milestone: L43 A3 ACCEPTED / INTEGRATED; A2 METADATA OBSERVATION ACCEPTED; B1 NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Accepted/integrated A2 source:
+Accepted/integrated A3 source:
 
-- HEAD: `c2e14d664b6e57f1a7a212c4240f29332a97af27`
-- tree: `18270bd2de56b7d19ced8ece49b025114a882d00`
-- feature mapped FULL: `43388450466`, attempt 1, SUCCESS
-- develop integration gate: `43389650423`, attempt 1, SUCCESS
+- HEAD: `5b571734222324b98786b150236b1dfd471d8b9d`
+- tree: `7c8986d360851ebf07af74e37608f18185dd7d74`
+- direct parent: `1d04f7e2213df277fde8200a901f39ba8fd660a6`
+- feature mapped FULL: `43411983474`, attempt 1, SUCCESS
+- develop integration gate: `43503087853`, attempt 1, SUCCESS
 - develop reuse: `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`
-- remote feature/develop relation: IDENTICAL
-- protected/provider effects during source work: `0`
+- develop duplicate FULL: NO
+- protected/provider effects during A3 source work: `0`
 
-A2 preserves `EXHAUSTIVE_AGENT_INITIATED_PARTITION/v1` unchanged and adds `AGENT_INITIATED_RUNTIME_PARTITION_PROOF_ELIGIBLE/v1`. The new contract accepts the reviewed public-style `agent_initiated` metadata only as eligibility for a later runtime equality proof. Injected metadata remains unauthenticated. Even an authenticated hosted metadata match may produce only `AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW`; it must retain `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`.
+A3 leaves the shared historical preflight dispatcher chain unchanged and registers the existing A2 runtime-partition metadata observer only through the current `arch147-live-prototype` read-only `preflight`. `execute=None` and `remote_head_env=None` remain.
 
-At A2 integration, the checkpoint had no runner surface for its observer. The current feature source now registers that existing A2 observer as a read-only unified-runner `preflight`; `execute=None` and `remote_head_env=None` remain. No A2 hosted observation has run and the A3 preflight has not been invoked. Registration, admission, and CI do not authorize an observation; wait for exact-source acceptance and integration, then treat any observation as a separate reviewed operator step.
+The reviewed A2 metadata observation is now ACCEPTED / CONSUMED SUCCESSFULLY / NO RETRY.
 
-The earlier `placed_agent` schema observation remains consumed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. Its immutable evidence is `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`, result `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`. Automatic retry is FORBIDDEN.
+Runner evidence:
+`F:\AI\temp\ai-trading-bot-checkpoints\operator-33734b29c3f441ae88abe546e241d91f\arch147-live-prototype\preflight-20261113T205548.135877Z\report.json`
 
-Production remains `ORDER_SCOPE_UNPROVEN`; Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 is FORBIDDEN; `FINAL_HOLDOUT` is SEALED.
+Observer evidence:
+`F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`
+
+Observer evidence SHA-256:
+`34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`
+
+Observed result:
+
+- `status=PASS`
+- `disposition=SUCCESS_REVIEW_ONLY`
+- `observer_status=AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW`
+- `observer_reason=AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW_ONLY`
+- `source_recheck_status=PASS`
+- `IDENTITY_STABLE=True`
+- OAuth scope-entry attempts: `1`
+- MCP session-open attempts: `1`
+- `tools/list` attempts/pages: `1/1`
+- browser launches: `0`
+- MCP tool invocations: `0`
+- account/order/position reads: `0/0/0`
+- review/place/cancel: `0/0/0`
+- other tool calls: `0`
+- `partition_equality_proof=NOT_PROVEN`
+- `production_order_scope_authority=NOT_GRANTED`
+
+This closes only the metadata-eligibility question. It does not prove the TRUE/FALSE partitions equal the account-wide order universe. Production remains `ORDER_SCOPE_UNPROVEN`. The earlier `placed_agent` observation remains consumed/no-retry; Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 is FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-After the A3 feature push, wait for its single mapped GitHub CI run to reach terminal status, then perform ChatGPT exact-source review. Inspect the active-tests artifact for the A3 runner guard and the A1/A2 observer tests, and confirm all seven mapped FULL lanes pass under 300 seconds with no duplicate FULL route. No local FULL or hosted A2 observation is part of this checkpoint. Stop at exact-source review; integration and any later operator observation remain separate boundaries.
+B1 is the next source checkpoint. Propagate a strict boolean `agent_initiated` field through the normalized L43 order model/read adapter needed by the future runtime proof. Accept only real booleans and fail closed on null/missing/string/numeric/ambiguous values. Preserve existing order identity/pagination/reconciliation semantics and do not add production order authority, provider fallback, protected effects, or B2 runtime observation behavior.
+
+After B1 exact-source acceptance/integration, B2 will separately implement and run the four-read runtime proof: ALL-before, TRUE, FALSE, ALL-after, with exhaustive pagination, stable ID universe, strict booleans, duplicate/conflict rejection, exact union/partition equality, source/evidence binding, and no retry after an ambiguous/provider-effectful read sequence.
 
 ## L41R1 consumed observation and L41R2 source successor
 

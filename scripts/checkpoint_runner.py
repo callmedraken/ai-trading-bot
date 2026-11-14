@@ -510,9 +510,11 @@ ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_B2O_NAME: Final = "arch147-l43-b2-runtime-partition-observation"
 ARCH147_B2O_TESTS: Final = (
+    *COMMON_TESTS,
     "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
 )
 ARCH147_B2O_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
     "scripts/arch147_l43_b2_runtime_partition_source.py",
     "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py",
     "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",

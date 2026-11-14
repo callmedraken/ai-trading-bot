@@ -1,28 +1,44 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 B2O ACCEPTED / INTEGRATED; ONE-TIME REAL B2 OBSERVATION NEXT
+## Current milestone - REAL B2 OBSERVATION CONSUMED / NOT PROVEN; NORMALIZATION CORRECTIVE NEXT
 
-Architecture 147 L43 B2O guarded runtime-partition observer source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `09ee1fafae73af7f77f7718a2d228c04db1edc3d` / tree `c6b207a0be2ab2dc336b108eb01660edd40e59fa`.
+The one separately authorized real Architecture 147 L43 B2 runtime-partition observation has been CONSUMED exactly once on source `e466d33cf3a859976f48d7b7092fa3b58afc2f53` / tree `45b9254a6aaf429c9a5322a31022089a8af954f4`.
 
-B2O is a separate manual/nonautomatic read-only checkpoint around the accepted B2 proof engine. It source-admits the exact canonical checkout before any OAuth/MCP activity, reserves a fresh protected external evidence destination, restricts provider capability to `get_accounts` and `get_equity_orders`, normalizes order rows through the strict L43 B2 adapter, invokes the accepted `prove_agent_initiated_partition()` engine exactly once, validates its result/evidence SHA-256 and logical read ordering, performs an exact post-dispatch source recheck, and persists only sanitized review evidence. It always emits `production_order_scope_authority=NOT_GRANTED`.
+Preserved observer evidence:
 
-The initial B2O publication lineage was `e3778dd7db17f4973de53d596ae798d7c22e898a` followed by runner-topology correction `7cd91b87daf7a188907db6f7d83f0086976306b5`. Exact-source review found one active-test ownership gap: the feature branch maps to `arch147-live-prototype`, but the new B2O observer test was not in that active suite. The green run `43573117556` is preserved but was not source-accepted.
+- path: `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`
+- B2 evidence SHA-256: `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`
+- account fingerprint: `f377529245bd1682f382d17b22ac8d55362f7138a4f7fc307593c16847e551cf`
+- status/reason: `NOT_PROVEN / ALL_BEFORE_READ_EXCEPTION`
+- `partition_equality_proof=NOT_PROVEN`
+- `production_order_scope_authority=NOT_GRANTED`
+- source authority FEATURE/PROSPECTIVE_DEVELOP: PASS
+- source recheck: PASS
 
-B2O-C1 `09ee1fafae73af7f77f7718a2d228c04db1edc3d` closed only that ownership defect by adding the observer test exactly once to `ARCH147_PROTOTYPE_TESTS`, adding the B2O observer/runner source exactly once to prototype Ruff ownership, and adding a regression that preserves B2O's manual/nonautomatic registration.
+Attempt accounting proves provider dispatch began:
 
-Feature run `43579859939`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates. The active-test artifact selected `tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py` exactly once in both pytest arguments and executed-tests evidence. Canonical FULL lane wall times were `100.504 / 134.343 / 82.222 / 227.962 / 120.338 / 201.876 / 139.522` seconds, all below 300 seconds.
+- OAuth scope-entry attempts: 2
+- MCP session-open attempts: 2
+- tools/list attempts/pages: 2/2
+- account reads: 1
+- order reads: 1
+- total MCP tool invocations: 2
+- review/place/cancel/other-tool attempts: 0
+- browser launches: 0
 
-Develop was fast-forwarded directly to the exact C1 SHA. Develop run `43583208148`, attempt 1, passed source-static and source-gates after `Prove exact develop certification reuse` succeeded. Active tests, fallback tests, and canonical FULL were skipped, so no duplicate broad certification was consumed.
+The account read succeeded and the first unfiltered ALL_BEFORE SPY order read was attempted. No logical order-read evidence completed, so the observation cannot establish partition equality. The attempt is CONSUMED / NO AUTOMATIC RETRY. It must not be replayed.
 
-B2O source work performed zero provider reads, zero OAuth real dispatch, and zero provider effects. The real B2 observation remains NOT RUN. A2 remains consumed/no-retry; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED. Production remains `ORDER_SCOPE_UNPROVEN`.
+Source audit found a concrete contract mismatch sufficient to require a source correction before any later observation. The accepted A2/B2 runtime schema contract guarantees only order-row `id`, `symbol`, and strict boolean `agent_initiated` for the completeness proof. The B2 L43 adapter nevertheless routes every unfiltered order row through the older generic `RobinhoodEquityOrder` parser, which requires many additional order fields including `placed_agent`, state/side, timestamps, quantities, fees, instrument identity and related fields. Q62 previously exercised a narrower `placed_agent="agentic"` population and therefore did not prove this generic parser is valid for the account-wide unfiltered order universe.
+
+The preserved evidence intentionally sanitizes the underlying provider/parser exception, so no individual missing/nullable field is claimed as the exact trigger. The architectural defect is nevertheless established: the account-wide B2 normalization path requires fields outside its accepted provider schema contract.
+
+Production therefore remains `ORDER_SCOPE_UNPROVEN`. B2O must not be retried. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Run exactly one separately authorized real B2 observation through the manual `arch147-l43-b2-runtime-partition-observation` checkpoint after the local canonical worktree is fast-forwarded to the exact accepted/integrated docs descendant and source/develop/feature identity is proven equal.
+Implement a source-only B2 normalization corrective that removes the generic full-order parser from the account-wide partition proof. The corrected B2 seam should require only schema-guaranteed `id`, `symbol`, and strict `agent_initiated`, while binding each full raw JSON order row to a deterministic sanitized digest so same-ID row mutation across ALL/TRUE/FALSE/ALL can still fail closed without requiring undocumented/unguaranteed semantic fields.
 
-The real observation is read-only. It may authenticate Robinhood, read the account identity, and execute the accepted four logical SPY order reads ALL-before / TRUE / FALSE / ALL-after with pagination as required. It may not review, place, cancel, sell, mutate provider state, run Q63, or access `FINAL_HOLDOUT`.
-
-Any terminal result after provider dispatch is consumed/no-retry. A successful `partition_equality_proof=PROVEN` remains review-only evidence with `production_order_scope_authority=NOT_GRANTED` until ChatGPT independently reviews the exact evidence and a later separately reviewed authority-binding source checkpoint is accepted.
+The correction must be fake-only and perform zero provider reads. A later real observation, if authorized after source acceptance/integration, must be a new separately reviewed protected attempt; the consumed observation above is never retried.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

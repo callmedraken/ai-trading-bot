@@ -1,68 +1,61 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 B2O ACCEPTED / INTEGRATED; ONE-TIME REAL B2 OBSERVATION NEXT
+## Current milestone: REAL B2 OBSERVATION CONSUMED / NOT PROVEN; NORMALIZATION CORRECTIVE NEXT
 
-Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
+Canonical source used by the consumed observation:
 
-Accepted/integrated B2O-C1 source:
+- HEAD: `e466d33cf3a859976f48d7b7092fa3b58afc2f53`
+- tree: `45b9254a6aaf429c9a5322a31022089a8af954f4`
+- branch: `feature/robinhood-live-prototype-current`
+- feature/develop equality at observation: PASS
+- source recheck after observation: PASS
 
-- HEAD: `09ee1fafae73af7f77f7718a2d228c04db1edc3d`
-- tree: `c6b207a0be2ab2dc336b108eb01660edd40e59fa`
-- C1 direct parent: `7cd91b87daf7a188907db6f7d83f0086976306b5`
-- initial B2O implementation parent: `e3778dd7db17f4973de53d596ae798d7c22e898a`
-- B2O docs/base predecessor: `952f401d4df7f95ffe3cdcfaf8face88dc2d9acb`
-- admission evidence: `F:\AI\temp\arch147-l43-b2o-c1-admission-a0f4ddb1b665468b9c2ef507cd455457\arch132-r3n-prepublication-admission\source-gate-20261114T091258.930334Z\report.json`
-- accepted feature mapped FULL: `43579859939`, attempt 1, SUCCESS
-- develop integration gate: `43583208148`, attempt 1, SUCCESS
-- develop exact feature-certification reuse: PASS
-- develop duplicate FULL: NO
-- provider reads/effects during B2O source work: `0/0`
-- OAuth real dispatch: `0`
-- B2 real observation: NOT RUN
-- A2 rerun: NO
-- Q63: NOT RUN
-- `FINAL_HOLDOUT`: SEALED
+Consumed observer evidence:
 
-B2O is explicitly manual and remains absent from active CI checkpoint/certification registries. Normal feature pushes still map to `arch147-live-prototype`; C1 therefore adds the B2O observer test to that mapped checkpoint's active ownership while leaving the operator itself nonautomatic.
+- `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`
+- B2 evidence SHA-256: `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`
+- status: `NOT_PROVEN`
+- reason: `ALL_BEFORE_READ_EXCEPTION`
+- account fingerprint: `f377529245bd1682f382d17b22ac8d55362f7138a4f7fc307593c16847e551cf`
+- partition equality: `NOT_PROVEN`
+- production order-scope authority: `NOT_GRANTED`
 
-The accepted B2O boundary:
+Attempt counters:
 
-- source-admits canonical clean feature/develop equality before provider dispatch;
-- reserves a unique external B2 evidence directory before dispatch;
-- exposes only `get_accounts` and `get_equity_orders`;
-- passes raw provider orders only through `RobinhoodL43B2PreEffectReadAdapter`;
-- invokes accepted `prove_agent_initiated_partition()` rather than reimplementing partition semantics;
-- validates proof type/status/contract/source/symbol/evidence hash/logical read order/digests;
-- rechecks exact source after dispatch;
-- persists sanitized counters/digests only;
-- is one-use/no-retry;
-- always keeps `production_order_scope_authority=NOT_GRANTED`.
+- `oauth_scope_entry_attempts=2`
+- `mcp_session_open_attempts=2`
+- `tools_list_attempts=2`
+- `tools_list_pages_received=2`
+- `account_read_attempts=1`
+- `order_read_attempts=1`
+- `mcp_tool_invocation_attempts=2`
+- `browser_launch_attempts=0`
+- `review_attempts=0`
+- `placement_attempts=0`
+- `cancellation_attempts=0`
+- `other_tool_attempts=0`
 
-Feature run `43579859939` proves active ownership of the observer test exactly once. Canonical FULL walls were:
-`100.504 / 134.343 / 82.222 / 227.962 / 120.338 / 201.876 / 139.522` seconds.
-Develop run `43583208148` reused that exact feature certification and skipped duplicate broad execution.
+This is CONSUMED / NO RETRY. The first ALL_BEFORE order read did not complete and no logical-read snapshot was accepted.
+
+Independent source audit identified a normalization-contract defect. The accepted A2/B2 provider schema requires only `id`, `symbol`, and `agent_initiated` on order rows for this proof, but `RobinhoodL43B2PreEffectReadAdapter` currently calls the generic `parse_equity_orders_response()` / `RobinhoodEquityOrder` parser. That parser demands numerous additional fields not guaranteed by the accepted B2 schema. Q62's successful historical order read was narrower because it filtered `placed_agent="agentic"`; it did not establish generic parsing for the unfiltered ALL population.
+
+The exact underlying row/parser exception is not recoverable from the sanitized evidence and must not be invented. The source contract mismatch itself is sufficient to block production authority and justify a fake-only corrective.
 
 ## Immediate next step
 
-Prepare and perform one real read-only B2 observation through the explicit manual checkpoint only after local catch-up to the accepted docs descendant and an exact clean source/remote identity check.
+Build B2N1 as a source-only account-wide normalization correction:
 
-Allowed real capability:
-- OAuth/session setup as required;
-- `get_accounts`;
-- `get_equity_orders`;
-- the accepted four logical B2 reads with pagination.
+- remove generic full-order parsing from the B2-specific adapter;
+- validate required row `id`, `symbol`, and exact bool `agent_initiated`;
+- deterministically canonicalize/hash the complete JSON row for mutation detection without persisting raw order data or IDs;
+- return a B2-specific normalized fact consumed by the existing four-read proof;
+- preserve exact query sequence and pagination;
+- keep ordinary L43/Q62 generic parsing unchanged;
+- add manual/customer-order-shaped fixtures with optional/null/absent non-B2 fields;
+- remain zero-provider/fake-only;
+- do not authorize or perform another real B2 observation.
 
-Forbidden:
-- review;
-- placement;
-- cancellation;
-- position/quote/history/portfolio reads through this B2O boundary;
-- provider mutation;
-- production authority grant;
-- Q63;
-- `FINAL_HOLDOUT`.
-
-The observation is consumed after any provider dispatch. Do not automatically retry a PROVEN, NOT_PROVEN, provider-exception, malformed-result, source-recheck-failure, or ambiguous evidence-write outcome. Stop for ChatGPT review of the preserved evidence.
+Production remains `ORDER_SCOPE_UNPROVEN`; Q63 NOT RUN; `FINAL_HOLDOUT` SEALED.
 
 ## L41R1 consumed observation and L41R2 source successor
 

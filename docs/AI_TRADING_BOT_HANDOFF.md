@@ -1,59 +1,52 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 A3 ACCEPTED / INTEGRATED; A2 METADATA OBSERVATION ACCEPTED; B1 NEXT
+## Current milestone: L43 B1-C1 ACCEPTED / INTEGRATED; B2 SOURCE NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Accepted/integrated A3 source:
+Accepted/integrated B1-C1 source:
 
-- HEAD: `5b571734222324b98786b150236b1dfd471d8b9d`
-- tree: `7c8986d360851ebf07af74e37608f18185dd7d74`
-- direct parent: `1d04f7e2213df277fde8200a901f39ba8fd660a6`
-- feature mapped FULL: `43411983474`, attempt 1, SUCCESS
-- develop integration gate: `43503087853`, attempt 1, SUCCESS
-- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`
+- HEAD: `165badd5ff79458a2d8d20a04e796af252179a8d`
+- tree: `fd7c4f1127942e8c0311a784d3981a7baa46e7dd`
+- direct parent / initial published B1: `b1aa95b0b044dacbb57a80a95d31491ac779dd25`
+- pre-B1 docs/base source: `4b82f895d3f5bf880590ca170d18a4d3396bc06e`
+- valid C1 admission evidence: `F:\AI\temp\arch147-l43-b1-c1-admit-970c2eba0dcb48d09d4a27505f2b5075\arch132-r3n-prepublication-admission\source-gate-20261114T013613.658286Z\report.json`
+- feature mapped FULL: `43542056068`, attempt 1, SUCCESS
+- develop integration gate: `43542878661`, attempt 1, SUCCESS
+- develop reuse proof: PASS (`Prove exact develop certification reuse`)
 - develop duplicate FULL: NO
-- protected/provider effects during A3 source work: `0`
+- protected/provider effects during B1/C1: `0`
+- A2 rerun: NO
+- B2: NOT RUN
+- Q63: NOT RUN
+- `FINAL_HOLDOUT`: SEALED
 
-A3 leaves the shared historical preflight dispatcher chain unchanged and registers the existing A2 runtime-partition metadata observer only through the current `arch147-live-prototype` read-only `preflight`. `execute=None` and `remote_head_env=None` remain.
+The initial B1 source `b1aa95b0...` correctly introduced strict raw-row `agent_initiated` normalization but exact-source review found its canonical relevant-order material still omitted that fact. Its green feature run `43537492072` remains preserved but did not authorize integration. B1-C1 added exactly the missing canonical binding plus a regression proving `True` and `False` change `relevant_orders_digest` without adding any provider query filter.
 
-The reviewed A2 metadata observation is now ACCEPTED / CONSUMED SUCCESSFULLY / NO RETRY.
+Accepted B1 behavior:
 
-Runner evidence:
-`F:\AI\temp\ai-trading-bot-checkpoints\operator-33734b29c3f441ae88abe546e241d91f\arch147-live-prototype\preflight-20261113T205548.135877Z\report.json`
+- `L43OrderFact.agent_initiated` requires `type(value) is bool`.
+- Missing/null/string/integer/Decimal/list/mapping/other values fail closed.
+- `placed_agent` is retained independently and cannot establish partition membership.
+- Generic Robinhood order parsing was not broadened.
+- The existing SPY read remains `{"account_number": ..., "symbol": "SPY"}`.
+- `agent_initiated` is included in canonical `_order_material()` and therefore the relevant-order observation digest.
+- Active tests own both `tests/robinhood_mcp/test_l43_read_adapter.py` and `tests/live_prototype/test_l43_pre_effect_observation.py` exactly once.
 
-Observer evidence:
-`F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`
+Feature run `43542056068` passed source-static, active-tests, all seven FULL lanes, and source-gates. Canonical FULL walls were:
+`75.264 / 119.455 / 96.637 / 178.406 / 122.957 / 165.816 / 138.732` seconds.
+Develop run `43542878661` reused that exact feature certification; active tests and every broad certification job were skipped.
 
-Observer evidence SHA-256:
-`34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`
-
-Observed result:
-
-- `status=PASS`
-- `disposition=SUCCESS_REVIEW_ONLY`
-- `observer_status=AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW`
-- `observer_reason=AUTHENTICATED_RUNTIME_PARTITION_SCHEMA_FOR_REVIEW_ONLY`
-- `source_recheck_status=PASS`
-- `IDENTITY_STABLE=True`
-- OAuth scope-entry attempts: `1`
-- MCP session-open attempts: `1`
-- `tools/list` attempts/pages: `1/1`
-- browser launches: `0`
-- MCP tool invocations: `0`
-- account/order/position reads: `0/0/0`
-- review/place/cancel: `0/0/0`
-- other tool calls: `0`
-- `partition_equality_proof=NOT_PROVEN`
-- `production_order_scope_authority=NOT_GRANTED`
-
-This closes only the metadata-eligibility question. It does not prove the TRUE/FALSE partitions equal the account-wide order universe. Production remains `ORDER_SCOPE_UNPROVEN`. The earlier `placed_agent` observation remains consumed/no-retry; Q62 remains consumed/immutable; Q63 is NOT RUN; L41R7 is FORBIDDEN; `FINAL_HOLDOUT` remains SEALED.
+The reviewed A2 metadata observation remains ACCEPTED / CONSUMED SUCCESSFULLY / NO RETRY. Its preserved observer evidence is
+`F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`,
+SHA-256 `34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`.
+It proves metadata eligibility only: `partition_equality_proof=NOT_PROVEN` and `production_order_scope_authority=NOT_GRANTED`. Production remains `ORDER_SCOPE_UNPROVEN`.
 
 ## Immediate next step
 
-B1 is the next source checkpoint. Propagate a strict boolean `agent_initiated` field through the normalized L43 order model/read adapter needed by the future runtime proof. Accept only real booleans and fail closed on null/missing/string/numeric/ambiguous values. Preserve existing order identity/pagination/reconciliation semantics and do not add production order authority, provider fallback, protected effects, or B2 runtime observation behavior.
+B2 is the next source checkpoint. Implement the fail-closed four-read runtime partition proof using ALL-before / TRUE / FALSE / ALL-after. Require independently exhausted pagination, one stable account/SPY scope, strict boolean rows, duplicate/conflict rejection, stable ID universe, TRUE/FALSE disjointness, and exact union equality to ALL. Bind the proof to exact source/evidence and preserve reconciliation semantics for any observed mutation.
 
-After B1 exact-source acceptance/integration, B2 will separately implement and run the four-read runtime proof: ALL-before, TRUE, FALSE, ALL-after, with exhaustive pagination, stable ID universe, strict booleans, duplicate/conflict rejection, exact union/partition equality, source/evidence binding, and no retry after an ambiguous/provider-effectful read sequence.
+B2 source work is fake-only/non-effectful and must not perform OAuth/MCP/provider reads. A real B2 observation, if later authorized, is a separate bounded provider-read operation; it must not be silently retried after ambiguous or partially consumed activity.
 
 ## L41R1 consumed observation and L41R2 source successor
 

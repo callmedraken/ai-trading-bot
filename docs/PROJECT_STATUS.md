@@ -1,24 +1,28 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43 B2 SOURCE ACCEPTED / INTEGRATED; GUARDED B2 OBSERVER SOURCE NEXT
+## Current milestone - L43 B2O ACCEPTED / INTEGRATED; ONE-TIME REAL B2 OBSERVATION NEXT
 
-Architecture 147 L43 B2 source-only runtime partition proof is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `b9d8e97e66db806be2c70228c402577f2e84d719` / tree `fd995cab1a31b2382f7277c99e870e141707d591`.
+Architecture 147 L43 B2O guarded runtime-partition observer source is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `09ee1fafae73af7f77f7718a2d228c04db1edc3d` / tree `c6b207a0be2ab2dc336b108eb01660edd40e59fa`.
 
-B2 adds the provider-independent `agent_initiated_runtime_partition_proof.py` engine. It consumes only the normalized L43 read boundary and proves the exact logical sequence ALL-before / TRUE / FALSE / ALL-after. Each logical read is independently paginated and bounded; invalid or repeated cursors, duplicate order IDs, non-SPY or malformed normalized rows, strict-boolean partition violations, provider/read exceptions, source drift, ALL-universe drift, TRUE/FALSE overlap, union mismatch, and any same-ID canonical fact conflict fail closed.
+B2O is a separate manual/nonautomatic read-only checkpoint around the accepted B2 proof engine. It source-admits the exact canonical checkout before any OAuth/MCP activity, reserves a fresh protected external evidence destination, restricts provider capability to `get_accounts` and `get_equity_orders`, normalizes order rows through the strict L43 B2 adapter, invokes the accepted `prove_agent_initiated_partition()` engine exactly once, validates its result/evidence SHA-256 and logical read ordering, performs an exact post-dispatch source recheck, and persists only sanitized review evidence. It always emits `production_order_scope_authority=NOT_GRANTED`.
 
-Successful proof evidence binds exact source HEAD/tree, account fingerprint, SPY scope, per-read query digests/page/row counts, stable ALL-universe digest, TRUE/FALSE partition digests, and the canonical order-material digest. Raw account number and raw provider order IDs are not persisted in result evidence. A successful B2 proof reports `partition_equality_proof=PROVEN` only for the supplied normalized read sequence and always retains `production_order_scope_authority=NOT_GRANTED`.
+The initial B2O publication lineage was `e3778dd7db17f4973de53d596ae798d7c22e898a` followed by runner-topology correction `7cd91b87daf7a188907db6f7d83f0086976306b5`. Exact-source review found one active-test ownership gap: the feature branch maps to `arch147-live-prototype`, but the new B2O observer test was not in that active suite. The green run `43573117556` is preserved but was not source-accepted.
 
-Feature run `43556919773`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates on the exact B2 source. The active-test artifact `checkpoint-source-gate-active-tests` ID `14098498311` selected `tests/robinhood_mcp/test_agent_initiated_runtime_partition_proof.py`; its JUnit recorded 1,436 cases with zero failures/errors. Canonical FULL lane wall times were `82.359 / 116.094 / 114.874 / 180.053 / 137.653 / 152.521 / 141.130` seconds, all below 300 seconds.
+B2O-C1 `09ee1fafae73af7f77f7718a2d228c04db1edc3d` closed only that ownership defect by adding the observer test exactly once to `ARCH147_PROTOTYPE_TESTS`, adding the B2O observer/runner source exactly once to prototype Ruff ownership, and adding a regression that preserves B2O's manual/nonautomatic registration.
 
-Develop was fast-forwarded directly to the exact B2 SHA. Develop run `43557926282`, attempt 1, passed source-static and source-gates after exact feature-certification reuse succeeded. Active tests, fallback full-tests, generic certification, and canonical FULL were skipped, so no duplicate canonical certification was consumed.
+Feature run `43579859939`, attempt 1, passed source-static, active-tests, all seven mapped FULL lanes, and source-gates. The active-test artifact selected `tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py` exactly once in both pytest arguments and executed-tests evidence. Canonical FULL lane wall times were `100.504 / 134.343 / 82.222 / 227.962 / 120.338 / 201.876 / 139.522` seconds, all below 300 seconds.
 
-The production `RobinhoodL43AccountWideOrderScopeVerifier` remains unchanged and fail-closed. B2 performed no OAuth, MCP, Robinhood provider read, broker effect, A2 retry, Q63 operation, or `FINAL_HOLDOUT` access. Production therefore remains `ORDER_SCOPE_UNPROVEN`.
+Develop was fast-forwarded directly to the exact C1 SHA. Develop run `43583208148`, attempt 1, passed source-static and source-gates after `Prove exact develop certification reuse` succeeded. Active tests, fallback tests, and canonical FULL were skipped, so no duplicate broad certification was consumed.
+
+B2O source work performed zero provider reads, zero OAuth real dispatch, and zero provider effects. The real B2 observation remains NOT RUN. A2 remains consumed/no-retry; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED. Production remains `ORDER_SCOPE_UNPROVEN`.
 
 ## Immediate next step
 
-Implement a separately source-owned guarded B2 runtime-observation wrapper. It must source-admit the exact current checkout before any OAuth/MCP activity, construct only a restricted read-only Robinhood boundary, invoke the accepted B2 proof engine exactly once, persist sanitized evidence to a dedicated external evidence namespace, recheck exact source after dispatch, account for every OAuth/session/tools-list/order-read attempt, and be impossible to invoke automatically from normal prototype execution.
+Run exactly one separately authorized real B2 observation through the manual `arch147-l43-b2-runtime-partition-observation` checkpoint after the local canonical worktree is fast-forwarded to the exact accepted/integrated docs descendant and source/develop/feature identity is proven equal.
 
-This next checkpoint is source/fake-only. It must not perform the real B2 observation. Only after that observer source is independently accepted/integrated may a one-time real four-read observation be separately reviewed and authorized. Ambiguous or partially consumed provider activity must remain no-retry.
+The real observation is read-only. It may authenticate Robinhood, read the account identity, and execute the accepted four logical SPY order reads ALL-before / TRUE / FALSE / ALL-after with pagination as required. It may not review, place, cancel, sell, mutate provider state, run Q63, or access `FINAL_HOLDOUT`.
+
+Any terminal result after provider dispatch is consumed/no-retry. A successful `partition_equality_proof=PROVEN` remains review-only evidence with `production_order_scope_authority=NOT_GRANTED` until ChatGPT independently reviews the exact evidence and a later separately reviewed authority-binding source checkpoint is accepted.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

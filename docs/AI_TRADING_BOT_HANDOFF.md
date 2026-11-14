@@ -1,51 +1,68 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43 B2 SOURCE ACCEPTED / INTEGRATED; GUARDED B2 OBSERVER SOURCE NEXT
+## Current milestone: L43 B2O ACCEPTED / INTEGRATED; ONE-TIME REAL B2 OBSERVATION NEXT
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`; branch: `feature/robinhood-live-prototype-current`.
 
-Accepted/integrated B2 source:
+Accepted/integrated B2O-C1 source:
 
-- HEAD: `b9d8e97e66db806be2c70228c402577f2e84d719`
-- tree: `fd995cab1a31b2382f7277c99e870e141707d591`
-- direct parent / B1 docs closeout: `b254a1285fa63097b53613cde2ee8173ddf7ae3c`
-- admission evidence: `F:\AI\temp\arch147-l43-b2-admit-a2800ead098f435f853c52ce79a6e194\arch132-r3n-prepublication-admission\source-gate-20261114T042520.782354Z\report.json`
-- feature mapped FULL: `43556919773`, attempt 1, SUCCESS
-- active-test artifact: `checkpoint-source-gate-active-tests`, ID `14098498311`
-- develop integration gate: `43557926282`, attempt 1, SUCCESS
+- HEAD: `09ee1fafae73af7f77f7718a2d228c04db1edc3d`
+- tree: `c6b207a0be2ab2dc336b108eb01660edd40e59fa`
+- C1 direct parent: `7cd91b87daf7a188907db6f7d83f0086976306b5`
+- initial B2O implementation parent: `e3778dd7db17f4973de53d596ae798d7c22e898a`
+- B2O docs/base predecessor: `952f401d4df7f95ffe3cdcfaf8face88dc2d9acb`
+- admission evidence: `F:\AI\temp\arch147-l43-b2o-c1-admission-a0f4ddb1b665468b9c2ef507cd455457\arch132-r3n-prepublication-admission\source-gate-20261114T091258.930334Z\report.json`
+- accepted feature mapped FULL: `43579859939`, attempt 1, SUCCESS
+- develop integration gate: `43583208148`, attempt 1, SUCCESS
 - develop exact feature-certification reuse: PASS
 - develop duplicate FULL: NO
-- provider reads/effects during B2 source work: `0/0`
-- A2 rerun: NO
+- provider reads/effects during B2O source work: `0/0`
+- OAuth real dispatch: `0`
 - B2 real observation: NOT RUN
+- A2 rerun: NO
 - Q63: NOT RUN
 - `FINAL_HOLDOUT`: SEALED
 
-B2 implements the exact four logical reads ALL-before / TRUE / FALSE / ALL-after over the normalized L43 read boundary. It requires independently exhausted bounded pagination, strict normalized `agent_initiated` booleans, SPY-only rows, no duplicate IDs, stable canonical facts for every repeated ID, equal ALL-before/ALL-after universes, disjoint TRUE/FALSE sets, and exact TRUE∪FALSE = ALL equality. Any violation returns a sanitized NOT_PROVEN result.
+B2O is explicitly manual and remains absent from active CI checkpoint/certification registries. Normal feature pushes still map to `arch147-live-prototype`; C1 therefore adds the B2O observer test to that mapped checkpoint's active ownership while leaving the operator itself nonautomatic.
 
-Successful result evidence contains source HEAD/tree, account fingerprint, query/page/row metadata and digests, not raw account numbers or raw provider order IDs. The result contract always keeps `production_order_scope_authority=NOT_GRANTED`.
+The accepted B2O boundary:
 
-Feature run `43556919773` passed all seven canonical FULL lanes. Canonical runner walls were:
-`82.359 / 116.094 / 114.874 / 180.053 / 137.653 / 152.521 / 141.130` seconds.
-Develop run `43557926282` reused that exact feature certification and skipped all duplicate broad execution.
+- source-admits canonical clean feature/develop equality before provider dispatch;
+- reserves a unique external B2 evidence directory before dispatch;
+- exposes only `get_accounts` and `get_equity_orders`;
+- passes raw provider orders only through `RobinhoodL43B2PreEffectReadAdapter`;
+- invokes accepted `prove_agent_initiated_partition()` rather than reimplementing partition semantics;
+- validates proof type/status/contract/source/symbol/evidence hash/logical read order/digests;
+- rechecks exact source after dispatch;
+- persists sanitized counters/digests only;
+- is one-use/no-retry;
+- always keeps `production_order_scope_authority=NOT_GRANTED`.
 
-Production composition was not changed. `RobinhoodL43AccountWideOrderScopeVerifier` still returns no proof, so normal production L43 remains `ORDER_SCOPE_UNPROVEN`.
+Feature run `43579859939` proves active ownership of the observer test exactly once. Canonical FULL walls were:
+`100.504 / 134.343 / 82.222 / 227.962 / 120.338 / 201.876 / 139.522` seconds.
+Develop run `43583208148` reused that exact feature certification and skipped duplicate broad execution.
 
 ## Immediate next step
 
-Add a guarded, one-use B2 runtime observer/operator source around the accepted proof engine. The wrapper must:
+Prepare and perform one real read-only B2 observation through the explicit manual checkpoint only after local catch-up to the accepted docs descendant and an exact clean source/remote identity check.
 
-- prove exact source/branch/worktree admission before any OAuth/MCP dispatch;
-- use only read-only account/order capability;
-- call the accepted B2 proof engine rather than reimplement partition logic;
-- persist sanitized, source-bound evidence in a new B2-specific external namespace;
-- record bounded attempt counters including OAuth/session/tools-list/account/order reads;
-- perform an exact post-dispatch source recheck;
-- never grant production order-scope authority directly;
-- never auto-retry after any dispatched/ambiguous provider activity;
-- remain disconnected from normal prototype execute paths.
+Allowed real capability:
+- OAuth/session setup as required;
+- `get_accounts`;
+- `get_equity_orders`;
+- the accepted four logical B2 reads with pagination.
 
-This source checkpoint itself must use fakes only and perform zero provider reads. A later real observation requires separate explicit reviewed authorization after source acceptance/integration.
+Forbidden:
+- review;
+- placement;
+- cancellation;
+- position/quote/history/portfolio reads through this B2O boundary;
+- provider mutation;
+- production authority grant;
+- Q63;
+- `FINAL_HOLDOUT`.
+
+The observation is consumed after any provider dispatch. Do not automatically retry a PROVEN, NOT_PROVEN, provider-exception, malformed-result, source-recheck-failure, or ambiguous evidence-write outcome. Stop for ChatGPT review of the preserved evidence.
 
 ## L41R1 consumed observation and L41R2 source successor
 

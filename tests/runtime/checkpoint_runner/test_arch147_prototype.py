@@ -260,6 +260,24 @@ def test_l43_agent_initiated_schema_source_test_pairs_are_prepublication_owned()
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_l43_b2_runtime_partition_source_test_pair_is_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    source = "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_proof.py"
+    test = "tests/robinhood_mcp/test_agent_initiated_runtime_partition_proof.py"
+    spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+
+    assert (root / source).is_file()
+    assert (root / test).is_file()
+    assert runner.ARCH147_PROTOTYPE_RUFF.count(source) == 1
+    assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+    assert spec.ruff_paths.count(source) == 1
+    assert spec.tests.count(test) == 1
+    assert full.count(test) == 1
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_l43_read_normalization_source_test_pairs_are_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]

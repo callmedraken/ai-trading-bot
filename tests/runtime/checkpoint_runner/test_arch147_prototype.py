@@ -148,6 +148,40 @@ def test_prototype_has_no_protected_dispatch_and_maps_full():
     assert all(m in full for m in runner.ARCH147_PROTOTYPE_TESTS if m.endswith(".py"))
 
 
+def test_b2o_source_and_test_are_prototype_owned_but_checkpoint_stays_manual():
+    root = Path(runner.__file__).resolve().parents[1]
+    observer_source = (
+        "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py"
+    )
+    b2o_runner_source = "scripts/arch147_l43_b2_runtime_partition_source.py"
+    observer_test = (
+        "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py"
+    )
+    prototype = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
+    inventory = certification.discover_inventory(root)
+
+    assert (root / observer_source).is_file()
+    assert (root / b2o_runner_source).is_file()
+    assert (root / observer_test).is_file()
+    assert runner.ARCH147_PROTOTYPE_TESTS.count(observer_test) == 1
+    assert prototype.tests.count(observer_test) == 1
+    assert runner.ARCH147_PROTOTYPE_RUFF.count(observer_source) == 1
+    assert runner.ARCH147_PROTOTYPE_RUFF.count(b2o_runner_source) == 1
+    assert prototype.ruff_paths.count(observer_source) == 1
+    assert prototype.ruff_paths.count(b2o_runner_source) == 1
+    assert inventory.count(observer_test) == 1
+
+    assert runner.ARCH147_B2O_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH147_B2O_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH147_B2O_NAME not in runner.CI_CERTIFICATION_PROFILES
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), runner.ARCH147_PROTOTYPE_BRANCH, "push"
+        )
+        == runner.ARCH147_PROTOTYPE_NAME
+    )
+
+
 def test_arch147_guard_is_in_prepublication_admission_for_prototype_changes():
     guard = "tests/runtime/checkpoint_runner/test_arch147_prototype.py"
     selected = runner._prepublication_admission_tests(

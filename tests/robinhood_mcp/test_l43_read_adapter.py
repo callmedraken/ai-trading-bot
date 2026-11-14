@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from trading_bot.robinhood_mcp.l43_read_adapter import (
+    RobinhoodL43B2PreEffectReadAdapter,
     RobinhoodL43PreEffectReadAdapter,
 )
 
@@ -191,3 +192,14 @@ def test_valid_order_page_preserves_pagination() -> None:
     ).get_equity_orders({})
 
     assert page.next_cursor == "page-2"
+
+
+def test_b2_adapter_exposes_only_account_and_order_reads() -> None:
+    adapter = RobinhoodL43B2PreEffectReadAdapter(
+        _Read("orders", {"orders": [], "next": None})
+    )
+
+    assert hasattr(adapter, "get_accounts")
+    assert hasattr(adapter, "get_equity_orders")
+    assert not hasattr(adapter, "get_equity_positions")
+    assert adapter.get_equity_orders({}).rows == ()

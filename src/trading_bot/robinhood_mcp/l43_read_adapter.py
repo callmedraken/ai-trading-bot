@@ -45,21 +45,52 @@ class RobinhoodL43PreEffectReadAdapter:
         )
 
     def get_equity_orders(self, arguments: Mapping[str, object]) -> L43ReadPage:
-        payload = self._read.get_equity_orders(dict(arguments))
-        data = _data(payload, "orders")
-        agent_initiated = tuple(_strict_agent_initiated(row) for row in data["orders"])
-        parsed = parse_equity_orders_response(payload)
-        if len(parsed.orders) != len(data["orders"]) or any(
-            order is None for order in parsed.orders
+        return _order_page(self._read, arguments)
+
+
+class RobinhoodL43B2PreEffectReadAdapter:
+    """Narrow B2 sibling of the accepted L43 normalization adapter.
+
+    B2 needs only account and equity-order reads.  It intentionally has no
+    position, quote, portfolio, review, or mutation surface while reusing the
+    same strict order normalization and pagination checks as the accepted
+    ``RobinhoodL43PreEffectReadAdapter``.
+    """
+
+    __slots__ = ("_read",)
+
+    def __init__(self, read: object) -> None:
+        if not all(
+            callable(getattr(read, name, None))
+            for name in ("get_accounts", "get_equity_orders")
         ):
-            raise ValueError("order page contains an invalid row")
-        return L43ReadPage(
-            rows=tuple(
-                _order_fact(order, agent_initiated=agent_initiated[index])
-                for index, order in enumerate(parsed.orders)
-            ),
-            next_cursor=_cursor(data),
-        )
+            raise TypeError("B2 read adapter requires account/order read methods")
+        self._read = read
+
+    def get_accounts(self) -> L43AccountIdentity:
+        account = resolve_account(self._read.get_accounts())
+        return L43AccountIdentity(account.account_number, account.fingerprint)
+
+    def get_equity_orders(self, arguments: Mapping[str, object]) -> L43ReadPage:
+        return _order_page(self._read, arguments)
+
+
+def _order_page(read: object, arguments: Mapping[str, object]) -> L43ReadPage:
+    payload = read.get_equity_orders(dict(arguments))
+    data = _data(payload, "orders")
+    agent_initiated = tuple(_strict_agent_initiated(row) for row in data["orders"])
+    parsed = parse_equity_orders_response(payload)
+    if len(parsed.orders) != len(data["orders"]) or any(
+        order is None for order in parsed.orders
+    ):
+        raise ValueError("order page contains an invalid row")
+    return L43ReadPage(
+        rows=tuple(
+            _order_fact(order, agent_initiated=agent_initiated[index])
+            for index, order in enumerate(parsed.orders)
+        ),
+        next_cursor=_cursor(data),
+    )
 
 
 def _data(payload: object, collection: str) -> Mapping[str, object]:
@@ -134,4 +165,7 @@ def _order_fact(order: RobinhoodEquityOrder, *, agent_initiated: bool) -> L43Ord
     )
 
 
-__all__ = ["RobinhoodL43PreEffectReadAdapter"]
+__all__ = [
+    "RobinhoodL43B2PreEffectReadAdapter",
+    "RobinhoodL43PreEffectReadAdapter",
+]

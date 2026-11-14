@@ -508,6 +508,15 @@ ARCH147_P6_RUFF: Final = (
 )
 ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
+ARCH147_B2O_NAME: Final = "arch147-l43-b2-runtime-partition-observation"
+ARCH147_B2O_TESTS: Final = (
+    "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
+)
+ARCH147_B2O_RUFF: Final = (
+    "scripts/arch147_l43_b2_runtime_partition_source.py",
+    "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py",
+    "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
+)
 ARCH147_PROTOTYPE_TESTS: Final = (
     *COMMON_TESTS,
     "tests/live_prototype/test_capability_collector.py",
@@ -26642,6 +26651,16 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_PROTOTYPE_BRANCH,
     )
+    values[ARCH147_B2O_NAME] = CheckpointSpec(
+        ARCH147_B2O_NAME,
+        "B2 one-time runtime partition observation; explicit read-only preflight only",
+        ARCH147_B2O_TESTS,
+        ARCH147_B2O_RUFF,
+        _arch147_b2o_authority_check,
+        preflight=_arch147_b2o_preflight,
+        execute=None,
+        remote_branch=None,
+    )
     values[ARCH147_P6_NAME] = CheckpointSpec(
         ARCH147_P6_NAME,
         "Architecture 147 tiny-live source boundary with explicit operator arm",
@@ -29115,9 +29134,40 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(failures)
 
 
+def _arch147_b2o_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Keep B2O explicit/manual and separate from the consumed A2 route."""
+    failures: list[str] = []
+    spec = _checkpoint_specs()[ARCH147_B2O_NAME]
+    if (
+        spec.tests != ARCH147_B2O_TESTS
+        or spec.ruff_paths != ARCH147_B2O_RUFF
+        or spec.authority_check is not _arch147_b2o_authority_check
+        or spec.preflight is not _arch147_b2o_preflight
+        or spec.execute is not None
+        or spec.remote_branch is not None
+        or ARCH147_B2O_NAME in CURRENT_ACTIVE_CI_CHECKPOINTS
+        or ARCH147_B2O_NAME in ACTIVE_CI_CHECKPOINTS
+        or ARCH147_B2O_NAME in CI_CERTIFICATION_PROFILES
+        or resolve_ci_checkpoint(_checkpoint_specs(), ARCH147_PROTOTYPE_BRANCH, "push")
+        != ARCH147_PROTOTYPE_NAME
+    ):
+        failures.append("147 B2O manual registration drift")
+    for relative in (*ARCH147_B2O_TESTS, *ARCH147_B2O_RUFF):
+        if not (repo_root / relative).exists():
+            failures.append("147 B2O missing owned path: " + relative)
+    return tuple(dict.fromkeys(failures))
+
+
 def _arch147_l43_a3_preflight() -> dict[str, object]:
     """Dispatch only the source-owned, read-only Architecture 147 A3 preflight."""
     from scripts.arch147_l43_a3_source import run_preflight
+
+    return run_preflight()
+
+
+def _arch147_b2o_preflight() -> dict[str, object]:
+    """Dispatch only through the separately named B2O manual checkpoint."""
+    from scripts.arch147_l43_b2_runtime_partition_source import run_preflight
 
     return run_preflight()
 

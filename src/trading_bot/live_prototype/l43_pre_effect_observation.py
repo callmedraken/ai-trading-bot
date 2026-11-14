@@ -1994,6 +1994,7 @@ def _order_material(order: L43OrderFact) -> tuple[str, ...]:
         order.side.value,
         order.state.casefold(),
         order.placed_agent,
+        order.agent_initiated,
         order.created_at.isoformat(),
         _decimal_text(order.cumulative_quantity),
         "" if order.average_price is None else _decimal_text(order.average_price),

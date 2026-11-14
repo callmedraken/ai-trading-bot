@@ -467,6 +467,39 @@ def test_flat_buy_returns_fresh_semantic_plan_without_reserving_or_authority(
     assert _ORDER_ID not in evidence
 
 
+def test_relevant_order_digest_binds_agent_initiated_without_query_filter(
+    tmp_path: Path,
+):
+    digests: list[str] = []
+    for agent_initiated, label in ((True, "true"), (False, "false")):
+        variant_path = tmp_path / label
+        variant_path.mkdir()
+        state_path, _ = _state_path(variant_path, reconcile_initial=False)
+        row = _order(Decimal("0.5"))
+        row["agent_initiated"] = agent_initiated
+        dependencies, read, _, _ = _dependencies(
+            state_path=state_path,
+            as_of=_NOW,
+            decision=SignalDecision.BUY,
+            order_rows=[row],
+        )
+
+        result = observer.observe_l43_pre_effect(dependencies)
+
+        assert (
+            result.outcome
+            is observer.L43PreEffectOutcome.READY_FOR_L43_ENTRY_EFFECT_REVIEW
+        )
+        assert result.plan is not None
+        assert read.calls[-1] == (
+            "get_equity_orders",
+            {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+        )
+        digests.append(result.plan.relevant_orders_digest)
+
+    assert digests[0] != digests[1]
+
+
 def test_non_buy_ignores_invalid_entry_risk_without_side_effects(tmp_path: Path):
     state_path, _ = _state_path(tmp_path)
     dependencies, _, _, _ = _dependencies(

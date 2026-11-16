@@ -37,23 +37,28 @@ Attempt counters:
 
 This is CONSUMED / NO RETRY. The first ALL_BEFORE order read did not complete and no logical-read snapshot was accepted.
 
-Independent source audit identified a normalization-contract defect. The accepted A2/B2 provider schema requires only `id`, `symbol`, and `agent_initiated` on order rows for this proof, but `RobinhoodL43B2PreEffectReadAdapter` currently calls the generic `parse_equity_orders_response()` / `RobinhoodEquityOrder` parser. That parser demands numerous additional fields not guaranteed by the accepted B2 schema. Q62's successful historical order read was narrower because it filtered `placed_agent="agentic"`; it did not establish generic parsing for the unfiltered ALL population.
+Independent source audit of the consumed observation source identified a normalization-contract defect. The accepted A2/B2 provider schema requires only `id`, `symbol`, and `agent_initiated` on order rows for this proof, but that source's `RobinhoodL43B2PreEffectReadAdapter` called the generic `parse_equity_orders_response()` / `RobinhoodEquityOrder` parser, which demanded additional fields not guaranteed by the accepted B2 schema. Q62's successful historical order read was narrower because it filtered `placed_agent="agentic"`; it did not establish generic parsing for the unfiltered ALL population.
 
 The exact underlying row/parser exception is not recoverable from the sanitized evidence and must not be invented. The source contract mismatch itself is sufficient to block production authority and justify a fake-only corrective.
 
 ## Immediate next step
 
-Build B2N1 as a source-only account-wide normalization correction:
+The active source-only correction is
+`ARCH147-RHC1A_ROBINHOOD_COMPATIBILITY_NORMALIZATION`:
 
 - remove generic full-order parsing from the B2-specific adapter;
 - validate required row `id`, `symbol`, and exact bool `agent_initiated`;
 - deterministically canonicalize/hash the complete JSON row for mutation detection without persisting raw order data or IDs;
 - return a B2-specific normalized fact consumed by the existing four-read proof;
-- preserve exact query sequence and pagination;
+- normalize the B2 terminal pagination forms while preserving opaque nonempty cursors;
+- preserve the exact four-read query sequence and exhaustive pagination;
 - keep ordinary L43/Q62 generic parsing unchanged;
 - add manual/customer-order-shaped fixtures with optional/null/absent non-B2 fields;
 - remain zero-provider/fake-only;
 - do not authorize or perform another real B2 observation.
+
+RHC1B separately owns MCP session lifetime and capability discovery. No real
+Robinhood/provider interaction may occur between RHC1A and RHC1B.
 
 Production remains `ORDER_SCOPE_UNPROVEN`; Q63 NOT RUN; `FINAL_HOLDOUT` SEALED.
 

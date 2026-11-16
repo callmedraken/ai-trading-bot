@@ -16,7 +16,6 @@ from scripts import checkpoint_runner as runner
 from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
 from trading_bot.live_prototype.l43_provider_contracts import (
     L43AccountIdentity,
-    L43ReadPage,
 )
 from trading_bot.robinhood_mcp import (
     agent_initiated_runtime_partition_observer as observer,
@@ -35,16 +34,16 @@ class _Read:
     def get_accounts(self) -> L43AccountIdentity:
         return L43AccountIdentity(_ACCOUNT, _FINGERPRINT)
 
-    def get_equity_orders(self, arguments: dict[str, object]) -> L43ReadPage:
+    def get_equity_orders(self, arguments: dict[str, object]) -> proof.B2OrderReadPage:
         assert arguments["symbol"] == "SPY"
-        return L43ReadPage(rows=(), next_cursor=None)
+        return proof.B2OrderReadPage(rows=(), next_cursor=None)
 
 
 class _AccountFailure:
     def get_accounts(self) -> L43AccountIdentity:
         raise RuntimeError("raw provider error secret-token")
 
-    def get_equity_orders(self, arguments: dict[str, object]) -> L43ReadPage:
+    def get_equity_orders(self, arguments: dict[str, object]) -> proof.B2OrderReadPage:
         raise AssertionError("account failure must stop before order reads")
 
 
@@ -317,6 +316,113 @@ def test_valid_proof_is_called_once_validated_and_persisted_review_only(
             "other_tool_attempts",
         )
     )
+
+
+@pytest.mark.parametrize(
+    ("failure_kind", "expected_reason"),
+    (
+        ("dispatch", proof.B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE),
+        ("result", proof.B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE),
+        ("normalization", proof.B2FailureReason.AGENT_INITIATED_STRICT_BOOL_FAILURE),
+    ),
+)
+def test_closed_failure_classes_reach_sanitized_observer_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    failure_kind: str,
+    expected_reason: proof.B2FailureReason,
+) -> None:
+    real_run = observer._run_production_session
+    real_transport = observer.RobinhoodB2ReadTransport
+
+    class _FailureSession:
+        async def __aenter__(self) -> _FailureSession:
+            return self
+
+        async def __aexit__(self, *args: object) -> None:
+            return None
+
+        async def list_tools(self, *, cursor: str | None = None) -> _ToolListing:
+            del cursor
+            return _ToolListing()
+
+        async def call_tool(
+            self, name: str, arguments: dict[str, object]
+        ) -> SimpleNamespace:
+            del arguments
+            if name == "get_accounts":
+                return SimpleNamespace(
+                    is_error=False,
+                    structured_content={
+                        "data": {
+                            "accounts": [
+                                {
+                                    "account_number": _ACCOUNT,
+                                    "agentic_allowed": True,
+                                }
+                            ]
+                        }
+                    },
+                )
+            if failure_kind == "dispatch":
+                raise RuntimeError("raw dispatch secret-token")
+            if failure_kind == "result":
+                return SimpleNamespace(
+                    is_error=True,
+                    structured_content={"raw": "provider-result-secret"},
+                )
+            return SimpleNamespace(
+                is_error=False,
+                structured_content={
+                    "data": {
+                        "orders": [
+                            {
+                                "id": "provider-order-secret",
+                                "symbol": "SPY",
+                            }
+                        ],
+                        "next": None,
+                    }
+                },
+            )
+
+    monkeypatch.setattr(
+        observer,
+        "RobinhoodB2ReadTransport",
+        lambda _oauth, attempts, dispatch: real_transport.for_test(
+            _FailureSession, attempts, dispatch
+        ),
+    )
+    monkeypatch.setattr(
+        "trading_bot.robinhood_mcp.windows_oauth.create_windows_robinhood_oauth_factory",
+        lambda **_kwargs: lambda: None,
+    )
+    monkeypatch.setattr(proof, "_read_source_identity", lambda _root: _SOURCE)
+
+    def run(*args: object) -> object:
+        return real_run(*args)
+
+    _install_fake_harness(monkeypatch, tmp_path, run)
+    result = asyncio.run(
+        observer.RobinhoodAgentInitiatedRuntimePartitionObserver().observe(
+            evidence_dir=tmp_path
+            / ("arch147-agent-initiated-runtime-partition-" + "c" * 32)
+        )
+    )
+    assert result.evidence_file is not None
+    evidence_text = result.evidence_file.read_text(encoding="ascii")
+    evidence = json.loads(evidence_text)
+
+    assert result.reason == expected_reason.value
+    assert evidence["reason"] == expected_reason.value
+    assert evidence["b2_result_reason"] == expected_reason.value
+    assert evidence["b2_proof_contract_version"] == proof.B2_PROOF_CONTRACT_VERSION
+    assert _ACCOUNT not in evidence_text
+    assert "secret-token" not in evidence_text
+    assert "provider-result-secret" not in evidence_text
+    assert "provider-order-secret" not in evidence_text
+    assert "raw dispatch" not in evidence_text
+    assert result.provider_dispatch_started is True
 
 
 def test_not_proven_is_consumed_and_preserved_without_authority(

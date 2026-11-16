@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import math
 from collections.abc import Mapping
 
 from trading_bot.desktop_paper.robinhood_read import parse_position, resolve_account
@@ -12,6 +15,13 @@ from trading_bot.live_prototype.l43_provider_contracts import (
     L43OrderFact,
     L43PositionFact,
     L43ReadPage,
+)
+from trading_bot.robinhood_mcp.agent_initiated_runtime_partition_proof import (
+    B2CompatibilityFailure,
+    B2FailureReason,
+    B2OrderFact,
+    B2OrderReadPage,
+    validate_b2_order_fields,
 )
 from trading_bot.robinhood_mcp.models import RobinhoodEquityOrder
 from trading_bot.robinhood_mcp.parsing import parse_equity_orders_response
@@ -52,9 +62,8 @@ class RobinhoodL43B2PreEffectReadAdapter:
     """Narrow B2 sibling of the accepted L43 normalization adapter.
 
     B2 needs only account and equity-order reads.  It intentionally has no
-    position, quote, portfolio, review, or mutation surface while reusing the
-    same strict order normalization and pagination checks as the accepted
-    ``RobinhoodL43PreEffectReadAdapter``.
+    position, quote, portfolio, review, or mutation surface. Its order model is
+    intentionally limited to the B2 partition facts and complete-row digest.
     """
 
     __slots__ = ("_read",)
@@ -71,8 +80,8 @@ class RobinhoodL43B2PreEffectReadAdapter:
         account = resolve_account(self._read.get_accounts())
         return L43AccountIdentity(account.account_number, account.fingerprint)
 
-    def get_equity_orders(self, arguments: Mapping[str, object]) -> L43ReadPage:
-        return _order_page(self._read, arguments)
+    def get_equity_orders(self, arguments: Mapping[str, object]) -> B2OrderReadPage:
+        return _b2_order_page(self._read, arguments)
 
 
 def _order_page(read: object, arguments: Mapping[str, object]) -> L43ReadPage:
@@ -91,6 +100,129 @@ def _order_page(read: object, arguments: Mapping[str, object]) -> L43ReadPage:
         ),
         next_cursor=_cursor(data),
     )
+
+
+def _b2_order_page(read: object, arguments: Mapping[str, object]) -> B2OrderReadPage:
+    try:
+        payload = read.get_equity_orders(dict(arguments))
+    except B2CompatibilityFailure:
+        raise
+    except Exception:
+        raise B2CompatibilityFailure(
+            B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+        ) from None
+
+    data = _b2_data(payload)
+    rows: list[B2OrderFact] = []
+    for row in data["orders"]:
+        if not isinstance(row, Mapping):
+            raise B2CompatibilityFailure(B2FailureReason.ORDER_ROW_SHAPE_FAILURE)
+        try:
+            order_id = row.get("id")
+            symbol = row.get("symbol")
+            agent_initiated = row.get("agent_initiated")
+        except Exception:
+            raise B2CompatibilityFailure(
+                B2FailureReason.ORDER_ROW_SHAPE_FAILURE
+            ) from None
+        order_id, symbol, agent_initiated = validate_b2_order_fields(
+            order_id, symbol, agent_initiated
+        )
+        try:
+            row_digest = _b2_raw_row_sha256(row)
+        except Exception:
+            raise B2CompatibilityFailure(
+                B2FailureReason.CANONICAL_ROW_SERIALIZATION_FAILURE
+            ) from None
+        rows.append(
+            B2OrderFact(
+                order_id=order_id,
+                symbol=symbol,
+                agent_initiated=agent_initiated,
+                row_material_sha256=row_digest,
+            )
+        )
+    return B2OrderReadPage(rows=tuple(rows), next_cursor=_b2_cursor(data))
+
+
+def _b2_data(payload: object) -> Mapping[str, object]:
+    try:
+        if not isinstance(payload, Mapping):
+            raise B2CompatibilityFailure(
+                B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE
+            )
+        data = payload.get("data")
+        if not isinstance(data, Mapping):
+            raise B2CompatibilityFailure(
+                B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE
+            )
+        orders = data.get("orders")
+        if type(orders) is not list:
+            raise B2CompatibilityFailure(B2FailureReason.ORDER_COLLECTION_SHAPE_FAILURE)
+        return data
+    except B2CompatibilityFailure:
+        raise
+    except Exception:
+        raise B2CompatibilityFailure(
+            B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE
+        ) from None
+
+
+def _b2_cursor(data: Mapping[str, object]) -> str | None:
+    try:
+        if "next" not in data:
+            return None
+        cursor = data["next"]
+    except Exception:
+        raise B2CompatibilityFailure(
+            B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE
+        ) from None
+    if cursor is None:
+        return None
+    if type(cursor) is not str:
+        raise B2CompatibilityFailure(B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE)
+    if cursor == "":
+        return None
+    if len(cursor) > 4096:
+        raise B2CompatibilityFailure(B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE)
+    return cursor
+
+
+def _b2_raw_row_sha256(row: Mapping[str, object]) -> str:
+    canonical = _canonical_json_value(row)
+    encoded = json.dumps(
+        canonical,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8", errors="strict")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_json_value(value: object) -> object:
+    if value is None or type(value) is bool or type(value) is int:
+        return value
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("non-finite JSON number")
+        return value
+    if type(value) is str:
+        value.encode("utf-8", errors="strict")
+        return value
+    if type(value) is list:
+        return [_canonical_json_value(item) for item in value]
+    if isinstance(value, Mapping):
+        normalized: dict[str, object] = {}
+        for key in value:
+            if type(key) is not str:
+                raise ValueError("JSON object key is not a string")
+            key.encode("utf-8", errors="strict")
+            if key in normalized:
+                raise ValueError("JSON object repeats a key")
+            normalized[key] = _canonical_json_value(value[key])
+        return normalized
+    raise ValueError("value is outside the JSON domain")
 
 
 def _data(payload: object, collection: str) -> Mapping[str, object]:

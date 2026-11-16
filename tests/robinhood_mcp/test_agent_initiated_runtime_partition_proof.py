@@ -1,40 +1,33 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import replace
-from datetime import UTC, datetime
-from decimal import Decimal
+import json
 from pathlib import Path
 from typing import Final
 
 import pytest
 
-from trading_bot.domain import OrderSide
 from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
-from trading_bot.live_prototype.l43_provider_contracts import (
-    L43AccountIdentity,
-    L43DollarAmountFact,
-    L43ExecutionFact,
-    L43OrderFact,
-    L43ReadPage,
-)
+from trading_bot.live_prototype.l43_provider_contracts import L43AccountIdentity
 from trading_bot.robinhood_mcp import agent_initiated_runtime_partition_proof as proof
+from trading_bot.robinhood_mcp.l43_read_adapter import (
+    RobinhoodL43B2PreEffectReadAdapter,
+)
 
 _ACCOUNT_NUMBER: Final = "account-secret-147"
 _ACCOUNT_FINGERPRINT: Final = "a" * 64
 _SOURCE: Final = L43SourceIdentity(source_head="b" * 40, source_tree="c" * 40)
 _OTHER_SOURCE: Final = L43SourceIdentity(source_head="d" * 40, source_tree="e" * 40)
-_NOW: Final = datetime(2026, 11, 10, 15, 0, tzinfo=UTC)
 
 
 class _Read:
     def __init__(
         self,
-        pages: dict[tuple[bool | None, str | None], L43ReadPage],
+        pages: dict[tuple[bool | None, str | None], proof.B2OrderReadPage],
         *,
         fail_at: int | None = None,
         account: L43AccountIdentity | None = None,
-        all_after: L43ReadPage | None = None,
+        all_after: proof.B2OrderReadPage | None = None,
     ) -> None:
         self.pages = pages
         self.fail_at = fail_at
@@ -48,7 +41,7 @@ class _Read:
     def get_accounts(self) -> L43AccountIdentity:
         return self.account
 
-    def get_equity_orders(self, arguments: dict[str, object]) -> L43ReadPage:
+    def get_equity_orders(self, arguments: dict[str, object]) -> proof.B2OrderReadPage:
         self.calls.append(dict(arguments))
         if self.fail_at == len(self.calls):
             raise RuntimeError("provider response must not be surfaced")
@@ -72,44 +65,55 @@ def _order(
     symbol: str = "SPY",
     quantity: str = "0.5",
     state: str = "filled",
-    executions: tuple[L43ExecutionFact, ...] = (),
-    dollar_based_amount: L43DollarAmountFact | None = None,
-) -> L43OrderFact:
-    return L43OrderFact(
+    extra_material: dict[str, object] | None = None,
+) -> proof.B2OrderFact:
+    material: dict[str, object] = {
+        "id": order_id,
+        "symbol": symbol,
+        "agent_initiated": agent_initiated,
+        "quantity": quantity,
+        "state": state,
+    }
+    if extra_material is not None:
+        material.update(extra_material)
+    canonical = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return proof.B2OrderFact(
         order_id=order_id,
         symbol=symbol,
-        side=OrderSide.BUY,
-        state=state,
-        placed_agent="agentic",
         agent_initiated=agent_initiated,
-        created_at=_NOW,
-        market_hours="regular_hours",
-        time_in_force="day",
-        order_type="market",
-        cumulative_quantity=Decimal(quantity),
-        average_price=Decimal("20"),
-        dollar_based_amount=dollar_based_amount,
-        executions=executions,
+        row_material_sha256=hashlib.sha256(canonical).hexdigest(),
     )
 
 
 def _pages(
     *,
-    all_rows: tuple[L43OrderFact, ...],
-    true_rows: tuple[L43OrderFact, ...],
-    false_rows: tuple[L43OrderFact, ...],
+    all_rows: tuple[proof.B2OrderFact, ...],
+    true_rows: tuple[proof.B2OrderFact, ...],
+    false_rows: tuple[proof.B2OrderFact, ...],
     paginated: bool = False,
-) -> dict[tuple[bool | None, str | None], L43ReadPage]:
+) -> dict[tuple[bool | None, str | None], proof.B2OrderReadPage]:
     rows_by_filter = {None: all_rows, True: true_rows, False: false_rows}
-    pages: dict[tuple[bool | None, str | None], L43ReadPage] = {}
+    pages: dict[tuple[bool | None, str | None], proof.B2OrderReadPage] = {}
     for filter_value, rows in rows_by_filter.items():
         if not paginated:
-            pages[(filter_value, None)] = L43ReadPage(rows=rows, next_cursor=None)
+            pages[(filter_value, None)] = proof.B2OrderReadPage(
+                rows=rows, next_cursor=None
+            )
             continue
         split = max(1, len(rows) // 2)
         cursor = f"cursor-{filter_value}"
-        pages[(filter_value, None)] = L43ReadPage(rows=rows[:split], next_cursor=cursor)
-        pages[(filter_value, cursor)] = L43ReadPage(rows=rows[split:], next_cursor=None)
+        pages[(filter_value, None)] = proof.B2OrderReadPage(
+            rows=rows[:split], next_cursor=cursor
+        )
+        pages[(filter_value, cursor)] = proof.B2OrderReadPage(
+            rows=rows[split:], next_cursor=None
+        )
     return pages
 
 
@@ -146,9 +150,9 @@ def _run(
     ),
 )
 def test_proves_empty_and_true_false_partition_shapes(
-    all_rows: tuple[L43OrderFact, ...],
-    true_rows: tuple[L43OrderFact, ...],
-    false_rows: tuple[L43OrderFact, ...],
+    all_rows: tuple[proof.B2OrderFact, ...],
+    true_rows: tuple[proof.B2OrderFact, ...],
+    false_rows: tuple[proof.B2OrderFact, ...],
 ) -> None:
     read = _Read(_pages(all_rows=all_rows, true_rows=true_rows, false_rows=false_rows))
 
@@ -227,6 +231,23 @@ def test_multi_page_reads_preserve_each_filter_and_order_exactly() -> None:
     assert result.logical_reads[0].query_sha256 == result.logical_reads[3].query_sha256
 
 
+def test_nonempty_cursor_is_passed_back_without_interpretation() -> None:
+    opaque_cursor = "opaque cursor/%2F?next=https://example.invalid"
+    pages = _pages(all_rows=(), true_rows=(), false_rows=(), paginated=True)
+    pages[(None, None)] = proof.B2OrderReadPage(rows=(), next_cursor=opaque_cursor)
+    pages[(None, opaque_cursor)] = proof.B2OrderReadPage(rows=(), next_cursor=None)
+    read = _Read(pages)
+
+    result = _run(read)
+
+    assert result.proven
+    assert read.calls[1] == {
+        "account_number": _ACCOUNT_NUMBER,
+        "symbol": "SPY",
+        "cursor": opaque_cursor,
+    }
+
+
 @pytest.mark.parametrize(
     ("all_rows", "true_rows", "false_rows", "expected_reason"),
     (
@@ -234,7 +255,7 @@ def test_multi_page_reads_preserve_each_filter_and_order_exactly() -> None:
             (_order("stable", True),),
             (_order("stable", True),),
             (_order("stable", False),),
-            "ORDER_FACT_CONFLICT",
+            "SAME_ID_MATERIAL_CONFLICT",
         ),
         (
             (_order("one", True), _order("two", False)),
@@ -264,14 +285,14 @@ def test_multi_page_reads_preserve_each_filter_and_order_exactly() -> None:
             (_order("duplicate", True), _order("duplicate", True)),
             (_order("duplicate", True),),
             (),
-            "ALL_BEFORE_DUPLICATE_ORDER_ID",
+            "DUPLICATE_ORDER_IDENTITY",
         ),
     ),
 )
 def test_partition_invariants_fail_closed(
-    all_rows: tuple[L43OrderFact, ...],
-    true_rows: tuple[L43OrderFact, ...],
-    false_rows: tuple[L43OrderFact, ...],
+    all_rows: tuple[proof.B2OrderFact, ...],
+    true_rows: tuple[proof.B2OrderFact, ...],
+    false_rows: tuple[proof.B2OrderFact, ...],
     expected_reason: str,
 ) -> None:
     read = _Read(_pages(all_rows=all_rows, true_rows=true_rows, false_rows=false_rows))
@@ -289,7 +310,7 @@ def test_all_before_and_all_after_universe_mismatch_fails_closed() -> None:
     after = _order("after", True)
     read = _Read(
         _pages(all_rows=(before,), true_rows=(before,), false_rows=()),
-        all_after=L43ReadPage(rows=(after,), next_cursor=None),
+        all_after=proof.B2OrderReadPage(rows=(after,), next_cursor=None),
     )
 
     result = _run(read)
@@ -301,29 +322,14 @@ def test_all_before_and_all_after_universe_mismatch_fails_closed() -> None:
 @pytest.mark.parametrize(
     "mutation",
     (
-        replace(_order("mutating", True), state="canceled"),
-        replace(_order("mutating", True), cumulative_quantity=Decimal("0.7")),
-        replace(
-            _order("mutating", True),
-            executions=(
-                L43ExecutionFact(
-                    execution_id="execution-147",
-                    quantity=Decimal("0.1"),
-                    price=Decimal("20"),
-                    timestamp=_NOW,
-                ),
-            ),
-        ),
-        replace(
-            _order("mutating", True),
-            dollar_based_amount=L43DollarAmountFact(
-                amount=Decimal("10"), currency_code="USD"
-            ),
-        ),
+        _order("mutating", True, state="canceled"),
+        _order("mutating", True, quantity="0.7"),
+        _order("mutating", True, extra_material={"fees": "0.01"}),
+        _order("mutating", True, extra_material={"nullable": None}),
     ),
 )
 def test_same_order_id_material_mutation_fails_closed(
-    mutation: L43OrderFact,
+    mutation: proof.B2OrderFact,
 ) -> None:
     base = _order("mutating", True)
     read = _Read(
@@ -337,15 +343,63 @@ def test_same_order_id_material_mutation_fails_closed(
     result = _run(read)
 
     assert result.status is proof.AgentInitiatedRuntimePartitionProofStatus.NOT_PROVEN
-    assert result.reason == "ORDER_FACT_CONFLICT"
+    assert result.reason == "SAME_ID_MATERIAL_CONFLICT"
+
+
+def test_raw_adapter_to_proof_detects_nested_nonsemantic_same_id_mutation() -> None:
+    before = {
+        "id": "same-order",
+        "symbol": "SPY",
+        "agent_initiated": True,
+        "metadata": {"audit": {"review_note": "before"}},
+    }
+    changed = {
+        "id": "same-order",
+        "symbol": "SPY",
+        "agent_initiated": True,
+        "metadata": {"audit": {"review_note": "after"}},
+    }
+
+    class _RawRead:
+        def __init__(self) -> None:
+            self.unfiltered_reads = 0
+
+        def get_accounts(self) -> dict[str, object]:
+            return {
+                "data": {
+                    "accounts": [
+                        {"account_number": _ACCOUNT_NUMBER, "agentic_allowed": True}
+                    ]
+                }
+            }
+
+        def get_equity_orders(self, arguments: dict[str, object]) -> dict[str, object]:
+            filter_value = arguments.get("agent_initiated")
+            if filter_value is None:
+                self.unfiltered_reads += 1
+                rows = [before]
+            elif filter_value is True:
+                rows = [changed]
+            else:
+                rows = []
+            return {"data": {"orders": rows}}
+
+    result = _run(RobinhoodL43B2PreEffectReadAdapter(_RawRead()))
+
+    assert result.reason == "SAME_ID_MATERIAL_CONFLICT"
+    assert _ACCOUNT_NUMBER not in result.evidence_json.decode("ascii")
+    assert "same-order" not in result.evidence_json.decode("ascii")
+    assert "review_note" not in result.evidence_json.decode("ascii")
+    assert "before" not in result.evidence_json.decode("ascii")
+    assert "after" not in result.evidence_json.decode("ascii")
 
 
 def test_malformed_normalized_fact_and_non_spy_rows_fail_closed() -> None:
     malformed = _Read(
         {
-            (None, None): L43ReadPage(rows=(object(),), next_cursor=None),
-            (True, None): L43ReadPage(rows=(), next_cursor=None),
-            (False, None): L43ReadPage(rows=(), next_cursor=None),
+            (None, None): proof.B2OrderReadPage(rows=(object(),), next_cursor=None),
+            (True, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
+            (False, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
         }
     )
     non_spy = _Read(
@@ -359,45 +413,45 @@ def test_malformed_normalized_fact_and_non_spy_rows_fail_closed() -> None:
     malformed_result = _run(malformed)
     non_spy_result = _run(non_spy)
 
-    assert malformed_result.reason == "ALL_BEFORE_FACT_INVALID"
-    assert non_spy_result.reason == "ALL_BEFORE_FACT_INVALID"
+    assert malformed_result.reason == "ORDER_ROW_SHAPE_FAILURE"
+    assert non_spy_result.reason == "REQUIRED_B2_FIELD_FAILURE"
 
 
 @pytest.mark.parametrize("next_cursor", (1, ""))
 def test_invalid_pagination_next_fails_closed(next_cursor: object) -> None:
     read = _Read(
         {
-            (None, None): L43ReadPage(rows=(), next_cursor=next_cursor),
-            (True, None): L43ReadPage(rows=(), next_cursor=None),
-            (False, None): L43ReadPage(rows=(), next_cursor=None),
+            (None, None): proof.B2OrderReadPage(rows=(), next_cursor=next_cursor),
+            (True, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
+            (False, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
         }
     )
 
     result = _run(read)
 
-    assert result.reason == "ALL_BEFORE_CURSOR_INVALID"
+    assert result.reason == "PAGINATION_ENVELOPE_CURSOR_FAILURE"
 
 
 def test_repeated_cursor_and_incomplete_pagination_fail_closed(monkeypatch) -> None:
     repeated = _Read(
         {
-            (None, None): L43ReadPage(rows=(), next_cursor="repeat"),
-            (None, "repeat"): L43ReadPage(rows=(), next_cursor="repeat"),
-            (True, None): L43ReadPage(rows=(), next_cursor=None),
-            (False, None): L43ReadPage(rows=(), next_cursor=None),
+            (None, None): proof.B2OrderReadPage(rows=(), next_cursor="repeat"),
+            (None, "repeat"): proof.B2OrderReadPage(rows=(), next_cursor="repeat"),
+            (True, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
+            (False, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
         }
     )
     incomplete = _Read(
         {
-            (None, None): L43ReadPage(rows=(), next_cursor="next"),
-            (True, None): L43ReadPage(rows=(), next_cursor=None),
-            (False, None): L43ReadPage(rows=(), next_cursor=None),
+            (None, None): proof.B2OrderReadPage(rows=(), next_cursor="next"),
+            (True, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
+            (False, None): proof.B2OrderReadPage(rows=(), next_cursor=None),
         }
     )
 
-    assert _run(repeated).reason == "ALL_BEFORE_CURSOR_REPEATED"
+    assert _run(repeated).reason == "CURSOR_REPEATED"
     monkeypatch.setattr(proof, "_MAX_PAGES", 1)
-    assert _run(incomplete).reason == "ALL_BEFORE_PAGINATION_INCOMPLETE"
+    assert _run(incomplete).reason == "PAGINATION_INCOMPLETE"
 
 
 def test_account_and_source_mismatch_fail_closed_without_order_reads() -> None:
@@ -433,10 +487,10 @@ def test_source_changes_during_four_read_window_fail_closed() -> None:
 @pytest.mark.parametrize(
     ("fail_at", "expected_reason"),
     (
-        (1, "ALL_BEFORE_READ_EXCEPTION"),
-        (2, "TRUE_READ_EXCEPTION"),
-        (3, "FALSE_READ_EXCEPTION"),
-        (4, "ALL_AFTER_READ_EXCEPTION"),
+        (1, "TRANSPORT_TOOL_DISPATCH_FAILURE"),
+        (2, "TRANSPORT_TOOL_DISPATCH_FAILURE"),
+        (3, "TRANSPORT_TOOL_DISPATCH_FAILURE"),
+        (4, "TRANSPORT_TOOL_DISPATCH_FAILURE"),
     ),
 )
 def test_provider_read_exception_at_each_stage_fails_closed(

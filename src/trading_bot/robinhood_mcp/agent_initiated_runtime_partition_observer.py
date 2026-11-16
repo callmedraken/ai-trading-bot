@@ -24,9 +24,13 @@ from typing import Protocol
 
 from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
 from trading_bot.robinhood_mcp.agent_initiated_runtime_partition_proof import (
+    B2_PROOF_CONTRACT_VERSION,
     AgentInitiatedLogicalReadEvidence,
     AgentInitiatedRuntimePartitionProofResult,
     AgentInitiatedRuntimePartitionProofStatus,
+    B2CompatibilityFailure,
+    B2FailureReason,
+    is_b2_failure_reason,
     prove_agent_initiated_partition,
 )
 from trading_bot.robinhood_mcp.l43_read_adapter import (
@@ -45,7 +49,7 @@ from trading_bot.robinhood_mcp.order_scope_schema_observer import (
 
 _OBSERVATION_SCHEMA = "arch147-agent-initiated-runtime-partition-observation/v1"
 _OBSERVATION_NAME = "ARCH147_L43_AGENT_INITIATED_RUNTIME_PARTITION_OBSERVER"
-_PROOF_CONTRACT_VERSION = "ARCH147_L43_B2_AGENT_INITIATED_RUNTIME_PARTITION/v1"
+_PROOF_CONTRACT_VERSION = B2_PROOF_CONTRACT_VERSION
 _CANONICAL_WORKTREE = Path(r"F:\AI\worktrees\ai-trading-bot-live-prototype-current")
 _EVIDENCE_ROOT = Path(r"F:\AI\temp")
 _EXPECTED_ORIGIN = "https://github.com/callmedraken/ai-trading-bot.git"
@@ -144,8 +148,8 @@ class _ToolsListClient(Protocol):
     async def call_tool(self, name: str, arguments: Mapping[str, object]) -> object: ...
 
 
-class _B2ReadError(RuntimeError):
-    """Internal fixed diagnostic; provider text never crosses the boundary."""
+class _B2ReadError(B2CompatibilityFailure):
+    """Compatibility alias for the closed B2 failure taxonomy."""
 
 
 class RobinhoodB2ReadTransport:
@@ -191,26 +195,28 @@ class RobinhoodB2ReadTransport:
         self, arguments: Mapping[str, object]
     ) -> Mapping[str, object]:
         if not isinstance(arguments, Mapping):
-            raise _B2ReadError("ORDER_ARGUMENTS_INVALID")
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         return self._invoke("get_equity_orders", arguments)
 
     def _invoke(
         self, name: str, arguments: Mapping[str, object]
     ) -> Mapping[str, object]:
         if name not in _TOOLS:
-            raise _B2ReadError("READ_TOOL_REJECTED")
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             pass
         else:
-            raise _B2ReadError("READ_EVENT_LOOP_REJECTED")
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         try:
             return asyncio.run(self._request(name, dict(arguments)))
         except _B2ReadError:
             raise
         except Exception:
-            raise _B2ReadError("READ_REQUEST_FAILED") from None
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
 
     async def _request(
         self, name: str, arguments: dict[str, object]
@@ -226,7 +232,9 @@ class RobinhoodB2ReadTransport:
             from mcp import Client
             from mcp.client.streamable_http import streamable_http_client
         except ImportError:
-            raise _B2ReadError("MCP_DEPENDENCY_UNAVAILABLE") from None
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
 
         self._attempts.oauth_scope_entry_attempts += 1
         self._dispatch_state.started = True
@@ -247,23 +255,25 @@ class RobinhoodB2ReadTransport:
         await self._require_b2_tools(client)
         if name == "get_accounts":
             if arguments:
-                raise _B2ReadError("ACCOUNT_ARGUMENTS_INVALID")
+                raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
             self._attempts.account_read_attempts += 1
         elif name == "get_equity_orders":
             self._attempts.order_read_attempts += 1
         else:
-            raise _B2ReadError("READ_TOOL_REJECTED")
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         self._attempts.mcp_tool_invocation_attempts += 1
         self._dispatch_state.started = True
         try:
             result = await client.call_tool(name, arguments)
         except Exception:
-            raise _B2ReadError("READ_DISPATCH_FAILED") from None
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
         if getattr(result, "is_error", None) is not False:
-            raise _B2ReadError("READ_RESULT_INVALID")
+            raise _B2ReadError(B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE)
         payload = getattr(result, "structured_content", None)
         if not isinstance(payload, Mapping):
-            raise _B2ReadError("READ_RESULT_INVALID")
+            raise _B2ReadError(B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE)
         return dict(payload)
 
     async def _require_b2_tools(self, client: _ToolsListClient) -> None:
@@ -275,15 +285,17 @@ class RobinhoodB2ReadTransport:
             try:
                 listing = await client.list_tools(cursor=cursor)
             except Exception:
-                raise _B2ReadError("TOOLS_LIST_FAILED") from None
+                raise _B2ReadError(
+                    B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+                ) from None
             self._attempts.tools_list_pages_received += 1
             tools = getattr(listing, "tools", None)
             if not isinstance(tools, Sequence) or isinstance(tools, (str, bytes)):
-                raise _B2ReadError("TOOLS_LIST_INVALID")
+                raise _B2ReadError(B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE)
             for tool in tools:
                 name = getattr(tool, "name", None)
                 if type(name) is not str or not name:
-                    raise _B2ReadError("TOOLS_LIST_INVALID")
+                    raise _B2ReadError(B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE)
                 if name in _TOOLS:
                     advertised.add(name)
             next_cursor = getattr(listing, "next_cursor", None)
@@ -295,13 +307,13 @@ class RobinhoodB2ReadTransport:
                 or len(next_cursor) > _MAX_CURSOR_LENGTH
                 or next_cursor in seen
             ):
-                raise _B2ReadError("TOOLS_LIST_CURSOR_INVALID")
+                raise _B2ReadError(B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE)
             seen.add(next_cursor)
             cursor = next_cursor
         else:
-            raise _B2ReadError("TOOLS_LIST_BOUND_EXCEEDED")
+            raise _B2ReadError(B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE)
         if advertised != _TOOLS:
-            raise _B2ReadError("B2_READ_CAPABILITY_MISSING")
+            raise _B2ReadError(B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE)
 
 
 class RobinhoodAgentInitiatedRuntimePartitionObserver:
@@ -479,7 +491,7 @@ def _run_production_session(
 
     def launch_browser(url: str) -> object:
         if attempts.browser_launch_attempts >= 1:
-            raise _B2ReadError("BROWSER_FLOW_LIMIT")
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         attempts.browser_launch_attempts += 1
         return webbrowser.open(url)
 
@@ -502,7 +514,7 @@ def _validate_proof_result(
         return None, "PROOF_RESULT_TYPE_INVALID"
     if not isinstance(result.status, AgentInitiatedRuntimePartitionProofStatus):
         return None, "PROOF_STATUS_INVALID"
-    if type(result.reason) is not str or _REASON.fullmatch(result.reason) is None:
+    if not is_b2_failure_reason(result.reason):
         return None, "PROOF_REASON_INVALID"
     if result.contract_version != _PROOF_CONTRACT_VERSION:
         return None, "PROOF_CONTRACT_INVALID"

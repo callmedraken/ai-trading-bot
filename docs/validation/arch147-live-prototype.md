@@ -1,85 +1,62 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## RHC3P corrective source checkpoint - exact-source acceptance pending
+## RHC3P post-effect normalization and pending-settlement correction — ACCEPTED / INTEGRATED
 
-RHC3 remains ACCEPTED / INTEGRATED as recorded below. The attempted RHC4
-production composition is `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`: it stopped
-before source implementation because the current L43 read path could not safely
-produce post-placement reconciliation facts for a newly bound order. There is
-no RHC4 commit, test run, admission, push, or CI result to preserve.
+RHC3P is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final corrective HEAD `26e168f15747345e25c550a2d76ccac8f4adaa0b` / tree `3ef5dba7eba54f892269ddb59aea48b297208ecd`.
 
-RHC3P is the additive Architecture 147 source-only / fake-only correction.
-Its exact-source acceptance and integration are pending. RHC3P does not modify
-the accepted RHC3 source or the consumed A2/RHC2 evidence. No provider
-observation, real review, or other protected action occurred or is authorized.
+The first publication `6503ee1088d7532bc2f77dc0fe16bbf1dc52dab8` / tree `e12ebc4b863669b83236e66640a39c9454d8ffb1` and mapped FULL run `44062318005`, attempt 1, remain preserved terminal SUCCESS. Independent exact-source review found a lifecycle gap before integration: a newly bound order could be observed as WORKING/PARTIAL, but no later read-only path could advance that durable state to eventual terminal broker facts; additionally a known WORKING SELL was being converted to UNKNOWN/manual-close.
 
-### Pre-effect and post-effect order policy
+Corrective C1 commit `26e168f15747345e25c550a2d76ccac8f4adaa0b` changed only:
+- `src/trading_bot/live_prototype/l43_effect_operator.py`;
+- `src/trading_bot/live_prototype/l43_post_effect_reconciler.py`;
+- `tests/live_prototype/test_l43_effect_operator.py`;
+- `tests/live_prototype/test_l43_post_effect_reconciler.py`.
 
-The existing pre-effect policy remains unchanged. It blocks unresolved or
-unknown SPY orders and post-entry conflicting unrelated SPY rows. Older
-unrelated terminal history may pass the existing pre-effect policy. This is
-distinct from the new post-effect interpretation: post-effect reconciliation
-uses the exhaustive RHC3-proven, unfiltered account-and-SPY order universe and
-blocks on any unrelated row, including an otherwise terminal historical row.
-The additive post-effect path does not grant permission to begin another effect
-while an order is working or unknown.
+C1 mapped FULL run `44073855992`, attempt 1, is terminal SUCCESS with source-static, active-tests, all seven canonical FULL lanes and source-gates passing. Develop run `44152192296`, attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and `IDENTITY_STABLE=True`; active/FULL work was skipped, so there was no duplicate broad develop certification.
 
-Post-effect reconciliation requires the exact bound provider ID once, SPY,
-`agent_initiated=true`, matching durable kind/provider side, and the exact
-market / regular-hours / GFD / immediate contract. Unknown states, malformed
-or duplicate executions, duplicate or missing bound orders, fill regression,
-position mismatch, incomplete pagination, or missing/tampered RHC3 scope proof
-fail closed. Fills and cumulative notional come only from unique positive
-execution facts; the broker position must equal baseline plus confirmed entry
-buys minus confirmed exit sells before complete-order evidence is returned.
+### Accepted factual-read split
 
-A dollar ENTRY has no source-owned requested share quantity. Provider
-`requested_quantity` may be absent or vary, is not an identity or ownership
-fact, and its durable `working_remainder` is always zero. The durable dollar
-reservation remains consumed in full while only confirmed shares become owned.
-EXIT continues to require the exact provider requested quantity and exact
-positive active remainder; no replacement sell is authorized. Historical
-durable journal replay accepts previously valid nonzero ENTRY remainder records
-without rewriting them, while every new ENTRY observation requires zero
-remainder. An active ENTRY remains non-ready through its unresolved status and
-pending identity independently of remainder.
+The same shared broker-read kernel owns canonical account, SPY position, exhaustive unfiltered account+SPY orders, bounded pagination, and the RHC3 account-wide-all-agents proof.
 
-### Accepted review semantic and clean fake response
+Pre-effect interpretation remains strict. Unresolved/unknown orders and conflicting post-entry SPY activity block new effects.
 
-The accepted L41R6 source-owned official claim is
-`REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS`. It states that
-`review_equity_order` simulates an equity order and returns pre-trade warnings,
-while `place_equity_order` is separately described as placing the order.
-L41R6 records `REVIEW_PREVIEW_ONLY=PROVEN` with rationale
-`L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN`. This proves nonplacing semantics only;
-it does not prove account-specific response success or placement success. The
-production normalizer must resolve and authenticate this exact claim at use
-time and fail closed when it cannot.
+Post-effect reconciliation/settlement is additive and stricter about exact ownership. It requires exact durable provider bindings, exact SPY side/type/session/time-in-force/trigger facts, `agent_initiated=true`, unique execution IDs, execution-derived cumulative quantity/notional, monotonic fills, complete durable order coverage, no unrelated SPY order, and exact broker-position agreement.
 
-RHC3P's only clean response is fake test material. It has a successful
-structured result (`is_error=false`) with a root containing exactly `data`.
-The data contains only `market_data_disclosure` (optional string/null),
-`order_checks`, `quantity`, `quote_data`, `side`, `symbol`, and `type`; it echoes
-the exact proposed full-owned quantity, `side=sell`, `symbol=SPY`, and
-`type=market`; and `order_checks` is an empty mapping. Its complete `quote_data`
-key set is `adjusted_previous_close`, `ask_price`, `bid_price`, `has_traded`,
-`last_non_reg_trade_price`, `last_trade_price`, `previous_close`,
-`previous_close_date`, `state`, `symbol`, `venue_ask_time`, `venue_bid_time`,
-`venue_last_non_reg_trade_time`, and `venue_last_trade_time`. The parsed quote
-is SPY, active, traded, has valid prices/timestamps, and supplies a positive
-sell-side reference. The proposal review arguments equal the exact intended
-placement arguments: account-scoped regular-hours SPY sell, market, GFD, and
-the same full-owned quantity. Only this clean fake response normalizes to
-`AFFIRMATIVE / NONPLACING_PREVIEW`, meaning no identified pre-trade warning
-for that exact proposal. It is neither placement success nor reusable
-placement authority. No real review call is authorized in RHC3P.
+### Dollar ENTRY and exact EXIT
 
-RHC3P has performed zero provider, OAuth, browser, MCP, account, position,
-order, review, placement, cancellation, or Alpaca operations. L43 protected
-qualification and Q63 remain NOT_RUN; `FINAL_HOLDOUT` remains SEALED. RHC4 may
-resume only after RHC3P exact-source acceptance, integration, and
-coordination-document synchronization. The RHC4 executable-wiring milestone
-remains future work.
+A dollar ENTRY has no source-owned requested share quantity. Its durable share remainder is always zero; requested USD remains the one-time reservation authority, while only execution-confirmed shares become owned.
+
+EXIT remains bound to exact requested shares. Working/partial remainder is exact requested minus cumulative fill; FILLED must equal the full exact request.
+
+Historical durable replay compatibility for previously valid ENTRY remainder records is preserved; new ENTRY observations use the corrected zero-remainder contract.
+
+### Repeatable read-only settlement
+
+C1 adds settlement for an already-bound durable ENTRY or EXIT in WORKING/PARTIAL state.
+
+The settlement path:
+- accepts no detached effect plan;
+- uses the provider ID already stored in durable state;
+- requires canonical Q62 origin and current accepted source continuity;
+- reuses the same exhaustive RHC3-proven broker read;
+- can only persist monotonic factual reconciliation;
+- does not obtain a new exact-plan authorization;
+- does not call review/place/cancel;
+- does not retry the original write.
+
+ENTRY can converge across later reads from WORKING/PARTIAL to terminal facts without another placement. A known WORKING SELL remains `SELL_PENDING`; it is not marked UNKNOWN simply because it is still open. Later FILLED reconciles normally. Later PARTIAL/CANCELED/REJECTED with confirmed residual enters the existing sticky manual-close contract, and no replacement sell is authorized.
+
+Read failure leaves the last exact durable facts intact and blocked. Ordinary pre-effect admission remains closed while settlement is pending.
+
+### Review semantic
+
+The accepted L41R6 source-owned official claim `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS` continues to prove only the nonplacing review semantic. A clean exact runtime response may normalize to `AFFIRMATIVE / NONPLACING_PREVIEW` only under the strict RHC3P response contract; this is neither placement success nor placement authority.
+
+### Boundaries
+
+RHC3P/C1 performed no real provider/OAuth/browser/MCP/read/review/place/cancel/Alpaca action. RHC2 remains CONSUMED / PASS / NO RETRY. RHC3 retained evidence is unchanged. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED.
+
+The earlier RHC4 attempt remains historical `NOT_RUN / STOPPED_PRE_IMPLEMENTATION` with no source commit. Its post-placement normalization blocker is closed by accepted RHC3P. RHC4 production composition may resume only after this acceptance closeout and final remote/local/docs synchronization.
 
 ## L43 schema-only order-scope observation — CONSUMED / UNPROVEN / NO RETRY
 

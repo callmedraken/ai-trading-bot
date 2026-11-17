@@ -1,24 +1,28 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC3 ACCEPTED / INTEGRATED; RHC3P corrective source pending
+## Current milestone - RHC3P ACCEPTED / INTEGRATED; RHC4 production composition next
 
-RHC3 remains ACCEPTED / INTEGRATED at `13f1b7ba953011bf4476a25378467739b2c54c97` / tree `d71836119976d8484b97db95ea182ae1a77437b8`. Feature mapped FULL run `44040948021`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven canonical FULL lanes passed. Develop then fast-forwarded to the exact accepted source; develop run `44042374626`, attempt 1, was terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`. Active tests and FULL were skipped on develop, so no duplicate broad certification ran.
+RHC3P is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final corrective HEAD `26e168f15747345e25c550a2d76ccac8f4adaa0b` / tree `3ef5dba7eba54f892269ddb59aea48b297208ecd`. Its direct parent `6503ee1088d7532bc2f77dc0fe16bbf1dc52dab8` remains preserved as the first RHC3P publication; exact-source review required the C1 pending-order convergence correction before integration.
 
-RHC4 production composition is `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`. No RHC4 source, test run, admission, push, or CI result exists. The stop identified that the current L43 read path cannot safely produce post-placement reconciliation facts for a newly bound order. RHC3P is the additive source-only / fake-only corrective checkpoint; exact-source acceptance and integration are pending.
+The final feature mapped FULL run is `44073855992`, attempt 1, terminal SUCCESS. Source-static, active-tests, source-gates, and all seven canonical FULL lanes passed. The superseded first RHC3P run `44062318005`, attempt 1, also remains preserved terminal SUCCESS and was not rerun.
 
-RHC3 reauthenticates the fixed consumed A2/RHC2 evidence chain at proof time and permits the production pre-effect verifier to emit `ACCOUNT_WIDE_ALL_AGENTS` only for the exact canonical-Q62-bound unfiltered SPY order query with bounded exhausted pagination and valid current counts. The historical A2/RHC2 records themselves remain immutable review-only evidence and are never retried. This closes the `ORDER_SCOPE_UNPROVEN` prerequisite only when the exact admitted evidence remains present and valid; it grants no review, placement, cancellation, Q63, or other live-effect authority.
+Develop fast-forwarded to the exact accepted final source. Develop run `44152192296`, attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and `IDENTITY_STABLE=True`. Active tests and FULL were skipped on develop, so no duplicate broad certification ran.
 
-RHC3P preserves the pre-effect gate: unresolved or unknown SPY orders and post-entry conflicting unrelated SPY rows block, while older terminal history may pass the existing pre-effect policy. The additive post-effect matcher is stricter: any unrelated row in the exhaustive RHC3-proven order universe blocks reconciliation. It does not broaden pre-effect eligibility.
+RHC3P now separates strict pre-effect admission from repeatable read-only settlement of an already-bound order. The same canonical Q62-bound, exhaustive unfiltered account+SPY read kernel and RHC3 `ACCOUNT_WIDE_ALL_AGENTS` proof are reused. A known ENTRY or SELL in `WORKING` / `PARTIAL` can converge later through factual reads only; settlement cannot review, place, cancel, retry, acquire a new effect authorization, or change the stored provider binding. Working/partial state still blocks new effects.
 
-The accepted L41R6 source-owned claim `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS` already proves that `review_equity_order` simulates an equity order and returns pre-trade warnings, while `place_equity_order` is described separately as placing an order. Its `REVIEW_PREVIEW_ONLY` fact is `PROVEN / L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN`; this proves nonplacing semantics, not an instance response or placement success. RHC3P's clean response fixture is fake-only: a successful structured result with the exact `data` envelope, exact SPY sell / market / full-owned quantity echo, structurally complete matching SPY quote data, and an empty `order_checks` mapping. It normalizes to `AFFIRMATIVE / NONPLACING_PREVIEW` only for matching review and placement arguments. No real review call or provider observation occurred or is authorized in RHC3P.
+Dollar ENTRY retains the exact USD reservation while its source-owned share remainder remains zero. EXIT retains exact requested-share and residual semantics. Fill quantities/notional remain execution-derived, fill regression fails closed, unrelated SPY rows fail closed, and broker position must equal durable owned fills before settlement facts are accepted.
 
-The three pinned A2/RHC2 files under `F:\AI\temp` remain runtime prerequisites for the narrow RHC3 proof. Missing, moved, linked/reparsed, modified, malformed, or hash-mismatched evidence fails closed back to `ORDER_SCOPE_UNPROVEN`. Preserve these exact artifacts and include them in Q63 backup/restore and delivery custody.
+A known `WORKING` SELL remains known-working as `SELL_PENDING`; it is not coerced to UNKNOWN merely because it has not filled yet. Later FILLED reconciles normally. Later PARTIAL/CANCELED/REJECTED with confirmed residual enters the existing sticky manual-close path with no replacement sell.
 
-RHC3P has performed no provider, OAuth, browser, MCP, account, position, order, review, placement, cancellation, or Alpaca operation. L43 protected qualification remains NOT_RUN; Q63 remains NOT_RUN and `FINAL_HOLDOUT` remains SEALED.
+The accepted L41R6 `REVIEW_PREVIEW_ONLY` official-rule binding remains the source-owned semantic authority for nonplacing sell review. RHC3P grants no review or placement authority by itself.
+
+RHC4 remains `NOT_RUN / STOPPED_PRE_IMPLEMENTATION` historically; no RHC4 source exists yet. Its prior stop is closed as a source-contract blocker by accepted RHC3P. The immediate next source milestone is the source-only/fake-only production L43 composition and explicit live desktop wiring checkpoint. That checkpoint must keep production exact-plan effect authority closed by default and must perform zero real Robinhood/Alpaca effects.
+
+RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained evidence remains immutable and operationally required. L43 protected qualification remains NOT_RUN; Q63 remains NOT_RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Review the exact RHC3P source and mapped FULL evidence. RHC4 resumes after RHC3P acceptance, integration, and coordination-document synchronization. L43 protected qualification remains NOT_RUN; Q63 remains NOT_RUN and `FINAL_HOLDOUT` remains SEALED.
+Resume RHC4 from the final canonical post-closeout HEAD after remote/local/docs synchronization. RHC4 must compose the already-accepted pre-effect reader, RHC3 order-scope proof, RHC3P post-effect settlement, durable L43 state, effect operator/transport seams, runtime signal input, and a production exact-plan authorization seam behind an explicit live desktop service while remaining SOURCE_ONLY / FAKE_ONLY. No protected execution is authorized by this transition.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

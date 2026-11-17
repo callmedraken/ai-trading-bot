@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC3P ACCEPTED / INTEGRATED; RHC4 production composition next
+## Current milestone - RHC4 source checkpoint / independent acceptance pending
 
 RHC3P is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final corrective HEAD `26e168f15747345e25c550a2d76ccac8f4adaa0b` / tree `3ef5dba7eba54f892269ddb59aea48b297208ecd`. Its direct parent `6503ee1088d7532bc2f77dc0fe16bbf1dc52dab8` remains preserved as the first RHC3P publication; exact-source review required the C1 pending-order convergence correction before integration.
 
@@ -16,13 +16,15 @@ A known `WORKING` SELL remains known-working as `SELL_PENDING`; it is not coerce
 
 The accepted L41R6 `REVIEW_PREVIEW_ONLY` official-rule binding remains the source-owned semantic authority for nonplacing sell review. RHC3P grants no review or placement authority by itself.
 
-RHC4 remains `NOT_RUN / STOPPED_PRE_IMPLEMENTATION` historically; no RHC4 source exists yet. Its prior stop is closed as a source-contract blocker by accepted RHC3P. The immediate next source milestone is the source-only/fake-only production L43 composition and explicit live desktop wiring checkpoint. That checkpoint must keep production exact-plan effect authority closed by default and must perform zero real Robinhood/Alpaca effects.
+The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live desktop service and launcher mode, and a serialized runtime lifecycle. The default production exact-plan authorizer denies. Start is lifecycle only. A bound pending ENTRY or SELL is settled through the accepted read-only RHC3P path before a new effect is evaluated. Construction, import and help remain effect-free. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
+
+RHC4 remains SOURCE_ONLY / FAKE_ONLY. The existing prototype route owns its mapped feature FULL. Terminal certification and independent exact-source acceptance remain pending. No real Robinhood, OAuth, MCP, Alpaca, review, placement or cancellation action occurred for this source checkpoint. It grants no broker-effect authority or readiness.
 
 RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained evidence remains immutable and operationally required. L43 protected qualification remains NOT_RUN; Q63 remains NOT_RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Resume RHC4 from the final canonical post-closeout HEAD after remote/local/docs synchronization. RHC4 must compose the already-accepted pre-effect reader, RHC3 order-scope proof, RHC3P post-effect settlement, durable L43 state, effect operator/transport seams, runtime signal input, and a production exact-plan authorization seam behind an explicit live desktop service while remaining SOURCE_ONLY / FAKE_ONLY. No protected execution is authorized by this transition.
+The existing `arch147-live-prototype` route requires `ops.ps1 admit` on the exact clean source before its single ordinary push. After push, the mapped feature FULL must reach terminal state. ChatGPT then performs exact-source review and acceptance. No protected L43 qualification, Q63, provider observation or broker effect is part of this source checkpoint.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

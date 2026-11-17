@@ -13,7 +13,7 @@ from scripts.source_authority import current_owner
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
 
-_L41_IMPORT_ALLOWLIST = {
+_PRODUCTION_IMPORT_ALLOWLIST = {
     "src/trading_bot/live_prototype/capability_operator.py": {
         ("import", "subprocess", None),
         (
@@ -96,6 +96,43 @@ _L41_IMPORT_ALLOWLIST = {
         ("from", "mcp", "Client"),
         ("from", "mcp.client.streamable_http", "streamable_http_client"),
     },
+    "src/trading_bot/live_prototype/l43_runtime.py": {
+        (
+            "from",
+            "trading_bot.robinhood_mcp.l43_production_composition",
+            "DEFAULT_ROBINHOOD_REDIRECT_URI",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.l43_production_composition",
+            "L43ProductionPreEffectComposition",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.l43_transport",
+            "L43RobinhoodTransport",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.order_scope_evidence_admission",
+            "OrderScopeEvidenceAuthority",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.order_scope_evidence_admission",
+            "load_order_scope_evidence_authority",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp._current_session",
+            "_open_robinhood_client",
+        ),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.windows_oauth",
+            "create_windows_robinhood_oauth_factory",
+        ),
+    },
 }
 _FORBIDDEN_PRODUCTION_IMPORTS = (
     "robinhood_mcp",
@@ -118,7 +155,7 @@ def _production_imports(path: str, tree: ast.AST) -> list[tuple[str, str, str | 
             )
         elif isinstance(node, ast.Import):
             records.extend(("import", alias.name, alias.asname) for alias in node.names)
-    allowed = _L41_IMPORT_ALLOWLIST.get(path, set())
+    allowed = _PRODUCTION_IMPORT_ALLOWLIST.get(path, set())
     return [
         record
         for record in records
@@ -501,6 +538,72 @@ def test_rhc3p_reconciliation_and_transport_are_prototype_owned():
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_rhc4_runtime_composition_and_restricted_live_mode_are_prototype_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    registry = runner._checkpoint_specs()
+    spec = registry[runner.ARCH147_PROTOTYPE_NAME]
+    source_tests = (
+        (
+            "src/trading_bot/live_prototype/l43_runtime.py",
+            "tests/live_prototype/test_l43_runtime.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/l43_pre_effect_observation.py",
+            "tests/live_prototype/test_l43_pre_effect_observation.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/restricted_live_application_service.py",
+            "tests/live_prototype/test_restricted_live_application.py",
+        ),
+        (
+            "scripts/run_live_prototype.py",
+            "tests/live_prototype/test_launcher.py",
+        ),
+    )
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+    ruff_paths = runner.ARCH147_PROTOTYPE_RUFF
+
+    def ruff_ownership_count(source: str) -> int:
+        return sum(
+            path == source
+            or ((root / path).is_dir() and source.startswith(path.rstrip("/") + "/"))
+            for path in ruff_paths
+        )
+
+    assert spec.tests == runner.ARCH147_PROTOTYPE_TESTS
+    assert spec.ruff_paths == runner.ARCH147_PROTOTYPE_RUFF
+    assert spec.preflight is runner._arch147_l43_a3_preflight
+    assert spec.execute is None
+    assert spec.remote_head_env is None
+    assert spec.remote_branch == runner.ARCH147_PROTOTYPE_BRANCH
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(spec.name) == 1
+    assert (
+        sum(
+            item.remote_branch == runner.ARCH147_PROTOTYPE_BRANCH
+            for item in registry.values()
+        )
+        == 1
+    )
+    assert (
+        runner.resolve_ci_checkpoint(registry, runner.ARCH147_PROTOTYPE_BRANCH, "push")
+        == spec.name
+    )
+    assert runner.ARCH147_PROTOTYPE_RUFF.count("src/trading_bot/live_prototype") == 1
+
+    for source, test in source_tests:
+        assert (root / source).is_file()
+        assert (root / test).is_file()
+        assert ruff_ownership_count(source) == 1
+        assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+        assert spec.tests.count(test) == 1
+        assert full.count(test) == 1
+        assert inventory.count(test) == 1
+        assert test not in runner.ARCH147_RHC2_TESTS
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_tiny_live_pivot_source_test_pairs_are_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     pairs = (
@@ -594,7 +697,7 @@ def test_prototype_rejects_effectful_dispatch_without_invoking_it(monkeypatch):
     assert calls == []
 
 
-def test_new_application_has_no_production_transport_or_dynamic_dispatch():
+def test_live_prototype_imports_are_allowlisted_and_use_no_dynamic_dispatch():
     root = Path(runner.__file__).resolve().parents[1]
     paths = tuple((root / "src/trading_bot/live_prototype").glob("*.py")) + (
         root / "scripts/run_live_prototype.py",

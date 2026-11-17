@@ -1,4 +1,4 @@
-"""Effect-free help and explicit isolated synthetic desktop launcher."""
+"""Effect-free help and explicit synthetic or restricted-live desktop launcher."""
 
 from __future__ import annotations
 
@@ -12,11 +12,22 @@ def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(
         description="Isolated synthetic trading research desktop"
     )
-    result.add_argument(
+    modes = result.add_mutually_exclusive_group()
+    modes.add_argument(
         "--synthetic", action="store_true", help="use fakes only; no live transport"
     )
+    modes.add_argument(
+        "--restricted-live",
+        action="store_true",
+        help=(
+            "run the canonical restricted-live runtime; Start grants no "
+            "effect authority"
+        ),
+    )
     result.add_argument(
-        "--state-root", type=Path, help="fresh absolute external F: directory"
+        "--state-root",
+        type=Path,
+        help="fresh absolute external F: directory for synthetic mode only",
     )
     result.add_argument(
         "--comparison-report",
@@ -55,10 +66,26 @@ def prepare_state_root(
 
 def main(argv: list[str] | None = None) -> int:
     arguments = parser().parse_args(argv)
+    if arguments.restricted_live:
+        if arguments.state_root is not None:
+            parser().error("--state-root is synthetic-only; live state is source-owned")
+        if (
+            arguments.comparison_report is not None
+            and not arguments.comparison_report.is_absolute()
+        ):
+            parser().error("comparison report path must be absolute")
+        root = Path(__file__).resolve().parents[1]
+        sys.path.insert(0, str(root / "src"))
+        from trading_bot.live_prototype.application import main as application_main
+
+        desktop_arguments = ["--mode", "RESTRICTED_LIVE"]
+        if arguments.comparison_report is not None:
+            desktop_arguments.extend(
+                ("--comparison-report", str(arguments.comparison_report))
+            )
+        return application_main(desktop_arguments)
     if not arguments.synthetic or arguments.state_root is None:
-        parser().error(
-            "--synthetic and --state-root are required; live mode is unavailable"
-        )
+        parser().error("choose --synthetic with --state-root or --restricted-live")
     if (
         arguments.comparison_report is not None
         and not arguments.comparison_report.is_absolute()

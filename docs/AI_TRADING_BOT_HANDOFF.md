@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC3P ACCEPTED / INTEGRATED; RHC4 production composition next
+## Current milestone: RHC4 source checkpoint / independent acceptance pending
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -58,16 +58,17 @@ RHC3P and C1 are source-only/fake-only. They performed zero OAuth, browser, MCP,
 
 RHC2 remains `CONSUMED / PASS / NO RETRY`.
 RHC3 remains accepted/integrated and its retained evidence remains immutable.
-RHC4 has no implementation yet and historically remains `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`.
+The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live application service and launcher mode, and a serialized runtime lifecycle. The production exact-plan authorizer denies by default. Start/Stop control worker lifecycle only. An existing bound pending ENTRY/SELL is settled through read-only RHC3P convergence before a new effect is evaluated. Construction, import and help perform no provider action. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
+
+RHC4 remains SOURCE_ONLY / FAKE_ONLY. The existing prototype route owns the mapped feature FULL. Terminal certification and independent exact-source acceptance are pending. No real Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for this source checkpoint. It does not grant effect authority or live readiness.
+Focused fake-only tests, current/historical authority, both source-context selections, whole-repository Ruff, and diff checks passed. Exact commands and basetemps are recorded in the [validation ledger](validation/arch147-live-prototype.md#rhc4-focused-and-pre-candidate-verification).
 L43 protected qualification remains NOT_RUN.
 Q63 remains NOT_RUN.
 `FINAL_HOLDOUT` remains SEALED.
 
-## Next source milestone
+## RHC4 source checkpoint and next gate
 
-Resume RHC4 only from the final synchronized post-closeout Git identity.
-
-RHC4 should be one coherent SOURCE_ONLY / FAKE_ONLY production-composition checkpoint that:
+The checkpoint is prepared from the synchronized RHC3P baseline at `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` / tree `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`. It uses the existing `arch147-live-prototype` feature push route and its mapped FULL. No RHC4 branch or protected execute route is added. The implementation:
 - composes canonical Q62/RHC3 read authority and RHC3P repeatable settlement;
 - reuses the existing durable L43 state/session owner;
 - reuses the existing L43 effect operator and Robinhood effect transport rather than duplicating business logic;
@@ -77,7 +78,7 @@ RHC4 should be one coherent SOURCE_ONLY / FAKE_ONLY production-composition check
 - keeps Start/Stop lifecycle distinct from effect authorization;
 - performs no real provider effect in the source checkpoint.
 
-After RHC4 source acceptance/integration, the remaining protected path is bounded genuine L43 qualification followed by Q63 delivery/custody. No protected execution is authorized now.
+The existing route requires `ops.ps1 admit` on the exact clean source before its single ordinary push. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
 
 ## RHC3 production order-scope admission
 
@@ -97,24 +98,6 @@ At each current L43 proof request, the production verifier reauthenticates the e
 The historical RHC2 field `production_order_scope_authority=NOT_GRANTED` remains unchanged; RHC3 is the separately source-reviewed consumer that grants only this narrow pre-effect order-scope prerequisite. It does not grant review/place/cancel authority or any generic live-effect permission.
 
 The three pinned evidence files are now operational runtime dependencies. Do not clean, move, rewrite, regenerate, or replace them. Q63 must include their exact custody, backup/restore and hash verification in the final delivery package. Loss or mutation is fail-closed availability loss, not authority to recreate evidence.
-
-## RHC4 resume boundary
-
-RHC4 remains `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`. Resume its implementation
-only after RHC3P exact-source acceptance, integration, and coordination-document
-synchronization. When that boundary is met, implement one coherent
-source-only/fake-only production-composition checkpoint for the remaining
-runnable-bot gap. Reuse existing accepted components rather than reopening
-Robinhood semantics:
-
-- compose canonical Q62/RHC3 read authority, L43 durable state, current Robinhood read transport, L43 effect operator/transport seams, Alpaca runtime signal input and exact authorizer behind one production composition;
-- add an explicit live application/service mode and launcher path instead of the current permanently `REAL_DISARMED` / synthetic-only startup;
-- keep construction/help effect-free and keep Start/Stop serialized;
-- preserve no-retry/UNKNOWN handling, exact ownership, <=$10 requested acquisition limit and exact-owned reducing exits;
-- source/fake tests only for this checkpoint: no real Robinhood/OAuth/browser/MCP/review/place/cancel action;
-- do not authorize L43 real qualification, Q63 or `FINAL_HOLDOUT` as part of the source checkpoint.
-
-After exact-source acceptance/integration of that composition, the remaining protected path is bounded genuine L43 qualification followed by Q63 delivery. Q63=NOT_RUN and `FINAL_HOLDOUT=SEALED`.
 
 ## L41R1 consumed observation and L41R2 source successor
 

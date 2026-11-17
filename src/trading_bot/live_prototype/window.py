@@ -1,4 +1,4 @@
-"""Five-page synthetic and real/disarmed composition over cached service state."""
+"""Five-page desktop composition over cached synthetic, disarmed, or live state."""
 
 from __future__ import annotations
 
@@ -48,8 +48,8 @@ class PrototypeWindow(QMainWindow):
         self._closing = False
         snapshot = service.snapshot()
         self._mode = mode if mode is not None else snapshot.mode
-        if self._mode not in ("SYNTHETIC", "REAL_DISARMED"):
-            raise ValueError("explicit synthetic or real/disarmed mode required")
+        if self._mode not in ("SYNTHETIC", "REAL_DISARMED", "RESTRICTED_LIVE"):
+            raise ValueError("explicit supported application mode required")
         if snapshot.mode != self._mode:
             raise ValueError("window mode must match the composed application service")
         self.setWindowTitle(f"Trading research prototype - {self._mode}")
@@ -108,6 +108,27 @@ class PrototypeWindow(QMainWindow):
         if self._mode == "SYNTHETIC":
             return
         page = self._pages[3]
+        if self._mode == "RESTRICTED_LIVE":
+            page.start_button.setText("Start restricted-live runtime")
+            page.start_button.setObjectName("sessionStartRestrictedLiveRuntime")
+            page.stop_button.setText("Stop restricted-live runtime")
+            page.stop_button.setObjectName("sessionStopRestrictedLiveRuntime")
+            for name, value in (
+                (
+                    "sessionScope",
+                    "Enable observation and read-only pending-order settlement.",
+                ),
+                ("sessionRequestHeading", "Restricted-live runtime lifecycle"),
+                (
+                    "sessionRequestNote",
+                    "Start and Stop control workers only; effect authority "
+                    "remains closed.",
+                ),
+            ):
+                label = page.findChild(QLabel, name)
+                if label is not None:
+                    label.setText(value)
+            return
         page.start_button.setText("Start disarmed workers")
         page.start_button.setObjectName("sessionStartDisarmedWorkers")
         page.stop_button.setText("Stop disarmed workers")
@@ -159,6 +180,24 @@ class PrototypeWindow(QMainWindow):
                 "Synthetic workspace | explicit worker start | live effects unavailable"
             )
             details = ("Source/configuration/evidence identity: synthetic workspace",)
+        elif self._mode == "RESTRICTED_LIVE":
+            status = getattr(snapshot, "restricted_live_status", None)
+            status_text = getattr(status, "value", "BLOCKED")
+            runtime = (
+                "ENABLED"
+                if getattr(snapshot, "restricted_live_enabled", False)
+                else "STOPPED"
+            )
+            diagnostic = (
+                getattr(snapshot, "restricted_live_reason_code", None) or "NOT_RUN"
+            )
+            self._banner.setText(
+                f"RESTRICTED_LIVE | runtime: {runtime} | status: {status_text} | "
+                f"effect authority: NOT GRANTED | readiness: BLOCKED | "
+                f"diagnostic: {diagnostic} | blockers: {reason_text}"
+            )
+            display_details = getattr(self._service, "display_details", None)
+            details = display_details() if callable(display_details) else ()
         else:
             ready = (
                 "READY"

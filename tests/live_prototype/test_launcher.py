@@ -1,3 +1,4 @@
+import importlib
 import os
 from pathlib import Path
 
@@ -11,9 +12,56 @@ def test_help_does_not_construct_gui_or_state(capsys):
     with pytest.raises(SystemExit) as result:
         main(["--help"])
     assert result.value.code == 0
-    assert "--synthetic" in capsys.readouterr().out
+    help_text = capsys.readouterr().out
+    assert "--synthetic" in help_text
+    assert "--restricted-live" in help_text
     with pytest.raises(SystemExit):
         main(["--live"])
+
+
+def test_launcher_import_and_help_do_not_compose_runtime(monkeypatch, capsys):
+    import scripts.run_live_prototype as launcher
+
+    from trading_bot.live_prototype import l43_runtime
+
+    calls = []
+
+    def build(_repo_root):
+        calls.append("built")
+        raise AssertionError("help must not compose the production runtime")
+
+    monkeypatch.setattr(l43_runtime, "build_production_l43_runtime", build)
+    importlib.reload(launcher)
+    with pytest.raises(SystemExit) as result:
+        launcher.main(["--help"])
+
+    assert result.value.code == 0
+    assert calls == []
+    assert "--restricted-live" in capsys.readouterr().out
+
+
+def test_restricted_live_routes_to_canonical_application_without_cli_state(
+    monkeypatch,
+):
+    from trading_bot.live_prototype import application
+
+    captured = []
+
+    def run_application(arguments):
+        captured.extend(arguments)
+        return 17
+
+    monkeypatch.setattr(application, "main", run_application)
+
+    assert main(["--restricted-live"]) == 17
+    assert captured == ["--mode", "RESTRICTED_LIVE"]
+
+
+def test_restricted_live_rejects_cli_state_and_modes_are_exclusive():
+    with pytest.raises(SystemExit):
+        main(["--restricted-live", "--state-root", "F:\\AI\\temp\\state"])
+    with pytest.raises(SystemExit):
+        main(["--restricted-live", "--synthetic"])
 
 
 def test_fresh_synthetic_state_only_and_no_reuse_or_source_write(tmp_path):

@@ -34,6 +34,7 @@ from trading_bot.live_prototype.l43_production_owner import (
     Q62JournalOrigin,
     SourceAuthorityEvidence,
 )
+from trading_bot.live_prototype.l43_provider_contracts import L43AccountIdentity
 from trading_bot.live_prototype.l43_state import (
     L43StateSession,
     read_l43_state_snapshot,
@@ -530,6 +531,31 @@ def test_flat_buy_returns_fresh_semantic_plan_without_reserving_or_authority(
     evidence = first.evidence_json.decode("ascii")
     assert _ACCOUNT_NUMBER not in evidence
     assert _ORDER_ID not in evidence
+
+
+def test_private_account_handoff_emits_only_for_validated_ready_result(
+    tmp_path: Path,
+):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    selected: list[object] = []
+
+    result = observer.observe_l43_pre_effect(
+        dependencies,
+        _account_identity_sink=selected.append,
+    )
+
+    assert (
+        result.outcome is observer.L43PreEffectOutcome.READY_FOR_L43_ENTRY_EFFECT_REVIEW
+    )
+    assert result.plan is not None
+    assert selected == [L43AccountIdentity(_ACCOUNT_NUMBER, _ACCOUNT.fingerprint)]
+    assert selected[0].account_fingerprint == result.plan.account_fingerprint
+    assert _ACCOUNT_NUMBER not in result.evidence_json.decode("ascii")
 
 
 @pytest.mark.parametrize(

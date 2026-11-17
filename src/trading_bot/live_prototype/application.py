@@ -1,4 +1,4 @@
-"""Explicit desktop composition for synthetic and real/disarmed modes."""
+"""Explicit desktop composition for synthetic, disarmed, and restricted-live modes."""
 
 from __future__ import annotations
 
@@ -16,6 +16,9 @@ if TYPE_CHECKING:
         ResearchWorker,
         RuntimeWorker,
     )
+    from trading_bot.live_prototype.restricted_live_application_service import (
+        RestrictedLiveApplicationService,
+    )
     from trading_bot.live_prototype.synthetic_service import (
         SyntheticApplicationService,
     )
@@ -24,6 +27,7 @@ if TYPE_CHECKING:
 class ApplicationMode(StrEnum):
     SYNTHETIC = "SYNTHETIC"
     REAL_DISARMED = "REAL_DISARMED"
+    RESTRICTED_LIVE = "RESTRICTED_LIVE"
 
 
 def compose_application_service(
@@ -32,11 +36,18 @@ def compose_application_service(
     identity: ApplicationIdentity | None = None,
     research_worker: ResearchWorker | None = None,
     runtime_worker: RuntimeWorker | None = None,
-) -> SyntheticApplicationService | RealDisarmedApplicationService:
-    """Construct only the explicitly selected, effect-disabled application mode."""
+) -> (
+    SyntheticApplicationService
+    | RealDisarmedApplicationService
+    | RestrictedLiveApplicationService
+):
+    """Construct only the explicitly selected desktop application mode."""
     from trading_bot.live_prototype.application_service import (
         ApplicationIdentity,
         RealDisarmedApplicationService,
+    )
+    from trading_bot.live_prototype.restricted_live_application_service import (
+        RestrictedLiveApplicationService,
     )
     from trading_bot.live_prototype.synthetic_service import SyntheticApplicationService
 
@@ -50,6 +61,24 @@ def compose_application_service(
         ):
             raise ValueError("synthetic mode does not accept real/disarmed inputs")
         return SyntheticApplicationService()
+    if mode is ApplicationMode.RESTRICTED_LIVE:
+        if (
+            identity is not None
+            or research_worker is not None
+            or runtime_worker is not None
+        ):
+            raise ValueError(
+                "restricted-live mode uses only canonical production inputs"
+            )
+        repo_root = Path(__file__).resolve().parents[3]
+        from trading_bot.live_prototype.l43_runtime import (
+            build_production_l43_runtime,
+        )
+
+        runtime = build_production_l43_runtime(repo_root)
+        return RestrictedLiveApplicationService(runtime=runtime)
+    if mode is not ApplicationMode.REAL_DISARMED:
+        raise ValueError("unsupported application mode")
     if type(identity) is not ApplicationIdentity:
         raise ValueError("real/disarmed mode requires exact source/config identity")
     return RealDisarmedApplicationService(
@@ -61,18 +90,26 @@ def compose_application_service(
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Five-page trading research prototype; all modes are disarmed"
+        description=(
+            "Five-page desktop prototype with explicit synthetic, real/disarmed, "
+            "and restricted-live modes"
+        )
     )
     parser.add_argument(
         "--mode",
         required=True,
         choices=tuple(mode.value for mode in ApplicationMode),
-        help="explicitly choose SYNTHETIC or REAL_DISARMED",
+        help="explicitly choose SYNTHETIC, REAL_DISARMED, or RESTRICTED_LIVE",
     )
     parser.add_argument("--source-head")
     parser.add_argument("--source-tree")
     parser.add_argument("--configuration-digest")
     parser.add_argument("--evidence-digest")
+    parser.add_argument(
+        "--comparison-report",
+        type=Path,
+        help="explicit descriptive comparison report, loaded on a worker",
+    )
     return parser
 
 
@@ -91,6 +128,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     identity: ApplicationIdentity | None = None
     if mode is ApplicationMode.REAL_DISARMED:
+        from trading_bot.live_prototype.application_service import ApplicationIdentity
+
         if any(value is None for value in identity_args[:3]):
             parser.error(
                 "REAL_DISARMED requires --source-head, --source-tree, and "
@@ -108,9 +147,26 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "source, configuration, and evidence identities must be digests"
             )
     elif any(value is not None for value in identity_args):
-        parser.error("identity arguments are accepted only in REAL_DISARMED mode")
+        parser.error(
+            "identity arguments are accepted only in REAL_DISARMED mode; "
+            "restricted-live identity is source-owned"
+        )
+    if (
+        arguments.comparison_report is not None
+        and not arguments.comparison_report.is_absolute()
+    ):
+        parser.error("comparison report path must be absolute")
 
-    service = compose_application_service(mode, identity=identity)
+    try:
+        service = compose_application_service(mode, identity=identity)
+    except Exception:
+        if mode is not ApplicationMode.RESTRICTED_LIVE:
+            raise
+        print(
+            "RESTRICTED_LIVE_COMPOSITION_FAILED; no fallback mode selected",
+            file=sys.stderr,
+        )
+        return 2
     try:
         from PySide6.QtWidgets import QApplication
 
@@ -122,6 +178,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 2
 
+    if arguments.comparison_report is not None:
+        service.request_report(arguments.comparison_report)
     app = QApplication.instance() or QApplication([])
     window = PrototypeWindow(service, mode=mode.value)
     window.show()

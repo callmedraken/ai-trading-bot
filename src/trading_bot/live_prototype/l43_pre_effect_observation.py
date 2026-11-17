@@ -568,6 +568,7 @@ def observe_l43_pre_effect(
     dependencies: L43PreEffectDependencies,
     *,
     requested_entry_risk: Decimal = Decimal("10.00"),
+    _account_identity_sink: Callable[[L43AccountIdentity], None] | None = None,
 ) -> L43PreEffectResult:
     """Observe fresh L43 source/account/state/session/signal facts once.
 
@@ -579,10 +580,13 @@ def observe_l43_pre_effect(
 
     if type(dependencies) is not L43PreEffectDependencies:
         raise TypeError("exact L43PreEffectDependencies required")
+    if _account_identity_sink is not None and not callable(_account_identity_sink):
+        raise TypeError("private account identity sink must be callable")
     counters = _Counters()
     now = _SANITIZED_TIME
     source: L43SourceIdentity | None = None
     plan: L43PreEffectPlan | None = None
+    broker: _BrokerSnapshot | None = None
     outcome = L43PreEffectOutcome.BLOCKED
     blockers: list[L43PreEffectBlocker] = []
     manual_close: _ManualCloseEvidence | None = None
@@ -848,6 +852,19 @@ def observe_l43_pre_effect(
         blockers.append(L43PreEffectBlocker.OBSERVATION_INDETERMINATE)
         plan = None
         outcome = L43PreEffectOutcome.BLOCKED
+
+    if _account_identity_sink is not None and outcome in {
+        L43PreEffectOutcome.READY_FOR_L43_ENTRY_EFFECT_REVIEW,
+        L43PreEffectOutcome.READY_FOR_L43_EXACT_OWNED_REVIEW,
+    }:
+        try:
+            if broker is None or plan is None:
+                raise ValueError
+            _account_identity_sink(broker.account)
+        except Exception:
+            blockers.append(L43PreEffectBlocker.OBSERVATION_INDETERMINATE)
+            plan = None
+            outcome = L43PreEffectOutcome.BLOCKED
 
     if outcome is L43PreEffectOutcome.NO_ACTION_SIGNAL:
         blockers = []

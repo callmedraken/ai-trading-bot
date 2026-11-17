@@ -108,6 +108,84 @@ class RuntimeWorker(Protocol):
 
 ReportReader = Callable[[Path], ResearchView]
 
+
+class DesktopWorkers:
+    """Shared thread/event ownership for the desktop application services."""
+
+    def __init__(self) -> None:
+        self.stop_event = Event()
+        self._workers: tuple[Thread, ...] = ()
+        self._report_worker: Thread | None = None
+
+    @property
+    def workers(self) -> tuple[Thread, ...]:
+        return self._workers
+
+    @property
+    def report_worker_active(self) -> bool:
+        return self._report_worker is not None and self._report_worker.is_alive()
+
+    def start_workers(
+        self,
+        specs: tuple[tuple[str, Callable[..., object], tuple[object, ...]], ...],
+    ) -> tuple[bool, tuple[Thread, ...]]:
+        """Start one named worker set, retaining only threads started on failure."""
+        if any(worker.is_alive() for worker in self._workers):
+            return False, ()
+        self.stop_event.clear()
+        workers = tuple(
+            Thread(target=target, args=args, name=name, daemon=False)
+            for name, target, args in specs
+        )
+        self._workers = workers
+        started: list[Thread] = []
+        try:
+            for worker in workers:
+                worker.start()
+                started.append(worker)
+        except Exception:
+            self.stop_event.set()
+            self._workers = tuple(started)
+            return False, tuple(started)
+        return True, tuple(started)
+
+    def start_report_worker(
+        self,
+        *,
+        name: str,
+        target: Callable[..., object],
+        args: tuple[object, ...],
+    ) -> bool:
+        if self.report_worker_active:
+            return False
+        worker = Thread(target=target, args=args, name=name, daemon=False)
+        self._report_worker = worker
+        try:
+            worker.start()
+        except Exception:
+            self._report_worker = None
+            return False
+        return True
+
+    def worker_active(self, name: str) -> bool:
+        return any(
+            worker.name == name and worker.is_alive() for worker in self._workers
+        )
+
+    def all_workers(self) -> tuple[Thread, ...]:
+        return self._workers + (
+            (self._report_worker,) if self._report_worker is not None else ()
+        )
+
+    def any_active(self) -> bool:
+        return any(worker.is_alive() for worker in self.all_workers())
+
+    def join_all(self) -> None:
+        """Poll worker termination without blocking the service lock."""
+        for worker in self.all_workers():
+            worker.join(timeout=0)
+
+
 _BASE_REASONS = (
     Reason.SOURCE_ACCEPTANCE_REQUIRED,
     Reason.DATA_NOT_READY,
@@ -142,9 +220,8 @@ class RealDisarmedApplicationService:
         self._runtime_worker = runtime_worker or _wait_for_stop
         self._report_reader = report_reader
         self._lock = Lock()
-        self._stop = Event()
-        self._workers: tuple[Thread, ...] = ()
-        self._report_worker: Thread | None = None
+        self._desktop_workers = DesktopWorkers()
+        self._stop = self._desktop_workers.stop_event
         self._sequence = 0
         self._connection = ConnectionState.DISCONNECTED
         self._recovery = RecoveryState.NOT_CHECKED
@@ -201,29 +278,23 @@ class RealDisarmedApplicationService:
             )
             return PrototypeCommandResult(command, False, reason)
 
-        self._stop.clear()
-        workers = (
-            Thread(
-                target=self._run_research,
-                name="prototype-real-disarmed-research-worker",
-                daemon=False,
-            ),
-            Thread(
-                target=self._run_runtime,
-                name="prototype-real-disarmed-runtime-worker",
-                daemon=False,
-            ),
+        started_ok, started = self._desktop_workers.start_workers(
+            (
+                (
+                    "prototype-real-disarmed-research-worker",
+                    self._run_research,
+                    (),
+                ),
+                (
+                    "prototype-real-disarmed-runtime-worker",
+                    self._run_runtime,
+                    (),
+                ),
+            )
         )
-        self._workers = workers
         self._record(Lifecycle.RUNNING, Reason.DATA_NOT_READY, running=True)
-        started: list[Thread] = []
-        try:
-            for worker in workers:
-                worker.start()
-                started.append(worker)
-        except Exception:
+        if not started_ok:
             self._stop.set()
-            self._workers = tuple(started)
             lifecycle = Lifecycle.STOPPING if started else Lifecycle.BLOCKED
             self._record(lifecycle, Reason.COMMAND_REJECTED, running=bool(started))
             return PrototypeCommandResult(command, False, Reason.COMMAND_REJECTED)
@@ -247,22 +318,14 @@ class RealDisarmedApplicationService:
         with self._lock:
             self._observe_workers()
             if self._snapshot.lifecycle is Lifecycle.STOPPING or (
-                self._report_worker is not None and self._report_worker.is_alive()
+                self._desktop_workers.report_worker_active
             ):
                 return False
-            worker = Thread(
+            return self._desktop_workers.start_report_worker(
+                name="prototype-real-disarmed-report-reader",
                 target=self._read_report,
                 args=(path,),
-                name="prototype-real-disarmed-report-reader",
-                daemon=False,
             )
-            self._report_worker = worker
-            try:
-                worker.start()
-            except Exception:
-                self._report_worker = None
-                return False
-            return True
 
     def publish_runtime(self, observation: RuntimeObservation) -> None:
         """Install allowlisted cached facts while forcing readiness to remain false."""
@@ -289,7 +352,7 @@ class RealDisarmedApplicationService:
             )
 
     def _publish_research(self, research: ResearchView) -> None:
-        if not _valid_research_view(research):
+        if not valid_research_view(research):
             raise ValueError("non-live descriptive research view required")
         with self._lock:
             self._snapshot = replace(
@@ -358,9 +421,7 @@ class RealDisarmedApplicationService:
             )
 
     def _all_workers(self) -> tuple[Thread, ...]:
-        return self._workers + (
-            (self._report_worker,) if self._report_worker is not None else ()
-        )
+        return self._desktop_workers.all_workers()
 
     def _observe_workers(self) -> None:
         alive = any(worker.is_alive() for worker in self._all_workers())
@@ -385,9 +446,7 @@ class RealDisarmedApplicationService:
 
     def shutdown_complete(self) -> bool:
         with self._lock:
-            workers = self._all_workers()
-        for worker in workers:
-            worker.join(timeout=0)
+            self._desktop_workers.join_all()
         with self._lock:
             self._observe_workers()
             return not any(worker.is_alive() for worker in self._all_workers())
@@ -421,7 +480,7 @@ def _validate_timestamp(value: str | None) -> None:
         raise ValueError("UTC timestamp required")
 
 
-def _valid_research_view(value: object) -> bool:
+def valid_research_view(value: object) -> bool:
     if type(value) is not ResearchView or value.live_eligible is not False:
         return False
     if (

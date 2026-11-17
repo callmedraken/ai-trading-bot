@@ -558,6 +558,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_application_acceptance.py",
     "tests/live_prototype/test_application_service.py",
     "tests/live_prototype/test_application_composition.py",
+    "tests/live_prototype/test_restricted_live_application.py",
     "tests/live_prototype/test_window_shutdown_disarmed.py",
     "tests/live_prototype/test_readiness_operator.py",
     "tests/live_prototype/test_capability_tiny_live_admission.py",
@@ -574,6 +575,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
     "tests/live_prototype/test_l43_pre_effect_observation.py",
     "tests/live_prototype/test_l43_post_effect_reconciler.py",
     "tests/live_prototype/test_l43_effect_operator.py",
+    "tests/live_prototype/test_l43_runtime.py",
     "tests/robinhood_mcp/test_order_scope_evidence_admission.py",
     "tests/robinhood_mcp/test_agent_initiated_partition_schema_qualifier.py",
     "tests/robinhood_mcp/test_agent_initiated_partition_schema_observer.py",
@@ -26670,7 +26672,7 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
     )
     values[ARCH147_PROTOTYPE_NAME] = CheckpointSpec(
         ARCH147_PROTOTYPE_NAME,
-        "A2 runtime-partition metadata observer; read-only preflight only",
+        "Current live-prototype source; A3 preflight remains read-only",
         ARCH147_PROTOTYPE_TESTS,
         ARCH147_PROTOTYPE_RUFF,
         _arch147_prototype_authority_check,

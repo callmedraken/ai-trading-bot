@@ -17,6 +17,23 @@ class Lifecycle(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
+class RestrictedLiveStatus(StrEnum):
+    """Sanitized status facts surfaced by the restricted-live runtime."""
+
+    STOPPED = "STOPPED"
+    RUNNING_READ_ONLY = "RUNNING_READ_ONLY"
+    NO_ACTION = "NO_ACTION"
+    ENTRY_PENDING = "ENTRY_PENDING"
+    SELL_PENDING = "SELL_PENDING"
+    ENTRY_RECONCILED = "ENTRY_RECONCILED"
+    SELL_RECONCILED = "SELL_RECONCILED"
+    REVIEW_ACCEPTED = "REVIEW_ACCEPTED"
+    BLOCKED = "BLOCKED"
+    AUTHORIZATION_MISSING = "AUTHORIZATION_MISSING"
+    MANUAL_CLOSE_REQUIRED = "MANUAL_CLOSE_REQUIRED"
+    EFFECT_UNKNOWN = "EFFECT_UNKNOWN"
+
+
 class Reason(StrEnum):
     SYNTHETIC_ONLY = "SYNTHETIC_ONLY"
     SOURCE_ACCEPTANCE_REQUIRED = "SOURCE_ACCEPTANCE_REQUIRED"
@@ -34,6 +51,13 @@ class Reason(StrEnum):
     AMBIGUOUS_EFFECT = "AMBIGUOUS_EFFECT"
     BUDGET_EXHAUSTED = "BUDGET_EXHAUSTED"
     PERSISTENCE_FAILED = "PERSISTENCE_FAILED"
+    ENTRY_PENDING = "ENTRY_PENDING"
+    SELL_PENDING = "SELL_PENDING"
+    ENTRY_RECONCILED = "ENTRY_RECONCILED"
+    SELL_RECONCILED = "SELL_RECONCILED"
+    AUTHORIZATION_MISSING = "AUTHORIZATION_MISSING"
+    MANUAL_CLOSE_REQUIRED = "MANUAL_CLOSE_REQUIRED"
+    EFFECT_UNKNOWN = "EFFECT_UNKNOWN"
 
 
 class Command(StrEnum):
@@ -103,6 +127,35 @@ class PrototypeSnapshot:
     reasons: tuple[Reason, ...] = (Reason.SYNTHETIC_ONLY,)
     activity: tuple[ActivityItem, ...] = ()
     research: ResearchView = ResearchView()
+    restricted_live_status: RestrictedLiveStatus = RestrictedLiveStatus.STOPPED
+    restricted_live_enabled: bool = False
+    effect_authority_granted: bool = False
+    source_tree: str | None = None
+    restricted_live_reason_code: str | None = None
+
+    def __post_init__(self) -> None:
+        if type(self.restricted_live_status) is not RestrictedLiveStatus:
+            raise TypeError("exact restricted-live status required")
+        if (
+            type(self.restricted_live_enabled) is not bool
+            or type(self.effect_authority_granted) is not bool
+        ):
+            raise TypeError("restricted-live state flags must be exact booleans")
+        if self.mode == "RESTRICTED_LIVE" and (
+            self.ready_to_trade or self.effect_authority_granted
+        ):
+            raise ValueError(
+                "restricted-live readiness and effect authority stay closed"
+            )
+        if self.restricted_live_reason_code is not None and (
+            type(self.restricted_live_reason_code) is not str
+            or not 1 <= len(self.restricted_live_reason_code) <= 96
+            or any(
+                character not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+                for character in self.restricted_live_reason_code
+            )
+        ):
+            raise ValueError("restricted-live diagnostic must be a safe reason code")
 
 
 @dataclass(frozen=True, slots=True)

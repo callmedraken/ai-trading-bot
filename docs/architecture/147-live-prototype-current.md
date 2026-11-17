@@ -1,5 +1,20 @@
 # Architecture 147 research-to-live prototype contract v1
 
+## Current RHC4 restricted-live source boundary
+
+The RHC4 source checkpoint adds a distinct production L43 runtime composition
+and restricted-live desktop service. Independent exact-source acceptance is
+pending. The production exact-plan authorizer is closed by default; runtime
+Start controls worker lifecycle and grants no review, placement or cancellation
+authority. A bound pending ENTRY or SELL is settled through the accepted
+read-only RHC3P path before the runtime considers another effect. L43 protected
+qualification remains NOT_RUN, Q63 remains NOT_RUN, and `FINAL_HOLDOUT` remains
+SEALED.
+
+The default research worker remains idle until a research source is separately
+supplied. The existing comparison-report worker remains available and can run
+alongside restricted-live runtime.
+
 ## Historical checkpoint record - L43 schema observation
 
 The accepted metadata-only order-scope observer was executed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. The result is `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`.
@@ -204,14 +219,26 @@ make no fill-price, value or loss guarantee. Official account/size/minimum/
 residual capability remains L41 evidence, not a synthetic assertion. P6 policy
 and consumed authority are unchanged; no live runtime or readiness is granted.
 
-## Frozen launcher interface
+## Current launcher interface
 
-python scripts/run_live_prototype.py --help is effect-free.
---synthetic --state-root <fresh absolute external F: directory> launches isolated
-fakes only; no default state creation on import/construction or help. Start and
-Stop manage synthetic workers; no production provider exists in this route.
-No live CLI flag until accepted real composition exists. Credentials/state stay
-outside source. Updates are manual while stopped; no updater/scheduler machinery.
+`python scripts/run_live_prototype.py --help` is effect-free. Import, argument
+parsing, composition construction and opening the window are also effect-free.
+`--synthetic --state-root <fresh absolute external F: directory>` launches
+isolated fakes. Synthetic state roots must be fresh and external. The RHC4 source
+checkpoint adds the mutually exclusive `--restricted-live` selector. That mode
+uses source-owned production state and executable identity; it rejects a caller
+`--state-root`. Selecting the mode and pressing Start grants no effect authority.
+
+Restricted-live Start/Stop manage only the runtime lifecycle. The runtime can
+perform configured read-only reconciliation/observation after Start, and it
+settles a bound pending order before considering a new effect. The default
+production exact-plan authorizer denies requests; review/place/cancel remains
+unavailable without a separately reviewed exact authority. No order authority
+or readiness follows from mode selection, GUI state, CLI arguments or source
+construction. Optional `--comparison-report <absolute path>` loads comparison
+evidence on a worker and cannot change the active binding. Credentials and
+durable production state stay outside source. Updates remain manual while
+stopped; there is no updater or scheduler machinery.
 
 ## Synthetic examples and host checklist
 

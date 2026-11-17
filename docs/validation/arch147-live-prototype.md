@@ -1,5 +1,87 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## RHC4 restricted-live production composition — SOURCE_ONLY / independent acceptance pending
+
+The RHC4 source checkpoint is prepared from synchronized baseline
+`fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` / tree
+`3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`. It extends the existing
+`arch147-live-prototype` feature source-gate route and its mapped FULL. No RHC4
+branch, additional checkpoint route, or protected execute route is added.
+The source-gate test inventory now includes the RHC4 runtime and restricted-live
+application tests. The source owner remains the existing `arch147-live-prototype`
+route, its mapped profile stays FULL, and `execute=None`. The explicit A3
+read-only preflight is unchanged. The import guard admits only the exact
+production L43 composition and transport imports in `l43_runtime.py`; unrelated
+modules remain blocked from those imports and dynamic dispatch remains rejected.
+
+It composes accepted Q62/RHC3 read authority, the RHC3P read-only
+pending-order settlement, canonical L43 durable state, effect/operator seams,
+and the Alpaca runtime signal path. It adds an explicit `RESTRICTED_LIVE`
+application service and `--restricted-live` launcher selector. The production
+exact-plan authorizer defaults to deny. GUI Start/Stop control lifecycle only.
+Bound `WORKING` / `PARTIAL` ENTRY and SELL orders settle read-only before a new
+effect is considered. Construction, import, argument parsing, help and window
+opening are effect-free. Restricted-live rejects a caller-supplied state root
+and uses source-owned production state/source identity. The synthetic route
+remains separate.
+
+Focused verification, current/historical source authority, both context
+selections and combined Ruff/diff checks are recorded below. The exact clean
+source must pass admission before push. Mapped feature FULL and independent
+acceptance remain pending. RHC4 is SOURCE_ONLY / FAKE_ONLY. No real
+Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for
+this source checkpoint. RHC2 remains CONSUMED / PASS / NO RETRY.
+RHC3/RHC3P and their retained evidence/contracts are unchanged.
+L43 protected qualification remains NOT_RUN, Q63 remains NOT_RUN, and
+`FINAL_HOLDOUT` remains SEALED.
+
+### RHC4 focused and pre-candidate verification
+
+The composition/runtime and observer tests passed **51 tests** with Python
+`C:\Program Files\Python314\python.exe` (Python 3.14.3, pytest 8.4.2). The
+fresh external basetemp was
+`F:\AI\temp\pytest\rhc4-runtime-latest-d0d72d0e-682d-4e1c-bab9-9bb99206583b`.
+
+```powershell
+& 'C:\Program Files\Python314\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-runtime-latest-d0d72d0e-682d-4e1c-bab9-9bb99206583b' tests/live_prototype/test_l43_runtime.py tests/live_prototype/test_l43_pre_effect_observation.py
+```
+
+The separate ambient environment/caller-claim denial regression passed **1
+test** with the same Python and a fresh basetemp:
+`F:\AI\temp\pytest\rhc4-runtime-env-negative-0b5f1ba4-a987-4645-8aa0-8683c154cab4`.
+
+```powershell
+& 'C:\Program Files\Python314\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-runtime-env-negative-0b5f1ba4-a987-4645-8aa0-8683c154cab4' tests/live_prototype/test_l43_runtime.py::test_ambient_environment_and_caller_claims_cannot_authorize_runtime
+```
+
+The desktop/application and launcher set passed **50 tests** with
+`F:\AI\ai-trading-bot\.venv\Scripts\python.exe` (Python 3.14.3, PySide6
+6.10.3). Its fresh external basetemp was
+`F:\AI\temp\pytest\rhc4-desktop-final-19b59a36-f447-463c-b7ed-09112ad573c4`.
+
+```powershell
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-desktop-final-19b59a36-f447-463c-b7ed-09112ad573c4' tests/live_prototype/test_restricted_live_application.py tests/live_prototype/test_launcher.py tests/live_prototype/test_application_composition.py tests/live_prototype/test_application_service.py tests/live_prototype/test_window_shutdown_disarmed.py tests/live_prototype/test_application_acceptance.py tests/live_prototype/test_synthetic_service.py
+```
+
+The source-gate owner and required runner/admission coherence bundle passed
+**505 tests** with the project Python. Its fresh basetemp was
+`F:\AI\temp\pytest\arch147-rhc4-prepublish-51c31274a2b1406db8c905bf49e9665d`.
+
+```powershell
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -m pytest -q -p no:cacheprovider tests/runtime/checkpoint_runner/test_arch147_prototype.py tests/runtime/checkpoint_runner/test_core.py tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py tests/experiments/test_research_strategy_production_compatibility.py tests/scripts/certification_runner/test_results.py tests/scripts/certification_runner/test_source.py tests/runtime/checkpoint_runner/test_source_authority.py --basetemp 'F:\AI\temp\pytest\arch147-rhc4-prepublish-51c31274a2b1406db8c905bf49e9665d'
+```
+
+Current authority and historical ownership passed. FEATURE selected the existing
+`arch147-live-prototype` route. PROSPECTIVE_DEVELOP evaluated 84 current
+checkpoint owners and passed. The exact Git state was unchanged. These
+pre-candidate calls invoked authority checks only. They did not use the public
+clean-tree evaluator or dispatch preflight/execute.
+
+Whole-repository Ruff check and format check passed. `git diff --check` passed
+with no whitespace errors. Windows Git emitted line-ending normalization notices
+for modified source files. The exact clean-source `ops.ps1 admit` remains required
+before push. No local FULL or ROBINHOOD certification was run.
+
 ## RHC3P post-effect normalization and pending-settlement correction — ACCEPTED / INTEGRATED
 
 RHC3P is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final corrective HEAD `26e168f15747345e25c550a2d76ccac8f4adaa0b` / tree `3ef5dba7eba54f892269ddb59aea48b297208ecd`.
@@ -56,7 +138,7 @@ The accepted L41R6 source-owned official claim `REVIEW_EQUITY_ORDER_SIMULATION_P
 
 RHC3P/C1 performed no real provider/OAuth/browser/MCP/read/review/place/cancel/Alpaca action. RHC2 remains CONSUMED / PASS / NO RETRY. RHC3 retained evidence is unchanged. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED.
 
-The earlier RHC4 attempt remains historical `NOT_RUN / STOPPED_PRE_IMPLEMENTATION` with no source commit. Its post-placement normalization blocker is closed by accepted RHC3P. RHC4 production composition may resume only after this acceptance closeout and final remote/local/docs synchronization.
+The earlier RHC4 attempt remains historical `NOT_RUN / STOPPED_PRE_IMPLEMENTATION` with no source commit. Its post-placement normalization blocker closed with accepted RHC3P. The current source checkpoint is recorded at the top of this ledger.
 
 ## L43 schema-only order-scope observation — CONSUMED / UNPROVEN / NO RETRY
 

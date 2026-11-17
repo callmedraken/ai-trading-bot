@@ -16,11 +16,15 @@ paper binding and deterministic replay are complete. P5B read/reconciliation
 and the P6 59+1 completed-close source are accepted/integrated; source certification
 does not grant provider or order authority.
 
-The additive research-to-live prototype now composes five desktop pages, frozen
-research comparison and isolated synthetic workers. Independent prototype source
-acceptance, native host UAT, current data/binding parity, and complete owned exit/
-recovery remain separate gates. No paper soak is required and no live order is
-authorized. FINAL_HOLDOUT remains sealed.
+The additive research-to-live prototype composes five desktop pages, frozen
+research comparison and isolated synthetic workers. The RHC4 source checkpoint
+adds a distinct restricted-live application path; independent exact-source
+acceptance remains pending. Its production exact-plan authorizer is closed by
+default, and Start controls runtime lifecycle without granting effect authority.
+Independent source acceptance, native host UAT, current data/binding parity,
+protected L43 qualification, and complete owned exit/recovery remain separate
+gates. No paper soak is required and no live order is authorized.
+FINAL_HOLDOUT remains sealed.
 
 See [project status](docs/PROJECT_STATUS.md), [current handoff](docs/AI_TRADING_BOT_HANDOFF.md)
 and [prototype contract](docs/architecture/147-live-prototype-current.md).
@@ -29,7 +33,7 @@ and [prototype contract](docs/architecture/147-live-prototype-current.md).
 
 The current prototype progression is:
 
-1. Admit and independently accept the additive comparison/GUI source checkpoint.
+1. Independently accept the RHC4 restricted-live composition source checkpoint.
 2. Inspect an admitted offline comparison; keep all results and no-qualifier outcomes.
 3. Prove selected-strategy data parity and complete owned entry/exit/recovery.
 4. Complete distinct native Windows UAT and fresh protected provider/data readiness.
@@ -60,7 +64,9 @@ checkpoint. Their presence does not broaden current production authorization.
 ## Safety model
 
 - Paper trading is the default operating mode.
-- Live trading is a future, separately enabled integration.
+- The RHC4 restricted-live application path has no effect authority by default.
+  Live execution remains unavailable pending independent acceptance and
+  separately reviewed exact-stage authority.
 - All order requests pass through deterministic risk validation.
 - Credentials and private keys must never be hard-coded, logged, printed, or committed.
 - Real external effects require durable authority/evidence and fail closed when required state is absent or invalid.
@@ -102,9 +108,16 @@ $StateRoot = 'F:\AI\temp\live-prototype-uat-' + [guid]::NewGuid().ToString('N')
 
 The five pages are Dashboard, Research, Strategy, Live Session and Activity/Health.
 Opening a comparison report loads it on a worker and cannot change the active
-binding. Start/Stop operate a synthetic worker; Close waits for all application
-threads. There is no live mode or GUI arm/place/cancel/exit authority. State roots
-must be fresh under F:\AI\temp; preserve an existing root and choose a new one.
+binding. The report worker can run alongside the restricted-live runtime; the
+default research worker stays idle until a research source is separately
+supplied. Start/Stop operate a synthetic worker; Close waits for all application
+threads. The RHC4 source checkpoint adds an explicit `--restricted-live` mode;
+independent exact-source acceptance remains pending. Restricted-live production
+state and source identity are source-owned, and a caller-supplied `--state-root`
+is not accepted for that mode. Start/Stop control only the runtime lifecycle;
+production effect authority remains closed by default, with no GUI
+arm/place/cancel/exit control. Synthetic state roots must be fresh under
+F:\AI\temp; preserve an existing root and choose a new one.
 Optional `--comparison-report <absolute path>` opens explicit comparison evidence.
 Follow [native UAT](docs/LIVE_PROTOTYPE_UAT.md) after independent source acceptance.
 Offscreen source tests do not grant either readiness label.

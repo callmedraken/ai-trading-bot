@@ -357,12 +357,18 @@ class RobinhoodB2ReadTransport:
 class RobinhoodAgentInitiatedRuntimePartitionObserver:
     """One-use source-gated observer; positive evidence remains review-only."""
 
-    __slots__ = ("_repo_root", "_used", "_guard")
+    __slots__ = ("_repo_root", "_used", "_guard", "_expected_account_fingerprint")
 
-    def __init__(self) -> None:
+    def __init__(self, *, expected_account_fingerprint: str | None = None) -> None:
+        if expected_account_fingerprint is not None and (
+            type(expected_account_fingerprint) is not str
+            or _SHA256.fullmatch(expected_account_fingerprint) is None
+        ):
+            raise ValueError("expected account fingerprint must be lowercase SHA-256")
         self._repo_root = Path(__file__).resolve().parents[3]
         self._used = False
         self._guard = threading.Lock()
+        self._expected_account_fingerprint = expected_account_fingerprint
 
     async def observe(
         self, *, evidence_dir: Path
@@ -454,6 +460,7 @@ class RobinhoodAgentInitiatedRuntimePartitionObserver:
                         dispatch_state,
                         self._repo_root,
                         expected_source,
+                        self._expected_account_fingerprint,
                     )
                 )
                 try:
@@ -544,6 +551,7 @@ def _run_production_session(
     dispatch_state: _DispatchState,
     repo_root: Path,
     expected_source: L43SourceIdentity,
+    expected_account_fingerprint: str | None = None,
 ) -> AgentInitiatedRuntimePartitionProofResult:
     from trading_bot.robinhood_mcp.windows_oauth import (
         create_windows_robinhood_oauth_factory,
@@ -565,6 +573,7 @@ def _run_production_session(
             adapter,
             repo_root=repo_root,
             expected_source=expected_source,
+            expected_account_fingerprint=expected_account_fingerprint,
         )
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib.util
 import re
 import sys
 from pathlib import Path
@@ -10,6 +11,8 @@ from types import ModuleType
 from uuid import uuid4
 
 _CANONICAL_WORKTREE = Path(r"F:\AI\worktrees\ai-trading-bot-live-prototype-current")
+_Q62_READER_MODULE = "trading_bot.live_prototype.l43_production_owner"
+_Q62_READER_PATH = "src/trading_bot/live_prototype/l43_production_owner.py"
 _EVIDENCE_PREFIX = "arch147-agent-initiated-runtime-partition-"
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _ATTEMPT_COUNTERS = frozenset(
@@ -59,6 +62,39 @@ def _module_origin_is_canonical(
         return False
 
 
+def _q62_reader_spec_is_canonical(*, repo_root: Path) -> bool:
+    try:
+        spec = importlib.util.find_spec(_Q62_READER_MODULE)
+        module_path = None if spec is None else spec.origin
+        expected_path = repo_root / _Q62_READER_PATH
+        return (
+            type(module_path) is str
+            and expected_path.is_file()
+            and Path(module_path).resolve(strict=True) == expected_path
+        )
+    except Exception:
+        return False
+
+
+def _read_q62_expected_account_fingerprint(*, repo_root: Path) -> str:
+    from trading_bot.live_prototype import l43_production_owner as q62_owner
+
+    if not _module_origin_is_canonical(
+        q62_owner, repo_root=repo_root, relative_path=_Q62_READER_PATH
+    ):
+        raise ValueError("canonical Q62 reader origin differs")
+    origin = q62_owner.read_canonical_q62_origin()
+    if type(origin) is not q62_owner.Q62JournalOrigin:
+        raise ValueError("canonical Q62 origin type differs")
+    identity = origin.runtime_identity
+    if type(identity) is not q62_owner.RuntimeIdentity:
+        raise ValueError("canonical Q62 runtime identity type differs")
+    fingerprint = identity.account_fingerprint
+    if type(fingerprint) is not str or _SHA256.fullmatch(fingerprint) is None:
+        raise ValueError("canonical Q62 account fingerprint differs")
+    return fingerprint
+
+
 def _run_preflight() -> dict[str, object]:
     """Run one source-gated observer attempt and return review-only evidence."""
     try:
@@ -83,6 +119,9 @@ def _run_preflight() -> dict[str, object]:
     except Exception:
         return _blocked("SOURCE_AUTHORITY_REJECTED")
 
+    if not _q62_reader_spec_is_canonical(repo_root=repo_root):
+        return _blocked("Q62_ORIGIN_REJECTED")
+
     try:
         from trading_bot.robinhood_mcp import (
             agent_initiated_runtime_partition_observer as b2,
@@ -90,8 +129,21 @@ def _run_preflight() -> dict[str, object]:
 
         if not b2._module_origins_are_source_owned(repo_root=repo_root):
             return _blocked("OBSERVER_MODULE_ORIGIN_REJECTED")
+    except (Exception, asyncio.CancelledError, KeyboardInterrupt):
+        return _blocked("OBSERVER_EXCEPTION")
+
+    try:
+        expected_account_fingerprint = _read_q62_expected_account_fingerprint(
+            repo_root=repo_root
+        )
+    except Exception:
+        return _blocked("Q62_ORIGIN_REJECTED")
+
+    try:
         evidence_dir = b2._EVIDENCE_ROOT / (_EVIDENCE_PREFIX + uuid4().hex)
-        instance = b2.RobinhoodAgentInitiatedRuntimePartitionObserver()
+        instance = b2.RobinhoodAgentInitiatedRuntimePartitionObserver(
+            expected_account_fingerprint=expected_account_fingerprint
+        )
         result = asyncio.run(instance.observe(evidence_dir=evidence_dir))
     except (Exception, asyncio.CancelledError, KeyboardInterrupt):
         return _blocked("OBSERVER_EXCEPTION")

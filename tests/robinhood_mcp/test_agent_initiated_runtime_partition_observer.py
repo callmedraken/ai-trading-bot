@@ -9,12 +9,15 @@ import threading
 from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, datetime
+from importlib.machinery import ModuleSpec
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
 import pytest
 
 from scripts import checkpoint_runner as runner
+from trading_bot.desktop_paper.robinhood_read import resolve_account
+from trading_bot.live_prototype import l43_production_owner as q62_owner
 from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
 from trading_bot.live_prototype.l43_provider_contracts import (
     L43AccountIdentity,
@@ -59,8 +62,13 @@ class _ToolListing:
 
 
 class _Session:
-    def __init__(self, calls: list[tuple[str, str, object]]) -> None:
+    def __init__(
+        self,
+        calls: list[tuple[str, str, object]],
+        account_number: str = _ACCOUNT,
+    ) -> None:
         self._calls = calls
+        self._account_number = account_number
 
     async def __aenter__(self) -> _Session:
         self._calls.append(("open", "", None))
@@ -81,7 +89,12 @@ class _Session:
         if name == "get_accounts":
             payload = {
                 "data": {
-                    "accounts": [{"account_number": _ACCOUNT, "agentic_allowed": True}]
+                    "accounts": [
+                        {
+                            "account_number": self._account_number,
+                            "agentic_allowed": True,
+                        }
+                    ]
                 }
             }
         else:
@@ -108,6 +121,154 @@ def _tool_listing(*names: str, next_cursor: str | None = None) -> SimpleNamespac
         tools=tuple(SimpleNamespace(name=name) for name in names),
         next_cursor=next_cursor,
     )
+
+
+def _account_fingerprint(account_number: str) -> str:
+    return resolve_account(
+        {
+            "data": {
+                "accounts": [
+                    {
+                        "account_number": account_number,
+                        "agentic_allowed": True,
+                    }
+                ]
+            }
+        }
+    ).fingerprint
+
+
+def _q62_runtime_identity(account_fingerprint: object) -> q62_owner.RuntimeIdentity:
+    return q62_owner.RuntimeIdentity(
+        account_fingerprint=account_fingerprint,  # type: ignore[arg-type]
+        source_head="1" * 40,
+        source_tree="2" * 40,
+        config_digest="3" * 64,
+        binding_digest="4" * 64,
+        lifecycle_id="00000000-0000-4000-8000-000000000001",
+    )
+
+
+def _q62_origin(runtime_identity: object) -> q62_owner.Q62JournalOrigin:
+    return q62_owner.Q62JournalOrigin(
+        runtime_identity=runtime_identity,  # type: ignore[arg-type]
+        journal_label="fake-q62-origin",
+        journal_sha256="5" * 64,
+        initialization_event_sha256="6" * 64,
+        consumed_observation_sha256="7" * 64,
+    )
+
+
+def _install_rhc2_source_guards(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[ModuleType, Path]:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    q62_path = tmp_path / rhc2._Q62_READER_PATH
+    q62_path.parent.mkdir(parents=True, exist_ok=True)
+    q62_path.write_text("# fake source path for origin guard\n", encoding="utf-8")
+    canonical_find_spec = rhc2.importlib.util.find_spec
+
+    def find_spec(name: str, *args: object, **kwargs: object) -> object:
+        if name == rhc2._Q62_READER_MODULE:
+            return ModuleSpec(name, loader=None, origin=str(q62_path))
+        return canonical_find_spec(name, *args, **kwargs)
+
+    monkeypatch.setattr(rhc2.importlib.util, "find_spec", find_spec)
+    return rhc2, q62_path
+
+
+def _install_fake_rhc2_session(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> tuple[list[tuple[str, str, object]], list[dict[str, object]], list[str | None]]:
+    from trading_bot.robinhood_mcp import windows_oauth
+
+    calls: list[tuple[str, str, object]] = []
+    oauth_factories: list[dict[str, object]] = []
+    proof_bindings: list[str | None] = []
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: oauth_factories.append(kwargs) or (lambda: object()),
+    )
+    real_proof = proof.prove_agent_initiated_partition
+
+    def prove_with_binding(read, **kwargs):
+        proof_bindings.append(kwargs.get("expected_account_fingerprint"))
+        return real_proof(read, **kwargs)
+
+    monkeypatch.setattr(observer, "prove_agent_initiated_partition", prove_with_binding)
+
+    def open_fake_session(
+        oauth_factory, *, before_oauth, before_mcp_session
+    ) -> _Session:
+        del oauth_factory
+        before_oauth()
+        before_mcp_session()
+        return _Session(calls)
+
+    monkeypatch.setattr(observer, "_open_robinhood_client", open_fake_session)
+    monkeypatch.setattr(proof, "_read_source_identity", lambda _: _SOURCE)
+    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
+    _install_fake_harness(monkeypatch, tmp_path, observer._run_production_session)
+    return calls, oauth_factories, proof_bindings
+
+
+def _assert_q62_blocked_before_observer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    rhc2: ModuleType,
+    reader_calls: list[str],
+    expected_reader_calls: list[str],
+    expected_origin_events: list[str],
+) -> None:
+    from trading_bot.robinhood_mcp import windows_oauth
+
+    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
+    oauth_calls: list[str] = []
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: oauth_calls.append("oauth") or (lambda: object()),
+    )
+    constructed: list[object] = []
+
+    class _ObserverConstructionTrap:
+        def __init__(self, **kwargs: object) -> None:
+            constructed.append(kwargs)
+            raise AssertionError("observer construction must follow Q62 validation")
+
+    monkeypatch.setattr(
+        observer,
+        "RobinhoodAgentInitiatedRuntimePartitionObserver",
+        _ObserverConstructionTrap,
+    )
+    provider_calls: list[str] = []
+
+    def fake_provider(*args: object) -> object:
+        provider_calls.append("dispatch")
+        raise AssertionError("provider dispatch must not start")
+
+    events = _install_fake_harness(monkeypatch, tmp_path, fake_provider)
+    before = tuple(sorted(path.name for path in tmp_path.iterdir()))
+
+    result = rhc2._run_preflight()
+
+    assert result == {
+        "status": "BLOCKED",
+        "reason": "Q62_ORIGIN_REJECTED",
+        "disposition": "REVIEW_ONLY",
+        "production_order_scope_authority": "NOT_GRANTED",
+    }
+    assert reader_calls == expected_reader_calls
+    assert constructed == []
+    assert provider_calls == []
+    assert oauth_calls == []
+    assert events == expected_origin_events
+    assert tuple(sorted(path.name for path in tmp_path.iterdir())) == before
 
 
 def _valid_proof() -> proof.AgentInitiatedRuntimePartitionProofResult:
@@ -215,8 +376,22 @@ def test_observer_signature_is_one_use_and_construction_is_inert() -> None:
 
     assert list(inspect.signature(instance.observe).parameters) == ["evidence_dir"]
     assert instance._used is False
+    assert instance._expected_account_fingerprint is None
     assert not hasattr(observer.RobinhoodB2ReadTransport, "get_equity_positions")
     assert not hasattr(observer.RobinhoodB2ReadTransport, "place_equity_order")
+
+
+@pytest.mark.parametrize(
+    "fingerprint",
+    ("", "A" * 64, "g" * 64, "a" * 63, "a" * 65, 123, object()),
+)
+def test_observer_rejects_noncanonical_expected_account_fingerprint(
+    fingerprint: object,
+) -> None:
+    with pytest.raises(ValueError, match="lowercase SHA-256"):
+        observer.RobinhoodAgentInitiatedRuntimePartitionObserver(
+            expected_account_fingerprint=fingerprint  # type: ignore[arg-type]
+        )
 
 
 def test_b2o_checkpoint_is_explicit_manual_and_not_automatic() -> None:
@@ -670,6 +845,7 @@ def test_exact_proof_engine_is_the_only_partition_call(
         "scope-exit",
     ]
     assert calls[3][1] == "normalized-boundary"
+    assert calls[3][2]["expected_account_fingerprint"] is None
 
 
 def test_public_observer_cannot_accept_a_caller_supplied_proof() -> None:
@@ -1089,32 +1265,16 @@ def test_b2_proof_uses_one_fake_sdk_session_and_complete_discovery(
 def test_rhc2_wrapper_dispatches_the_b2_proof_through_one_fake_session(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
-    from trading_bot.robinhood_mcp import windows_oauth
-
-    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
-    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
-    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
-    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
-    calls: list[tuple[str, str, object]] = []
-    oauth_factories: list[dict[str, object]] = []
+    _install_rhc2_source_guards(monkeypatch, tmp_path)
+    expected_fingerprint = _account_fingerprint(_ACCOUNT)
     monkeypatch.setattr(
-        windows_oauth,
-        "create_windows_robinhood_oauth_factory",
-        lambda **kwargs: oauth_factories.append(kwargs) or (lambda: object()),
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: _q62_origin(_q62_runtime_identity(expected_fingerprint)),
     )
-
-    def open_fake_session(
-        oauth_factory, *, before_oauth, before_mcp_session
-    ) -> _Session:
-        del oauth_factory
-        before_oauth()
-        before_mcp_session()
-        return _Session(calls)
-
-    monkeypatch.setattr(observer, "_open_robinhood_client", open_fake_session)
-    monkeypatch.setattr(proof, "_read_source_identity", lambda _: _SOURCE)
-    _install_fake_harness(monkeypatch, tmp_path, observer._run_production_session)
+    calls, oauth_factories, proof_bindings = _install_fake_rhc2_session(
+        monkeypatch, tmp_path
+    )
     result = runner._arch147_rhc2_preflight()
 
     assert result["status"] == "PASS"
@@ -1130,6 +1290,7 @@ def test_rhc2_wrapper_dispatches_the_b2_proof_through_one_fake_session(
     assert result["attempt_counters"]["review_attempts"] == 0
     assert result["attempt_counters"]["placement_attempts"] == 0
     assert result["attempt_counters"]["cancellation_attempts"] == 0
+    assert proof_bindings == [expected_fingerprint]
     assert "provider_effects" not in result
     assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
         "open",
@@ -1143,6 +1304,147 @@ def test_rhc2_wrapper_dispatches_the_b2_proof_through_one_fake_session(
         "get_equity_orders",
         "get_equity_orders",
     ]
+
+
+def test_rhc2_q62_account_mismatch_stops_after_one_account_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _install_rhc2_source_guards(monkeypatch, tmp_path)
+    expected_fingerprint = _account_fingerprint("different-fake-account")
+    monkeypatch.setattr(
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: _q62_origin(_q62_runtime_identity(expected_fingerprint)),
+    )
+    calls, oauth_factories, proof_bindings = _install_fake_rhc2_session(
+        monkeypatch, tmp_path
+    )
+
+    result = runner._arch147_rhc2_preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["observer_status"] == "NOT_PROVEN"
+    assert result["reason"] == proof.B2FailureReason.ACCOUNT_MISMATCH.value
+    assert result["disposition"] == "REVIEW_ONLY"
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+    assert result["observer_evidence_path"] is not None
+    assert result["observer_evidence_sha256"] is not None
+    evidence_text = Path(result["observer_evidence_path"]).read_text(encoding="ascii")
+    evidence = json.loads(evidence_text)
+    assert evidence["b2_result_reason"] == proof.B2FailureReason.ACCOUNT_MISMATCH.value
+    assert _ACCOUNT not in evidence_text
+    assert proof_bindings == [expected_fingerprint]
+    assert len(oauth_factories) == 1
+    assert result["attempt_counters"]["oauth_scope_entry_attempts"] == 1
+    assert result["attempt_counters"]["mcp_session_open_attempts"] == 1
+    assert result["attempt_counters"]["account_read_attempts"] == 1
+    assert result["attempt_counters"]["order_read_attempts"] == 0
+    assert result["attempt_counters"]["review_attempts"] == 0
+    assert result["attempt_counters"]["placement_attempts"] == 0
+    assert result["attempt_counters"]["cancellation_attempts"] == 0
+    assert [item[1] for item in calls if item[0] == "call"] == ["get_accounts"]
+
+
+@pytest.mark.parametrize(
+    "invalid_origin",
+    ("reader_exception", "origin_type", "identity_type", "fingerprint"),
+)
+def test_rhc2_rejects_q62_origin_before_observer_or_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    invalid_origin: str,
+) -> None:
+    rhc2, _ = _install_rhc2_source_guards(monkeypatch, tmp_path)
+
+    def reader_exception():
+        raise RuntimeError("private Q62 journal details")
+
+    def wrong_origin_type():
+        return object()
+
+    def wrong_identity_type():
+        return _q62_origin(object())
+
+    def wrong_fingerprint():
+        identity = _q62_runtime_identity("8" * 64)
+        object.__setattr__(identity, "account_fingerprint", "not-a-fingerprint")
+        return _q62_origin(identity)
+
+    read_origin = {
+        "reader_exception": reader_exception,
+        "origin_type": wrong_origin_type,
+        "identity_type": wrong_identity_type,
+        "fingerprint": wrong_fingerprint,
+    }[invalid_origin]
+    reader_calls: list[str] = []
+
+    def record_read():
+        reader_calls.append("read")
+        return read_origin()
+
+    monkeypatch.setattr(q62_owner, "read_canonical_q62_origin", record_read)
+    _assert_q62_blocked_before_observer(
+        monkeypatch,
+        tmp_path,
+        rhc2,
+        reader_calls,
+        ["read"],
+        ["module-origins"],
+    )
+
+
+@pytest.mark.parametrize(
+    "foreign_stage", ("module_spec", "invalid_spec", "loaded_module")
+)
+def test_rhc2_rejects_foreign_q62_reader_origin_before_read_or_observer(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    foreign_stage: str,
+) -> None:
+    rhc2, _ = _install_rhc2_source_guards(monkeypatch, tmp_path)
+    foreign_path = tmp_path / "foreign_q62_reader.py"
+    foreign_path.write_text("# foreign fake source\n", encoding="utf-8")
+    if foreign_stage == "module_spec":
+        monkeypatch.setattr(
+            rhc2.importlib.util,
+            "find_spec",
+            lambda name, *args, **kwargs: (
+                ModuleSpec(name, loader=None, origin=str(foreign_path))
+                if name == rhc2._Q62_READER_MODULE
+                else None
+            ),
+        )
+    elif foreign_stage == "invalid_spec":
+        monkeypatch.setattr(
+            rhc2.importlib.util,
+            "find_spec",
+            lambda name, *args, **kwargs: (
+                SimpleNamespace() if name == rhc2._Q62_READER_MODULE else None
+            ),
+        )
+    else:
+
+        def origin_check(module, *, repo_root: Path, relative_path: str) -> bool:
+            del repo_root, relative_path
+            return module is not q62_owner
+
+        monkeypatch.setattr(rhc2, "_module_origin_is_canonical", origin_check)
+    reader_calls: list[str] = []
+    monkeypatch.setattr(
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: (
+            reader_calls.append("read") or _q62_origin(_q62_runtime_identity("8" * 64))
+        ),
+    )
+    _assert_q62_blocked_before_observer(
+        monkeypatch,
+        tmp_path,
+        rhc2,
+        reader_calls,
+        [],
+        [] if foreign_stage in {"module_spec", "invalid_spec"} else ["module-origins"],
+    )
 
 
 def test_rhc2_wrapper_rejects_origin_or_registration_before_observer(
@@ -1185,11 +1487,13 @@ def test_rhc2_wrapper_rejects_origin_or_registration_before_observer(
 def test_rhc2_wrapper_keeps_negative_evidence_review_only(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+    rhc2, _ = _install_rhc2_source_guards(monkeypatch, tmp_path)
 
-    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
-    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
-    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: _q62_origin(_q62_runtime_identity("8" * 64)),
+    )
     monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
     _install_fake_harness(monkeypatch, tmp_path, lambda *_: _not_proven())
 
@@ -1207,14 +1511,19 @@ def test_rhc2_wrapper_keeps_negative_evidence_review_only(
 def test_rhc2_wrapper_sanitizes_observer_failure_without_effect_claims(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+    rhc2, _ = _install_rhc2_source_guards(monkeypatch, tmp_path)
 
-    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
-    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
-    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
     monkeypatch.setattr(observer, "_module_origins_are_source_owned", lambda **_: True)
+    monkeypatch.setattr(
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: _q62_origin(_q62_runtime_identity("8" * 64)),
+    )
 
     class _FailingObserver:
+        def __init__(self, **kwargs: object) -> None:
+            del kwargs
+
         async def observe(self, *, evidence_dir: Path) -> object:
             del evidence_dir
             raise RuntimeError("private-token must not escape")
@@ -1237,17 +1546,19 @@ def test_rhc2_wrapper_sanitizes_observer_failure_without_effect_claims(
 def test_rhc2_wrapper_preserves_existing_evidence_on_uuid_collision(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+    rhc2, _ = _install_rhc2_source_guards(monkeypatch, tmp_path)
 
     token = "d" * 32
     evidence_dir = tmp_path / ("arch147-agent-initiated-runtime-partition-" + token)
     evidence_dir.mkdir()
     sentinel = evidence_dir / "evidence.json"
     sentinel.write_bytes(b"old-path-sentinel\n")
-    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
-    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
     monkeypatch.setattr(rhc2, "uuid4", lambda: SimpleNamespace(hex=token))
-    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(
+        q62_owner,
+        "read_canonical_q62_origin",
+        lambda: _q62_origin(_q62_runtime_identity("8" * 64)),
+    )
     monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
     provider_calls: list[str] = []
     _install_fake_harness(

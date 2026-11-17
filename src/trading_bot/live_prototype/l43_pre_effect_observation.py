@@ -527,7 +527,7 @@ class _StateView:
 
 
 @dataclass(frozen=True, slots=True)
-class _BrokerView:
+class _BrokerSnapshot:
     account: L43AccountIdentity
     positions: tuple[L43PositionFact, ...]
     spy_position_quantity: Decimal
@@ -540,7 +540,6 @@ class _BrokerView:
     positions_observation_digest: str
     orders_observation_digest: str
     order_scope_evidence_digest: str
-    reconciliation: ReconciliationSnapshot
     account_observed_at: datetime
     positions_observed_at: datetime
     orders_observed_at: datetime
@@ -665,15 +664,11 @@ def observe_l43_pre_effect(
             else nullcontext()
         )
         with read_scope:
-            broker = _read_broker(
+            broker, reconciliation = _read_broker(
                 robinhood,
                 dependencies=dependencies,
                 origin=dependencies.origin,
                 state=state_before.state,
-                source=source,
-                provenance=provenance,
-                target_session=session_view.facts.target_session,
-                observed_at=observed_at,
                 counters=counters,
             )
 
@@ -756,7 +751,6 @@ def observe_l43_pre_effect(
                 _validate_entry_risk(requested_entry_risk)
                 if not recovery.reconciled or recovery.unresolved_effects:
                     raise _Blocked(L43PreEffectBlocker.RECONCILIATION_FAILED)
-                reconciliation = broker.reconciliation
                 plan = _make_plan(
                     kind=L43PlanKind.ENTRY,
                     source=source,
@@ -792,14 +786,14 @@ def observe_l43_pre_effect(
                 if signal_decision is not SignalDecision.SELL:
                     outcome = L43PreEffectOutcome.NO_ACTION_SIGNAL
                 else:
-                    _require_terminal_entry_reconciled(state, broker.reconciliation)
+                    _require_terminal_entry_reconciled(state, reconciliation)
                     proposal = _exact_owned_sell_proposal(
                         state=state,
                         origin_identity=dependencies.origin.runtime_identity,
                         target_session=session_view.facts.target_session,
                         broker_position=broker.spy_position_quantity,
                         broker_sellable=broker.spy_sellable_quantity,
-                        reconciliation=broker.reconciliation,
+                        reconciliation=reconciliation,
                     )
                     eligibility = evaluate_exact_owned_sell_proposal(proposal)
                     if (
@@ -812,7 +806,7 @@ def observe_l43_pre_effect(
                             provenance=provenance,
                             continuity=continuity,
                             state=state_before,
-                            reconciliation=broker.reconciliation,
+                            reconciliation=reconciliation,
                             broker=broker,
                             scope_digest=broker.order_scope_digest,
                             session=session_view.facts,
@@ -835,6 +829,7 @@ def observe_l43_pre_effect(
                             continuity=continuity,
                             state=state_before,
                             broker=broker,
+                            reconciliation=reconciliation,
                             session=session_view.facts,
                             signal=decision_facts,
                             recovery=recovery,
@@ -1077,12 +1072,42 @@ def _read_broker(
     dependencies: L43PreEffectDependencies,
     origin: Q62JournalOrigin,
     state: DurableState,
-    source: L43SourceIdentity,
-    provenance: L43Provenance,
-    target_session: str,
-    observed_at: datetime,
     counters: _Counters,
-) -> _BrokerView:
+) -> tuple[_BrokerSnapshot, ReconciliationSnapshot]:
+    broker = _read_broker_snapshot(
+        robinhood,
+        dependencies=dependencies,
+        origin=origin,
+        counters=counters,
+    )
+    unresolved_spy = tuple(
+        order for order in broker.spy_orders if not _order_terminal(order)
+    )
+    if unresolved_spy:
+        raise _Blocked(L43PreEffectBlocker.WORKING_OR_UNKNOWN_ORDER)
+
+    reconciliation = _reconciliation_snapshot(
+        state=state,
+        origin_identity=origin.runtime_identity,
+        spy_position=broker.spy_position_quantity,
+        spy_orders=broker.spy_orders,
+    )
+    return broker, reconciliation
+
+
+def _read_broker_snapshot(
+    robinhood: L43PreEffectReadBoundary,
+    *,
+    dependencies: L43PreEffectDependencies,
+    origin: Q62JournalOrigin,
+    counters: _Counters,
+) -> _BrokerSnapshot:
+    """Acquire one exhaustive, scope-proven factual account/position/order view.
+
+    This shared kernel deliberately does not interpret unresolved provider
+    states or durable order ownership. Pre-effect admission and post-effect
+    reconciliation apply their own interpretation to this same snapshot.
+    """
     if not all(
         callable(getattr(robinhood, name, None))
         for name in ("get_accounts", "get_equity_positions", "get_equity_orders")
@@ -1226,7 +1251,7 @@ def _read_broker(
         raise _Blocked(L43PreEffectBlocker.ORDER_COVERAGE_INCOMPLETE)
     orders_digest = _digest(
         (
-            "ARCH147_L43_RELEVANT_SPY_ORDERS_V1",
+            "ARCH147_L43_RELEVANT_SPY_ORDERS_V2",
             account.fingerprint,
             tuple(sorted(_order_material(order) for order in spy_orders)),
             orders_page.page_count,
@@ -1245,18 +1270,7 @@ def _read_broker(
     counters.orders_observation_digest = orders_observation_digest
     counters.observed_times.append(("orders", orders_at))
 
-    unresolved_spy = tuple(order for order in spy_orders if not _order_terminal(order))
-    if unresolved_spy:
-        raise _Blocked(L43PreEffectBlocker.WORKING_OR_UNKNOWN_ORDER)
-
-    reconciliation = _reconciliation_snapshot(
-        state=state,
-        origin_identity=origin.runtime_identity,
-        spy_position=position_quantity,
-        spy_orders=spy_orders,
-    )
-    del source, provenance, target_session, observed_at
-    return _BrokerView(
+    return _BrokerSnapshot(
         account=account,
         positions=positions,
         spy_position_quantity=position_quantity,
@@ -1269,7 +1283,6 @@ def _read_broker(
         positions_observation_digest=positions_observation_digest,
         orders_observation_digest=orders_observation_digest,
         order_scope_evidence_digest=proof.evidence_sha256,
-        reconciliation=reconciliation,
         account_observed_at=account_at,
         positions_observed_at=positions_at,
         orders_observed_at=orders_at,
@@ -1603,7 +1616,8 @@ def _manual_close_evidence(
     provenance: L43Provenance,
     continuity: L43ContinuityResult,
     state: _StateView,
-    broker: _BrokerView,
+    broker: _BrokerSnapshot,
+    reconciliation: ReconciliationSnapshot,
     session: XnysSessionFacts,
     signal: D34SignalFacts,
     recovery: RecoveryFacts,
@@ -1616,7 +1630,7 @@ def _manual_close_evidence(
         or quantity <= _ZERO
         or broker.spy_position_quantity != quantity
         or broker.spy_sellable_quantity < quantity
-        or broker.reconciliation.observed_position != quantity
+        or reconciliation.observed_position != quantity
         or not state.state.reconciled
         or not recovery.reconciled
         or recovery.unresolved_effects
@@ -1631,15 +1645,15 @@ def _manual_close_evidence(
         or _valid_exact_quantity(quantity)
     ):
         raise _Blocked(L43PreEffectBlocker.SELL_POSITION_MISMATCH)
-    _require_terminal_entry_reconciled(state.state, broker.reconciliation)
+    _require_terminal_entry_reconciled(state.state, reconciliation)
     if unsupported_proposal_sha256 is None:
         raise _Blocked(L43PreEffectBlocker.SELL_PROPOSAL_INVALID)
     _sha256(unsupported_proposal_sha256, "unsupported sell proposal digest")
     reconciliation_digest = _digest(
         (
             "ARCH147_L43_RECONCILIATION_FACTS_V1",
-            broker.reconciliation.identity.to_record(),
-            broker.reconciliation.observed_position,
+            reconciliation.identity.to_record(),
+            reconciliation.observed_position,
             tuple(
                 sorted(
                     (
@@ -1650,7 +1664,7 @@ def _manual_close_evidence(
                         _decimal_text(item.cumulative_notional),
                         _decimal_text(item.working_remainder),
                     )
-                    for item in broker.reconciliation.orders
+                    for item in reconciliation.orders
                 )
             ),
         )
@@ -1705,7 +1719,7 @@ def _manual_close_evidence(
 def _recovery_facts(
     *,
     state: DurableState,
-    broker: _BrokerView,
+    broker: _BrokerSnapshot,
     source: L43SourceIdentity,
     provenance: L43Provenance,
     continuity: L43ContinuityResult,
@@ -1776,7 +1790,7 @@ def _make_plan(
     continuity: L43ContinuityResult,
     state: _StateView,
     reconciliation: ReconciliationSnapshot,
-    broker: _BrokerView,
+    broker: _BrokerSnapshot,
     scope_digest: str,
     session: XnysSessionFacts,
     signal: D34SignalFacts,
@@ -2008,27 +2022,49 @@ def _order_material(order: L43OrderFact) -> tuple[str, ...]:
         order.placed_agent,
         order.agent_initiated,
         order.created_at.isoformat(),
-        _decimal_text(order.cumulative_quantity),
-        "" if order.average_price is None else _decimal_text(order.average_price),
+        _bounded_order_decimal_text(order.cumulative_quantity),
+        ""
+        if order.average_price is None
+        else _bounded_order_decimal_text(order.average_price),
         order.order_type.casefold(),
         order.market_hours.casefold(),
         order.time_in_force.casefold(),
+        order.trigger,
+        ""
+        if order.requested_quantity is None
+        else _bounded_order_decimal_text(order.requested_quantity),
         ""
         if order.dollar_based_amount is None
-        else _decimal_text(order.dollar_based_amount.amount),
+        else _bounded_order_decimal_text(order.dollar_based_amount.amount),
         ""
         if order.dollar_based_amount is None
         else order.dollar_based_amount.currency_code,
         tuple(
             (
                 item.execution_id,
-                _decimal_text(item.quantity),
-                _decimal_text(item.price),
+                _bounded_order_decimal_text(item.quantity),
+                _bounded_order_decimal_text(item.price),
                 item.timestamp.isoformat(),
             )
             for item in order.executions
         ),
     )
+
+
+def _bounded_order_decimal_text(value: Decimal) -> str:
+    """Reject unbounded provider numerics before fixed-point rendering."""
+
+    if type(value) is not Decimal or not value.is_finite():
+        raise ValueError("provider order decimal is not finite")
+    parts = value.as_tuple()
+    if (
+        not -12 <= parts.exponent <= 12
+        or len(parts.digits) > 64
+        or value.adjusted() > 12
+        or value < _ZERO
+    ):
+        raise ValueError("provider order decimal is outside the bounded domain")
+    return _decimal_text(value)
 
 
 def _validate_entry_risk(risk: Decimal) -> None:

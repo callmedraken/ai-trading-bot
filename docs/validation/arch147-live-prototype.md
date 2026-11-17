@@ -1,5 +1,86 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
+## RHC3P corrective source checkpoint - exact-source acceptance pending
+
+RHC3 remains ACCEPTED / INTEGRATED as recorded below. The attempted RHC4
+production composition is `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`: it stopped
+before source implementation because the current L43 read path could not safely
+produce post-placement reconciliation facts for a newly bound order. There is
+no RHC4 commit, test run, admission, push, or CI result to preserve.
+
+RHC3P is the additive Architecture 147 source-only / fake-only correction.
+Its exact-source acceptance and integration are pending. RHC3P does not modify
+the accepted RHC3 source or the consumed A2/RHC2 evidence. No provider
+observation, real review, or other protected action occurred or is authorized.
+
+### Pre-effect and post-effect order policy
+
+The existing pre-effect policy remains unchanged. It blocks unresolved or
+unknown SPY orders and post-entry conflicting unrelated SPY rows. Older
+unrelated terminal history may pass the existing pre-effect policy. This is
+distinct from the new post-effect interpretation: post-effect reconciliation
+uses the exhaustive RHC3-proven, unfiltered account-and-SPY order universe and
+blocks on any unrelated row, including an otherwise terminal historical row.
+The additive post-effect path does not grant permission to begin another effect
+while an order is working or unknown.
+
+Post-effect reconciliation requires the exact bound provider ID once, SPY,
+`agent_initiated=true`, matching durable kind/provider side, and the exact
+market / regular-hours / GFD / immediate contract. Unknown states, malformed
+or duplicate executions, duplicate or missing bound orders, fill regression,
+position mismatch, incomplete pagination, or missing/tampered RHC3 scope proof
+fail closed. Fills and cumulative notional come only from unique positive
+execution facts; the broker position must equal baseline plus confirmed entry
+buys minus confirmed exit sells before complete-order evidence is returned.
+
+A dollar ENTRY has no source-owned requested share quantity. Provider
+`requested_quantity` may be absent or vary, is not an identity or ownership
+fact, and its durable `working_remainder` is always zero. The durable dollar
+reservation remains consumed in full while only confirmed shares become owned.
+EXIT continues to require the exact provider requested quantity and exact
+positive active remainder; no replacement sell is authorized. Historical
+durable journal replay accepts previously valid nonzero ENTRY remainder records
+without rewriting them, while every new ENTRY observation requires zero
+remainder. An active ENTRY remains non-ready through its unresolved status and
+pending identity independently of remainder.
+
+### Accepted review semantic and clean fake response
+
+The accepted L41R6 source-owned official claim is
+`REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS`. It states that
+`review_equity_order` simulates an equity order and returns pre-trade warnings,
+while `place_equity_order` is separately described as placing the order.
+L41R6 records `REVIEW_PREVIEW_ONLY=PROVEN` with rationale
+`L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN`. This proves nonplacing semantics only;
+it does not prove account-specific response success or placement success. The
+production normalizer must resolve and authenticate this exact claim at use
+time and fail closed when it cannot.
+
+RHC3P's only clean response is fake test material. It has a successful
+structured result (`is_error=false`) with a root containing exactly `data`.
+The data contains only `market_data_disclosure` (optional string/null),
+`order_checks`, `quantity`, `quote_data`, `side`, `symbol`, and `type`; it echoes
+the exact proposed full-owned quantity, `side=sell`, `symbol=SPY`, and
+`type=market`; and `order_checks` is an empty mapping. Its complete `quote_data`
+key set is `adjusted_previous_close`, `ask_price`, `bid_price`, `has_traded`,
+`last_non_reg_trade_price`, `last_trade_price`, `previous_close`,
+`previous_close_date`, `state`, `symbol`, `venue_ask_time`, `venue_bid_time`,
+`venue_last_non_reg_trade_time`, and `venue_last_trade_time`. The parsed quote
+is SPY, active, traded, has valid prices/timestamps, and supplies a positive
+sell-side reference. The proposal review arguments equal the exact intended
+placement arguments: account-scoped regular-hours SPY sell, market, GFD, and
+the same full-owned quantity. Only this clean fake response normalizes to
+`AFFIRMATIVE / NONPLACING_PREVIEW`, meaning no identified pre-trade warning
+for that exact proposal. It is neither placement success nor reusable
+placement authority. No real review call is authorized in RHC3P.
+
+RHC3P has performed zero provider, OAuth, browser, MCP, account, position,
+order, review, placement, cancellation, or Alpaca operations. L43 protected
+qualification and Q63 remain NOT_RUN; `FINAL_HOLDOUT` remains SEALED. RHC4 may
+resume only after RHC3P exact-source acceptance, integration, and
+coordination-document synchronization. The RHC4 executable-wiring milestone
+remains future work.
+
 ## L43 schema-only order-scope observation — CONSUMED / UNPROVEN / NO RETRY
 
 Accepted observer source remains `826bca192a90c20738bb1dc1199b8d3373e083e7` / tree `e204de937c29cd0719b57a4499a5bd8cb2dd13d4`. Feature mapped FULL `43346232426` and develop exact-certification reuse `43364684407` are terminal SUCCESS. Observation-bound docs source `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913` has feature/develop docs gates `43365064205` / `43365310403` terminal SUCCESS.

@@ -450,14 +450,16 @@ class OrderObservation:
             self.working_remainder,
         ):
             _validate_decimal(value, "order observation")
+        if self.cumulative_quantity == _ZERO and self.cumulative_notional != _ZERO:
+            raise ValueError("zero fill quantity cannot have cumulative notional")
         if self.cumulative_quantity > _ZERO and self.cumulative_notional == _ZERO:
             raise ValueError("positive fill quantity requires positive notional")
         if self.status is OrderStatus.WORKING:
-            if self.cumulative_quantity != _ZERO or self.working_remainder <= _ZERO:
-                raise ValueError("WORKING order must be unfilled with remainder")
+            if self.cumulative_quantity != _ZERO:
+                raise ValueError("WORKING order must be unfilled")
         elif self.status is OrderStatus.PARTIAL:
-            if self.cumulative_quantity <= _ZERO or self.working_remainder <= _ZERO:
-                raise ValueError("PARTIAL order requires fills and remainder")
+            if self.cumulative_quantity <= _ZERO:
+                raise ValueError("PARTIAL order requires fills")
         elif self.status is OrderStatus.FILLED:
             if self.cumulative_quantity <= _ZERO or self.working_remainder != _ZERO:
                 raise ValueError("FILLED order requires fills and no remainder")
@@ -591,7 +593,12 @@ def _event_payload(event: dict[str, object], expected: set[str]) -> dict[str, ob
     return payload
 
 
-def _apply_event(state: DurableState | None, event: dict[str, object]) -> DurableState:
+def _apply_event(
+    state: DurableState | None,
+    event: dict[str, object],
+    *,
+    allow_legacy_entry_observation: bool = False,
+) -> DurableState:
     kind = event["kind"]
     sequence = event["sequence"]
     event_hash = event["event_hash"]
@@ -816,7 +823,14 @@ def _apply_event(state: DurableState | None, event: dict[str, object]) -> Durabl
             or notional < target.cumulative_notional
         ):
             raise JournalCorruption("cumulative fills are not monotone")
-        _validate_observed_transition(target, status, quantity, notional, remainder)
+        _validate_observed_transition(
+            target,
+            status,
+            quantity,
+            notional,
+            remainder,
+            allow_legacy_entry_observation=allow_legacy_entry_observation,
+        )
         updated = _update_intent(
             state,
             replace(
@@ -941,6 +955,8 @@ def _validate_observed_transition(
     quantity: Decimal,
     notional: Decimal,
     remainder: Decimal,
+    *,
+    allow_legacy_entry_observation: bool = False,
 ) -> None:
     if status not in {
         IntentStatus.WORKING,
@@ -965,7 +981,18 @@ def _validate_observed_transition(
         or notional != target.cumulative_notional
     ):
         raise JournalCorruption("terminal order observation changed")
-    if target.kind is IntentKind.EXIT:
+    if target.kind is IntentKind.ENTRY:
+        if remainder != _ZERO and not allow_legacy_entry_observation:
+            raise JournalCorruption("dollar entry cannot have a share remainder")
+        if (
+            quantity == _ZERO
+            and notional != _ZERO
+            and not allow_legacy_entry_observation
+        ):
+            raise JournalCorruption(
+                "entry without fills cannot have cumulative notional"
+            )
+    else:
         requested = target.requested_quantity
         assert requested is not None
         if quantity > requested:
@@ -975,9 +1002,13 @@ def _validate_observed_transition(
         if status in {IntentStatus.WORKING, IntentStatus.PARTIAL}:
             if remainder != _subtract(requested, quantity):
                 raise JournalCorruption("exit remainder differs from requested shares")
-    if status is IntentStatus.WORKING and (quantity != _ZERO or remainder <= _ZERO):
+    if status is IntentStatus.WORKING and (
+        quantity != _ZERO or (target.kind is IntentKind.EXIT and remainder <= _ZERO)
+    ):
         raise JournalCorruption("working order observation is inconsistent")
-    if status is IntentStatus.PARTIAL and (quantity <= _ZERO or remainder <= _ZERO):
+    if status is IntentStatus.PARTIAL and (
+        quantity <= _ZERO or (target.kind is IntentKind.EXIT and remainder <= _ZERO)
+    ):
         raise JournalCorruption("partial order observation is inconsistent")
     if status is IntentStatus.FILLED and (quantity <= _ZERO or remainder != _ZERO):
         raise JournalCorruption("filled order observation is inconsistent")
@@ -1173,7 +1204,7 @@ class DurableStateStore:
             )
             if event != rebuilt:
                 raise JournalCorruption("event identity or digest differs")
-            state = _apply_event(state, event)
+            state = _apply_event(state, event, allow_legacy_entry_observation=True)
             previous_hash = event["event_hash"]
         if state is None:
             raise JournalCorruption("durable journal has no state")

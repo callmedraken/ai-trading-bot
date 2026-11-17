@@ -516,11 +516,7 @@ class _Reconciler:
                 status = self.entry_status
                 quantity = self.entry_quantity
                 notional = quantity * Decimal("20.00")
-                remainder = (
-                    _OWNED - quantity
-                    if status in {OrderStatus.WORKING, OrderStatus.PARTIAL}
-                    else _ZERO
-                )
+                remainder = _ZERO
             elif self.exit_quantity is None:
                 status = self.exit_status
                 quantity = order.requested_quantity or _ZERO

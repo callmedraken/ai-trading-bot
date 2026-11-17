@@ -200,6 +200,29 @@ def _accepted_claim_bindings() -> tuple[L41R6OfficialClaimScopeBinding, ...]:
     return tuple(result)
 
 
+def accepted_proven_review_preview_claim_binding() -> L41R6OfficialClaimScopeBinding:
+    """Resolve only the accepted PROVEN L41R6 nonplacing-review semantic."""
+    expected_decision = (
+        Classification.PROVEN,
+        "L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN",
+        "INTERFACE",
+    )
+    if _L41R6_DECISIONS.get(FactId.REVIEW_PREVIEW_ONLY) != expected_decision:
+        raise ValueError("L41R6_REVIEW_PREVIEW_FACT_NOT_PROVEN")
+    matches = tuple(
+        item
+        for item in _accepted_claim_bindings()
+        if item.fact_id is FactId.REVIEW_PREVIEW_ONLY
+    )
+    if (
+        len(matches) != 1
+        or matches[0].claim.claim_id
+        is not OfficialClaimId.REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS
+    ):
+        raise ValueError("L41R6_REVIEW_PREVIEW_CLAIM_UNTRUSTED")
+    return matches[0]
+
+
 def _interface_provenance(
     evidence: ConsumedL41R5InterfaceProvenance,
 ) -> tuple[L41R6InterfaceFactProvenance, ...]:

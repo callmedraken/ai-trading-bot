@@ -38,6 +38,7 @@ class L43TransportError(RuntimeError):
 
 class L43ReviewStatus(StrEnum):
     NORMALIZED_UNKNOWN = "NORMALIZED_UNKNOWN"
+    NORMALIZED_AFFIRMATIVE = "NORMALIZED_AFFIRMATIVE"
     BLOCKED = "BLOCKED"
 
 
@@ -75,6 +76,20 @@ class L43ReviewNormalization:
                 raise ValueError("raw provider output cannot assert review outcome")
             if self.review.semantics.value != "UNKNOWN":
                 raise ValueError("raw provider output cannot assert review semantics")
+        elif self.status is L43ReviewStatus.NORMALIZED_AFFIRMATIVE:
+            if (
+                self.review is None
+                or self.review.outcome.value != "AFFIRMATIVE"
+                or self.review.semantics.value != "NONPLACING_PREVIEW"
+                or self.review.warnings
+                or self.review.unknown_fields
+                or self.review.rejection_code is not None
+                or self.review.provider_order_id is not None
+                or self.manual_close_trigger is not None
+            ):
+                raise ValueError(
+                    "affirmative review must be a clean nonplacing preview"
+                )
         elif self.review is not None or self.manual_close_trigger is None:
             raise ValueError("blocked review requires only a manual-close trigger")
 
@@ -186,6 +201,8 @@ class L43OrderFact:
     market_hours: str
     time_in_force: str
     order_type: str
+    trigger: str
+    requested_quantity: Decimal | None
     cumulative_quantity: Decimal
     average_price: Decimal | None
     dollar_based_amount: L43DollarAmountFact | None

@@ -6,6 +6,9 @@ from pathlib import Path
 import pytest
 
 from trading_bot.live_prototype.durable_state import RuntimeIdentity
+from trading_bot.live_prototype.l43_post_effect_reconciler import (
+    L43ExactPostEffectReconciler,
+)
 from trading_bot.live_prototype.l43_pre_effect_observation import (
     L43PreEffectDependencies,
 )
@@ -88,6 +91,11 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
         built.dependencies.order_scope_verifier,
         composition.RobinhoodL43AccountWideOrderScopeVerifier,
     )
+    assert oauth_factory_calls == []
+
+    post_effect_reconciler = built.post_effect_reconciler()
+    assert type(post_effect_reconciler) is L43ExactPostEffectReconciler
+    assert post_effect_reconciler._dependencies is built.dependencies
     assert oauth_factory_calls == []
 
     read = built.dependencies.robinhood_builder()

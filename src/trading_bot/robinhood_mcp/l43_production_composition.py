@@ -21,6 +21,9 @@ from scripts.checkpoint_runner import _git_output
 from trading_bot.live_prototype.alpaca_runtime_signal_provider import (
     AlpacaRuntimeSignalProvider,
 )
+from trading_bot.live_prototype.l43_post_effect_reconciler import (
+    L43ExactPostEffectReconciler,
+)
 from trading_bot.live_prototype.l43_pre_effect_observation import (
     _MAX_ORDER_PAGES,
     _MAX_ORDERS,
@@ -203,6 +206,11 @@ class L43ProductionPreEffectComposition:
             raise TypeError("production composition requires the accepted Q62 origin")
         self.dependencies = dependencies
         self.origin = origin
+
+    def post_effect_reconciler(self) -> L43ExactPostEffectReconciler:
+        """Return the lazy read-only reconciler over the shared L43 dependencies."""
+
+        return L43ExactPostEffectReconciler(self.dependencies)
 
     @classmethod
     def for_production(

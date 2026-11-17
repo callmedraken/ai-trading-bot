@@ -241,6 +241,24 @@ def test_valid_order_page_preserves_pagination() -> None:
     assert page.next_cursor == "page-2"
 
 
+@pytest.mark.parametrize(
+    ("provider_quantity", "expected_quantity"),
+    ((None, None), ("0.25", Decimal("0.25"))),
+)
+def test_l43_order_fact_preserves_optional_requested_quantity_and_trigger(
+    provider_quantity: str | None,
+    expected_quantity: Decimal | None,
+) -> None:
+    row = _order(quantity=provider_quantity, trigger="stop")
+    page = RobinhoodL43PreEffectReadAdapter(
+        _Read("orders", {"orders": [row], "next": None})
+    ).get_equity_orders({"account_number": "account-147", "symbol": "SPY"})
+
+    fact = page.rows[0]
+    assert fact.requested_quantity == expected_quantity
+    assert fact.trigger == "stop"
+
+
 def test_b2_adapter_exposes_only_account_and_order_reads() -> None:
     adapter = RobinhoodL43B2PreEffectReadAdapter(
         _Read("orders", {"orders": [], "next": None})

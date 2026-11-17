@@ -284,6 +284,8 @@ def _order_fact(order: RobinhoodEquityOrder, *, agent_initiated: bool) -> L43Ord
         market_hours=order.market_hours,
         time_in_force=order.time_in_force,
         order_type=order.order_type,
+        trigger=order.trigger,
+        requested_quantity=order.quantity,
         cumulative_quantity=order.cumulative_quantity,
         average_price=order.average_price,
         dollar_based_amount=(

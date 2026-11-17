@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from trading_bot.live_prototype import capability_rule_binding_l41r6 as l41r6
 from trading_bot.live_prototype.contracts import EffectDisposition, Lifecycle
 from trading_bot.live_prototype.durable_state import IntentKind
 from trading_bot.live_prototype.live_contract import OwnershipSnapshot
@@ -28,8 +29,10 @@ from trading_bot.live_prototype.tiny_live_policy import (
     SellSide,
     SellTimeInForce,
     TerminalEntryEvidence,
+    evaluate_exact_owned_sell_proposal,
     validate_normalized_sell_review,
 )
+from trading_bot.robinhood_mcp import l43_transport
 from trading_bot.robinhood_mcp.l43_transport import (
     L43PlacementReceipt,
     L43ReviewStatus,
@@ -94,7 +97,14 @@ def _schemas(*, missing: tuple[str, str] | None = None, quantity_union=False):
 
 class _FakeSession:
     def __init__(
-        self, schemas, *, result=None, results=None, pages=None, call_gate=None
+        self,
+        schemas,
+        *,
+        result=None,
+        results=None,
+        pages=None,
+        call_gate=None,
+        request_mutator=None,
     ):
         self.schemas = schemas
         self.result = result or SimpleNamespace(
@@ -104,6 +114,7 @@ class _FakeSession:
         self.results = results
         self.pages = pages
         self.call_gate = call_gate
+        self.request_mutator = request_mutator
         self.calls: list[tuple[str, dict[str, object]]] = []
         self.list_calls: list[str | None] = []
 
@@ -121,6 +132,8 @@ class _FakeSession:
 
     async def call_tool(self, name, arguments):
         self.calls.append((name, dict(arguments)))
+        if self.request_mutator is not None:
+            self.request_mutator(arguments)
         if self.call_gate is not None:
             await self.call_gate.wait()
         if self.results is not None:
@@ -408,18 +421,13 @@ def test_entry_order_rejects_invalid_dollar_amount_before_discovery(value):
     assert session.calls == []
 
 
-def test_sell_review_and_place_arguments_match_exact_full_owned_quantity():
+def test_clean_sell_review_is_affirmative_nonplacing_and_does_not_place():
     args = _arguments()
     proposal = _proposal(args)
+    payload = _review_payload()
     session = _FakeSession(
         _schemas(),
-        results=[
-            SimpleNamespace(is_error=False, structured_content=_review_payload()),
-            SimpleNamespace(
-                is_error=False,
-                structured_content={"data": {"order": {"id": "provider-order-1"}}},
-            ),
-        ],
+        result=SimpleNamespace(is_error=False, structured_content=payload),
     )
     transport = L43RobinhoodTransport.for_test(lambda: session)
 
@@ -427,42 +435,68 @@ def test_sell_review_and_place_arguments_match_exact_full_owned_quantity():
         review = await transport.review_sell_order(
             account_number="account-one", proposal=proposal
         )
-        assert review.status is L43ReviewStatus.NORMALIZED_UNKNOWN
-        assert review.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_UNKNOWN
+        assert review.status is L43ReviewStatus.NORMALIZED_AFFIRMATIVE
+        assert review.manual_close_trigger is None
         assert review.review is not None
         assert review.review.contract_id == EXACT_SELL_REVIEW_CONTRACT_ID
-        assert review.review.outcome is NormalizedReviewOutcome.UNKNOWN
-        assert review.review.semantics is NormalizedReviewSemantics.UNKNOWN
-        assert validate_normalized_sell_review(
-            proposal, review.review
-        ).manual_close_trigger is (ManualCloseTrigger.SELL_REVIEW_UNKNOWN)
-        async with transport.prepare_sell_order(
-            account_number="account-one", arguments=args
-        ) as prepared:
-            invoke = prepared.resolve_callable(authority_sha256=_AUTHORITY)
-            await invoke(
-                _permit(
-                    IntentKind.EXIT,
-                    quantity=args.quantity,
-                    authority_sha256=_AUTHORITY,
-                )
-            )
+        assert review.review.outcome is NormalizedReviewOutcome.AFFIRMATIVE
+        assert review.review.semantics is NormalizedReviewSemantics.NONPLACING_PREVIEW
+        assert review.review.reviewed_arguments == proposal.placement_arguments
+        validation = validate_normalized_sell_review(proposal, review.review)
+        assert validation.manual_close_trigger is None
+        assert validation.provider_mutation_count == 0
+        assert validation.placement_authority_granted is False
+        assert validation.trade_authority_granted is False
+        return review
 
-    asyncio.run(scenario())
-    review_args = session.calls[0][1]
-    place_args = session.calls[1][1]
-    assert session.calls[0][0] == "review_equity_order"
-    assert session.calls[1][0] == "place_equity_order"
-    assert review_args == place_args
-    assert review_args == {
-        "account_number": "account-one",
-        "market_hours": "regular_hours",
-        "quantity": "0.123456",
-        "side": "sell",
-        "symbol": "SPY",
-        "time_in_force": "gfd",
-        "type": "market",
-    }
+    review = asyncio.run(scenario())
+    assert session.calls == [
+        (
+            "review_equity_order",
+            {
+                "account_number": "account-one",
+                "market_hours": "regular_hours",
+                "quantity": "0.123456",
+                "side": "sell",
+                "symbol": "SPY",
+                "time_in_force": "gfd",
+                "type": "market",
+            },
+        )
+    ]
+    assert dict(transport.call_counts)["review_equity_order"] == 1
+    assert dict(transport.call_counts)["place_equity_order"] == 0
+    proposal_sha256 = evaluate_exact_owned_sell_proposal(proposal).proposal_sha256
+    assert proposal_sha256 is not None
+    assert review.review is not None
+    assert review.review.evidence_sha256 == l43_transport._review_evidence_digest(
+        payload,
+        session.calls[0][1],
+        proposal_sha256,
+        l43_transport._accepted_review_preview_authority_sha256(),
+    )
+    authority_sha256 = l43_transport._accepted_review_preview_authority_sha256()
+    request = session.calls[0][1]
+    expected_digest = review.review.evidence_sha256
+    assert expected_digest != l43_transport._review_evidence_digest(
+        payload,
+        {**request, "account_number": "account-two"},
+        proposal_sha256,
+        authority_sha256,
+    )
+    assert expected_digest != l43_transport._review_evidence_digest(
+        _review_payload(quantity="0.123455"),
+        request,
+        proposal_sha256,
+        authority_sha256,
+    )
+    alternate_authority = "0" * 64 if authority_sha256 != "0" * 64 else "1" * 64
+    assert expected_digest != l43_transport._review_evidence_digest(
+        payload,
+        request,
+        proposal_sha256,
+        alternate_authority,
+    )
 
 
 def test_sell_review_unknown_fields_and_order_checks_fail_closed():
@@ -498,6 +532,137 @@ def test_sell_review_unknown_fields_and_order_checks_fail_closed():
         assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_WARNING
 
     asyncio.run(warning_case())
+
+
+def test_review_claim_resolution_failure_blocks_before_session_or_provider_call(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(l41r6, "_accepted_claim_bindings", lambda: ())
+    session = _FakeSession(_schemas())
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_UNKNOWN
+
+    asyncio.run(scenario())
+    assert session.list_calls == []
+    assert session.calls == []
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("symbol", "QQQ"), ("has_traded", False), ("bid_price", "0")],
+)
+def test_review_rejects_malformed_or_contradictory_quote_data(field, value):
+    payload = _review_payload()
+    payload["data"]["quote_data"][field] = value
+    session = _FakeSession(
+        _schemas(), result=SimpleNamespace(is_error=False, structured_content=payload)
+    )
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_MALFORMED
+
+    asyncio.run(scenario())
+
+
+def test_review_response_placement_shaped_material_is_blocked():
+    session = _FakeSession(
+        _schemas(),
+        result=SimpleNamespace(
+            is_error=False,
+            structured_content={
+                "data": {"order": {"id": "provider-order-1"}},
+            },
+        ),
+    )
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_MALFORMED
+
+    asyncio.run(scenario())
+    assert session.calls[0][0] == "review_equity_order"
+    assert dict(transport.call_counts)["place_equity_order"] == 0
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("symbol", "QQQ"), ("side", "buy"), ("type", "limit"), ("quantity", "0.123455")],
+)
+def test_review_response_must_echo_the_exact_sell_proposal(field, value):
+    payload = _review_payload()
+    payload["data"][field] = value
+    session = _FakeSession(
+        _schemas(), result=SimpleNamespace(is_error=False, structured_content=payload)
+    )
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_MALFORMED
+
+    asyncio.run(scenario())
+
+
+def test_review_requires_successful_structured_result():
+    session = _FakeSession(
+        _schemas(),
+        result=SimpleNamespace(is_error=True, structured_content=_review_payload()),
+    )
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_UNKNOWN
+
+    asyncio.run(scenario())
+    assert dict(transport.call_counts)["place_equity_order"] == 0
+
+
+def test_review_request_mutation_is_blocked_and_never_places():
+    session = _FakeSession(
+        _schemas(),
+        result=SimpleNamespace(is_error=False, structured_content=_review_payload()),
+        request_mutator=lambda arguments: arguments.update(quantity="0.123455"),
+    )
+    transport = L43RobinhoodTransport.for_test(lambda: session)
+
+    async def scenario():
+        result = await transport.review_sell_order(
+            account_number="account-one", proposal=_proposal()
+        )
+        assert result.status is L43ReviewStatus.BLOCKED
+        assert result.review is None
+        assert result.manual_close_trigger is ManualCloseTrigger.SELL_REVIEW_MALFORMED
+
+    asyncio.run(scenario())
+    assert session.calls[0][1]["quantity"] == "0.123456"
+    assert dict(transport.call_counts)["place_equity_order"] == 0
 
 
 def test_sell_arguments_reject_dollar_substitution_manual_position_and_scale():

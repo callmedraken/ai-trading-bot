@@ -1,10 +1,9 @@
 """Narrow, effect-unwired Robinhood transport for the L43 source boundary.
 
 This adapter validates the bounded L43 order argument shapes against the
-consumed L41R5 input-schema facts.  It has no OAuth factory or production
-composition.  Input schema evidence does not establish provider review or
-placement semantics; review responses are normalized only as UNKNOWN unless a
-later separately accepted contract establishes affirmative semantics.
+consumed L41R5 input-schema facts. It has no OAuth factory or production
+composition. An affirmative nonplacing review requires both the authenticated
+L41R6 source-owned semantic and a clean, exact current response.
 """
 
 from __future__ import annotations
@@ -19,6 +18,12 @@ from decimal import Decimal
 from typing import Protocol
 
 from trading_bot.desktop_live.ownership import provider_order_id
+from trading_bot.domain import OrderSide, Symbol
+from trading_bot.live_prototype.capability_observer import FactId
+from trading_bot.live_prototype.capability_rule_binding_l41r6 import (
+    L41R6OfficialClaimScopeBinding,
+    accepted_proven_review_preview_claim_binding,
+)
 from trading_bot.live_prototype.consumed_l41r5_evidence import (
     L41R5FieldSemantics,
 )
@@ -30,6 +35,10 @@ from trading_bot.live_prototype.l43_provider_contracts import (
     L43TransportError,
 )
 from trading_bot.live_prototype.live_controller import PreparedInvocation
+from trading_bot.live_prototype.official_rule_binding import (
+    OfficialClaimId,
+    accepted_official_rule_binding_v2,
+)
 from trading_bot.live_prototype.tiny_live_policy import (
     EXACT_SELL_REVIEW_CONTRACT_ID,
     ExactOwnedSellProposal,
@@ -44,6 +53,7 @@ from trading_bot.live_prototype.tiny_live_policy import (
     SellTimeInForce,
     evaluate_exact_owned_sell_proposal,
 )
+from trading_bot.robinhood_mcp.parsing import parse_quote_data
 
 L43_TOOL_NAMES = ("review_equity_order", "place_equity_order")
 MAX_DISCOVERY_PAGES = 20
@@ -224,6 +234,18 @@ class L43RobinhoodTransport:
             )
         arguments = proposal.review_arguments
         try:
+            official_authority_sha256 = _accepted_review_preview_authority_sha256()
+        except Exception:
+            return _blocked_review(
+                ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
+                "L43_REVIEW_AUTHORITY_UNTRUSTED",
+            )
+        if arguments != proposal.placement_arguments:
+            return _blocked_review(
+                ManualCloseTrigger.SELL_REVIEW_MALFORMED,
+                "L43_REVIEW_PLACE_ARGUMENTS_MISMATCH",
+            )
+        try:
             wire = _sell_order_arguments(account_number, arguments)
         except (TypeError, ValueError):
             return _blocked_review(
@@ -238,11 +260,17 @@ class L43RobinhoodTransport:
                 )
                 self._counts["review_equity_order"] += 1
                 try:
+                    request_snapshot = dict(wire)
                     result = await client.call_tool("review_equity_order", wire)
                 except Exception:
                     return _blocked_review(
                         ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
                         "L43_REVIEW_RESULT_UNKNOWN",
+                    )
+                if wire != request_snapshot:
+                    return _blocked_review(
+                        ManualCloseTrigger.SELL_REVIEW_MALFORMED,
+                        "L43_REVIEW_REQUEST_MUTATED",
                     )
                 payload = _structured_payload(result)
                 if payload is None:
@@ -255,7 +283,8 @@ class L43RobinhoodTransport:
                         payload,
                         proposal=proposal,
                         arguments=arguments,
-                        request=wire,
+                        request=request_snapshot,
+                        official_authority_sha256=official_authority_sha256,
                     )
                 except (TypeError, ValueError, L43TransportError):
                     return _blocked_review(
@@ -553,8 +582,21 @@ def _normalize_review_payload(
     proposal: ExactOwnedSellProposal,
     arguments: SellOrderArguments,
     request: Mapping[str, object],
+    official_authority_sha256: str,
 ) -> L43ReviewNormalization:
-    """Normalize only echoed current fields; unknown status remains blocked."""
+    """Normalize a clean current review under the accepted L41R6 claim."""
+    eligibility = evaluate_exact_owned_sell_proposal(proposal)
+    if (
+        not eligibility.eligible_for_nonplacing_review
+        or proposal.review_arguments != proposal.placement_arguments
+        or arguments != proposal.review_arguments
+        or not isinstance(official_authority_sha256, str)
+        or _SHA256.fullmatch(official_authority_sha256) is None
+    ):
+        return _blocked_review(
+            ManualCloseTrigger.SELL_REVIEW_MALFORMED,
+            "L43_REVIEW_PROPOSAL_CHANGED",
+        )
     root = payload
     data = root.get("data")
     if not isinstance(data, Mapping) or set(root) != {"data"}:
@@ -640,13 +682,37 @@ def _normalize_review_payload(
             ManualCloseTrigger.SELL_REVIEW_WARNING,
             "L43_REVIEW_CHECKS_PRESENT",
         )
-    proposal_sha256 = evaluate_exact_owned_sell_proposal(proposal).proposal_sha256
+    parsed_quote = parse_quote_data(quote)
+    if parsed_quote.symbol != Symbol("SPY"):
+        return _blocked_review(
+            ManualCloseTrigger.SELL_REVIEW_MALFORMED,
+            "L43_REVIEW_QUOTE_SYMBOL_MISMATCH",
+        )
+    parsed_quote.require_paper_fill_reference(OrderSide.SELL)
+    try:
+        resolved_authority_sha256 = _accepted_review_preview_authority_sha256()
+    except Exception:
+        return _blocked_review(
+            ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
+            "L43_REVIEW_AUTHORITY_UNTRUSTED",
+        )
+    if official_authority_sha256 != resolved_authority_sha256:
+        return _blocked_review(
+            ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
+            "L43_REVIEW_AUTHORITY_CHANGED",
+        )
+    proposal_sha256 = eligibility.proposal_sha256
     if proposal_sha256 is None:
         return _blocked_review(
             ManualCloseTrigger.SELL_REVIEW_MALFORMED,
             "L43_PROPOSAL_DIGEST_UNAVAILABLE",
         )
-    evidence_sha256 = _review_evidence_digest(payload, request, proposal_sha256)
+    evidence_sha256 = _review_evidence_digest(
+        payload,
+        request,
+        proposal_sha256,
+        official_authority_sha256,
+    )
     review_id = f"l43-{evidence_sha256[:64]}"
     normalized = NormalizedSellReview(
         contract_id=EXACT_SELL_REVIEW_CONTRACT_ID,
@@ -655,19 +721,67 @@ def _normalize_review_payload(
         proposal_sha256=proposal_sha256,
         identity=proposal.position.identity,
         reviewed_arguments=arguments,
-        outcome=NormalizedReviewOutcome.UNKNOWN,
-        semantics=NormalizedReviewSemantics.UNKNOWN,
+        outcome=NormalizedReviewOutcome.AFFIRMATIVE,
+        semantics=NormalizedReviewSemantics.NONPLACING_PREVIEW,
         warnings=(),
         unknown_fields=(),
         rejection_code=None,
         provider_order_id=None,
     )
     return L43ReviewNormalization(
-        L43ReviewStatus.NORMALIZED_UNKNOWN,
+        L43ReviewStatus.NORMALIZED_AFFIRMATIVE,
         normalized,
-        ManualCloseTrigger.SELL_REVIEW_UNKNOWN,
-        "L43_REVIEW_SEMANTICS_UNPROVEN",
+        None,
+        "L43_REVIEW_AFFIRMATIVE_NONPLACING",
     )
+
+
+def _accepted_review_preview_authority_sha256() -> str:
+    """Digest the canonical proven fact, official claim, and source identities."""
+    accepted = accepted_proven_review_preview_claim_binding()
+    if (
+        not isinstance(accepted, L41R6OfficialClaimScopeBinding)
+        or accepted.fact_id is not FactId.REVIEW_PREVIEW_ONLY
+        or accepted.claim.claim_id
+        is not OfficialClaimId.REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS
+    ):
+        raise ValueError("L41R6_REVIEW_PREVIEW_CLAIM_UNTRUSTED")
+    binding = accepted_official_rule_binding_v2()
+    canonical_claims = tuple(
+        claim
+        for claim in binding.claims
+        if claim.claim_id
+        is OfficialClaimId.REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS
+    )
+    if len(canonical_claims) != 1 or accepted.claim is not canonical_claims[0]:
+        raise ValueError("L41R6_REVIEW_PREVIEW_CLAIM_UNTRUSTED")
+    sources_by_id = {source.source_id: source for source in binding.sources}
+    expected_sources = tuple(
+        sources_by_id[source_id] for source_id in accepted.claim.sources
+    )
+    if accepted.sources != expected_sources:
+        raise ValueError("L41R6_REVIEW_PREVIEW_SOURCE_UNTRUSTED")
+
+    authority_material = {
+        "binding_id": binding.binding_id,
+        "fact_id": FactId.REVIEW_PREVIEW_ONLY.value,
+        "classification": "PROVEN",
+        "rationale_code": "L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN",
+        "claim_id": accepted.claim.claim_id.value,
+        "statement": accepted.claim.statement,
+        "scope_limit": accepted.claim.scope_limit,
+        "sources": [
+            [source.source_id.value, source.content_sha256]
+            for source in accepted.sources
+        ],
+    }
+    canonical = json.dumps(
+        authority_material,
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    return hashlib.sha256(canonical).hexdigest()
 
 
 def _blocked_review(
@@ -840,18 +954,25 @@ def _review_evidence_digest(
     payload: Mapping[str, object],
     request: Mapping[str, object],
     proposal_sha256: str,
+    official_authority_sha256: str,
 ) -> str:
-    """Hash bounded response material without retaining or returning payload text."""
-    safe_request = tuple(
-        (key, value)
-        for key, value in sorted(request.items())
-        if key != "account_number"
-    )
+    """Bind accepted authority, the exact request, and successful response."""
+    request_bytes = json.dumps(
+        _plain_json(request),
+        ensure_ascii=True,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("ascii")
+    if len(request_bytes) > MAX_RESPONSE_BYTES:
+        raise L43TransportError("L43_REVIEW_REQUEST_BOUND_EXCEEDED")
+    request_sha256 = hashlib.sha256(request_bytes).hexdigest()
     document = json.dumps(
         (
-            "ARCH147_L43_SELL_REVIEW_RAW_UNKNOWN_V1",
+            "ARCH147_L43_SELL_REVIEW_AUTHENTICATED_NONPLACING_V1",
+            official_authority_sha256,
             proposal_sha256,
-            safe_request,
+            True,
+            request_sha256,
             _plain_json(payload),
         ),
         ensure_ascii=True,

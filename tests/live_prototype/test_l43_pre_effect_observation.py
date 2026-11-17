@@ -611,6 +611,100 @@ def test_relevant_order_digest_binds_agent_initiated_without_query_filter(
     assert digests[0] != digests[1]
 
 
+def test_relevant_order_digest_binds_requested_quantity_and_trigger(
+    tmp_path: Path,
+):
+    digests: dict[str, str] = {}
+    variants = (
+        ("baseline", None, "immediate"),
+        ("requested-quantity", "0.5", "immediate"),
+        ("trigger", None, "stop"),
+    )
+    for label, requested_quantity, trigger in variants:
+        variant_path = tmp_path / label
+        variant_path.mkdir()
+        state_path, _ = _state_path(variant_path, reconcile_initial=False)
+        row = _order(Decimal("0.5"))
+        row["quantity"] = requested_quantity
+        row["trigger"] = trigger
+        dependencies, _, _, _ = _dependencies(
+            state_path=state_path,
+            as_of=_NOW,
+            decision=SignalDecision.BUY,
+            order_rows=[row],
+        )
+
+        result = observer.observe_l43_pre_effect(dependencies)
+
+        assert (
+            result.outcome
+            is observer.L43PreEffectOutcome.READY_FOR_L43_ENTRY_EFFECT_REVIEW
+        )
+        assert result.plan is not None
+        digests[label] = result.plan.relevant_orders_digest
+
+    assert digests["baseline"] != digests["requested-quantity"]
+    assert digests["baseline"] != digests["trigger"]
+
+
+def test_post_entry_unrelated_spy_order_blocks_exact_owned_sell_review(
+    tmp_path: Path,
+):
+    state_path, _ = _state_path(tmp_path, owned=Decimal("0.5"))
+    entry_order = _order(Decimal("0.5"))
+    unrelated = _canceled_zero_fill_order()
+    unrelated.update(
+        {
+            "id": "customer-spy-order-147",
+            "symbol": "SPY",
+            "side": "sell",
+            "placed_agent": "user",
+            "agent_initiated": False,
+            "created_at": "2026-11-10T15:01:00+00:00",
+            "last_transaction_at": "2026-11-10T15:01:00+00:00",
+            "quantity": "0.25",
+            "dollar_based_amount": None,
+        }
+    )
+    dependencies, read, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.SELL,
+        owned=Decimal("0.5"),
+        order_rows=[entry_order, unrelated],
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
+    assert result.blockers == (observer.L43PreEffectBlocker.UNRELATED_SPY_ORDER,)
+    assert result.plan is None
+    assert read.calls[-1] == (
+        "get_equity_orders",
+        {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+    )
+    assert "placed_agent" not in read.calls[-1][1]
+    _assert_no_effects(result)
+
+
+def test_nonterminal_entry_cannot_produce_exact_owned_sell_proposal(
+    tmp_path: Path,
+):
+    state_path, _ = _state_path(tmp_path, unknown_entry=True)
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.SELL,
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
+    assert result.blockers == (observer.L43PreEffectBlocker.STATE_UNRESOLVED,)
+    assert result.plan is None
+    _assert_no_effects(result)
+
+
 def test_non_buy_ignores_invalid_entry_risk_without_side_effects(tmp_path: Path):
     state_path, _ = _state_path(tmp_path)
     dependencies, _, _, _ = _dependencies(

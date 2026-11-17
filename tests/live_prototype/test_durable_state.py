@@ -5,6 +5,7 @@ import pytest
 
 from trading_bot.live_prototype.durable_state import (
     BlockReason,
+    DurableStateError,
     DurableStateStore,
     DurableWriteError,
     IntentStatus,
@@ -12,6 +13,8 @@ from trading_bot.live_prototype.durable_state import (
     OrderStatus,
     ReconciliationSnapshot,
     RuntimeIdentity,
+    _canonical_json,
+    _make_event,
 )
 
 
@@ -50,7 +53,7 @@ def test_entry_reservation_is_durable_and_partial_fill_is_owned(tmp_path: Path):
                     OrderStatus.PARTIAL,
                     Decimal("0.03"),
                     Decimal("3.00"),
-                    Decimal("0.01"),
+                    Decimal("0"),
                 ),
             ),
         )
@@ -58,6 +61,166 @@ def test_entry_reservation_is_durable_and_partial_fill_is_owned(tmp_path: Path):
     assert store.state.owned_quantity == Decimal("0.03")
     assert store.state.entry_reserved_dollars == Decimal("9.00")
     assert store.state.entry_budget_remaining == Decimal("1.00")
+
+
+def test_active_entry_with_zero_remainder_still_blocks_new_effects(
+    tmp_path: Path,
+):
+    store = _ready_store(tmp_path)
+    intent_id = store.reserve_entry(Decimal("10.00"))
+    store.mark_may_have_occurred(intent_id)
+    store.bind_provider_order(intent_id, "provider-order-1")
+
+    for status, quantity, notional in (
+        (OrderStatus.WORKING, Decimal("0"), Decimal("0")),
+        (OrderStatus.PARTIAL, Decimal("0.03"), Decimal("3.00")),
+    ):
+        state = store.reconcile(
+            ReconciliationSnapshot(
+                _identity(),
+                quantity,
+                (
+                    OrderObservation(
+                        intent_id,
+                        "provider-order-1",
+                        status,
+                        quantity,
+                        notional,
+                        Decimal("0"),
+                    ),
+                ),
+            )
+        )
+        assert state.blocked_reason is None
+        assert state.entry is not None
+        assert state.entry.working_remainder == Decimal("0")
+        assert state.entry_reserved_dollars == Decimal("10.00")
+        assert state.entry_budget_remaining == Decimal("0")
+        assert not state.automated_order_allowed
+        with pytest.raises(DurableStateError, match="working order remains unresolved"):
+            store.reserve_entry(Decimal("0.01"))
+
+
+def test_new_entry_observation_rejects_nonzero_share_remainder(tmp_path: Path):
+    store = _ready_store(tmp_path)
+    intent_id = store.reserve_entry(Decimal("10.00"))
+    store.mark_may_have_occurred(intent_id)
+    store.bind_provider_order(intent_id, "provider-order-1")
+
+    blocked = store.reconcile(
+        ReconciliationSnapshot(
+            _identity(),
+            Decimal("0.03"),
+            (
+                OrderObservation(
+                    intent_id,
+                    "provider-order-1",
+                    OrderStatus.PARTIAL,
+                    Decimal("0.03"),
+                    Decimal("3.00"),
+                    Decimal("0.01"),
+                ),
+            ),
+        )
+    )
+
+    assert blocked.blocked_reason is BlockReason.ORDER_BINDING_MISMATCH
+    assert blocked.entry is not None
+    assert blocked.entry.status is IntentStatus.WORKING
+
+
+def test_working_entry_rejects_notional_without_fills(tmp_path: Path):
+    store = _ready_store(tmp_path)
+    intent_id = store.reserve_entry(Decimal("10.00"))
+
+    with pytest.raises(ValueError, match="zero fill quantity"):
+        OrderObservation(
+            intent_id,
+            "provider-order-1",
+            OrderStatus.WORKING,
+            Decimal("0"),
+            Decimal("1.00"),
+            Decimal("0"),
+        )
+
+
+@pytest.mark.parametrize(
+    ("status", "quantity", "notional", "position"),
+    (
+        (OrderStatus.WORKING, Decimal("0"), Decimal("0"), Decimal("0")),
+        (
+            OrderStatus.PARTIAL,
+            Decimal("0.03"),
+            Decimal("3"),
+            Decimal("0.03"),
+        ),
+    ),
+)
+def test_replay_accepts_preexisting_entry_remainder_but_new_reads_clear_it(
+    tmp_path: Path,
+    status: OrderStatus,
+    quantity: Decimal,
+    notional: Decimal,
+    position: Decimal,
+):
+    path = tmp_path / "state.jsonl"
+    store = DurableStateStore.create(path, _identity())
+    store.reconcile(ReconciliationSnapshot(_identity(), Decimal("0")))
+    intent_id = store.reserve_entry(Decimal("10.00"))
+    store.mark_may_have_occurred(intent_id)
+    store.bind_provider_order(intent_id, "provider-order-1")
+    previous = store.state
+
+    legacy_observation = _make_event(
+        _identity(),
+        previous.last_sequence + 1,
+        previous.journal_hash,
+        "ORDER_OBSERVED",
+        {
+            "intent_id": intent_id,
+            "provider_order_id": "provider-order-1",
+            "status": IntentStatus(status.value).value,
+            "cumulative_quantity": str(quantity),
+            "cumulative_notional": str(notional),
+            "working_remainder": "0.1",
+        },
+    )
+    legacy_reconciliation = _make_event(
+        _identity(),
+        previous.last_sequence + 2,
+        str(legacy_observation["event_hash"]),
+        "RECONCILIATION_PASSED",
+        {"observed_position": str(position)},
+    )
+    with path.open("ab") as journal:
+        journal.write(_canonical_json(legacy_observation) + b"\n")
+        journal.write(_canonical_json(legacy_reconciliation) + b"\n")
+
+    reopened = DurableStateStore.open(path, _identity())
+    assert reopened.state.entry is not None
+    assert reopened.state.entry.working_remainder == Decimal("0.1")
+    assert not reopened.state.automated_order_allowed
+
+    state = reopened.reconcile(
+        ReconciliationSnapshot(
+            _identity(),
+            position,
+            (
+                OrderObservation(
+                    intent_id,
+                    "provider-order-1",
+                    status,
+                    quantity,
+                    notional,
+                    Decimal("0"),
+                ),
+            ),
+        )
+    )
+    assert state.blocked_reason is None
+    assert state.entry is not None
+    assert state.entry.working_remainder == Decimal("0")
+    assert not state.automated_order_allowed
 
 
 def test_restart_replays_hash_chain_and_requires_exact_identity(tmp_path: Path):
@@ -164,6 +327,65 @@ def test_exit_uses_exact_owned_remainder_and_monotone_fills(tmp_path: Path):
         )
     )
     assert regressed.blocked_reason is BlockReason.FILL_REGRESSION
+
+
+@pytest.mark.parametrize(
+    ("status", "quantity", "notional"),
+    (
+        (OrderStatus.WORKING, Decimal("0"), Decimal("0")),
+        (OrderStatus.PARTIAL, Decimal("0.01"), Decimal("0.40")),
+    ),
+)
+def test_exit_working_or_partial_requires_exact_positive_remainder(
+    tmp_path: Path,
+    status: OrderStatus,
+    quantity: Decimal,
+    notional: Decimal,
+):
+    store = _ready_store(tmp_path)
+    entry_id = store.reserve_entry(Decimal("2.00"))
+    store.mark_may_have_occurred(entry_id)
+    store.bind_provider_order(entry_id, "entry-order")
+    store.reconcile(
+        ReconciliationSnapshot(
+            _identity(),
+            Decimal("0.05"),
+            (
+                OrderObservation(
+                    entry_id,
+                    "entry-order",
+                    OrderStatus.FILLED,
+                    Decimal("0.05"),
+                    Decimal("2.00"),
+                    Decimal("0"),
+                ),
+            ),
+        )
+    )
+    exit_id = store.reserve_exit(Decimal("0.05"))
+    store.mark_may_have_occurred(exit_id)
+    store.bind_provider_order(exit_id, "exit-order")
+
+    blocked = store.reconcile(
+        ReconciliationSnapshot(
+            _identity(),
+            Decimal("0.05") - quantity,
+            (
+                OrderObservation(
+                    exit_id,
+                    "exit-order",
+                    status,
+                    quantity,
+                    notional,
+                    Decimal("0"),
+                ),
+            ),
+        )
+    )
+
+    assert blocked.blocked_reason is BlockReason.ORDER_BINDING_MISMATCH
+    assert blocked.exit is not None
+    assert blocked.exit.status is IntentStatus.WORKING
 
 
 def test_save_fsync_failure_poisoned_store_never_invokes_provider(tmp_path: Path):

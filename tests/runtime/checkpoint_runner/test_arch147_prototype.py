@@ -442,6 +442,65 @@ def test_l43_read_normalization_source_test_pairs_are_prepublication_owned():
         assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_rhc3p_reconciliation_and_transport_are_prototype_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    registry = runner._checkpoint_specs()
+    spec = registry[runner.ARCH147_PROTOTYPE_NAME]
+    source_tests = (
+        (
+            "src/trading_bot/live_prototype/l43_post_effect_reconciler.py",
+            "tests/live_prototype/test_l43_post_effect_reconciler.py",
+        ),
+        (
+            "src/trading_bot/live_prototype/l43_effect_operator.py",
+            "tests/live_prototype/test_l43_effect_operator.py",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/l43_transport.py",
+            "tests/robinhood_mcp/test_l43_transport.py",
+        ),
+    )
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+    ruff_owned = set(runner.ARCH147_PROTOTYPE_RUFF)
+
+    assert spec.tests == runner.ARCH147_PROTOTYPE_TESTS
+    assert spec.ruff_paths == runner.ARCH147_PROTOTYPE_RUFF
+    assert spec.execute is None
+    assert spec.preflight is runner._arch147_l43_a3_preflight
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
+    assert runner.CURRENT_ACTIVE_CI_CHECKPOINTS.count(spec.name) == 1
+    assert (
+        sum(
+            item.remote_branch == runner.ARCH147_PROTOTYPE_BRANCH
+            for item in registry.values()
+        )
+        == 1
+    )
+    assert (
+        runner.resolve_ci_checkpoint(registry, runner.ARCH147_PROTOTYPE_BRANCH, "push")
+        == spec.name
+    )
+    assert "src/trading_bot/live_prototype" in ruff_owned
+    assert (
+        runner.ARCH147_PROTOTYPE_RUFF.count(
+            "src/trading_bot/robinhood_mcp/l43_transport.py"
+        )
+        == 1
+    )
+    assert "src/trading_bot/robinhood_mcp/l43_transport.py" not in (
+        runner.ARCH147_RHC2_RUFF
+    )
+    for source, test in source_tests:
+        assert (root / source).is_file()
+        assert (root / test).is_file()
+        assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+        assert spec.tests.count(test) == 1
+        assert full.count(test) == 1
+        assert test not in runner.ARCH147_RHC2_TESTS
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_tiny_live_pivot_source_test_pairs_are_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     pairs = (

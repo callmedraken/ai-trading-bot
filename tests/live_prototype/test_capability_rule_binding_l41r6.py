@@ -256,6 +256,22 @@ def test_composite_emits_exact_thirteen_fact_matrix_and_typed_sources(
     )
 
 
+def test_review_preview_resolver_returns_only_the_proven_l41r6_claim(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    resolved = l41r6.accepted_proven_review_preview_claim_binding()
+
+    assert resolved.fact_id is FactId.REVIEW_PREVIEW_ONLY
+    assert resolved.claim.claim_id is (
+        OfficialClaimId.REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS
+    )
+    assert resolved.sources
+
+    monkeypatch.setattr(l41r6, "_accepted_claim_bindings", lambda: ())
+    with pytest.raises(ValueError, match="L41R6_REVIEW_PREVIEW_CLAIM_UNTRUSTED"):
+        l41r6.accepted_proven_review_preview_claim_binding()
+
+
 def test_consumed_l41_parse_failure_returns_no_partial_report(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC3 ACCEPTED / INTEGRATED; production L43 composition next
+## Current milestone: RHC3 ACCEPTED / INTEGRATED; RHC3P corrective source pending
 
 Canonical worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -16,6 +16,51 @@ Accepted/integrated RHC3 executable identity:
 - duplicate develop FULL: NO; active/FULL jobs were skipped
 
 RHC3 is source-only. It performed zero provider, OAuth, browser, MCP, review, placement, or cancellation actions.
+
+## Current RHC3P checkpoint state
+
+RHC4 production composition is `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`. It
+stopped before source edits because the current L43 read path could not safely
+produce post-placement reconciliation facts for a newly bound order. There is
+no RHC4 commit, test run, admission, push, or CI result to preserve.
+
+RHC3P is the additive source-only / fake-only correction. Exact-source
+acceptance and integration are pending. It adds post-effect factual
+reconciliation over the exhaustive canonical Q62-bound, unfiltered account
+and SPY order universe proven by RHC3, and reuses the already accepted L41R6
+review-preview claim. No provider observation, real review, or protected
+effect occurred or is authorized.
+
+The official claim is
+`REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS`; L41R6 binds
+`REVIEW_PREVIEW_ONLY` as `PROVEN` with rationale
+`L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN`. It establishes that
+`review_equity_order` simulates an equity order and returns pre-trade warnings,
+separately from `place_equity_order` placement semantics. It does not prove an
+account-specific response or placement success.
+
+The only clean review result in RHC3P is a fake structured result with
+`is_error=false` and `structured_content` whose root contains exactly `data`.
+The data has only the allowed review keys, echoes `side=sell`, `symbol=SPY`,
+`type=market`, and the proposed full-owned `quantity`, has `order_checks={}`,
+and includes the complete retained quote-data field set for SPY with valid
+market facts. Optional `market_data_disclosure` is string or null. The review
+arguments equal the intended placement arguments (account-scoped,
+regular-hours, SPY sell, market, GFD, exact quantity). The test result is
+`AFFIRMATIVE / NONPLACING_PREVIEW`: no pre-trade warning was identified for
+that exact proposal. It is not placement success or reusable placement
+authority.
+
+Pre-effect policy remains as accepted: unresolved/unknown orders and
+post-entry conflicting unrelated SPY rows block, though older terminal history
+may pass the existing pre-effect policy. New post-effect reconciliation blocks
+on any unrelated row in the complete RHC3-proven order universe. RHC3P does
+not relax pre-effect admission.
+
+RHC3P performs zero provider, OAuth, browser, MCP, account, position, order,
+review, placement, cancellation, or Alpaca operations. RHC2 remains CONSUMED /
+PASS / NO RETRY; RHC3 remains accepted/integrated; Q63 remains NOT_RUN and
+L43 protected qualification remains NOT_RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## RHC3 production order-scope admission
 
@@ -36,9 +81,14 @@ The historical RHC2 field `production_order_scope_authority=NOT_GRANTED` remains
 
 The three pinned evidence files are now operational runtime dependencies. Do not clean, move, rewrite, regenerate, or replace them. Q63 must include their exact custody, backup/restore and hash verification in the final delivery package. Loss or mutation is fail-closed availability loss, not authority to recreate evidence.
 
-## Next source milestone
+## RHC4 resume boundary
 
-Implement one coherent source-only/fake-only production-composition checkpoint for the remaining runnable-bot gap. Reuse existing accepted components rather than reopening Robinhood semantics:
+RHC4 remains `NOT_RUN / STOPPED_PRE_IMPLEMENTATION`. Resume its implementation
+only after RHC3P exact-source acceptance, integration, and coordination-document
+synchronization. When that boundary is met, implement one coherent
+source-only/fake-only production-composition checkpoint for the remaining
+runnable-bot gap. Reuse existing accepted components rather than reopening
+Robinhood semantics:
 
 - compose canonical Q62/RHC3 read authority, L43 durable state, current Robinhood read transport, L43 effect operator/transport seams, Alpaca runtime signal input and exact authorizer behind one production composition;
 - add an explicit live application/service mode and launcher path instead of the current permanently `REAL_DISARMED` / synthetic-only startup;

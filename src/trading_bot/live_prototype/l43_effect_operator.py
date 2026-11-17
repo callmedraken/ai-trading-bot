@@ -176,7 +176,7 @@ class L43EffectReobserver(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class L43PostEffectFacts:
-    """Bounded, already normalized facts returned by an injected fake seam."""
+    """Bounded normalized facts from the production reader or an injected fake."""
 
     account_fingerprint: str
     snapshot: ReconciliationSnapshot

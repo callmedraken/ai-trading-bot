@@ -12,6 +12,7 @@ from trading_bot.desktop_paper.robinhood_reconciliation import (
 )
 from trading_bot.robinhood_mcp.current_read_transport import (
     READ_TOOLS,
+    CurrentReadError,
     RobinhoodCurrentReadTransport,
 )
 
@@ -78,13 +79,19 @@ def preflight() -> dict[str, object]:
     try:
         before = _production_identities()
         transport = _transport()
-        observation = observe_robinhood_baseline(
-            transport, observed_at=attempted_at
-        ).sanitized()
+        with transport as session_transport:
+            observation = observe_robinhood_baseline(
+                session_transport, observed_at=attempted_at
+            ).sanitized()
         diagnostic = "NONE"
-    except Exception:
+    except Exception as error:
         # Never serialize exception text, args, repr, traceback, or payloads.
-        diagnostic = "RECONCILIATION_FAILED"
+        diagnostic = (
+            "READ_SESSION_CLEANUP_FAILED"
+            if type(error) is CurrentReadError
+            and error.args == ("READ_SESSION_CLEANUP_FAILED",)
+            else "RECONCILIATION_FAILED"
+        )
     finally:
         try:
             after = _production_identities()

@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 
 import pytest
@@ -10,24 +11,53 @@ from trading_bot.robinhood_mcp.current_live_transport import (
 
 
 class _Session:
-    def __init__(self, schemas):
+    def __init__(
+        self,
+        schemas,
+        *,
+        next_cursor=None,
+        cleanup_failure=None,
+        tool_failure=None,
+    ):
         self.client = SimpleNamespace(
             list_tools=self._list_tools,
             call_tool=self._call_tool,
         )
         self.schemas = schemas
+        self.next_cursor = next_cursor
+        self.cleanup_failure = cleanup_failure
+        self.tool_failure = tool_failure
+        self.opens = 0
+        self.closes = 0
+        self.listings = 0
+        self.calls = []
+        self.tasks = []
+
+    def _record_task(self):
+        self.tasks.append(asyncio.current_task())
 
     async def __aenter__(self):
+        self.opens += 1
+        self._record_task()
         return self.client
 
     async def __aexit__(self, *args):
+        self.closes += 1
+        self._record_task()
+        if self.cleanup_failure:
+            raise RuntimeError(self.cleanup_failure)
         return None
 
     async def _list_tools(self, cursor=None):
-        del cursor
-        return SimpleNamespace(tools=self.schemas, next_cursor=None)
+        self._record_task()
+        self.listings += 1
+        return SimpleNamespace(tools=self.schemas, next_cursor=self.next_cursor)
 
     async def _call_tool(self, name, arguments):
+        self._record_task()
+        self.calls.append((name, arguments))
+        if self.tool_failure:
+            raise RuntimeError(self.tool_failure)
         return SimpleNamespace(
             is_error=False,
             structured_content={"data": {}, "name": name, "arguments": arguments},
@@ -74,13 +104,16 @@ def _schema_for(entry):
 
 
 def test_live_transport_discovers_exact_surface_without_generic_dispatch():
-    transport = RobinhoodCurrentLiveTransport.for_test(lambda: _Session(_schemas()))
+    session = _Session(_schemas())
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
     assert {item.name for item in transport.discover_required_capabilities()} == set(
         LIVE_TOOL_SURFACE
     )
     assert not hasattr(transport, "call_tool")
     assert transport.place_equity_order({"dollar_amount": "0.50"})["data"] == {}
     assert dict(transport.call_counts)["place_equity_order"] == 1
+    assert session.opens == session.closes == 2
+    assert session.listings == 2
 
 
 def test_live_transport_accepts_mcp_v2_snake_case_tool_objects():
@@ -179,6 +212,150 @@ def test_current_alternative_sizing_schema_does_not_require_dollar_globally():
         assert {"dollar_amount", "quantity"} <= schemas[name].properties
         assert schemas[name].required == {"account_number", "symbol", "side", "type"}
     assert dict(transport.call_counts) == dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+
+
+def test_live_operation_reuses_one_session_and_discovery_after_explicit_discovery():
+    session = _Session(_schemas())
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with transport:
+        first = transport.discover_required_capabilities()
+        second = transport.discover_required_capabilities()
+        transport.get_accounts()
+        transport.review_equity_order({"symbol": "SPY"})
+
+        assert first == second
+        assert transport.advertised_schemas == first
+
+    assert session.opens == session.closes == 1
+    assert session.listings == 1
+    assert [name for name, _ in session.calls] == [
+        "get_accounts",
+        "review_equity_order",
+    ]
+    assert len({id(task) for task in session.tasks}) == 1
+    assert transport.advertised_schemas == ()
+
+
+def test_live_lazy_first_call_discovers_once_per_operation():
+    session = _Session(_schemas())
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with transport:
+        transport.get_accounts()
+        transport.get_equity_positions({"account_number": "opaque"})
+        transport.get_equity_orders({"account_number": "opaque"})
+
+    assert session.opens == session.closes == 1
+    assert session.listings == 1
+    assert len(session.calls) == 3
+    assert len({id(task) for task in session.tasks}) == 1
+
+
+def test_live_schema_authority_is_reset_between_independent_sessions():
+    first = _Session(_schemas())
+    second_schemas = _schemas()
+    second_schemas = [
+        item for item in second_schemas if item.name != "get_equity_orders"
+    ]
+    second = _Session(second_schemas)
+    sessions = iter((first, second))
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: next(sessions))
+
+    with transport:
+        assert transport.discover_required_capabilities()
+    assert transport.advertised_schemas == ()
+
+    with pytest.raises(CurrentLiveTransportError, match="LIVE_CAPABILITY_MISSING"):
+        with transport:
+            transport.get_accounts()
+
+    assert first.opens == first.closes == second.opens == second.closes == 1
+    assert first.listings == second.listings == 1
+    assert first.calls == []
+    assert second.calls == []
+
+
+def test_nested_scope_and_running_loop_rejection_do_not_clear_outer_schemas():
+    session = _Session(_schemas())
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with transport:
+        transport.discover_required_capabilities()
+        with pytest.raises(
+            CurrentLiveTransportError,
+            match="LIVE_SESSION_REENTRY_REJECTED",
+        ):
+            with transport:
+                pass
+        assert len(transport.advertised_schemas) == len(LIVE_TOOL_SURFACE)
+        transport.get_accounts()
+
+    async def discover_from_loop():
+        return transport.discover_required_capabilities()
+
+    with pytest.raises(CurrentLiveTransportError, match="LIVE_EVENT_LOOP_REJECTED"):
+        asyncio.run(discover_from_loop())
+
+    assert session.opens == session.closes == 1
+    assert session.listings == 1
+
+
+def test_repeated_cursor_fails_closed_before_dispatch_and_does_not_publish_schema():
+    session = _Session(_schemas(), next_cursor="repeated")
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with pytest.raises(
+        CurrentLiveTransportError, match="LIVE_DISCOVERY_CURSOR_INVALID"
+    ):
+        with transport:
+            transport.get_accounts()
+
+    assert session.opens == session.closes == 1
+    assert session.listings == 2
+    assert session.calls == []
+    assert transport.advertised_schemas == ()
+
+
+def test_cleanup_failure_after_place_is_sanitized_without_retry():
+    session = _Session(
+        _schemas(),
+        cleanup_failure="secret cleanup token",
+    )
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with pytest.raises(
+        CurrentLiveTransportError,
+        match="LIVE_SESSION_CLEANUP_FAILED",
+    ) as caught:
+        with transport:
+            transport.place_equity_order({"dollar_amount": "0.50"})
+
+    assert "secret cleanup token" not in str(caught.value)
+    assert session.opens == session.closes == 1
+    assert session.calls == [("place_equity_order", {"dollar_amount": "0.50"})]
+    assert dict(transport.call_counts)["place_equity_order"] == 1
+
+
+def test_tool_and_cleanup_failure_remain_sanitized_and_count_one_attempt():
+    session = _Session(
+        _schemas(),
+        cleanup_failure="secret cleanup token",
+        tool_failure="secret provider token",
+    )
+    transport = RobinhoodCurrentLiveTransport.for_test(lambda: session)
+
+    with pytest.raises(
+        CurrentLiveTransportError,
+        match="LIVE_SESSION_CLEANUP_FAILED",
+    ) as caught:
+        transport.place_equity_order({"dollar_amount": "0.50"})
+
+    assert "secret cleanup token" not in str(caught.value)
+    assert "secret provider token" not in str(caught.value)
+    assert session.opens == session.closes == 1
+    assert len(session.calls) == 1
+    assert dict(transport.call_counts)["place_equity_order"] == 1
 
 
 @pytest.mark.parametrize(

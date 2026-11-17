@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -31,6 +31,7 @@ from trading_bot.desktop_live.ownership import (
     local_order_id as _local_order_id,
 )
 from trading_bot.desktop_live.preflight import (
+    _operation_scope,
     _source_identity,
     resolve_target_session,
     review_order_arguments,
@@ -39,6 +40,7 @@ from trading_bot.desktop_paper.robinhood_read import resolve_account
 from trading_bot.desktop_paper.robinhood_reconciliation import (
     observe_robinhood_baseline,
 )
+from trading_bot.robinhood_mcp.current_live_transport import CurrentLiveTransportError
 
 # Fixed P6 provider-reference namespace, independent of account/credentials.
 P6_PROVIDER_REF_NAMESPACE = UUID("5c888a69-0b50-5ff8-90c0-b98d4b0d04fb")
@@ -160,6 +162,46 @@ def execute_plan(
     if state_store.ownership_path.exists():
         return _blocked("EXISTING_OWNERSHIP_BINDING_NO_PLACEMENT", 0, 0)
 
+    result: ExecutionResult | None = None
+    try:
+        with _operation_scope(transport) as session_transport:
+            result = _execute_plan_in_session(
+                plan,
+                transport=session_transport,
+                now=now,
+                state_store=state_store,
+            )
+    except CurrentLiveTransportError as error:
+        if error.args != ("LIVE_SESSION_CLEANUP_FAILED",):
+            raise
+        if result is None:
+            return _blocked("LIVE_SESSION_CLEANUP_FAILED", 0, 0)
+        cleanup_reason = (
+            result.reason
+            if result.reason == "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY"
+            else "LIVE_SESSION_CLEANUP_FAILED"
+        )
+        return replace(
+            result,
+            status="STOPPED"
+            if result.receipt is not None
+            or result.attempt_consumed
+            or result.effect_disposition != "NO_MUTATION"
+            else "BLOCKED",
+            reason=cleanup_reason,
+        )
+    assert result is not None
+    return result
+
+
+def _execute_plan_in_session(
+    plan: LiveExecutionPlan,
+    *,
+    transport: object,
+    now: datetime,
+    state_store: LiveStateStore,
+) -> ExecutionResult:
+    """Perform reads, review, one placement and reconciliation in one scope."""
     account_number = resolve_account(transport.get_accounts()).account_number
     fresh = observe_robinhood_baseline(transport, observed_at=now)
     if fresh.account_fingerprint != plan.account_fingerprint:

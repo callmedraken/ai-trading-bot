@@ -94,6 +94,8 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
     signal = built.dependencies.signal_provider_builder()
     assert isinstance(read, RobinhoodL43PreEffectReadAdapter)
     assert isinstance(read._read, RobinhoodCurrentReadTransport)
+    assert built.dependencies.read_operation_scope_factory is not None
+    assert built.dependencies.read_operation_scope_factory(read) is read._read
     assert hasattr(signal, "snapshot")
     assert oauth_factory_calls == [
         {"redirect_uri": composition.DEFAULT_ROBINHOOD_REDIRECT_URI}
@@ -142,6 +144,23 @@ def test_production_scope_verifier_cannot_be_caller_asserted():
         composition.RobinhoodL43AccountWideOrderScopeVerifier(  # type: ignore[call-arg]
             scope="ACCOUNT_WIDE_ALL_AGENTS"
         )
+
+
+def test_production_read_scope_fails_closed_without_the_adapter_scope():
+    class _LegacyRead:
+        def get_accounts(self):
+            return None
+
+        def get_equity_positions(self, _arguments):
+            return None
+
+        def get_equity_orders(self, _arguments):
+            return None
+
+    read = RobinhoodL43PreEffectReadAdapter(_LegacyRead())
+
+    with pytest.raises(TypeError, match="no operation scope"):
+        composition._read_operation_scope(read)
 
 
 def test_production_composition_has_no_effect_or_raw_provider_dependency():

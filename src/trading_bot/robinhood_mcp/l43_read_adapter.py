@@ -6,6 +6,8 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
+from contextlib import AbstractContextManager
+from typing import cast
 
 from trading_bot.desktop_paper.robinhood_read import parse_position, resolve_account
 from trading_bot.live_prototype.l43_provider_contracts import (
@@ -39,6 +41,13 @@ class RobinhoodL43PreEffectReadAdapter:
         ):
             raise TypeError("Robinhood read adapter requires explicit read methods")
         self._read = read
+
+    def _operation_scope(self) -> AbstractContextManager[object]:
+        enter = getattr(self._read, "__enter__", None)
+        exit_scope = getattr(self._read, "__exit__", None)
+        if not callable(enter) or not callable(exit_scope):
+            raise TypeError("Robinhood read boundary has no operation scope")
+        return cast(AbstractContextManager[object], self._read)
 
     def get_accounts(self) -> L43AccountIdentity:
         account = resolve_account(self._read.get_accounts())

@@ -4,11 +4,13 @@ import asyncio
 import hashlib
 import inspect
 import json
+import sys
+import threading
 from contextlib import nullcontext
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
@@ -17,6 +19,7 @@ from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
 from trading_bot.live_prototype.l43_provider_contracts import (
     L43AccountIdentity,
 )
+from trading_bot.robinhood_mcp import _current_session
 from trading_bot.robinhood_mcp import (
     agent_initiated_runtime_partition_observer as observer,
 )
@@ -60,9 +63,11 @@ class _Session:
         self._calls = calls
 
     async def __aenter__(self) -> _Session:
+        self._calls.append(("open", "", None))
         return self
 
     async def __aexit__(self, *args: object) -> None:
+        self._calls.append(("close", "", None))
         return None
 
     async def list_tools(self, *, cursor: str | None = None) -> _ToolListing:
@@ -82,6 +87,27 @@ class _Session:
         else:
             payload = {"data": {"orders": [], "next": None}}
         return SimpleNamespace(is_error=False, structured_content=payload)
+
+
+class _ConfiguredSession(_Session):
+    def __init__(
+        self,
+        calls: list[tuple[str, str, object]],
+        listings: tuple[object, ...],
+    ) -> None:
+        super().__init__(calls)
+        self._listings = iter(listings)
+
+    async def list_tools(self, *, cursor: str | None = None) -> object:
+        self._calls.append(("list", "", cursor))
+        return next(self._listings)
+
+
+def _tool_listing(*names: str, next_cursor: str | None = None) -> SimpleNamespace:
+    return SimpleNamespace(
+        tools=tuple(SimpleNamespace(name=name) for name in names),
+        next_cursor=next_cursor,
+    )
 
 
 def _valid_proof() -> proof.AgentInitiatedRuntimePartitionProofResult:
@@ -479,6 +505,54 @@ def test_one_use_no_retry_after_success_or_provider_exception(
     assert calls == ["provider"]
 
 
+def test_outer_cancellation_waits_for_proof_worker_cleanup_before_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    started = threading.Event()
+    release = threading.Event()
+    closed = threading.Event()
+
+    def run(*args: object) -> object:
+        del args
+        started.set()
+        try:
+            if not release.wait(timeout=5):
+                raise TimeoutError("fake proof worker timed out")
+            return _valid_proof()
+        finally:
+            closed.set()
+
+    _install_fake_harness(monkeypatch, tmp_path, run)
+    instance = observer.RobinhoodAgentInitiatedRuntimePartitionObserver()
+    evidence_dir = tmp_path / ("arch147-agent-initiated-runtime-partition-" + "d" * 32)
+    evidence_file = evidence_dir / "evidence.json"
+
+    async def cancel_and_drain():
+        task = asyncio.create_task(instance.observe(evidence_dir=evidence_dir))
+        while not started.is_set():
+            await asyncio.sleep(0.001)
+        task.cancel()
+        await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.sleep(0)
+        assert not task.done()
+        assert not evidence_file.exists()
+        release.set()
+        return await task
+
+    result = asyncio.run(cancel_and_drain())
+
+    assert closed.is_set()
+    assert (
+        result.status
+        is observer.AgentInitiatedRuntimePartitionObservationStatus.PROVIDER_EXCEPTION
+    )
+    assert result.reason == "PROVIDER_EXCEPTION"
+    assert result.evidence_file == evidence_file
+    evidence = json.loads(evidence_file.read_text(encoding="ascii"))
+    assert evidence["status"] == "PROVIDER_EXCEPTION"
+
+
 def test_source_recheck_change_blocks_and_keeps_evidence(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -554,6 +628,14 @@ def test_exact_proof_engine_is_the_only_partition_call(
         def __init__(self, *args: object) -> None:
             calls.append("transport")
 
+        def __enter__(self):
+            calls.append("scope-enter")
+            return self
+
+        def __exit__(self, *_args: object) -> bool:
+            calls.append("scope-exit")
+            return False
+
     monkeypatch.setattr(observer, "RobinhoodB2ReadTransport", _Transport)
     monkeypatch.setattr(
         observer,
@@ -580,9 +662,14 @@ def test_exact_proof_engine_is_the_only_partition_call(
     )
 
     assert [item for item in calls if isinstance(item, tuple) and item[0] == "proof"]
-    assert calls[0] == "transport"
-    assert calls[1][0] == "adapter"
-    assert calls[2][0] == "proof"
+    assert [item if isinstance(item, str) else item[0] for item in calls] == [
+        "transport",
+        "adapter",
+        "scope-enter",
+        "proof",
+        "scope-exit",
+    ]
+    assert calls[3][1] == "normalized-boundary"
 
 
 def test_public_observer_cannot_accept_a_caller_supplied_proof() -> None:
@@ -605,6 +692,35 @@ def test_transport_counter_contract_keeps_effects_zero() -> None:
     assert counters["other_tool_attempts"] == 0
 
 
+def test_b2_transport_construction_is_inert() -> None:
+    oauth_calls: list[str] = []
+    attempts = observer._AttemptCounters()
+    transport = observer.RobinhoodB2ReadTransport(
+        lambda: oauth_calls.append("oauth") or object(),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    assert oauth_calls == []
+    assert attempts.material() == observer._AttemptCounters().material()
+    assert transport._session.in_scope is False
+
+
+def test_b2_source_origin_guard_binds_current_session_owner(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    repo_root = Path(observer.__file__).resolve().parents[3]
+    monkeypatch.setattr(observer, "_CANONICAL_WORKTREE", repo_root)
+
+    assert observer._module_origins_are_source_owned(repo_root=repo_root)
+
+    foreign_module = tmp_path / "foreign_current_session.py"
+    foreign_module.write_text("# not the selected worktree\n", encoding="ascii")
+    monkeypatch.setattr(_current_session, "__file__", str(foreign_module))
+
+    assert not observer._module_origins_are_source_owned(repo_root=repo_root)
+
+
 def test_restricted_transport_counts_only_account_and_order_reads() -> None:
     calls: list[tuple[str, str, object]] = []
     attempts = observer._AttemptCounters()
@@ -612,13 +728,15 @@ def test_restricted_transport_counts_only_account_and_order_reads() -> None:
     transport = observer.RobinhoodB2ReadTransport.for_test(
         lambda: _Session(calls), attempts, dispatch
     )
+    assert not hasattr(transport, "call_tool")
 
-    assert transport.get_accounts()["data"]["accounts"]
-    assert transport.get_equity_orders({"symbol": "SPY"})["data"]["orders"] == []
+    with transport:
+        assert transport.get_accounts()["data"]["accounts"]
+        assert transport.get_equity_orders({"symbol": "SPY"})["data"]["orders"] == []
     counters = attempts.material()
-    assert counters["mcp_session_open_attempts"] == 2
-    assert counters["tools_list_attempts"] == 2
-    assert counters["tools_list_pages_received"] == 2
+    assert counters["mcp_session_open_attempts"] == 1
+    assert counters["tools_list_attempts"] == 1
+    assert counters["tools_list_pages_received"] == 1
     assert counters["account_read_attempts"] == 1
     assert counters["order_read_attempts"] == 1
     assert counters["mcp_tool_invocation_attempts"] == 2
@@ -631,3 +749,338 @@ def test_restricted_transport_counts_only_account_and_order_reads() -> None:
         "get_accounts",
         "get_equity_orders",
     ]
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+    ]
+
+
+def test_b2_missing_capability_fails_before_dispatch_and_closes_session() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _ConfiguredSession(
+            calls,
+            (_tool_listing("get_accounts"),),
+        ),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    with pytest.raises(observer._B2ReadError) as error:
+        with transport:
+            transport.get_accounts()
+
+    assert error.value.reason is proof.B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE
+    assert attempts.mcp_session_open_attempts == 1
+    assert attempts.tools_list_attempts == attempts.tools_list_pages_received == 1
+    assert attempts.mcp_tool_invocation_attempts == 0
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+    ]
+
+
+def test_b2_repeated_discovery_cursor_fails_closed_and_closes_session() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _ConfiguredSession(
+            calls,
+            (
+                _tool_listing("get_accounts", next_cursor="repeat"),
+                _tool_listing("get_equity_orders", next_cursor="repeat"),
+            ),
+        ),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    with pytest.raises(observer._B2ReadError) as error:
+        with transport:
+            transport.get_accounts()
+
+    assert (
+        error.value.reason is proof.B2FailureReason.PAGINATION_ENVELOPE_CURSOR_FAILURE
+    )
+    assert attempts.mcp_session_open_attempts == 1
+    assert attempts.tools_list_attempts == attempts.tools_list_pages_received == 2
+    assert attempts.mcp_tool_invocation_attempts == 0
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+    ]
+
+
+def test_b2_discovery_state_does_not_carry_to_the_next_session() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+    sessions = iter(
+        (
+            (_tool_listing("get_accounts", "get_equity_orders"),),
+            (_tool_listing("get_accounts"),),
+        )
+    )
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _ConfiguredSession(calls, next(sessions)),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    with transport:
+        assert transport.get_accounts()["data"]["accounts"]
+
+    with pytest.raises(observer._B2ReadError) as error:
+        with transport:
+            transport.get_accounts()
+
+    assert error.value.reason is proof.B2FailureReason.PROVIDER_RESULT_ENVELOPE_FAILURE
+    assert attempts.mcp_session_open_attempts == 2
+    assert attempts.tools_list_attempts == attempts.tools_list_pages_received == 2
+    assert attempts.account_read_attempts == 1
+    assert attempts.mcp_tool_invocation_attempts == 1
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+        "open",
+        "close",
+    ]
+
+
+def test_b2_nested_scope_fails_without_corrupting_the_outer_scope() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _Session(calls),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    with transport:
+        with pytest.raises(observer._B2ReadError):
+            with transport:
+                pytest.fail("nested scope should not enter")
+        assert transport.get_accounts()["data"]["accounts"]
+
+    assert attempts.mcp_session_open_attempts == 1
+    assert attempts.account_read_attempts == 1
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+    ]
+
+
+def test_b2_dispatch_rejects_an_already_running_event_loop() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _Session(calls),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    async def inside_loop() -> None:
+        with pytest.raises(observer._B2ReadError):
+            transport.get_accounts()
+
+    asyncio.run(inside_loop())
+
+    assert attempts.mcp_session_open_attempts == 0
+    assert attempts.tools_list_attempts == 0
+    assert attempts.mcp_tool_invocation_attempts == 0
+    assert calls == []
+
+
+def test_b2_cleanup_failure_is_sanitized_after_successful_read() -> None:
+    calls: list[tuple[str, str, object]] = []
+    attempts = observer._AttemptCounters()
+
+    class _CleanupFailureSession(_Session):
+        async def __aexit__(self, *args: object) -> None:
+            self._calls.append(("close", "", None))
+            raise RuntimeError("raw cleanup secret-token")
+
+    transport = observer.RobinhoodB2ReadTransport.for_test(
+        lambda: _CleanupFailureSession(calls),
+        attempts,
+        observer._DispatchState(),
+    )
+
+    with pytest.raises(observer._B2ReadError) as error:
+        with transport:
+            assert transport.get_accounts()["data"]["accounts"]
+
+    assert error.value.reason is proof.B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+    assert "secret-token" not in str(error.value)
+    assert attempts.account_read_attempts == attempts.mcp_tool_invocation_attempts == 1
+    assert calls[-1][0] == "close"
+
+
+@pytest.mark.parametrize("paginate_orders", (False, True))
+def test_b2_proof_uses_one_fake_sdk_session_and_complete_discovery(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    paginate_orders: bool,
+) -> None:
+    events: list[tuple[str, object]] = []
+    rows = (
+        {"id": "order-true", "symbol": "SPY", "agent_initiated": True},
+        {"id": "order-false", "symbol": "SPY", "agent_initiated": False},
+    )
+    all_order_reads = 0
+
+    class _ProviderClient:
+        async def list_tools(self, *, cursor: str | None = None) -> object:
+            events.append(("tools-list", cursor))
+            if cursor is None:
+                return _tool_listing(
+                    "get_accounts",
+                    "place_equity_order",
+                    next_cursor="tools-page-2",
+                )
+            return _tool_listing("get_equity_orders", "cancel_equity_order")
+
+        async def call_tool(
+            self, name: str, arguments: dict[str, object]
+        ) -> SimpleNamespace:
+            nonlocal all_order_reads
+            events.append(("tool-call", (id(self), name, dict(arguments))))
+            if name == "get_accounts":
+                payload = {
+                    "data": {
+                        "accounts": [
+                            {
+                                "account_number": _ACCOUNT,
+                                "agentic_allowed": True,
+                            }
+                        ]
+                    }
+                }
+            else:
+                partition = arguments.get("agent_initiated")
+                next_cursor = None
+                if partition is None:
+                    if arguments.get("cursor") is None:
+                        all_order_reads += 1
+                    if paginate_orders and all_order_reads == 1:
+                        if arguments.get("cursor") is None:
+                            selected = list(rows[:1])
+                            next_cursor = "orders-page-2"
+                        else:
+                            selected = list(rows[1:])
+                    else:
+                        selected = list(rows)
+                else:
+                    selected = list(
+                        row for row in rows if row["agent_initiated"] is partition
+                    )
+                payload = {"data": {"orders": selected, "next": next_cursor}}
+            return SimpleNamespace(is_error=False, structured_content=payload)
+
+    client = _ProviderClient()
+
+    class _HttpClient:
+        def __init__(self, *, auth: object, timeout: int) -> None:
+            assert timeout == 60
+            events.append(("http-client-init", auth))
+
+        async def __aenter__(self) -> _HttpClient:
+            events.append(("http-client-open", None))
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            events.append(("http-client-close", None))
+
+    class _StreamContext:
+        async def __aenter__(self) -> _ProviderClient:
+            events.append(("mcp-stream-open", None))
+            return client
+
+        async def __aexit__(self, *_args: object) -> None:
+            events.append(("mcp-stream-close", None))
+
+    class _MCPClientContext:
+        def __init__(self, stream: _StreamContext) -> None:
+            self._stream = stream
+
+        async def __aenter__(self) -> _ProviderClient:
+            result = await self._stream.__aenter__()
+            events.append(("mcp-client-open", None))
+            return result
+
+        async def __aexit__(self, *args: object) -> None:
+            events.append(("mcp-client-close", None))
+            await self._stream.__aexit__(*args)
+
+    httpx2_module = ModuleType("httpx2")
+    httpx2_module.AsyncClient = _HttpClient
+    mcp_module = ModuleType("mcp")
+    mcp_module.Client = _MCPClientContext
+    mcp_client_module = ModuleType("mcp.client")
+    mcp_client_module.__path__ = []
+    mcp_stream_module = ModuleType("mcp.client.streamable_http")
+    mcp_stream_module.streamable_http_client = lambda url, *, http_client: (
+        events.append(("stream-url", url)) or _StreamContext()
+    )
+    monkeypatch.setitem(sys.modules, "httpx2", httpx2_module)
+    monkeypatch.setitem(sys.modules, "mcp", mcp_module)
+    monkeypatch.setitem(sys.modules, "mcp.client", mcp_client_module)
+    monkeypatch.setitem(sys.modules, "mcp.client.streamable_http", mcp_stream_module)
+    oauth_builds: list[dict[str, object]] = []
+    oauth_entries: list[str] = []
+    from trading_bot.robinhood_mcp import windows_oauth
+
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: (
+            oauth_builds.append(kwargs)
+            or (lambda: oauth_entries.append("entered") or object())
+        ),
+    )
+    monkeypatch.setattr(proof, "_read_source_identity", lambda _root: _SOURCE)
+    attempts = observer._AttemptCounters()
+    dispatch = observer._DispatchState()
+
+    result = observer._run_production_session(
+        attempts,
+        dispatch,
+        tmp_path,
+        _SOURCE,
+    )
+
+    assert result.status is proof.AgentInitiatedRuntimePartitionProofStatus.PROVEN, (
+        result.reason
+    )
+    assert len(oauth_builds) == 1
+    assert oauth_builds[0]["redirect_uri"] == observer._REDIRECT_URI
+    assert callable(oauth_builds[0]["browser_opener"])
+    assert len(oauth_entries) == 1
+    counters = attempts.material()
+    assert counters["oauth_scope_entry_attempts"] == 1
+    assert counters["mcp_session_open_attempts"] == 1
+    assert counters["tools_list_attempts"] == counters["tools_list_pages_received"] == 2
+    assert counters["account_read_attempts"] == 1
+    assert counters["order_read_attempts"] == 4 + int(paginate_orders)
+    assert counters["mcp_tool_invocation_attempts"] == 5 + int(paginate_orders)
+    assert counters["review_attempts"] == 0
+    assert counters["placement_attempts"] == 0
+    assert counters["cancellation_attempts"] == 0
+    assert counters["other_tool_attempts"] == 0
+    assert dispatch.started is True
+    assert [name for name, _ in events].count("http-client-open") == 1
+    assert [name for name, _ in events].count("mcp-client-open") == 1
+    assert [name for name, _ in events].count("mcp-client-close") == 1
+    assert [name for name, _ in events].count("http-client-close") == 1
+    calls = [value for name, value in events if name == "tool-call"]
+    assert [item[1] for item in calls] == [
+        "get_accounts",
+        "get_equity_orders",
+        *(["get_equity_orders"] if paginate_orders else []),
+        "get_equity_orders",
+        "get_equity_orders",
+        "get_equity_orders",
+    ]
+    assert len({item[0] for item in calls}) == 1
+    if paginate_orders:
+        assert calls[2][2]["cursor"] == "orders-page-2"

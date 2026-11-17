@@ -17,6 +17,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Context, Decimal, localcontext
@@ -259,6 +260,9 @@ class L43PreEffectDependencies:
     clock: Callable[[], datetime]
     session_authority: _PublishedSessionAuthority | None = None
     order_scope_verifier: L43OrderScopeVerifier | None = None
+    read_operation_scope_factory: (
+        Callable[[L43PreEffectReadBoundary], AbstractContextManager[object]] | None
+    ) = None
 
     def __post_init__(self) -> None:
         for callback, label in (
@@ -282,6 +286,10 @@ class L43PreEffectDependencies:
             getattr(self.order_scope_verifier, "verify_account_wide_spy_orders", None)
         ):
             raise TypeError("order scope verifier is invalid")
+        if self.read_operation_scope_factory is not None and not callable(
+            self.read_operation_scope_factory
+        ):
+            raise TypeError("read operation scope factory must be callable")
 
 
 @dataclass(frozen=True, slots=True)
@@ -650,17 +658,23 @@ def observe_l43_pre_effect(
             robinhood = dependencies.robinhood_builder()
         except Exception:
             raise _Blocked(L43PreEffectBlocker.ACCOUNT_READ_FAILED) from None
-        broker = _read_broker(
-            robinhood,
-            dependencies=dependencies,
-            origin=dependencies.origin,
-            state=state_before.state,
-            source=source,
-            provenance=provenance,
-            target_session=session_view.facts.target_session,
-            observed_at=observed_at,
-            counters=counters,
+        read_scope = (
+            dependencies.read_operation_scope_factory(robinhood)
+            if dependencies.read_operation_scope_factory is not None
+            else nullcontext()
         )
+        with read_scope:
+            broker = _read_broker(
+                robinhood,
+                dependencies=dependencies,
+                origin=dependencies.origin,
+                state=state_before.state,
+                source=source,
+                provenance=provenance,
+                target_session=session_view.facts.target_session,
+                observed_at=observed_at,
+                counters=counters,
+            )
 
         final_as_of = _clock(dependencies.clock)
         now = final_as_of

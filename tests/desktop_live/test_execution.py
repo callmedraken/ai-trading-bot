@@ -31,6 +31,7 @@ from trading_bot.desktop_live.ownership import (
 )
 from trading_bot.desktop_live.preflight import review_order_arguments
 from trading_bot.desktop_paper.robinhood_read import parse_order, resolve_account
+from trading_bot.robinhood_mcp.current_live_transport import CurrentLiveTransportError
 
 
 def _plan() -> LiveExecutionPlan:
@@ -77,8 +78,28 @@ class _FakeTransport:
         self.canceled = 0
         self.review_arguments = []
         self.placement_arguments = []
+        self.session_entries = 0
+        self.session_exits = 0
+        self.session_active = False
+        self.session_cleanup_fails = False
+        self.session_activity = []
+
+    def __enter__(self):
+        assert not self.session_active
+        self.session_entries += 1
+        self.session_active = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        assert self.session_active
+        self.session_exits += 1
+        self.session_active = False
+        if self.session_cleanup_fails:
+            raise CurrentLiveTransportError("LIVE_SESSION_CLEANUP_FAILED")
+        return False
 
     def get_accounts(self):
+        self.session_activity.append(self.session_active)
         return {
             "data": {
                 "accounts": [{"account_number": "SYNTHETIC", "agentic_allowed": True}]
@@ -86,6 +107,7 @@ class _FakeTransport:
         }
 
     def review_equity_order(self, arguments):
+        self.session_activity.append(self.session_active)
         self.review_arguments.append(dict(arguments))
         return {
             "data": {
@@ -98,6 +120,7 @@ class _FakeTransport:
         }
 
     def place_equity_order(self, arguments):
+        self.session_activity.append(self.session_active)
         self.placement_arguments.append(dict(arguments))
         self.placed += 1
         return {"data": {"approval": {}, "order": {"id": "provider-order-1"}}}
@@ -132,6 +155,7 @@ def test_disarmed_plan_stops_before_any_mutation(tmp_path, monkeypatch):
     assert result.place_call_count == 0
     assert not result.attempt_consumed
     assert not (tmp_path / "attempt.json").exists()
+    assert transport.session_entries == transport.session_exits == 0
 
 
 @pytest.mark.parametrize(
@@ -145,6 +169,7 @@ def test_nonterminal_post_trade_state_is_consumed_and_never_reconciled(
     observations = 0
 
     def observe(*args, **kwargs):
+        assert transport.session_active
         nonlocal observations
         observations += 1
         if observations == 1:
@@ -216,6 +241,7 @@ def ready_execution(tmp_path, monkeypatch):
     now = datetime(2026, 11, 2, 14, 31, tzinfo=UTC)
 
     def observe(*args, **kwargs):
+        assert transport.session_active
         if not transport.placed:
             return SimpleNamespace(
                 account_fingerprint=plan.account_fingerprint,
@@ -433,7 +459,89 @@ def test_terminal_reconciliation_preserves_receipt_and_no_retry(
     records = [json.loads(line) for line in store.lifecycle.read_text().splitlines()]
     assert records[-1]["status"] == "RECONCILED"
     assert records[-1]["additional_buy_enabled"] is False
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_activity == [True, True, True]
     _assert_consumed_retry(transport, store)
+    assert transport.session_entries == transport.session_exits == 1
+
+
+def test_cleanup_failure_after_reconciliation_preserves_receipt_and_consumption(
+    ready_execution,
+):
+    _, transport, store = ready_execution
+    transport.session_cleanup_fails = True
+
+    result = execution.execute()
+
+    assert result["status"] == "STOPPED"
+    assert result["reason"] == "LIVE_SESSION_CLEANUP_FAILED"
+    assert result["effect_disposition"] == "RECONCILED"
+    assert result["receipt"]["provider_order_id"] == "provider-order-1"
+    assert result["place_call_count"] == transport.placed == 1
+    assert result["attempt_consumed"] is True
+    assert store.marker.is_file()
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_activity == [True, True, True]
+    _assert_consumed_retry(transport, store)
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_activity == [True, True, True]
+
+
+def test_cleanup_failure_after_ambiguous_placement_preserves_no_retry(
+    ready_execution, monkeypatch
+):
+    _, transport, store = ready_execution
+    transport.session_cleanup_fails = True
+    observe = execution.observe_robinhood_baseline
+
+    def fail_post_observation(*args, **kwargs):
+        assert transport.session_active
+        if transport.placed:
+            raise RuntimeError("synthetic private reconciliation detail")
+        return observe(*args, **kwargs)
+
+    monkeypatch.setattr(execution, "observe_robinhood_baseline", fail_post_observation)
+
+    result = execution.execute()
+
+    assert result["status"] == "STOPPED"
+    assert result["reason"] == "LIVE_SESSION_CLEANUP_FAILED"
+    assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+    assert result["receipt"] is None
+    assert result["place_call_count"] == transport.placed == 1
+    assert result["attempt_consumed"] is True
+    assert store.marker.is_file()
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_activity == [True, True, True]
+    assert "synthetic private" not in json.dumps(result)
+    _assert_consumed_retry(transport, store)
+    assert transport.session_entries == transport.session_exits == 1
+
+
+def test_cleanup_failure_preserves_consumed_marker_race_disposition(
+    ready_execution, monkeypatch
+):
+    _, transport, store = ready_execution
+    transport.session_cleanup_fails = True
+
+    def marker_race(**kwargs):
+        store.marker.write_text("synthetic consumed marker", encoding="utf-8")
+        raise FileExistsError("private marker race detail")
+
+    monkeypatch.setattr(store, "start_attempt", marker_race)
+
+    result = execution.execute()
+
+    assert result["status"] == "STOPPED"
+    assert result["reason"] == "PRESERVE_CONSUMED_ATTEMPT_NO_RETRY"
+    assert result["effect_disposition"] == "MAY_HAVE_OCCURRED"
+    assert result["place_call_count"] == transport.placed == 0
+    assert result["attempt_consumed"] is True
+    assert store.marker.is_file()
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_activity == [True, True]
+    _assert_consumed_retry(transport, store)
+    assert transport.session_entries == transport.session_exits == 1
 
 
 def test_pre_ownership_observation_failure_reports_zero_calls(

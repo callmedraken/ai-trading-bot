@@ -4,9 +4,20 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Mapping, Sequence
-from typing import Final
+from contextlib import AbstractAsyncContextManager
+from types import TracebackType
+from typing import Final, Self, cast
 
-from trading_bot.robinhood_mcp.sdk_transport import ROBINHOOD_TRADING_MCP_URL
+from trading_bot.robinhood_mcp._current_session import (
+    _open_robinhood_client,
+    _RobinhoodSession,
+    _RobinhoodSessionCleanupError,
+    _RobinhoodSessionConcurrentUseError,
+    _RobinhoodSessionEventLoopError,
+    _RobinhoodSessionFailedError,
+    _RobinhoodSessionScopeError,
+    _RobinhoodSessionThreadError,
+)
 
 READ_TOOLS: Final = (
     "get_accounts",
@@ -23,22 +34,34 @@ class CurrentReadError(RuntimeError):
 
 
 class RobinhoodCurrentReadTransport:
-    """Five explicit read methods; OAuth and HTTP are inert until a read call.
+    """Five explicit read methods, scoped to one reusable session per operation.
 
-    Each read uses one session and discovers the entire required read surface
-    before dispatch. No review/mutation capability is required or retained.
-    There is no retry, generic public dispatch, or arbitrary endpoint override.
+    OAuth and HTTP remain inert until the first read in an operation. A direct
+    getter owns one independent operation; an explicit ``with`` scope lets a
+    composed operation reuse one session and one read-capability discovery.
     """
 
-    __slots__ = ("_oauth_factory", "_session_factory", "_counts", "_observed")
+    __slots__ = (
+        "_oauth_factory",
+        "_session_factory",
+        "_session_owner",
+        "_session_discovered",
+        "_counts",
+        "_observed",
+    )
 
     def __init__(self, oauth_factory: Callable[[], object]) -> None:
         if not callable(oauth_factory):
             raise TypeError("OAuth factory must be callable")
         self._oauth_factory = oauth_factory
-        self._session_factory = None
+        self._session_factory: Callable[[], object] | None = None
+        self._session_discovered = False
         self._counts = dict.fromkeys(READ_TOOLS, 0)
         self._observed: tuple[str, ...] = ()
+        self._session_owner = _RobinhoodSession(
+            self._new_session,
+            on_stop=self._reset_session_state,
+        )
 
     @classmethod
     def for_test(
@@ -55,6 +78,35 @@ class RobinhoodCurrentReadTransport:
     @property
     def observed_read_tools(self) -> tuple[str, ...]:
         return self._observed
+
+    def __enter__(self) -> Self:
+        try:
+            self._session_owner.start()
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentReadError("READ_EVENT_LOOP_REJECTED") from None
+        except _RobinhoodSessionThreadError:
+            raise CurrentReadError("READ_SESSION_USE_REJECTED") from None
+        except _RobinhoodSessionScopeError:
+            raise CurrentReadError("READ_SESSION_REENTRY_REJECTED") from None
+        self._session_discovered = False
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        del exc_type, exc, traceback
+        try:
+            self._session_owner.stop()
+        except _RobinhoodSessionCleanupError:
+            raise CurrentReadError("READ_SESSION_CLEANUP_FAILED") from None
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentReadError("READ_EVENT_LOOP_REJECTED") from None
+        except (_RobinhoodSessionThreadError, _RobinhoodSessionConcurrentUseError):
+            raise CurrentReadError("READ_SESSION_USE_REJECTED") from None
+        return False
 
     def get_accounts(self) -> Mapping[str, object]:
         return self._invoke("get_accounts", {})
@@ -88,34 +140,75 @@ class RobinhoodCurrentReadTransport:
             pass
         else:
             raise CurrentReadError("READ_EVENT_LOOP_REJECTED")
+
         try:
-            return asyncio.run(self._request(name, dict(arguments)))
+            if self._session_owner.in_scope:
+                return self._session_owner._drive(
+                    lambda: self._request(name, dict(arguments))
+                )
+            with self:
+                return self._session_owner._drive(
+                    lambda: self._request(name, dict(arguments))
+                )
+        except _RobinhoodSessionCleanupError:
+            raise CurrentReadError("READ_SESSION_CLEANUP_FAILED") from None
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentReadError("READ_EVENT_LOOP_REJECTED") from None
+        except (
+            _RobinhoodSessionScopeError,
+            _RobinhoodSessionThreadError,
+            _RobinhoodSessionConcurrentUseError,
+            _RobinhoodSessionFailedError,
+        ):
+            raise CurrentReadError("READ_SESSION_USE_REJECTED") from None
+        except CurrentReadError as exc:
+            if str(exc) in {
+                "READ_EVENT_LOOP_REJECTED",
+                "READ_SESSION_CLEANUP_FAILED",
+                "READ_SESSION_REENTRY_REJECTED",
+                "READ_SESSION_USE_REJECTED",
+            }:
+                raise
+            raise CurrentReadError("READ_REQUEST_FAILED") from None
         except Exception:
             raise CurrentReadError("READ_REQUEST_FAILED") from None
+
+    def _new_session(self) -> AbstractAsyncContextManager[object]:
+        if self._session_factory is not None:
+            return cast(AbstractAsyncContextManager[object], self._session_factory())
+        return _open_robinhood_client(self._oauth_factory)
 
     async def _request(
         self, name: str, arguments: dict[str, object]
     ) -> Mapping[str, object]:
         if name not in READ_TOOLS:
             raise CurrentReadError("READ_METHOD_REJECTED")
-        if self._session_factory is not None:
-            async with self._session_factory() as client:
-                return await self._read(client, name, arguments)
-        import httpx2
-        from mcp import Client
-        from mcp.client.streamable_http import streamable_http_client
+        return await self._session_owner._submit(
+            lambda client: self._read(client, name, arguments)
+        )
 
-        async with httpx2.AsyncClient(auth=self._oauth_factory(), timeout=60) as http:
-            async with Client(
-                streamable_http_client(ROBINHOOD_TRADING_MCP_URL, http_client=http)
-            ) as client:
-                return await self._read(client, name, arguments)
+    def _reset_session_state(self) -> None:
+        self._session_discovered = False
 
     async def _read(
         self, client: object, name: str, arguments: dict[str, object]
     ) -> Mapping[str, object]:
         if name not in READ_TOOLS:
             raise CurrentReadError("READ_METHOD_REJECTED")
+        if not self._session_discovered:
+            await self._discover_read_tools(client)
+            self._session_discovered = True
+            self._observed = READ_TOOLS
+        self._counts[name] += 1
+        result = await client.call_tool(name, arguments)
+        payload = getattr(result, "structured_content", None)
+        if getattr(result, "is_error", None) is not False or not isinstance(
+            payload, Mapping
+        ):
+            raise CurrentReadError("READ_RESULT_INVALID")
+        return dict(payload)
+
+    async def _discover_read_tools(self, client: object) -> None:
         cursor = None
         seen = set()
         advertised = set()
@@ -141,12 +234,3 @@ class RobinhoodCurrentReadTransport:
             raise CurrentReadError("READ_DISCOVERY_BOUND_EXCEEDED")
         if advertised != set(READ_TOOLS):
             raise CurrentReadError("READ_CAPABILITY_MISSING")
-        self._observed = READ_TOOLS
-        self._counts[name] += 1
-        result = await client.call_tool(name, arguments)
-        payload = getattr(result, "structured_content", None)
-        if getattr(result, "is_error", None) is not False or not isinstance(
-            payload, Mapping
-        ):
-            raise CurrentReadError("READ_RESULT_INVALID")
-        return dict(payload)

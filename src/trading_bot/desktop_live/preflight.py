@@ -7,10 +7,12 @@ import json
 import re
 import subprocess
 from collections.abc import Mapping
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import cast
 from zoneinfo import ZoneInfo
 
 from trading_bot.desktop_live.configuration import (
@@ -105,6 +107,7 @@ _FAILURE_CODES = {
             "LIVE_DISCOVERY_INVALID",
             "LIVE_DISCOVERY_CURSOR_INVALID",
             "LIVE_DISCOVERY_BOUND_EXCEEDED",
+            "LIVE_SESSION_CLEANUP_FAILED",
             "LIVE_DOLLAR_ORDER_SCHEMA_MISSING",
             "LIVE_SCHEMA_INVALID",
         }
@@ -282,6 +285,35 @@ def build_live_plan(
     ):
         raise TypeError("transport does not expose the reviewed P6 surface")
     now = utc(now)
+    with _operation_scope(transport) as session_transport:
+        return _build_live_plan_in_session(
+            transport=session_transport,
+            p5b=p5b,
+            source_head=source_head,
+            source_tree=source_tree,
+            now=now,
+            policy=policy,
+        )
+
+
+def _operation_scope(transport: object) -> AbstractContextManager[object]:
+    enter = getattr(transport, "__enter__", None)
+    exit_scope = getattr(transport, "__exit__", None)
+    if callable(enter) and callable(exit_scope):
+        return cast(AbstractContextManager[object], transport)
+    return nullcontext(transport)
+
+
+def _build_live_plan_in_session(
+    *,
+    transport: object,
+    p5b: P5BBaselineEvidence,
+    source_head: str,
+    source_tree: str,
+    now: datetime,
+    policy: TinyLivePolicy,
+) -> LiveExecutionPlan:
+    """Build the complete plan inside one caller-owned Robinhood session."""
     transport.discover_required_capabilities()
     account_number = resolve_account(transport.get_accounts()).account_number
     quote_capture = _P6QuoteCapture(transport)

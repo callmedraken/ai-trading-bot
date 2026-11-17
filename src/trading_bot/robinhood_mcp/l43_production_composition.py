@@ -8,8 +8,10 @@ state, or exposes a mutation/review transport.
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import cast
 
 from scripts.checkpoint_runner import _git_output
 
@@ -24,6 +26,9 @@ from trading_bot.live_prototype.l43_production_owner import (
     L43SourceIdentity,
     Q62JournalOrigin,
     read_canonical_q62_origin,
+)
+from trading_bot.live_prototype.l43_provider_contracts import (
+    L43PreEffectReadBoundary,
 )
 from trading_bot.live_prototype.l43_state import read_production_l43_state_snapshot
 from trading_bot.review_paper.nyse_published_regular_sessions import (
@@ -133,8 +138,20 @@ class L43ProductionPreEffectComposition:
             clock=lambda: datetime.now(UTC),
             session_authority=session_authority,
             order_scope_verifier=scope_verifier,
+            read_operation_scope_factory=_read_operation_scope,
         )
         return cls(dependencies=dependencies, origin=origin)
+
+
+def _read_operation_scope(
+    boundary: L43PreEffectReadBoundary,
+) -> AbstractContextManager[object]:
+    """Select the explicit scope for the exact production read adapter."""
+
+    if type(boundary) is not RobinhoodL43PreEffectReadAdapter:
+        raise TypeError("production scope requires the normalized L43 read adapter")
+    adapter = cast(RobinhoodL43PreEffectReadAdapter, boundary)
+    return adapter._operation_scope()
 
 
 __all__ = [

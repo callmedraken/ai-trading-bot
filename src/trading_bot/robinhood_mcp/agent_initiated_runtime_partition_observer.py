@@ -15,14 +15,19 @@ import re
 import sys
 import threading
 import webbrowser
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from contextlib import AbstractAsyncContextManager
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
+from trading_bot.robinhood_mcp._current_session import (
+    _open_robinhood_client,
+    _RobinhoodSession,
+    _RobinhoodSessionCleanupError,
+)
 from trading_bot.robinhood_mcp.agent_initiated_runtime_partition_proof import (
     B2_PROOF_CONTRACT_VERSION,
     AgentInitiatedLogicalReadEvidence,
@@ -160,6 +165,8 @@ class RobinhoodB2ReadTransport:
         "_session_factory",
         "_attempts",
         "_dispatch_state",
+        "_session",
+        "_discovered",
     )
 
     def __init__(
@@ -176,6 +183,11 @@ class RobinhoodB2ReadTransport:
         ) = None
         self._attempts = attempts
         self._dispatch_state = dispatch_state
+        self._discovered = False
+        self._session = _RobinhoodSession(
+            self._new_session,
+            on_stop=self._reset_session_state,
+        )
 
     @classmethod
     def for_test(
@@ -187,6 +199,36 @@ class RobinhoodB2ReadTransport:
         instance = cls(lambda: None, attempts, dispatch_state)
         instance._session_factory = session_factory
         return instance
+
+    def __enter__(self) -> RobinhoodB2ReadTransport:
+        if self._session.in_scope:
+            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
+        try:
+            self._session.start()
+        except Exception:
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: object | None,
+    ) -> bool:
+        del exc_type, exc_value, traceback
+        try:
+            self._session.stop()
+        except _RobinhoodSessionCleanupError:
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
+        except Exception:
+            raise _B2ReadError(
+                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
+            ) from None
+        return False
 
     def get_accounts(self) -> Mapping[str, object]:
         return self._invoke("get_accounts", {})
@@ -204,13 +246,17 @@ class RobinhoodB2ReadTransport:
         if name not in _TOOLS:
             raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
         try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            pass
-        else:
-            raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
-        try:
-            return asyncio.run(self._request(name, dict(arguments)))
+            if not self._session.in_scope:
+                with self:
+                    return self._invoke(name, dict(arguments))
+
+            async def read(client: object) -> Mapping[str, object]:
+                return await self._read(
+                    cast(_ToolsListClient, client), name, dict(arguments)
+                )
+
+            callback: Callable[[object], Awaitable[Mapping[str, object]]] = read
+            return self._session.run(callback)
         except _B2ReadError:
             raise
         except Exception:
@@ -218,41 +264,33 @@ class RobinhoodB2ReadTransport:
                 B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
             ) from None
 
-    async def _request(
-        self, name: str, arguments: dict[str, object]
-    ) -> Mapping[str, object]:
+    def _new_session(self) -> AbstractAsyncContextManager[object]:
         session_factory = self._session_factory
         if session_factory is not None:
             self._attempts.mcp_session_open_attempts += 1
-            async with session_factory() as client:
-                return await self._read(client, name, arguments)
+            return session_factory()
+        return _open_robinhood_client(
+            self._oauth_factory,
+            before_oauth=self._oauth_scope_entry,
+            before_mcp_session=self._mcp_session_open,
+        )
 
-        try:
-            import httpx2
-            from mcp import Client
-            from mcp.client.streamable_http import streamable_http_client
-        except ImportError:
-            raise _B2ReadError(
-                B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE
-            ) from None
-
+    def _oauth_scope_entry(self) -> None:
         self._attempts.oauth_scope_entry_attempts += 1
         self._dispatch_state.started = True
-        oauth_auth = self._oauth_factory()
-        from trading_bot.robinhood_mcp.sdk_transport import ROBINHOOD_TRADING_MCP_URL
 
-        async with httpx2.AsyncClient(auth=oauth_auth, timeout=60) as http_client:
-            stream = streamable_http_client(
-                ROBINHOOD_TRADING_MCP_URL, http_client=http_client
-            )
-            self._attempts.mcp_session_open_attempts += 1
-            async with Client(stream) as client:
-                return await self._read(client, name, arguments)
+    def _mcp_session_open(self) -> None:
+        self._attempts.mcp_session_open_attempts += 1
+
+    def _reset_session_state(self) -> None:
+        self._discovered = False
 
     async def _read(
         self, client: _ToolsListClient, name: str, arguments: dict[str, object]
     ) -> Mapping[str, object]:
-        await self._require_b2_tools(client)
+        if not self._discovered:
+            await self._require_b2_tools(client)
+            self._discovered = True
         if name == "get_accounts":
             if arguments:
                 raise _B2ReadError(B2FailureReason.TRANSPORT_TOOL_DISPATCH_FAILURE)
@@ -409,13 +447,35 @@ class RobinhoodAgentInitiatedRuntimePartitionObserver:
             with _suppress_external_output():
                 # Run the blocking proof/transport in a worker with no active
                 # event loop; the proof engine itself is intentionally sync.
-                proof_result = await asyncio.to_thread(
-                    _run_production_session,
-                    attempts,
-                    dispatch_state,
-                    self._repo_root,
-                    expected_source,
+                proof_task = asyncio.create_task(
+                    asyncio.to_thread(
+                        _run_production_session,
+                        attempts,
+                        dispatch_state,
+                        self._repo_root,
+                        expected_source,
+                    )
                 )
+                try:
+                    proof_result = await asyncio.shield(proof_task)
+                except asyncio.CancelledError:
+                    # Cancelling asyncio.to_thread() only cancels its awaiter.
+                    # Keep the consumed operation alive until its synchronous
+                    # owner has closed the MCP session, then write evidence.
+                    # Shield again after each caller cancellation so the worker
+                    # cannot be abandoned between dispatch and cleanup.
+                    while not proof_task.done():
+                        try:
+                            await asyncio.shield(proof_task)
+                        except asyncio.CancelledError:
+                            continue
+                        except Exception:
+                            break
+                    try:
+                        proof_task.result()
+                    except (Exception, asyncio.CancelledError):
+                        pass
+                    raise
         except (Exception, asyncio.CancelledError):
             status = AgentInitiatedRuntimePartitionObservationStatus.PROVIDER_EXCEPTION
             reason = "PROVIDER_EXCEPTION"
@@ -500,11 +560,12 @@ def _run_production_session(
     )
     transport = RobinhoodB2ReadTransport(oauth_factory, attempts, dispatch_state)
     adapter = RobinhoodL43B2PreEffectReadAdapter(transport)
-    return prove_agent_initiated_partition(
-        adapter,
-        repo_root=repo_root,
-        expected_source=expected_source,
-    )
+    with transport:
+        return prove_agent_initiated_partition(
+            adapter,
+            repo_root=repo_root,
+            expected_source=expected_source,
+        )
 
 
 def _validate_proof_result(
@@ -703,6 +764,9 @@ def _module_origins_are_source_owned(*, repo_root: Path) -> bool:
     try:
         from scripts import current_source_authority
         from trading_bot.robinhood_mcp import (
+            _current_session as current_session_module,
+        )
+        from trading_bot.robinhood_mcp import (
             agent_initiated_runtime_partition_proof as proof_module,
         )
         from trading_bot.robinhood_mcp import (
@@ -714,6 +778,7 @@ def _module_origins_are_source_owned(*, repo_root: Path) -> bool:
         modules = (
             sys.modules[__name__],
             proof_module,
+            current_session_module,
             l43_read_adapter,
             order_scope_schema_observer,
         )

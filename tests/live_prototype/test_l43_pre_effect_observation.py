@@ -154,6 +154,41 @@ class _ReadBoundary:
         return {"data": {"orders": self.orders, "next": cursor}}
 
 
+class _ScopedReadBoundary(_ReadBoundary):
+    def __init__(self, *, scope_events: list[str], malformed_orders: bool, **kwargs):
+        super().__init__(**kwargs)
+        self._scope_events = scope_events
+        self._scope_active = False
+        self._malformed_orders = malformed_orders
+
+    def __enter__(self):
+        self._scope_events.append("open")
+        self._scope_active = True
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        self._scope_events.append("close")
+        self._scope_active = False
+
+    def _record(self, method: str) -> None:
+        assert self._scope_active
+        self._scope_events.append(method)
+
+    def get_accounts(self):
+        self._record("get_accounts")
+        return super().get_accounts()
+
+    def get_equity_positions(self, arguments):
+        self._record("get_equity_positions")
+        return super().get_equity_positions(arguments)
+
+    def get_equity_orders(self, arguments):
+        self._record("get_equity_orders")
+        if self._malformed_orders:
+            return {"data": {"orders": []}}
+        return super().get_equity_orders(arguments)
+
+
 class _SignalProvider:
     def __init__(
         self,
@@ -352,6 +387,8 @@ def _dependencies(
     signal_offset: timedelta = timedelta(0),
     clock_values: tuple[datetime, ...] | None = None,
     order_page_cursors: tuple[str | None, ...] | None = None,
+    read_scope_events: list[str] | None = None,
+    malformed_orders: bool = False,
 ) -> tuple[
     observer.L43PreEffectDependencies, _ReadBoundary, _SignalProvider, _ScopeVerifier
 ]:
@@ -371,12 +408,20 @@ def _dependencies(
         orders = [_order(owned if order_filled is None else order_filled)]
     if order_rows is not None:
         orders = order_rows
-    read = _ReadBoundary(
-        positions=positions,
-        orders=orders,
-        account_number=account_number,
-        order_page_cursors=order_page_cursors,
-    )
+    read_args = {
+        "positions": positions,
+        "orders": orders,
+        "account_number": account_number,
+        "order_page_cursors": order_page_cursors,
+    }
+    if read_scope_events is None:
+        read = _ReadBoundary(**read_args)
+    else:
+        read = _ScopedReadBoundary(
+            **read_args,
+            scope_events=read_scope_events,
+            malformed_orders=malformed_orders,
+        )
     normalized_read = RobinhoodL43PreEffectReadAdapter(read)
     signal = _SignalProvider(decision, observation_offset=signal_offset)
     scope = _ScopeVerifier(AgenticAccountIdentity(account_number, 1).fingerprint)
@@ -400,6 +445,11 @@ def _dependencies(
         signal_provider_builder=lambda: signal,
         clock=clock,
         order_scope_verifier=scope if scope_proven else None,
+        read_operation_scope_factory=(
+            (lambda boundary: boundary._operation_scope())
+            if read_scope_events is not None
+            else None
+        ),
     )
     return deps, read, signal, scope
 
@@ -465,6 +515,52 @@ def test_flat_buy_returns_fresh_semantic_plan_without_reserving_or_authority(
     evidence = first.evidence_json.decode("ascii")
     assert _ACCOUNT_NUMBER not in evidence
     assert _ORDER_ID not in evidence
+
+
+@pytest.mark.parametrize(
+    ("malformed_orders", "scope_proven", "expected_blocker"),
+    (
+        (
+            False,
+            False,
+            observer.L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN,
+        ),
+        (
+            True,
+            True,
+            observer.L43PreEffectBlocker.ORDER_READ_FAILED,
+        ),
+    ),
+)
+def test_read_operation_scope_covers_all_reads_and_closes_on_block(
+    tmp_path: Path,
+    malformed_orders: bool,
+    scope_proven: bool,
+    expected_blocker: observer.L43PreEffectBlocker,
+):
+    state_path, _ = _state_path(tmp_path)
+    events: list[str] = []
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        scope_proven=scope_proven,
+        read_scope_events=events,
+        malformed_orders=malformed_orders,
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
+    assert result.blockers == (expected_blocker,)
+    assert events[0] == "open"
+    assert events[-1] == "close"
+    assert events[1:-1] == [
+        "get_accounts",
+        "get_equity_positions",
+        "get_equity_orders",
+    ]
+    assert result.robinhood_read_count == 3
 
 
 def test_relevant_order_digest_binds_agent_initiated_without_query_filter(

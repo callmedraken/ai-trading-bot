@@ -7,12 +7,31 @@ from pathlib import Path
 import pytest
 
 from trading_bot.desktop_paper import robinhood_preflight as preflight
-from trading_bot.robinhood_mcp.current_read_transport import READ_TOOLS
+from trading_bot.robinhood_mcp.current_read_transport import (
+    READ_TOOLS,
+    CurrentReadError,
+)
 
 from .test_robinhood_read import ACCOUNT, FakeReads
 
 
 class FakeTransport(FakeReads):
+    def __init__(self):
+        super().__init__()
+        self.session_entries = 0
+        self.session_exits = 0
+        self.session_cleanup_fails = False
+
+    def __enter__(self):
+        self.session_entries += 1
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.session_exits += 1
+        if self.session_cleanup_fails:
+            raise CurrentReadError("READ_SESSION_CLEANUP_FAILED")
+        return False
+
     @property
     def observed_read_tools(self):
         return READ_TOOLS
@@ -68,6 +87,7 @@ def test_preflight_zero_mutations_and_read_only_state_hashes(monkeypatch, tmp_pa
     assert result["credential_values_exposed"] is False
     assert ACCOUNT not in json.dumps(result)
     assert len(transport.calls) == 5
+    assert transport.session_entries == transport.session_exits == 1
 
 
 @pytest.mark.parametrize("stage", ["oauth", *READ_TOOLS])
@@ -92,6 +112,11 @@ def test_failures_never_leak_account_tokens_payload_or_retry(
     assert ACCOUNT not in serialized and "secret-token" not in serialized
     assert "unnecessary provider payload" not in serialized
     assert len(calls) == 1
+    assert (
+        transport.session_entries
+        == transport.session_exits
+        == (0 if stage == "oauth" else 1)
+    )
     assert result["mutation_call_count"] == 0
     assert result["production_state_unchanged"]
 
@@ -120,6 +145,37 @@ def test_changed_production_state_fails_closed(monkeypatch, tmp_path):
     result = preflight.preflight()
     assert result["status"] == "BLOCKED"
     assert result["production_state_unchanged"] is False
+
+
+def test_parse_failure_closes_the_read_scope(monkeypatch, tmp_path):
+    _, transport = setup_fake(monkeypatch, tmp_path)
+
+    def fail_parse(read, *, observed_at):
+        read.get_accounts()
+        raise RuntimeError(ACCOUNT + " private parser detail")
+
+    monkeypatch.setattr(preflight, "observe_robinhood_baseline", fail_parse)
+    result = preflight.preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["diagnostic"] == "RECONCILIATION_FAILED"
+    assert ACCOUNT not in json.dumps(result)
+    assert transport.session_entries == transport.session_exits == 1
+    assert len(transport.calls) == 1
+
+
+def test_cleanup_failure_uses_fixed_read_transport_diagnostic(monkeypatch, tmp_path):
+    _, transport = setup_fake(monkeypatch, tmp_path)
+    transport.session_cleanup_fails = True
+
+    result = preflight.preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["diagnostic"] == "READ_SESSION_CLEANUP_FAILED"
+    assert result["provider_call_counts"]["get_accounts"] == 1
+    assert transport.session_entries == transport.session_exits == 1
+    assert "READ_SESSION_CLEANUP_FAILED" in json.dumps(result)
+    assert "CurrentReadError" not in json.dumps(result)
 
 
 def test_no_paper_write_or_holdout_alpaca_effect_imports():

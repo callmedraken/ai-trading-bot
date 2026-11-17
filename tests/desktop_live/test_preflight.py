@@ -195,6 +195,11 @@ class _PlanTransport:
         self.review_changes = {}
         self.setting_approval = False
         self.review_arguments = []
+        self.session_entries = 0
+        self.session_exits = 0
+        self.session_active = False
+        self.session_cleanup_fails = False
+        self.discovery_calls = 0
         selected = _selected_sessions(now)
         official_close = 159 if rising else 141
         stamp = now.isoformat()
@@ -233,14 +238,33 @@ class _PlanTransport:
         }
         self.quote_payload_seen_by_baseline = None
 
+    def __enter__(self):
+        assert not self.session_active
+        self.session_entries += 1
+        self.session_active = True
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        assert self.session_active
+        self.session_exits += 1
+        self.session_active = False
+        if self.session_cleanup_fails:
+            raise CurrentLiveTransportError("LIVE_SESSION_CLEANUP_FAILED")
+        return False
+
+    def _require_session(self):
+        assert self.session_active
+
     @property
     def call_counts(self):
         return tuple(self._counts.items())
 
     def discover_required_capabilities(self):
-        pass
+        self._require_session()
+        self.discovery_calls += 1
 
     def get_accounts(self):
+        self._require_session()
         self._counts["get_accounts"] += 1
         return {
             "data": {
@@ -255,11 +279,13 @@ class _PlanTransport:
     get_equity_orders = get_portfolio
 
     def get_equity_quotes(self, arguments):
+        self._require_session()
         self._counts["get_equity_quotes"] += 1
         assert arguments == {"symbols": ["SPY"]}
         return self.quote_payload
 
     def get_equity_historicals(self, arguments):
+        self._require_session()
         self._counts["get_equity_historicals"] += 1
         request = RobinhoodDailyHistoryRequest(
             preflight.LIVE_SYMBOL,
@@ -297,6 +323,7 @@ class _PlanTransport:
         }
 
     def get_equity_tradability(self, arguments):
+        self._require_session()
         self._counts["get_equity_tradability"] += 1
         return {
             "data": {
@@ -308,10 +335,12 @@ class _PlanTransport:
         }
 
     def get_trade_approval_setting(self, arguments):
+        self._require_session()
         self._counts["get_trade_approval_setting"] += 1
         return {"data": {"enabled": self.setting_approval}}
 
     def review_equity_order(self, arguments):
+        self._require_session()
         self.reviews += 1
         self._counts["review_equity_order"] += 1
         self.review_arguments.append(dict(arguments))
@@ -360,11 +389,13 @@ def plan_builder(monkeypatch):
         through_preflight=False,
         review_changes=None,
         setting_approval=False,
+        session_cleanup_fails=False,
     ):
         now = datetime.fromisoformat(instant)
         transport = _PlanTransport(now, rising=rising)
         transport.review_changes = review_changes or {}
         transport.setting_approval = setting_approval
+        transport.session_cleanup_fails = session_cleanup_fails
         if through_preflight:
             monkeypatch.setattr(preflight, "_transport", lambda: transport)
             monkeypatch.setattr(
@@ -401,6 +432,8 @@ def test_buy_preflight_can_prepare_anytime_for_next_executable_session(
     assert plan.review.clean
     assert Decimal("0") < plan.requested_dollars <= Decimal("10")
     assert transport.reviews == 1
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.discovery_calls == 1
 
 
 @pytest.mark.parametrize(
@@ -415,6 +448,8 @@ def test_no_action_preflight_has_no_market_time_gate(
     assert plan.target_session == target
     assert plan.requested_dollars == 0
     assert transport.reviews == 0
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.discovery_calls == 1
 
 
 SECRET = "SECRET_OAUTH_ACCOUNT_PROVIDER_PAYLOAD"
@@ -486,11 +521,15 @@ class _PreflightSession:
     def __init__(self, *, fail_review=False):
         self.fail_review = fail_review
         self.calls = []
+        self.session_entries = 0
+        self.session_exits = 0
 
     async def __aenter__(self):
+        self.session_entries += 1
         return self
 
     async def __aexit__(self, *args):
+        self.session_exits += 1
         return None
 
     async def list_tools(self, cursor=None):
@@ -619,6 +658,35 @@ def test_successful_preflight_retains_complete_counts(
     assert result["order_placement_count"] == result["order_cancel_count"] == 0
     assert transport.placed == transport.canceled == 0
     assert result["production_state_unchanged"] is True
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.discovery_calls == 1
+
+
+def test_cleanup_failure_after_plan_build_is_sanitized_and_retains_counts(
+    preflight_environment, plan_builder
+):
+    result, transport = plan_builder(
+        "2026-11-02T17:00:00+00:00",
+        through_preflight=True,
+        session_cleanup_fails=True,
+    )
+
+    expected = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
+    expected["get_accounts"] = 2
+    expected["get_equity_quotes"] = expected["get_equity_historicals"] = 1
+    expected["get_equity_tradability"] = 1
+    expected["get_trade_approval_setting"] = 1
+    expected["review_equity_order"] = 1
+    _assert_blocked(
+        result,
+        "P6_PLAN_BUILD_BLOCKED",
+        expected,
+        preflight_environment,
+        code="LIVE_SESSION_CLEANUP_FAILED",
+    )
+    assert transport.session_entries == transport.session_exits == 1
+    assert transport.session_active is False
+    assert transport.discovery_calls == 1
 
 
 @pytest.mark.parametrize("unavailable", (False, True))
@@ -745,7 +813,9 @@ def current_history():
         preflight.MIN_COMPLETED_BARS - 2,
         BoundMarketCalendar(XNYS_CALENDAR_DESCRIPTOR, NYSEMarketCalendar()),
     )
-    payload = _PlanTransport(now).get_equity_historicals(request.arguments())
+    transport = _PlanTransport(now)
+    with transport:
+        payload = transport.get_equity_historicals(request.arguments())
     return request, payload
 
 
@@ -1232,9 +1302,11 @@ def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
 ):
     # Use the real transport invocation boundary with an entirely fake SDK.
     now = datetime(2026, 11, 3, 17, 0, tzinfo=UTC)
-    payload = _PlanTransport(now).get_equity_historicals(
-        _history_prefix_request(now).arguments()
-    )
+    payload_transport = _PlanTransport(now)
+    with payload_transport:
+        payload = payload_transport.get_equity_historicals(
+            _history_prefix_request(now).arguments()
+        )
     if failure == "history-contract":
         payload["guide"] = SECRET
         payload["data"]["results"][0]["bars"][30]["close_price"] = SECRET
@@ -1290,3 +1362,4 @@ def test_history_failure_through_preflight_is_sanitized_and_truthfully_counted(
     assert dict(transport.call_counts) == expected
     assert "guide" not in json.dumps(result)
     assert "close_price" not in json.dumps(result)
+    assert session.session_entries == session.session_exits == 1

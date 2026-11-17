@@ -1,18 +1,28 @@
 """Explicit, discovery-gated Robinhood MCP transport for P6 live execution.
 
-The P5B read facade is intentionally not extended.  This module is the only
-current Architecture 147 transport that exposes the bounded live mutation
-surface, and it never offers arbitrary public tool dispatch.
+The P5B read facade is intentionally not extended. This module exposes only the
+bounded live mutation surface, and it never offers arbitrary public dispatch.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
-from typing import Final
+from types import TracebackType
+from typing import Final, Self, cast
 
-from trading_bot.robinhood_mcp.sdk_transport import ROBINHOOD_TRADING_MCP_URL
+from trading_bot.robinhood_mcp._current_session import (
+    _open_robinhood_client,
+    _RobinhoodSession,
+    _RobinhoodSessionCleanupError,
+    _RobinhoodSessionConcurrentUseError,
+    _RobinhoodSessionEventLoopError,
+    _RobinhoodSessionFailedError,
+    _RobinhoodSessionScopeError,
+    _RobinhoodSessionThreadError,
+)
 
 LIVE_READ_TOOLS: Final = (
     "get_accounts",
@@ -44,11 +54,13 @@ class AdvertisedTool:
 
 
 class RobinhoodCurrentLiveTransport:
-    """Typed P6 transport with no public arbitrary ``call_tool`` method."""
+    """Typed live transport with one owned MCP session per operation."""
 
     __slots__ = (
         "_oauth_factory",
         "_session_factory",
+        "_session_owner",
+        "_session_discovered",
         "_counts",
         "_observed",
         "_schemas",
@@ -58,10 +70,15 @@ class RobinhoodCurrentLiveTransport:
         if not callable(oauth_factory):
             raise TypeError("OAuth factory must be callable")
         self._oauth_factory = oauth_factory
-        self._session_factory = None
+        self._session_factory: Callable[[], object] | None = None
+        self._session_discovered = False
         self._counts = dict.fromkeys(LIVE_TOOL_SURFACE, 0)
         self._observed: tuple[str, ...] = ()
         self._schemas: dict[str, AdvertisedTool] = {}
+        self._session_owner = _RobinhoodSession(
+            self._new_session,
+            on_stop=self._reset_session_state,
+        )
 
     @classmethod
     def for_test(
@@ -83,6 +100,36 @@ class RobinhoodCurrentLiveTransport:
     @property
     def advertised_schemas(self) -> tuple[AdvertisedTool, ...]:
         return tuple(self._schemas[name] for name in self._schemas)
+
+    def __enter__(self) -> Self:
+        try:
+            self._session_owner.start()
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentLiveTransportError("LIVE_EVENT_LOOP_REJECTED") from None
+        except _RobinhoodSessionThreadError:
+            raise CurrentLiveTransportError("LIVE_SESSION_USE_REJECTED") from None
+        except _RobinhoodSessionScopeError:
+            raise CurrentLiveTransportError("LIVE_SESSION_REENTRY_REJECTED") from None
+        self._session_discovered = False
+        self._schemas = {}
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        del exc_type, exc, traceback
+        try:
+            self._session_owner.stop()
+        except _RobinhoodSessionCleanupError:
+            raise CurrentLiveTransportError("LIVE_SESSION_CLEANUP_FAILED") from None
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentLiveTransportError("LIVE_EVENT_LOOP_REJECTED") from None
+        except (_RobinhoodSessionThreadError, _RobinhoodSessionConcurrentUseError):
+            raise CurrentLiveTransportError("LIVE_SESSION_USE_REJECTED") from None
+        return False
 
     def get_accounts(self) -> Mapping[str, object]:
         return self._invoke("get_accounts", {})
@@ -136,48 +183,71 @@ class RobinhoodCurrentLiveTransport:
         return self._invoke("cancel_equity_order", arguments)
 
     def discover_required_capabilities(self) -> tuple[AdvertisedTool, ...]:
-        """Discover all P6 tools and validate the exact mutation schemas."""
-        return self._discover()
+        """Return this operation's validated schemas, discovering once if needed."""
+        result = self._run_operation(self._discover_client, "LIVE_DISCOVERY_FAILED")
+        if not isinstance(result, tuple) or any(
+            not isinstance(item, AdvertisedTool) for item in result
+        ):
+            raise CurrentLiveTransportError("LIVE_DISCOVERY_FAILED")
+        return result
 
     def _invoke(
         self, name: str, arguments: Mapping[str, object]
     ) -> Mapping[str, object]:
         if name not in LIVE_TOOL_SURFACE or not isinstance(arguments, Mapping):
             raise CurrentLiveTransportError("LIVE_METHOD_REJECTED")
+
+        result = self._run_operation(
+            lambda client: self._call(client, name, dict(arguments)),
+            "LIVE_REQUEST_FAILED",
+        )
+        if not isinstance(result, Mapping):
+            raise CurrentLiveTransportError("LIVE_REQUEST_FAILED")
+        return result
+
+    def _run_operation(
+        self,
+        operation: Callable[[object], Awaitable[object]],
+        failure_code: str,
+    ) -> object:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
             pass
         else:
             raise CurrentLiveTransportError("LIVE_EVENT_LOOP_REJECTED")
+
         try:
-            return asyncio.run(self._request(name, dict(arguments)))
+            if self._session_owner.in_scope:
+                return self._session_owner.run(operation)
+            with self:
+                return self._session_owner.run(operation)
+        except _RobinhoodSessionCleanupError:
+            raise CurrentLiveTransportError("LIVE_SESSION_CLEANUP_FAILED") from None
+        except _RobinhoodSessionEventLoopError:
+            raise CurrentLiveTransportError("LIVE_EVENT_LOOP_REJECTED") from None
+        except (
+            _RobinhoodSessionScopeError,
+            _RobinhoodSessionThreadError,
+            _RobinhoodSessionConcurrentUseError,
+        ):
+            raise CurrentLiveTransportError("LIVE_SESSION_USE_REJECTED") from None
+        except _RobinhoodSessionFailedError:
+            raise CurrentLiveTransportError("LIVE_SESSION_FAILED") from None
         except CurrentLiveTransportError:
             raise
         except Exception:
-            raise CurrentLiveTransportError("LIVE_REQUEST_FAILED") from None
+            raise CurrentLiveTransportError(failure_code) from None
 
-    async def _request(
-        self, name: str, arguments: dict[str, object]
-    ) -> Mapping[str, object]:
+    def _new_session(self) -> AbstractAsyncContextManager[object]:
         if self._session_factory is not None:
-            async with self._session_factory() as client:
-                return await self._call(client, name, arguments)
-        import httpx2
-        from mcp import Client
-        from mcp.client.streamable_http import streamable_http_client
-
-        async with httpx2.AsyncClient(auth=self._oauth_factory(), timeout=60) as http:
-            async with Client(
-                streamable_http_client(ROBINHOOD_TRADING_MCP_URL, http_client=http)
-            ) as client:
-                return await self._call(client, name, arguments)
+            return cast(AbstractAsyncContextManager[object], self._session_factory())
+        return _open_robinhood_client(self._oauth_factory)
 
     async def _call(
         self, client: object, name: str, arguments: dict[str, object]
     ) -> Mapping[str, object]:
-        await self._discover_from_client(client)
-        self._validate_mutation_schemas()
+        await self._ensure_discovered(client)
         if name not in self._schemas:
             raise CurrentLiveTransportError("LIVE_CAPABILITY_MISSING")
         self._counts[name] += 1
@@ -189,42 +259,20 @@ class RobinhoodCurrentLiveTransport:
             raise CurrentLiveTransportError("LIVE_RESULT_INVALID")
         return dict(payload)
 
-    def _discover(self) -> tuple[AdvertisedTool, ...]:
-        async def discover() -> tuple[AdvertisedTool, ...]:
-            if self._session_factory is not None:
-                async with self._session_factory() as client:
-                    await self._discover_from_client(client)
-            else:
-                import httpx2
-                from mcp import Client
-                from mcp.client.streamable_http import streamable_http_client
+    async def _discover_client(self, client: object) -> tuple[AdvertisedTool, ...]:
+        await self._ensure_discovered(client)
+        return self.advertised_schemas
 
-                async with httpx2.AsyncClient(
-                    auth=self._oauth_factory(), timeout=60
-                ) as http:
-                    async with Client(
-                        streamable_http_client(
-                            ROBINHOOD_TRADING_MCP_URL, http_client=http
-                        )
-                    ) as client:
-                        await self._discover_from_client(client)
-            self._validate_mutation_schemas()
-            return self.advertised_schemas
+    async def _ensure_discovered(self, client: object) -> None:
+        if self._session_discovered:
+            return
+        found = await self._discover_from_client(client)
+        self._validate_mutation_schemas(found)
+        self._schemas = found
+        self._observed = LIVE_TOOL_SURFACE
+        self._session_discovered = True
 
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            pass
-        else:
-            raise CurrentLiveTransportError("LIVE_EVENT_LOOP_REJECTED")
-        try:
-            return asyncio.run(discover())
-        except CurrentLiveTransportError:
-            raise
-        except Exception:
-            raise CurrentLiveTransportError("LIVE_DISCOVERY_FAILED") from None
-
-    async def _discover_from_client(self, client: object) -> None:
+    async def _discover_from_client(self, client: object) -> dict[str, AdvertisedTool]:
         cursor = None
         seen: set[str] = set()
         found: dict[str, AdvertisedTool] = {}
@@ -247,15 +295,14 @@ class RobinhoodCurrentLiveTransport:
             raise CurrentLiveTransportError("LIVE_DISCOVERY_BOUND_EXCEEDED")
         if set(found) != set(LIVE_TOOL_SURFACE):
             raise CurrentLiveTransportError("LIVE_CAPABILITY_MISSING")
-        self._schemas = found
-        self._observed = LIVE_TOOL_SURFACE
+        return found
 
-    def _validate_mutation_schemas(self) -> None:
+    def _validate_mutation_schemas(self, schemas: Mapping[str, AdvertisedTool]) -> None:
         # P6 requires the dollar-order capability surface, not unconditional
         # provider requiredness of an alternative sizing field.
-        review = self._schemas.get("review_equity_order")
-        place = self._schemas.get("place_equity_order")
-        cancel = self._schemas.get("cancel_equity_order")
+        review = schemas.get("review_equity_order")
+        place = schemas.get("place_equity_order")
+        cancel = schemas.get("cancel_equity_order")
         required_order = frozenset(
             {
                 "account_number",
@@ -282,6 +329,10 @@ class RobinhoodCurrentLiveTransport:
             or not frozenset({"account_number", "order_id"}) <= cancel.required
         ):
             raise CurrentLiveTransportError("LIVE_DOLLAR_ORDER_SCHEMA_MISSING")
+
+    def _reset_session_state(self) -> None:
+        self._session_discovered = False
+        self._schemas = {}
 
 
 def _advertised_tool(entry: object) -> AdvertisedTool:

@@ -1,44 +1,30 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - REAL B2 OBSERVATION CONSUMED / NOT PROVEN; NORMALIZATION CORRECTIVE NEXT
+## Current milestone - RHC1A ACCEPTED / INTEGRATED; RHC1B SESSION CONSOLIDATION NEXT
 
-The one separately authorized real Architecture 147 L43 B2 runtime-partition observation has been CONSUMED exactly once on source `e466d33cf3a859976f48d7b7092fa3b58afc2f53` / tree `45b9254a6aaf429c9a5322a31022089a8af954f4`.
+RHC1A Robinhood compatibility normalization is ACCEPTED and INTEGRATED at `700f55ec5cfd803a0c5bff6ea4a853ba8f6731ab` / tree `967ab32de73fbe5bbe5904701da746ba3a3a55f5`, direct parent `a2db30cdc31df12f27699ae1bf1a08e658b4f427`.
 
-Preserved observer evidence:
+Feature mapped FULL `43972239523`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven FULL lanes passed; broad-1 through broad-7 wall times were `99.533`, `134.547`, `155.170`, `249.149`, `82.999`, `133.315`, and `146.142` seconds. Exact-source review accepted the checkpoint.
 
-- path: `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`
-- B2 evidence SHA-256: `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`
-- account fingerprint: `f377529245bd1682f382d17b22ac8d55362f7138a4f7fc307593c16847e551cf`
-- status/reason: `NOT_PROVEN / ALL_BEFORE_READ_EXCEPTION`
-- `partition_equality_proof=NOT_PROVEN`
-- `production_order_scope_authority=NOT_GRANTED`
-- source authority FEATURE/PROSPECTIVE_DEVELOP: PASS
-- source recheck: PASS
+`develop` fast-forwarded to the accepted source. Develop run `43987074364`, attempt 1, was terminal SUCCESS and proved exact feature-certification reuse; active/FULL jobs were skipped, so no duplicate broad certification ran.
 
-Attempt accounting proves provider dispatch began:
+RHC1A establishes a B2-specific normalized fact containing only bounded order ID, exact `SPY`, strict boolean `agent_initiated`, and a SHA-256 digest of the complete canonical JSON row. It removes generic full-order parsing from the B2 account-wide partition path without weakening the ordinary Robinhood parser or Q62 path. It also normalizes missing/null/empty-string terminal order cursors while preserving nonempty cursors as opaque bounded values.
 
-- OAuth scope-entry attempts: 2
-- MCP session-open attempts: 2
-- tools/list attempts/pages: 2/2
-- account reads: 1
-- order reads: 1
-- total MCP tool invocations: 2
-- review/place/cancel/other-tool attempts: 0
-- browser launches: 0
+The proof still performs ALL_BEFORE / TRUE / FALSE / ALL_AFTER and requires stable ALL universes, disjoint TRUE/FALSE sets, exact union equality, duplicate rejection, exhaustive pagination, strict partition membership, and same-ID complete-row digest stability. The proof contract is `ARCH147_L43_B2_AGENT_INITIATED_RUNTIME_PARTITION/v2`. Production order-scope authority remains `NOT_GRANTED`.
 
-The account read succeeded and the first unfiltered ALL_BEFORE SPY order read was attempted. No logical order-read evidence completed, so the observation cannot establish partition equality. The attempt is CONSUMED / NO AUTOMATIC RETRY. It must not be replayed.
+The previous real B2 observation remains CONSUMED / NOT_PROVEN / NO RETRY. Its immutable evidence is `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`, SHA-256 `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`, bound to source `e466d33cf3a859976f48d7b7092fa3b58afc2f53` / tree `45b9254a6aaf429c9a5322a31022089a8af954f4`. It recorded `NOT_PROVEN / ALL_BEFORE_READ_EXCEPTION`; the sanitized evidence does not reveal the exact raw provider/parser exception. It must not be replayed.
 
-Source audit of the consumed observation source found a concrete contract mismatch sufficient to require a correction before any later observation. That source's accepted A2/B2 runtime schema guarantees only order-row `id`, `symbol`, and strict boolean `agent_initiated` for the completeness proof, but its B2 L43 adapter routes every unfiltered row through the older generic `RobinhoodEquityOrder` parser, which requires additional fields not guaranteed by that schema. Q62's historical read covered a narrower `placed_agent="agentic"` population and therefore did not establish the generic parser contract for the account-wide unfiltered order universe.
-
-The preserved evidence intentionally sanitizes the underlying provider/parser exception, so no individual missing/nullable field is claimed as the exact trigger. The architectural defect is nevertheless established: the consumed source's account-wide B2 normalization path required fields outside its accepted provider schema contract.
-
-Production therefore remains `ORDER_SCOPE_UNPROVEN`. B2O must not be retried. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+Production therefore remains `ORDER_SCOPE_UNPROVEN`. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Implement a source-only B2 normalization corrective that removes the generic full-order parser from the account-wide partition proof. The corrected B2 seam should require only schema-guaranteed `id`, `symbol`, and strict `agent_initiated`, while binding each full raw JSON order row to a deterministic sanitized digest so same-ID row mutation across ALL/TRUE/FALSE/ALL can still fail closed without requiring undocumented/unguaranteed semantic fields.
+Implement `ARCH147-RHC1B_ROBINHOOD_SESSION_CONSOLIDATION` as a source-only/fake-only checkpoint before any future real B2/order-scope successor observation.
 
-The correction must be fake-only and perform zero provider reads. A later real observation, if authorized after source acceptance/integration, must be a new separately reviewed protected attempt; the consumed observation above is never retried.
+RHC1B must consolidate the current per-call MCP session and capability-discovery lifecycle in `current_read_transport.py`, `current_live_transport.py`, and the B2 observer transport. One composed Robinhood operation must own one reusable MCP session/event-loop lifetime, and required capability/schema discovery must occur once per established session rather than before every logical call.
+
+The checkpoint must preserve construction-time inertness, explicit allowlisted methods, fail-closed schema validation, sanitized error surfaces, exact call accounting, source/evidence authority boundaries, and all existing mutation no-retry rules. It must not add arbitrary production dispatch or automatic place/cancel retry.
+
+RHC1B performs zero provider reads, zero OAuth, zero real MCP sessions, and zero broker effects. No real Robinhood observation occurs between RHC1A and RHC1B.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

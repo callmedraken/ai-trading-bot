@@ -312,6 +312,71 @@ def test_l43_b2_runtime_partition_source_test_pair_is_prepublication_owned():
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_rhc2_successor_is_manually_owned_by_the_current_prototype_route():
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+    from scripts import current_source_authority
+
+    root = Path(runner.__file__).resolve().parents[1]
+    source = "scripts/arch147_rhc2_order_scope_successor_source.py"
+    observer_test = (
+        "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py"
+    )
+    spec = runner._checkpoint_specs()[runner.ARCH147_RHC2_NAME]
+
+    assert (root / source).is_file()
+    assert spec.preflight is runner._arch147_rhc2_preflight
+    assert spec.execute is None
+    assert spec.remote_branch is None
+    assert spec.remote_head_env is None
+    assert spec.ruff_paths.count(source) == 1
+    assert runner.ARCH147_RHC2_RUFF.count(source) == 1
+    assert runner.ARCH147_PROTOTYPE_RUFF.count(source) == 1
+    assert spec.tests.count(observer_test) == 1
+    assert runner.ARCH147_PROTOTYPE_TESTS.count(observer_test) == 1
+    assert inspect.signature(rhc2._run_preflight).parameters == {}
+    assert not hasattr(rhc2, "run_preflight")
+    prototype_tree = ast.parse(
+        inspect.getsource(runner._arch147_prototype_authority_check)
+    )
+    prototype_calls = {
+        node.func.id
+        for node in ast.walk(prototype_tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    assert "_arch147_rhc2_authority_check" in prototype_calls
+    assert "_arch147_rhc2_preflight" not in prototype_calls
+    assert current_source_authority.historical_preflight_dispatch_failures(root) == ()
+    assert runner._arch147_rhc2_authority_check(root) == ()
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
+def test_rhc2_origin_guard_requires_the_resolved_module_inside_lexical_root(
+    tmp_path: Path,
+):
+    from types import ModuleType
+
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    root = tmp_path / "checkout"
+    scripts = root / "scripts"
+    scripts.mkdir(parents=True)
+    expected = scripts / "checkpoint_runner.py"
+    expected.write_text("# expected source\n", encoding="ascii")
+    module = ModuleType("fake_checkpoint_runner")
+    module.__file__ = str(expected)
+
+    assert rhc2._module_origin_is_canonical(
+        module, repo_root=root, relative_path="scripts/checkpoint_runner.py"
+    )
+
+    foreign = tmp_path / "foreign_runner.py"
+    foreign.write_text("# foreign source\n", encoding="ascii")
+    module.__file__ = str(foreign)
+    assert not rhc2._module_origin_is_canonical(
+        module, repo_root=root, relative_path="scripts/checkpoint_runner.py"
+    )
+
+
 def test_l43_read_normalization_source_test_pairs_are_prepublication_owned():
     root = Path(runner.__file__).resolve().parents[1]
     spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]

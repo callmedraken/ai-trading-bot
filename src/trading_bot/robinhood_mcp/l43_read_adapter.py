@@ -245,13 +245,13 @@ def _data(payload: object, collection: str) -> Mapping[str, object]:
 
 def _cursor(data: Mapping[str, object]) -> str | None:
     if "next" not in data:
-        raise ValueError("Robinhood pagination field is missing")
+        return None
     cursor = data["next"]
-    if cursor is not None and (
-        type(cursor) is not str or not cursor or len(cursor) > 4096
-    ):
+    if cursor is None:
+        return None
+    if type(cursor) is not str or len(cursor) > 4096:
         raise ValueError("Robinhood cursor is invalid")
-    return cursor
+    return cursor or None
 
 
 def _strict_agent_initiated(row: object) -> bool:

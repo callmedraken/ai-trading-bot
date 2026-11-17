@@ -135,6 +135,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert set(specs) == {
         runner.ARCH147_PROTOTYPE_NAME,
         runner.ARCH147_B2O_NAME,
+        runner.ARCH147_RHC2_NAME,
         runner.ARCH147_P6_NAME,
         runner.ARCH147_P5B_NAME,
         runner.ARCH147_FILTERED_TREND_NAME,
@@ -456,7 +457,7 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
             expected_branch = runner.ARCH147_P5A_BRANCH
         if spec.name == runner.ARCH147_P4_NAME:
             expected_branch = runner.ARCH147_P4_BRANCH
-        if spec.name == runner.ARCH147_B2O_NAME:
+        if spec.name in {runner.ARCH147_B2O_NAME, runner.ARCH147_RHC2_NAME}:
             expected_branch = None
         assert spec.remote_branch == expected_branch
 
@@ -484,6 +485,27 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
     )
+
+
+def test_rhc2_registration_is_manual_and_unmapped() -> None:
+    root = Path(runner.__file__).resolve().parents[1]
+    spec = runner._checkpoint_specs()[runner.ARCH147_RHC2_NAME]
+
+    assert spec.name == "arch147-rhc2-robinhood-order-scope-successor-observation"
+    assert spec.preflight is runner._arch147_rhc2_preflight
+    assert spec.execute is None
+    assert spec.remote_branch is None
+    assert spec.remote_head_env is None
+    assert runner.ARCH147_RHC2_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH147_RHC2_NAME not in runner.ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH147_RHC2_NAME not in runner.CI_CERTIFICATION_PROFILES
+    assert (
+        runner.resolve_ci_checkpoint(
+            runner._checkpoint_specs(), runner.ARCH147_PROTOTYPE_BRANCH, "push"
+        )
+        == runner.ARCH147_PROTOTYPE_NAME
+    )
+    assert runner._arch147_rhc2_authority_check(root) == ()
 
 
 def test_default_evidence_root_is_outside_repo() -> None:
@@ -1552,6 +1574,11 @@ def test_r2b_common_and_family_requirements_are_independently_selectable():
             )
         if name == runner.ARCH147_B2O_NAME:
             expected = runner.COMMON_TESTS
+        if name == runner.ARCH147_RHC2_NAME:
+            expected = (
+                *runner.COMMON_TESTS,
+                "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
+            )
         if name == runner.ARCH147_P6_NAME:
             expected = tuple(
                 path

@@ -1084,3 +1084,183 @@ def test_b2_proof_uses_one_fake_sdk_session_and_complete_discovery(
     assert len({item[0] for item in calls}) == 1
     if paginate_orders:
         assert calls[2][2]["cursor"] == "orders-page-2"
+
+
+def test_rhc2_wrapper_dispatches_the_b2_proof_through_one_fake_session(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+    from trading_bot.robinhood_mcp import windows_oauth
+
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
+    calls: list[tuple[str, str, object]] = []
+    oauth_factories: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: oauth_factories.append(kwargs) or (lambda: object()),
+    )
+
+    def open_fake_session(
+        oauth_factory, *, before_oauth, before_mcp_session
+    ) -> _Session:
+        del oauth_factory
+        before_oauth()
+        before_mcp_session()
+        return _Session(calls)
+
+    monkeypatch.setattr(observer, "_open_robinhood_client", open_fake_session)
+    monkeypatch.setattr(proof, "_read_source_identity", lambda _: _SOURCE)
+    _install_fake_harness(monkeypatch, tmp_path, observer._run_production_session)
+    result = runner._arch147_rhc2_preflight()
+
+    assert result["status"] == "PASS"
+    assert result["disposition"] == "REVIEW_ONLY"
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+    assert result["provider_dispatch_started"] is True
+    assert len(oauth_factories) == 1
+    assert result["attempt_counters"]["oauth_scope_entry_attempts"] == 1
+    assert result["attempt_counters"]["mcp_session_open_attempts"] == 1
+    assert result["attempt_counters"]["tools_list_attempts"] == 1
+    assert result["attempt_counters"]["account_read_attempts"] == 1
+    assert result["attempt_counters"]["order_read_attempts"] == 4
+    assert result["attempt_counters"]["review_attempts"] == 0
+    assert result["attempt_counters"]["placement_attempts"] == 0
+    assert result["attempt_counters"]["cancellation_attempts"] == 0
+    assert "provider_effects" not in result
+    assert [item[0] for item in calls if item[0] in {"open", "close"}] == [
+        "open",
+        "close",
+    ]
+    assert [item[0] for item in calls if item[0] == "list"] == ["list"]
+    assert [item[1] for item in calls if item[0] == "call"] == [
+        "get_accounts",
+        "get_equity_orders",
+        "get_equity_orders",
+        "get_equity_orders",
+        "get_equity_orders",
+    ]
+
+
+def test_rhc2_wrapper_rejects_origin_or_registration_before_observer(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: False)
+    authority_calls: list[Path] = []
+    monkeypatch.setattr(
+        runner,
+        "_arch147_rhc2_authority_check",
+        lambda root: authority_calls.append(root) or (),
+    )
+    result = rhc2._run_preflight()
+    assert result["reason"] == "SOURCE_MODULE_ORIGIN_REJECTED"
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+    assert authority_calls == []
+
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(
+        runner,
+        "_arch147_rhc2_authority_check",
+        lambda root: authority_calls.append(root) or ("registration drift",),
+    )
+    observer_origin_calls: list[Path] = []
+    monkeypatch.setattr(
+        observer,
+        "_module_origins_are_source_owned",
+        lambda *, repo_root: observer_origin_calls.append(repo_root) or True,
+    )
+    result = rhc2._run_preflight()
+    assert result["reason"] == "CHECKPOINT_REGISTRATION_REJECTED"
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+    assert authority_calls == [tmp_path]
+    assert observer_origin_calls == []
+
+
+def test_rhc2_wrapper_keeps_negative_evidence_review_only(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
+    _install_fake_harness(monkeypatch, tmp_path, lambda *_: _not_proven())
+
+    result = rhc2._run_preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["observer_status"] == "NOT_PROVEN"
+    assert result["disposition"] == "REVIEW_ONLY"
+    assert result["observer_evidence_path"] is not None
+    assert result["observer_evidence_sha256"] is not None
+    assert result["source_recheck_status"] == "PASS"
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+
+
+def test_rhc2_wrapper_sanitizes_observer_failure_without_effect_claims(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(observer, "_module_origins_are_source_owned", lambda **_: True)
+
+    class _FailingObserver:
+        async def observe(self, *, evidence_dir: Path) -> object:
+            del evidence_dir
+            raise RuntimeError("private-token must not escape")
+
+    monkeypatch.setattr(
+        observer, "RobinhoodAgentInitiatedRuntimePartitionObserver", _FailingObserver
+    )
+    result = rhc2._run_preflight()
+
+    assert result == {
+        "status": "BLOCKED",
+        "reason": "OBSERVER_EXCEPTION",
+        "disposition": "REVIEW_ONLY",
+        "production_order_scope_authority": "NOT_GRANTED",
+    }
+    assert "private-token" not in repr(result)
+    assert "provider_effects" not in result
+
+
+def test_rhc2_wrapper_preserves_existing_evidence_on_uuid_collision(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from scripts import arch147_rhc2_order_scope_successor_source as rhc2
+
+    token = "d" * 32
+    evidence_dir = tmp_path / ("arch147-agent-initiated-runtime-partition-" + token)
+    evidence_dir.mkdir()
+    sentinel = evidence_dir / "evidence.json"
+    sentinel.write_bytes(b"old-path-sentinel\n")
+    monkeypatch.setattr(rhc2, "_expected_worktree", lambda: tmp_path)
+    monkeypatch.setattr(rhc2, "_module_origin_is_canonical", lambda *a, **k: True)
+    monkeypatch.setattr(rhc2, "uuid4", lambda: SimpleNamespace(hex=token))
+    monkeypatch.setattr(runner, "_arch147_rhc2_authority_check", lambda _: ())
+    monkeypatch.setattr(observer, "_EVIDENCE_ROOT", tmp_path)
+    provider_calls: list[str] = []
+    _install_fake_harness(
+        monkeypatch,
+        tmp_path,
+        lambda *_: provider_calls.append("dispatched"),
+    )
+
+    result = rhc2._run_preflight()
+
+    assert result["status"] == "BLOCKED"
+    assert result["observer_status"] == "EVIDENCE_WRITE_FAILURE"
+    assert result["observer_evidence_path"] is None
+    assert result["production_order_scope_authority"] == "NOT_GRANTED"
+    assert sentinel.read_bytes() == b"old-path-sentinel\n"
+    assert provider_calls == []

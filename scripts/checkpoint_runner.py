@@ -509,6 +509,7 @@ ARCH147_P6_RUFF: Final = (
 ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_B2O_NAME: Final = "arch147-l43-b2-runtime-partition-observation"
+ARCH147_RHC2_NAME: Final = "arch147-rhc2-robinhood-order-scope-successor-observation"
 ARCH147_B2O_TESTS: Final = (
     *COMMON_TESTS,
     "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
@@ -517,6 +518,18 @@ ARCH147_B2O_RUFF: Final = (
     *COMMON_RUFF_PATHS,
     "scripts/arch147_l43_b2_runtime_partition_source.py",
     "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py",
+    "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
+)
+ARCH147_RHC2_TESTS: Final = (
+    *COMMON_TESTS,
+    "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
+    "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
+)
+ARCH147_RHC2_RUFF: Final = (
+    *COMMON_RUFF_PATHS,
+    "scripts/arch147_rhc2_order_scope_successor_source.py",
+    "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py",
+    "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
     "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
 )
 ARCH147_PROTOTYPE_TESTS: Final = (
@@ -583,6 +596,7 @@ ARCH147_PROTOTYPE_RUFF: Final = (
     "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_proof.py",
     "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py",
     "scripts/arch147_l43_b2_runtime_partition_source.py",
+    "scripts/arch147_rhc2_order_scope_successor_source.py",
     "src/trading_bot/experiments/filtered_trend_comparison_v2.py",
     "src/trading_bot/experiments/filtered_trend_comparison_campaign_v2.py",
     "src/trading_bot/experiments/filtered_trend_comparison_bundle_v2.py",
@@ -26666,6 +26680,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=None,
     )
+    values[ARCH147_RHC2_NAME] = CheckpointSpec(
+        ARCH147_RHC2_NAME,
+        "RHC2 review-only B2 successor observation; explicit read-only preflight only",
+        ARCH147_RHC2_TESTS,
+        ARCH147_RHC2_RUFF,
+        _arch147_rhc2_authority_check,
+        preflight=_arch147_rhc2_preflight,
+        execute=None,
+        remote_branch=None,
+        remote_head_env=None,
+    )
     values[ARCH147_P6_NAME] = CheckpointSpec(
         ARCH147_P6_NAME,
         "Architecture 147 tiny-live source boundary with explicit operator arm",
@@ -29136,6 +29161,7 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
             failures.append("147 prototype missing tests: " + relative)
     if not (repo_root / "scripts/arch147_l43_a3_source.py").is_file():
         failures.append("147 prototype A3 source owner missing")
+    failures.extend(_arch147_rhc2_authority_check(repo_root))
     return tuple(failures)
 
 
@@ -29163,6 +29189,52 @@ def _arch147_b2o_authority_check(repo_root: Path) -> tuple[str, ...]:
     return tuple(dict.fromkeys(failures))
 
 
+def _arch147_rhc2_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Keep the RHC2 successor manual, separately registered, and review-only."""
+    failures: list[str] = []
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_RHC2_NAME)
+    if spec is None:
+        return ("147 RHC2 manual registration missing",)
+    if (
+        spec.name != ARCH147_RHC2_NAME
+        or spec.tests != ARCH147_RHC2_TESTS
+        or spec.ruff_paths != ARCH147_RHC2_RUFF
+        or spec.authority_check is not _arch147_rhc2_authority_check
+        or spec.preflight is not _arch147_rhc2_preflight
+        or spec.execute is not None
+        or spec.remote_branch is not None
+        or spec.remote_head_env is not None
+        or ARCH147_RHC2_NAME in CURRENT_ACTIVE_CI_CHECKPOINTS
+        or ARCH147_RHC2_NAME in ACTIVE_CI_CHECKPOINTS
+        or ARCH147_RHC2_NAME in CI_CERTIFICATION_PROFILES
+        or resolve_ci_checkpoint(specs, ARCH147_PROTOTYPE_BRANCH, "push")
+        != ARCH147_PROTOTYPE_NAME
+    ):
+        failures.append("147 RHC2 manual registration drift")
+    for relative in (*ARCH147_RHC2_TESTS, *ARCH147_RHC2_RUFF):
+        if not (repo_root / relative).exists():
+            failures.append("147 RHC2 missing owned path: " + relative)
+    if (
+        ARCH147_RHC2_RUFF.count("scripts/arch147_rhc2_order_scope_successor_source.py")
+        != 1
+        or ARCH147_PROTOTYPE_RUFF.count(
+            "scripts/arch147_rhc2_order_scope_successor_source.py"
+        )
+        != 1
+        or ARCH147_PROTOTYPE_TESTS.count(
+            "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py"
+        )
+        != 1
+        or ARCH147_PROTOTYPE_RUFF.count(
+            "src/trading_bot/robinhood_mcp/agent_initiated_runtime_partition_observer.py"
+        )
+        != 1
+    ):
+        failures.append("147 RHC2 prototype ownership drift")
+    return tuple(dict.fromkeys(failures))
+
+
 def _arch147_l43_a3_preflight() -> dict[str, object]:
     """Dispatch only the source-owned, read-only Architecture 147 A3 preflight."""
     from scripts.arch147_l43_a3_source import run_preflight
@@ -29175,6 +29247,13 @@ def _arch147_b2o_preflight() -> dict[str, object]:
     from scripts.arch147_l43_b2_runtime_partition_source import run_preflight
 
     return run_preflight()
+
+
+def _arch147_rhc2_preflight() -> dict[str, object]:
+    """Dispatch only through the separately named RHC2 manual checkpoint."""
+    from scripts.arch147_rhc2_order_scope_successor_source import _run_preflight
+
+    return _run_preflight()
 
 
 if __name__ == "__main__":

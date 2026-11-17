@@ -185,7 +185,7 @@ class _ScopedReadBoundary(_ReadBoundary):
     def get_equity_orders(self, arguments):
         self._record("get_equity_orders")
         if self._malformed_orders:
-            return {"data": {"orders": []}}
+            return {"data": {"orders": [], "next": False}}
         return super().get_equity_orders(arguments)
 
 

@@ -74,14 +74,15 @@ def _order(**overrides: object) -> dict[str, object]:
         ("orders", "get_equity_orders"),
     ),
 )
-def test_paginated_response_requires_explicit_next_key(
+def test_paginated_response_normalizes_missing_next_key_as_terminal(
     collection: str,
     read_method: str,
 ) -> None:
     adapter = RobinhoodL43PreEffectReadAdapter(_Read(collection, {collection: []}))
 
-    with pytest.raises(ValueError, match="pagination field is missing"):
-        getattr(adapter, read_method)({})
+    page = getattr(adapter, read_method)({})
+
+    assert page.next_cursor is None
 
 
 @pytest.mark.parametrize(
@@ -91,7 +92,7 @@ def test_paginated_response_requires_explicit_next_key(
         ("orders", "get_equity_orders"),
     ),
 )
-@pytest.mark.parametrize("cursor", (None, "cursor-2"))
+@pytest.mark.parametrize("cursor", (None, "", "cursor-2", "c" * 4096))
 def test_paginated_response_accepts_exhaustion_or_cursor(
     collection: str,
     read_method: str,
@@ -103,7 +104,7 @@ def test_paginated_response_accepts_exhaustion_or_cursor(
 
     page = getattr(adapter, read_method)({})
 
-    assert page.next_cursor == cursor
+    assert page.next_cursor == (cursor or None)
 
 
 @pytest.mark.parametrize(
@@ -113,7 +114,10 @@ def test_paginated_response_accepts_exhaustion_or_cursor(
         ("orders", "get_equity_orders"),
     ),
 )
-@pytest.mark.parametrize("cursor", (False, 1, [], {}, "", "c" * 4097))
+@pytest.mark.parametrize(
+    "cursor",
+    (False, True, 0, 1, [], {}, object(), "c" * 4097),
+)
 def test_paginated_response_rejects_malformed_cursor(
     collection: str,
     read_method: str,
@@ -125,6 +129,43 @@ def test_paginated_response_rejects_malformed_cursor(
 
     with pytest.raises(ValueError):
         getattr(adapter, read_method)({})
+
+
+def test_paginated_response_rejects_non_string_equal_to_empty_cursor() -> None:
+    class _EmptyEqual:
+        def __eq__(self, other: object) -> bool:
+            return other == ""
+
+    adapter = RobinhoodL43PreEffectReadAdapter(
+        _Read("positions", {"positions": [], "next": _EmptyEqual()})
+    )
+
+    with pytest.raises(ValueError, match="cursor is invalid"):
+        adapter.get_equity_positions({})
+
+
+@pytest.mark.parametrize(
+    "cursor",
+    (
+        "cursor/π/雪",
+        " \t\n ",
+        "https://example.invalid/orders?cursor=a%2Fb&next=https://other.invalid/",
+    ),
+)
+def test_paginated_response_preserves_opaque_nonempty_cursor_verbatim(
+    cursor: str,
+) -> None:
+    for collection, read_method in (
+        ("positions", "get_equity_positions"),
+        ("orders", "get_equity_orders"),
+    ):
+        adapter = RobinhoodL43PreEffectReadAdapter(
+            _Read(collection, {collection: [], "next": cursor})
+        )
+
+        page = getattr(adapter, read_method)({})
+
+        assert page.next_cursor == cursor
 
 
 @pytest.mark.parametrize(

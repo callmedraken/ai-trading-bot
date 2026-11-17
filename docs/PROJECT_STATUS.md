@@ -1,30 +1,32 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC1A ACCEPTED / INTEGRATED; RHC1B SESSION CONSOLIDATION NEXT
+## Current milestone - RHC1B ACCEPTED / INTEGRATED; RHC1C COMPATIBILITY CLOSEOUT NEXT
 
-RHC1A Robinhood compatibility normalization is ACCEPTED and INTEGRATED at `700f55ec5cfd803a0c5bff6ea4a853ba8f6731ab` / tree `967ab32de73fbe5bbe5904701da746ba3a3a55f5`, direct parent `a2db30cdc31df12f27699ae1bf1a08e658b4f427`.
+RHC1B Robinhood session consolidation is ACCEPTED and INTEGRATED at `d5215aa483ce44da730b0853abe609d95a4021f9` / tree `d19a0aeba702bded270c99a4fd07bdc3cb2d2145`, direct parent `6f48a49683fc1decc8e2e8abdfd6f2b7c9152bcc`.
 
-Feature mapped FULL `43972239523`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven FULL lanes passed; broad-1 through broad-7 wall times were `99.533`, `134.547`, `155.170`, `249.149`, `82.999`, `133.315`, and `146.142` seconds. Exact-source review accepted the checkpoint.
+Feature mapped FULL `43998813899`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven FULL lanes passed; broad-1 through broad-7 wall times were `102.188`, `134.413`, `141.536`, `231.148`, `107.433`, `161.796`, and `136.197` seconds. Exact-source review accepted the checkpoint.
 
-`develop` fast-forwarded to the accepted source. Develop run `43987074364`, attempt 1, was terminal SUCCESS and proved exact feature-certification reuse; active/FULL jobs were skipped, so no duplicate broad certification ran.
+`develop` fast-forwarded to the accepted source. Develop run `44010723352`, attempt 1, was terminal SUCCESS and proved exact feature-certification reuse; active/FULL jobs were skipped, so no duplicate broad certification ran.
 
-RHC1A establishes a B2-specific normalized fact containing only bounded order ID, exact `SPY`, strict boolean `agent_initiated`, and a SHA-256 digest of the complete canonical JSON row. It removes generic full-order parsing from the B2 account-wide partition path without weakening the ordinary Robinhood parser or Q62 path. It also normalizes missing/null/empty-string terminal order cursors while preserving nonempty cursors as opaque bounded values.
+RHC1B replaces per-call current Robinhood session churn with an explicit operation-scoped private session owner. One `asyncio.Runner` and persistent same-loop owner task keep a single MCP context alive across the composed operation. Required current-read/current-live/B2 discovery is performed once per session, session authorization state is reset between operations, misuse fails closed, cleanup diagnostics are sanitized, and no automatic provider/write retry was added. Live mutation ordering and consumed-attempt semantics remain unchanged.
 
-The proof still performs ALL_BEFORE / TRUE / FALSE / ALL_AFTER and requires stable ALL universes, disjoint TRUE/FALSE sets, exact union equality, duplicate rejection, exhaustive pagination, strict partition membership, and same-ID complete-row digest stability. The proof contract is `ARCH147_L43_B2_AGENT_INITIATED_RUNTIME_PARTITION/v2`. Production order-scope authority remains `NOT_GRANTED`.
+For the fake complete B2 proof, the accepted source establishes one OAuth entry, one MCP session, one complete capability-discovery sequence, one account read, four one-page order reads and five tool invocations; extra pages remain inside the same session. RHC1B itself performed zero provider/OAuth/MCP/broker effects.
 
-The previous real B2 observation remains CONSUMED / NOT_PROVEN / NO RETRY. Its immutable evidence is `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`, SHA-256 `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`, bound to source `e466d33cf3a859976f48d7b7092fa3b58afc2f53` / tree `45b9254a6aaf429c9a5322a31022089a8af954f4`. It recorded `NOT_PROVEN / ALL_BEFORE_READ_EXCEPTION`; the sanitized evidence does not reveal the exact raw provider/parser exception. It must not be replayed.
+RHC1A remains accepted and unchanged. The previous real B2 observation remains CONSUMED / NOT_PROVEN / NO RETRY with immutable evidence at `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`, SHA-256 `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`. It is never replayed.
 
-Production therefore remains `ORDER_SCOPE_UNPROVEN`. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+A remaining current-L43 source compatibility mismatch is now the next boundary. The current hosted schema capture for `get_equity_positions` and `get_equity_orders` treats `next` as optional, `""` as terminal, and a nonempty value as an opaque cursor. The capture basis is `kevin1chun/robinhood-for-agents/docs/official-mcp-tools.json`, blob SHA `c100e9b5c21dcfef8dc2d48d41d6d16ee69966b4`. The ordinary `RobinhoodL43PreEffectReadAdapter` still requires an explicit `next` key and rejects `""`. This independently established mismatch is not asserted to be the cause of the consumed B2 failure.
+
+Production remains `ORDER_SCOPE_UNPROVEN`. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Implement `ARCH147-RHC1B_ROBINHOOD_SESSION_CONSOLIDATION` as a source-only/fake-only checkpoint before any future real B2/order-scope successor observation.
+Implement `ARCH147-RHC1C_ROBINHOOD_COMPATIBILITY_CLOSEOUT` as source-only/fake-only work before any future real order-scope observation.
 
-RHC1B must consolidate the current per-call MCP session and capability-discovery lifecycle in `current_read_transport.py`, `current_live_transport.py`, and the B2 observer transport. One composed Robinhood operation must own one reusable MCP session/event-loop lifetime, and required capability/schema discovery must occur once per established session rather than before every logical call.
+RHC1C must correct the current ordinary L43 positions/orders cursor normalization to accept missing/null/empty-string terminal forms while preserving opaque bounded nonempty cursors and rejecting malformed values. B2 normalization, the generic Robinhood order parser, and Q62 must remain unchanged.
 
-The checkpoint must preserve construction-time inertness, explicit allowlisted methods, fail-closed schema validation, sanitized error surfaces, exact call accounting, source/evidence authority boundaries, and all existing mutation no-retry rules. It must not add arbitrary production dispatch or automatic place/cancel retry.
+RHC1C must also register a separately named manual/read-only successor observation checkpoint for a later RHC2 decision. The old consumed B2/B2O checkpoint identity and evidence remain immutable and cannot be reused as the executable successor. The new checkpoint must remain nonautomatic, effect-disabled, source-gated, and outside active CI/certification routing. Its execution is NOT RUN during RHC1C and production order-scope authority remains `NOT_GRANTED`.
 
-RHC1B performs zero provider reads, zero OAuth, zero real MCP sessions, and zero broker effects. No real Robinhood observation occurs between RHC1A and RHC1B.
+RHC1C performs zero provider reads, zero OAuth/browser/MCP activity and zero broker effects. A future RHC2 protected observation requires a separate ChatGPT authorization after RHC1C exact-source review and integration.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

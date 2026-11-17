@@ -1,20 +1,18 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC3 source preparation with acceptance pending
+## Current milestone - RHC3 ACCEPTED / INTEGRATED; production L43 composition next
 
-RHC1C is accepted and integrated at `7eb8f3e975ef76f9082996b7c2a2f5c852c12745` / tree `e3728c584d2f4b2dbf475aa646e35658aa1363a6`. RHC1D is accepted and integrated at `600f1ec55de6bbc65e59db839c5016bbd511b449` / tree `245b2789acd2196e05ad0ae544e182d4356bdd25`. At this checkpoint's entry, the feature and `develop` remote refs both matched the RHC1D identity.
+RHC3 is ACCEPTED / INTEGRATED at `13f1b7ba953011bf4476a25378467739b2c54c97` / tree `d71836119976d8484b97db95ea182ae1a77437b8`. Feature mapped FULL run `44040948021`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven canonical FULL lanes passed. Develop then fast-forwarded to the exact accepted source; develop run `44042374626`, attempt 1, was terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True` / `exact_feature_certification`. Active tests and FULL were skipped on develop, so no duplicate broad certification ran.
 
-RHC2 is CONSUMED / PASS / NO RETRY. Its four exhaustive runtime reads returned zero rows. Treat these reads as runtime consistency evidence together with A2's authenticated hosted semantic contract. The zero rows provide no non-empty row witness. RHC2 does not grant production order-scope authority.
+RHC3 reauthenticates the fixed consumed A2/RHC2 evidence chain at proof time and permits the production pre-effect verifier to emit `ACCOUNT_WIDE_ALL_AGENTS` only for the exact canonical-Q62-bound unfiltered SPY order query with bounded exhausted pagination and valid current counts. The historical A2/RHC2 records themselves remain immutable review-only evidence and are never retried. This closes the `ORDER_SCOPE_UNPROVEN` prerequisite only when the exact admitted evidence remains present and valid; it grants no review, placement, cancellation, Q63, or other live-effect authority.
 
-The exact A2/RHC2 evidence paths and hashes are recorded in the [current handoff](AI_TRADING_BOT_HANDOFF.md).
+The three pinned A2/RHC2 files under `F:\AI\temp` are now runtime prerequisites for this narrow proof. Missing, moved, linked/reparsed, modified, malformed, or hash-mismatched evidence fails closed back to `ORDER_SCOPE_UNPROVEN`. Preserve these exact artifacts and include them in Q63 backup/restore and delivery custody.
 
-RHC3 is the current source-only evidence-admission checkpoint. Its selected design reauthenticates the immutable A2/RHC2 chain at proof time, binds it to canonical Q62 identity and the current query while preserving L43 digest material, and binds the admitted evidence provenance to the current exhaustive pagination. Exact-source acceptance and integration remain pending.
-
-Production order-scope authority remains `ORDER_SCOPE_UNPROVEN` / `NOT_GRANTED` until RHC3 is accepted and integrated. No live effect is authorized. Q63=NOT_RUN and `FINAL_HOLDOUT=SEALED`.
+Q63 remains NOT_RUN and `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step
 
-Complete the RHC3 source-only implementation, focused verification and mapped FULL. Then perform exact-source review. Integrate only if accepted. RHC3 consumes the fixed, already-consumed evidence. This checkpoint includes no observation retry or provider/OAuth/browser/MCP activity.
+Build one source-only/fake-only Architecture 147 production-composition checkpoint that wires the already-accepted L43 pre-effect/read/effect components into an explicit live desktop composition without invoking Robinhood or granting protected effects. The current launcher/service must remain disarmed until that separately reviewed source is accepted. Real L43 qualification and Q63 remain later protected boundaries.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

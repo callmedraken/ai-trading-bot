@@ -1,25 +1,53 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC3 source preparation with acceptance pending
+## Current milestone: RHC3 ACCEPTED / INTEGRATED; production L43 composition next
 
 Canonical worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
 
-RHC1C cursor normalization and its manual RHC2 successor registration were accepted and integrated at `7eb8f3e975ef76f9082996b7c2a2f5c852c12745` / tree `e3728c584d2f4b2dbf475aa646e35658aa1363a6`. RHC1D then bound the successor observation to canonical Q62 identity and was accepted and integrated at `600f1ec55de6bbc65e59db839c5016bbd511b449` / tree `245b2789acd2196e05ad0ae544e182d4356bdd25`. At this checkpoint's entry, the feature and `develop` remote refs both matched that RHC1D identity.
+Accepted/integrated RHC3 executable identity:
 
-## RHC2 consumed observation — CONSUMED / PASS / NO RETRY
+- parent: `600f1ec55de6bbc65e59db839c5016bbd511b449`
+- HEAD: `13f1b7ba953011bf4476a25378467739b2c54c97`
+- tree: `d71836119976d8484b97db95ea182ae1a77437b8`
+- feature mapped FULL: `44040948021`, attempt 1, terminal SUCCESS
+- develop exact-source reuse: `44042374626`, attempt 1, terminal SUCCESS
+- develop reuse classification: `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`
+- duplicate develop FULL: NO; active/FULL jobs were skipped
 
-The registered RHC2 report is `F:\AI\temp\ai-trading-bot-checkpoints\arch147-rhc2-robinhood-order-scope-successor-observation\preflight-20261117T064253.945488Z\report.json`, SHA-256 `25873f5cdbb509b7a93b80a0644affb01e784c1bf0145a1aca20222ac71f56e9`. Its observer evidence is `F:\AI\temp\arch147-agent-initiated-runtime-partition-3f05ea6fed42440293ea3d58a1af5074\evidence.json`, SHA-256 `99bca426cba77589055be6dc826cf0d72884c51e40f493c19b55625ac2bf2189`. The inner B2 evidence SHA-256 is `7016e9c9f5a8b52e996a56e5eab4ee89ce993b967513109c09af23aa5e693fc3`.
+RHC3 is source-only. It performed zero provider, OAuth, browser, MCP, review, placement, or cancellation actions.
 
-RHC2 completed four exhaustive reads (`ALL_BEFORE`, `TRUE`, `FALSE`, `ALL_AFTER`), all with zero rows. RHC2 provides runtime consistency evidence paired with A2's authenticated hosted semantic contract. The zero rows carry no non-empty runtime witness. A2 evidence is `F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`, SHA-256 `34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`. It authenticates the hosted metadata semantics while leaving runtime partition equality unproven on its own. These observations are immutable and must not be retried.
+## RHC3 production order-scope admission
 
-RHC2 retained Q62-bound account fingerprint `f377529245bd1682f382d17b22ac8d55362f7138a4f7fc307593c16847e551cf`. Its report and observation remain `REVIEW_ONLY`. Production order-scope authority was not granted.
+RHC3 consumes, but never mutates or retries, the exact retained A2/RHC2 chain:
 
-## Immediate next step: finish RHC3 and review the exact source
+- A2 semantic evidence: `F:\AI\temp\arch147-agent-initiated-runtime-proof-eligible-0d1c18123732442c9d3f4a14ba0f43e6\evidence.json`, SHA-256 `34483478bbf6430ff0e9a139cd33cdc8837be22eff100e53e0f6b2fdde46c3f1`
+- RHC2 registered report: `F:\AI\temp\ai-trading-bot-checkpoints\arch147-rhc2-robinhood-order-scope-successor-observation\preflight-20261117T064253.945488Z\report.json`, SHA-256 `25873f5cdbb509b7a93b80a0644affb01e784c1bf0145a1aca20222ac71f56e9`
+- RHC2 observer evidence: `F:\AI\temp\arch147-agent-initiated-runtime-partition-3f05ea6fed42440293ea3d58a1af5074\evidence.json`, SHA-256 `99bca426cba77589055be6dc826cf0d72884c51e40f493c19b55625ac2bf2189`
+- reconstructed inner B2 evidence SHA-256: `7016e9c9f5a8b52e996a56e5eab4ee89ce993b967513109c09af23aa5e693fc3`
 
-`ARCH147-RHC3_CONSUMED_ORDER_SCOPE_EVIDENCE_ADMISSION` is a source-only consumer of the fixed consumed A2/RHC2 evidence. The selected model reauthenticates that chain at proof time, binds it to canonical Q62 and the current L43 query while preserving L43 digest material, and hashes evidence provenance together with exact current pagination inputs. After focused verification and mapped FULL, ChatGPT exact-source review is next. Integration follows only if accepted.
+A2 authenticates the hosted `agent_initiated` filter semantics. RHC2 remains CONSUMED / PASS / NO RETRY and supplies four exhaustive runtime-consistency reads (`ALL_BEFORE`, `TRUE`, `FALSE`, `ALL_AFTER`), all zero-row. The zero-row observation is not treated as a non-empty semantic witness.
 
-Until that acceptance and integration, production order-scope authority remains `ORDER_SCOPE_UNPROVEN` / `NOT_GRANTED`. RHC3 grants no live effect authority. Q63=NOT_RUN and `FINAL_HOLDOUT=SEALED`. No additional Robinhood/provider observation, OAuth, browser, MCP, review, placement or cancellation is authorized for this source checkpoint.
+The RHC3 loader reads only those fixed paths, validates exact file hashes before parsing, rejects symlink/reparse/path/object drift, duplicate or unexpected JSON structure, wrong counters/status/source identity, and any write/other-tool attempt. It reconstructs and verifies the inner B2 digest and requires the retained RHC2 account fingerprint to equal canonical Q62.
+
+At each current L43 proof request, the production verifier reauthenticates the evidence chain rather than caching authority. It accepts only the exact current unfiltered `{"account_number": ..., "symbol": "SPY"}` query, proves the account-number hash matches the Q62-bound fingerprint, requires bounded positive page count, bounded nonnegative row count and exhausted pagination, and returns an `ACCOUNT_WIDE_ALL_AGENTS` scope proof whose evidence digest binds all four retained evidence hashes plus current account/query/page/row/exhaustion facts. Any failure returns no proof and preserves `ORDER_SCOPE_UNPROVEN`.
+
+The historical RHC2 field `production_order_scope_authority=NOT_GRANTED` remains unchanged; RHC3 is the separately source-reviewed consumer that grants only this narrow pre-effect order-scope prerequisite. It does not grant review/place/cancel authority or any generic live-effect permission.
+
+The three pinned evidence files are now operational runtime dependencies. Do not clean, move, rewrite, regenerate, or replace them. Q63 must include their exact custody, backup/restore and hash verification in the final delivery package. Loss or mutation is fail-closed availability loss, not authority to recreate evidence.
+
+## Next source milestone
+
+Implement one coherent source-only/fake-only production-composition checkpoint for the remaining runnable-bot gap. Reuse existing accepted components rather than reopening Robinhood semantics:
+
+- compose canonical Q62/RHC3 read authority, L43 durable state, current Robinhood read transport, L43 effect operator/transport seams, Alpaca runtime signal input and exact authorizer behind one production composition;
+- add an explicit live application/service mode and launcher path instead of the current permanently `REAL_DISARMED` / synthetic-only startup;
+- keep construction/help effect-free and keep Start/Stop serialized;
+- preserve no-retry/UNKNOWN handling, exact ownership, <=$10 requested acquisition limit and exact-owned reducing exits;
+- source/fake tests only for this checkpoint: no real Robinhood/OAuth/browser/MCP/review/place/cancel action;
+- do not authorize L43 real qualification, Q63 or `FINAL_HOLDOUT` as part of the source checkpoint.
+
+After exact-source acceptance/integration of that composition, the remaining protected path is bounded genuine L43 qualification followed by Q63 delivery. Q63=NOT_RUN and `FINAL_HOLDOUT=SEALED`.
 
 ## L41R1 consumed observation and L41R2 source successor
 

@@ -10,14 +10,13 @@ from __future__ import annotations
 import asyncio
 import re
 import threading
-from collections.abc import Callable, Coroutine
+from collections.abc import Callable, Coroutine, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-
-from scripts.checkpoint_runner import _git_output
 
 from trading_bot.live_prototype.contracts import RestrictedLiveStatus
 from trading_bot.live_prototype.durable_state import (
@@ -40,7 +39,10 @@ from trading_bot.live_prototype.l43_pre_effect_observation import (
     L43PreEffectResult,
     observe_l43_pre_effect,
 )
-from trading_bot.live_prototype.l43_production_owner import L43SourceIdentity
+from trading_bot.live_prototype.l43_production_owner import (
+    L43SourceIdentity,
+    read_source_identity,
+)
 from trading_bot.live_prototype.l43_provider_contracts import L43AccountIdentity
 from trading_bot.live_prototype.l43_state import (
     L43StateSession,
@@ -88,34 +90,43 @@ class _DefaultDenyAuthorizer(L43ExactPlanAuthorizer):
         return None
 
 
-class _StopAwareAuthorizer(L43ExactPlanAuthorizer):
-    """Recheck worker Stop immediately around the exact grant decision."""
+class L43SerializedLifecycleInterlock:
+    """Linearize Stop against a new durable effect/review transition."""
 
-    __slots__ = ("_inner", "_stop_requested")
+    __slots__ = ("_lock", "_active_stop")
 
-    def __init__(
-        self,
-        inner: L43ExactPlanAuthorizer,
-        stop_requested: Callable[[], bool],
-    ) -> None:
-        if not callable(getattr(inner, "authorize", None)) or not callable(
-            stop_requested
-        ):
-            raise TypeError(
-                "stop-aware authorizer requires a typed seam and Stop reader"
-            )
-        self._inner = inner
-        self._stop_requested = stop_requested
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._active_stop: threading.Event | None = None
 
-    def authorize(
-        self, request: L43AuthorizationRequest
-    ) -> L43StageAuthorization | None:
-        if self._stop_requested():
-            return None
-        grant = self._inner.authorize(request)
-        if self._stop_requested():
-            return None
-        return grant
+    def bind_cycle(self, stop: threading.Event) -> None:
+        if not callable(getattr(stop, "is_set", None)):
+            raise TypeError("lifecycle interlock requires a threading.Event")
+        with self._lock:
+            if self._active_stop is not None:
+                raise RuntimeError("lifecycle interlock already has an active cycle")
+            self._active_stop = stop
+
+    def unbind_cycle(self, stop: threading.Event) -> None:
+        with self._lock:
+            if self._active_stop is not stop:
+                raise RuntimeError("lifecycle interlock cycle identity changed")
+            self._active_stop = None
+
+    def request_stop(self) -> None:
+        """Request Stop in the same order as a new effect/review boundary."""
+
+        with self._lock:
+            if self._active_stop is not None:
+                self._active_stop.set()
+
+    @contextmanager
+    def effect_boundary(self) -> Iterator[bool]:
+        """Admit reservation/MAY or durable review-start as one decision."""
+
+        with self._lock:
+            stop = self._active_stop
+            yield stop is not None and not stop.is_set()
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,6 +149,7 @@ class L43Runtime:
         "_components_failed",
         "_cycle_lock",
         "_active_stop",
+        "_lifecycle_interlock",
         "_accepted_review",
     )
 
@@ -159,6 +171,7 @@ class L43Runtime:
         self._components_failed = False
         self._cycle_lock = threading.Lock()
         self._active_stop: threading.Event | None = None
+        self._lifecycle_interlock = L43SerializedLifecycleInterlock()
         self._accepted_review: L43AcceptedReviewReceipt | None = None
 
     @property
@@ -169,6 +182,11 @@ class L43Runtime:
     def source_tree(self) -> str:
         return self._expected_source.source_tree
 
+    def request_stop(self) -> None:
+        """Serialize an application Stop request with the current effect path."""
+
+        self._lifecycle_interlock.request_stop()
+
     def run_cycle(self, stop: threading.Event) -> L43RuntimeObservation:
         """Run one cycle to completion; Stop never cancels an effect boundary."""
 
@@ -178,9 +196,11 @@ class L43Runtime:
             return _observation(RestrictedLiveStatus.STOPPED, "STOP_REQUESTED")
         with self._cycle_lock:
             self._active_stop = stop
+            self._lifecycle_interlock.bind_cycle(stop)
             try:
                 return self._run_cycle_locked(stop)
             finally:
+                self._lifecycle_interlock.unbind_cycle(stop)
                 self._active_stop = None
 
     def _run_cycle_locked(self, stop: threading.Event) -> L43RuntimeObservation:
@@ -256,7 +276,9 @@ class L43Runtime:
         if self._components_failed:
             return None
         try:
-            components = self._components_factory(self._stop_requested)
+            components = self._components_factory(
+                self._lifecycle_interlock.effect_boundary
+            )
             if (
                 type(components) is not _RuntimeComponents
                 or not callable(components.session_factory)
@@ -278,10 +300,6 @@ class L43Runtime:
             return None
         self._components = components
         return components
-
-    def _stop_requested(self) -> bool:
-        stop = self._active_stop
-        return stop is None or stop.is_set()
 
     def _source_is_pinned(self) -> bool:
         try:
@@ -511,10 +529,10 @@ def build_production_l43_runtime(repo_root: Path) -> L43Runtime:
     return L43Runtime(
         expected_source=expected,
         source_reader=lambda: _read_source_identity(root),
-        components_factory=lambda stop_requested: _production_components(
+        components_factory=lambda effect_boundary: _production_components(
             root,
             expected,
-            stop_requested=stop_requested,
+            effect_boundary=effect_boundary,
         ),
     )
 
@@ -523,7 +541,7 @@ def _production_components(
     repo_root: Path,
     expected_source: L43SourceIdentity,
     *,
-    stop_requested: Callable[[], bool],
+    effect_boundary: Callable[[], object],
 ) -> _RuntimeComponents:
     """Load canonical prerequisites only after Start enters the first cycle."""
 
@@ -545,14 +563,14 @@ def _production_components(
         raise RuntimeError("retained RHC3 order-scope evidence is unavailable")
 
     state_factory = L43StateSession.for_production
-    transport = L43RobinhoodTransport(_lazy_robinhood_session_factory)
+    transport = L43RobinhoodTransport.for_production(
+        redirect_uri=DEFAULT_ROBINHOOD_REDIRECT_URI
+    )
     operator = L43EffectOperator(
         session_factory=state_factory,
         transport=transport,
-        authorizer=_StopAwareAuthorizer(
-            _DefaultDenyAuthorizer(),
-            stop_requested,
-        ),
+        authorizer=_DefaultDenyAuthorizer(),
+        effect_boundary=effect_boundary,
         reobserver=_locked_reobserver(dependencies),
         reconciler=composition.post_effect_reconciler(),
         review_caller=transport.review_sell_order,
@@ -610,29 +628,8 @@ def _locked_reobserver(
     return reobserve
 
 
-def _lazy_robinhood_session_factory() -> object:
-    """Lazily create the effect-side OAuth/MCP session.
-
-    The accepted operator prepares and discovers placement schemas before its
-    exact-plan authorization request. RHC4's default denial prevents review or
-    placement dispatch; changing that accepted ordering is outside this module.
-    """
-
-    from trading_bot.robinhood_mcp._current_session import _open_robinhood_client
-    from trading_bot.robinhood_mcp.windows_oauth import (
-        create_windows_robinhood_oauth_factory,
-    )
-
-    oauth_factory = create_windows_robinhood_oauth_factory(
-        redirect_uri=DEFAULT_ROBINHOOD_REDIRECT_URI
-    )
-    return _open_robinhood_client(oauth_factory)
-
-
 def _read_source_identity(repo_root: Path) -> L43SourceIdentity:
-    head = _git_output(repo_root, "rev-parse", "HEAD")
-    tree = _git_output(repo_root, "rev-parse", "HEAD^{tree}")
-    return L43SourceIdentity(source_head=head, source_tree=tree)
+    return read_source_identity(repo_root)
 
 
 def _snapshot_outcome(

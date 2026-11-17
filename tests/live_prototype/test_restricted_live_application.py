@@ -58,10 +58,14 @@ class _FakeRuntime:
         self.reconciled = Event()
         self._lock = Lock()
         self.calls = 0
+        self.stop_requests = 0
         self.active = 0
         self.max_active = 0
         self.lineage_token = object()
         self.lineages_used: list[object] = []
+
+    def request_stop(self) -> None:
+        self.stop_requests += 1
 
     def run_cycle(self, stop: Event) -> L43RuntimeObservation:
         del stop  # The runtime completes its current fake reconciliation boundary.
@@ -220,6 +224,7 @@ def test_start_is_idempotent_stop_finishes_boundary_and_report_runs_independentl
         assert research_stopped.is_set()
         assert runtime.calls == 1
         assert runtime.max_active == 1
+        assert runtime.stop_requests == 1
     finally:
         release.set()
         service.submit(Command.STOP)

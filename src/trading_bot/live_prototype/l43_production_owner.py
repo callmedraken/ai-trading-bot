@@ -401,6 +401,17 @@ def _git_text(repo_root: Path, *arguments: str) -> str:
     return value
 
 
+def read_source_identity(repo_root: Path) -> L43SourceIdentity:
+    """Read only the executable checkout's current Git source identity."""
+
+    if not isinstance(repo_root, Path):
+        raise TypeError("source identity requires a concrete repo Path")
+    return L43SourceIdentity(
+        source_head=_git_text(repo_root, "rev-parse", "HEAD"),
+        source_tree=_git_text(repo_root, "rev-parse", "HEAD^{tree}"),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ProductionSourceAuthorityVerifier:
     """Canonical read-only adapter to the current source-owned evaluator."""
@@ -856,10 +867,7 @@ class L43ProductionOwner:
         if not isinstance(repo_root, Path):
             raise TypeError("production composition requires a concrete repo Path")
         origin = _read_canonical_q62_origin()
-        current = L43SourceIdentity(
-            source_head=_git_text(repo_root, "rev-parse", "HEAD"),
-            source_tree=_git_text(repo_root, "rev-parse", "HEAD^{tree}"),
-        )
+        current = read_source_identity(repo_root)
         reader = Q62ReadOnlyJournalReader(
             journal_path=Q62_CANONICAL_JOURNAL_PATH,
             expected_origin=origin,
@@ -1032,6 +1040,7 @@ __all__ = [
     "L43ProductionOwner",
     "L43Provenance",
     "L43SourceIdentity",
+    "read_source_identity",
     "L43_REVIEW_LABEL",
     "ManualCloseTrigger",
     "NormalizedSellReview",

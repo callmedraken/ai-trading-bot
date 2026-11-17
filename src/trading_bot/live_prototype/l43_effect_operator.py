@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -164,6 +165,12 @@ class L43ExactPlanAuthorizer(Protocol):
     def authorize(
         self, request: L43AuthorizationRequest
     ) -> L43StageAuthorization | None: ...
+
+
+class L43EffectBoundary(Protocol):
+    """Serialize Stop against one new durable effect/review transition."""
+
+    def __call__(self) -> object: ...
 
 
 class L43EffectReobserver(Protocol):
@@ -327,6 +334,7 @@ class L43EffectOperator:
         "_reobserver",
         "_reconciler",
         "_review_caller",
+        "_effect_boundary",
     )
 
     def __init__(
@@ -338,6 +346,7 @@ class L43EffectOperator:
         reobserver: L43EffectReobserver,
         reconciler: L43PostEffectReconciler,
         review_caller: L43NormalizedReviewCaller | None = None,
+        effect_boundary: Callable[[], object] | None = None,
     ) -> None:
         if not callable(session_factory):
             raise TypeError("state session factory must be injected")
@@ -362,12 +371,15 @@ class L43EffectOperator:
             review_caller = transport.review_sell_order
         if not callable(review_caller):
             raise TypeError("normalized review caller must be callable")
+        if effect_boundary is not None and not callable(effect_boundary):
+            raise TypeError("effect boundary must be callable")
         self._session_factory = session_factory
         self._transport = transport
         self._authorizer = authorizer
         self._reobserver = reobserver
         self._reconciler = reconciler
         self._review_caller = review_caller
+        self._effect_boundary = effect_boundary or (lambda: nullcontext(True))
 
     async def place_entry(
         self, pre_effect: L43PreEffectResult, *, account_number: str
@@ -481,35 +493,45 @@ class L43EffectOperator:
                             None,
                             snapshot,
                         )
-                    intent_id = session.reserve_entry(risk)
-                    invoke = prepared.resolve_callable()
-                    try:
-                        permit = session.prepare_invocation(intent_id)
-                    except Exception:
-                        return self._result(
-                            L43EffectStage.ENTRY_PLACEMENT,
-                            L43EffectOutcome.BLOCKED,
-                            "ENTRY_MAY_PERSIST_FAILED",
-                            fresh,
-                            authorization,
-                            session.snapshot(),
-                        )
-                    if not _permit_matches(
-                        permit,
-                        kind=IntentKind.ENTRY,
-                        dollars=risk,
-                        quantity=None,
-                        authority_sha256=None,
-                    ):
-                        completed_result = self._after_may_failure(
-                            session,
-                            intent_id,
-                            L43EffectStage.ENTRY_PLACEMENT,
-                            fresh,
-                            authorization,
-                            trigger=None,
-                        )
-                        return completed_result
+                    with self._effect_boundary() as admitted:
+                        if admitted is not True:
+                            return self._result(
+                                L43EffectStage.ENTRY_PLACEMENT,
+                                L43EffectOutcome.BLOCKED,
+                                "ENTRY_STOP_REQUESTED",
+                                fresh,
+                                authorization,
+                                session.snapshot(),
+                            )
+                        intent_id = session.reserve_entry(risk)
+                        invoke = prepared.resolve_callable()
+                        try:
+                            permit = session.prepare_invocation(intent_id)
+                        except Exception:
+                            return self._result(
+                                L43EffectStage.ENTRY_PLACEMENT,
+                                L43EffectOutcome.BLOCKED,
+                                "ENTRY_MAY_PERSIST_FAILED",
+                                fresh,
+                                authorization,
+                                session.snapshot(),
+                            )
+                        if not _permit_matches(
+                            permit,
+                            kind=IntentKind.ENTRY,
+                            dollars=risk,
+                            quantity=None,
+                            authority_sha256=None,
+                        ):
+                            completed_result = self._after_may_failure(
+                                session,
+                                intent_id,
+                                L43EffectStage.ENTRY_PLACEMENT,
+                                fresh,
+                                authorization,
+                                trigger=None,
+                            )
+                            return completed_result
                     try:
                         receipt = await invoke(permit)
                         if type(receipt) is not L43PlacementReceipt:
@@ -701,10 +723,20 @@ class L43EffectOperator:
                         None,
                         snapshot,
                     )
-                session.begin_sell_review(
-                    proposal_sha256=proposal_sha256,
-                    arguments_sha256=arguments_sha256,
-                )
+                with self._effect_boundary() as admitted:
+                    if admitted is not True:
+                        return self._result(
+                            L43EffectStage.SELL_REVIEW,
+                            L43EffectOutcome.BLOCKED,
+                            "SELL_REVIEW_STOP_REQUESTED",
+                            fresh,
+                            authorization,
+                            session.snapshot(),
+                        )
+                    session.begin_sell_review(
+                        proposal_sha256=proposal_sha256,
+                        arguments_sha256=arguments_sha256,
+                    )
                 try:
                     raw_normalized = await self._review_caller(
                         account_number=account_number,
@@ -1042,40 +1074,50 @@ class L43EffectOperator:
                             None,
                             snapshot,
                         )
-                    intent_id = session.reserve_exit(
-                        arguments.quantity,
-                        authority_sha256=authorization.authority_sha256,
-                    )
-                    invoke = prepared.resolve_callable(
-                        authority_sha256=authorization.authority_sha256
-                    )
-                    try:
-                        permit = session.prepare_invocation(intent_id)
-                    except Exception:
-                        return self._result(
-                            L43EffectStage.SELL_PLACEMENT,
-                            L43EffectOutcome.BLOCKED,
-                            "SELL_MAY_PERSIST_FAILED",
-                            fresh,
-                            authorization,
-                            session.snapshot(),
+                    with self._effect_boundary() as admitted:
+                        if admitted is not True:
+                            return self._result(
+                                L43EffectStage.SELL_PLACEMENT,
+                                L43EffectOutcome.BLOCKED,
+                                "SELL_PLACEMENT_STOP_REQUESTED",
+                                fresh,
+                                authorization,
+                                session.snapshot(),
+                            )
+                        intent_id = session.reserve_exit(
+                            arguments.quantity,
+                            authority_sha256=authorization.authority_sha256,
                         )
-                    if not _permit_matches(
-                        permit,
-                        kind=IntentKind.EXIT,
-                        dollars=None,
-                        quantity=arguments.quantity,
-                        authority_sha256=authorization.authority_sha256,
-                    ):
-                        completed_result = self._after_may_failure(
-                            session,
-                            intent_id,
-                            L43EffectStage.SELL_PLACEMENT,
-                            fresh,
-                            authorization,
-                            trigger=ManualCloseTrigger.SELL_UNKNOWN,
+                        invoke = prepared.resolve_callable(
+                            authority_sha256=authorization.authority_sha256
                         )
-                        return completed_result
+                        try:
+                            permit = session.prepare_invocation(intent_id)
+                        except Exception:
+                            return self._result(
+                                L43EffectStage.SELL_PLACEMENT,
+                                L43EffectOutcome.BLOCKED,
+                                "SELL_MAY_PERSIST_FAILED",
+                                fresh,
+                                authorization,
+                                session.snapshot(),
+                            )
+                        if not _permit_matches(
+                            permit,
+                            kind=IntentKind.EXIT,
+                            dollars=None,
+                            quantity=arguments.quantity,
+                            authority_sha256=authorization.authority_sha256,
+                        ):
+                            completed_result = self._after_may_failure(
+                                session,
+                                intent_id,
+                                L43EffectStage.SELL_PLACEMENT,
+                                fresh,
+                                authorization,
+                                trigger=ManualCloseTrigger.SELL_UNKNOWN,
+                            )
+                            return completed_result
                     try:
                         receipt = await invoke(permit)
                         if type(receipt) is not L43PlacementReceipt:

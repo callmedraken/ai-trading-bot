@@ -1,8 +1,16 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## RHC4 restricted-live production composition — SOURCE_ONLY / independent acceptance pending
+## RHC4 C1 stop/effect-boundary serialization — SOURCE_ONLY / exact review correction
 
-The RHC4 source checkpoint is prepared from synchronized baseline
+The first RHC4 publication was
+`2f4f50a1df44c261d172f55bc540b635d637cbd9` / tree
+`558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. Its mapped FULL run
+`44181143712`, attempt 1, reached terminal SUCCESS and is preserved as
+terminal-green evidence. Exact-source review rejected that publication for
+`RHC4_STOP_EFFECT_BOUNDARY_RACE` and direct new coupling to private helpers;
+the run remains a successful CI result and was not rerun or rewritten.
+
+The C1 source checkpoint is prepared from synchronized baseline
 `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` / tree
 `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`. It extends the existing
 `arch147-live-prototype` feature source-gate route and its mapped FULL. No RHC4
@@ -25,62 +33,46 @@ opening are effect-free. Restricted-live rejects a caller-supplied state root
 and uses source-owned production state/source identity. The synthetic route
 remains separate.
 
-Focused verification, current/historical source authority, both context
-selections and combined Ruff/diff checks are recorded below. The exact clean
-source must pass admission before push. Mapped feature FULL and independent
-acceptance remain pending. RHC4 is SOURCE_ONLY / FAKE_ONLY. No real
+Focused verification, relevant source-authority/coherence tests and combined
+Ruff/diff checks are recorded below. The exact clean source must pass admission
+before push. Mapped feature FULL and independent acceptance remain pending.
+RHC4 is SOURCE_ONLY / FAKE_ONLY. No real
 Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for
 this source checkpoint. RHC2 remains CONSUMED / PASS / NO RETRY.
 RHC3/RHC3P and their retained evidence/contracts are unchanged.
 L43 protected qualification remains NOT_RUN, Q63 remains NOT_RUN, and
 `FINAL_HOLDOUT` remains SEALED.
 
-### RHC4 focused and pre-candidate verification
+### RHC4 C1 focused verification
 
-The composition/runtime and observer tests passed **51 tests** with Python
-`C:\Program Files\Python314\python.exe` (Python 3.14.3, pytest 8.4.2). The
-fresh external basetemp was
-`F:\AI\temp\pytest\rhc4-runtime-latest-d0d72d0e-682d-4e1c-bab9-9bb99206583b`.
-
-```powershell
-& 'C:\Program Files\Python314\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-runtime-latest-d0d72d0e-682d-4e1c-bab9-9bb99206583b' tests/live_prototype/test_l43_runtime.py tests/live_prototype/test_l43_pre_effect_observation.py
-```
-
-The separate ambient environment/caller-claim denial regression passed **1
-test** with the same Python and a fresh basetemp:
-`F:\AI\temp\pytest\rhc4-runtime-env-negative-0b5f1ba4-a987-4645-8aa0-8683c154cab4`.
+The effect-operator and runtime tests passed **50 tests** with the project
+Python. The fresh external basetemp was
+`F:\AI\temp\pytest\rhc4-stop-interlock-focused-491d52ee663144ffbfa68698fa676cd1`.
 
 ```powershell
-& 'C:\Program Files\Python314\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-runtime-env-negative-0b5f1ba4-a987-4645-8aa0-8683c154cab4' tests/live_prototype/test_l43_runtime.py::test_ambient_environment_and_caller_claims_cannot_authorize_runtime
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-stop-interlock-focused-491d52ee663144ffbfa68698fa676cd1' tests/live_prototype/test_l43_effect_operator.py tests/live_prototype/test_l43_runtime.py
 ```
 
-The desktop/application and launcher set passed **50 tests** with
-`F:\AI\ai-trading-bot\.venv\Scripts\python.exe` (Python 3.14.3, PySide6
-6.10.3). Its fresh external basetemp was
-`F:\AI\temp\pytest\rhc4-desktop-final-19b59a36-f447-463c-b7ed-09112ad573c4`.
+The desktop/application, launcher, source-owner and checkpoint-runner
+coherence bundle passed **254 tests**. Its fresh external basetemp was
+`F:\AI\temp\pytest\rhc4-service-runner-focused-78791192d056469dbd986e1b19eb433d`.
 
 ```powershell
-& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-desktop-final-19b59a36-f447-463c-b7ed-09112ad573c4' tests/live_prototype/test_restricted_live_application.py tests/live_prototype/test_launcher.py tests/live_prototype/test_application_composition.py tests/live_prototype/test_application_service.py tests/live_prototype/test_window_shutdown_disarmed.py tests/live_prototype/test_application_acceptance.py tests/live_prototype/test_synthetic_service.py
+& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -m pytest -q -p no:cacheprovider --basetemp='F:\AI\temp\pytest\rhc4-service-runner-focused-78791192d056469dbd986e1b19eb433d' tests/live_prototype/test_restricted_live_application.py tests/live_prototype/test_launcher.py tests/live_prototype/test_application_composition.py tests/live_prototype/test_application_service.py tests/live_prototype/test_l43_production_owner.py tests/live_prototype/test_l43_source_boundaries.py tests/runtime/checkpoint_runner/test_arch147_prototype.py tests/runtime/checkpoint_runner/test_core.py tests/runtime/checkpoint_runner/test_source_authority.py
 ```
 
-The source-gate owner and required runner/admission coherence bundle passed
-**505 tests** with the project Python. Its fresh basetemp was
-`F:\AI\temp\pytest\arch147-rhc4-prepublish-51c31274a2b1406db8c905bf49e9665d`.
+The focused tests cover positive grant followed by Stop before the serialized
+ENTRY, SELL placement and SELL-review boundaries; Stop after durable placement
+`MAY_HAVE_OCCURRED` with factual reconciliation; pending RHC3P settlement
+without replacement effects; default-deny and ambient-claim paths; source
+mismatch; stopped-cycle effect-free behavior; and UNKNOWN/no-retry. The service
+regression also verifies that Stop requests the runtime interlock.
 
-```powershell
-& 'F:\AI\ai-trading-bot\.venv\Scripts\python.exe' -B -m pytest -q -p no:cacheprovider tests/runtime/checkpoint_runner/test_arch147_prototype.py tests/runtime/checkpoint_runner/test_core.py tests/review_paper/test_arch134_readonly_deployment_admission_diagnostic.py tests/experiments/test_research_strategy_production_compatibility.py tests/scripts/certification_runner/test_results.py tests/scripts/certification_runner/test_source.py tests/runtime/checkpoint_runner/test_source_authority.py --basetemp 'F:\AI\temp\pytest\arch147-rhc4-prepublish-51c31274a2b1406db8c905bf49e9665d'
-```
-
-Current authority and historical ownership passed. FEATURE selected the existing
-`arch147-live-prototype` route. PROSPECTIVE_DEVELOP evaluated 84 current
-checkpoint owners and passed. The exact Git state was unchanged. These
-pre-candidate calls invoked authority checks only. They did not use the public
-clean-tree evaluator or dispatch preflight/execute.
-
-Whole-repository Ruff check and format check passed. `git diff --check` passed
-with no whitespace errors. Windows Git emitted line-ending normalization notices
-for modified source files. The exact clean-source `ops.ps1 admit` remains required
-before push. No local FULL or ROBINHOOD certification was run.
+Non-mutating Ruff check and format check both passed for the ten changed Python
+files; `git diff --check` passed with no whitespace errors. Windows Git emitted
+only line-ending normalization notices. Exact clean-source admission remains
+the next publication gate. No local FULL, ROBINHOOD, LEGACY or EXHAUSTIVE
+certification is run.
 
 ## RHC3P post-effect normalization and pending-settlement correction — ACCEPTED / INTEGRATED
 

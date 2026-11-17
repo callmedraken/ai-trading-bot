@@ -2,14 +2,32 @@
 
 ## Current RHC4 restricted-live source boundary
 
-The RHC4 source checkpoint adds a distinct production L43 runtime composition
-and restricted-live desktop service. Independent exact-source acceptance is
-pending. The production exact-plan authorizer is closed by default; runtime
-Start controls worker lifecycle and grants no review, placement or cancellation
+The first RHC4 publication is
+`2f4f50a1df44c261d172f55bc540b635d637cbd9` / tree
+`558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. Its mapped FULL run
+`44181143712`, attempt 1, is preserved terminal SUCCESS. Exact-source review
+rejected the publication for `RHC4_STOP_EFFECT_BOUNDARY_RACE` and direct new
+coupling to private helpers. This run remains terminal-green evidence; it is
+not a failed CI result and is not rerun or rewritten.
+
+The C1 source-only/fake-only correction serializes Stop with the transition
+into the one-way ENTRY/SELL placement or nonplacing SELL-review boundary. The
+serialized decision has these semantics: Stop wins before the boundary and
+prevents reservation, `MAY_HAVE_OCCURRED`, review-start and provider work; the
+effect path winning and durably crossing placement `MAY_HAVE_OCCURRED`, or
+durably starting a nonplacing sell review, allows the in-flight factual
+reconciliation/classification to finish. Stop may prevent future cycles but
+never cancels, retries, liquidates, grants authority or creates a replacement.
+
+The production exact-plan authorizer remains closed by default; runtime Start
+controls worker lifecycle and grants no review, placement or cancellation
 authority. A bound pending ENTRY or SELL is settled through the accepted
-read-only RHC3P path before the runtime considers another effect. L43 protected
-qualification remains NOT_RUN, Q63 remains NOT_RUN, and `FINAL_HOLDOUT` remains
-SEALED.
+read-only RHC3P path before the runtime considers another effect. The C1
+correction also uses public source-owned seams for source identity and provider
+session construction rather than importing private helpers into the runtime.
+Construction and import remain effect-free. L43 protected qualification
+remains NOT_RUN, Q63 remains NOT_RUN, and `FINAL_HOLDOUT` remains
+`SEALED`.
 
 The default research worker remains idle until a research source is separately
 supplied. The existing comparison-report worker remains available and can run

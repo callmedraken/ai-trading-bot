@@ -30,6 +30,8 @@ from trading_bot.live_prototype.contracts import (
 class _Runtime(Protocol):
     def run_cycle(self, stop: Event) -> object: ...
 
+    def request_stop(self) -> None: ...
+
     @property
     def source_head(self) -> str: ...
 
@@ -216,6 +218,9 @@ class RestrictedLiveApplicationService:
             )
             self._record(Lifecycle.STOPPED, Reason.WORKERS_STOPPED, running=False)
             return PrototypeCommandResult(Command.STOP, True, Reason.WORKERS_STOPPED)
+        request_stop = getattr(self._runtime, "request_stop", None)
+        if callable(request_stop):
+            request_stop()
         self._stop.set()
         self._snapshot = replace(
             self._snapshot,

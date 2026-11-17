@@ -629,6 +629,7 @@ def _operator(
     reconciler: _Reconciler | None = None,
     review_caller=None,
     reobserver=None,
+    effect_boundary=None,
 ) -> L43EffectOperator:
     authorizer = _Authorizer() if authorizer is None else authorizer
     reconciler = _Reconciler() if reconciler is None else reconciler
@@ -660,6 +661,7 @@ def _operator(
         reobserver=reobserver,
         reconciler=reconciler,
         review_caller=review_caller,
+        effect_boundary=effect_boundary,
     )
 
 

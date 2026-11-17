@@ -16,8 +16,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-from scripts.checkpoint_runner import _git_output
-
 from trading_bot.live_prototype.alpaca_runtime_signal_provider import (
     AlpacaRuntimeSignalProvider,
 )
@@ -37,6 +35,7 @@ from trading_bot.live_prototype.l43_production_owner import (
     L43SourceIdentity,
     Q62JournalOrigin,
     read_canonical_q62_origin,
+    read_source_identity,
 )
 from trading_bot.live_prototype.l43_provider_contracts import (
     L43AccountIdentity,
@@ -232,10 +231,7 @@ class L43ProductionPreEffectComposition:
         )
 
         def source_reader() -> L43SourceIdentity:
-            return L43SourceIdentity(
-                source_head=_git_output(repo_root, "rev-parse", "HEAD"),
-                source_tree=_git_output(repo_root, "rev-parse", "HEAD^{tree}"),
-            )
+            return read_source_identity(repo_root)
 
         def robinhood_builder() -> RobinhoodL43PreEffectReadAdapter:
             from trading_bot.robinhood_mcp.windows_oauth import (

@@ -34,6 +34,18 @@ LIVE_READ_TOOLS: Final = (
     "get_equity_tradability",
     "get_trade_approval_setting",
 )
+
+
+def open_robinhood_client(
+    oauth_factory: Callable[[], object],
+) -> AbstractAsyncContextManager[object]:
+    """Return the provider-owned lazy MCP client context manager."""
+
+    if not callable(oauth_factory):
+        raise TypeError("OAuth factory must be callable")
+    return _open_robinhood_client(oauth_factory)
+
+
 LIVE_REVIEW_TOOLS: Final = ("review_equity_order",)
 LIVE_MUTATION_TOOLS: Final = ("place_equity_order", "cancel_equity_order")
 LIVE_TOOL_SURFACE: Final = LIVE_READ_TOOLS + LIVE_REVIEW_TOOLS + LIVE_MUTATION_TOOLS

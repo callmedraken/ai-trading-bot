@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import threading
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -80,6 +81,22 @@ from trading_bot.robinhood_mcp.l43_production_composition import (
 
 _NOW = datetime(1970, 1, 1, tzinfo=UTC)
 _SOURCE = L43SourceIdentity(source_head="8" * 40, source_tree="9" * 40)
+
+
+class _PauseAfterGrantAuthorizer(_Authorizer):
+    def __init__(self, stage: L43EffectStage) -> None:
+        super().__init__()
+        self._stage = stage
+        self.grant_returned = threading.Event()
+        self.release = threading.Event()
+
+    def authorize(self, request: L43AuthorizationRequest):
+        grant = super().authorize(request)
+        if request.stage is self._stage and grant is not None:
+            self.grant_returned.set()
+            if not self.release.wait(timeout=4):
+                raise TimeoutError("authorization barrier expired")
+        return grant
 
 
 def _origin() -> L43OriginAnchor:
@@ -688,7 +705,7 @@ def test_operator_default_deny_blocks_exact_owned_sell_review_before_review_call
     assert DurableStateStore.open(path, _IDENTITY).state.sell_review is None
 
 
-def test_stop_during_locked_read_revalidation_denies_before_reservation_or_place(
+def test_stop_before_serialized_entry_boundary_denies_before_reservation_or_place(
     tmp_path: Path,
 ):
     path = _state_path(tmp_path)
@@ -705,15 +722,13 @@ def test_stop_during_locked_read_revalidation_denies_before_reservation_or_place
         stop.set()
         return _operator_pre_effect(plan)
 
-    def build_components(stop_requested):
+    def build_components(effect_boundary):
         operator = _operator(
             path,
             mcp,
-            authorizer=l43_runtime._StopAwareAuthorizer(
-                positive_authorizer,
-                stop_requested,
-            ),
+            authorizer=positive_authorizer,
             reobserver=delayed_reobserver,
+            effect_boundary=effect_boundary,
         )
 
         def observer(sink):
@@ -736,10 +751,177 @@ def test_stop_during_locked_read_revalidation_denies_before_reservation_or_place
     result = runtime.run_cycle(stop)
 
     state = DurableStateStore.open(path, _IDENTITY).state
-    assert result.status is RestrictedLiveStatus.AUTHORIZATION_MISSING
+    assert result.status is RestrictedLiveStatus.BLOCKED
+    assert result.reason_code == "ENTRY_STOP_REQUESTED"
     assert stop.is_set()
-    assert positive_authorizer.requests == positive_authorizer.grants == []
+    assert len(positive_authorizer.requests) == len(positive_authorizer.grants) == 1
     assert state.entry is None
+    assert mcp.calls == []
+
+
+def test_stop_wins_after_positive_entry_grant_before_serialized_boundary(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    mcp = _FakeMcpSession(path)
+    stop = threading.Event()
+    authorizer = _PauseAfterGrantAuthorizer(L43EffectStage.ENTRY_PLACEMENT)
+
+    def observer(sink):
+        result = _input_result(path)
+        sink(L43AccountIdentity("account-one", _IDENTITY.account_fingerprint))
+        return result
+
+    def components(effect_boundary):
+        return l43_runtime._RuntimeComponents(
+            session_factory=lambda: L43StateSession.open_existing(path, _ORIGIN_ANCHOR),
+            observer=observer,
+            operator=_operator(
+                path,
+                mcp,
+                authorizer=authorizer,
+                effect_boundary=effect_boundary,
+            ),
+        )
+
+    runtime = l43_runtime.L43Runtime(
+        expected_source=_CURRENT,
+        source_reader=lambda: _CURRENT,
+        components_factory=components,
+    )
+    result_box: list[l43_runtime.L43RuntimeObservation] = []
+    worker = threading.Thread(
+        target=lambda: result_box.append(runtime.run_cycle(stop)),
+        name="rhc4-entry-boundary-test",
+    )
+    worker.start()
+    assert authorizer.grant_returned.wait(timeout=4)
+    runtime.request_stop()
+    authorizer.release.set()
+    worker.join(timeout=4)
+
+    assert not worker.is_alive()
+    assert len(result_box) == 1
+    assert result_box[0].status is RestrictedLiveStatus.BLOCKED
+    assert result_box[0].reason_code == "ENTRY_STOP_REQUESTED"
+    assert stop.is_set()
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert state.entry is None
+    assert mcp.calls == []
+
+
+def test_stop_wins_after_positive_sell_review_grant_before_serialized_boundary(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    _owned_state(path)
+    mcp = _FakeMcpSession(path)
+    stop = threading.Event()
+    authorizer = _PauseAfterGrantAuthorizer(L43EffectStage.SELL_REVIEW)
+
+    def observer(sink):
+        result = _input_result(path)
+        sink(L43AccountIdentity("account-one", _IDENTITY.account_fingerprint))
+        return result
+
+    def components(effect_boundary):
+        return l43_runtime._RuntimeComponents(
+            session_factory=lambda: L43StateSession.open_existing(path, _ORIGIN_ANCHOR),
+            observer=observer,
+            operator=_operator(
+                path,
+                mcp,
+                authorizer=authorizer,
+                effect_boundary=effect_boundary,
+            ),
+        )
+
+    runtime = l43_runtime.L43Runtime(
+        expected_source=_CURRENT,
+        source_reader=lambda: _CURRENT,
+        components_factory=components,
+    )
+    result_box: list[l43_runtime.L43RuntimeObservation] = []
+    worker = threading.Thread(
+        target=lambda: result_box.append(runtime.run_cycle(stop)),
+        name="rhc4-review-boundary-test",
+    )
+    worker.start()
+    if not authorizer.grant_returned.wait(timeout=4):
+        worker.join(timeout=1)
+        pytest.fail(f"runtime returned before sell review grant: {result_box!r}")
+    runtime.request_stop()
+    authorizer.release.set()
+    worker.join(timeout=4)
+
+    assert not worker.is_alive()
+    assert len(result_box) == 1
+    assert result_box[0].status is RestrictedLiveStatus.BLOCKED
+    assert result_box[0].reason_code == "SELL_REVIEW_STOP_REQUESTED"
+    assert stop.is_set()
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert state.sell_review is None
+    assert state.exit is None
+    assert mcp.calls == []
+
+
+def test_stop_wins_after_positive_sell_placement_grant_before_serialized_boundary(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    _owned_state(path)
+    mcp = _FakeMcpSession(path)
+    stop = threading.Event()
+    authorizer = _PauseAfterGrantAuthorizer(L43EffectStage.SELL_PLACEMENT)
+
+    async def reviewer(*, account_number, proposal):
+        return _affirmative_review(proposal)
+
+    def observer(sink):
+        result = _input_result(path)
+        sink(L43AccountIdentity("account-one", _IDENTITY.account_fingerprint))
+        return result
+
+    def components(effect_boundary):
+        return l43_runtime._RuntimeComponents(
+            session_factory=lambda: L43StateSession.open_existing(path, _ORIGIN_ANCHOR),
+            observer=observer,
+            operator=_operator(
+                path,
+                mcp,
+                authorizer=authorizer,
+                effect_boundary=effect_boundary,
+                review_caller=reviewer,
+            ),
+        )
+
+    runtime = l43_runtime.L43Runtime(
+        expected_source=_CURRENT,
+        source_reader=lambda: _CURRENT,
+        components_factory=components,
+    )
+    result_box: list[l43_runtime.L43RuntimeObservation] = []
+    worker = threading.Thread(
+        target=lambda: result_box.append(runtime.run_cycle(stop)),
+        name="rhc4-sell-boundary-test",
+    )
+    worker.start()
+    if not authorizer.grant_returned.wait(timeout=4):
+        worker.join(timeout=1)
+        pytest.fail(f"runtime returned before sell placement grant: {result_box!r}")
+    runtime.request_stop()
+    authorizer.release.set()
+    worker.join(timeout=4)
+
+    assert not worker.is_alive()
+    assert len(result_box) == 1
+    assert result_box[0].status is RestrictedLiveStatus.BLOCKED
+    assert result_box[0].reason_code == "SELL_PLACEMENT_STOP_REQUESTED"
+    assert stop.is_set()
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert state.sell_review is not None
+    assert state.sell_review.status is L43SellReviewStatus.ACCEPTED
+    assert state.exit is None
     assert mcp.calls == []
 
 
@@ -809,18 +991,6 @@ def test_stop_after_may_allows_one_fake_placement_and_reconciliation_to_finish(
     stop = threading.Event()
     stop_during_may: list[tuple[IntentStatus, str | None]] = []
 
-    class _StopAfterPlacementSession(_FakeMcpSession):
-        async def call_tool(self, name, arguments):
-            response = await super().call_tool(name, arguments)
-            if name != "review_equity_order":
-                state = DurableStateStore.open(path, _IDENTITY).state
-                assert state.entry is not None
-                stop_during_may.append(
-                    (state.entry.status, state.entry.provider_order_id)
-                )
-                stop.set()
-            return response
-
     reconciliation_state: list[tuple[bool, IntentStatus, str | None]] = []
 
     class _ObserveStopReconciler(_Reconciler):
@@ -836,30 +1006,45 @@ def test_stop_after_may_allows_one_fake_placement_and_reconciliation_to_finish(
             )
             return await super().reconcile(**kwargs)
 
-    mcp = _StopAfterPlacementSession(path)
+    mcp = _FakeMcpSession(path)
     authorizer = _Authorizer()
     reconciler = _ObserveStopReconciler()
-    operator = _operator(
-        path,
-        mcp,
-        authorizer=l43_runtime._StopAwareAuthorizer(authorizer, stop.is_set),
-        reconciler=reconciler,
-    )
 
     def observer(sink):
         result = _input_result(path)
         sink(L43AccountIdentity("account-one", _IDENTITY.account_fingerprint))
         return result
 
-    components = l43_runtime._RuntimeComponents(
-        session_factory=lambda: L43StateSession.open_existing(path, _ORIGIN_ANCHOR),
-        observer=observer,
-        operator=operator,
-    )
+    def build_components(effect_boundary):
+        @contextmanager
+        def boundary():
+            with effect_boundary() as admitted:
+                yield admitted
+            if admitted:
+                state = DurableStateStore.open(path, _IDENTITY).state
+                assert state.entry is not None
+                stop_during_may.append(
+                    (state.entry.status, state.entry.provider_order_id)
+                )
+                runtime.request_stop()
+
+        operator = _operator(
+            path,
+            mcp,
+            authorizer=authorizer,
+            reconciler=reconciler,
+            effect_boundary=boundary,
+        )
+        return l43_runtime._RuntimeComponents(
+            session_factory=lambda: L43StateSession.open_existing(path, _ORIGIN_ANCHOR),
+            observer=observer,
+            operator=operator,
+        )
+
     runtime = l43_runtime.L43Runtime(
         expected_source=_CURRENT,
         source_reader=lambda: _CURRENT,
-        components_factory=lambda _stop_requested: components,
+        components_factory=build_components,
     )
 
     result = runtime.run_cycle(stop)

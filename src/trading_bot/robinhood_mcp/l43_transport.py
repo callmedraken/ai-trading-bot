@@ -1,8 +1,8 @@
-"""Narrow, effect-unwired Robinhood transport for the L43 source boundary.
+"""Narrow Robinhood transport for the L43 source boundary.
 
 This adapter validates the bounded L43 order argument shapes against the
-consumed L41R5 input-schema facts. It has no OAuth factory or production
-composition. An affirmative nonplacing review requires both the authenticated
+consumed L41R5 input-schema facts. An affirmative nonplacing review requires
+both the authenticated
 L41R6 source-owned semantic and a clean, exact current response.
 """
 
@@ -204,6 +204,22 @@ class L43RobinhoodTransport:
             raise TypeError("L43 session factory must be callable")
         self._session_factory = session_factory
         self._counts = dict.fromkeys(L43_TOOL_NAMES, 0)
+
+    @classmethod
+    def for_production(cls, *, redirect_uri: str) -> L43RobinhoodTransport:
+        """Build the lazy provider session through the provider-owned seam."""
+
+        from trading_bot.robinhood_mcp.current_live_transport import (
+            open_robinhood_client,
+        )
+        from trading_bot.robinhood_mcp.windows_oauth import (
+            create_windows_robinhood_oauth_factory,
+        )
+
+        oauth_factory = create_windows_robinhood_oauth_factory(
+            redirect_uri=redirect_uri
+        )
+        return cls(lambda: open_robinhood_client(oauth_factory))
 
     @classmethod
     def for_test(cls, session_factory: Callable[[], object]) -> L43RobinhoodTransport:

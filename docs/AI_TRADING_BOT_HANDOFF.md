@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC4 source checkpoint / independent acceptance pending
+## Current milestone: RHC4 C1 stop/effect-boundary correction
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -20,6 +20,15 @@ Accepted/integrated RHC3P final executable identity:
 - duplicate develop FULL: NO
 
 Exact-source review accepted the final C1 source. The correction changes only the effect operator, post-effect reconciler, and their focused tests relative to the first RHC3P candidate.
+
+The first RHC4 publication is `2f4f50a1df44c261d172f55bc540b635d637cbd9` /
+tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. Its mapped FULL run
+`44181143712`, attempt 1, is preserved terminal SUCCESS. Exact-source review
+rejected that source for `RHC4_STOP_EFFECT_BOUNDARY_RACE` and new direct
+coupling to private helpers. The run is terminal-green preserved evidence, not
+a failed CI result, and must not be rerun or rewritten. C1 is the bounded
+source-only/fake-only correction from parent `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` /
+tree `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`.
 
 ## RHC3P accepted contract
 
@@ -58,9 +67,9 @@ RHC3P and C1 are source-only/fake-only. They performed zero OAuth, browser, MCP,
 
 RHC2 remains `CONSUMED / PASS / NO RETRY`.
 RHC3 remains accepted/integrated and its retained evidence remains immutable.
-The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live application service and launcher mode, and a serialized runtime lifecycle. The production exact-plan authorizer denies by default. Start/Stop control worker lifecycle only. An existing bound pending ENTRY/SELL is settled through read-only RHC3P convergence before a new effect is evaluated. Construction, import and help perform no provider action. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
+The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live application service and launcher mode, and a serialized runtime lifecycle. The production exact-plan authorizer denies by default. Start/Stop control worker lifecycle only. C1 gives Stop and the transition into the one-way placement/review boundary one common ordering decision: a Stop that wins before the boundary blocks reservation/MAY/review/provider work, while a path that wins and durably reaches `MAY_HAVE_OCCURRED` or review-start is allowed to finish factual reconciliation/classification. An existing bound pending ENTRY/SELL is settled through read-only RHC3P convergence before a new effect is evaluated. Construction, import and help perform no provider action. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
 
-RHC4 remains SOURCE_ONLY / FAKE_ONLY. The existing prototype route owns the mapped feature FULL. Terminal certification and independent exact-source acceptance are pending. No real Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for this source checkpoint. It does not grant effect authority or live readiness.
+RHC4 C1 remains SOURCE_ONLY / FAKE_ONLY. The existing prototype route owns the mapped feature FULL. The corrective source is not yet published or independently accepted. No real Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for this source checkpoint. It does not grant effect authority or live readiness.
 Focused fake-only tests, current/historical authority, both source-context selections, whole-repository Ruff, and diff checks passed. Exact commands and basetemps are recorded in the [validation ledger](validation/arch147-live-prototype.md#rhc4-focused-and-pre-candidate-verification).
 L43 protected qualification remains NOT_RUN.
 Q63 remains NOT_RUN.
@@ -78,7 +87,7 @@ The checkpoint is prepared from the synchronized RHC3P baseline at `fdbdbb4fe887
 - keeps Start/Stop lifecycle distinct from effect authorization;
 - performs no real provider effect in the source checkpoint.
 
-The existing route requires `ops.ps1 admit` on the exact clean source before its single ordinary push. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
+The existing route requires `ops.ps1 admit` on the exact clean C1 source before its single ordinary corrective push. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
 
 ## RHC3 production order-scope admission
 

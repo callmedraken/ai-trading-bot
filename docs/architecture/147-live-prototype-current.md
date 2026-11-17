@@ -1,16 +1,16 @@
 # Architecture 147 research-to-live prototype contract v1
 
-## Current boundary - L43 schema observation consumed / semantics unproven
+## Historical checkpoint record - L43 schema observation
 
 The accepted metadata-only order-scope observer was executed exactly once against `2d7a934dbde7f0dbeda64dde4be0469bb3e0d7aa` / tree `6feb5c829c83c7baf56410dd62d5841786806913`. The result is `PROVIDER_SEMANTICS_UNPROVEN` / `UNPROVEN_PROVIDER_SEMANTICS`.
 
 Evidence is fixed at `F:\AI\temp\arch147-order-scope-schema-7deccd50cfd24a9f943b4e6221091461\evidence.json`, SHA-256 `da30df502ed3e439f66fbce375f5531f892730493e41c447325e62af16436e34`. Pagination was exhaustive in one tools/list page. OAuth scope/session attempts were `1/1`, browser launches `0`, tools/list attempts `1`, and every MCP provider-tool/account/position/order/review/place/cancel/other-tool attempt remained `0`.
 
-This is a consumed negative semantic result, not an operational failure. No automatic retry is allowed. It does not establish `ACCOUNT_WIDE_ALL_AGENTS`; production composition must continue to return no order-scope proof and full L43 pre-effect observation remains blocked.
+At that checkpoint, this was a consumed negative semantic result following the metadata-only observation. The outcome did not arise from an operational failure. The observation remains permanently consumed, with no retry permitted. It did not establish `ACCOUNT_WIDE_ALL_AGENTS`; production composition was required to return no order-scope proof and full L43 pre-effect observation remained blocked at that time.
 
-The next source boundary is an alternative completeness proof design, not another omission-semantics schema attempt. Positive authority requires a provider-authenticated closed enumeration of every relevant order-source/agent category or another equivalently strong completeness mechanism. Empirical superset comparisons, current-row observations and caller assertions are insufficient.
+The source boundary recorded at that checkpoint was an alternative completeness-proof design after the omission-semantics schema attempt. The then-required basis for positive authority was a provider-authenticated closed enumeration of every relevant order-source/agent category or another equivalently strong completeness mechanism. Empirical superset comparisons, current-row observations and caller assertions were insufficient under that checkpoint's decision.
 
-If no complete provider-authenticated mechanism exists, preserve the blocker and redesign the tiny-live safety boundary. Q62 remains immutable; FINAL_HOLDOUT remains SEALED.
+That checkpoint recorded that, absent a complete provider-authenticated mechanism, the blocker would remain and the tiny-live safety boundary would need redesign. Q62 remains immutable. `FINAL_HOLDOUT` remains SEALED.
 
 ## D34 accepted boundary - historical transition to L40
 

@@ -1,32 +1,20 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC1B ACCEPTED / INTEGRATED; RHC1C COMPATIBILITY CLOSEOUT NEXT
+## Current milestone - RHC3 source preparation with acceptance pending
 
-RHC1B Robinhood session consolidation is ACCEPTED and INTEGRATED at `d5215aa483ce44da730b0853abe609d95a4021f9` / tree `d19a0aeba702bded270c99a4fd07bdc3cb2d2145`, direct parent `6f48a49683fc1decc8e2e8abdfd6f2b7c9152bcc`.
+RHC1C is accepted and integrated at `7eb8f3e975ef76f9082996b7c2a2f5c852c12745` / tree `e3728c584d2f4b2dbf475aa646e35658aa1363a6`. RHC1D is accepted and integrated at `600f1ec55de6bbc65e59db839c5016bbd511b449` / tree `245b2789acd2196e05ad0ae544e182d4356bdd25`. At this checkpoint's entry, the feature and `develop` remote refs both matched the RHC1D identity.
 
-Feature mapped FULL `43998813899`, attempt 1, was terminal SUCCESS. Source-static, active-tests, source-gates, and all seven FULL lanes passed; broad-1 through broad-7 wall times were `102.188`, `134.413`, `141.536`, `231.148`, `107.433`, `161.796`, and `136.197` seconds. Exact-source review accepted the checkpoint.
+RHC2 is CONSUMED / PASS / NO RETRY. Its four exhaustive runtime reads returned zero rows. Treat these reads as runtime consistency evidence together with A2's authenticated hosted semantic contract. The zero rows provide no non-empty row witness. RHC2 does not grant production order-scope authority.
 
-`develop` fast-forwarded to the accepted source. Develop run `44010723352`, attempt 1, was terminal SUCCESS and proved exact feature-certification reuse; active/FULL jobs were skipped, so no duplicate broad certification ran.
+The exact A2/RHC2 evidence paths and hashes are recorded in the [current handoff](AI_TRADING_BOT_HANDOFF.md).
 
-RHC1B replaces per-call current Robinhood session churn with an explicit operation-scoped private session owner. One `asyncio.Runner` and persistent same-loop owner task keep a single MCP context alive across the composed operation. Required current-read/current-live/B2 discovery is performed once per session, session authorization state is reset between operations, misuse fails closed, cleanup diagnostics are sanitized, and no automatic provider/write retry was added. Live mutation ordering and consumed-attempt semantics remain unchanged.
+RHC3 is the current source-only evidence-admission checkpoint. Its selected design reauthenticates the immutable A2/RHC2 chain at proof time, binds it to canonical Q62 identity and the current query while preserving L43 digest material, and binds the admitted evidence provenance to the current exhaustive pagination. Exact-source acceptance and integration remain pending.
 
-For the fake complete B2 proof, the accepted source establishes one OAuth entry, one MCP session, one complete capability-discovery sequence, one account read, four one-page order reads and five tool invocations; extra pages remain inside the same session. RHC1B itself performed zero provider/OAuth/MCP/broker effects.
-
-RHC1A remains accepted and unchanged. The previous real B2 observation remains CONSUMED / NOT_PROVEN / NO RETRY with immutable evidence at `F:\AI\temp\arch147-agent-initiated-runtime-partition-de58697fd0f642fa82c00d231f572f34\evidence.json`, SHA-256 `15dfa00092447881af7289287210faf50ba3bf292102fb5cb534174b149255ca`. It is never replayed.
-
-A remaining current-L43 source compatibility mismatch is now the next boundary. The current hosted schema capture for `get_equity_positions` and `get_equity_orders` treats `next` as optional, `""` as terminal, and a nonempty value as an opaque cursor. The capture basis is `kevin1chun/robinhood-for-agents/docs/official-mcp-tools.json`, blob SHA `c100e9b5c21dcfef8dc2d48d41d6d16ee69966b4`. The ordinary `RobinhoodL43PreEffectReadAdapter` still requires an explicit `next` key and rejects `""`. This independently established mismatch is not asserted to be the cause of the consumed B2 failure.
-
-Production remains `ORDER_SCOPE_UNPROVEN`. Q63 remains NOT RUN and `FINAL_HOLDOUT` remains SEALED.
+Production order-scope authority remains `ORDER_SCOPE_UNPROVEN` / `NOT_GRANTED` until RHC3 is accepted and integrated. No live effect is authorized. Q63=NOT_RUN and `FINAL_HOLDOUT=SEALED`.
 
 ## Immediate next step
 
-Implement `ARCH147-RHC1C_ROBINHOOD_COMPATIBILITY_CLOSEOUT` as source-only/fake-only work before any future real order-scope observation.
-
-RHC1C must correct the current ordinary L43 positions/orders cursor normalization to accept missing/null/empty-string terminal forms while preserving opaque bounded nonempty cursors and rejecting malformed values. B2 normalization, the generic Robinhood order parser, and Q62 must remain unchanged.
-
-RHC1C must also register a separately named manual/read-only successor observation checkpoint for a later RHC2 decision. The old consumed B2/B2O checkpoint identity and evidence remain immutable and cannot be reused as the executable successor. The new checkpoint must remain nonautomatic, effect-disabled, source-gated, and outside active CI/certification routing. Its execution is NOT RUN during RHC1C and production order-scope authority remains `NOT_GRANTED`.
-
-RHC1C performs zero provider reads, zero OAuth/browser/MCP activity and zero broker effects. A future RHC2 protected observation requires a separate ChatGPT authorization after RHC1C exact-source review and integration.
+Complete the RHC3 source-only implementation, focused verification and mapped FULL. Then perform exact-source review. Integrate only if accepted. RHC3 consumes the fixed, already-consumed evidence. This checkpoint includes no observation retry or provider/OAuth/browser/MCP activity.
 
 ## L41R1, L41R2, and L41R3 historical observations
 
@@ -58,7 +46,7 @@ URLs, callback values, tokens or provider text. Credential reads and writes are
 SDK-managed and individually uncounted (`null`/`null`). A successful result is
 `CAPTURED_FOR_REVIEW` only; it grants no live readiness, broker authority, Q62
 acceptance or order authority. At that historical checkpoint, Q62 was NOT RUN
-and blocked pending L41R3 classification; its current boundary is above.
+and blocked pending L41R3 classification.
 
 The L41R2 observation is CONSUMED / BLOCKED / NO RETRY. Its preserved evidence
 is
@@ -92,7 +80,7 @@ suppression, truthful SDK-managed credential accounting, and no-retry
 semantics. `CAPTURED_FOR_REVIEW` grants no Q62 readiness, broker/order or
 numeric-rule authority, live eligibility, or `FINAL_HOLDOUT` authority. At the
 L41R2 source-acceptance checkpoint, the L41R3 observation had not yet been run;
-its later consumed result is recorded in the current boundary above.
+its later consumed result followed that checkpoint.
 
 The first unpublished L41R2 prepublication admission is preserved at
 `F:\\AI\\temp\\arch147-l41r2-source-admission-2804bb15b8ec49eab4f0ac8ac0fe0a0f` and is classified
@@ -112,7 +100,7 @@ attempt 1, was terminal SUCCESS. The real
 `L41R2_INTERACTIVE_SCHEMA_DISCOVERY` was later consumed as BLOCKED / NO RETRY;
 see the exact evidence record above. At that source-acceptance checkpoint,
 L41R3 was its additive successor and had not yet been run against Robinhood;
-the later L41R3 observation is recorded in the current boundary above.
+the later L41R3 observation followed that source-acceptance checkpoint.
 
 ## L40 accepted/integrated baseline
 

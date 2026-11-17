@@ -127,22 +127,14 @@ def test_for_production_rejects_caller_selected_boundaries(tmp_path: Path):
             )
 
 
-def test_production_scope_verifier_cannot_be_caller_asserted():
-    verifier = composition.RobinhoodL43AccountWideOrderScopeVerifier()
-
-    assert (
-        verifier.verify_account_wide_spy_orders(
-            account_fingerprint="a" * 64,
-            query_sha256="b" * 64,
-            pages_read=1,
-            row_count=0,
-            exhausted=True,
-        )
-        is None
-    )
+def test_production_scope_verifier_requires_source_owned_q62_construction():
+    origin = _origin()
     with pytest.raises(TypeError):
-        composition.RobinhoodL43AccountWideOrderScopeVerifier(  # type: ignore[call-arg]
-            scope="ACCOUNT_WIDE_ALL_AGENTS"
+        composition.RobinhoodL43AccountWideOrderScopeVerifier(origin=origin)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        composition.RobinhoodL43AccountWideOrderScopeVerifier(
+            origin=origin,
+            _source_seal=object(),
         )
 
 

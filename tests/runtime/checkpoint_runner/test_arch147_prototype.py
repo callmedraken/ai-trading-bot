@@ -312,6 +312,38 @@ def test_l43_b2_runtime_partition_source_test_pair_is_prepublication_owned():
     assert runner._arch147_prototype_authority_check(root) == ()
 
 
+def test_rhc3_evidence_admission_and_composition_are_prepublication_owned():
+    root = Path(runner.__file__).resolve().parents[1]
+    pairs = (
+        (
+            "src/trading_bot/robinhood_mcp/order_scope_evidence_admission.py",
+            "tests/robinhood_mcp/test_order_scope_evidence_admission.py",
+        ),
+        (
+            "src/trading_bot/robinhood_mcp/l43_production_composition.py",
+            "tests/robinhood_mcp/test_l43_production_composition.py",
+        ),
+    )
+    spec = runner._checkpoint_specs()[runner.ARCH147_PROTOTYPE_NAME]
+    inventory = certification.discover_inventory(root)
+    full = certification.select_inventory(inventory, "full")
+
+    assert spec.tests == runner.ARCH147_PROTOTYPE_TESTS
+    assert spec.ruff_paths == runner.ARCH147_PROTOTYPE_RUFF
+    assert runner.CI_CERTIFICATION_PROFILES[spec.name] == "full"
+    for source, test in pairs:
+        assert (root / source).is_file()
+        assert (root / test).is_file()
+        assert runner.ARCH147_PROTOTYPE_RUFF.count(source) == 1
+        assert spec.ruff_paths.count(source) == 1
+        assert runner.ARCH147_PROTOTYPE_TESTS.count(test) == 1
+        assert spec.tests.count(test) == 1
+        assert full.count(test) == 1
+        assert source not in runner.ARCH147_RHC2_RUFF
+        assert test not in runner.ARCH147_RHC2_TESTS
+    assert runner._arch147_prototype_authority_check(root) == ()
+
+
 def test_rhc2_successor_is_manually_owned_by_the_current_prototype_route():
     from scripts import arch147_rhc2_order_scope_successor_source as rhc2
     from scripts import current_source_authority

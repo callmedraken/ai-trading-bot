@@ -188,10 +188,10 @@ class L43OrderScope(StrEnum):
 class L43OrderScopeProof:
     """A verifier result for complete account-wide SPY order visibility.
 
-    Current checked-in Robinhood transport/schema evidence does not produce
-    this proof.  Therefore normal composition must leave the verifier absent,
-    which fails closed.  Fake tests may inject a verifier to exercise the
-    positive derivation path without claiming production scope qualification.
+    Production composition can produce this proof only from its current
+    source-owned order query plus the authenticated consumed A2/RHC2 evidence
+    chain. Fake tests may still inject a verifier to exercise the derivation
+    path without claiming production qualification.
     """
 
     scope: L43OrderScope
@@ -230,6 +230,7 @@ class L43OrderScopeVerifier(Protocol):
         *,
         account_fingerprint: str,
         query_sha256: str,
+        order_arguments: Mapping[str, object],
         pages_read: int,
         row_count: int,
         exhausted: bool,
@@ -1183,12 +1184,8 @@ def _read_broker(
     if any(order.symbol != "SPY" for order in orders):
         # The read was requested for SPY; ignored symbol scope is not accepted.
         raise _Blocked(L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN)
-    query_digest = _digest(
-        (
-            "ARCH147_L43_ACCOUNT_WIDE_SPY_ORDER_QUERY_V1",
-            account.fingerprint,
-            tuple(sorted(order_arguments.items())),
-        )
+    query_digest = _account_wide_spy_order_query_digest(
+        account.fingerprint, order_arguments
     )
     proof: L43OrderScopeProof | None = None
     verifier = dependencies.order_scope_verifier
@@ -1197,6 +1194,7 @@ def _read_broker(
             proof = verifier.verify_account_wide_spy_orders(
                 account_fingerprint=account.fingerprint,
                 query_sha256=query_digest,
+                order_arguments=order_arguments,
                 pages_read=orders_page.page_count,
                 row_count=orders_page.row_count,
                 exhausted=orders_page.exhausted,
@@ -2124,6 +2122,20 @@ def _digest(material: object) -> str:
         allow_nan=False,
     ).encode("ascii")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _account_wide_spy_order_query_digest(
+    account_fingerprint: str, order_arguments: Mapping[str, object]
+) -> str:
+    """Return the unchanged canonical digest for the source-owned SPY query."""
+
+    return _digest(
+        (
+            "ARCH147_L43_ACCOUNT_WIDE_SPY_ORDER_QUERY_V1",
+            account_fingerprint,
+            tuple(sorted(order_arguments.items())),
+        )
+    )
 
 
 def _json_scalar(value: object) -> str:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -87,17 +89,20 @@ class _ScopeVerifier:
     def __init__(self, account_fingerprint: str) -> None:
         self.account_fingerprint = account_fingerprint
         self.calls: list[tuple[str, int, int, bool]] = []
+        self.order_arguments: list[dict[str, object]] = []
 
     def verify_account_wide_spy_orders(
         self,
         *,
         account_fingerprint: str,
         query_sha256: str,
+        order_arguments: Mapping[str, object],
         pages_read: int,
         row_count: int,
         exhausted: bool,
     ):
         self.calls.append((query_sha256, pages_read, row_count, exhausted))
+        self.order_arguments.append(dict(order_arguments))
         if account_fingerprint != self.account_fingerprint:
             return None
         return observer.L43OrderScopeProof(
@@ -389,6 +394,7 @@ def _dependencies(
     order_page_cursors: tuple[str | None, ...] | None = None,
     read_scope_events: list[str] | None = None,
     malformed_orders: bool = False,
+    order_scope_verifier_override: object | None = None,
 ) -> tuple[
     observer.L43PreEffectDependencies, _ReadBoundary, _SignalProvider, _ScopeVerifier
 ]:
@@ -444,7 +450,13 @@ def _dependencies(
         robinhood_builder=lambda: normalized_read,
         signal_provider_builder=lambda: signal,
         clock=clock,
-        order_scope_verifier=scope if scope_proven else None,
+        order_scope_verifier=(
+            order_scope_verifier_override
+            if order_scope_verifier_override is not None
+            else scope
+            if scope_proven
+            else None
+        ),
         read_operation_scope_factory=(
             (lambda boundary: boundary._operation_scope())
             if read_scope_events is not None
@@ -507,6 +519,9 @@ def test_flat_buy_returns_fresh_semantic_plan_without_reserving_or_authority(
     assert not first.live_ready
     assert signal.calls == 1
     assert scope.calls[0][2] == 0
+    assert scope.order_arguments == [
+        {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"}
+    ]
     assert read.calls[-1] == (
         "get_equity_orders",
         {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
@@ -676,6 +691,136 @@ def test_explicit_complete_order_pagination_needs_provider_scope_semantics(
     else:
         assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
         assert result.blockers == (observer.L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN,)
+
+
+def _rhc3_production_scope_verifier(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    *,
+    evidence_admitted: bool,
+):
+    from trading_bot.robinhood_mcp import l43_production_composition as composition
+    from trading_bot.robinhood_mcp import order_scope_evidence_admission as admission
+
+    q62, _ = _origin()
+    owner = L43ProductionOwner(
+        authority_verifier=_Authority(), journal_reader=_JournalReader()
+    )
+    monkeypatch.setattr(composition, "read_canonical_q62_origin", lambda: q62)
+    monkeypatch.setattr(
+        composition.L43ProductionOwner,
+        "for_production",
+        classmethod(lambda cls, *, repo_root: owner),
+    )
+    authority = admission.OrderScopeEvidenceAuthority(
+        account_fingerprint=q62.runtime_identity.account_fingerprint,
+        a2_evidence_sha256="a" * 64,
+        rhc2_report_sha256="b" * 64,
+        rhc2_observer_evidence_sha256="c" * 64,
+        inner_b2_evidence_sha256="d" * 64,
+        _seal=admission._AUTHORITY_SEAL,
+    )
+    monkeypatch.setattr(
+        composition,
+        "load_order_scope_evidence_authority",
+        lambda _origin: authority if evidence_admitted else None,
+    )
+    built = composition.L43ProductionPreEffectComposition.for_production(
+        repo_root=tmp_path,
+    )
+    return built.dependencies.order_scope_verifier
+
+
+@pytest.mark.parametrize(
+    ("order_rows", "expected_row_count"),
+    [([], 0), ([_canceled_zero_fill_order()], 1)],
+    ids=("empty-current-set", "nonempty-current-set"),
+)
+def test_rhc3_production_verifier_authenticates_source_owned_order_pages(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    order_rows: list[dict[str, object]],
+    expected_row_count: int,
+):
+    state_path, _ = _state_path(tmp_path)
+    verifier = _rhc3_production_scope_verifier(
+        monkeypatch, tmp_path, evidence_admitted=True
+    )
+    dependencies, read, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        order_rows=order_rows,
+        order_scope_verifier_override=verifier,
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert (
+        result.outcome is observer.L43PreEffectOutcome.READY_FOR_L43_ENTRY_EFFECT_REVIEW
+    )
+    assert result.blockers == ()
+    assert result.plan is not None
+    assert result.robinhood_page_count == 2
+    query_sha256 = observer._account_wide_spy_order_query_digest(
+        _ACCOUNT.fingerprint,
+        {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+    )
+    expected_material = (
+        "ARCH147_RHC3_PRODUCTION_ORDER_SCOPE_EVIDENCE_V1",
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "d" * 64,
+        _ACCOUNT.fingerprint,
+        query_sha256,
+        1,
+        expected_row_count,
+        True,
+    )
+    expected_digest = hashlib.sha256(
+        json.dumps(
+            expected_material,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("ascii")
+    ).hexdigest()
+    assert result.plan.order_scope_evidence_digest == expected_digest
+    assert read.calls[-1] == (
+        "get_equity_orders",
+        {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+    )
+    assert result.reservation_count == result.review_count == 0
+    assert result.placement_count == result.cancellation_count == 0
+
+
+def test_rhc3_tampered_evidence_chain_keeps_order_scope_blocker(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    state_path, _ = _state_path(tmp_path)
+    verifier = _rhc3_production_scope_verifier(
+        monkeypatch, tmp_path, evidence_admitted=False
+    )
+    dependencies, read, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        order_scope_verifier_override=verifier,
+    )
+
+    result = observer.observe_l43_pre_effect(dependencies)
+
+    assert result.outcome is observer.L43PreEffectOutcome.BLOCKED
+    assert result.blockers == (observer.L43PreEffectBlocker.ORDER_SCOPE_UNPROVEN,)
+    assert result.plan is None
+    assert "order_scope_evidence_digest" not in json.loads(result.evidence_json)
+    assert read.calls[-1] == (
+        "get_equity_orders",
+        {"account_number": _ACCOUNT_NUMBER, "symbol": "SPY"},
+    )
 
 
 @pytest.mark.parametrize(

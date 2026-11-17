@@ -39,12 +39,14 @@ from trading_bot.live_prototype.l43_pre_effect_observation import (
 from trading_bot.live_prototype.l43_production_owner import (
     ContinuityStatus,
     D34SignalFacts,
+    JournalReplayFacts,
     L43ContinuityResult,
     L43ProductionOwner,
     L43Provenance,
     L43SourceIdentity,
     Q62JournalOrigin,
     RecoveryFacts,
+    SourceAuthorityEvidence,
     XnysSessionFacts,
 )
 from trading_bot.live_prototype.l43_provider_contracts import (
@@ -73,6 +75,7 @@ from trading_bot.live_prototype.tiny_live_policy import (
 )
 
 _NOW = datetime(2026, 11, 10, 16, 0, tzinfo=UTC)
+_ZERO = Decimal("0")
 _ACCOUNT_NUMBER = "912345678901"
 _SOURCE = L43SourceIdentity(source_head="8" * 40, source_tree="9" * 40)
 _ACCOUNT_FINGERPRINT = hashlib.sha256(_ACCOUNT_NUMBER.encode("ascii")).hexdigest()
@@ -106,6 +109,35 @@ class _UnusedOwnerBoundary:
 
     def replay(self, *_args: object, **_kwargs: object) -> object:
         raise AssertionError("post-effect reconciliation must not replay Q62")
+
+
+class _AcceptedOwnerBoundary:
+    def verify(
+        self,
+        origin: Q62JournalOrigin,
+        current: L43SourceIdentity,
+    ) -> SourceAuthorityEvidence:
+        return SourceAuthorityEvidence(
+            origin_head=origin.runtime_identity.source_head,
+            origin_tree=origin.runtime_identity.source_tree,
+            candidate_head=current.source_head,
+            candidate_tree=current.source_tree,
+            strict_descendant=True,
+            feature_passed=True,
+            prospective_develop_passed=True,
+            evidence_sha256=_sha("c"),
+        )
+
+    def replay(self, origin: Q62JournalOrigin) -> JournalReplayFacts:
+        return JournalReplayFacts(
+            runtime_identity=origin.runtime_identity,
+            journal_sha256=origin.journal_sha256,
+            initialization_event_sha256=origin.initialization_event_sha256,
+            consumed_observation_sha256=origin.consumed_observation_sha256,
+            initialization_sequence=origin.initialization_sequence,
+            tail_sequence=origin.initialization_sequence,
+            tail_sha256=origin.initialization_event_sha256,
+        )
 
 
 class _ScopeVerifier:
@@ -300,8 +332,11 @@ def _dependencies(
     scope_mode: str = "valid",
     clock_values: tuple[datetime, ...] | None = None,
     source_values: tuple[L43SourceIdentity, ...] | None = None,
+    accepted_continuity: bool = False,
 ) -> L43PreEffectDependencies:
-    unused = _UnusedOwnerBoundary()
+    owner_boundary = (
+        _AcceptedOwnerBoundary() if accepted_continuity else _UnusedOwnerBoundary()
+    )
     scope = _ScopeVerifier(origin, mode=scope_mode)
     clock_iter = iter(clock_values or (_NOW,))
     source_iter = iter(source_values or (_SOURCE,))
@@ -321,8 +356,8 @@ def _dependencies(
     return L43PreEffectDependencies(
         source_reader=source_reader,
         continuity_owner=L43ProductionOwner(
-            authority_verifier=unused,
-            journal_reader=unused,
+            authority_verifier=owner_boundary,
+            journal_reader=owner_boundary,
         ),
         origin=origin,
         state_snapshot_reader=lambda _origin: None,
@@ -368,6 +403,39 @@ def _run_entry_reconcile(
             known_state=known_state,
         )
     )
+
+
+def _run_bound_settlement(
+    *,
+    origin: Q62JournalOrigin,
+    stage: L43EffectStage,
+    intent_id: str,
+    provider_order_id: str,
+    known_state,
+    read: _ReadBoundary,
+    accepted_continuity: bool = True,
+    scope_mode: str = "valid",
+):
+    return asyncio.run(
+        L43ExactPostEffectReconciler(
+            _dependencies(
+                origin,
+                read,
+                accepted_continuity=accepted_continuity,
+                scope_mode=scope_mode,
+            )
+        ).settle_bound_order(
+            stage=stage,
+            intent_id=intent_id,
+            provider_order_id=provider_order_id,
+            known_state=known_state,
+        )
+    )
+
+
+def _persist_snapshot(path: Path, origin: Q62JournalOrigin, snapshot) -> object:
+    with L43StateSession.open_existing(path, origin_anchor_from_q62(origin)) as session:
+        return session.reconcile(snapshot)
 
 
 def test_entry_post_effect_uses_off_thread_read_and_ignores_provider_share_estimate(
@@ -447,6 +515,169 @@ def test_entry_post_effect_working_zero_fill_has_zero_remainder_and_stays_blocke
     assert observation.working_remainder == Decimal("0")
     assert known_state.entry_reserved_dollars == Decimal("10.00")
     assert known_state.automated_order_allowed is False
+
+
+@pytest.mark.parametrize(
+    ("first_provider_state", "first_quantity"),
+    (("pending", Decimal("0")), ("partially_filled", Decimal("0.2"))),
+)
+def test_bound_entry_settlement_uses_persisted_state_and_allows_monotone_fill(
+    tmp_path: Path,
+    first_provider_state: str,
+    first_quantity: Decimal,
+) -> None:
+    origin, plan, intent_id, known_state, path = _new_entry_state(tmp_path)
+    first = _run_entry_reconcile(
+        origin=origin,
+        plan=plan,
+        intent_id=intent_id,
+        known_state=known_state,
+        read=_read(
+            origin,
+            order=_entry_order(
+                status=first_provider_state,
+                quantity=first_quantity,
+                requested_quantity=(
+                    None if first_quantity == _ZERO else Decimal("0.5")
+                ),
+            ),
+            position=first_quantity,
+        ),
+    )
+    persisted = _persist_snapshot(path, origin, first.snapshot)
+    assert persisted.entry is not None
+    assert persisted.entry.status is (
+        IntentStatus.WORKING if first_quantity == _ZERO else IntentStatus.PARTIAL
+    )
+    assert persisted.reconciled is True
+
+    later = _run_bound_settlement(
+        origin=origin,
+        stage=L43EffectStage.ENTRY_PLACEMENT,
+        intent_id=intent_id,
+        provider_order_id="entry-provider-147",
+        known_state=persisted,
+        read=_read(
+            origin,
+            order=_entry_order(
+                status="filled",
+                quantity=Decimal("0.5"),
+                requested_quantity=None,
+                price=Decimal("21"),
+            ),
+            position=Decimal("0.5"),
+        ),
+    )
+    final = _persist_snapshot(path, origin, later.snapshot)
+    assert later.snapshot.orders[0].status is OrderStatus.FILLED
+    assert final.entry is not None
+    assert final.entry.status is IntentStatus.FILLED
+    assert final.entry.cumulative_quantity == Decimal("0.5")
+    assert final.entry.cumulative_notional == Decimal("10.5")
+    assert final.entry.working_remainder == _ZERO
+
+
+def _persisted_working_entry(
+    tmp_path: Path,
+    *,
+    first_quantity: Decimal = Decimal("0"),
+):
+    origin, plan, intent_id, known_state, path = _new_entry_state(tmp_path)
+    first_provider_state = "pending" if first_quantity == _ZERO else "partially_filled"
+    first = _run_entry_reconcile(
+        origin=origin,
+        plan=plan,
+        intent_id=intent_id,
+        known_state=known_state,
+        read=_read(
+            origin,
+            order=_entry_order(
+                status=first_provider_state,
+                quantity=first_quantity,
+                requested_quantity=(
+                    None if first_quantity == _ZERO else Decimal("0.5")
+                ),
+                executions=(
+                    ()
+                    if first_quantity == _ZERO
+                    else (
+                        _execution("entry-execution-1", first_quantity, Decimal("20")),
+                    )
+                ),
+            ),
+            position=first_quantity,
+        ),
+    )
+    persisted = _persist_snapshot(path, origin, first.snapshot)
+    return origin, intent_id, persisted, path
+
+
+def test_bound_entry_settlement_rejects_regression_provider_id_unrelated_and_scope(
+    tmp_path: Path,
+) -> None:
+    origin, intent_id, persisted, path = _persisted_working_entry(
+        tmp_path,
+        first_quantity=Decimal("0.2"),
+    )
+    regressed = _read(
+        origin,
+        order=_entry_order(
+            status="partially_filled",
+            quantity=Decimal("0.1"),
+            requested_quantity=None,
+        ),
+        position=Decimal("0.1"),
+    )
+    with pytest.raises(L43TransportError):
+        _run_bound_settlement(
+            origin=origin,
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=intent_id,
+            provider_order_id="entry-provider-147",
+            known_state=persisted,
+            read=regressed,
+        )
+
+    with pytest.raises(L43TransportError):
+        _run_bound_settlement(
+            origin=origin,
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=intent_id,
+            provider_order_id="different-provider-id",
+            known_state=persisted,
+            read=regressed,
+        )
+
+    with pytest.raises(L43TransportError):
+        _run_bound_settlement(
+            origin=origin,
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=intent_id,
+            provider_order_id="entry-provider-147",
+            known_state=persisted,
+            read=_read(
+                origin,
+                order=_entry_order(),
+                position=Decimal("0.5"),
+                extra_orders=(_entry_order(provider_order_id="unrelated-order"),),
+            ),
+        )
+
+    with pytest.raises(L43TransportError):
+        _run_bound_settlement(
+            origin=origin,
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=intent_id,
+            provider_order_id="entry-provider-147",
+            known_state=persisted,
+            read=_read(
+                origin,
+                order=_entry_order(),
+                position=Decimal("0.5"),
+            ),
+            scope_mode="missing",
+        )
+    assert DurableStateStore.open(path, origin.runtime_identity).state == persisted
 
 
 @pytest.mark.parametrize(
@@ -853,6 +1084,56 @@ def _new_sell_state(tmp_path: Path):
     return origin, plan, exit_id, known_state
 
 
+def _persisted_working_sell(tmp_path: Path):
+    origin, plan, intent_id, known_state = _new_sell_state(tmp_path)
+    path = tmp_path / "l43-sell-state.jsonl"
+    initial = asyncio.run(
+        L43ExactPostEffectReconciler(
+            _dependencies(
+                origin,
+                _read(
+                    origin,
+                    order=_entry_order(
+                        status="filled",
+                        quantity=Decimal("0.5"),
+                        requested_quantity=None,
+                        amount=Decimal("10"),
+                    ),
+                    position=Decimal("0.5"),
+                    extra_orders=(_exit_order(status="new", quantity=Decimal("0")),),
+                ),
+            )
+        ).reconcile(
+            stage=L43EffectStage.SELL_PLACEMENT,
+            plan=plan,
+            intent_id=intent_id,
+            provider_order_id="exit-provider-147",
+            known_state=known_state,
+        )
+    )
+    persisted = _persist_snapshot(path, origin, initial.snapshot)
+    assert persisted.exit is not None
+    assert persisted.exit.status is IntentStatus.WORKING
+    return origin, intent_id, persisted, path
+
+
+def _run_sell_settlement(
+    *,
+    origin: Q62JournalOrigin,
+    intent_id: str,
+    known_state,
+    read: _ReadBoundary,
+):
+    return _run_bound_settlement(
+        origin=origin,
+        stage=L43EffectStage.SELL_PLACEMENT,
+        intent_id=intent_id,
+        provider_order_id="exit-provider-147",
+        known_state=known_state,
+        read=read,
+    )
+
+
 def _exit_order(
     *,
     status: str,
@@ -957,6 +1238,77 @@ def test_exact_sell_reconciles_full_order_set_and_share_remainder(
     assert exit_observation.cumulative_notional == fill * Decimal("20")
     assert exit_observation.working_remainder == remainder
     assert facts.snapshot.observed_position == position
+
+
+def test_bound_sell_settlement_uses_persisted_working_binding_and_fills(
+    tmp_path: Path,
+) -> None:
+    origin, intent_id, persisted, path = _persisted_working_sell(tmp_path)
+    later = _run_sell_settlement(
+        origin=origin,
+        intent_id=intent_id,
+        known_state=persisted,
+        read=_read(
+            origin,
+            order=_entry_order(
+                status="filled",
+                quantity=Decimal("0.5"),
+                requested_quantity=None,
+                amount=Decimal("10"),
+            ),
+            position=Decimal("0"),
+            extra_orders=(_exit_order(status="filled", quantity=Decimal("0.5")),),
+        ),
+    )
+    final = _persist_snapshot(path, origin, later.snapshot)
+    assert later.snapshot.observed_position == Decimal("0")
+    assert final.exit is not None
+    exit_order = final.exit
+    assert exit_order.status is IntentStatus.FILLED
+    assert exit_order.cumulative_quantity == Decimal("0.5")
+    assert final.owned_quantity == _ZERO
+
+
+@pytest.mark.parametrize(
+    ("provider_state", "quantity"),
+    (
+        ("partially_filled", Decimal("0.2")),
+        ("canceled", Decimal("0.2")),
+        ("rejected", Decimal("0.2")),
+    ),
+)
+def test_bound_sell_settlement_preserves_residual_for_terminal_manual_close(
+    tmp_path: Path,
+    provider_state: str,
+    quantity: Decimal,
+) -> None:
+    origin, intent_id, persisted, path = _persisted_working_sell(tmp_path)
+    later = _run_sell_settlement(
+        origin=origin,
+        intent_id=intent_id,
+        known_state=persisted,
+        read=_read(
+            origin,
+            order=_entry_order(
+                status="filled",
+                quantity=Decimal("0.5"),
+                requested_quantity=None,
+                amount=Decimal("10"),
+            ),
+            position=Decimal("0.3"),
+            extra_orders=(_exit_order(status=provider_state, quantity=quantity),),
+        ),
+    )
+    final = _persist_snapshot(path, origin, later.snapshot)
+    assert final.exit is not None
+    expected_status = {
+        "partially_filled": IntentStatus.PARTIAL,
+        "canceled": IntentStatus.CANCELED,
+        "rejected": IntentStatus.REJECTED,
+    }[provider_state]
+    assert final.exit.status is expected_status
+    assert final.owned_quantity == Decimal("0.3")
+    assert final.manual_close is None
 
 
 @pytest.mark.parametrize(

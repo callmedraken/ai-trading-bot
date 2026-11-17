@@ -18,8 +18,10 @@ from enum import StrEnum
 from typing import Protocol
 
 from trading_bot.live_prototype.durable_state import (
+    DurableState,
     IntentKind,
     IntentStatus,
+    OrderState,
     ReconciliationSnapshot,
 )
 from trading_bot.live_prototype.l43_pre_effect_observation import (
@@ -67,6 +69,7 @@ class L43EffectOutcome(StrEnum):
     REVIEW_ACCEPTED = "REVIEW_ACCEPTED"
     MANUAL_CLOSE_REQUIRED = "MANUAL_CLOSE_REQUIRED"
     SELL_RECONCILED = "SELL_RECONCILED"
+    SELL_PENDING = "SELL_PENDING"
     EFFECT_UNKNOWN = "EFFECT_UNKNOWN"
 
 
@@ -202,13 +205,22 @@ class L43PostEffectFacts:
 
 
 class L43PostEffectReconciler(Protocol):
-    """One bounded factual read after a placement; never a retry/cancel path."""
+    """Bounded factual reads; neither path has retry/cancel authority."""
 
     async def reconcile(
         self,
         *,
         stage: L43EffectStage,
         plan: L43PreEffectPlan,
+        intent_id: str,
+        provider_order_id: str,
+        known_state: object,
+    ) -> L43PostEffectFacts: ...
+
+    async def settle_bound_order(
+        self,
+        *,
+        stage: L43EffectStage,
         intent_id: str,
         provider_order_id: str,
         known_state: object,
@@ -344,6 +356,8 @@ class L43EffectOperator:
             raise TypeError("locked reobserver must be injected")
         if not callable(getattr(reconciler, "reconcile", None)):
             raise TypeError("post-effect reconciler must be injected")
+        if not callable(getattr(reconciler, "settle_bound_order", None)):
+            raise TypeError("bound-order settlement reconciler must be injected")
         if review_caller is None:
             review_caller = transport.review_sell_order
         if not callable(review_caller):
@@ -1133,6 +1147,17 @@ class L43EffectOperator:
                                 supplemental_digest=facts.evidence_sha256,
                             )
                             return completed_result
+                        if exit_order.status is IntentStatus.WORKING:
+                            completed_result = self._result(
+                                L43EffectStage.SELL_PLACEMENT,
+                                L43EffectOutcome.SELL_PENDING,
+                                "SELL_ORDER_KNOWN_WORKING",
+                                fresh,
+                                authorization,
+                                session.snapshot(),
+                                supplemental_digest=facts.evidence_sha256,
+                            )
+                            return completed_result
                         if exit_order.status is IntentStatus.FILLED:
                             if (
                                 not updated.reconciled
@@ -1207,6 +1232,177 @@ class L43EffectOperator:
                 L43EffectOutcome.BLOCKED,
                 "SELL_PREPARATION_OR_STATE_FAILED",
                 plan,
+                None,
+                None,
+            )
+
+    async def settle_pending_order(
+        self,
+        *,
+        stage: L43EffectStage,
+        intent_id: str,
+        provider_order_id: str | None = None,
+    ) -> L43EffectResult:
+        """Read and persist facts for one already-bound pending order.
+
+        Settlement opens the durable state directly.  It does not run the
+        pre-effect observer, acquire a new authorization, prepare a provider
+        transport, review, place, cancel, or mark a known order UNKNOWN.
+        """
+
+        if stage not in {
+            L43EffectStage.ENTRY_PLACEMENT,
+            L43EffectStage.SELL_PLACEMENT,
+        }:
+            return self._result(
+                stage,
+                L43EffectOutcome.BLOCKED,
+                "PENDING_SETTLEMENT_STAGE_INVALID",
+                None,
+                None,
+                None,
+            )
+        try:
+            with self._session_factory() as session:
+                target = _pending_intent(session.state, stage, intent_id)
+                if target is None or target.provider_order_id is None:
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.BLOCKED,
+                        "PENDING_ORDER_NOT_BOUND",
+                        None,
+                        None,
+                        session.snapshot(),
+                    )
+                if (
+                    provider_order_id is not None
+                    and provider_order_id != target.provider_order_id
+                ):
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.BLOCKED,
+                        "PENDING_ORDER_BINDING_MISMATCH",
+                        None,
+                        None,
+                        session.snapshot(),
+                    )
+                facts = await self._reconciler.settle_bound_order(
+                    stage=stage,
+                    intent_id=intent_id,
+                    provider_order_id=target.provider_order_id,
+                    known_state=session.state,
+                )
+                if not self._valid_bound_settlement_facts(
+                    facts,
+                    state=session.state,
+                    intent_id=intent_id,
+                    provider_order_id=target.provider_order_id,
+                    expected_stage=stage,
+                ):
+                    raise L43TransportError("L43_BOUND_SETTLEMENT_FACTS_INVALID")
+                updated = session.reconcile(facts.snapshot)
+                settled = _intent_for_stage(updated, stage, intent_id)
+                if settled is None or updated.blocked_reason is not None:
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.BLOCKED,
+                        "PENDING_SETTLEMENT_BLOCKED",
+                        None,
+                        None,
+                        session.snapshot(),
+                        supplemental_digest=facts.evidence_sha256,
+                    )
+                if stage is L43EffectStage.ENTRY_PLACEMENT:
+                    outcome = (
+                        L43EffectOutcome.ENTRY_RECONCILED
+                        if settled.status
+                        in {
+                            IntentStatus.FILLED,
+                            IntentStatus.CANCELED,
+                            IntentStatus.REJECTED,
+                        }
+                        else L43EffectOutcome.ENTRY_PENDING
+                    )
+                    return self._result(
+                        stage,
+                        outcome,
+                        "ENTRY_SETTLEMENT_RECONCILED",
+                        None,
+                        None,
+                        session.snapshot(),
+                        confirmed_filled_quantity=settled.cumulative_quantity,
+                        supplemental_digest=facts.evidence_sha256,
+                    )
+                if settled.status is IntentStatus.WORKING:
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.SELL_PENDING,
+                        "SELL_ORDER_KNOWN_WORKING",
+                        None,
+                        None,
+                        session.snapshot(),
+                        supplemental_digest=facts.evidence_sha256,
+                    )
+                if settled.status is IntentStatus.FILLED:
+                    if not updated.reconciled or updated.owned_quantity != _ZERO:
+                        return self._result(
+                            stage,
+                            L43EffectOutcome.BLOCKED,
+                            "SELL_RESIDUAL_AFTER_FILL",
+                            None,
+                            None,
+                            session.snapshot(),
+                            supplemental_digest=facts.evidence_sha256,
+                        )
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.SELL_RECONCILED,
+                        "SELL_SETTLEMENT_RECONCILED",
+                        None,
+                        None,
+                        session.snapshot(),
+                        confirmed_filled_quantity=settled.cumulative_quantity,
+                        supplemental_digest=facts.evidence_sha256,
+                    )
+                if updated.owned_quantity <= _ZERO:
+                    return self._result(
+                        stage,
+                        L43EffectOutcome.BLOCKED,
+                        "SELL_RESIDUAL_UNAVAILABLE",
+                        None,
+                        None,
+                        session.snapshot(),
+                        supplemental_digest=facts.evidence_sha256,
+                    )
+                trigger = {
+                    IntentStatus.PARTIAL: ManualCloseTrigger.SELL_PARTIAL,
+                    IntentStatus.CANCELED: ManualCloseTrigger.SELL_CANCELED,
+                    IntentStatus.REJECTED: ManualCloseTrigger.SELL_REJECTED,
+                }.get(settled.status)
+                if trigger is None:
+                    raise L43TransportError("L43_SELL_SETTLEMENT_STATE_INVALID")
+                self._manual_close_after_settlement(
+                    session,
+                    trigger=trigger,
+                    evidence_sha256=facts.evidence_sha256,
+                )
+                return self._result(
+                    stage,
+                    L43EffectOutcome.MANUAL_CLOSE_REQUIRED,
+                    "SELL_SETTLEMENT_REQUIRES_MANUAL_CLOSE",
+                    None,
+                    None,
+                    _snapshot_best_effort(session),
+                    supplemental_digest=facts.evidence_sha256,
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return self._result(
+                stage,
+                L43EffectOutcome.BLOCKED,
+                "PENDING_ORDER_SETTLEMENT_FAILED",
+                None,
                 None,
                 None,
             )
@@ -1390,6 +1586,63 @@ class L43EffectOperator:
             return state.entry is not None and state.entry.kind is IntentKind.ENTRY
         return state.exit is not None and state.exit.kind is IntentKind.EXIT
 
+    def _valid_bound_settlement_facts(
+        self,
+        facts: L43PostEffectFacts,
+        *,
+        state: object,
+        intent_id: str,
+        provider_order_id: str,
+        expected_stage: L43EffectStage,
+    ) -> bool:
+        if (
+            type(state) is not DurableState
+            or type(facts) is not L43PostEffectFacts
+            or facts.account_fingerprint != state.identity.account_fingerprint
+            or facts.snapshot.identity != state.identity
+            or not facts.all_relevant_orders_proven
+        ):
+            return False
+        expected_orders = {
+            order.intent_id: order.provider_order_id
+            for order in (state.entry, state.exit)
+            if order is not None and order.provider_order_id is not None
+        }
+        if expected_orders.get(intent_id) != provider_order_id:
+            return False
+        seen: dict[str, str] = {}
+        for observation in facts.snapshot.orders:
+            if observation.local_intent_id in seen:
+                return False
+            seen[observation.local_intent_id] = observation.provider_order_id
+        if seen != expected_orders:
+            return False
+        placed = next(
+            (
+                observation
+                for observation in facts.snapshot.orders
+                if observation.local_intent_id == intent_id
+            ),
+            None,
+        )
+        if placed is None or placed.provider_order_id != provider_order_id:
+            return False
+        if expected_stage is L43EffectStage.ENTRY_PLACEMENT:
+            return state.entry is not None and state.entry.kind is IntentKind.ENTRY
+        return state.exit is not None and state.exit.kind is IntentKind.EXIT
+
+    def _manual_close_after_settlement(
+        self,
+        session: L43StateSession,
+        *,
+        trigger: ManualCloseTrigger,
+        evidence_sha256: str,
+    ) -> None:
+        session.require_manual_close(
+            trigger=trigger,
+            effect_evidence_sha256=evidence_sha256,
+        )
+
     def _after_may_failure(
         self,
         session: L43StateSession,
@@ -1535,6 +1788,31 @@ def _ready_plan(
     if type(plan) is not L43PreEffectPlan or plan.kind is not kind:
         return None
     return plan
+
+
+def _pending_intent(
+    state: DurableState,
+    stage: L43EffectStage,
+    intent_id: str,
+) -> OrderState | None:
+    target = _intent_for_stage(state, stage, intent_id)
+    if target is None or target.status not in {
+        IntentStatus.WORKING,
+        IntentStatus.PARTIAL,
+    }:
+        return None
+    return target
+
+
+def _intent_for_stage(
+    state: DurableState,
+    stage: L43EffectStage,
+    intent_id: str,
+) -> OrderState | None:
+    target = state.entry if stage is L43EffectStage.ENTRY_PLACEMENT else state.exit
+    if target is None or target.intent_id != intent_id:
+        return None
+    return target
 
 
 def _check_plan_state_binding(plan: L43PreEffectPlan, snapshot: object) -> None:

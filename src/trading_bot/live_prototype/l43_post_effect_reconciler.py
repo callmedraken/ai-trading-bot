@@ -1,9 +1,12 @@
 """Exact, read-only L43 post-placement broker reconciliation.
 
 The reconciler shares the exhaustive account/position/order acquisition kernel
-with pre-effect observation, then interprets the resulting facts for the exact
-newly bound intent. It contains no review, placement, cancellation, or retry
-path. The potentially blocking provider read runs outside the async event loop.
+with pre-effect observation, then interprets the resulting facts for either the
+exact newly bound intent or a later read-only settlement of that same durable
+binding. The two paths have separate validation rules: only the initial path
+requires a fresh zero-fill working receipt. Neither path contains review,
+placement, cancellation, or retry authority. The potentially blocking provider
+read runs outside the async event loop.
 """
 
 from __future__ import annotations
@@ -47,6 +50,8 @@ from trading_bot.live_prototype.l43_pre_effect_observation import (
     _require_fresh,
 )
 from trading_bot.live_prototype.l43_production_owner import (
+    L43ContinuityResult,
+    L43Provenance,
     L43SourceIdentity,
     Q62JournalOrigin,
 )
@@ -106,7 +111,7 @@ class L43ExactPostEffectReconciler:
 
         try:
             return await asyncio.to_thread(
-                self._reconcile_sync,
+                self._reconcile_initial_sync,
                 stage=stage,
                 plan=plan,
                 intent_id=intent_id,
@@ -116,7 +121,34 @@ class L43ExactPostEffectReconciler:
         except Exception:
             raise L43TransportError("L43_POST_EFFECT_RECONCILIATION_FAILED") from None
 
-    def _reconcile_sync(
+    async def settle_bound_order(
+        self,
+        *,
+        stage: L43EffectStage,
+        intent_id: str,
+        provider_order_id: str,
+        known_state: object,
+    ) -> L43PostEffectFacts:
+        """Settle one already-bound order using reads only.
+
+        This path deliberately accepts no detached effect plan.  It binds to
+        the current durable state and the provider ID already stored there,
+        then reuses the same source-continuity and exhaustive account/position/
+        SPY-order read kernel as the initial post-placement path.
+        """
+
+        try:
+            return await asyncio.to_thread(
+                self._settle_bound_order_sync,
+                stage=stage,
+                intent_id=intent_id,
+                provider_order_id=provider_order_id,
+                known_state=known_state,
+            )
+        except Exception:
+            raise L43TransportError("L43_BOUND_ORDER_SETTLEMENT_FAILED") from None
+
+    def _reconcile_initial_sync(
         self,
         *,
         stage: L43EffectStage,
@@ -228,6 +260,111 @@ class L43ExactPostEffectReconciler:
             all_relevant_orders_proven=True,
         )
 
+    def _settle_bound_order_sync(
+        self,
+        *,
+        stage: L43EffectStage,
+        intent_id: str,
+        provider_order_id: str,
+        known_state: object,
+    ) -> L43PostEffectFacts:
+        dependencies = self._dependencies
+        origin = dependencies.origin
+        if type(stage) is not L43EffectStage:
+            raise ValueError("effect stage is invalid")
+        if type(known_state) is not DurableState:
+            raise ValueError("durable state is invalid")
+        L43PlacementReceipt(provider_order_id)
+        state = cast(DurableState, known_state)
+        target = _validate_bound_settlement_state(
+            stage=stage,
+            intent_id=intent_id,
+            provider_order_id=provider_order_id,
+            state=state,
+            origin=origin,
+        )
+        current_source, continuity = _current_source_continuity(dependencies, origin)
+
+        reader = dependencies.robinhood_builder()
+        scope = (
+            dependencies.read_operation_scope_factory(reader)
+            if dependencies.read_operation_scope_factory is not None
+            else nullcontext()
+        )
+        with scope:
+            broker = _read_broker_snapshot(
+                reader,
+                dependencies=dependencies,
+                origin=origin,
+                counters=_Counters(),
+            )
+        final_as_of = _clock(dependencies.clock)
+        _require_current_freshness(broker, final_as_of, None)
+        if broker.account.fingerprint != origin.runtime_identity.account_fingerprint:
+            raise ValueError("current account differs from canonical Q62")
+        if not _bounded_decimal(broker.spy_position_quantity):
+            raise ValueError("SPY position quantity is outside its bounded domain")
+        if not _bounded_decimal(broker.spy_sellable_quantity):
+            raise ValueError("SPY sellable quantity is outside its bounded domain")
+
+        state_orders = _bound_orders_by_provider_id(state)
+        if len(broker.spy_orders) != len(state_orders):
+            raise ValueError("account-wide SPY order set differs from durable state")
+        observations: list[OrderObservation] = []
+        observed_by_intent: dict[str, OrderObservation] = {}
+        for order in broker.spy_orders:
+            durable_order = state_orders.get(order.order_id)
+            if durable_order is None:
+                raise ValueError("account-wide SPY result contains an unrelated order")
+            observation = _normalize_order(
+                order,
+                durable_order,
+                is_new_target=False,
+            )
+            observations.append(observation)
+            observed_by_intent[durable_order.intent_id] = observation
+
+        if set(observed_by_intent) != {
+            order.intent_id for order in (state.entry, state.exit) if order is not None
+        }:
+            raise ValueError("bound durable order coverage is incomplete")
+        expected_position = _expected_position(state, observed_by_intent)
+        if broker.spy_position_quantity != expected_position:
+            raise ValueError("broker SPY position differs from observed owned fills")
+        snapshot = ReconciliationSnapshot(
+            identity=origin.runtime_identity,
+            observed_position=broker.spy_position_quantity,
+            orders=tuple(sorted(observations, key=lambda item: item.local_intent_id)),
+        )
+        final_source = dependencies.source_reader()
+        if (
+            type(final_source) is not L43SourceIdentity
+            or final_source != current_source
+            or continuity.current != final_source
+        ):
+            raise ValueError("executable source changed during settlement")
+        evidence_sha256 = _settlement_evidence_digest(
+            stage=stage,
+            intent_id=intent_id,
+            provider_order_id=provider_order_id,
+            state=state,
+            source=current_source,
+            broker=broker,
+            snapshot=snapshot,
+            final_as_of=final_as_of,
+        )
+        if target.intent_id != intent_id:
+            raise ValueError("settlement target changed during reconciliation")
+        return L43PostEffectFacts(
+            account_fingerprint=broker.account.fingerprint,
+            snapshot=snapshot,
+            positions_digest=broker.positions_digest,
+            orders_digest=broker.orders_digest,
+            order_scope_digest=broker.order_scope_digest,
+            evidence_sha256=evidence_sha256,
+            all_relevant_orders_proven=True,
+        )
+
 
 def _validate_bound_state(
     *,
@@ -304,6 +441,102 @@ def _validate_bound_state(
     if not _prior_order_observations_match(plan=plan, state=state, target=target):
         raise ValueError("prior terminal order facts differ from effect plan")
     return target
+
+
+def _validate_bound_settlement_state(
+    *,
+    stage: L43EffectStage,
+    intent_id: str,
+    provider_order_id: str,
+    state: DurableState,
+    origin: Q62JournalOrigin,
+) -> OrderState:
+    """Validate only current durable identity for a later read-only settle."""
+
+    identity = origin.runtime_identity
+    if (
+        state.identity != identity
+        or state.l43_origin != origin_anchor_from_q62(origin)
+        or state.manual_close is not None
+        or state.sell_review_pending
+    ):
+        raise ValueError("durable state differs from canonical settlement origin")
+
+    if stage is L43EffectStage.ENTRY_PLACEMENT:
+        target = state.entry
+        if (
+            target is None
+            or state.exit is not None
+            or target.kind is not IntentKind.ENTRY
+            or target.status not in {IntentStatus.WORKING, IntentStatus.PARTIAL}
+            or target.requested_dollars is None
+            or target.requested_quantity is not None
+            or target.working_remainder != _ZERO
+            or state.entries_used != 1
+            or state.exits_used != 0
+            or state.baseline_quantity != _ZERO
+        ):
+            raise ValueError("durable entry is not a pending settlement")
+    elif stage is L43EffectStage.SELL_PLACEMENT:
+        target = state.exit
+        if (
+            target is None
+            or target.kind is not IntentKind.EXIT
+            or target.status not in {IntentStatus.WORKING, IntentStatus.PARTIAL}
+            or target.requested_quantity is None
+            or target.requested_dollars is not None
+            or state.entry is None
+            or state.entry.status not in _TERMINAL_INTENT_STATUSES
+            or state.entries_used != 1
+            or state.exits_used != 1
+            or state.owned_quantity <= _ZERO
+        ):
+            raise ValueError("durable sell is not a pending settlement")
+        expected_remainder = (
+            target.requested_quantity
+            if target.status is IntentStatus.WORKING
+            else _subtract(target.requested_quantity, target.cumulative_quantity)
+        )
+        if target.working_remainder != expected_remainder:
+            raise ValueError("durable sell remainder differs from its exact binding")
+    else:
+        raise ValueError("unsupported settlement stage")
+
+    if target.intent_id != intent_id or target.provider_order_id != provider_order_id:
+        raise ValueError("settlement receipt differs from the exact durable binding")
+    return target
+
+
+def _current_source_continuity(
+    dependencies: L43PreEffectDependencies,
+    origin: Q62JournalOrigin,
+) -> tuple[L43SourceIdentity, L43ContinuityResult]:
+    try:
+        source = dependencies.source_reader()
+        if type(source) is not L43SourceIdentity:
+            raise ValueError
+        continuity = dependencies.continuity_owner.prove_continuity(
+            origin=origin,
+            current=source,
+            provenance=L43Provenance(
+                config_digest=origin.runtime_identity.config_digest,
+                binding_digest=origin.runtime_identity.binding_digest,
+                account_fingerprint=origin.runtime_identity.account_fingerprint,
+            ),
+        )
+    except Exception:
+        raise ValueError(
+            "current executable source continuity is unavailable"
+        ) from None
+    if (
+        type(continuity) is not L43ContinuityResult
+        or not continuity.accepted
+        or continuity.origin != origin
+        or continuity.current != source
+        or not continuity.provenance.matches(origin.runtime_identity)
+    ):
+        raise ValueError("current executable source continuity is not accepted")
+    return source, continuity
 
 
 def _bound_orders_by_provider_id(state: DurableState) -> dict[str, OrderState]:
@@ -513,9 +746,9 @@ def _expected_position(
 def _require_current_freshness(
     broker: _BrokerSnapshot,
     final_as_of: datetime,
-    plan_as_of: datetime,
+    plan_as_of: datetime | None,
 ) -> None:
-    if final_as_of < plan_as_of:
+    if plan_as_of is not None and final_as_of < plan_as_of:
         raise ValueError("post-effect observation clock is invalid")
     timestamps = (
         (broker.account_observed_at, _ACCOUNT_TTL, L43PreEffectBlocker.ACCOUNT_STALE),
@@ -534,7 +767,7 @@ def _require_current_freshness(
             type(timestamp) is not datetime
             or timestamp.tzinfo is None
             or timestamp.utcoffset() != timedelta(0)
-            or timestamp < plan_as_of
+            or (plan_as_of is not None and timestamp < plan_as_of)
         ):
             raise ValueError("broker factual snapshot is stale")
         _require_fresh(
@@ -600,6 +833,62 @@ def _post_effect_evidence_digest(
         state.identity.to_record(),
         state.last_sequence,
         state.journal_hash,
+        broker.account.fingerprint,
+        broker.positions_digest,
+        broker.orders_digest,
+        broker.order_scope_digest,
+        broker.order_scope_evidence_digest,
+        broker.positions_observation_digest,
+        broker.orders_observation_digest,
+        broker.account_observed_at.isoformat(),
+        broker.positions_observed_at.isoformat(),
+        broker.orders_observed_at.isoformat(),
+        final_as_of.isoformat(),
+        snapshot.identity.to_record(),
+        _decimal_text(snapshot.observed_position),
+        tuple(
+            (
+                order.local_intent_id,
+                order.provider_order_id,
+                order.status.value,
+                _decimal_text(order.cumulative_quantity),
+                _decimal_text(order.cumulative_notional),
+                _decimal_text(order.working_remainder),
+            )
+            for order in snapshot.orders
+        ),
+    )
+    encoded = json.dumps(
+        material,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("ascii")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _settlement_evidence_digest(
+    *,
+    stage: L43EffectStage,
+    intent_id: str,
+    provider_order_id: str,
+    state: DurableState,
+    source: L43SourceIdentity,
+    broker: _BrokerSnapshot,
+    snapshot: ReconciliationSnapshot,
+    final_as_of: datetime,
+) -> str:
+    material = (
+        "ARCH147_L43_BOUND_ORDER_SETTLEMENT_FACTS_V1",
+        stage.value,
+        intent_id,
+        provider_order_id,
+        state.identity.to_record(),
+        state.last_sequence,
+        state.journal_hash,
+        source.source_head,
+        source.source_tree,
         broker.account.fingerprint,
         broker.positions_digest,
         broker.orders_digest,

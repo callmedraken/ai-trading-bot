@@ -493,6 +493,7 @@ class _Reconciler:
         self.fail = fail
         self.cancel = cancel
         self.calls = 0
+        self.settlement_calls = 0
 
     async def reconcile(
         self,
@@ -554,6 +555,68 @@ class _Reconciler:
             orders_digest=_sha("post-orders"),
             order_scope_digest=_sha("post-scope"),
             evidence_sha256=_sha(f"post-facts:{stage.value}:{self.calls}"),
+            all_relevant_orders_proven=True,
+        )
+
+    async def settle_bound_order(
+        self,
+        *,
+        stage,
+        intent_id,
+        provider_order_id,
+        known_state,
+    ):
+        self.settlement_calls += 1
+        if self.cancel:
+            raise asyncio.CancelledError
+        if self.fail:
+            raise RuntimeError("synthetic settlement outage")
+        rows: list[OrderObservation] = []
+        for order in (known_state.entry, known_state.exit):
+            if order is None or order.provider_order_id is None:
+                continue
+            if order.kind is IntentKind.ENTRY:
+                status = self.entry_status
+                quantity = self.entry_quantity
+                notional = quantity * Decimal("20.00")
+                remainder = _ZERO
+            elif self.exit_quantity is None:
+                status = self.exit_status
+                quantity = order.requested_quantity or _ZERO
+                notional = Decimal("250.00") if quantity > _ZERO else _ZERO
+                remainder = _ZERO
+            else:
+                status = self.exit_status
+                quantity = self.exit_quantity
+                notional = Decimal("100.00") if quantity > _ZERO else _ZERO
+                remainder = (
+                    _ZERO
+                    if status
+                    in {OrderStatus.FILLED, OrderStatus.CANCELED, OrderStatus.REJECTED}
+                    else (order.requested_quantity or _ZERO) - quantity
+                )
+            rows.append(
+                OrderObservation(
+                    local_intent_id=order.intent_id,
+                    provider_order_id=order.provider_order_id,
+                    status=status,
+                    cumulative_quantity=quantity,
+                    cumulative_notional=notional,
+                    working_remainder=remainder,
+                )
+            )
+        if stage is L43EffectStage.ENTRY_PLACEMENT:
+            position = self.entry_quantity
+        else:
+            quantity = _OWNED if self.exit_quantity is None else self.exit_quantity
+            position = _OWNED - quantity
+        return L43PostEffectFacts(
+            account_fingerprint=known_state.identity.account_fingerprint,
+            snapshot=ReconciliationSnapshot(_IDENTITY, position, tuple(rows)),
+            positions_digest=_sha("settle-positions"),
+            orders_digest=_sha("settle-orders"),
+            order_scope_digest=_sha("settle-scope"),
+            evidence_sha256=_sha(f"settle-facts:{stage.value}:{self.settlement_calls}"),
             all_relevant_orders_proven=True,
         )
 
@@ -801,6 +864,100 @@ def test_partial_entry_consumes_full_budget_owns_only_confirmed_fill_and_cannot_
     assert restarted_mcp.calls == []
 
 
+def test_working_entry_is_durable_pending_and_pre_effect_blocks_new_placement(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    mcp = _FakeMcpSession(path)
+    reconciler = _Reconciler(
+        entry_status=OrderStatus.WORKING,
+        entry_quantity=Decimal("0"),
+    )
+    operator = _operator(path, mcp, reconciler=reconciler)
+    submitted = _input_result(path)
+
+    first = asyncio.run(operator.place_entry(submitted, account_number="account-one"))
+    second = asyncio.run(operator.place_entry(submitted, account_number="account-one"))
+
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert first.outcome is L43EffectOutcome.ENTRY_PENDING
+    assert state.entry is not None
+    assert state.entry.status is IntentStatus.WORKING
+    assert state.entry.working_remainder == _ZERO
+    assert second.outcome is L43EffectOutcome.BLOCKED
+    assert len(mcp.calls) == 1
+    assert reconciler.calls == 1
+
+
+@pytest.mark.parametrize("first_status", [OrderStatus.WORKING, OrderStatus.PARTIAL])
+def test_entry_pending_settlement_fills_without_second_placement(
+    tmp_path: Path,
+    first_status: OrderStatus,
+):
+    path = _state_path(tmp_path)
+    mcp = _FakeMcpSession(path)
+    reconciler = _Reconciler(
+        entry_status=first_status,
+        entry_quantity=(
+            Decimal("0") if first_status is OrderStatus.WORKING else Decimal("0.2")
+        ),
+    )
+    operator = _operator(path, mcp, reconciler=reconciler)
+
+    first = asyncio.run(
+        operator.place_entry(_input_result(path), account_number="account-one")
+    )
+    reconciler.entry_status = OrderStatus.FILLED
+    reconciler.entry_quantity = _OWNED
+    second = asyncio.run(
+        operator.settle_pending_order(
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=DurableStateStore.open(path, _IDENTITY).state.entry.intent_id,
+        )
+    )
+
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert first.outcome is L43EffectOutcome.ENTRY_PENDING
+    assert second.outcome is L43EffectOutcome.ENTRY_RECONCILED
+    assert state.entry is not None and state.entry.status is IntentStatus.FILLED
+    assert state.entry.cumulative_quantity == _OWNED
+    assert reconciler.settlement_calls == 1
+    assert len(mcp.calls) == 1
+
+
+def test_pending_settlement_read_failure_preserves_working_state_without_retry(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    mcp = _FakeMcpSession(path)
+    reconciler = _Reconciler(
+        entry_status=OrderStatus.WORKING,
+        entry_quantity=_ZERO,
+    )
+    operator = _operator(path, mcp, reconciler=reconciler)
+
+    placed = asyncio.run(
+        operator.place_entry(_input_result(path), account_number="account-one")
+    )
+    reconciler.fail = True
+    before = DurableStateStore.open(path, _IDENTITY).state
+    settled = asyncio.run(
+        operator.settle_pending_order(
+            stage=L43EffectStage.ENTRY_PLACEMENT,
+            intent_id=before.entry.intent_id,
+        )
+    )
+    after = DurableStateStore.open(path, _IDENTITY).state
+
+    assert placed.outcome is L43EffectOutcome.ENTRY_PENDING
+    assert settled.outcome is L43EffectOutcome.BLOCKED
+    assert settled.reason_code == "PENDING_ORDER_SETTLEMENT_FAILED"
+    assert after.entry == before.entry
+    assert after.owned_quantity == before.owned_quantity
+    assert reconciler.settlement_calls == 1
+    assert len(mcp.calls) == 1
+
+
 def test_cancelled_entry_call_persists_unknown_before_propagating_cancellation(
     tmp_path: Path,
 ):
@@ -942,6 +1099,121 @@ def test_positive_fake_sell_uses_reviewed_quantity_and_reconciles_exact_exit(
     assert state.exit.authority_sha256 == authorizer.grants[1].authority_sha256
     assert state.owned_quantity == _ZERO
     assert not state.manual_close_required
+
+
+def test_working_sell_stays_known_working_and_read_only_settles_to_filled(
+    tmp_path: Path,
+):
+    path = _state_path(tmp_path)
+    _owned_state(path)
+    mcp = _FakeMcpSession(path, provider_order_id=_EXIT_ORDER_ID)
+    reconciler = _Reconciler(
+        exit_status=OrderStatus.WORKING,
+        exit_quantity=Decimal("0"),
+    )
+
+    async def reviewer(*, account_number, proposal):
+        return _affirmative_review(proposal)
+
+    operator = _operator(
+        path,
+        mcp,
+        review_caller=reviewer,
+        reconciler=reconciler,
+    )
+    reviewed = asyncio.run(
+        operator.review_sell(_input_result(path), account_number="account-one")
+    )
+    placed = asyncio.run(
+        operator.place_sell(
+            _input_result(path),
+            reviewed.accepted_review,
+            account_number="account-one",
+        )
+    )
+    state_after_place = DurableStateStore.open(path, _IDENTITY).state
+    assert placed.outcome is L43EffectOutcome.SELL_PENDING
+    assert state_after_place.exit is not None
+    assert state_after_place.exit.status is IntentStatus.WORKING
+    assert state_after_place.manual_close is None
+
+    reconciler.exit_status = OrderStatus.FILLED
+    reconciler.exit_quantity = _OWNED
+    settled = asyncio.run(
+        operator.settle_pending_order(
+            stage=L43EffectStage.SELL_PLACEMENT,
+            intent_id=state_after_place.exit.intent_id,
+        )
+    )
+    final = DurableStateStore.open(path, _IDENTITY).state
+    assert settled.outcome is L43EffectOutcome.SELL_RECONCILED
+    assert final.exit is not None and final.exit.status is IntentStatus.FILLED
+    assert final.owned_quantity == _ZERO
+    assert final.manual_close is None
+    assert reconciler.settlement_calls == 1
+    assert len(mcp.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("status", "quantity", "trigger"),
+    (
+        (OrderStatus.PARTIAL, Decimal("0.2"), ManualCloseTrigger.SELL_PARTIAL),
+        (OrderStatus.CANCELED, Decimal("0.2"), ManualCloseTrigger.SELL_CANCELED),
+        (OrderStatus.REJECTED, Decimal("0.2"), ManualCloseTrigger.SELL_REJECTED),
+    ),
+)
+def test_later_sell_terminal_residual_is_sticky_manual_close_without_replacement(
+    tmp_path: Path,
+    status: OrderStatus,
+    quantity: Decimal,
+    trigger: ManualCloseTrigger,
+):
+    path = _state_path(tmp_path)
+    _owned_state(path)
+    mcp = _FakeMcpSession(path, provider_order_id=_EXIT_ORDER_ID)
+    reconciler = _Reconciler(
+        exit_status=OrderStatus.WORKING,
+        exit_quantity=Decimal("0"),
+    )
+
+    async def reviewer(*, account_number, proposal):
+        return _affirmative_review(proposal)
+
+    operator = _operator(
+        path,
+        mcp,
+        review_caller=reviewer,
+        reconciler=reconciler,
+    )
+    reviewed = asyncio.run(
+        operator.review_sell(_input_result(path), account_number="account-one")
+    )
+    placed = asyncio.run(
+        operator.place_sell(
+            _input_result(path),
+            reviewed.accepted_review,
+            account_number="account-one",
+        )
+    )
+    assert placed.outcome is L43EffectOutcome.SELL_PENDING
+    state = DurableStateStore.open(path, _IDENTITY).state
+    assert state.exit is not None
+    reconciler.exit_status = status
+    reconciler.exit_quantity = quantity
+    settled = asyncio.run(
+        operator.settle_pending_order(
+            stage=L43EffectStage.SELL_PLACEMENT,
+            intent_id=state.exit.intent_id,
+        )
+    )
+    final = DurableStateStore.open(path, _IDENTITY).state
+    assert settled.outcome is L43EffectOutcome.MANUAL_CLOSE_REQUIRED
+    assert final.manual_close is not None
+    assert final.manual_close.trigger is trigger
+    assert final.manual_close.exact_residual_quantity == Decimal("0.3")
+    assert final.exit is not None and final.exit.status is IntentStatus(status.value)
+    assert len(mcp.calls) == 1
+    assert reconciler.settlement_calls == 1
 
 
 def test_partial_sell_records_confirmed_fill_and_sticks_manual_close_no_replacement(

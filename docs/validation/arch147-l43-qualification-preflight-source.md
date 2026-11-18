@@ -1,0 +1,128 @@
+# Architecture 147 — L43-Q1 qualification preflight source validation plan
+
+## Scope
+
+This is the source-validation plan for
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE`.
+
+It implements the frozen architecture in
+[147-l43-qualification-preflight-source.md](../architecture/147-l43-qualification-preflight-source.md)
+against accepted RHC4-C2
+`4f560a74b04ecba85c7b312364a9e4e7b30e57b6` /
+`b422ef66d88b184bdbe12788546e6b2ffd083846`.
+
+Source work is fake-only. The real preflight, credentials/provider reads and all
+broker effects remain NOT RUN in this checkpoint.
+
+## Implementation routing
+
+This is substantial Architecture-147 implementation under the current
+prototype-completion delegation overlay:
+
+- ChatGPT Sol High owns architecture, exact-source review, certification,
+  integration and protected-effect decisions.
+- Codex Sol High is coordinator-only.
+- Luna Extra High owns repository implementation and focused verification.
+- Codex Sol High must not code, edit, test, stage, commit, push, merge or perform
+  protected effects.
+
+## Expected source surfaces
+
+The exact file set may narrow after coordinator inspection, but implementation
+should remain inside current Architecture-147 ownership. Prefer a small additive
+qualification module and CLI/runner adapter rather than altering the effect
+operator.
+
+Likely surfaces:
+
+- new source-owned L43 qualification/preflight module under
+  `src/trading_bot/live_prototype/`;
+- one narrow script/runner entry point;
+- `scripts/checkpoint_runner.py` registration/routing only as required;
+- focused Architecture-147 tests;
+- current architecture/validation docs only when implementation details require
+  exact updates.
+
+Do not create a second Robinhood transport, second OAuth/session owner, second
+durable-state engine or second strategy signal path.
+
+## Required fake scenarios
+
+Focused tests must cover at least:
+
+1. import/help/construction: zero provider/credential/state mutation;
+2. exact current source/config/binding/Q62/RHC3 admission;
+3. canonical account selection with exhaustive account/SPY order reads;
+4. genuine BUY, flat state, <=$10 request -> READY challenge;
+5. HOLD/SELL while flat -> NO_ACTION/BLOCKED with no challenge;
+6. >$10, zero/negative request, consumed entry -> BLOCKED;
+7. manual SPY holdings/account mismatch -> BLOCKED;
+8. unresolved/MAY/UNKNOWN effect -> BLOCKED;
+9. bound WORKING/PARTIAL order -> PENDING_SETTLEMENT_REQUIRED, no settlement
+   mutation from Q1;
+10. manual-close state -> MANUAL_CLOSE_REQUIRED;
+11. stale/wrong session or signal -> BLOCKED;
+12. source/config/state-tail drift -> BLOCKED;
+13. provider read or pagination ambiguity -> BLOCKED, no retry;
+14. evidence sanitization: no raw account number, token, provider payload or order
+    identifier;
+15. challenge digest changes for every material bound fact;
+16. caller cannot inject account/source/plan/authorization facts;
+17. preflight cannot call review/place/cancel;
+18. preflight cannot construct/return `L43StageAuthorization`;
+19. repeated fake preflight leaves durable bytes/state unchanged;
+20. current RHC4 public session/source seams remain the only production path.
+
+## Admission and certification
+
+Before publication:
+
+- prove exact canonical F: worktree, branch, HEAD/tree, origin and clean state;
+- run affected focused tests with a fresh external
+  `F:\AI\temp\pytest\<purpose>-<GUID>` basetemp and
+  `-p no:cacheprovider`;
+- run required Architecture-147 route/ownership/current-authority tests;
+- run combined Ruff check/format on the changed Python surfaces with
+  `--no-cache`;
+- run `git diff --check`;
+- create one atomic unpublished commit;
+- run general `ops.ps1 admit` on that exact clean committed candidate;
+- require FEATURE and PROSPECTIVE_DEVELOP PASS and stable exact identity;
+- one ordinary feature push;
+- one mapped CI run to terminal.
+
+Do not run duplicate local FULL when the exact mapped feature CI owns FULL.
+
+Any deterministic route-owned failure that admission should have exercised is
+`PREPUBLICATION_COVERAGE_DEFECT`; preserve evidence and stop for ChatGPT review.
+No unchanged CI rerun.
+
+## Protected-effect counters
+
+Source implementation/certification must report:
+
+- real OAuth/browser/MCP sessions: 0;
+- real Robinhood account/position/order reads: 0;
+- real Alpaca calls: 0;
+- review/place/cancel: 0;
+- broker mutations: 0;
+- production durable-state mutations: 0;
+- Q62 journal mutations: 0;
+- FINAL_HOLDOUT accesses: 0.
+
+Fake transports may record synthetic calls only.
+
+## Post-acceptance sequence
+
+After ChatGPT exact-source acceptance and exact-SHA fast-forward integration:
+
+1. verify terminal develop certification/reuse;
+2. reconcile local feature/develop worktrees using the documented known-behind
+   fast-forward rule where applicable;
+3. invoke one separately reviewed registered Q1 protected read-only preflight;
+4. preserve evidence and stop on READY, NO_ACTION or BLOCKED;
+5. only after independent review of a READY result may the next exact
+   human-authorized effect source/boundary be designed or invoked.
+
+Q1 preflight has no `execute` authority and never places an order.
+

@@ -1,139 +1,80 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC4 C2 prepublication coverage and stale-current correction
+## Current milestone: RHC4-C2 ACCEPTED / INTEGRATED; L43-Q1 design frozen
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
 
-Accepted/integrated RHC3P final executable identity:
-
-- predecessor docs/start HEAD: `209f27a3c1a3d9691a1bd7d097bb30b0d70ce7d3`
-- first RHC3P publication: `6503ee1088d7532bc2f77dc0fe16bbf1dc52dab8` / tree `e12ebc4b863669b83236e66640a39c9454d8ffb1`
-- corrective C1/final accepted HEAD: `26e168f15747345e25c550a2d76ccac8f4adaa0b`
-- final accepted tree: `3ef5dba7eba54f892269ddb59aea48b297208ecd`
-- superseded candidate mapped FULL: `44062318005`, attempt 1, terminal SUCCESS, preserved/no rerun
-- final C1 mapped FULL: `44073855992`, attempt 1, terminal SUCCESS
-- develop exact-source run: `44152192296`, attempt 1, terminal SUCCESS
+Accepted/integrated executable identity:
+- RHC4-C2 HEAD: `4f560a74b04ecba85c7b312364a9e4e7b30e57b6`
+- tree: `b422ef66d88b184bdbe12788546e6b2ffd083846`
+- direct C2 substantive parent: `7dfd693b6588f9b3bde24efbe04ba803d08e502b`
+- C1 predecessor: `f3f44e00ec17279ea74445df2b7a680875745f7b`
+- feature mapped FULL: `44217082229`, attempt 1, terminal SUCCESS
+- develop exact-source run: `44236195177`, attempt 1, terminal SUCCESS
 - develop reuse: `DEVELOP_CERTIFICATION_REUSE=True`
-- develop reuse reason: `exact_feature_certification`
+- reuse reason: `exact_feature_certification`
 - develop identity stability: `IDENTITY_STABLE=True`
 - duplicate develop FULL: NO
 
-Exact-source review accepted the final C1 source. The correction changes only the effect operator, post-effect reconciler, and their focused tests relative to the first RHC3P candidate.
+Preserved predecessor evidence:
+- original RHC4 `2f4f50a1df44c261d172f55bc540b635d637cbd9` / tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`; mapped run `44181143712` terminal SUCCESS but exact-source rejected;
+- RHC4-C1 `f3f44e00ec17279ea74445df2b7a680875745f7b` / tree `8dac42fa7039bde8fdb6f6bdd63eeaf432cb049a`; run `44192574584` terminal FAILURE / `PREPUBLICATION_COVERAGE_DEFECT`;
+- first clean C2 admission `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json` remains `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`;
+- final C2 admission `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T013037.569843Z\\report.json` passed FEATURE and PROSPECTIVE_DEVELOP with stable identity, `2692 passed, 1 skipped`, Ruff PASS and diff PASS.
 
-The first RHC4 publication is `2f4f50a1df44c261d172f55bc540b635d637cbd9` /
-tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. Its mapped FULL run
-`44181143712`, attempt 1, is preserved terminal SUCCESS. Exact-source review
-rejected that source for `RHC4_STOP_EFFECT_BOUNDARY_RACE` and new direct
-coupling to private helpers. The run is terminal-green preserved evidence, not
-a failed CI result, and must not be rerun or rewritten. C1 is the bounded
-source-only/fake-only correction from direct parent `2f4f50a1df44c261d172f55bc540b635d637cbd9` /
-tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. C1 is published at
-`f3f44e00ec17279ea74445df2b7a680875745f7b` / tree
-`8dac42fa7039bde8fdb6f6bdd63eeaf432cb049a`, directly from that parent.
+RHC4-C2 is production composition source, not real-order evidence. Its default production exact-plan authorizer denies. Start/Stop does not grant trading authority. Pending bound orders settle through accepted RHC3P factual reads first. The serialized lifecycle interlock orders Stop against the transition into ENTRY placement, SELL nonplacing review and SELL placement. Import, construction and help remain effect-free. No RHC4 real Robinhood/OAuth/browser/MCP/Alpaca/review/place/cancel action occurred during source implementation, certification or integration.
 
-C1's mapped run `44192574584`, attempt 1, is preserved terminal FAILURE and
-was not retried, amended, rerun or relabeled. `source-static` passed;
-`active-tests` reported `1774 passed, 1 skipped, 1 failed`; broad-1 through
-broad-5 and broad-7 passed; broad-6 reported `2123 passed, 7 skipped, 1
-failed`; and `source-gates` failed. The exact failure was
-`tests/robinhood_mcp/test_l43_production_composition.py::test_production_composition_is_inert_and_wires_normalized_read_dependencies`,
-which still monkeypatched removed private seam `composition._git_output`.
-Local reproduction used fresh basetemp
-`F:\\AI\\temp\\pytest\\rhc4-c1-coverage-defect-42118041f5e04c18acc2a5c776a2e1dc`
-and failed one test in 0.44 seconds. Classification:
-`PREPUBLICATION_COVERAGE_DEFECT`.
+### Q62 retained state and consumed observation
 
-## RHC3P accepted contract
+Q62 source was accepted/integrated before RHC4. Its create-once local state is consumed and must never be reinitialized:
 
-RHC3P retains provider `requested_quantity` and `trigger` in normalized L43 order facts and reuses one shared factual broker-read kernel for both strict pre-effect interpretation and post-effect settlement.
+- journal: `F:\AI\arch147-q62-live-state-v1\durable-state.jsonl`
+- bytes: `806`
+- SHA-256: `21F6C07273226D467F85CC8B86DED104B58A94C456E81C67521F94D8CC7CA7D1`
 
-Post-effect facts require:
-- canonical Q62 origin and account fingerprint;
-- current accepted source continuity;
-- exhaustive unfiltered account+SPY order coverage;
-- the RHC3 `ACCOUNT_WIDE_ALL_AGENTS` scope proof;
-- exact stored provider order binding;
-- SPY, `agent_initiated=true`, exact side/kind;
-- market / regular-hours / GFD / immediate order contract;
-- unique positive execution facts whose sum equals cumulative quantity;
-- monotonic quantities/notional;
-- no unrelated SPY row;
-- exact broker position = baseline + confirmed ENTRY buys - confirmed EXIT sells.
+The separately reviewed protected read-only Q62 observation was consumed successfully:
 
-Dollar ENTRY is dollar-authoritative, not provider-share-estimate-authoritative. Requested USD must match the durable reservation; provider requested share quantity may be absent or vary; durable ENTRY `working_remainder` is zero. The full one-time requested-dollar budget remains consumed while only confirmed shares become owned.
+- status: `READY_FOR_L43_PROTOTYPE_READ_ONLY`
+- reason: `Q62_READ_ONLY_PREREQUISITES_PROVEN`
+- evidence: `F:\AI\temp\arch147-q62-tiny-live-readiness-ecd813dcb93f4f66bb7f9adce592ed42\evidence.json`
+- bytes: `11,663`
+- SHA-256: `4D08EB505651CEB551BF6D94BB87960F14940925263D3E682B62610A063FC9C9`
+- PROVEN: SOURCE, CONFIGURATION, ACCOUNT, CAPABILITY, OWNERSHIP, BUDGET, SESSION, SIGNAL_INPUTS, RECOVERY
+- Robinhood reads: get_accounts=1, get_equity_positions=1, get_equity_orders=1
+- Alpaca snapshot/provider call: 1
+- review/place/cancel/other Robinhood calls: 0
+- provider mutations: 0
+- live readiness: false
+- trade authority: false
+- disposition: `CONSUMED / NO AUTOMATIC RETRY`
 
-EXIT remains exact-share-authoritative. Provider requested quantity must equal durable requested quantity and exact residual math is preserved.
+RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained account-wide-all-agents order-scope evidence remains immutable and operationally required. Q62 evidence is an anchor, not current effect authorization.
 
-The C1 correction adds a repeatable read-only settlement path for already-bound `WORKING` / `PARTIAL` orders. It does not take a detached effect plan, does not acquire a fresh effect authorization, does not prepare an effect transport, and cannot review/place/cancel/retry. It validates current durable identity and the stored provider ID, proves current source continuity, reruns the same RHC3-proven exhaustive read, and persists only monotonic factual reconciliation.
+### Workflow deviations preserved
 
-ENTRY `WORKING/PARTIAL -> FILLED/CANCELED/REJECTED` can therefore converge after the immediate placement read without a second order. A known WORKING SELL returns `SELL_PENDING` and remains known-working rather than being converted to UNKNOWN. Later SELL FILLED reconciles to flat. Later PARTIAL/CANCELED/REJECTED with residual enters sticky manual-close with no replacement sell.
+`RHC4_C2_PREPUBLICATION_ATOMICITY_DEVIATION` records that C2 was published as two unpublished commits (`7dfd693b...` then `4f560a74...`) in one push rather than one atomic checkpoint commit. Do not rewrite published history.
 
-Settlement read failure preserves the previously known durable facts and returns blocked; it does not create a new effect or invent a terminal state. Ordinary pre-effect admission remains strict and continues to block while settlement is pending.
+`RHC4_C2_TRANSITION_WORKFLOW_REGRESSION` records that the first ChatGPT integration guard Boolean-tested `git diff --quiet` stdout and falsely stopped a clean worktree. The broader transition also failed to follow existing procedure in several places: remembered-path use instead of same-block worktree discovery/reproof, incomplete first cleanliness proof, unsafe native stderr handling, output parsing before native-exit classification, missing canonical-origin/final-cleanliness proof, oversized generated PowerShell, incorrect delegation of the tiny docs closeout, delayed automatic continuation, failure to batch the known L43-Q1 design freeze with the closeout, and an initially missed stale current Q62 summary. The diagnostic re-established exact clean state before successful integration. These are workflow/procedure regressions, not source defects.
 
-## Sell-review contract
+For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory:
+- discover or re-prove the exact worktree; never derive it from a branch name;
+- normalize filesystem identity with `Resolve-Path`;
+- use porcelain/status arrays for tracked/index cleanliness and explicitly account for untracked state when the contract requires it;
+- check `$LASTEXITCODE` before parsing potentially absent native output;
+- never Boolean-test stdout from an exit-code-only native command;
+- use the reviewed wrapper or stderr-safe `Start-Process -Wait -PassThru` pattern when native stderr is expected;
+- verify the canonical origin before network/ref mutation;
+- re-prove final branch/HEAD/tree/tracked/index/untracked state;
+- after any STOP, re-establish the complete gate before continuation.
 
-The accepted L41R6 source-owned official claim `REVIEW_EQUITY_ORDER_SIMULATION_PRETRADE_WARNINGS` binds `REVIEW_PREVIEW_ONLY=PROVEN / L41R6_OFFICIAL_REVIEW_PREVIEW_PROVEN`. The production review normalizer authenticates that claim before opening a review session. Only an exact successful structured response for the exact full-owned SPY market sell with empty checks and matching review/place arguments may normalize to `AFFIRMATIVE / NONPLACING_PREVIEW`. That is not placement success and does not grant reusable placement authority.
+### Next source milestone
 
-## Effects and protected boundaries
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is frozen in:
+- `docs/architecture/147-l43-qualification-preflight-source.md`
+- `docs/validation/arch147-l43-qualification-preflight-source.md`
 
-RHC3P and C1 are source-only/fake-only. They performed zero OAuth, browser, MCP, account, position, order, review, placement, cancellation, or Alpaca calls in the real environment. Q62, RHC2/RHC3 retained evidence, and production L43 state were untouched.
-
-RHC2 remains `CONSUMED / PASS / NO RETRY`.
-RHC3 remains accepted/integrated and its retained evidence remains immutable.
-The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live application service and launcher mode, and a serialized runtime lifecycle. The production exact-plan authorizer denies by default. Start/Stop control worker lifecycle only. C1 gives Stop and the transition into the one-way placement/review boundary one common ordering decision: a Stop that wins before the boundary blocks reservation/MAY/review/provider work, while a path that wins and durably reaches `MAY_HAVE_OCCURRED` or review-start is allowed to finish factual reconciliation/classification. An existing bound pending ENTRY/SELL is settled through read-only RHC3P convergence before a new effect is evaluated. Construction, import and help perform no provider action. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
-
-RHC4 C2 remains SOURCE_ONLY / FAKE_ONLY. The current bounded correction is
-`ARCH147-RHC4-C2_PREPUBLICATION_COVERAGE_AND_STALE_CURRENT_CORRECTION`. It
-updates the stale composition test to `read_source_identity`, makes admission
-execute the complete deduplicated route-owned `ARCH147_PROTOTYPE_TESTS` set,
-and updates stale current seam/type/documentation references. No real
-Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred
-for this source checkpoint; provider and protected-effect counters are zero.
-It does not grant effect authority or live readiness.
-Focused fake-only tests, current/historical authority, both source-context
-selections, whole-repository Ruff, and diff checks are required before C2
-publication. Exact commands and basetemps are recorded in the [validation
-ledger](validation/arch147-live-prototype.md#rhc4-c2-prepublication-coverage-and-stale-current-correction).
-
-The first clean C2 admission is preserved at
-`F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json`
-and classified `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`. It executed
-the corrected route-owned bundle, including the production-composition test,
-and recorded FEATURE PASS, PROSPECTIVE_DEVELOP PASS, `IDENTITY_STABLE=True`,
-Ruff PASS and diff PASS, but pytest reported `2691 passed, 1 skipped, 1
-failed`. The sole failure was the L41R4 current test asserting that pytest
-`tmp_path` was not on F:, incompatible with the mandatory F: basetemp. No
-push followed; the bounded follow-up uses a synthetic C: candidate path and
-does not alter the source boundary.
-L43 protected qualification remains NOT_RUN.
-Q63 remains NOT_RUN.
-`FINAL_HOLDOUT` remains SEALED.
-
-## RHC4 source checkpoint and next gate
-
-The checkpoint is prepared from the synchronized RHC3P baseline at `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` / tree `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`. It uses the existing `arch147-live-prototype` feature push route and its mapped FULL. No RHC4 branch or protected execute route is added. The implementation:
-- composes canonical Q62/RHC3 read authority and RHC3P repeatable settlement;
-- reuses the existing durable L43 state/session owner;
-- reuses the existing L43 effect operator and Robinhood effect transport rather than duplicating business logic;
-- composes the Alpaca runtime signal path;
-- adds a production exact-plan authorizer seam that is closed by default and cannot be satisfied by GUI Start, CLI flags, environment variables, caller booleans, or RHC3/Q62 proof alone;
-- adds an explicit live/restricted-live application service and launcher path while keeping construction/help/import effect-free;
-- keeps Start/Stop lifecycle distinct from effect authorization;
-- performs no real provider effect in the source checkpoint.
-
-The existing route requires `ops.ps1 admit` on the exact clean C2 source before its single ordinary corrective push. The corrected admission must execute the production-composition test and the complete route-owned prototype set, with FEATURE and PROSPECTIVE_DEVELOP PASS and stable identity. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
-
-The required public-reference cross-check was read-only and corroborating only:
-`EUGMsub/RobinhoodAgenticTrader` main `src/mcp_client.py` and `src/oauth.py`
-show lazy MCP initialization/session caching with `Mcp-Session-Id`, bounded
-401/404 recovery, and OAuth 2.1 + PKCE; `kevin1chun/robinhood-for-agents`
-main `src/server/official/forward.ts` and `docs/MODES.md` show a provider-owned
-lazy cached client for `https://agent.robinhood.com/mcp/trading`, provider-owned
-bearer injection, and application/provider separation. These repositories are
-implementation evidence only; C2 does not redesign our session lifetime or
-weaken source ownership, exact-plan authorization, durable MAY/UNKNOWN,
-no-retry, or protected-effect boundaries.
+Q1 is SOURCE_ONLY / FAKE_ONLY. It must add a source-owned registered read-only preflight that can later re-derive fresh L43 facts and an exact challenge without review, placement, cancellation or effect authorization. The real provider-facing preflight remains a separate protected read-only invocation after source acceptance/integration. L43 protected order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## RHC3 production order-scope admission
 

@@ -137,6 +137,34 @@ only line-ending normalization notices. Exact clean-source admission remains
 the next publication gate. No local FULL, ROBINHOOD, LEGACY or EXHAUSTIVE
 certification is run.
 
+## RHC4-C2 production composition correction — ACCEPTED / INTEGRATED
+
+RHC4-C2 is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final HEAD `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / tree `b422ef66d88b184bdbe12788546e6b2ffd083846`.
+
+The final candidate lineage is:
+- original RHC4 `2f4f50a1df44c261d172f55bc540b635d637cbd9`, mapped FULL `44181143712` terminal SUCCESS but exact-source rejected for the Stop/effect race and private-helper coupling;
+- C1 `f3f44e00ec17279ea74445df2b7a680875745f7b`, mapped run `44192574584` terminal FAILURE / `PREPUBLICATION_COVERAGE_DEFECT`;
+- substantive C2 `7dfd693b6588f9b3bde24efbe04ba803d08e502b`;
+- final C2 portability correction `4f560a74b04ecba85c7b312364a9e4e7b30e57b6`.
+
+The first clean C2 admission is preserved at `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json` as `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`; it reached the corrected route-owned test set but exposed the current L41R4 test's invalid assumption about F: pytest basetemp. No push followed. Final admission at `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T013037.569843Z\\report.json` recorded FEATURE PASS, PROSPECTIVE_DEVELOP PASS, `IDENTITY_STABLE=True`, `2692 passed, 1 skipped`, Ruff PASS and diff PASS.
+
+Feature run `44217082229`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven FULL lanes green. Develop run `44236195177`, attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, `REASON=exact_feature_certification`, and `IDENTITY_STABLE=True`; active tests and canonical FULL were skipped, so no duplicate broad certification ran.
+
+Exact-source review accepted the final source. The accepted correction:
+- closes the Stop/effect TOCTOU with one serialized lifecycle interlock;
+- routes current L43 production composition through public source/session seams instead of direct private-helper coupling;
+- makes prepublication admission select the complete route-owned Architecture-147 prototype test set;
+- preserves default-deny production exact-plan authorization;
+- settles an already-bound pending order before considering a new effect;
+- performs no real provider effect during source implementation/certification/integration.
+
+Two transition deviations are preserved:
+- `RHC4_C2_PREPUBLICATION_ATOMICITY_DEVIATION`: C2 reached the final published tree through two unpublished commits in one push instead of one atomic unpublished candidate. Published history remains immutable.
+- `RHC4_C2_TRANSITION_WORKFLOW_REGRESSION`: the first ChatGPT integration guard Boolean-tested the empty stdout of `git diff --quiet` and falsely stopped a clean worktree. The broader transition also drifted from the existing workflow's worktree discovery, cleanliness, native-stderr/exit-code, canonical-origin, final-state, direct-closeout, automatic-continuation and closeout/design-batching rules. A read-only diagnostic re-established exact clean develop state before successful integration. No source defect, provider effect or partial merge occurred.
+
+This closeout does not authorize L43. Q62 remains consumed/no-retry, RHC2 remains consumed/pass/no-retry, RHC3 retained evidence remains immutable, Q63 is NOT RUN, and `FINAL_HOLDOUT` remains SEALED.
+
 ## RHC3P post-effect normalization and pending-settlement correction — ACCEPTED / INTEGRATED
 
 RHC3P is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at final corrective HEAD `26e168f15747345e25c550a2d76ccac8f4adaa0b` / tree `3ef5dba7eba54f892269ddb59aea48b297208ecd`.
@@ -609,12 +637,16 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | L41R4 | consumed L41R3 observation | additive schema-classification diagnostic successor | bounded sanitized structural diagnosis; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `c343ad83fc86ad1635374b177b27ab52a2da1dde` / `2411e867f00e11d92ad7cf208684d03518c17731`; feature `42890601819` and develop `42892262771` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R4_TOP_LEVEL_UNSUPPORTED_CONSTRAINT` |
 | L41R5 | consumed L41R4 observation | additive schema semantic-recovery successor | fixed L41R4 interface baseline; sanitized additionalProperties classification; separated tool/nested description and numeric provenance; metadata-only `tools/list`; no MCP tool invocation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `13a97b1f4c369243737cc0ac6646b5520327651a` / `81e58dd75656593ca0f960ecdcdf21c14d00d969`; feature `42905997160` and develop reuse `42926313979` SUCCESS; real observation CONSUMED / BLOCKED / NO RETRY as `L41R5_PLACE_NONPLACEMENT_SEMANTIC_CONFLICT` |
 | L41R6 | consumed L41R5 observation | digest-backed official-rule binding and pure 13-fact classification | source-only; anonymous public source preparation; no OAuth/MCP/provider observation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `17faef900919cf400ce77877b328418e40787842` / `dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`; feature FULL `42941127629` and develop reuse `42947447216` succeeded; 7 PROVEN / 5 BLOCKING_L42 / 1 DEFER; overall BLOCKED |
-| Q62 tiny-live pivot source | accepted L41R6 evidence | additive admission, typed policy, prototype Q62 evaluator, exact-owned review/manual-close contracts | pure source/tests only; no OAuth/MCP/provider observation or order review | Source candidate pending mapped CI and subsequent independent exact-source review; historical Q62 exact sole capability blocker remains; Q62 observation NOT RUN; `PROTECTED_EFFECTS=0` |
+| Q62 tiny-live pivot source | accepted L41R6 evidence | additive admission, typed policy, prototype Q62 evaluator, exact-owned review/manual-close contracts | source plus separately reviewed protected read-only observation | SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / `369c1e14f201541864c61cb66d718e8efd163940`; protected read-only Q62 observation later CONSUMED / PASS / NO AUTOMATIC RETRY as `READY_FOR_L43_PROTOTYPE_READ_ONLY`; provider mutations 0; no live/trade authority |
 | L42/I53 | consumed L41 capability boundary | durable state/controller, runtime signal, disarmed service/GUI | consolidated effect-disabled source | ACCEPTED / INTEGRATED at `0b9f3ac25158b11c5daa327ed8ca732c05adb78b`; feature FULL `42201682850` SUCCESS; develop `42285116586` SUCCESS with exact certification reuse |
 | I50-I52 | GUI/service convergence | Sol composition, Luna scenarios/docs | synthetic-only v1 | Synthetic I50/I51 and bounded I52 SOL_REVIEWED; full live scenarios/I53 deferred |
 | Q60 | exact source | Sol admission/publication/FULL | registered source-only | D34 implementation/corrections/docs integrated at `b86defe`; mapped feature FULL and develop reuse passed |
 | Q61 | accepted/integrated L42/I53 source | Human native Windows UAT | isolated synthetic | ACCEPTED; five pages, resize/navigation, synthetic safety boundary, Start/Stop/restart and clean close verified; both launches exited 0; protected effects 0 |
-| Q62 | accepted source/data/exit | Operator protected readiness | independent runner | NOT RUN; additive prototype source candidate is pending acceptance; historical Q62 remains BLOCKED on its exact capability-only blocker; no live readiness granted |
+| Q62 | accepted/integrated tiny-live source | Operator protected readiness | independent runner | CONSUMED / PASS / NO AUTOMATIC RETRY; `READY_FOR_L43_PROTOTYPE_READ_ONLY / Q62_READ_ONLY_PREREQUISITES_PROVEN`; nine proof kinds PROVEN; provider mutations 0; live readiness false; trade authority false |
+| RHC2 | accepted Q62 + order-scope successor | protected read-only scope proof | retained immutable evidence | CONSUMED / PASS / NO RETRY |
+| RHC3 | RHC2 + exhaustive account/SPY reads | account-wide-all-agents factual admission | retained immutable evidence | ACCEPTED / INTEGRATED; retained evidence operationally required |
+| RHC3P | RHC3 + durable order binding | post-effect factual settlement | source/fake certification | ACCEPTED / INTEGRATED at `26e168f15747345e25c550a2d76ccac8f4adaa0b`; feature FULL `44073855992`; develop reuse `44152192296` |
+| RHC4-C2 | RHC3P + production composition | restricted-live composition with default-deny exact-plan authority | source/fake certification | ACCEPTED / INTEGRATED at `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / `b422ef66d88b184bdbe12788546e6b2ffd083846`; feature FULL `44217082229`; develop reuse `44236195177`; no real order effect |
 | Q63 | all required evidence | Sol exact delivery | guarded test package | NOT RUN; source assembler preserves identities and leaves future evidence slots unfilled |
 
 | Acceptance requirement | Status | Evidence / limitation |
@@ -623,12 +655,12 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Reproducible explicit selection | SYNTHETIC PASS / OFFLINE NOT RUN | 144-cell synthetic topology, frozen policy and strict bundle; real admitted data separate |
 | Research/runtime parity | D32 ACCEPTED / CLOSED | strategy math, research binding, and current data-basis parity PASS |
 | Current valid inputs | ACCEPTED / CONSUMED | D34 READY observation accepted; one credential read and one provider call; no retry |
-| Entry and exact owned exit | BLOCKED / SOURCE CONTRACT ONLY | L41R6's five global quantity/close blockers remain unchanged; the unaccepted source candidate defines a <=$10 single-entry policy and exact-owned full-close proposal/review contract, but no provider review, placement, or automated residual-close capability has been performed or qualified |
-| Durable limits/no duplicate effects | SOURCE-TESTED / EFFECT-DISABLED | Hash-chained durable state/controller covers flat baseline, full reservation, exact order binding, monotone fills, partial ownership, UNKNOWN/no-retry, and crash write/flush/fsync/close seams; no provider invocation |
-| Stop/kill/restart/reconnect | SYNTHETIC NATIVE PASS / REAL DISARMED SOURCE-TESTED | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and a clean close; real/disarmed recovery remains source-tested |
+| Entry and exact owned exit | SOURCE/RUNTIME COMPOSED / PROTECTED EFFECT NOT RUN | Q62/RHC2/RHC3/RHC3P/RHC4-C2 now provide the accepted current read/ownership/settlement/composition path with <=$10 requested new acquisition and exact-owned exit semantics. Actual L43 entry placement, genuine owned-position sell review, and sell placement remain NOT RUN / NOT AUTHORIZED; production exact-plan authorizer denies by default |
+| Durable limits/no duplicate effects | ACCEPTED SOURCE / REAL L43 EFFECT NOT RUN | Accepted RHC3P/RHC4 source preserves full requested-dollar reservation, exact order binding, monotone fills, pending factual settlement, UNKNOWN/no-retry and serialized effect entry. No real L43 placement/review qualification has occurred |
+| Stop/kill/restart/reconnect | Q61 NATIVE PASS / RHC4 SOURCE ACCEPTED / REAL L43 EFFECT NOT RUN | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and clean close. RHC4-C2 adds the accepted serialized Stop/effect boundary and pending factual settlement path; no real L43 mutation/restart evidence is claimed |
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
-| Exact source certified | L42/I53 baseline and L41R4/R5 observer additions ACCEPTED / INTEGRATED; L41R6 ACCEPTED / INTEGRATED; pivot source candidate pending | L41R6 at `17faef900919cf400ce77877b328418e40787842` / tree `dbf4ea260b15b069a6c5d4d1c6c34627bca09a02`; feature `42941127629` and develop reuse `42947447216` succeeded; no candidate commit or CI result is recorded for the tiny-live source |
-| Bounded live test ready | BLOCKED | no live effect authorization |
+| Exact source certified | CURRENT RHC4-C2 ACCEPTED / INTEGRATED | RHC4-C2 `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / tree `b422ef66d88b184bdbe12788546e6b2ffd083846`; feature FULL `44217082229` SUCCESS; develop `44236195177` SUCCESS with exact feature-certification reuse and no duplicate FULL |
+| Bounded live test ready | NOT AUTHORIZED | Next gate is L43-Q1 source-owned qualification preflight. Real provider-facing preflight is separately protected/read-only; L43 review/place/cancel remain unauthorized |
 
 ### L41R1 consumed record and L41R2 successor
 

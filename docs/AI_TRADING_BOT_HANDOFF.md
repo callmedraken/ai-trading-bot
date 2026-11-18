@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC4-C2 ACCEPTED / INTEGRATED; L43-Q1 design frozen
+## Current milestone: L43-Q1 prepublication coverage correction
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -70,13 +70,13 @@ For future Windows/Git operator commands, follow the normative sections of `docs
 - re-prove final branch/HEAD/tree/tracked/index/untracked state;
 - after any STOP, re-establish the complete gate before continuation.
 
-### Next source milestone
+### L43-Q1 source checkpoint and next boundary
 
-`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is frozen in:
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is governed by the frozen design and validation plan:
 - `docs/architecture/147-l43-qualification-preflight-source.md`
 - `docs/validation/arch147-l43-qualification-preflight-source.md`
 
-Q1 is SOURCE_ONLY / FAKE_ONLY. It must add a source-owned registered read-only preflight that can later re-derive fresh L43 facts and an exact challenge without review, placement, cancellation or effect authorization. The real provider-facing preflight remains a separate protected read-only invocation after source acceptance/integration. L43 protected order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
+Q1 is SOURCE_ONLY / FAKE_ONLY. The registered checkpoint slug is `arch147-l43-qualification-preflight`; its protected `preflight` is a separate read-only invocation and `execute=None`. The failed unpublished candidate was HEAD `fac050e10a126542177fd11fd82f9cf3bb866d83`, tree `405fd237d0ea20be29467a3705a273a605234f44`, direct parent `f38c3079d83f5e9773280fe36e43a4d9d9d3c76d`. Its preserved admission report is `F:\AI\temp\ai-trading-bot-checkpoints\arch132-r3n-prepublication-admission\source-gate-20261118T061227.307789Z\report.json`; the overall result was `CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`. The candidate was not pushed and no feature CI ran. The Q1 validation record contains the failure diagnosis and correction scope. The correction requires focused verification and fresh admission before publication. Independent exact-source review follows terminal feature CI. The existing `arch147-live-prototype` route remains the mapped FULL route; independent exact-source acceptance has not occurred. The real provider-facing preflight is NOT RUN and follows separate ChatGPT exact-source acceptance, integration, and review. L43 protected order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## RHC3 production order-scope admission
 

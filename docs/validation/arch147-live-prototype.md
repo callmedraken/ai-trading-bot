@@ -661,7 +661,7 @@ All production, broker, runtime-binding, campaign, paper, live, and
 | Stop/kill/restart/reconnect | Q61 NATIVE PASS / RHC4 SOURCE ACCEPTED / REAL L43 EFFECT NOT RUN | Q61 recorded two complete synthetic RUNNING -> STOPPING -> STOPPED cycles and clean close. RHC4-C2 adds the accepted serialized Stop/effect boundary and pending factual settlement path; no real L43 mutation/restart evidence is claimed |
 | Credential/state isolation | PASS / Q61 | Two fresh external F: synthetic state roots; no credential/provider construction or protected effect |
 | Exact source certified | CURRENT RHC4-C2 ACCEPTED / INTEGRATED | RHC4-C2 `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / tree `b422ef66d88b184bdbe12788546e6b2ffd083846`; feature FULL `44217082229` SUCCESS; develop `44236195177` SUCCESS with exact feature-certification reuse and no duplicate FULL |
-| Bounded live test ready | NOT AUTHORIZED | Next gate is L43-Q1 source-owned qualification preflight. Real provider-facing preflight is separately protected/read-only; L43 review/place/cancel remain unauthorized |
+| Bounded live test ready | NOT AUTHORIZED | L43-Q1 remains source/fake-only. Its first unpublished candidate was blocked by a `CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`; details are in the [Q1 validation record](arch147-l43-qualification-preflight-source.md). The candidate was not pushed and no feature CI ran. The real protected read-only Q1 preflight is NOT RUN; L43 review/place/cancel remain NOT RUN / NOT AUTHORIZED |
 
 ### L41R1 consumed record and L41R2 successor
 

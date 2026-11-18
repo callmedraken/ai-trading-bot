@@ -97,6 +97,28 @@ Any deterministic route-owned failure that admission should have exercised is
 `PREPUBLICATION_COVERAGE_DEFECT`; preserve evidence and stop for ChatGPT review.
 No unchanged CI rerun.
 
+### Preserved first unpublished admission
+
+The first unpublished candidate's identity and immutable report path are
+recorded in the [current handoff](../AI_TRADING_BOT_HANDOFF.md#l43-q1-source-checkpoint-and-next-boundary).
+Its admission was classified
+`CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`.
+The report recorded FEATURE=PASS, PROSPECTIVE_DEVELOP=PASS,
+`IDENTITY_STABLE=True`, Ruff=PASS, DIFF=PASS, and pytest with 2,737 passed,
+2 failed and 1 skipped; overall admission was FAIL. The two failures were
+`test_registered_profiles_include_current_arch128_gates` and
+`test_r2b_common_and_family_requirements_are_independently_selectable` in
+`tests/runtime/checkpoint_runner/test_core.py`. The first treats the complete
+current checkpoint registry and checkpoint-name routing representation as a
+fixed snapshot. The second reconstructs current family ownership from checkpoint
+names and exception sets, then compares exact runner-test tuples. Q1 correctly
+belongs to the current Architecture-147 prototype owner; these mutable global
+snapshots instead preserve obsolete current expectations.
+
+The correction replaces current mutable registry and family snapshots with
+semantic invariants and synthetic growth tests. The candidate was not pushed
+and no feature CI ran; provider and protected-effect counters remained zero.
+
 ## Protected-effect counters
 
 Source implementation/certification must report:

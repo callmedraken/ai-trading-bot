@@ -510,6 +510,7 @@ ARCH147_PROTOTYPE_NAME: Final = "arch147-live-prototype"
 ARCH147_PROTOTYPE_BRANCH: Final = "feature/robinhood-live-prototype-current"
 ARCH147_B2O_NAME: Final = "arch147-l43-b2-runtime-partition-observation"
 ARCH147_RHC2_NAME: Final = "arch147-rhc2-robinhood-order-scope-successor-observation"
+ARCH147_Q1_NAME: Final = "arch147-l43-qualification-preflight"
 ARCH147_B2O_TESTS: Final = (
     *COMMON_TESTS,
     "tests/robinhood_mcp/test_agent_initiated_runtime_partition_observer.py",
@@ -595,6 +596,7 @@ ARCH147_PROTOTYPE_TESTS: Final = (
 )
 ARCH147_PROTOTYPE_RUFF: Final = (
     "scripts/checkpoint_runner.py",
+    "scripts/source_authority.py",
     "scripts/arch147_l43_a3_source.py",
     "src/trading_bot/live_prototype",
     "src/trading_bot/robinhood_mcp/l43_production_composition.py",
@@ -617,7 +619,19 @@ ARCH147_PROTOTYPE_RUFF: Final = (
     "src/trading_bot/gui/prototype_strategy_page.py",
     "src/trading_bot/gui/prototype_activity_page.py",
     "scripts/run_live_prototype.py",
+    "scripts/arch147_l43_q1_source.py",
     *ARCH147_PROTOTYPE_TESTS,
+)
+ARCH147_Q1_TESTS: Final = (
+    "tests/live_prototype/test_l43_pre_effect_observation.py",
+    "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
+)
+ARCH147_Q1_RUFF: Final = (
+    "scripts/checkpoint_runner.py",
+    "scripts/source_authority.py",
+    "scripts/arch147_l43_q1_source.py",
+    "src/trading_bot/live_prototype/l43_qualification_preflight.py",
+    *ARCH147_Q1_TESTS,
 )
 CURRENT_ACTIVE_CI_CHECKPOINTS: Final = (
     ARCH147_P6_NAME,
@@ -820,7 +834,8 @@ def _prepublication_requires_arch147_prototype(
 ) -> bool:
     owned_paths = (*ARCH147_PROTOTYPE_RUFF, *ARCH147_PROTOTYPE_TESTS)
     return any(
-        any(path == owned or path.startswith(owned + "/") for owned in owned_paths)
+        path.startswith("tests/live_prototype/")
+        or any(path == owned or path.startswith(owned + "/") for owned in owned_paths)
         for path in changed_paths
     )
 
@@ -26679,6 +26694,17 @@ def _readonly_checkpoint_specs() -> dict[str, CheckpointSpec]:
         execute=None,
         remote_branch=ARCH147_PROTOTYPE_BRANCH,
     )
+    values[ARCH147_Q1_NAME] = CheckpointSpec(
+        ARCH147_Q1_NAME,
+        "L43 qualification preflight; protected read-only only",
+        ARCH147_Q1_TESTS,
+        ARCH147_Q1_RUFF,
+        _arch147_q1_authority_check,
+        preflight=_arch147_q1_preflight,
+        execute=None,
+        remote_branch=None,
+        remote_head_env=None,
+    )
     values[ARCH147_B2O_NAME] = CheckpointSpec(
         ARCH147_B2O_NAME,
         "B2 one-time runtime partition observation; explicit read-only preflight only",
@@ -29084,6 +29110,13 @@ def _arch147_p6_execute() -> dict[str, object]:
     return execute()
 
 
+def _arch147_q1_preflight() -> dict[str, object]:
+    """Dispatch Q1 only through its source-admitted read-only adapter."""
+    from scripts.arch147_l43_q1_source import run_preflight
+
+    return run_preflight()
+
+
 def _arch147_p5b_preflight_checkpoint(
     spec: CheckpointSpec, *, repo_root: Path, evidence_root: Path
 ) -> tuple[bool, Path | None]:
@@ -29171,7 +29204,59 @@ def _arch147_prototype_authority_check(repo_root: Path) -> tuple[str, ...]:
     if not (repo_root / "scripts/arch147_l43_a3_source.py").is_file():
         failures.append("147 prototype A3 source owner missing")
     failures.extend(_arch147_rhc2_authority_check(repo_root))
+    failures.extend(_arch147_q1_authority_check(repo_root))
     return tuple(failures)
+
+
+def _arch147_q1_authority_check(repo_root: Path) -> tuple[str, ...]:
+    """Own Q1's manual read-only registration and active prototype test route."""
+    specs = _checkpoint_specs()
+    spec = specs.get(ARCH147_Q1_NAME)
+    prototype = specs.get(ARCH147_PROTOTYPE_NAME)
+    failures: list[str] = []
+    if (
+        spec is None
+        or sum(value.name == ARCH147_Q1_NAME for value in specs.values()) != 1
+        or spec.tests != ARCH147_Q1_TESTS
+        or spec.ruff_paths != ARCH147_Q1_RUFF
+        or spec.authority_check is not _arch147_q1_authority_check
+        or spec.preflight is not _arch147_q1_preflight
+        or spec.execute is not None
+        or spec.remote_branch is not None
+        or spec.remote_head_env is not None
+        or ARCH147_Q1_NAME in CURRENT_ACTIVE_CI_CHECKPOINTS
+        or ARCH147_Q1_NAME in ACTIVE_CI_CHECKPOINTS
+        or ARCH147_Q1_NAME in CI_CERTIFICATION_PROFILES
+    ):
+        failures.append("147 Q1 manual read-only registration drift")
+    if (
+        prototype is None
+        or any(path not in prototype.tests for path in ARCH147_Q1_TESTS)
+        or any(
+            path not in prototype.ruff_paths
+            for path in (
+                "scripts/arch147_l43_q1_source.py",
+                "scripts/source_authority.py",
+            )
+        )
+        or resolve_ci_checkpoint(specs, ARCH147_PROTOTYPE_BRANCH, "push")
+        != ARCH147_PROTOTYPE_NAME
+    ):
+        failures.append("147 Q1 existing prototype route ownership drift")
+    if any(path not in ARCH147_PROTOTYPE_TESTS for path in ARCH147_Q1_TESTS):
+        failures.append("147 Q1 focused tests are not prototype route-owned")
+    if any(
+        path not in ARCH147_PROTOTYPE_RUFF
+        for path in (
+            "scripts/arch147_l43_q1_source.py",
+            "scripts/source_authority.py",
+        )
+    ):
+        failures.append("147 Q1 runner authority paths are not prototype route-owned")
+    for relative in (*ARCH147_Q1_TESTS, *ARCH147_Q1_RUFF):
+        if not (repo_root / relative).is_file():
+            failures.append("147 Q1 missing owned path: " + relative)
+    return tuple(dict.fromkeys(failures))
 
 
 def _arch147_b2o_authority_check(repo_root: Path) -> tuple[str, ...]:

@@ -124,8 +124,9 @@ bounded coherence bundle before publication:
 - `tests/scripts/certification_runner/test_results.py`
 - `tests/scripts/certification_runner/test_source.py`
 
-The bundle checks exact current registry inventory and common/family runner-test
-selection before publication, alongside certification result/source provenance.
+The bundle checks current registry closure/ownership invariants and common/family
+runner-test selection semantics before publication, alongside certification
+result/source provenance.
 It also checks that historical workflow reconstruction removes later current
 checkpoint registrations before applying the frozen predecessor predicate, and
 that frozen Architecture-143 pins are checked against historical authority while

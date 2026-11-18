@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -12,6 +13,7 @@ import pytest
 
 from trading_bot.desktop_paper.robinhood_read import AgenticAccountIdentity
 from trading_bot.live_prototype import l43_pre_effect_observation as observer
+from trading_bot.live_prototype import l43_qualification_preflight as qualification
 from trading_bot.live_prototype.alpaca_runtime_signal_provider import (
     RuntimeSignalReason,
     RuntimeSignalSnapshot,
@@ -20,9 +22,13 @@ from trading_bot.live_prototype.alpaca_signal_inputs import SignalDecision
 from trading_bot.live_prototype.configuration import CompletedSignalInputs
 from trading_bot.live_prototype.durable_state import (
     DurableStateStore,
+    IntentKind,
     IntentStatus,
     L43OriginAnchor,
+    ManualCloseBasis,
+    ManualCloseRequired,
     OrderObservation,
+    OrderState,
     OrderStatus,
     ReconciliationSnapshot,
     RuntimeIdentity,
@@ -1216,3 +1222,732 @@ def test_observation_blockers_fail_closed_without_effects(
     assert read_l43_state_snapshot(state_path, _origin()[1]) == before
     if scenario == "continuity":
         assert signal.calls == 0
+
+
+def _qualify(
+    dependencies: observer.L43PreEffectDependencies,
+    *,
+    risk: Decimal = Decimal("10.00"),
+):
+    origin, _ = _origin()
+    return qualification._evaluate_qualification(
+        context=qualification._Context(origin=origin, requested_entry_usd=risk),
+        dependencies=dependencies,
+        root=Path("fake-repository"),
+        ancestry_check=lambda _root, _source: True,
+    )
+
+
+def _qualification_snapshot_with_order(
+    snapshot,
+    *,
+    kind: IntentKind,
+    status: IntentStatus,
+    provider_order_id: str | None = "qualification-order",
+):
+    if kind is IntentKind.ENTRY:
+        order = OrderState(
+            kind=kind,
+            intent_id="qualification-entry-intent",
+            requested_dollars=Decimal("10.00"),
+            provider_order_id=provider_order_id,
+            status=status,
+            cumulative_quantity=(
+                Decimal("0.1") if status is IntentStatus.PARTIAL else Decimal("0")
+            ),
+            cumulative_notional=(
+                Decimal("2") if status is IntentStatus.PARTIAL else Decimal("0")
+            ),
+            working_remainder=Decimal("0.4")
+            if status is IntentStatus.PARTIAL
+            else Decimal("0"),
+        )
+        state = replace(snapshot.state, entry=order)
+    else:
+        order = OrderState(
+            kind=kind,
+            intent_id="qualification-exit-intent",
+            requested_quantity=Decimal("0.5"),
+            provider_order_id=provider_order_id,
+            status=status,
+            cumulative_quantity=(
+                Decimal("0.1") if status is IntentStatus.PARTIAL else Decimal("0")
+            ),
+            cumulative_notional=(
+                Decimal("2") if status is IntentStatus.PARTIAL else Decimal("0")
+            ),
+            working_remainder=Decimal("0.4")
+            if status is IntentStatus.PARTIAL
+            else Decimal("0.5"),
+        )
+        state = replace(snapshot.state, exit=order)
+    return replace(
+        snapshot,
+        state=state,
+        sell_review_pending=state.sell_review_pending,
+        manual_close_required=state.manual_close_required,
+        manual_follow_up_required=state.manual_follow_up_required,
+    )
+
+
+def test_q1_flat_buy_returns_sanitized_challenge_without_effects(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    state_bytes = state_path.read_bytes()
+
+    result = _qualify(dependencies)
+    repeated = _qualify(dependencies)
+
+    assert (
+        result["outcome"]
+        == qualification.QualificationOutcome.READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW
+    )
+    assert result["status"] == "PASS"
+    assert result["stage"] == "ENTRY_PLACEMENT"
+    assert result["challenge_sha256"] and len(result["challenge_sha256"]) == 64
+    assert result["account_fingerprint"] == _ACCOUNT.fingerprint
+    assert result["provider_call_counts"]["robinhood_reads"] == 3
+    assert result["provider_call_counts"]["credential_reads"] is None
+    assert all(value == 0 for value in result["effect_counters"].values())
+    assert qualification._is_sanitized_result(result)
+    assert _ACCOUNT_NUMBER not in json.dumps(result)
+    assert _ORDER_ID not in json.dumps(result)
+    assert state_path.read_bytes() == state_bytes
+    assert repeated["challenge_sha256"] == result["challenge_sha256"]
+    assert len(read.calls) == 6
+    assert signal.calls == 2
+
+
+@pytest.mark.parametrize("decision", (SignalDecision.HOLD, SignalDecision.SELL))
+def test_q1_flat_non_buy_is_no_action_without_challenge(tmp_path: Path, decision):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=decision,
+    )
+
+    result = _qualify(dependencies)
+
+    assert result["status"] == "PASS"
+    assert result["outcome"] == "NO_ACTION_SIGNAL"
+    assert result["challenge_sha256"] is None
+    assert result["stage"] is None
+    assert qualification._is_sanitized_result(result)
+
+
+@pytest.mark.parametrize(
+    "risk",
+    (Decimal("0"), Decimal("-0.01"), Decimal("10.01"), Decimal("1.001")),
+)
+def test_q1_invalid_entry_risk_blocks_before_provider_reads(tmp_path: Path, risk):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+
+    result = _qualify(dependencies, risk=risk)
+
+    assert result["outcome"] == "BLOCKED"
+    assert "ENTRY_RISK_INVALID" in result["reason_codes"]
+    assert result["provider_call_counts"]["robinhood_reads"] == 0
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+@pytest.mark.parametrize(
+    ("kind", "status"),
+    (
+        (IntentKind.ENTRY, IntentStatus.WORKING),
+        (IntentKind.ENTRY, IntentStatus.PARTIAL),
+        (IntentKind.EXIT, IntentStatus.WORKING),
+        (IntentKind.EXIT, IntentStatus.PARTIAL),
+    ),
+)
+def test_q1_bound_pending_orders_return_settlement_required_without_reads(
+    tmp_path: Path,
+    kind: IntentKind,
+    status: IntentStatus,
+):
+    state_path, _ = _state_path(
+        tmp_path,
+        owned=Decimal("0.5") if kind is IntentKind.EXIT else None,
+    )
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    base = read_l43_state_snapshot(state_path, _origin()[1])
+    pending = _qualification_snapshot_with_order(base, kind=kind, status=status)
+    dependencies = replace(dependencies, state_snapshot_reader=lambda: pending)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "PENDING_SETTLEMENT_REQUIRED"
+    assert result["status"] == "BLOCKED"
+    assert result["provider_call_counts"]["robinhood_reads"] == 0
+    assert read.calls == []
+    assert signal.calls == 0
+    assert result["challenge_sha256"] is None
+
+
+def test_q1_unresolved_order_precedes_pending_classification(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    base = read_l43_state_snapshot(state_path, _origin()[1])
+    pending = _qualification_snapshot_with_order(
+        base,
+        kind=IntentKind.ENTRY,
+        status=IntentStatus.WORKING,
+    )
+    unknown_exit = OrderState(
+        kind=IntentKind.EXIT,
+        intent_id="ambiguous-exit-intent",
+        requested_quantity=Decimal("0.5"),
+        status=IntentStatus.UNKNOWN,
+    )
+    mixed = replace(pending, state=replace(pending.state, exit=unknown_exit))
+    dependencies = replace(dependencies, state_snapshot_reader=lambda: mixed)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["reason_codes"] == ("UNRESOLVED_EFFECT",)
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+def test_q1_pending_preflight_requires_accepted_source_continuity(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        authority_passed=False,
+    )
+    base = read_l43_state_snapshot(state_path, _origin()[1])
+    pending = _qualification_snapshot_with_order(
+        base,
+        kind=IntentKind.ENTRY,
+        status=IntentStatus.WORKING,
+    )
+    dependencies = replace(dependencies, state_snapshot_reader=lambda: pending)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["reason_codes"] == ("CONTINUITY_UNPROVEN",)
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+def test_q1_pending_remains_typed_without_market_or_provider_reads(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=datetime(2026, 11, 10, 22, 0, tzinfo=UTC),
+        decision=SignalDecision.BUY,
+    )
+    base = read_l43_state_snapshot(state_path, _origin()[1])
+    pending = _qualification_snapshot_with_order(
+        base,
+        kind=IntentKind.ENTRY,
+        status=IntentStatus.PARTIAL,
+    )
+
+    class BrokenSignal:
+        calls = 0
+
+        def snapshot(self, _as_of):
+            self.calls += 1
+            raise RuntimeError("provider unavailable")
+
+    broken = BrokenSignal()
+    dependencies = replace(
+        dependencies,
+        state_snapshot_reader=lambda: pending,
+        signal_provider_builder=lambda: broken,
+    )
+    before = state_path.read_bytes()
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "PENDING_SETTLEMENT_REQUIRED"
+    assert result["provider_call_counts"]["robinhood_reads"] == 0
+    assert read.calls == []
+    assert broken.calls == 0
+    assert state_path.read_bytes() == before
+
+
+def test_q1_manual_close_state_is_typed_and_read_only(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    base = read_l43_state_snapshot(state_path, _origin()[1])
+    manual_close = ManualCloseRequired(
+        trigger=ManualCloseTrigger.UNSUPPORTED_EXACT_RESIDUAL,
+        exact_residual_quantity=Decimal("0.5"),
+        basis=ManualCloseBasis.CONFIRMED_RECONCILED_RESIDUAL,
+        effect_evidence_sha256="d" * 64,
+    )
+    state = replace(base.state, manual_close=manual_close)
+    snapshot = replace(
+        base,
+        state=state,
+        manual_close_required=True,
+        manual_follow_up_required=True,
+    )
+    dependencies = replace(dependencies, state_snapshot_reader=lambda: snapshot)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "MANUAL_CLOSE_REQUIRED"
+    assert result["status"] == "BLOCKED"
+    assert result["challenge_sha256"] is None
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+def test_q1_consumed_entry_never_becomes_no_action_or_ready(tmp_path: Path):
+    state_path, _ = _state_path(
+        tmp_path,
+        terminal_entry_status=IntentStatus.CANCELED,
+    )
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.HOLD,
+        order_rows=[_canceled_zero_fill_order()],
+    )
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["reason_codes"] == ("ENTRY_ALREADY_CONSUMED",)
+    assert result["challenge_sha256"] is None
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+def test_q1_state_drift_after_observation_blocks_and_strips_plan(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    original_reader = dependencies.state_snapshot_reader
+    reads = 0
+
+    def changing_reader():
+        nonlocal reads
+        reads += 1
+        snapshot = original_reader()
+        if reads != 4:
+            return snapshot
+        state = replace(
+            snapshot.state,
+            last_sequence=snapshot.last_sequence + 1,
+            journal_hash="e" * 64,
+        )
+        return replace(
+            snapshot,
+            state=state,
+            last_sequence=state.last_sequence,
+            journal_sha256=state.journal_hash,
+        )
+
+    dependencies = replace(dependencies, state_snapshot_reader=changing_reader)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["reason_codes"] == ("STATE_TAIL_CHANGED",)
+    assert result["plan_binding_digest"] is None
+    assert result["challenge_sha256"] is None
+
+
+def test_q1_challenge_is_stable_for_decimal_scale_and_binds_request(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    whole = _qualify(dependencies, risk=Decimal("10"))
+    scaled = _qualify(dependencies, risk=Decimal("10.00"))
+    lower = _qualify(dependencies, risk=Decimal("9.99"))
+    alternate_source = L43SourceIdentity("6" * 40, "7" * 40)
+    source_result = _qualify(
+        replace(dependencies, source_reader=lambda: alternate_source)
+    )
+    alternate_root = tmp_path / "alternate-state"
+    alternate_root.mkdir()
+    alternate_state_path, _ = _state_path(
+        alternate_root,
+        reconcile_initial=True,
+    )
+    alternate_state, _, _, _ = _dependencies(
+        state_path=alternate_state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    state_result = _qualify(alternate_state)
+
+    assert (
+        whole["outcome"]
+        == scaled["outcome"]
+        == "READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW"
+    )
+    assert whole["challenge_sha256"] == scaled["challenge_sha256"]
+    assert lower["outcome"] == "READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW"
+    assert lower["challenge_sha256"] != whole["challenge_sha256"]
+    assert source_result["outcome"] == "READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW"
+    assert state_result["outcome"] == "READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW"
+    assert source_result["challenge_sha256"] != whole["challenge_sha256"]
+    assert state_result["challenge_sha256"] != whole["challenge_sha256"]
+
+
+@pytest.mark.parametrize("drift", ("config", "binding"))
+def test_q1_source_and_runtime_binding_drift_fail_closed(tmp_path: Path, drift: str):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    origin, anchor = _origin()
+    runtime = replace(
+        origin.runtime_identity,
+        **{f"{drift}_digest": "f" * 64},
+    )
+    alternate_origin = replace(origin, runtime_identity=runtime)
+    alternate_anchor = replace(anchor, runtime_identity=runtime)
+    base = read_l43_state_snapshot(state_path, anchor)
+    state = replace(
+        base.state,
+        identity=runtime,
+        l43_origin=alternate_anchor,
+    )
+    snapshot = replace(
+        base,
+        origin=alternate_anchor,
+        state=state,
+    )
+    dependencies = replace(
+        dependencies,
+        origin=alternate_origin,
+        state_snapshot_reader=lambda: snapshot,
+    )
+    context = qualification._Context(
+        origin=alternate_origin,
+        requested_entry_usd=Decimal("10.00"),
+    )
+
+    result = qualification._evaluate_qualification(
+        context=context,
+        dependencies=dependencies,
+        root=Path("fake-repository"),
+        ancestry_check=lambda _root, _source: True,
+    )
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["challenge_sha256"] is None
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+def test_q1_source_drift_during_observation_blocks_challenge(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    calls = 0
+    changed = L43SourceIdentity("6" * 40, "7" * 40)
+
+    def changing_source():
+        nonlocal calls
+        calls += 1
+        return _SOURCE if calls <= 2 else changed
+
+    dependencies = replace(dependencies, source_reader=changing_source)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert "SOURCE_CHANGED" in result["reason_codes"]
+    assert result["challenge_sha256"] is None
+    assert len(read.calls) == 3
+    assert signal.calls == 1
+
+
+def test_q1_source_authority_and_rhc4_ancestry_fail_before_reads(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        authority_passed=False,
+    )
+    result = _qualify(dependencies)
+    assert result["outcome"] == "BLOCKED"
+    assert read.calls == []
+    assert signal.calls == 0
+
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    context = qualification._Context(
+        origin=_origin()[0],
+        requested_entry_usd=Decimal("10.00"),
+    )
+    rejected = qualification._evaluate_qualification(
+        context=context,
+        dependencies=dependencies,
+        root=Path("fake-repository"),
+        ancestry_check=lambda _root, _source: False,
+    )
+    assert rejected["reason_codes"] == ("RHC4_C2_ANCESTRY_UNPROVEN",)
+    assert read.calls == []
+    assert signal.calls == 0
+
+
+@pytest.mark.parametrize(
+    "scenario", ("account_mismatch", "manual_position", "scope_missing")
+)
+def test_q1_account_position_and_scope_mismatches_block(tmp_path: Path, scenario: str):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    options: dict[str, object] = {}
+    if scenario == "account_mismatch":
+        options["account_number"] = "712345678901"
+    elif scenario == "manual_position":
+        options["owned"] = Decimal("0.5")
+    else:
+        options["scope_proven"] = False
+    dependencies, _, _, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        **options,
+    )
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["challenge_sha256"] is None
+
+
+@pytest.mark.parametrize("scenario", ("closed_session", "stale_signal"))
+def test_q1_closed_session_and_stale_signal_block(tmp_path: Path, scenario: str):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    options: dict[str, object] = {}
+    as_of = _NOW
+    if scenario == "closed_session":
+        as_of = datetime(2026, 11, 10, 22, 0, tzinfo=UTC)
+    else:
+        options["signal_offset"] = timedelta(minutes=3)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=as_of,
+        decision=SignalDecision.BUY,
+        **options,
+    )
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert result["challenge_sha256"] is None
+    expected_reason = (
+        "SESSION_UNPROVEN" if scenario == "closed_session" else "SIGNAL_STALE"
+    )
+    assert expected_reason in result["reason_codes"]
+    assert signal.calls == 1
+    assert len(read.calls) <= 3
+
+
+@pytest.mark.parametrize(
+    "failure", ("account", "positions", "orders", "pagination", "alpaca")
+)
+def test_q1_read_failures_are_sanitized_and_not_retried(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure: str,
+):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, signal, _ = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+    )
+    calls: list[str] = []
+
+    def fail_accounts():
+        calls.append("account")
+        read.calls.append(("get_accounts", {}))
+        raise RuntimeError("raw-provider-secret")
+
+    def fail_positions(arguments):
+        calls.append("positions")
+        read.calls.append(("get_equity_positions", dict(arguments)))
+        raise RuntimeError("raw-provider-secret")
+
+    def fail_orders(arguments):
+        calls.append("orders")
+        read.calls.append(("get_equity_orders", dict(arguments)))
+        raise RuntimeError("raw-provider-secret")
+
+    if failure == "account":
+        monkeypatch.setattr(read, "get_accounts", fail_accounts)
+    elif failure == "positions":
+        monkeypatch.setattr(read, "get_equity_positions", fail_positions)
+    elif failure == "orders":
+        monkeypatch.setattr(read, "get_equity_orders", fail_orders)
+    elif failure == "pagination":
+        dependencies, read, signal, _ = _dependencies(
+            state_path=state_path,
+            as_of=_NOW,
+            decision=SignalDecision.BUY,
+            order_page_cursors=("repeated-page", "repeated-page"),
+        )
+    else:
+
+        class BrokenSignal:
+            calls = 0
+
+            def snapshot(self, _as_of):
+                self.calls += 1
+                raise RuntimeError("raw-provider-secret")
+
+        broken = BrokenSignal()
+        dependencies = replace(dependencies, signal_provider_builder=lambda: broken)
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "BLOCKED"
+    assert "raw-provider-secret" not in json.dumps(result)
+    assert result["challenge_sha256"] is None
+    if failure == "pagination":
+        page_calls = [name for name, _ in read.calls if name == "get_equity_orders"]
+        assert len(page_calls) == 2
+    elif failure == "alpaca":
+        assert broken.calls == 1
+        assert result["provider_call_counts"]["alpaca_provider_calls"] is None
+        assert result["provider_call_counts"]["credential_reads"] is None
+    else:
+        assert calls == [failure]
+
+
+def test_q1_successful_multpage_order_read_stays_bounded(tmp_path: Path):
+    state_path, _ = _state_path(tmp_path, reconcile_initial=False)
+    dependencies, read, _, scope = _dependencies(
+        state_path=state_path,
+        as_of=_NOW,
+        decision=SignalDecision.BUY,
+        order_page_cursors=("page-2", None),
+    )
+
+    result = _qualify(dependencies)
+
+    assert result["outcome"] == "READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW"
+    assert result["provider_call_counts"]["robinhood_reads"] == 4
+    assert result["provider_call_counts"]["robinhood_pages"] == 3
+    assert sum(name == "get_equity_orders" for name, _ in read.calls) == 2
+    assert scope.calls[0][1:] == (2, 0, True)
+
+
+def test_q1_source_boundary_has_no_effect_or_authorization_imports():
+    import ast
+    import inspect
+
+    tree = ast.parse(inspect.getsource(qualification))
+    imported = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+    imported.update(
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+    )
+    forbidden = {
+        "trading_bot.live_prototype.l43_effect_operator",
+        "trading_bot.live_prototype.l43_runtime",
+    }
+    source = inspect.getsource(qualification)
+    assert imported.isdisjoint(forbidden)
+    assert "L43StageAuthorization" not in source
+    assert "L43EffectOperator" not in source
+    assert "review_equity_order" not in source
+    assert "place_equity_order" not in source
+    assert "cancel_equity_order" not in source
+    assert qualification._run_protected_preflight.__code__.co_argcount == 0
+
+
+@pytest.mark.parametrize(
+    ("accepted_tree", "ancestor_returncode", "expected"),
+    (
+        (qualification.RHC4_C2_TREE, 0, True),
+        (qualification.RHC4_C2_TREE, 1, False),
+        ("0" * 40, 0, False),
+    ),
+)
+def test_q1_rhc4_ancestor_proof_binds_pinned_commit_tree(
+    monkeypatch: pytest.MonkeyPatch,
+    accepted_tree: str,
+    ancestor_returncode: int,
+    expected: bool,
+):
+    from types import SimpleNamespace
+
+    git_calls: list[tuple[object, ...]] = []
+    merge_calls: list[tuple[object, ...]] = []
+
+    def fake_git_text(_root, *arguments):
+        git_calls.append(arguments)
+        return accepted_tree
+
+    def fake_run(arguments, **_kwargs):
+        merge_calls.append(tuple(arguments))
+        return SimpleNamespace(returncode=ancestor_returncode)
+
+    monkeypatch.setattr(qualification, "_git_text", fake_git_text)
+    monkeypatch.setattr(qualification.subprocess, "run", fake_run)
+
+    result = qualification._has_accepted_rhc4_ancestor(Path("fake-root"), _SOURCE)
+
+    assert result is expected
+    assert git_calls == [("rev-parse", f"{qualification.RHC4_C2_HEAD}^{{tree}}")]
+    if accepted_tree == qualification.RHC4_C2_TREE:
+        assert merge_calls == [
+            (
+                "git",
+                "-C",
+                "fake-root",
+                "merge-base",
+                "--is-ancestor",
+                qualification.RHC4_C2_HEAD,
+                _SOURCE.source_head,
+            )
+        ]
+    else:
+        assert merge_calls == []

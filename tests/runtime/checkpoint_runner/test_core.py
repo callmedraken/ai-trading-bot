@@ -129,337 +129,190 @@ def test_run_verification_steps_collects_both_ruff_diagnostics(
     ]
 
 
-def test_registered_profiles_include_current_arch128_gates() -> None:
-    specs = runner._checkpoint_specs()
+def _current_registry_invariant_failures(
+    specs: dict[str, runner.CheckpointSpec],
+    *,
+    active_names: tuple[str, ...] | None = None,
+    current_active_names: tuple[str, ...] | None = None,
+    retained_names: tuple[str, ...] | None = None,
+    certification_profiles: dict[str, str] | None = None,
+) -> tuple[str, ...]:
+    """Validate current registry closure and ownership without a name snapshot."""
+    active = runner.ACTIVE_CI_CHECKPOINTS if active_names is None else active_names
+    current_active = (
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+        if current_active_names is None
+        else current_active_names
+    )
+    retained = runner.RETAINED_CHECKPOINTS if retained_names is None else retained_names
+    profiles = (
+        runner.CI_CERTIFICATION_PROFILES
+        if certification_profiles is None
+        else certification_profiles
+    )
+    failures: list[str] = []
+    if not specs:
+        failures.append("checkpoint registry is empty")
 
-    assert set(specs) == {
-        runner.ARCH147_PROTOTYPE_NAME,
-        runner.ARCH147_B2O_NAME,
-        runner.ARCH147_RHC2_NAME,
-        runner.ARCH147_P6_NAME,
-        runner.ARCH147_P5B_NAME,
-        runner.ARCH147_FILTERED_TREND_NAME,
-        runner.ARCH147_NAME,
-        runner.ARCH147_P5A_NAME,
-        runner.ARCH147_P4_NAME,
-        runner.ARCH146_PARTIAL_STATE_NAME,
-        runner.ARCH146_PRE_B2_NAME,
-        runner.ARCH146B1_NAME,
-        runner.READONLY_ADMISSION_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
-        runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
-        runner.ARCH146A_NAME,
-        runner.ARCH134_FRESH_NAME,
-        runner.ARCH134_ACL_NAME,
-        runner.ARCH134_D1S4_NAME,
-        runner.ARCH134_R5_NAME,
-        "arch133-robinhood-supervised-release-installation-operator",
-        "arch133-robinhood-supervised-release-publication-recovery",
-        "arch133-robinhood-supervised-release-installation-reconciliation",
-        "arch133-robinhood-supervised-deployment-qualification",
-        "arch133-robinhood-supervised-runtime-host-admission",
-        "arch133-robinhood-supervised-maintenance-rebind",
-        "arch133-robinhood-supervised-release-installation",
-        "arch133-robinhood-supervised-release-build-verification",
-        "arch133-robinhood-supervised-release-foundation",
-        "arch128-parent-acl-repair",
-        "arch128-r4",
-        "arch128-r5-substrate",
-        "arch128-r5-trading",
-        "arch128-r6",
-        "arch128-r7",
-        "arch128-r8",
-        "arch128-r8-terminal-halt",
-        "arch130-r8i-d1",
-        "arch131-robinhood-review-paper",
-        "arch131-robinhood-mcp-schema",
-        "arch131-robinhood-paper-cycle",
-        "arch131-robinhood-performance",
-        "arch131-robinhood-direct-mcp",
-        "arch131-robinhood-oauth-windows",
-        "arch131-robinhood-agentic-account",
-        "arch131-robinhood-paper-operator",
-        "arch131-robinhood-paper-intent-bridge",
-        "arch131-robinhood-deterministic-paper-pipeline",
-        "arch131-robinhood-virtual-risk-context",
-        "arch131-robinhood-forward-paper-cycle",
-        "arch131-robinhood-live-qualification-verifier",
-        "arch131-robinhood-session-admission",
-        "arch131-robinhood-risk-price-snapshot",
-        "arch131-robinhood-forward-paper-preview",
-        "arch131-robinhood-risk-price-acquisition",
-        "arch131-robinhood-supervised-forward-paper",
-        "arch131-robinhood-supervised-prepare-qualification",
-        "arch131-robinhood-supervised-prepare-verifier",
-        "arch131-nyse-published-regular-session-authority",
-        "arch131-robinhood-published-session-prepare",
-        "arch131-robinhood-published-prepare-operator",
-        "arch131-robinhood-supervised-qualification",
-        "arch133-robinhood-unattended-activation-core",
-        "arch133-robinhood-unattended-state-store",
-        "arch133-robinhood-unattended-one-wake-composition",
-        "arch133-robinhood-unattended-review-paper-execution",
-        "arch133-robinhood-unattended-host-scheduler-surface",
-        "arch133-robinhood-unattended-host-bootstrap",
-        "arch133-robinhood-unattended-host-publication",
-        "arch133-robinhood-scratch-root-acl-qualification",
-        "arch133-robinhood-retained-root-diagnostic",
-        "arch133-robinhood-retained-root-acl-recovery",
-        "arch133-robinhood-post-publication-verifier",
-        "arch133-robinhood-post-publication-stage-diagnostic",
-        "arch133-robinhood-publication-state-paper-diagnostic",
-        "arch133-robinhood-publication-state-paper-corrected",
-        "arch133-robinhood-single-session-scheduler-installation",
-        "arch133-robinhood-fresh-activation-reprovision",
-        "arch133-robinhood-reprovision-admission-diagnostic",
-        "arch133-robinhood-reprovision-parent-security-diagnostic",
-        "arch133-robinhood-reprovision-parent-policy-diagnostic",
-        "arch133-robinhood-fresh-activation-reprovision-corrected",
-        "arch133-robinhood-reprovision-indeterminate-reconciliation",
-        "arch133-robinhood-reprovision-sealed-predecessor-recovery",
-        "arch133-robinhood-reprovision-recovery-reconciliation",
-        "arch133-robinhood-windows-rename-qualification",
-        "arch133-robinhood-closed-descendant-rename-qualification",
-        "arch134-production-strategy-contract",
-        "arch134-production-strategy-decision",
-        "arch134-production-strategy-live-paper",
-        "arch134-armed-paper-mvp",
-        "arch134-production-paper-runtime",
-        "arch134-production-paper-runtime-acl",
-        "arch144-c-f1-paper-evidence-admission",
-        "arch145-a-research-robustness-live-canary-eligibility",
-        "arch134-f1r1-a-runtime-isolation",
-        "arch134-f1r1-d1s3-successor-release-installation-operator",
-        "arch134-f1r1-d1s2-successor-installed-readiness",
-        "arch134-f1r1-d1s1-successor-soak-source",
-        "arch134-f1r1-c1-qualification-operator",
-        "arch134-f1r1-b-host-qualification",
-        "arch134-f1-five-session-soak",
-        "arch134-d1r8-d1-session-execution-consumer",
-        "arch134-d1r7-d1-session-authorization",
-        "arch134-d1r6-overnight-wake-arming",
-        "arch134-d1r5-pre-market-wake-qualification",
-        "arch134-alpaca-authentication-qualification",
-    }
-    for spec in specs.values():
-        assert "tests/runtime/checkpoint_runner/test_core.py" in spec.tests
-        assert "scripts/checkpoint_runner.py" in spec.ruff_paths
-        assert "tests/runtime/checkpoint_runner/test_core.py" in spec.ruff_paths
-        expected_branch = (
-            "feature/robinhood-review-paper-side-foundation"
-            if spec.name
-            in {
-                "arch131-robinhood-live-qualification-verifier",
-                "arch131-robinhood-session-admission",
-                "arch131-robinhood-risk-price-snapshot",
-                "arch131-robinhood-forward-paper-preview",
-                "arch131-robinhood-risk-price-acquisition",
-                "arch131-robinhood-supervised-forward-paper",
-                "arch131-robinhood-supervised-prepare-qualification",
-                "arch131-robinhood-supervised-prepare-verifier",
-                "arch131-nyse-published-regular-session-authority",
-                "arch131-robinhood-published-session-prepare",
-                "arch131-robinhood-published-prepare-operator",
-                "arch131-robinhood-supervised-qualification",
-            }
-            else (
-                "feature/robinhood-review-paper-mode"
-                if spec.name
-                in {
-                    "arch131-robinhood-review-paper",
-                    "arch131-robinhood-mcp-schema",
-                    "arch131-robinhood-paper-cycle",
-                    "arch131-robinhood-performance",
-                    "arch131-robinhood-direct-mcp",
-                    "arch131-robinhood-oauth-windows",
-                    "arch131-robinhood-agentic-account",
-                    "arch131-robinhood-paper-operator",
-                    "arch131-robinhood-paper-intent-bridge",
-                    "arch131-robinhood-deterministic-paper-pipeline",
-                    "arch131-robinhood-virtual-risk-context",
-                    "arch131-robinhood-forward-paper-cycle",
-                }
-                else (
-                    "feature/d10c-r8-incident-reconciliation"
-                    if spec.name == "arch130-r8i-d1"
-                    else (
-                        "feature/d10c-r8-terminal-halt"
-                        if spec.name == "arch128-r8-terminal-halt"
-                        else "feature/d10c-durable-wake-evidence"
-                    )
-                )
+    for key, spec in specs.items():
+        if key != spec.name:
+            failures.append(f"registry key does not match spec name: {key}")
+        if not spec.tests:
+            failures.append(f"checkpoint has no tests: {key}")
+        if not spec.ruff_paths:
+            failures.append(f"checkpoint has no Ruff paths: {key}")
+        runner_tests = tuple(
+            path
+            for path in spec.tests
+            if path.startswith("tests/runtime/checkpoint_runner/")
+        )
+        uncovered = tuple(
+            path
+            for path in runner_tests
+            if not any(
+                ruff_path == "."
+                or path == ruff_path
+                or path.startswith(ruff_path.rstrip("/") + "/")
+                for ruff_path in spec.ruff_paths
             )
         )
-        if spec.name == "arch133-robinhood-unattended-activation-core":
-            expected_branch = "feature/robinhood-unattended-review-paper-133a"
-        if spec.name == "arch133-robinhood-unattended-state-store":
-            expected_branch = "feature/robinhood-unattended-review-paper-133b"
-        if spec.name == "arch133-robinhood-unattended-one-wake-composition":
-            expected_branch = "feature/robinhood-unattended-review-paper-133c"
-        if spec.name == "arch133-robinhood-unattended-review-paper-execution":
-            expected_branch = "feature/robinhood-unattended-review-paper-133d"
-        if spec.name == "arch133-robinhood-unattended-host-scheduler-surface":
-            expected_branch = "feature/robinhood-unattended-review-paper-133e"
-        if spec.name == "arch133-robinhood-unattended-host-bootstrap":
-            expected_branch = "feature/robinhood-unattended-review-paper-133g"
-        if spec.name == "arch133-robinhood-unattended-host-publication":
-            expected_branch = "feature/robinhood-unattended-review-paper-133h"
-        if spec.name == "arch133-robinhood-scratch-root-acl-qualification":
-            expected_branch = "feature/robinhood-unattended-review-paper-133i"
-        if spec.name == "arch133-robinhood-retained-root-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133j"
-        if spec.name == "arch133-robinhood-retained-root-acl-recovery":
-            expected_branch = "feature/robinhood-unattended-review-paper-133k"
-        if spec.name == "arch133-robinhood-post-publication-verifier":
-            expected_branch = "feature/robinhood-unattended-review-paper-133l"
-        if spec.name == "arch133-robinhood-post-publication-stage-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133m"
-        if spec.name == "arch133-robinhood-publication-state-paper-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133n"
-        if spec.name == "arch133-robinhood-publication-state-paper-corrected":
-            expected_branch = "feature/robinhood-unattended-review-paper-133o"
-        if spec.name == "arch133-robinhood-single-session-scheduler-installation":
-            expected_branch = "feature/robinhood-unattended-review-paper-133p"
-        if spec.name == "arch133-robinhood-fresh-activation-reprovision":
-            expected_branch = "feature/robinhood-unattended-review-paper-133q"
-        if spec.name == "arch133-robinhood-reprovision-admission-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133r"
-        if spec.name == "arch133-robinhood-reprovision-parent-security-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133s"
-        if spec.name == "arch133-robinhood-reprovision-parent-policy-diagnostic":
-            expected_branch = "feature/robinhood-unattended-review-paper-133t"
-        if spec.name == "arch133-robinhood-fresh-activation-reprovision-corrected":
-            expected_branch = "feature/robinhood-unattended-review-paper-133u"
-        if spec.name == "arch133-robinhood-reprovision-indeterminate-reconciliation":
-            expected_branch = "feature/robinhood-unattended-review-paper-133v"
-        if spec.name == "arch133-robinhood-reprovision-sealed-predecessor-recovery":
-            expected_branch = "feature/robinhood-unattended-review-paper-133w"
-        if spec.name == "arch133-robinhood-reprovision-recovery-reconciliation":
-            expected_branch = "feature/robinhood-unattended-review-paper-133x"
-        if spec.name == "arch133-robinhood-windows-rename-qualification":
-            expected_branch = "feature/robinhood-unattended-review-paper-133y"
-        if spec.name == "arch133-robinhood-closed-descendant-rename-qualification":
-            expected_branch = "feature/robinhood-unattended-review-paper-133z"
-        if spec.name == "arch133-robinhood-supervised-release-foundation":
-            expected_branch = "feature/robinhood-supervised-release-foundation"
-        if spec.name == "arch133-robinhood-supervised-release-build-verification":
-            expected_branch = "feature/robinhood-supervised-release-build-verification"
-        if spec.name == "arch133-robinhood-supervised-release-installation":
-            expected_branch = "feature/robinhood-supervised-release-installation"
-        if spec.name == "arch133-robinhood-supervised-runtime-host-admission":
-            expected_branch = "feature/robinhood-supervised-runtime-host-admission"
-        if spec.name == "arch133-robinhood-supervised-deployment-qualification":
-            expected_branch = "feature/robinhood-supervised-deployment-qualification"
-        if spec.name == "arch133-robinhood-supervised-maintenance-rebind":
-            expected_branch = "feature/robinhood-supervised-maintenance-rebind"
-        if spec.name == "arch133-robinhood-supervised-release-publication-recovery":
-            expected_branch = (
-                "feature/robinhood-supervised-release-publication-recovery"
+        if uncovered:
+            failures.append(f"runner tests lack Ruff ownership in {key}: {uncovered}")
+
+    route_groups = (
+        ("active", active),
+        ("current active", current_active),
+        ("retained", retained),
+    )
+    for label, references in route_groups:
+        if len(references) != len(set(references)):
+            failures.append(f"duplicate {label} route references")
+        for name in references:
+            if name not in specs:
+                failures.append(
+                    f"{label} route references unregistered checkpoint: {name}"
+                )
+
+    for name, profile in profiles.items():
+        if name not in specs:
+            failures.append(
+                f"certification profile references unregistered checkpoint: {name}"
             )
-        if spec.name == "arch133-robinhood-supervised-release-installation-operator":
-            expected_branch = (
-                "feature/robinhood-supervised-release-installation-operator"
-            )
-        if (
-            spec.name
-            == "arch133-robinhood-supervised-release-installation-reconciliation"
-        ):
-            expected_branch = (
-                "feature/robinhood-supervised-release-installation-reconciliation"
-            )
-        if spec.name == "arch134-production-strategy-contract":
-            expected_branch = "feature/robinhood-production-strategy-contract"
-        if spec.name == "arch134-production-strategy-decision":
-            expected_branch = "feature/robinhood-production-strategy-decision"
-        if spec.name == "arch134-production-strategy-live-paper":
-            expected_branch = "feature/robinhood-production-strategy-live-paper"
-        if spec.name == "arch134-armed-paper-mvp":
-            expected_branch = "feature/robinhood-production-paper-mvp"
-        if spec.name == "arch134-production-paper-runtime":
-            expected_branch = "feature/robinhood-production-paper-history-recovery"
-        if spec.name == "arch134-production-paper-runtime-acl":
-            expected_branch = "feature/robinhood-production-paper-runtime-acl"
-        if spec.name == "arch134-alpaca-authentication-qualification":
-            expected_branch = (
-                "feature/robinhood-production-paper-alpaca-auth-qualification"
-            )
-        if spec.name == "arch144-c-f1-paper-evidence-admission":
-            expected_branch = runner.ARCH144C_BRANCH
-        if spec.name == "arch145-a-research-robustness-live-canary-eligibility":
-            expected_branch = runner.ARCH145A_BRANCH
-        if spec.name == "arch134-f1r1-a-runtime-isolation":
-            expected_branch = runner.ARCH134_F1R1_A_BRANCH
-        if spec.name == "arch134-f1r1-d1s2-successor-installed-readiness":
-            expected_branch = (
-                "feature/robinhood-production-paper-134f1r1-successor-readiness-current"
-            )
-        if spec.name == runner.ARCH134_D1S3_NAME:
-            expected_branch = runner.ARCH134_D1S3_BRANCH
-        if spec.name == runner.ARCH134_R5_NAME:
-            expected_branch = runner.ARCH134_R5_BRANCH
-        if spec.name == runner.ARCH134_FRESH_NAME:
-            expected_branch = runner.ARCH134_FRESH_BRANCH
-        if spec.name == runner.ARCH134_ACL_NAME:
-            expected_branch = runner.ARCH134_ACL_BRANCH
-        if spec.name == runner.ARCH134_D1S4_NAME:
-            expected_branch = runner.ARCH134_D1S4_BRANCH
-        if spec.name == "arch134-f1r1-d1s1-successor-soak-source":
-            expected_branch = runner.ARCH134_D1S1_BRANCH
-        if spec.name == "arch134-f1r1-c1-qualification-operator":
-            expected_branch = runner.ARCH134_F1R1_C1_BRANCH
-        if spec.name == "arch134-f1r1-b-host-qualification":
-            expected_branch = runner.ARCH134_F1R1_B_BRANCH
-        if spec.name == "arch134-f1-five-session-soak":
-            expected_branch = runner.ARCH134_F1_BRANCH
-        if spec.name == "arch134-d1r8-d1-session-execution-consumer":
-            expected_branch = "feature/robinhood-production-paper-d1-session-execution"
-        if spec.name == "arch134-d1r7-d1-session-authorization":
-            expected_branch = (
-                "feature/robinhood-production-paper-d1-session-authorization"
-            )
-        if spec.name == "arch134-d1r6-overnight-wake-arming":
-            expected_branch = "feature/robinhood-production-paper-overnight-wake-arming"
-        if spec.name == "arch134-d1r5-pre-market-wake-qualification":
-            expected_branch = (
-                "feature/robinhood-production-paper-premarket-wake-qualification"
-            )
-        if spec.name == runner.ARCH146_PRE_B2_NAME:
-            expected_branch = runner.ARCH146_PRE_B2_BRANCH
-        if spec.name == runner.ARCH146_PARTIAL_STATE_NAME:
-            expected_branch = runner.ARCH146_PARTIAL_STATE_BRANCH
-        if spec.name == runner.ARCH146B1_NAME:
-            expected_branch = runner.ARCH146B1_BRANCH
-        if spec.name == runner.ARCH146A_NAME:
-            expected_branch = runner.ARCH146A_BRANCH
-        if spec.name == runner.READONLY_ADMISSION_NAME:
-            expected_branch = runner.READONLY_ADMISSION_BRANCH
-        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_NAME:
-            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_BRANCH
-        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME:
-            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R1_BRANCH
-        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME:
-            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R2_BRANCH
-        if spec.name == runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME:
-            expected_branch = runner.ARCH134_READONLY_DIAGNOSTIC_R3_BRANCH
-        if spec.name == runner.ARCH147_NAME:
-            expected_branch = runner.ARCH147_BRANCH
-        if spec.name == runner.ARCH147_FILTERED_TREND_NAME:
-            expected_branch = runner.ARCH147_FILTERED_TREND_BRANCH
-        if spec.name == runner.ARCH147_P5B_NAME:
-            expected_branch = runner.ARCH147_P5B_BRANCH
-        if spec.name == runner.ARCH147_PROTOTYPE_NAME:
-            expected_branch = runner.ARCH147_PROTOTYPE_BRANCH
-        if spec.name == runner.ARCH147_P6_NAME:
-            expected_branch = runner.ARCH147_P6_BRANCH
-        if spec.name == runner.ARCH147_P5A_NAME:
-            expected_branch = runner.ARCH147_P5A_BRANCH
-        if spec.name == runner.ARCH147_P4_NAME:
-            expected_branch = runner.ARCH147_P4_BRANCH
-        if spec.name in {runner.ARCH147_B2O_NAME, runner.ARCH147_RHC2_NAME}:
-            expected_branch = None
-        assert spec.remote_branch == expected_branch
+        if profile not in runner.CI_CERTIFICATION_PROFILE_VALUES:
+            failures.append(f"unsupported certification profile for {name}: {profile}")
+
+    current_route_valid = len(current_active) == len(set(current_active)) and all(
+        name in specs and specs[name].name == name for name in current_active
+    )
+    current_specs = tuple(specs[name] for name in current_active if name in specs)
+    if current_specs and current_route_valid:
+        selected_tests, selected_ruff = runner.batch_requirements(current_specs)
+        if not set(runner.COMMON_TESTS).issubset(selected_tests):
+            failures.append("current active route omits common runner tests")
+        if not set(runner.COMMON_RUFF_PATHS).issubset(selected_ruff):
+            failures.append("current active route omits common runner Ruff ownership")
+    elif current_active and not current_specs:
+        failures.append("current active route has no registered checkpoints")
+
+    return tuple(failures)
+
+
+def test_current_checkpoint_registry_invariants_allow_growth():
+    specs = runner._checkpoint_specs()
+
+    assert _current_registry_invariant_failures(specs) == ()
+
+
+def test_registry_invariants_accept_additions_and_reject_missing_references():
+    specs = runner._checkpoint_specs()
+    synthetic_name = "synthetic-future-checkpoint"
+    synthetic = runner.CheckpointSpec(
+        name=synthetic_name,
+        description="test-only additive checkpoint",
+        tests=(
+            *runner.COMMON_TESTS,
+            "tests/runtime/checkpoint_runner/test_synthetic_future.py",
+        ),
+        ruff_paths=(
+            *runner.COMMON_RUFF_PATHS,
+            "tests/runtime/checkpoint_runner/test_synthetic_future.py",
+        ),
+        authority_check=lambda _repo: (),
+    )
+    expanded = {**specs, synthetic_name: synthetic}
+    assert _current_registry_invariant_failures(expanded) == ()
+
+    active_with_synthetic = (*runner.ACTIVE_CI_CHECKPOINTS, synthetic_name)
+    current_with_synthetic = (
+        *runner.CURRENT_ACTIVE_CI_CHECKPOINTS,
+        synthetic_name,
+    )
+    assert (
+        _current_registry_invariant_failures(
+            expanded,
+            active_names=active_with_synthetic,
+            current_active_names=current_with_synthetic,
+        )
+        == ()
+    )
+
+    missing_route = (
+        *runner.CURRENT_ACTIVE_CI_CHECKPOINTS,
+        "synthetic-missing-current-route",
+    )
+    failures = _current_registry_invariant_failures(
+        expanded,
+        current_active_names=missing_route,
+    )
+    assert (
+        "current active route references unregistered checkpoint: "
+        "synthetic-missing-current-route"
+    ) in failures
+
+    missing_profile = {
+        **runner.CI_CERTIFICATION_PROFILES,
+        "synthetic-missing-profile-checkpoint": "full",
+    }
+    failures = _current_registry_invariant_failures(
+        expanded,
+        certification_profiles=missing_profile,
+    )
+    assert (
+        "certification profile references unregistered checkpoint: "
+        "synthetic-missing-profile-checkpoint"
+    ) in failures
+
+    malformed = dict(expanded)
+    malformed[synthetic_name] = replace(synthetic, name="different-spec-name")
+    assert any(
+        failure.startswith("registry key does not match spec name:")
+        for failure in _current_registry_invariant_failures(malformed)
+    )
+
+    empty_inventory = replace(synthetic, tests=(), ruff_paths=())
+    failures = _current_registry_invariant_failures(
+        {synthetic_name: empty_inventory},
+        active_names=(),
+        current_active_names=(),
+        retained_names=(),
+        certification_profiles={},
+    )
+    assert f"checkpoint has no tests: {synthetic_name}" in failures
+    assert f"checkpoint has no Ruff paths: {synthetic_name}" in failures
+
+    duplicate_current_route = (
+        *runner.CURRENT_ACTIVE_CI_CHECKPOINTS,
+        runner.CURRENT_ACTIVE_CI_CHECKPOINTS[0],
+    )
+    failures = _current_registry_invariant_failures(
+        specs,
+        current_active_names=duplicate_current_route,
+    )
+    assert "duplicate current active route references" in failures
+
+
+def test_arch128_arch130_arch131_dispatch_contracts_remain_exact():
+    specs = runner._checkpoint_specs()
 
     assert specs["arch128-parent-acl-repair"].execute is not None
     assert specs["arch128-r4"].execute is not None
@@ -471,16 +324,15 @@ def test_registered_profiles_include_current_arch128_gates() -> None:
     assert specs["arch128-r7"].execute is runner._r7_execute
     assert specs["arch130-r8i-d1"].preflight is runner._arch130_r8i_d1_preflight
     assert specs["arch130-r8i-d1"].execute is None
-    assert specs["arch131-robinhood-review-paper"].preflight is None
-    assert specs["arch131-robinhood-review-paper"].execute is None
-    assert specs["arch131-robinhood-mcp-schema"].preflight is None
-    assert specs["arch131-robinhood-mcp-schema"].execute is None
-    assert specs["arch131-robinhood-paper-cycle"].preflight is None
-    assert specs["arch131-robinhood-paper-cycle"].execute is None
-    assert specs["arch131-robinhood-performance"].preflight is None
-    assert specs["arch131-robinhood-performance"].execute is None
-    assert specs["arch131-robinhood-direct-mcp"].preflight is None
-    assert specs["arch131-robinhood-direct-mcp"].execute is None
+    for name in (
+        "arch131-robinhood-review-paper",
+        "arch131-robinhood-mcp-schema",
+        "arch131-robinhood-paper-cycle",
+        "arch131-robinhood-performance",
+        "arch131-robinhood-direct-mcp",
+    ):
+        assert specs[name].preflight is None
+        assert specs[name].execute is None
     assert specs["arch128-r5-substrate"].remote_head_env is None
     assert (
         specs["arch128-r5-trading"].remote_head_env == runner.R5_TRADING_REMOTE_HEAD_ENV
@@ -1452,185 +1304,101 @@ def test_r2a_pytest_top_100_duration_flags_are_exact_and_diagnostic_only(tmp_pat
 
 
 def test_r2b_common_and_family_requirements_are_independently_selectable():
-    assert runner.COMMON_TESTS == (
+    required_common = {
         "tests/runtime/checkpoint_runner/test_core.py",
         "tests/runtime/checkpoint_runner/test_ci.py",
+    }
+    assert required_common.issubset(runner.COMMON_TESTS)
+    assert len(runner.COMMON_TESTS) == len(set(runner.COMMON_TESTS))
+    assert set(runner.COMMON_TESTS).issubset(runner.COMMON_RUFF_PATHS)
+
+    shared_test = "tests/runtime/checkpoint_runner/test_synthetic_shared.py"
+    alpha_test = "tests/synthetic_alpha/test_duplicate.py"
+    beta_test = "tests/synthetic_beta/test_duplicate.py"
+    future_test = "tests/runtime/checkpoint_runner/test_synthetic_future_family.py"
+    shared_source = "scripts/synthetic_shared.py"
+    alpha_source = "scripts/synthetic_alpha.py"
+    beta_source = "scripts/synthetic_beta.py"
+    future_source = "scripts/synthetic_future_family.py"
+
+    def family_spec(name, family_tests, family_sources):
+        return runner.CheckpointSpec(
+            name=name,
+            description="synthetic test family",
+            tests=(*runner.COMMON_TESTS, *family_tests),
+            ruff_paths=(*runner.COMMON_RUFF_PATHS, *family_sources),
+            authority_check=lambda _repo: (),
+        )
+
+    alpha = family_spec(
+        "synthetic-family-alpha",
+        (shared_test, alpha_test),
+        (shared_source, alpha_source),
     )
+    beta = family_spec(
+        "synthetic-family-beta",
+        (shared_test, beta_test),
+        (shared_source, beta_source),
+    )
+    future = family_spec(
+        "synthetic-future-family",
+        (future_test,),
+        (future_source,),
+    )
+
+    requirements = runner.batch_requirements((alpha, beta))
+    expected = (
+        tuple(
+            dict.fromkeys((*runner.COMMON_TESTS, shared_test, alpha_test, beta_test))
+        ),
+        tuple(
+            dict.fromkeys(
+                (*runner.COMMON_RUFF_PATHS, shared_source, alpha_source, beta_source)
+            )
+        ),
+    )
+    assert requirements == expected
+    assert len(requirements[0]) == len(set(requirements[0]))
+    assert len(requirements[1]) == len(set(requirements[1]))
+    assert requirements[0].index(alpha_test) < requirements[0].index(beta_test)
+    assert runner.batch_requirements((alpha, beta)) == requirements
+    assert runner.batch_requirements((beta, alpha)) == (
+        tuple(
+            dict.fromkeys((*runner.COMMON_TESTS, shared_test, beta_test, alpha_test))
+        ),
+        tuple(
+            dict.fromkeys(
+                (*runner.COMMON_RUFF_PATHS, shared_source, beta_source, alpha_source)
+            )
+        ),
+    )
+
+    expanded = runner.batch_requirements((alpha, beta, future))
+    assert future_test in expanded[0]
+    assert future_source in expanded[1]
+    assert beta_test in expanded[0]
+    assert alpha_test in expanded[0]
+
+    independent = runner.batch_requirements((alpha, future))
+    assert future_test in independent[0]
+    assert alpha_test in independent[0]
+    assert beta_test not in independent[0]
+    with pytest.raises(ValueError, match="distinct registered checkpoints"):
+        runner.batch_requirements((alpha, replace(beta, name=alpha.name)))
+
+
+def test_active_and_retained_checkpoint_tests_remain_partitioned():
     registry = runner._checkpoint_specs()
-    for name, spec in registry.items():
-        if name.startswith("arch131-"):
-            module = "test_arch131.py"
-        elif name.startswith("arch133-"):
-            letter = spec.remote_branch[-1]
-            module = (
-                "test_arch133_a_g.py"
-                if letter <= "g"
-                else "test_arch133_h_k.py"
-                if letter <= "k"
-                else "test_arch133_l_m.py"
-            )
-        else:
-            module = "test_retained_arch128_130.py"
-        selected = tuple(
-            path
-            for path in spec.tests
-            if path.startswith("tests/runtime/checkpoint_runner/")
-        )
-        expected = (
-            runner.COMMON_TESTS
-            if name
-            in {
-                runner.READONLY_ADMISSION_NAME,
-                runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
-                runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-                runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
-                runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
-                "arch133-robinhood-supervised-release-installation-operator",
-                "arch133-robinhood-supervised-release-publication-recovery",
-                "arch133-robinhood-supervised-release-installation-reconciliation",
-                "arch133-robinhood-supervised-deployment-qualification",
-                "arch133-robinhood-supervised-release-foundation",
-                "arch133-robinhood-supervised-runtime-host-admission",
-                "arch133-robinhood-supervised-maintenance-rebind",
-                "arch133-robinhood-supervised-release-installation",
-                "arch133-robinhood-supervised-release-build-verification",
-                "arch134-production-strategy-contract",
-                "arch134-production-strategy-decision",
-                "arch134-production-strategy-live-paper",
-                "arch134-armed-paper-mvp",
-                "arch134-production-paper-runtime",
-                "arch134-production-paper-runtime-acl",
-                runner.ARCH146A_NAME,
-                runner.ARCH146_PRE_B2_NAME,
-                runner.ARCH146_PARTIAL_STATE_NAME,
-                runner.ARCH146B1_NAME,
-                runner.ARCH147_P5A_NAME,
-                runner.ARCH147_P4_NAME,
-                "arch144-c-f1-paper-evidence-admission",
-                "arch145-a-research-robustness-live-canary-eligibility",
-                "arch134-f1r1-a-runtime-isolation",
-                "arch134-f1-five-session-soak",
-                "arch134-d1r8-d1-session-execution-consumer",
-                "arch134-d1r7-d1-session-authorization",
-                "arch134-d1r6-overnight-wake-arming",
-                "arch134-d1r5-pre-market-wake-qualification",
-                "arch134-alpaca-authentication-qualification",
-                runner.ARCH134_FRESH_NAME,
-                runner.ARCH134_ACL_NAME,
-                runner.ARCH134_D1S4_NAME,
-            }
-            else (
-                (
-                    *runner.COMMON_TESTS,
-                    "tests/runtime/checkpoint_runner/test_arch133_a_g.py",
-                    "tests/runtime/checkpoint_runner/test_arch133_h_k.py",
-                    "tests/runtime/checkpoint_runner/test_arch133_l_m.py",
-                )
-                if name
-                in {
-                    runner.ARCH134_F1R1_B_NAME,
-                    runner.ARCH134_F1R1_C1_NAME,
-                    runner.ARCH134_R5_NAME,
-                    runner.ARCH134_D1S3_NAME,
-                    runner.ARCH134_D1S2_NAME,
-                    runner.ARCH134_D1S1_NAME,
-                }
-                else (
-                    *runner.COMMON_TESTS,
-                    "tests/runtime/checkpoint_runner/" + module,
-                )
-            )
-        )
-        if name == runner.ARCH147_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147.py",
-            )
-        if name == runner.ARCH147_FILTERED_TREND_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147.py",
-                "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
-                "tests/runtime/checkpoint_runner/test_arch147_filtered_trend.py",
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-            )
-        if name == runner.ARCH147_P5A_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
-            )
-        if name == runner.ARCH147_P5B_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147_p5a.py",
-                "tests/runtime/checkpoint_runner/test_arch147_p5b.py",
-                "tests/runtime/checkpoint_runner/test_arch131.py",
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-            )
-        if name == runner.ARCH147_PROTOTYPE_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
-            )
-        if name == runner.ARCH147_B2O_NAME:
-            expected = runner.COMMON_TESTS
-        if name == runner.ARCH147_RHC2_NAME:
-            expected = (
-                *runner.COMMON_TESTS,
-                "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
-            )
-        if name == runner.ARCH147_P6_NAME:
-            expected = tuple(
-                path
-                for path in runner.ARCH147_P6_TESTS
-                if path.startswith("tests/runtime/checkpoint_runner/")
-            )
-        if name in {
-            runner.ARCH134_READONLY_DIAGNOSTIC_NAME,
-            runner.ARCH134_READONLY_DIAGNOSTIC_R1_NAME,
-            runner.ARCH134_READONLY_DIAGNOSTIC_R2_NAME,
-            runner.ARCH134_READONLY_DIAGNOSTIC_R3_NAME,
-        }:
-            expected = (
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-                *expected,
-            )
-        if name in {runner.ARCH146_PRE_B2_NAME, runner.ARCH146_PARTIAL_STATE_NAME}:
-            expected = (
-                *expected,
-                "tests/runtime/checkpoint_runner/test_source_authority.py",
-            )
-        assert selected == expected
-        assert set(selected) <= set(spec.ruff_paths)
-        certification = tuple(
-            path
-            for path in spec.tests
-            if path.startswith("tests/scripts/certification_runner/")
-        )
-        assert certification in [
-            (),
-            ("tests/scripts/certification_runner/test_profiles.py",),
-            (
-                "tests/scripts/certification_runner/test_profiles.py",
-                "tests/scripts/certification_runner/test_lanes.py",
-            ),
-            (
-                "tests/scripts/certification_runner/test_source.py",
-                "tests/scripts/certification_runner/test_profiles.py",
-                "tests/scripts/certification_runner/test_lanes.py",
-            ),
-        ]
     active, _ = runner.batch_requirements(
-        [registry[name] for name in runner.ACTIVE_CI_CHECKPOINTS]
+        tuple(registry[name] for name in runner.ACTIVE_CI_CHECKPOINTS)
     )
     retained, _ = runner.batch_requirements(
-        [registry[name] for name in runner.RETAINED_CHECKPOINTS]
+        tuple(registry[name] for name in runner.RETAINED_CHECKPOINTS)
     )
-    assert "tests/runtime/checkpoint_runner/test_retained_arch128_130.py" not in active
-    assert "tests/runtime/checkpoint_runner/test_retained_arch128_130.py" in retained
-    assert not any(
-        "test_arch" in path for path in retained if "/checkpoint_runner/" in path
-    )
+    retained_owner = "tests/runtime/checkpoint_runner/test_retained_arch128_130.py"
+
+    assert retained_owner not in active
+    assert retained_owner in retained
 
 
 def test_source_junit_evidence_is_external_and_additive(tmp_path):

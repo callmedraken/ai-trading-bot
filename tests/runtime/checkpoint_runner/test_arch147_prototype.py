@@ -1,17 +1,23 @@
 """Current prototype read-only preflight route and ownership regressions."""
 
 import ast
+import asyncio
 import hashlib
 import inspect
 import json
+import logging
 from dataclasses import replace
+from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from scripts.source_authority import current_owner
 
+from scripts import arch147_l43_q1_source as q1_source
 from scripts import checkpoint_runner as runner
 from scripts import run_test_certification as certification
+from trading_bot.live_prototype import l43_qualification_preflight as q1
 
 _PRODUCTION_IMPORT_ALLOWLIST = {
     "src/trading_bot/live_prototype/capability_operator.py": {
@@ -121,6 +127,14 @@ _PRODUCTION_IMPORT_ALLOWLIST = {
             "from",
             "trading_bot.robinhood_mcp.order_scope_evidence_admission",
             "load_order_scope_evidence_authority",
+        ),
+    },
+    "src/trading_bot/live_prototype/l43_qualification_preflight.py": {
+        ("import", "subprocess", None),
+        (
+            "from",
+            "trading_bot.robinhood_mcp.l43_production_composition",
+            "L43ProductionPreEffectComposition",
         ),
     },
 }
@@ -1266,3 +1280,276 @@ def test_a3_post_dispatch_admission_exception_preserves_observer_result(
     assert result["observer_evidence_sha256"] is not None
     assert result["attempt_counters"]["tools_list_attempts"] == 1
     assert calls == ["constructed", "dispatched"]
+
+
+def _q1_accepted_snapshot() -> q1_source._SourceSnapshot:
+    head = "a" * 40
+    return q1_source._SourceSnapshot(
+        root_is_canonical=True,
+        windows_host=True,
+        canonical_origin=True,
+        clean=True,
+        branch=q1_source.FEATURE_BRANCH,
+        local_head=head,
+        local_tree="b" * 40,
+        feature_head=head,
+        develop_head=head,
+    )
+
+
+def _q1_blocked_result() -> dict[str, object]:
+    return q1._safe_result(
+        q1._Context(
+            source=None,
+            origin=None,
+            snapshot=None,
+            pre_effect=None,
+            requested_entry_usd=Decimal("10.00"),
+            counts_unknown=False,
+        ),
+        q1.QualificationOutcome.BLOCKED,
+        ("FAKE_READ_BLOCKED",),
+        challenge=None,
+    )
+
+
+def _q1_ready_result() -> dict[str, object]:
+    source = SimpleNamespace(source_head="a" * 40, source_tree="b" * 40)
+    origin = SimpleNamespace(
+        runtime_identity=SimpleNamespace(
+            config_digest="c" * 64,
+            binding_digest="d" * 64,
+        ),
+        journal_sha256="e" * 64,
+    )
+    snapshot = SimpleNamespace(last_sequence=1, journal_sha256="f" * 64)
+    plan = SimpleNamespace(
+        account_fingerprint="1" * 64,
+        session=SimpleNamespace(target_session="2026-11-17"),
+        binding_sha256="2" * 64,
+    )
+    pre_effect = SimpleNamespace(
+        plan=plan,
+        evidence_sha256="3" * 64,
+        blockers=frozenset(),
+        robinhood_read_count=1,
+        robinhood_page_count=1,
+        alpaca_provider_call_count=1,
+        credential_read_count=1,
+    )
+    context = SimpleNamespace(
+        source=source,
+        origin=origin,
+        snapshot=snapshot,
+        pre_effect=pre_effect,
+        requested_entry_usd=Decimal("10.00"),
+        counts_unknown=False,
+    )
+    return q1._safe_result(
+        context,
+        q1.QualificationOutcome.READY_FOR_EXACT_ENTRY_AUTHORIZATION_REVIEW,
+        (),
+        challenge="4" * 64,
+    )
+
+
+def test_q1_is_manual_read_only_and_existing_full_route_remains_unique():
+    root = Path(runner.__file__).resolve().parents[1]
+    specs = runner._checkpoint_specs()
+    spec = specs[runner.ARCH147_Q1_NAME]
+    prototype_spec = specs[runner.ARCH147_PROTOTYPE_NAME]
+    prototype_test_owner = "tests/runtime/checkpoint_runner/test_arch147_prototype.py"
+
+    assert (
+        sum(candidate.name == runner.ARCH147_Q1_NAME for candidate in specs.values())
+        == 1
+    )
+    assert prototype_test_owner in spec.tests
+    assert prototype_test_owner in prototype_spec.tests
+    assert (
+        "tests/runtime/checkpoint_runner/test_retained_arch128_130.py" not in spec.tests
+    )
+    assert spec.preflight is runner._arch147_q1_preflight
+    assert spec.execute is None
+    assert spec.remote_branch is None
+    assert spec.remote_head_env is None
+    assert runner.ARCH147_Q1_NAME not in runner.CURRENT_ACTIVE_CI_CHECKPOINTS
+    assert runner.ARCH147_Q1_NAME not in runner.CI_CERTIFICATION_PROFILES
+    assert runner._arch147_q1_authority_check(root) == ()
+    assert current_owner("ARCH147_Q1_NAME") == "checkpoint_runner"
+    assert current_owner("ARCH147_Q1_TESTS") == "checkpoint_runner"
+    assert current_owner("ARCH147_Q1_RUFF") == "checkpoint_runner"
+    assert current_owner("_arch147_q1_authority_check") == "checkpoint_runner"
+    assert current_owner("_arch147_q1_preflight") == "checkpoint_runner"
+    assert current_owner("scripts/arch147_l43_q1_source.py") == "checkpoint_runner"
+    assert (
+        runner.resolve_ci_checkpoint(specs, runner.ARCH147_PROTOTYPE_BRANCH, "push")
+        == runner.ARCH147_PROTOTYPE_NAME
+    )
+    assert runner.CI_CERTIFICATION_PROFILES[runner.ARCH147_PROTOTYPE_NAME] == "full"
+    assert q1._is_sanitized_result(_q1_blocked_result())
+
+
+def test_q1_source_and_tests_are_prepublication_owned_with_family_growth():
+    guard = "tests/runtime/checkpoint_runner/test_arch147_prototype.py"
+    q1_paths = runner.ARCH147_Q1_RUFF
+    for path in q1_paths:
+        selected = runner._prepublication_admission_tests((path,))
+        assert guard in selected
+        assert all(test in selected for test in runner.ARCH147_Q1_TESTS)
+        assert selected.count(guard) == 1
+
+    for synthetic in (
+        "src/trading_bot/live_prototype/future_q1_component.py",
+        "tests/live_prototype/test_future_q1_component.py",
+    ):
+        selected = runner._prepublication_admission_tests((synthetic,))
+        assert guard in selected
+        assert all(test in selected for test in runner.ARCH147_Q1_TESTS)
+
+    unrelated = runner._prepublication_admission_tests(
+        ("src/trading_bot/domain/unrelated_component.py",)
+    )
+    assert guard not in unrelated
+    assert not any(test in unrelated for test in runner.ARCH147_Q1_TESTS)
+
+    authority_infrastructure = runner._prepublication_admission_tests(
+        ("scripts/source_authority.py",)
+    )
+    assert guard in authority_infrastructure
+    assert all(test in authority_infrastructure for test in runner.ARCH147_Q1_TESTS)
+
+
+def test_q1_source_gate_blocks_before_import_and_records_known_zero_calls(monkeypatch):
+    blocked = replace(_q1_accepted_snapshot(), develop_head="c" * 40)
+    monkeypatch.setattr(q1_source, "_capture_source_snapshot", lambda: blocked)
+
+    def unexpected_import():
+        pytest.fail("Q1 module loaded before accepted-source admission")
+
+    monkeypatch.setattr(q1_source, "_load_q1_owner", unexpected_import)
+    report = q1_source.run_preflight()
+
+    assert report["status"] == "BLOCKED"
+    assert report["source_admission"]["status"] == "BLOCKED"
+    assert report["dispatch"] == {
+        "status": "NOT_STARTED",
+        "provider_call_counts": {
+            "robinhood_reads": 0,
+            "robinhood_pages": 0,
+            "alpaca_provider_calls": 0,
+            "credential_reads": 0,
+        },
+        "reason_codes": [],
+    }
+    assert report["qualification"] is None
+
+
+def test_q1_runner_callback_delegates_only_to_registered_adapter(monkeypatch):
+    sentinel = {"status": "BLOCKED"}
+    monkeypatch.setattr(q1_source, "run_preflight", lambda: sentinel)
+
+    assert runner._arch147_q1_preflight() is sentinel
+    assert inspect.signature(runner._arch147_q1_preflight).parameters == {}
+
+
+def test_q1_keeps_source_admission_pass_independent_of_blocked_result(monkeypatch):
+    accepted = _q1_accepted_snapshot()
+    monkeypatch.setattr(q1_source, "_capture_source_snapshot", lambda: accepted)
+    result = _q1_blocked_result()
+    owner = SimpleNamespace(
+        _run_protected_preflight=lambda: result,
+        _is_sanitized_result=q1._is_sanitized_result,
+    )
+    monkeypatch.setattr(q1_source, "_load_q1_owner", lambda: owner)
+
+    report = q1_source.run_preflight()
+
+    assert report["status"] == "BLOCKED"
+    assert report["source_admission"]["status"] == "PASS"
+    assert report["dispatch"]["status"] == "COMPLETED"
+    assert report["qualification"] == result
+
+
+def test_q1_source_drift_redacts_ready_challenge_but_preserves_result_digest(
+    monkeypatch,
+):
+    before = _q1_accepted_snapshot()
+    after = replace(
+        before,
+        local_head="c" * 40,
+        local_tree="d" * 40,
+        feature_head="c" * 40,
+        develop_head="c" * 40,
+    )
+    snapshots = iter((before, after))
+    monkeypatch.setattr(q1_source, "_capture_source_snapshot", lambda: next(snapshots))
+    result = _q1_ready_result()
+    assert q1._is_sanitized_result(result)
+    owner = SimpleNamespace(
+        _run_protected_preflight=lambda: result,
+        _is_sanitized_result=q1._is_sanitized_result,
+    )
+    monkeypatch.setattr(q1_source, "_load_q1_owner", lambda: owner)
+
+    report = q1_source.run_preflight()
+
+    assert report["status"] == "BLOCKED"
+    assert report["source_admission"]["status"] == "BLOCKED"
+    assert report["dispatch"]["status"] == "COMPLETED"
+    invalidated = report["qualification"]
+    assert invalidated["status"] == "BLOCKED"
+    assert invalidated["outcome"] == "BLOCKED"
+    assert invalidated["result_sha256"]
+    assert "challenge_sha256" not in invalidated
+    assert invalidated["provider_call_counts"] == result["provider_call_counts"]
+
+
+@pytest.mark.parametrize(
+    "failure_type",
+    (RuntimeError, asyncio.CancelledError, KeyboardInterrupt),
+)
+def test_q1_escaped_failure_is_sanitized_and_keeps_counts_unknown(
+    monkeypatch, capsys, failure_type
+):
+    accepted = _q1_accepted_snapshot()
+    monkeypatch.setattr(q1_source, "_capture_source_snapshot", lambda: accepted)
+    calls = []
+
+    def escaped_failure():
+        calls.append("started")
+        print("raw-provider-payload")
+        logging.getLogger("q1-test").error("raw-provider-trace")
+        raise failure_type("credential-bearing-provider-error")
+
+    owner = SimpleNamespace(
+        _run_protected_preflight=escaped_failure,
+        _is_sanitized_result=q1._is_sanitized_result,
+    )
+    monkeypatch.setattr(q1_source, "_load_q1_owner", lambda: owner)
+
+    report = q1_source.run_preflight()
+    captured = capsys.readouterr()
+
+    encoded = json.dumps(report, sort_keys=True)
+    assert captured.out == ""
+    assert captured.err == ""
+    assert "raw-provider-payload" not in encoded
+    assert "raw-provider-trace" not in encoded
+    assert "credential-bearing-provider-error" not in encoded
+    assert calls == ["started"]
+    assert report["source_admission"]["status"] == "PASS"
+    assert report["dispatch"] == {
+        "status": "FAILED",
+        "provider_call_counts": None,
+        "reason_codes": ["QUALIFICATION_DISPATCH_FAILED"],
+    }
+
+
+def test_q1_runner_loads_only_this_worktrees_production_module():
+    owner = q1_source._load_q1_owner()
+    root = Path(runner.__file__).resolve().parents[1]
+    source_root = (root / "src").resolve(strict=True)
+
+    assert source_root in Path(owner.__file__).resolve(strict=True).parents
+    assert owner._run_protected_preflight.__name__ == "_run_protected_preflight"

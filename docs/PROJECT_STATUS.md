@@ -1,6 +1,6 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - RHC4-C2 ACCEPTED / INTEGRATED; L43-Q1 qualification preflight source next
+## Current milestone - L43-Q1 prepublication coverage correction
 
 RHC4-C2 is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / tree `b422ef66d88b184bdbe12788546e6b2ffd083846`. Feature mapped FULL run `44217082229`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44236195177`, attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and `IDENTITY_STABLE=True`; active tests and FULL were skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
@@ -18,9 +18,9 @@ The first ChatGPT-direct closeout publication `bc5861c53252f870cfb97d7c6f81838d9
 
 Q62 is not pending. The accepted tiny-live source was integrated at `f709ec7cc6b610c76e57b9bba7e9484f91897a4f` / tree `369c1e14f201541864c61cb66d718e8efd163940`, and its later protected read-only observation was consumed successfully as `READY_FOR_L43_PROTOTYPE_READ_ONLY / Q62_READ_ONLY_PREREQUISITES_PROVEN`. That result grants no live readiness or trade authority and is `CONSUMED / NO AUTOMATIC RETRY`. RHC2 remains `CONSUMED / PASS / NO RETRY`; RHC3 retained order-scope evidence remains immutable; RHC3P and RHC4-C2 are accepted/integrated. L43 protected effects remain NOT RUN / NOT AUTHORIZED. Q63 remains NOT RUN. `FINAL_HOLDOUT` remains SEALED.
 
-## Immediate next step
+## Current Q1 checkpoint and next boundary
 
-The next source milestone is frozen in [Architecture 147 L43-Q1](architecture/147-l43-qualification-preflight-source.md) and its [validation plan](validation/arch147-l43-qualification-preflight-source.md): `ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE`. It is a SOURCE_ONLY / FAKE_ONLY implementation checkpoint that adds a source-owned registered L43 read-only qualification preflight and exact challenge material while keeping broker review/place/cancel and stage authorization unavailable during preflight. The later real preflight is a separate protected read-only invocation; source acceptance alone does not run it or authorize an order.
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` remains a SOURCE_ONLY / FAKE_ONLY checkpoint under the frozen [Architecture 147 L43-Q1 design](architecture/147-l43-qualification-preflight-source.md). Its first unpublished candidate was blocked at prepublication as `CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`: two current runner-owner tests retained stale registry/family snapshot expectations. The candidate was not pushed and no feature CI ran. The preserved report and bounded correction are recorded in the [Q1 validation record](validation/arch147-l43-qualification-preflight-source.md). The correction requires focused verification and fresh admission before publication. Independent exact-source review follows terminal feature CI. The real protected read-only Q1 preflight is NOT RUN; L43 order effects remain NOT RUN / NOT AUTHORIZED.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

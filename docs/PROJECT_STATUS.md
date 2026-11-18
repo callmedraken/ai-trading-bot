@@ -24,6 +24,8 @@ C1's mapped run `44192574584`, attempt 1, is preserved terminal FAILURE and was 
 
 The bounded C2 correction is `ARCH147-RHC4-C2_PREPUBLICATION_COVERAGE_AND_STALE_CURRENT_CORRECTION`: it updates the stale test to the public source-identity seam, makes prepublication admission include the deduplicated route-owned `ARCH147_PROTOTYPE_TESTS` set, and removes stale current private-boundary references. C2 remains SOURCE_ONLY / FAKE_ONLY. No real Robinhood, OAuth, MCP, Alpaca, review, placement or cancellation action occurred; provider and protected-effect counters are zero. It grants no broker-effect authority or readiness.
 
+The first clean C2 admission reached the corrected route-owned bundle and executed the production-composition test, but is preserved as `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`: report `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json` recorded FEATURE PASS, PROSPECTIVE_DEVELOP PASS, `IDENTITY_STABLE=True`, Ruff PASS and diff PASS, with `2691 passed, 1 skipped, 1 failed`. The sole failure was the current L41R4 test's assumption that pytest `tmp_path` is not on F:, despite the mandatory external F: basetemp. No push followed; no provider or protected effect occurred. The bounded follow-up changes only that test's candidate path to a synthetic C: path.
+
 RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained evidence remains immutable and operationally required. L43 protected qualification remains NOT_RUN; Q63 remains NOT_RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## Immediate next step

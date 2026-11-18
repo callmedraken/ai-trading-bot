@@ -45,6 +45,14 @@ C2 also makes the route-owned prototype test set part of prepublication
 admission and keeps the current public source-owned seams covered without
 redesigning provider session lifetime.
 
+The first C2 admission is preserved as
+`PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT` because one current L41R4 test
+assumed pytest `tmp_path` was not on F:, while the required external admission
+basetemp is on F:. FEATURE and PROSPECTIVE_DEVELOP authority passed, the
+production-composition test executed, and no publication or external effect
+followed. The bounded follow-up uses a synthetic C: candidate path in that
+test only.
+
 The default research worker remains idle until a research source is separately
 supplied. The existing comparison-report worker remains available and can run
 alongside restricted-live runtime.

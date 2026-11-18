@@ -93,6 +93,19 @@ documentation, and narrow source-owned fake-only seam tests. The accepted C1
 Stop/effect-boundary interlock and its deterministic Event/barrier tests are
 preserved unchanged semantically.
 
+The first clean C2 admission is preserved at
+`F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json`
+and classified `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`. It executed
+the route-owned bundle, including
+`tests/robinhood_mcp/test_l43_production_composition.py`, and recorded
+FEATURE PASS, PROSPECTIVE_DEVELOP PASS, `IDENTITY_STABLE=True`, Ruff PASS and
+diff PASS, but pytest reported `2691 passed, 1 skipped, 1 failed`. The sole
+failure was
+`tests/live_prototype/test_capability_schema_discovery_l41r4.py::test_fresh_evidence_dir_rejects_non_f_drive_with_monkeypatched_root`,
+whose `tmp_path` was on F: under the required external basetemp. No push or
+external effect followed. The bounded follow-up changes only the candidate
+path used by this test to a synthetic C: path.
+
 ### RHC4 C1 focused verification
 
 The effect-operator and runtime tests passed **50 tests** with the project

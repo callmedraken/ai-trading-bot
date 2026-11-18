@@ -95,6 +95,17 @@ Focused fake-only tests, current/historical authority, both source-context
 selections, whole-repository Ruff, and diff checks are required before C2
 publication. Exact commands and basetemps are recorded in the [validation
 ledger](validation/arch147-live-prototype.md#rhc4-c2-prepublication-coverage-and-stale-current-correction).
+
+The first clean C2 admission is preserved at
+`F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch132-r3n-prepublication-admission\\source-gate-20261118T012223.701722Z\\report.json`
+and classified `PREPUBLICATION_ADMISSION_PORTABILITY_DEFECT`. It executed
+the corrected route-owned bundle, including the production-composition test,
+and recorded FEATURE PASS, PROSPECTIVE_DEVELOP PASS, `IDENTITY_STABLE=True`,
+Ruff PASS and diff PASS, but pytest reported `2691 passed, 1 skipped, 1
+failed`. The sole failure was the L41R4 current test asserting that pytest
+`tmp_path` was not on F:, incompatible with the mandatory F: basetemp. No
+push followed; the bounded follow-up uses a synthetic C: candidate path and
+does not alter the source boundary.
 L43 protected qualification remains NOT_RUN.
 Q63 remains NOT_RUN.
 `FINAL_HOLDOUT` remains SEALED.

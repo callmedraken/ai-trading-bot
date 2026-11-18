@@ -866,7 +866,7 @@ def test_fresh_evidence_dir_rejects_non_f_drive_with_monkeypatched_root(
 ) -> None:
     parent_root = tmp_path.resolve(strict=True)
     monkeypatch.setattr(discovery, "_EVIDENCE_ROOT", parent_root)
-    evidence_dir = parent_root / "non-f-drive"
+    evidence_dir = Path("C:/") / tmp_path.name / "non-f-drive"
     assert evidence_dir.drive.casefold() != "f:"
 
     with pytest.raises(ValueError, match="L41R4_EVIDENCE_PATH_INVALID"):

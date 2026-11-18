@@ -213,4 +213,3 @@ After exact-source review, certification and fast-forward integration, run exact
 one separately reviewed protected **read-only** Q1 preflight from the accepted
 source using the repository-owned runner. Preserve its evidence whether READY,
 NO_ACTION or BLOCKED. Do not invoke an order effect in the same checkpoint.
-

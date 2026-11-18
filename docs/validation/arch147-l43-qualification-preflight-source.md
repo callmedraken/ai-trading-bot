@@ -125,4 +125,3 @@ After ChatGPT exact-source acceptance and exact-SHA fast-forward integration:
    human-authorized effect source/boundary be designed or invoked.
 
 Q1 preflight has no `execute` authority and never places an order.
-

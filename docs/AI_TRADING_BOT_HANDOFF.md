@@ -57,6 +57,8 @@ RHC2 remains `CONSUMED / PASS / NO RETRY`. RHC3 retained account-wide-all-agents
 
 `RHC4_C2_TRANSITION_WORKFLOW_REGRESSION` records that the first ChatGPT integration guard Boolean-tested `git diff --quiet` stdout and falsely stopped a clean worktree. The broader transition also failed to follow existing procedure in several places: remembered-path use instead of same-block worktree discovery/reproof, incomplete first cleanliness proof, unsafe native stderr handling, output parsing before native-exit classification, missing canonical-origin/final-cleanliness proof, oversized generated PowerShell, incorrect delegation of the tiny docs closeout, delayed automatic continuation, failure to batch the known L43-Q1 design freeze with the closeout, and an initially missed stale current Q62 summary. The diagnostic re-established exact clean state before successful integration. These are workflow/procedure regressions, not source defects.
 
+`RHC4_C2_CLOSEOUT_C1_DOCS_HYGIENE_DEFECT` preserves direct docs run `44239165344`, attempt 1, terminal FAILURE. Its only source-static defect was one new blank line at EOF in each newly added L43-Q1 document; canonical FULL/active tests were skipped. The run is immutable evidence and is not rerun unchanged.
+
 For future Windows/Git operator commands, follow the normative sections of `docs/AI_DEVELOPMENT_WORKFLOW.md` rather than reconstructing the rules from memory:
 - discover or re-prove the exact worktree; never derive it from a branch name;
 - normalize filesystem identity with `Resolve-Path`;

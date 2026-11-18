@@ -1,6 +1,10 @@
 # AI Trading Bot - Project Status
 
-## Current milestone - L43-Q1 prepublication coverage correction
+## Current milestone - L43-Q1 consumed BLOCKED; L43 state prerequisite gap
+
+L43-Q1 source/certification is independently ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `05f4c4700f82c3d40c83f474c3cf614573d48091` / tree `70aec1c51e63705a68d6710cc3448ac994227e46`. Feature mapped FULL run `44260469616`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44264566809`, attempt 1, is terminal SUCCESS with exact feature-certification reuse; active/FULL/certification jobs were skipped on develop, so no duplicate FULL ran. Local feature/develop reconciliation later reached the same exact clean HEAD/tree.
+
+The first separately reviewed real Q1 protected read-only preflight is CONSUMED / BLOCKED / NO AUTOMATIC RETRY. Evidence is `F:\\AI\\temp\\ai-trading-bot-checkpoints\\arch147-l43-qualification-preflight\\preflight-20261118T091033.372793Z\\report.json`. Source admission passed before and after on the exact accepted HEAD/tree with `IDENTITY_STABLE=True`; the qualification result was `BLOCKED / QUALIFICATION_INDETERMINATE`. It bound the accepted source plus Q62 config/binding/journal digests, but no L43 durable-state snapshot or fresh pre-effect/provider facts were captured. Review, placement, cancellation, broker mutation, L43 durable-state mutation and Q62 journal mutation counters were all zero. Provider-read/credential counters are `null`, meaning unknown rather than zero; the result does not prove any provider call occurred.
 
 RHC4-C2 is independently SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at HEAD `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / tree `b422ef66d88b184bdbe12788546e6b2ffd083846`. Feature mapped FULL run `44217082229`, attempt 1, is terminal SUCCESS with source-static, active-tests, source-gates and all seven canonical FULL lanes passing. Develop run `44236195177`, attempt 1, is terminal SUCCESS with `DEVELOP_CERTIFICATION_REUSE=True`, reason `exact_feature_certification`, and `IDENTITY_STABLE=True`; active tests and FULL were skipped on develop, so `DEVELOP_DUPLICATE_FULL=NO`.
 
@@ -20,7 +24,11 @@ Q62 is not pending. The accepted tiny-live source was integrated at `f709ec7cc6b
 
 ## Current Q1 checkpoint and next boundary
 
-`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` remains a SOURCE_ONLY / FAKE_ONLY checkpoint under the frozen [Architecture 147 L43-Q1 design](architecture/147-l43-qualification-preflight-source.md). Its first unpublished candidate was blocked at prepublication as `CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`: two current runner-owner tests retained stale registry/family snapshot expectations. The candidate was not pushed and no feature CI ran. The preserved report and bounded correction are recorded in the [Q1 validation record](validation/arch147-l43-qualification-preflight-source.md). The correction requires focused verification and fresh admission before publication. Independent exact-source review follows terminal feature CI. The real protected read-only Q1 preflight is NOT RUN; L43 order effects remain NOT RUN / NOT AUTHORIZED.
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is accepted/integrated at `05f4c4700f82c3d40c83f474c3cf614573d48091` / `70aec1c51e63705a68d6710cc3448ac994227e46`. Its first protected read-only observation is consumed as `BLOCKED / QUALIFICATION_INDETERMINATE / NO AUTOMATIC RETRY`; do not rerun it.
+
+The evidence proves the canonical composition and source identity were obtained, but the qualification did not bind an L43 durable-state snapshot. Source inspection shows the production snapshot reader opens only the fixed pre-provisioned `F:\AI\arch147-l43-live-state-v1\durable-state.jsonl` state plus its lock and never initializes it. No production L43 state-provisioning command currently exists; state creation appears only in fake/test fixtures. Because the sanitized Q1 result intentionally suppresses the underlying exception, it does not prove whether the host failure was a missing journal, missing lock, ownership/identity problem or another `L43StateUnavailable` case.
+
+The next source milestone is therefore a separately reviewed L43 state-provisioning and diagnostic-discrimination checkpoint. It must remain provider/broker-effect free, create or validate only the exact fixed L43 state prerequisite under explicit one-shot authority, preserve Q62 as immutable, and give Q1 a typed fail-closed state reason instead of collapsing this pre-provider class into `QUALIFICATION_INDETERMINATE`. No second Q1 observation is authorized until that source is accepted/integrated and its state-preparation boundary is separately reviewed. L43 order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
 
 ## L41R1, L41R2, and L41R3 historical observations
 

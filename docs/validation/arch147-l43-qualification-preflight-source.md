@@ -119,6 +119,45 @@ The correction replaces current mutable registry and family snapshots with
 semantic invariants and synthetic growth tests. The candidate was not pushed
 and no feature CI ran; provider and protected-effect counters remained zero.
 
+## Accepted correction and consumed protected observation
+
+The corrected Q1 candidate was published and independently accepted at
+`05f4c4700f82c3d40c83f474c3cf614573d48091` / tree
+`70aec1c51e63705a68d6710cc3448ac994227e46`. Feature mapped FULL run
+`44260469616`, attempt 1, is terminal SUCCESS; develop run `44264566809`,
+attempt 1, is terminal SUCCESS with exact feature-certification reuse and no
+duplicate FULL.
+
+After exact local feature/develop reconciliation, one separately reviewed
+protected read-only Q1 preflight was authorized and consumed. Its report is:
+
+`F:\AI\temp\ai-trading-bot-checkpoints\arch147-l43-qualification-preflight\preflight-20261118T091033.372793Z\report.json`
+
+The runner recorded source admission PASS before and after, exact stable Q1
+HEAD/tree, and `BLOCKED / QUALIFICATION_INDETERMINATE`. The qualification
+bound the accepted source plus Q62 configuration, binding and journal digests.
+It did not bind an L43 durable-state sequence/tail, fresh pre-effect facts,
+account fingerprint, target session, plan binding or challenge. All effect
+counters remained zero. Provider/credential counters are `null`, which is
+deliberately unknown accounting and must not be rewritten as zero. Automatic
+retry is `NOT_AUTHORIZED`.
+
+The result narrows the exception to after `source_reader()` succeeded and
+before `context.snapshot` was assigned. Current source inspection shows that
+the production state reader opens only
+`F:\AI\arch147-l43-live-state-v1\durable-state.jsonl` under its pre-existing
+lock and never initializes state. No production L43 state-provisioning command
+exists in the repository; state creation is present only in fake/test fixtures.
+Because the protected result sanitizes the underlying exception, it does not
+prove whether the concrete host cause was a missing journal, missing lock,
+identity/ownership failure or another `L43StateUnavailable` condition.
+
+This is therefore a consumed fail-closed observation and a next-prerequisite
+source/design gap, not authority to retry Q1 or to perform an order effect. The
+next source checkpoint must provide an explicit provider-free L43 state
+provisioning/validation boundary plus typed diagnostic discrimination before a
+new Q1 observation can be considered.
+
 ## Protected-effect counters
 
 Source implementation/certification must report:

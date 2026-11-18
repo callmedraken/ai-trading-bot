@@ -1,21 +1,20 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: L43-Q1 prepublication coverage correction
+## Current milestone: L43-Q1 consumed BLOCKED; L43 state prerequisite gap
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
 
-Accepted/integrated executable identity:
-- RHC4-C2 HEAD: `4f560a74b04ecba85c7b312364a9e4e7b30e57b6`
-- tree: `b422ef66d88b184bdbe12788546e6b2ffd083846`
-- direct C2 substantive parent: `7dfd693b6588f9b3bde24efbe04ba803d08e502b`
-- C1 predecessor: `f3f44e00ec17279ea74445df2b7a680875745f7b`
-- feature mapped FULL: `44217082229`, attempt 1, terminal SUCCESS
-- develop exact-source run: `44236195177`, attempt 1, terminal SUCCESS
-- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True`
-- reuse reason: `exact_feature_certification`
+Current accepted/integrated executable identity:
+- L43-Q1 HEAD: `05f4c4700f82c3d40c83f474c3cf614573d48091`
+- tree: `70aec1c51e63705a68d6710cc3448ac994227e46`
+- direct parent: `f38c3079d83f5e9773280fe36e43a4d9d9d3c76d`
+- feature mapped FULL: `44260469616`, attempt 1, terminal SUCCESS
+- develop exact-source run: `44264566809`, attempt 1, terminal SUCCESS
+- develop reuse: exact feature certification
 - develop identity stability: `IDENTITY_STABLE=True`
 - duplicate develop FULL: NO
+- accepted RHC4-C2 ancestor: `4f560a74b04ecba85c7b312364a9e4e7b30e57b6` / `b422ef66d88b184bdbe12788546e6b2ffd083846`
 
 Preserved predecessor evidence:
 - original RHC4 `2f4f50a1df44c261d172f55bc540b635d637cbd9` / tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`; mapped run `44181143712` terminal SUCCESS but exact-source rejected;
@@ -70,13 +69,24 @@ For future Windows/Git operator commands, follow the normative sections of `docs
 - re-prove final branch/HEAD/tree/tracked/index/untracked state;
 - after any STOP, re-establish the complete gate before continuation.
 
-### L43-Q1 source checkpoint and next boundary
+### L43-Q1 consumed observation and next boundary
 
-`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is governed by the frozen design and validation plan:
-- `docs/architecture/147-l43-qualification-preflight-source.md`
-- `docs/validation/arch147-l43-qualification-preflight-source.md`
+`ARCH147-L43-Q1_QUALIFICATION_PREFLIGHT_SOURCE` is accepted/integrated at `05f4c4700f82c3d40c83f474c3cf614573d48091` / tree `70aec1c51e63705a68d6710cc3448ac994227e46`. Feature run `44260469616` is terminal SUCCESS with mapped FULL; develop run `44264566809` is terminal SUCCESS with exact feature-certification reuse and no duplicate FULL. The registered slug remains `arch147-l43-qualification-preflight`, with protected read-only `preflight` and `execute=None`.
 
-Q1 is SOURCE_ONLY / FAKE_ONLY. The registered checkpoint slug is `arch147-l43-qualification-preflight`; its protected `preflight` is a separate read-only invocation and `execute=None`. The failed unpublished candidate was HEAD `fac050e10a126542177fd11fd82f9cf3bb866d83`, tree `405fd237d0ea20be29467a3705a273a605234f44`, direct parent `f38c3079d83f5e9773280fe36e43a4d9d9d3c76d`. Its preserved admission report is `F:\AI\temp\ai-trading-bot-checkpoints\arch132-r3n-prepublication-admission\source-gate-20261118T061227.307789Z\report.json`; the overall result was `CURRENT_MUTABLE_REGISTRY_PIN_REGRESSION / PREPUBLICATION_COVERAGE_DEFECT`. The candidate was not pushed and no feature CI ran. The Q1 validation record contains the failure diagnosis and correction scope. The correction requires focused verification and fresh admission before publication. Independent exact-source review follows terminal feature CI. The existing `arch147-live-prototype` route remains the mapped FULL route; independent exact-source acceptance has not occurred. The real provider-facing preflight is NOT RUN and follows separate ChatGPT exact-source acceptance, integration, and review. L43 protected order effects remain NOT RUN / NOT AUTHORIZED; Q63 remains NOT RUN; `FINAL_HOLDOUT` remains SEALED.
+The separately reviewed Q1 preflight was invoked once after exact local/remote reconciliation and is now CONSUMED / BLOCKED / NO AUTOMATIC RETRY:
+- evidence: `F:\AI\temp\ai-trading-bot-checkpoints\arch147-l43-qualification-preflight\preflight-20261118T091033.372793Z\report.json`
+- source admission: PASS before/after
+- identity: stable at the accepted Q1 HEAD/tree
+- qualification: `BLOCKED / QUALIFICATION_INDETERMINATE`
+- accepted source/config/binding/Q62 journal digests: present
+- L43 durable-state snapshot/fresh pre-effect facts/challenge: absent
+- review/place/cancel/broker mutation/L43 state mutation/Q62 mutation: all 0
+- provider/credential call counts: `null` (unknown, not proof of zero)
+- retry: `NOT_AUTHORIZED`
+
+Source review narrows the failure to the interval after accepted source identity and before a durable-state snapshot was bound. The production snapshot path is fixed at `F:\AI\arch147-l43-live-state-v1\durable-state.jsonl`; the reader requires an already provisioned journal plus lock and never initializes them. The repository currently has no production L43 provisioning command; only test/fake fixtures create L43 state. The sanitized observation does not expose the underlying exception, so do not claim a specific host cause such as a missing journal or lock without separate evidence.
+
+Next milestone: design and implement a source-owned, provider-free L43 state-provisioning/diagnostic checkpoint. It must preserve the Q62 journal byte-for-byte, use create-new/fail-closed semantics for the fixed L43 root, establish the exact origin/identity/lock prerequisites needed by Q1, and discriminate state-unavailable causes without leaking sensitive material. No second Q1 preflight, Robinhood/Alpaca observation, review/place/cancel, Q63, or `FINAL_HOLDOUT` access is authorized by this handoff.
 
 ## RHC3 production order-scope admission
 

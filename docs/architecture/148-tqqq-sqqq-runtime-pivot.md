@@ -304,15 +304,20 @@ general `ops.ps1 admit` remains the required broad prepublication admission
 before the one atomic feature push. The user retains final local broad
 verification ownership unless repository admission itself requires it.
 
+## 148-A exact-source acceptance and integration
+
+Architecture 148-A is SOURCE/CERTIFICATION ACCEPTED and FAST-FORWARD INTEGRATED at `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`. Feature mapped FULL run `44411012023`, attempt 1, and develop run `44423510835`, attempt 1, are terminal SUCCESS. Develop reused exact feature certification with stable identity; no duplicate FULL ran.
+
+Independent exact-source review accepted the source-only runtime and confirmed that it exposes no executor/provider composition. The review preserves two explicit live-promotion blockers for later closure rather than weakening them: protective stop-market compatibility under the current tiny-live notional, and provider approval-ID linkage when an approval-originated order does not retain the original `ref_id`. No real provider/broker effect or production state preparation occurred.
+
+`ARCH148_A_CONNECTOR_INTEGRATION_MECHANISM_DEVIATION` records the connector-only non-force expected-old-SHA GitHub ref fast-forward used for this integration instead of the workflow-preferred admitted local `merge --ff-only` plus ordinary push. The exact accepted one-parent result and certification provenance were preserved.
+
 ## Subsequent milestones
 
-After 148-A exact-source acceptance/integration:
+After accepted/integrated 148-A:
 
-- 148-B: acquire and qualify, or prove an already-qualified, completed 5-minute
-  QQQ/TQQQ/SQQQ historical dataset using the existing custody/evidence patterns;
-  then backtest the fixed v1 regime/entry/exit/3% stop, compare against flat/QQQ
-  controls and record drawdown/whipsaw/turnover. Existing daily-only research
-  history is not sufficient evidence for these intraday rules;
+- 148-B1: source-only/fake-only 5-minute QQQ/TQQQ/SQQQ acquisition/custody and no-lookahead backtest contract, reusing existing evidence/holdout authority and selecting only an eligible pre-holdout range; no real provider call;
+- 148-B2: one separately reviewed read-only historical acquisition/qualification on accepted B1 source, followed by the deterministic baseline backtest against flat/QQQ controls with drawdown, whipsaw and turnover reporting. Existing daily-only research history is not sufficient evidence for these intraday rules;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;

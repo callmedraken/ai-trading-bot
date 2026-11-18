@@ -1,6 +1,6 @@
 # Architecture 148-A runtime parity matrix
 
-Status: **source-only implementation candidate; exact-source review pending**.
+Status: **SOURCE/CERTIFICATION ACCEPTED / FAST-FORWARD INTEGRATED**.
 
 This matrix records how the effect-free runtime in `src/trading_bot/live_runtime/`
 maps the reviewed application shape, accepted P6/L43 safety contracts and the
@@ -104,3 +104,11 @@ construction and help do not load a Robinhood session or expose an effect path.
 The focused checks do not qualify real market data, provider schema, live stop
 coverage, OAuth/session ownership, production storage or broker effects. Q63 was
 not run and `FINAL_HOLDOUT` remains sealed.
+
+## Exact-source acceptance
+
+Accepted source identity: `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`.
+
+Feature mapped FULL run `44411012023`, attempt 1, passed source-static, active tests, all seven canonical FULL lanes and source-gates. Develop run `44423510835`, attempt 1, passed with exact feature-certification reuse, stable identity and no duplicate FULL. Independent exact-source review accepted this parity mapping and its referenced implementation/tests. No provider or broker effect occurred.
+
+The whole-share protective-stop constraint and approval-originated order identity/linkage remain explicit later promotion blockers. Acceptance of 148-A grants neither production persistence nor live broker authority.

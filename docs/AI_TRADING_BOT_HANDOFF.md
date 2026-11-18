@@ -1,20 +1,38 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: Architecture 148 TQQQ/SQQQ application-runtime pivot
+## Current milestone: Architecture 148-A accepted/integrated; 148-B1 source-only next
 
 
 Current product authority is [Architecture 148](architecture/148-tqqq-sqqq-runtime-pivot.md). It replaces further L43 checkpoint accretion as the application architecture while retaining accepted Architecture-147 safety components as reusable infrastructure and historical evidence.
 
 V1 scope is fixed: intraday-only, long-only, at most one of TQQQ/SQQQ, QQQ as the primary direction reference, two completed-bar confirmation, no same-cycle inverse flip, and forced flat beginning five minutes before official regular-session close. The source-owned hard stop is 3.00% below the reconciled average entry fill and may never be widened. Live readiness requires proving exact full-position stop protection; a broker stop-market order is preferred and software independently treats threshold breach as mandatory EXIT.
 
-Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` (MIT). Adopt its simple cycle shape, not its direct `robin_stocks` credential path, generic write retry, prompt-only risk limits or non-durable order handling. 148-A must produce an explicit parity matrix against that repo, accepted P6/L43 components and current Robinhood MCP behavior before publication.
+Primary application reference: `siropkin/robinhood-ai-trading-bot@1a778749cfbe92c7ab9444b12e3cc73587533ade` (MIT). 148-A used its simple cycle shape as a reference while retaining the repository's stronger deterministic risk, MCP boundary and durable reconciliation contracts; its direct `robin_stocks` credential path, generic write retry, prompt-only risk limits and non-durable order handling were not adopted. The accepted parity matrix is `docs/validation/arch148-runtime-parity.md`.
 
-Next milestone is 148-A SOURCE_ONLY / FAKE_ONLY: market-regime model, desired-position planner, 3% stop policy, session/forced-flat policy, deterministic transition planner, complete fresh broker-fact protocols, durable intent/ref-id/protective-stop model, fakeable application cycle and GUI-facing status projection. No accepted L43/P6 source is deleted during 148-A. No real Robinhood/OAuth/browser/Alpaca/review/place/cancel or production state preparation is authorized.
+148-A is accepted/integrated at `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd` / tree `2e139bdd886ee6ce8f92da57cc11ea38f341114f`, parent `ec0f33b7c15521c1901d749d5a933564360448c7`. Feature mapped FULL `44411012023`, attempt 1, is SUCCESS. Develop `44423510835`, attempt 1, is SUCCESS with exact feature-certification reuse, stable identity and no duplicate FULL. Real provider calls and broker effects were zero.
+
+The next milestone is 148-B1 SOURCE_ONLY / FAKE_ONLY. It must reuse the existing historical acquisition/custody evidence patterns to define a completed 5-minute QQQ/TQQQ/SQQQ dataset contract and deterministic no-lookahead backtest for the frozen 148-A strategy. It must inspect existing final-holdout/custody authority and select only an eligible pre-holdout range; it must not open `FINAL_HOLDOUT` or perform a real Alpaca/Robinhood provider acquisition. B2 is the later separately reviewed read-only acquisition boundary.
+
+
+### Architecture 148-A accepted runtime identity
+
+- HEAD: `df48cdd40bcd18f2bfdc65dda201cfe2b6f199bd`
+- tree: `2e139bdd886ee6ce8f92da57cc11ea38f341114f`
+- direct parent: `ec0f33b7c15521c1901d749d5a933564360448c7`
+- feature mapped FULL: `44411012023`, attempt 1, terminal SUCCESS
+- develop source gate: `44423510835`, attempt 1, terminal SUCCESS
+- develop reuse: `DEVELOP_CERTIFICATION_REUSE=True / exact_feature_certification`
+- develop identity: `IDENTITY_STABLE=True`
+- duplicate develop FULL: NO
+- provider/broker effects during source work/review/integration: zero
+- live-promotion blockers retained: whole-share protective-stop compatibility under the <=$10 canary; approval-ID linkage for approval-originated provider orders
+
+`ARCH148_A_CONNECTOR_INTEGRATION_MECHANISM_DEVIATION` is preserved: ChatGPT used a leased non-force GitHub ref fast-forward for develop in the connector-only review turn instead of the preferred admitted local `merge --ff-only` + ordinary push. Exact accepted history/tree and develop reuse were preserved; do not treat this as the normal integration method.
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
 
-Current accepted/integrated executable identity:
+Preserved accepted/integrated L43-Q1 predecessor identity:
 - L43-Q1 HEAD: `05f4c4700f82c3d40c83f474c3cf614573d48091`
 - tree: `70aec1c51e63705a68d6710cc3448ac994227e46`
 - direct parent: `f38c3079d83f5e9773280fe36e43a4d9d9d3c76d`

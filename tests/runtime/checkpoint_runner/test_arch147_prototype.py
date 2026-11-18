@@ -122,16 +122,6 @@ _PRODUCTION_IMPORT_ALLOWLIST = {
             "trading_bot.robinhood_mcp.order_scope_evidence_admission",
             "load_order_scope_evidence_authority",
         ),
-        (
-            "from",
-            "trading_bot.robinhood_mcp._current_session",
-            "_open_robinhood_client",
-        ),
-        (
-            "from",
-            "trading_bot.robinhood_mcp.windows_oauth",
-            "create_windows_robinhood_oauth_factory",
-        ),
     },
 }
 _FORBIDDEN_PRODUCTION_IMPORTS = (
@@ -226,6 +216,42 @@ def test_arch147_guard_is_in_prepublication_admission_for_prototype_changes():
     )
 
     assert selected.count(guard) == 1
+
+
+def test_arch147_route_owned_changes_select_the_complete_owned_test_set():
+    composition_source = "src/trading_bot/robinhood_mcp/l43_production_composition.py"
+    runtime_source = "src/trading_bot/live_prototype/l43_runtime.py"
+    unrelated_source = "src/trading_bot/domain/unrelated.py"
+    composition_test = "tests/robinhood_mcp/test_l43_production_composition.py"
+    runtime_test = "tests/live_prototype/test_l43_runtime.py"
+    guard = "tests/runtime/checkpoint_runner/test_arch147_prototype.py"
+
+    selected = runner._prepublication_admission_tests(
+        (composition_source, runtime_source)
+    )
+    assert set(runner.ARCH147_PROTOTYPE_TESTS) <= set(selected)
+    assert selected.count(composition_test) == 1
+    assert selected.count(runtime_test) == 1
+    assert selected.count(guard) == 1
+
+    unrelated = runner._prepublication_admission_tests((unrelated_source,))
+    assert composition_test not in unrelated
+    assert runtime_test not in unrelated
+    assert guard not in unrelated
+
+    infrastructure = runner._prepublication_admission_tests(
+        ("scripts/checkpoint_runner.py",)
+    )
+    assert set(runner.PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS) <= set(
+        infrastructure
+    )
+
+    combined = runner._prepublication_admission_tests(
+        ("scripts/checkpoint_runner.py", composition_source)
+    )
+    assert set(runner.ARCH147_PROTOTYPE_TESTS) <= set(combined)
+    assert set(runner.PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS) <= set(combined)
+    assert len(combined) == len(set(combined))
 
 
 def test_l41_capability_family_is_prepublication_owned():

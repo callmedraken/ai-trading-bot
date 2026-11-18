@@ -109,16 +109,16 @@ def test_production_composition_is_inert_and_wires_normalized_read_dependencies(
         {"redirect_uri": composition.DEFAULT_ROBINHOOD_REDIRECT_URI}
     ]
 
-    source_values = iter(("8" * 40, "9" * 40))
-    monkeypatch.setattr(
-        composition,
-        "_git_output",
-        lambda _root, *_arguments: next(source_values),
-    )
-    assert built.dependencies.source_reader() == composition.L43SourceIdentity(
+    source_identity = composition.L43SourceIdentity(
         source_head="8" * 40,
         source_tree="9" * 40,
     )
+    monkeypatch.setattr(
+        composition,
+        "read_source_identity",
+        lambda _root: source_identity,
+    )
+    assert built.dependencies.source_reader() == source_identity
 
 
 def test_for_production_rejects_caller_selected_boundaries(tmp_path: Path):

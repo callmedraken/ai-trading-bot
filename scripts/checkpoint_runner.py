@@ -815,6 +815,16 @@ def _prepublication_requires_infrastructure_coherence(
     )
 
 
+def _prepublication_requires_arch147_prototype(
+    changed_paths: Sequence[str],
+) -> bool:
+    owned_paths = (*ARCH147_PROTOTYPE_RUFF, *ARCH147_PROTOTYPE_TESTS)
+    return any(
+        any(path == owned or path.startswith(owned + "/") for owned in owned_paths)
+        for path in changed_paths
+    )
+
+
 def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, ...]:
     tests = (
         (
@@ -824,19 +834,8 @@ def _prepublication_admission_tests(changed_paths: Sequence[str]) -> tuple[str, 
         if _prepublication_requires_infrastructure_coherence(changed_paths)
         else (*ARCH132_R3N_ADMISSION_TESTS,)
     )
-    if any(
-        path.startswith(("src/trading_bot/live_prototype/", "tests/live_prototype/"))
-        or path
-        in {
-            "scripts/arch147_l43_a3_source.py",
-            "tests/runtime/checkpoint_runner/test_arch147_prototype.py",
-            "src/trading_bot/robinhood_mcp/l43_read_adapter.py",
-            "src/trading_bot/robinhood_mcp/l43_transport.py",
-            "tests/robinhood_mcp/test_l43_transport.py",
-        }
-        for path in changed_paths
-    ):
-        tests = (*tests, "tests/runtime/checkpoint_runner/test_arch147_prototype.py")
+    if _prepublication_requires_arch147_prototype(changed_paths):
+        tests = (*tests, *ARCH147_PROTOTYPE_TESTS)
     return tuple(dict.fromkeys(tests))
 
 

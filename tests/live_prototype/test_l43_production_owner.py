@@ -373,6 +373,27 @@ def test_production_factory_rejects_caller_supplied_origin_or_path():
         )
 
 
+def test_read_source_identity_is_source_owned_and_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    values = {
+        "HEAD": _git("8"),
+        "HEAD^{tree}": _git("9"),
+    }
+    calls: list[tuple[str, ...]] = []
+
+    def fake_git_text(_root: Path, *arguments: str) -> str:
+        calls.append(arguments)
+        return values[arguments[-1]]
+
+    monkeypatch.setattr(l43_owner, "_git_text", fake_git_text)
+
+    assert l43_owner.read_source_identity(tmp_path) == L43SourceIdentity(
+        source_head=_git("8"), source_tree=_git("9")
+    )
+    assert calls == [("rev-parse", "HEAD"), ("rev-parse", "HEAD^{tree}")]
+
+
 def test_production_reader_rejects_alternate_ancestor_or_journal_origin():
     expected = _origin()
     reader = Q62ReadOnlyJournalReader(Path("unused"), expected)

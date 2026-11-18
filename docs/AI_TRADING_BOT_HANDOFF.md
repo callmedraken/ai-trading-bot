@@ -1,6 +1,6 @@
 # AI Trading Bot - Current Handoff
 
-## Current milestone: RHC4 C1 stop/effect-boundary correction
+## Current milestone: RHC4 C2 prepublication coverage and stale-current correction
 
 Canonical feature worktree: `F:\AI\worktrees\ai-trading-bot-live-prototype-current`.
 Branch: `feature/robinhood-live-prototype-current`.
@@ -27,8 +27,22 @@ tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. Its mapped FULL run
 rejected that source for `RHC4_STOP_EFFECT_BOUNDARY_RACE` and new direct
 coupling to private helpers. The run is terminal-green preserved evidence, not
 a failed CI result, and must not be rerun or rewritten. C1 is the bounded
-source-only/fake-only correction from parent `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` /
-tree `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`.
+source-only/fake-only correction from direct parent `2f4f50a1df44c261d172f55bc540b635d637cbd9` /
+tree `558e2f8c1f930d3f15810dea3f01a92ca20fdc24`. C1 is published at
+`f3f44e00ec17279ea74445df2b7a680875745f7b` / tree
+`8dac42fa7039bde8fdb6f6bdd63eeaf432cb049a`, directly from that parent.
+
+C1's mapped run `44192574584`, attempt 1, is preserved terminal FAILURE and
+was not retried, amended, rerun or relabeled. `source-static` passed;
+`active-tests` reported `1774 passed, 1 skipped, 1 failed`; broad-1 through
+broad-5 and broad-7 passed; broad-6 reported `2123 passed, 7 skipped, 1
+failed`; and `source-gates` failed. The exact failure was
+`tests/robinhood_mcp/test_l43_production_composition.py::test_production_composition_is_inert_and_wires_normalized_read_dependencies`,
+which still monkeypatched removed private seam `composition._git_output`.
+Local reproduction used fresh basetemp
+`F:\\AI\\temp\\pytest\\rhc4-c1-coverage-defect-42118041f5e04c18acc2a5c776a2e1dc`
+and failed one test in 0.44 seconds. Classification:
+`PREPUBLICATION_COVERAGE_DEFECT`.
 
 ## RHC3P accepted contract
 
@@ -69,8 +83,18 @@ RHC2 remains `CONSUMED / PASS / NO RETRY`.
 RHC3 remains accepted/integrated and its retained evidence remains immutable.
 The RHC4 source checkpoint adds a production L43 composition, an explicit restricted-live application service and launcher mode, and a serialized runtime lifecycle. The production exact-plan authorizer denies by default. Start/Stop control worker lifecycle only. C1 gives Stop and the transition into the one-way placement/review boundary one common ordering decision: a Stop that wins before the boundary blocks reservation/MAY/review/provider work, while a path that wins and durably reaches `MAY_HAVE_OCCURRED` or review-start is allowed to finish factual reconciliation/classification. An existing bound pending ENTRY/SELL is settled through read-only RHC3P convergence before a new effect is evaluated. Construction, import and help perform no provider action. The default research worker stays idle until a research source is separately supplied. The existing comparison-report worker can operate alongside restricted-live runtime.
 
-RHC4 C1 remains SOURCE_ONLY / FAKE_ONLY. The existing prototype route owns the mapped feature FULL. The corrective source is not yet published or independently accepted. No real Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for this source checkpoint. It does not grant effect authority or live readiness.
-Focused fake-only tests, current/historical authority, both source-context selections, whole-repository Ruff, and diff checks passed. Exact commands and basetemps are recorded in the [validation ledger](validation/arch147-live-prototype.md#rhc4-focused-and-pre-candidate-verification).
+RHC4 C2 remains SOURCE_ONLY / FAKE_ONLY. The current bounded correction is
+`ARCH147-RHC4-C2_PREPUBLICATION_COVERAGE_AND_STALE_CURRENT_CORRECTION`. It
+updates the stale composition test to `read_source_identity`, makes admission
+execute the complete deduplicated route-owned `ARCH147_PROTOTYPE_TESTS` set,
+and updates stale current seam/type/documentation references. No real
+Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred
+for this source checkpoint; provider and protected-effect counters are zero.
+It does not grant effect authority or live readiness.
+Focused fake-only tests, current/historical authority, both source-context
+selections, whole-repository Ruff, and diff checks are required before C2
+publication. Exact commands and basetemps are recorded in the [validation
+ledger](validation/arch147-live-prototype.md#rhc4-c2-prepublication-coverage-and-stale-current-correction).
 L43 protected qualification remains NOT_RUN.
 Q63 remains NOT_RUN.
 `FINAL_HOLDOUT` remains SEALED.
@@ -87,7 +111,18 @@ The checkpoint is prepared from the synchronized RHC3P baseline at `fdbdbb4fe887
 - keeps Start/Stop lifecycle distinct from effect authorization;
 - performs no real provider effect in the source checkpoint.
 
-The existing route requires `ops.ps1 admit` on the exact clean C1 source before its single ordinary corrective push. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
+The existing route requires `ops.ps1 admit` on the exact clean C2 source before its single ordinary corrective push. The corrected admission must execute the production-composition test and the complete route-owned prototype set, with FEATURE and PROSPECTIVE_DEVELOP PASS and stable identity. After push, the mapped feature FULL must reach terminal state. ChatGPT exact-source review and acceptance follows CI. L43 protected qualification remains NOT_RUN. Q63 remains NOT_RUN. `FINAL_HOLDOUT` remains SEALED. No protected execution is part of RHC4.
+
+The required public-reference cross-check was read-only and corroborating only:
+`EUGMsub/RobinhoodAgenticTrader` main `src/mcp_client.py` and `src/oauth.py`
+show lazy MCP initialization/session caching with `Mcp-Session-Id`, bounded
+401/404 recovery, and OAuth 2.1 + PKCE; `kevin1chun/robinhood-for-agents`
+main `src/server/official/forward.ts` and `docs/MODES.md` show a provider-owned
+lazy cached client for `https://agent.robinhood.com/mcp/trading`, provider-owned
+bearer injection, and application/provider separation. These repositories are
+implementation evidence only; C2 does not redesign our session lifetime or
+weaken source ownership, exact-plan authorization, durable MAY/UNKNOWN,
+no-retry, or protected-effect boundaries.
 
 ## RHC3 production order-scope admission
 

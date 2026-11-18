@@ -253,7 +253,7 @@ def _runtime(
         expected_source=source,
         source_reader=(lambda: source) if source_reader is None else source_reader,
         components_factory=(
-            (lambda _stop_requested: components)
+            (lambda _effect_boundary: components)
             if component_factory is None
             else component_factory
         ),
@@ -381,7 +381,7 @@ def test_source_mismatch_blocks_before_component_or_state_access():
     component_calls = 0
     state_calls = 0
 
-    def components(_stop_requested):
+    def components(_effect_boundary):
         nonlocal component_calls
         component_calls += 1
         raise AssertionError("source mismatch must precede composition")
@@ -405,7 +405,7 @@ def test_source_mismatch_blocks_before_component_or_state_access():
 def test_stopped_cycle_performs_no_composition_or_state_open():
     component_calls = 0
 
-    def components(_stop_requested):
+    def components(_effect_boundary):
         nonlocal component_calls
         component_calls += 1
         raise AssertionError("stopped cycle must not compose")
@@ -659,7 +659,7 @@ def test_operator_default_deny_blocks_qualified_entry_without_reservation_or_pla
     runtime = l43_runtime.L43Runtime(
         expected_source=_CURRENT,
         source_reader=lambda: _CURRENT,
-        components_factory=lambda _stop_requested: components,
+        components_factory=lambda _effect_boundary: components,
     )
 
     result = runtime.run_cycle(threading.Event())
@@ -693,7 +693,7 @@ def test_operator_default_deny_blocks_exact_owned_sell_review_before_review_call
     runtime = l43_runtime.L43Runtime(
         expected_source=_CURRENT,
         source_reader=lambda: _CURRENT,
-        components_factory=lambda _stop_requested: components,
+        components_factory=lambda _effect_boundary: components,
     )
 
     result = runtime.run_cycle(threading.Event())
@@ -971,7 +971,7 @@ def test_real_durable_pending_sell_settles_before_review_or_replacement(tmp_path
     runtime = l43_runtime.L43Runtime(
         expected_source=_CURRENT,
         source_reader=lambda: _CURRENT,
-        components_factory=lambda _stop_requested: components,
+        components_factory=lambda _effect_boundary: components,
     )
 
     result = runtime.run_cycle(threading.Event())
@@ -1087,7 +1087,7 @@ def test_runtime_settlement_read_failure_blocks_and_preserves_durable_pending_fa
     runtime = l43_runtime.L43Runtime(
         expected_source=_CURRENT,
         source_reader=lambda: _CURRENT,
-        components_factory=lambda _stop_requested: components,
+        components_factory=lambda _effect_boundary: components,
     )
 
     result = runtime.run_cycle(threading.Event())

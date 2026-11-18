@@ -12,7 +12,7 @@ import hashlib
 import json
 import re
 from collections.abc import Callable
-from contextlib import nullcontext
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -170,7 +170,7 @@ class L43ExactPlanAuthorizer(Protocol):
 class L43EffectBoundary(Protocol):
     """Serialize Stop against one new durable effect/review transition."""
 
-    def __call__(self) -> object: ...
+    def __call__(self) -> AbstractContextManager[bool]: ...
 
 
 class L43EffectReobserver(Protocol):
@@ -346,7 +346,7 @@ class L43EffectOperator:
         reobserver: L43EffectReobserver,
         reconciler: L43PostEffectReconciler,
         review_caller: L43NormalizedReviewCaller | None = None,
-        effect_boundary: Callable[[], object] | None = None,
+        effect_boundary: L43EffectBoundary | None = None,
     ) -> None:
         if not callable(session_factory):
             raise TypeError("state session factory must be injected")

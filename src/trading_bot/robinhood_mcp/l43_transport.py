@@ -193,8 +193,10 @@ class _L43PreparedCall:
 class L43RobinhoodTransport:
     """Injected-session L43 boundary with only review and placement methods.
 
-    Production credentials and production session construction deliberately
-    remain outside this module.
+    ``for_test`` accepts an injected fake session. ``for_production`` wires the
+    lazy provider-owned OAuth/session seam from ``current_live_transport``;
+    this module remains responsible for L43 schema validation and bounded
+    review/placement calls, not provider session implementation.
     """
 
     __slots__ = ("_session_factory", "_counts")

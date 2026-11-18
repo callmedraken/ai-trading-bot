@@ -3,11 +3,33 @@ from types import SimpleNamespace
 
 import pytest
 
+from trading_bot.robinhood_mcp import current_live_transport
 from trading_bot.robinhood_mcp.current_live_transport import (
     LIVE_TOOL_SURFACE,
     CurrentLiveTransportError,
     RobinhoodCurrentLiveTransport,
 )
+
+
+def test_open_robinhood_client_delegates_through_provider_owned_seam(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def oauth_factory():
+        return object()
+
+    expected = object()
+    calls: list[object] = []
+
+    monkeypatch.setattr(
+        current_live_transport,
+        "_open_robinhood_client",
+        lambda factory: calls.append(factory) or expected,
+    )
+
+    assert current_live_transport.open_robinhood_client(oauth_factory) is expected
+    assert calls == [oauth_factory]
+    with pytest.raises(TypeError, match="OAuth factory"):
+        current_live_transport.open_robinhood_client(object())  # type: ignore[arg-type]
 
 
 class _Session:

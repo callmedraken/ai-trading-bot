@@ -10,6 +10,18 @@ rejected the publication for `RHC4_STOP_EFFECT_BOUNDARY_RACE` and direct new
 coupling to private helpers. This run remains terminal-green evidence; it is
 not a failed CI result and is not rerun or rewritten.
 
+C1 was published at
+`f3f44e00ec17279ea74445df2b7a680875745f7b` / tree
+`8dac42fa7039bde8fdb6f6bdd63eeaf432cb049a`, directly from the first RHC4
+publication. Its mapped run `44192574584`, attempt 1, is preserved terminal
+FAILURE and was not retried, amended, rerun or relabeled. The deterministic
+failure was the stale monkeypatch of removed `composition._git_output` in
+`tests/robinhood_mcp/test_l43_production_composition.py::test_production_composition_is_inert_and_wires_normalized_read_dependencies`.
+The run is classified `PREPUBLICATION_COVERAGE_DEFECT`: the local admission
+did not execute the current ARCH147 route-owned prototype test set. C2 is the
+bounded source-only/fake-only correction; no provider or protected effects
+occurred.
+
 The C1 source-only/fake-only correction serializes Stop with the transition
 into the one-way ENTRY/SELL placement or nonplacing SELL-review boundary. The
 serialized decision has these semantics: Stop wins before the boundary and
@@ -28,6 +40,10 @@ session construction rather than importing private helpers into the runtime.
 Construction and import remain effect-free. L43 protected qualification
 remains NOT_RUN, Q63 remains NOT_RUN, and `FINAL_HOLDOUT` remains
 `SEALED`.
+
+C2 also makes the route-owned prototype test set part of prepublication
+admission and keeps the current public source-owned seams covered without
+redesigning provider session lifetime.
 
 The default research worker remains idle until a research source is separately
 supplied. The existing comparison-report worker remains available and can run

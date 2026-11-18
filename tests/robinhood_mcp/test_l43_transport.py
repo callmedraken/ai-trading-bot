@@ -32,7 +32,11 @@ from trading_bot.live_prototype.tiny_live_policy import (
     evaluate_exact_owned_sell_proposal,
     validate_normalized_sell_review,
 )
-from trading_bot.robinhood_mcp import l43_transport
+from trading_bot.robinhood_mcp import (
+    current_live_transport,
+    l43_transport,
+    windows_oauth,
+)
 from trading_bot.robinhood_mcp.l43_transport import (
     L43PlacementReceipt,
     L43ReviewStatus,
@@ -50,6 +54,36 @@ _IDENTITY = ReadinessIdentity(
 _BINDING = "e" * 64
 _OWNED = Decimal("0.123456")
 _AUTHORITY = "f" * 64
+
+
+def test_for_production_uses_public_provider_session_seam(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    def oauth_factory():
+        return object()
+
+    session_context = object()
+    oauth_calls: list[dict[str, str]] = []
+    session_calls: list[object] = []
+
+    monkeypatch.setattr(
+        windows_oauth,
+        "create_windows_robinhood_oauth_factory",
+        lambda **kwargs: oauth_calls.append(kwargs) or oauth_factory,
+    )
+    monkeypatch.setattr(
+        current_live_transport,
+        "open_robinhood_client",
+        lambda factory: session_calls.append(factory) or session_context,
+    )
+
+    transport = L43RobinhoodTransport.for_production(
+        redirect_uri="http://127.0.0.1:8765/callback"
+    )
+
+    assert oauth_calls == [{"redirect_uri": "http://127.0.0.1:8765/callback"}]
+    assert transport._session_factory() is session_context
+    assert session_calls == [oauth_factory]
 
 
 def _schemas(*, missing: tuple[str, str] | None = None, quantity_union=False):

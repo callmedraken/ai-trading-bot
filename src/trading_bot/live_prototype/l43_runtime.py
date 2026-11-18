@@ -12,7 +12,7 @@ import re
 import threading
 from collections.abc import Callable, Coroutine, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
@@ -158,7 +158,9 @@ class L43Runtime:
         *,
         expected_source: L43SourceIdentity,
         source_reader: Callable[[], L43SourceIdentity],
-        components_factory: Callable[[Callable[[], bool]], _RuntimeComponents],
+        components_factory: Callable[
+            [Callable[[], AbstractContextManager[bool]]], _RuntimeComponents
+        ],
     ) -> None:
         if type(expected_source) is not L43SourceIdentity:
             raise TypeError("runtime requires a pinned source identity")
@@ -541,7 +543,7 @@ def _production_components(
     repo_root: Path,
     expected_source: L43SourceIdentity,
     *,
-    effect_boundary: Callable[[], object],
+    effect_boundary: Callable[[], AbstractContextManager[bool]],
 ) -> _RuntimeComponents:
     """Load canonical prerequisites only after Start enters the first cycle."""
 

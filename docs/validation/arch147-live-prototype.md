@@ -1,6 +1,6 @@
 # Architecture 147 prototype task ledger and acceptance matrix
 
-## RHC4 C1 stop/effect-boundary serialization — SOURCE_ONLY / exact review correction
+## RHC4 C2 prepublication coverage and stale-current correction — SOURCE_ONLY / exact review correction
 
 The first RHC4 publication was
 `2f4f50a1df44c261d172f55bc540b635d637cbd9` / tree
@@ -10,7 +10,23 @@ terminal-green evidence. Exact-source review rejected that publication for
 `RHC4_STOP_EFFECT_BOUNDARY_RACE` and direct new coupling to private helpers;
 the run remains a successful CI result and was not rerun or rewritten.
 
-The C1 source checkpoint is prepared from synchronized baseline
+C1 was published at
+`f3f44e00ec17279ea74445df2b7a680875745f7b` / tree
+`8dac42fa7039bde8fdb6f6bdd63eeaf432cb049a`, directly from the first RHC4
+publication. Its mapped run `44192574584`, attempt 1, is preserved terminal
+FAILURE and was not retried, amended, rerun or relabeled. `source-static`
+passed; `active-tests` reported `1774 passed, 1 skipped, 1 failed`; broad-1
+through broad-5 and broad-7 passed; broad-6 reported `2123 passed, 7 skipped,
+1 failed`; and `source-gates` failed. The exact deterministic failure was
+`tests/robinhood_mcp/test_l43_production_composition.py::test_production_composition_is_inert_and_wires_normalized_read_dependencies`,
+because it still monkeypatched removed private consumer seam
+`composition._git_output`. Local reproduction used fresh basetemp
+`F:\\AI\\temp\\pytest\\rhc4-c1-coverage-defect-42118041f5e04c18acc2a5c776a2e1dc`
+and failed one test in 0.44 seconds. Classification:
+`PREPUBLICATION_COVERAGE_DEFECT`.
+
+The C2 source checkpoint is prepared from published C1, whose direct parent
+is the first RHC4 publication. The synchronized develop baseline remains
 `fdbdbb4fe887fa52b4733dc7cf544dfa45aaf7b0` / tree
 `3c2df33d5b4cb892c57404ea1daa29a73d12e3c2`. It extends the existing
 `arch147-live-prototype` feature source-gate route and its mapped FULL. No RHC4
@@ -34,14 +50,48 @@ and uses source-owned production state/source identity. The synthetic route
 remains separate.
 
 Focused verification, relevant source-authority/coherence tests and combined
-Ruff/diff checks are recorded below. The exact clean source must pass admission
-before push. Mapped feature FULL and independent acceptance remain pending.
-RHC4 is SOURCE_ONLY / FAKE_ONLY. No real
+Ruff/diff checks for C2 are recorded below. The exact clean source must pass
+admission before push; admission must execute the complete deduplicated
+`ARCH147_PROTOTYPE_TESTS` route-owned set, including the corrected production
+composition test. Mapped feature FULL and independent acceptance remain
+pending. RHC4 is SOURCE_ONLY / FAKE_ONLY. No real
 Robinhood/OAuth/browser/MCP/Alpaca/read/review/place/cancel action occurred for
 this source checkpoint. RHC2 remains CONSUMED / PASS / NO RETRY.
 RHC3/RHC3P and their retained evidence/contracts are unchanged.
 L43 protected qualification remains NOT_RUN, Q63 remains NOT_RUN, and
 `FINAL_HOLDOUT` remains SEALED.
+
+The C2 correction is bounded to the stale public-seam test, route-owned
+prepublication selection, current stale-boundary references, and direct
+fake-only seam coverage. Provider and protected-effect counters are zero.
+The preserved original RHC4 run `44181143712` remains terminal-green but
+exact-source-rejected evidence; the preserved C1 run `44192574584` remains
+terminal FAILURE evidence. Neither run is rerun or rewritten.
+
+### RHC4 C2 public-reference cross-check
+
+The required read-only corroborating survey inspected
+`EUGMsub/RobinhoodAgenticTrader` main `src/mcp_client.py` and `src/oauth.py`,
+which demonstrate lazy MCP initialization/session caching with
+`Mcp-Session-Id`, bounded session/token recovery, and OAuth 2.1 + PKCE. It
+also inspected `kevin1chun/robinhood-for-agents` main
+`src/server/official/forward.ts` and `docs/MODES.md`, which demonstrate a
+provider-owned lazy cached client for
+`https://agent.robinhood.com/mcp/trading`, provider-owned bearer injection,
+and separation of application orchestration from provider connection
+ownership. These are corroborating implementation patterns only; C2 does not
+redesign session lifetime or weaken repository safety boundaries.
+
+### RHC4 C2 prepublication coverage and stale-current correction
+
+C2 changes the production-composition test to use the public
+`read_source_identity` seam and makes a current ARCH147 prototype-owned change
+select the full deduplicated `ARCH147_PROTOTYPE_TESTS` set in addition to the
+normal and infrastructure-coherence gates. It also updates the production
+import guard, serialized effect-boundary type annotations, transport ownership
+documentation, and narrow source-owned fake-only seam tests. The accepted C1
+Stop/effect-boundary interlock and its deterministic Event/barrier tests are
+preserved unchanged semantically.
 
 ### RHC4 C1 focused verification
 

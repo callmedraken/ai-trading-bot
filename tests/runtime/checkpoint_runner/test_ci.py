@@ -1680,7 +1680,10 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
 ):
     base_tests = runner.ARCH132_R3N_ADMISSION_TESTS
     coherence_tests = runner.PREPUBLICATION_INFRASTRUCTURE_COHERENCE_TESTS
-    expected = (*base_tests, *coherence_tests)
+    expected = tuple(dict.fromkeys((*base_tests, *coherence_tests)))
+    expected_arch147 = tuple(
+        dict.fromkeys((*expected, *runner.ARCH147_PROTOTYPE_TESTS))
+    )
     assert runner._prepublication_admission_tests(("src/example.py",)) == base_tests
     assert (
         runner._prepublication_admission_tests(("docs/PROJECT_STATUS.md",))
@@ -1705,7 +1708,12 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
     )
     for path in required_paths:
         selected = runner._prepublication_admission_tests((path,))
-        assert selected == expected
+        expected_for_path = (
+            expected_arch147
+            if runner._prepublication_requires_arch147_prototype((path,))
+            else expected
+        )
+        assert selected == expected_for_path
         # The real Windows native regression below belongs to this required
         # module, so workflow/generator edits cannot omit it from admission.
         assert "tests/runtime/checkpoint_runner/test_ci.py" in selected
@@ -1740,7 +1748,7 @@ def test_prepublication_admission_selects_infrastructure_coherence_tests(
         repo_root=tmp_path, evidence_root=tmp_path / "evidence"
     )
     assert passed
-    assert captured["tests"] == expected
+    assert captured["tests"] == expected_arch147
 
 
 def _r3n_admission_fixture(monkeypatch):

@@ -308,8 +308,11 @@ verification ownership unless repository admission itself requires it.
 
 After 148-A exact-source acceptance/integration:
 
-- 148-B: backtest the fixed v1 regime/entry/exit/3% stop on retained historical
-  data, compare against flat/QQQ controls and record drawdown/whipsaw/turnover;
+- 148-B: acquire and qualify, or prove an already-qualified, completed 5-minute
+  QQQ/TQQQ/SQQQ historical dataset using the existing custody/evidence patterns;
+  then backtest the fixed v1 regime/entry/exit/3% stop, compare against flat/QQQ
+  controls and record drawdown/whipsaw/turnover. Existing daily-only research
+  history is not sufficient evidence for these intraday rules;
 - 148-C: desktop/demo integration and GUI status/control path;
 - 148-D: current Robinhood read-only parity/preflight using the new complete
   runtime dependency closure;
